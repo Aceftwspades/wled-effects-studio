@@ -190,6 +190,7 @@ def build_menus(app):
             dpg.add_menu_item(label="Selection frames...", callback=lambda: show_frames(app))
             dpg.add_menu_item(label="Appearance...", callback=lambda: show_appearance(app))
             dpg.add_menu_item(label="Device address...", callback=lambda: show_device(app))
+            dpg.add_menu_item(label="Usermods and features...", callback=lambda: show_usermods(app))
             dpg.add_menu_item(label="External editor command...", callback=lambda: show_editor(app))
             dpg.add_menu_item(label="Draw the cube on the GPU", check=True, default_value=app.gpu_cube, tag="menu_gpu",
                               callback=lambda s, a: app.set_gpu_cube(bool(a)))
@@ -290,6 +291,30 @@ def build_dialogs(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="OK", width=80, callback=lambda: _name_ok(app))
             dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("name_dialog"))
+    with dpg.window(tag="usermods_win", label="Usermods and features", show=False, width=720, height=600, no_collapse=True):
+        dpg.add_text("What the firmware carries, for this project. The features are the studio's own optional parts; "
+                     "the usermods are WLED's, from this tree's usermods/ folder - the environment's, and any you add. "
+                     "Unticked ones are left out of the build.", color=DIM, wrap=690)
+        dpg.add_text("FEATURES", color=ACCENT)
+        with dpg.child_window(tag="um_features", height=200, border=True):
+            pass
+        with dpg.group(horizontal=True):
+            dpg.add_text("USERMODS", color=ACCENT)
+            dpg.add_text("", tag="um_env", color=DIM)
+        with dpg.child_window(tag="um_rows", height=190, border=True):
+            pass
+        with dpg.group(horizontal=True):
+            dpg.add_combo([], tag="um_pick", width=260)
+            dpg.add_button(label="Add", callback=lambda: app.add_usermod(dpg.get_value("um_pick")))
+            dpg.add_button(label="Import a folder...", callback=lambda: dpg.show_item("um_dialog"))
+            dpg.add_button(label="Import a zip...", callback=lambda: dpg.show_item("um_zip_dialog"))
+        dpg.add_text("", tag="um_status", color=DIM, wrap=690)
+    with dpg.file_dialog(directory_selector=True, show=False, tag="um_dialog", width=620, height=420,
+                         callback=lambda s, a: app.import_usermod(a.get("file_path_name", ""))):
+        pass
+    with dpg.file_dialog(directory_selector=False, show=False, tag="um_zip_dialog", width=620, height=420,
+                         callback=lambda s, a: app.import_usermod(a.get("file_path_name", ""))):
+        dpg.add_file_extension(".zip", color=(120, 200, 120))
     with dpg.window(tag="confirm_dialog", label="Question", modal=True, show=False, no_resize=True, width=460, height=170, no_collapse=True):
         dpg.add_text("", tag="confirm_text", color=TEXT, wrap=440)
         with dpg.group(horizontal=True, tag="confirm_buttons"):
@@ -722,6 +747,7 @@ def build_flash_dialog(app):
         with dpg.group(horizontal=True):
             dpg.add_text("FEATURES", color=ACCENT)
             dpg.add_text("what the firmware carries - untick what this device has not, and the build is smaller", color=DIM)
+            dpg.add_button(label="Usermods...", small=True, callback=lambda: show_usermods(app))
         with dpg.child_window(tag="flash_features", height=232, border=True):
             pass
         with dpg.group(horizontal=True):
@@ -800,32 +826,70 @@ def refresh_flash(app):
         dpg.configure_item("flash_budget", color=DIM)
 
 
-def _feature_rows(app):
+def _feature_rows(app, parent="flash_features"):
     """The picker: a checkbox per optional part of the firmware, the audio
     choice, and under each what it brings and which nodes lean on it."""
-    if not dpg.does_item_exist("flash_features"):
+    if not dpg.does_item_exist(parent):
         return
     from native.nodedefs import NEEDS
     f = flash.features_of(app.project)
-    dpg.delete_item("flash_features", children_only=True)
+    dpg.delete_item(parent, children_only=True)
     for key, label, files, flag, what in flash.FEATURES:
-        with dpg.group(parent="flash_features"):
+        with dpg.group(parent=parent):
             with dpg.group(horizontal=True):
                 dpg.add_checkbox(label=label, default_value=bool(f.get(key)), user_data=key,
                                  callback=lambda s, a, u: app.set_feature(u, bool(a)))
                 dpg.add_text(files, color=DIM)
             nodes = sorted(n for n, need in NEEDS.items() if need == key)
             dpg.add_text("    " + what + (f" Nodes: {', '.join(nodes)}." if nodes else ""), color=DIM, wrap=660)
-    with dpg.group(parent="flash_features"):
+    with dpg.group(parent=parent):
         with dpg.group(horizontal=True):
             labels = [a[1] for a in flash.AUDIO]
             cur = next((a[1] for a in flash.AUDIO if a[0] == f["audio"]), labels[0])
-            dpg.add_combo(labels, default_value=cur, width=420, tag="flash_audio",
+            dpg.add_combo(labels, default_value=cur, width=420, tag=f"{parent}_audio",
                           callback=lambda s, v: app.set_feature("audio", next(a[0] for a in flash.AUDIO if a[1] == v)))
             dpg.add_text("audio", color=DIM)
         what = next(a[2] for a in flash.AUDIO if a[0] == f["audio"])
         nodes = sorted(n for n, need in NEEDS.items() if need == "audio")
         dpg.add_text("    " + what + f" Nodes: {', '.join(nodes)}.", color=DIM, wrap=660)
+
+
+def show_usermods(app):
+    refresh_usermods(app)
+    _centre("usermods_win", 720, 600)
+    dpg.show_item("usermods_win")
+
+
+def refresh_usermods(app):
+    """The manager's rows: the features (the same rows the flash dialog
+    has), then the usermods with their source and a line about each."""
+    if not dpg.does_item_exist("um_rows"):
+        return
+    _feature_rows(app, "um_features")
+    env = dpg.get_value("flash_env") if dpg.does_item_exist("flash_env") else ""
+    env = env or app.project.options.get("flash_env") or ""
+    dpg.set_value("um_env", f"the environment {env}'s, then this project's" if env else "choose an environment in the flash dialog to see its own")
+    rows = flash.usermod_rows(app.project, env)
+    dpg.delete_item("um_rows", children_only=True)
+    for name, on, source in rows:
+        with dpg.group(horizontal=True, parent="um_rows"):
+            dpg.add_checkbox(default_value=on, user_data=name, callback=lambda s, a, u: app.set_usermod(u, bool(a)))
+            dpg.add_text(name, color=TEXT if name not in flash.CORE else ACCENT)
+            dpg.add_text("(env)" if source == "env" else "(added)", color=DIM)
+            if source == "project" or name in flash.features_of(app.project)["usermods"]:
+                dpg.add_button(label="remove" if source == "project" else "as the env says", small=True, user_data=name,
+                               callback=lambda s, a, u: app.remove_usermod(u))
+            info = flash.usermod_info(name)
+            if info:
+                room = 58 - len(name)
+                dpg.add_text(info[:room] + ("..." if len(info) > room else ""), color=DIM)
+                with dpg.tooltip(dpg.last_item()):
+                    dpg.add_text(info, wrap=400)
+    if not rows:
+        dpg.add_text("none yet - add one below", parent="um_rows", color=DIM)
+    listed = {r[0] for r in rows}
+    dpg.configure_item("um_pick", items=[n for n in flash.usermod_dirs() if n not in listed])
+    refresh_flash(app)
 
 
 def show_flash(app):

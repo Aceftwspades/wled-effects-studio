@@ -91,7 +91,9 @@ Three routes, all under File > Project, all needing the device's address:
    board's partition. Under FEATURES untick what your device has not - the
    motion sensor, the knob and screen, slider memory - and choose the
    audio (with the waveform, stock, or none): the firmware gets smaller,
-   and the nodes that lean on a feature you left out say so.
+   and the nodes that lean on a feature you left out say so. Settings >
+   Usermods and features manages WLED's own usermods for the project as
+   well: tick, untick, add one from the tree, import a folder or zip.
 3. **Export** the usermod folder and zip for a build elsewhere. If the
    effects (or a graph bundle) need firmware not every WLED tree has -
    the IMU driver - the studio asks whether to include it; importing such

@@ -696,6 +696,14 @@ them within each group; ticked when done.
       simulated sound). A new project starts with no hardware ticked but
       audio; a project from before keeps everything, as it built.
 
+- [x] **Usermod manager** (Settings > Usermods and features; the flash
+      dialog's Usermods... button): the features above, then WLED's own
+      usermods - the environment's and any the project adds - each on or
+      off with a line about it; add one from this tree's usermods/ folder,
+      import a folder or a zip into it, remove one from the list (the
+      folder stays). Kept in the project's features as `usermods: {name:
+      on}`; the staged env's custom_usermods is the base env's list with
+      those changes on it (`flash.staged_usermods`).
 - [x] **Dependencies travel with the work** (`flash.DEPENDENCIES`,
       `requirements_of_graph`, `requirements_of_code`). Exporting a graph
       bundle whose nodes need firmware that is not every WLED tree's (the

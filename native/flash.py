@@ -233,10 +233,122 @@ def missing_features(project, keys):
 
 def features_of(project):
     f = dict(DEFAULTS)
-    f.update({k: v for k, v in (project.options.get("features") or {}).items() if k in f})
+    opts = project.options.get("features") or {}
+    f.update({k: v for k, v in opts.items() if k in f})
     if f["audio"] not in {a[0] for a in AUDIO}:
         f["audio"] = "pcm"
+    # the usermods the manager lists: {folder name: on}, over the env's own
+    f["usermods"] = {str(k): bool(v) for k, v in (opts.get("usermods") or {}).items()}
     return f
+
+
+# --- usermods: WLED's own, managed per project ---------------------------------------
+# Every folder under usermods/ is one; the environment names the ones it
+# builds (custom_usermods). The manager (Settings > Usermods) lets a project
+# add any from the tree, import one from a folder or a zip, turn one off
+# that the env would build, and drop one from its list. The staged env's
+# custom_usermods is the base env's list with the project's changes on it.
+UM_DIR = os.path.join(ROOT, "usermods")
+CORE = ("cube_fx", "audioreactive")            # the two the studio itself leans on
+
+
+def usermod_dirs():
+    """The usermod folders in this tree, by name."""
+    if not os.path.isdir(UM_DIR):
+        return []
+    out = []
+    for n in sorted(os.listdir(UM_DIR), key=str.lower):
+        p = os.path.join(UM_DIR, n)
+        if os.path.isdir(p) and (os.path.exists(os.path.join(p, "library.json"))
+                                 or any(f.endswith((".cpp", ".h")) for f in os.listdir(p))):
+            out.append(n)
+    return out
+
+
+def usermod_info(name):
+    """A line about a usermod: library.json's description, else the
+    README's first line of prose, else nothing."""
+    import json
+    p = os.path.join(UM_DIR, name)
+    try:
+        d = json.load(open(os.path.join(p, "library.json"), encoding="utf-8"))
+        if d.get("description"):
+            return str(d["description"]).strip()
+    except Exception:
+        pass
+    for rd in ("README.md", "readme.md", "README.txt"):
+        try:
+            for line in open(os.path.join(p, rd), encoding="utf-8", errors="replace"):
+                t = line.strip()
+                if t and not t.startswith(("#", "!", "[", "|", "-", "<", "```")):
+                    return t[:160]
+        except OSError:
+            continue
+    return ""
+
+
+def usermod_rows(project, base_env):
+    """What the manager shows: [(name, on, source)] - the env's own first,
+    then the project's additions; source is "env" or "project"."""
+    f = features_of(project)
+    base = usermods_of(base_env) if base_env else []
+    rows = []
+    for n in base:
+        rows.append((n, f["usermods"].get(n, True), "env"))
+    for n, on in f["usermods"].items():
+        if n not in base:
+            rows.append((n, on, "project"))
+    return rows
+
+
+def staged_usermods(project, base_env):
+    """The custom_usermods the studio's env gets."""
+    f = features_of(project)
+    mods = [m for m in usermods_of(base_env)]
+    for n, on in f["usermods"].items():
+        if on and n not in mods:
+            mods.append(n)
+        elif not on and n in mods:
+            mods.remove(n)
+    if f["audio"] == "none":
+        mods = [m for m in mods if m != "audioreactive"]
+    return mods
+
+
+def import_usermod(path):
+    """A usermod folder, or a zip of one, copied into this tree's
+    usermods/. Returns the folder name, or raises with the reason."""
+    import shutil, zipfile, tempfile
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        raise ValueError(f"no such path: {path}")
+    src = path
+    tmp = None
+    if os.path.isfile(path) and path.lower().endswith(".zip"):
+        tmp = tempfile.mkdtemp(prefix="studio_um_")
+        with zipfile.ZipFile(path) as z:
+            for m in z.namelist():
+                if m.startswith("/") or ".." in m:
+                    raise ValueError("the zip reaches outside its folder")
+            z.extractall(tmp)
+        kids = [k for k in os.listdir(tmp) if not k.startswith("__MACOSX")]
+        src = os.path.join(tmp, kids[0]) if len(kids) == 1 and os.path.isdir(os.path.join(tmp, kids[0])) else tmp
+    if not os.path.isdir(src):
+        raise ValueError("a usermod is a folder (or a zip of one)")
+    files = os.listdir(src)
+    if not (any(f.endswith((".cpp", ".h")) for f in files) or "library.json" in files):
+        raise ValueError("no .cpp, .h or library.json inside - not a usermod")
+    name = os.path.basename(path)[:-4] if path.lower().endswith(".zip") else os.path.basename(src)
+    name = "".join(c if (c.isalnum() or c in "_-+") else "_" for c in name) or "usermod"
+    dst = os.path.join(UM_DIR, name)
+    if os.path.abspath(src) == os.path.abspath(dst):
+        return name
+    if os.path.exists(dst):
+        raise ValueError(f"usermods/{name} exists already - remove it first, or add the existing one")
+    shutil.copytree(src, dst)
+    if tmp:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return name
 
 
 def feature_flags(project):
@@ -262,11 +374,12 @@ def stage(project, base_env, log, only=None):
     if os.path.isdir(dst):
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
-    mods = usermods_of(base_env)
-    feats = features_of(project)
-    if feats["audio"] == "none" and "audioreactive" in mods:
-        mods = [m for m in mods if m != "audioreactive"]
-        log("no audio: audioreactive left out of the environment")
+    mods = staged_usermods(project, base_env)
+    base = usermods_of(base_env)
+    added = [m for m in mods if m not in base]
+    dropped = [m for m in base if m not in mods]
+    if added or dropped:
+        log("usermods: " + ", ".join(["+" + m for m in added] + ["-" + m for m in dropped]))
     if "cube_fx" in mods:
         # The effects register through cube_fx's bank; a second copy of the
         # bank's usermod would be the same class twice.

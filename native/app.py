@@ -771,7 +771,49 @@ class App(Features):
         self.project.options["features"] = f
         self.project.save()
         self.gp.refresh_features()
-        chrome.refresh_flash(self)
+        chrome.refresh_usermods(self)
+
+    def set_usermod(self, name, on):
+        """The manager's checkbox: a usermod built or left out for this
+        project, whatever the environment says."""
+        from native import flash
+        f = flash.features_of(self.project)
+        f["usermods"][name] = bool(on)
+        self.project.options["features"] = f
+        self.project.save()
+        chrome.refresh_usermods(self)
+
+    def add_usermod(self, name):
+        """A usermod from this tree onto the project's list, on."""
+        from native import flash
+        if name not in flash.usermod_dirs():
+            self.gp.status(f"no usermods/{name} in this tree"); return
+        self.set_usermod(name, True)
+        self.gp.status(f"{name} added to the project's usermods")
+
+    def remove_usermod(self, name):
+        """Off the project's list (the folder stays in the tree); one the
+        environment builds goes back to the environment's say."""
+        from native import flash
+        f = flash.features_of(self.project)
+        f["usermods"].pop(name, None)
+        self.project.options["features"] = f
+        self.project.save()
+        chrome.refresh_usermods(self)
+        self.gp.status(f"{name} removed from the project's list")
+
+    def import_usermod(self, path):
+        """A folder or a zip from anywhere, into the tree and onto the list."""
+        from native import flash
+        try:
+            name = flash.import_usermod(path)
+        except Exception as e:
+            self.gp.status(f"could not import: {e}")
+            if dpg.does_item_exist("um_status"):
+                dpg.set_value("um_status", f"could not import: {e}")
+            return
+        self.set_usermod(name, True)
+        self.gp.status(f"imported usermods/{name}")
 
     def switch_project(self, path, create=False):
         path = project_path(path)
@@ -2322,7 +2364,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "device_dialog", "editor_dialog", "about_win",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "device_dialog", "editor_dialog", "about_win",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -2885,6 +2927,7 @@ def service_command(app):
                  "shortcuts": lambda: chrome.show_keys(app), "about": lambda: dpg.show_item("about_win"),
                  "search": app.search_nodes, "name_ok": lambda: chrome._name_ok(app),
                  "frames": lambda: chrome.show_frames(app), "flash": lambda: chrome.show_flash(app),
+                 "usermods": lambda: chrome.show_usermods(app),
                  "flash_start": lambda: chrome.start_flash(app)}[c["chrome"]]()
             if "flash_opts" in c:                       # test hook: {"env":..., "host":..., "build":..., "upload":...}
                 o = c["flash_opts"]
@@ -2965,6 +3008,10 @@ def service_command(app):
                     app.sec_move(*v)
             if "feature" in c:                          # test hook: [key, value] of the feature picker
                 app.set_feature(*c["feature"])
+            if "usermod" in c:                          # test hook: ["add"|"remove"|"on"|"off"|"import", name or path]
+                what, name = c["usermod"]
+                {"add": app.add_usermod, "remove": app.remove_usermod, "import": app.import_usermod,
+                 "on": lambda n: app.set_usermod(n, True), "off": lambda n: app.set_usermod(n, False)}[what](name)
             if "confirm" in c:                          # test hook: press button k of the open question box
                 chrome.confirm_pick(app, int(c["confirm"]))
             if "export_usermod" in c:                   # test hook: with or without the dependencies
