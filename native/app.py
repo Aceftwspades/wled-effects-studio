@@ -273,6 +273,7 @@ class App(Features):
         self._pane_target = None     # (slot, zone) under the pointer while dragging
         self.popouts = Popouts()     # views in windows of their own
         self._file_dialogs = None    # the file dialogs, found once for the frames' holes
+        self._glow_mouse = None      # the pointer last frame, to lead a dragged node's frame
         # the side panel's sections: their order, and which are folded
         secs = self.prefs.get("sections") or {}
         self.sec_order = [k for k in (secs.get("order") or []) if k in self.SECTIONS]
@@ -2356,7 +2357,7 @@ class App(Features):
 
     @staticmethod
     def _merge_boxes(boxes):
-        """Rectangles that overlap or touch, merged until none do."""
+        """Rectangles that overlap, merged until none do."""
         out = [tuple(b) for b in boxes]
         merged = True
         while merged and len(out) > 1:
@@ -2364,7 +2365,7 @@ class App(Features):
             for i in range(len(out)):
                 for j in range(i + 1, len(out)):
                     a, b = out[i], out[j]
-                    if not (b[2] < a[0] or b[0] > a[2] or b[3] < a[1] or b[1] > a[3]):
+                    if not (b[2] <= a[0] or b[0] >= a[2] or b[3] <= a[1] or b[1] >= a[3]):
                         out[i] = (min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]))
                         del out[j]
                         merged = True
@@ -2433,24 +2434,21 @@ class App(Features):
                     (x0, y0), (x1, y1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
                     if x1 > x0 and y1 > y0:          # the content rect; the node is a padding wider
                         boxes.append((x0 - pad, y0 - pad, x1 + pad, y1 + pad))
-                # Boxes that touch merge into one frame round the group;
-                # a frame that would cross a node NOT selected is left out
-                # (the node's own selected look stays) - a frame drawn over
-                # a clump of nodes reads as mess, not as a selection.
+                # A node's rectangle is last frame's; while it is being
+                # dragged the frame would trail it by a frame, so the mouse's
+                # movement since then is added - imnodes moves the selection
+                # by exactly that. Selected nodes are drawn on top, so
+                # nothing but a window ever covers their frames.
+                mx, my = dpg.get_mouse_pos(local=False)
+                if self.gp.dragging_nodes() and self._glow_mouse is not None:
+                    dx, dy = mx - self._glow_mouse[0], my - self._glow_mouse[1]
+                    boxes = [(x0 + dx, y0 + dy, x1 + dx, y1 + dy) for x0, y0, x1, y1 in boxes]
+                self._glow_mouse = (mx, my)
+                # boxes that overlap merge into one frame round the group
                 boxes = self._merge_boxes(boxes)
                 if len(boxes) > 3:
                     boxes = [(min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))]
-                others = []
-                for nid in self.gp.graph.nodes:
-                    if nid in sel or not dpg.does_item_exist(f"gnode_{nid}"):
-                        continue
-                    st = dpg.get_item_state(f"gnode_{nid}")
-                    (ox0, oy0), (ox1, oy1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
-                    if ox1 > ox0 and oy1 > oy0:
-                        others.append((ox0, oy0, ox1, oy1))
                 for x0, y0, x1, y1 in boxes:
-                    if any(not (ox1 <= x0 or ox0 >= x1 or oy1 <= y0 or oy0 >= y1) for ox0, oy0, ox1, oy1 in others):
-                        continue
                     # the node's corners are rounded 4 at this zoom; the frame's hug them
                     rects.append((x0, y0, x1, y1, clip, 1.0, "sel", self.gp.px(4) if len(boxes) == 1 and len(sel) == 1 else glow.RADIUS))
         # Every window that floats over the panes is a hole in the frames:

@@ -2006,6 +2006,7 @@ class GraphPanel:
             self.set_selection([])                     # a plain click elsewhere: the key selection is over
         # where every node is now: a node dragged onto a wire is spliced in on release
         self._press_pos = {nid: tuple(dpg.get_item_pos(f"gnode_{nid}")) for nid in self.graph.nodes if dpg.does_item_exist(f"gnode_{nid}")}
+        self._node_press = over is not None          # a press on a node: the drag that follows moves the selection
         self._drag_kind = None
         for (nid, kind, name), tag in self._pins.items():
             if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
@@ -2032,6 +2033,7 @@ class GraphPanel:
                 if dpg.does_item_exist(f"gnode_{fid}") and dpg.is_item_hovered(f"gnode_{fid}"):
                     self._sync_pos(); self.rebuild()
                     break
+        self._node_press = False
         if self._drag_type is None:
             if self.graph and self._press_pos:
                 moved = [nid for nid, p in self._press_pos.items()
@@ -2076,6 +2078,11 @@ class GraphPanel:
         else:
             self._pending = (frm[0], frm[1], t)
             self.show_add_menu((mx, my), only=self._consumers(t, limit=60))
+
+    def dragging_nodes(self):
+        """True while a press that began on a node is held: the selection
+        is moving with the pointer."""
+        return bool(getattr(self, "_node_press", False)) and dpg.is_mouse_button_down(dpg.mvMouseButton_Left)             and self._drag_type is None
 
     def _wire_to_body(self, frm, t, nid, kind):
         """A wire from `frm` dropped on node `nid`: the first free input that
