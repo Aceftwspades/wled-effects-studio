@@ -290,6 +290,10 @@ def build_dialogs(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="OK", width=80, callback=lambda: _name_ok(app))
             dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("name_dialog"))
+    with dpg.window(tag="confirm_dialog", label="Question", modal=True, show=False, no_resize=True, width=460, height=170, no_collapse=True):
+        dpg.add_text("", tag="confirm_text", color=TEXT, wrap=440)
+        with dpg.group(horizontal=True, tag="confirm_buttons"):
+            pass
     with dpg.window(tag="device_dialog", label="Device", modal=True, show=False, no_resize=True, width=380, height=140, no_collapse=True):
         dpg.add_text("the WLED device's address, for sending the ledmap", color=DIM)
         dpg.add_input_text(tag="device_host", hint="e.g. 192.168.1.50", width=-1,
@@ -381,6 +385,28 @@ def ask(app, title, prompt, default, cb):
     dpg.configure_item("name_dialog", pos=(max(0, vw // 2 - 180), max(0, vh // 3)))
     dpg.show_item("name_dialog")
     dpg.focus_item("name_input")
+
+
+def confirm(app, title, text, buttons):
+    """A question with up to three answers: buttons is [(label, callback or
+    None), ...]; the box closes on any of them."""
+    dpg.configure_item("confirm_dialog", label=title)
+    dpg.set_value("confirm_text", text)
+    dpg.delete_item("confirm_buttons", children_only=True)
+    app._confirm = [cb for _, cb in buttons]
+    for k, (label, cb) in enumerate(buttons):
+        dpg.add_button(label=label, parent="confirm_buttons", user_data=k, callback=lambda s, a, u: confirm_pick(app, u))
+    lines = max(2, len(text) // 58 + 1)
+    _centre("confirm_dialog", 460, 78 + 17 * lines)
+    dpg.configure_item("confirm_dialog", height=78 + 17 * lines)
+    dpg.show_item("confirm_dialog")
+
+
+def confirm_pick(app, k):
+    dpg.hide_item("confirm_dialog")
+    cbs, app._confirm = getattr(app, "_confirm", None) or [], None
+    if 0 <= k < len(cbs) and cbs[k]:
+        cbs[k]()
 
 
 def _name_ok(app):

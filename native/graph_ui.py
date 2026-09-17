@@ -2891,8 +2891,23 @@ class GraphPanel:
     # --- sharing a graph -----------------------------------------------------------------
     # One JSON with the graph and every sub-graph it reaches (and user nodes
     # it uses), so a graph can be handed to someone else's project.
-    def export_bundle(self):
+    def export_bundle(self, with_deps=None):
+        """The graph, its sub-graphs and user nodes as one file. A graph
+        leaning on a feature that is not every WLED tree's (the IMU driver)
+        asks whether to carry that firmware in the bundle too; `with_deps`
+        answers without asking (a test, or the box's button)."""
         if not self.graph:
+            return
+        from native import flash, chrome
+        req = flash.requirements_of_graph(self.graph, self.lib, self.resolve_sub)
+        ours = sorted(k for k in req if k in flash.DEPENDENCIES and not flash.DEPENDENCIES[k]["standard"])
+        if ours and with_deps is None:
+            what = ", ".join(flash.DEPENDENCIES[k]["label"] for k in ours)
+            chrome.confirm(self.app, "Export graph bundle",
+                           f"This graph uses nodes that need {what} - firmware that is not part of every WLED tree. "
+                           "Include those usermod files in the bundle, so whoever opens it can build?",
+                           [("Include them", lambda: self.export_bundle(True)),
+                            ("Just the graph", lambda: self.export_bundle(False)), ("Cancel", None)])
             return
         self.save()
         subs = {}
@@ -2913,13 +2928,18 @@ class GraphPanel:
                 p = os.path.join(udir, G._ident(n["type"]) + ".json")
                 if os.path.exists(p) and n["type"] not in user:
                     user[n["type"]] = json.load(open(p, encoding="utf-8"))
-        bundle = {"studio_graph": 1, "graph": self.graph.to_json(), "subgraphs": subs, "nodes": user}
+        bundle = {"studio_graph": 1, "graph": self.graph.to_json(), "subgraphs": subs, "nodes": user,
+                  "requires": sorted(req)}
+        if with_deps and ours:
+            bundle["usermods"] = flash.dependency_files(ours)
         out = os.path.join(self.app.project.path, "export")
         os.makedirs(out, exist_ok=True)
         path = os.path.join(out, os.path.splitext(self.file)[0] + ".graph.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(bundle, f, indent=1)
-        self.status(f"exported {os.path.basename(path)} ({len(subs)} sub-graph(s), {len(user)} user node(s))")
+        self.status(f"exported {os.path.basename(path)} ({len(subs)} sub-graph(s), {len(user)} user node(s)"
+                    + (f", {len(bundle.get('usermods', {}))} firmware file(s)" if with_deps and ours else "")
+                    + (f"; needs {', '.join(sorted(req))}" if req else "") + ")")
         return path
 
     def import_bundle(self, path):
@@ -2953,6 +2973,33 @@ class GraphPanel:
         self.refresh_lib()
         self.open(fname)
         self.status(f"imported {name} as {fname}")
+        self.check_requirements(b)
+
+    def check_requirements(self, bundle):
+        """An imported graph's needs against the project's features: what
+        the project leaves out is offered - turned on, and the bundled
+        firmware files installed where this tree lacks them."""
+        from native import flash, chrome
+        req = set(bundle.get("requires") or [])
+        if self.graph:
+            req |= flash.requirements_of_graph(self.graph, self.lib, self.resolve_sub)
+        missing = flash.missing_features(self.app.project, req)
+        if not missing:
+            return
+        files = bundle.get("usermods") or {}
+        what = ", ".join(flash.DEPENDENCIES.get(k, {}).get("label", k) for k in sorted(missing))
+        text = (f"This graph needs {what}, which this project's features leave out (Flash > Features). "
+                "Turn the feature on for this project"
+                + (f" and install the {len(files)} firmware file(s) the bundle carries, where this tree lacks them" if files else "")
+                + "?")
+
+        def enable():
+            written = flash.install_dependency_files(files)
+            for k in sorted(missing):
+                self.app.set_feature(k, "stock" if k == "audio" else True)
+            self.status(f"features on: {', '.join(sorted(missing))}" + (f"; installed {', '.join(written)}" if written else ""))
+        chrome.confirm(self.app, "This graph needs more than the project has", text,
+                       [("Turn on", enable), ("Leave as is", None)])
 
     # --- pin preview ---------------------------------------------------------------------
     # "Preview this output" builds the graph with that pin shown instead of

@@ -154,6 +154,83 @@ DEFAULTS = {"imu": True, "ui": True, "param_memory": True, "audio": "pcm"}      
 NEW_DEFAULTS = {"imu": False, "ui": False, "param_memory": True, "audio": "pcm"}  # a new project: no hardware assumed
 
 
+# What a feature is made of, for handing a graph or an effect to someone
+# else: the firmware files that are ours (bundled on export, installed on
+# import) and what the receiving tree must have anyway. `standard` marks
+# what every WLED tree carries, which is never bundled. A node's `needs`
+# names the feature; an effect's C++ betrays it by the helper it calls.
+DEPENDENCIES = {
+    "imu": {"label": "the IMU driver (MPU6050)", "files": ["usermods/cube_fx/ace_imu_mpu6050.cpp", "usermods/cube_fx/cube_fx_imu.h"],
+            "marker": "cfx_imu(", "standard": False,
+            "note": "registers itself as a usermod; needs the sensor on I2C and CFX_WITH_IMU=1 (the default)"},
+    "audio": {"label": "the audioreactive usermod", "files": [], "marker": "cfx_getAudioData(", "standard": True,
+              "note": "WLED's own audioreactive, in custom_usermods (the studio's PCM waveform patch is optional)"},
+}
+
+
+def requirements_of_graph(graph, lib, resolve=None):
+    """The features a graph's nodes lean on, sub-graphs included: a set of
+    keys from the library's `needs`."""
+    out, seen = set(), set()
+    def walk(g):
+        for n in g.nodes.values():
+            d = lib.get(n["type"])
+            if d and d.get("needs"):
+                out.add(d["needs"])
+            if n["type"].startswith("sub:") and resolve and n["type"] not in seen:
+                seen.add(n["type"])
+                sub = resolve(n["type"][4:])
+                if sub is not None:
+                    walk(sub)
+    walk(graph)
+    return out
+
+
+def requirements_of_code(text):
+    """The features a C++ effect calls on, by the helpers it uses."""
+    return {k for k, d in DEPENDENCIES.items() if d["marker"] and d["marker"] in text}
+
+
+def dependency_files(keys):
+    """{path relative to the WLED tree: text} for the bundled files of these features."""
+    out = {}
+    for k in keys:
+        for rel in DEPENDENCIES.get(k, {}).get("files", []):
+            p = os.path.join(ROOT, rel)
+            if os.path.exists(p):
+                out[rel] = open(p, encoding="utf-8", errors="replace").read()
+    return out
+
+
+def install_dependency_files(files):
+    """Bundled firmware files into this tree, where the tree lacks them.
+    Returns the paths written."""
+    written = []
+    for rel, text in (files or {}).items():
+        rel = rel.replace("\\", "/")
+        if not rel.startswith("usermods/") or ".." in rel:
+            continue                                    # only usermod sources, only under usermods/
+        p = os.path.join(ROOT, *rel.split("/"))
+        if os.path.exists(p):
+            continue
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "w", encoding="utf-8", newline="\n").write(text)
+        written.append(rel)
+    return written
+
+
+def missing_features(project, keys):
+    """Of these required features, the ones this project's picker leaves out."""
+    f = features_of(project)
+    out = set()
+    for k in keys:
+        if k == "audio" and f.get("audio") == "none":
+            out.add(k)
+        elif k != "audio" and f.get(k) is False:
+            out.add(k)
+    return out
+
+
 def features_of(project):
     f = dict(DEFAULTS)
     f.update({k: v for k, v in (project.options.get("features") or {}).items() if k in f})

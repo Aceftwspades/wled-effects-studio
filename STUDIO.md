@@ -696,6 +696,18 @@ them within each group; ticked when done.
       simulated sound). A new project starts with no hardware ticked but
       audio; a project from before keeps everything, as it built.
 
+- [x] **Dependencies travel with the work** (`flash.DEPENDENCIES`,
+      `requirements_of_graph`, `requirements_of_code`). Exporting a graph
+      bundle whose nodes need firmware that is not every WLED tree's (the
+      IMU driver) asks whether to carry those usermod files in the bundle
+      (`usermods` in the JSON; `requires` is always written); the usermod
+      export asks the same for effects that call on it (the files land in
+      the folder, the README gets a Needs section). Importing a bundle, or
+      dropping a .cpp effect, checks its needs against the project's
+      features and offers to turn them on - installing the bundled files
+      where this tree lacks them (only under usermods/, never over a file
+      that exists). Audio counts as standard: noted, never bundled.
+
 ### A self-contained app (on hold)
 
 The goal: one download that runs, for any WLED user, not a checkout of

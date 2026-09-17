@@ -45,6 +45,8 @@ STEPS = [
     ([{"layout": "both"}, {"arrangement": [["main", "cube"], ["side"]]}, {"pane_move": ["cube", "side", "top"]},
       {"pane_move": ["side", "main", "left"]}, {"pane_move": ["cube", "main", "centre"]}, {"layout": "graph"},
       {"layout": "edit"}, {"arrangement": [["main"], ["cube"], ["side"]]}], 2.5),
+    ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
+      {"graph_import": "projects/default/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),
     ([{"popout": ["net", True]}, {"layout": "both"}], 4.0),
     ([{"popout": ["cube", False]}, {"popout": ["net", False]}], 2.0),
@@ -69,6 +71,7 @@ def main():
     saved = open(project, encoding="utf-8").read() if os.path.exists(project) else None
     graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
     saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
+    before = set(os.listdir(os.path.join(ROOT, "projects", "default", "graphs")))
     with open(LOG, "w") as log:
         proc = subprocess.Popen([sys.executable, "-u", "-m", "native.app"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
     try:
@@ -84,6 +87,8 @@ def main():
             open(project, "w", encoding="utf-8").write(saved)
         if saved_graph is not None:
             open(graph, "w", encoding="utf-8").write(saved_graph)
+        for f in set(os.listdir(os.path.join(ROOT, "projects", "default", "graphs"))) - before:
+            os.remove(os.path.join(ROOT, "projects", "default", "graphs", f))     # the import's copy
     text = open(LOG, encoding="utf-8", errors="replace").read()
     bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l]
     if bad:

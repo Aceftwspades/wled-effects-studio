@@ -1364,9 +1364,28 @@ class App(Features):
         if dpg.does_item_exist("api_header"):
             dpg.set_value("api_header", True)
 
-    def export_usermod(self):
+    def export_usermod(self, with_deps=None):
+        """The usermod folder and zip. Effects calling on firmware that is
+        not every WLED tree's (the IMU driver) ask whether to put those
+        files in the folder too; with_deps answers without asking."""
+        from native import flash
         self.gp.regenerate(self.project.build_files())
-        msg = "exported to " + self.project.export()
+        req = set()
+        for f in self.project.build_files():
+            try:
+                req |= flash.requirements_of_code(open(self.project.effect_path(f), encoding="utf-8", errors="replace").read())
+            except OSError:
+                pass
+        ours = sorted(k for k in req if not flash.DEPENDENCIES[k]["standard"])
+        if ours and with_deps is None:
+            what = ", ".join(flash.DEPENDENCIES[k]["label"] for k in ours)
+            chrome.confirm(self, "Export usermod",
+                           f"The effects call on {what} - firmware that is not part of every WLED tree. "
+                           "Include those files in the usermod folder, so it builds anywhere?",
+                           [("Include them", lambda: self.export_usermod(True)),
+                            ("Just the effects", lambda: self.export_usermod(False)), ("Cancel", None)])
+            return
+        msg = "exported to " + self.project.export(deps=ours if with_deps else [], requires=sorted(req))
         dpg.set_value("edit_status", msg); self.gp.status(msg)
 
     def save_device(self):
@@ -2303,7 +2322,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "device_dialog", "editor_dialog", "about_win",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "device_dialog", "editor_dialog", "about_win",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -2946,6 +2965,10 @@ def service_command(app):
                     app.sec_move(*v)
             if "feature" in c:                          # test hook: [key, value] of the feature picker
                 app.set_feature(*c["feature"])
+            if "confirm" in c:                          # test hook: press button k of the open question box
+                chrome.confirm_pick(app, int(c["confirm"]))
+            if "export_usermod" in c:                   # test hook: with or without the dependencies
+                app.export_usermod(bool(c["export_usermod"]))
             if "popout" in c:                           # test hook: [view, on]
                 app.set_popout(*c["popout"])
             if "layout" in c:
@@ -2996,8 +3019,8 @@ def service_command(app):
                 app.new_project(c["project"])
             if c.get("screenshot"):
                 app.shot_req = True
-            if "graph_export" in c:
-                app.gp.export_bundle()
+            if "graph_export" in c:                     # test hook: True / False answers the dependencies question
+                app.gp.export_bundle(c["graph_export"] if isinstance(c["graph_export"], bool) else None)
             if "graph_import" in c:
                 app.gp.import_bundle(c["graph_import"])
             if "meta" in c:

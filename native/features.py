@@ -58,6 +58,20 @@ class Features:
             return
         for path in drop.take():
             self.take_file(path)
+    def check_code_requirements(self, text):
+        """A C++ effect's needs, by the helpers it calls, against the
+        project's features."""
+        from native import flash
+        missing = flash.missing_features(self.project, flash.requirements_of_code(text))
+        if not missing:
+            return
+        what = ", ".join(flash.DEPENDENCIES[k]["label"] for k in sorted(missing))
+        chrome.confirm(self, "This effect needs more than the project has",
+                       f"This effect calls on {what}, which this project's features leave out (Flash > Features). "
+                       "Turn the feature on for this project?",
+                       [("Turn on", lambda: [self.set_feature(k, "stock" if k == "audio" else True) for k in sorted(missing)]),
+                        ("Leave as is", None)])
+
     def take_file(self, path):
         """A file from the desktop: a graph or bundle opens in the graph pane,
         a .cpp becomes a code effect, an image an Image node in the graph,
@@ -75,8 +89,10 @@ class Features:
             stem = fname[:-4]
             while fname in self.project.effect_files():
                 fname = f"{stem}_{n}.cpp"; n += 1
-            self.project.write_effect(fname, open(path, encoding="utf-8", errors="replace").read())
+            text = open(path, encoding="utf-8", errors="replace").read()
+            self.project.write_effect(fname, text)
             self.open_code(fname)
+            self.check_code_requirements(text)
         elif kind == "image":
             adir = os.path.join(self.project.path, "assets")
             os.makedirs(adir, exist_ok=True)

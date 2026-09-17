@@ -255,9 +255,11 @@ class Project:
             return fname
 
     # --- export ---------------------------------------------------------------------
-    def export(self, files=None):
+    def export(self, files=None, deps=(), requires=()):
         """ledmap.json for the geometry and a usermod folder with the effects
-        (the list, or the `files` given). Returns the export directory."""
+        (the list, or the `files` given); `deps` names the features whose
+        firmware files go in the folder too, `requires` what the README
+        says the effects need. Returns the export directory."""
         out = os.path.join(self.path, "export")
         with open(os.path.join(out, "ledmap.json"), "w", encoding="utf-8") as f:
             json.dump(self.geometry.ledmap(), f)
@@ -275,6 +277,15 @@ class Project:
             src = os.path.join(ROOT, "usermods", "cube_fx", h)
             if os.path.exists(src):
                 shutil.copyfile(src, os.path.join(um, h))
+        # the firmware behind a feature the effects need, when asked for
+        from native.flash import DEPENDENCIES
+        dep_files = []
+        for k in deps:
+            for rel in DEPENDENCIES.get(k, {}).get("files", []):
+                src = os.path.join(ROOT, rel)
+                if os.path.exists(src):
+                    shutil.copyfile(src, os.path.join(um, os.path.basename(rel)))
+                    dep_files.append(os.path.basename(rel))
         with open(os.path.join(um, "library.json"), "w", encoding="utf-8") as f:
             json.dump({"name": "usermod_studio", "version": "1.0.0",
                        "description": "Effects written in the WLED Effects Studio",
@@ -285,7 +296,11 @@ class Project:
             f.write("# Studio export\n\n"
                     f"Effects written in the WLED Effects Studio for: {g.describe()}.\n\n"
                     "## Effects\n\n" + "".join(f"- {t}\n" for t in titles) + "\n"
-                    "## Building\n\n"
+                    + ("## Needs\n\n" + "".join(f"- {DEPENDENCIES[k]['label']}: {DEPENDENCIES[k]['note']}\n" for k in requires if k in DEPENDENCIES)
+                       + (f"\nIncluded here: {', '.join(dep_files)}.\n" if dep_files else
+                          "\nNot included here: build against a tree that has them, or export again with them.\n" if any(not DEPENDENCIES[k]["standard"] for k in requires if k in DEPENDENCIES) else "")
+                       + "\n" if requires else "")
+                    + "## Building\n\n"
                     "1. Copy this folder into `usermods/` of a WLED source tree (0.15 / 16.x).\n"
                     "2. Add it to the build: in `platformio_override.ini`, under your environment,\n"
                     "   `custom_usermods = usermod_studio` (append to the list if there is one).\n"
