@@ -273,6 +273,7 @@ class App(Features):
         self._pane_target = None     # (slot, zone) under the pointer while dragging
         self.popouts = Popouts()     # views in windows of their own
         self._file_dialogs = None    # the file dialogs, found once for the frames' holes
+        self._menus = None           # every menu, found once: an open one is a hole too
         self._glow_mouse = None      # the pointer last frame, to lead a dragged node's frame
         # the side panel's sections: their order, and which are folded
         secs = self.prefs.get("sections") or {}
@@ -2459,6 +2460,30 @@ class App(Features):
         if self._file_dialogs is None:
             self._file_dialogs = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("mvFileDialog")]
         tags = [w for w in dpg.get_windows() if dpg.get_item_alias(w) != "root"] + self._file_dialogs + list(self.FLOATING)
+        # An open menu is an ImGui popup, not a window: it is found by its
+        # items being visible, and its box is theirs plus the padding.
+        if self._menus is None or any(not dpg.does_item_exist(m) for m in self._menus):
+            self._menus = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]
+        # An open menu reports its popup's size (closed, zero) and its own
+        # label's position: a top menu's popup hangs under the menu bar at
+        # that x, a submenu's opens to the right of its parent's popup at
+        # the item's height. Menus come parents first, so a parent's box is
+        # known by the time its child is looked at.
+        bar_bottom = (dpg.get_item_rect_min("toolbar")[1] - 8) if dpg.does_item_exist("toolbar") else 24
+        boxes = {}
+        for m in self._menus:
+            st = dpg.get_item_state(m)
+            w, h = st.get("rect_size") or (0, 0)
+            if w <= 0 or h <= 0:
+                continue
+            px, py = st.get("pos") or (0, 0)
+            parent = boxes.get(dpg.get_item_parent(m))
+            if parent is None:
+                x0, y0 = px - 2, bar_bottom
+            else:
+                x0, y0 = parent[2] - 8, parent[1] + py - 6
+            boxes[m] = (x0, y0, x0 + w, y0 + h)
+            holes.append((x0 - 2, y0 - 2, x0 + w + 2, y0 + h + 2))
         for tag in tags:
             if dpg.does_item_exist(tag) and dpg.is_item_shown(tag):
                 st = dpg.get_item_state(tag)
@@ -3055,6 +3080,27 @@ def service_command(app):
                 what, name = c["usermod"]
                 {"add": app.add_usermod, "remove": app.remove_usermod, "import": app.import_usermod,
                  "on": lambda n: app.set_usermod(n, True), "off": lambda n: app.set_usermod(n, False)}[what](name)
+            if "click" in c and os.name == "nt":        # test hook: a real click at viewport [x, y] (menus need one)
+                import ctypes
+                u32 = ctypes.windll.user32
+                hwnd = u32.FindWindowW(None, "WLED Effects Studio")
+                if hwnd:
+                    u32.SetForegroundWindow(hwnd)
+                    r = ctypes.wintypes.RECT() if hasattr(ctypes, "wintypes") else None
+                    import ctypes.wintypes as wt
+                    pt = wt.POINT(0, 0); u32.ClientToScreen(hwnd, ctypes.byref(pt))
+                    x, y = int(pt.x + c["click"][0]), int(pt.y + c["click"][1])
+                else:
+                    vx, vy = dpg.get_viewport_pos()
+                    x, y = int(vx + c["click"][0]), int(vy + c["click"][1])
+                u32.SetCursorPos(x, y)
+                u32.mouse_event(2, 0, 0, 0, 0); u32.mouse_event(4, 0, 0, 0, 0)
+                print("click at", x, y, "hwnd", hwnd)
+            if "menus" in c:                            # test hook: every menu's state (an open one shows)
+                for m in [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]:
+                    st = dpg.get_item_state(m)
+                    kids = dpg.get_item_children(m, 1) or []
+                    print("menu", dpg.get_item_configuration(m).get("label"), st, "first child", dpg.get_item_state(kids[0]) if kids else None)
             if "confirm" in c:                          # test hook: press button k of the open question box
                 chrome.confirm_pick(app, int(c["confirm"]))
             if "export_usermod" in c:                   # test hook: with or without the dependencies
