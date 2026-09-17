@@ -1115,6 +1115,12 @@ class GraphPanel:
         for a, out, b, inp in self.graph.links:
             self._make_link(a, out, b, inp)
         self._mark_problems()
+        # imnodes keeps its selection as slots in its node pool, and the
+        # pool hands freed slots to the new nodes - so after a rebuild its
+        # "selected" would be whichever nodes landed in those slots. It is
+        # cleared; the selection lives on in ext_sel.
+        dpg.clear_selected_nodes("node_editor")
+        dpg.clear_selected_links("node_editor")
         self._ext_last = {n: tuple(dpg.get_item_pos(f"gnode_{n}")) for n in self.ext_sel if dpg.does_item_exist(f"gnode_{n}")}
         self._focus_sel = None
 
