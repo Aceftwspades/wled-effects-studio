@@ -272,6 +272,7 @@ class App(Features):
         self._pane_drag = None       # the slot whose grip is being dragged
         self._pane_target = None     # (slot, zone) under the pointer while dragging
         self.popouts = Popouts()     # views in windows of their own
+        self._file_dialogs = None    # the file dialogs, found once for the frames' holes
         # the side panel's sections: their order, and which are folded
         secs = self.prefs.get("sections") or {}
         self.sec_order = [k for k in (secs.get("order") or []) if k in self.SECTIONS]
@@ -2431,11 +2432,21 @@ class App(Features):
                         continue
                     # the node's corners are rounded 4 at this zoom; the frame's hug them
                     rects.append((x0, y0, x1, y1, clip, 1.0, "sel", self.gp.px(4) if len(boxes) == 1 and len(sel) == 1 else glow.RADIUS))
-        # Every window that floats over the panes is a hole in the frames.
+        # Every window that floats over the panes is a hole in the frames:
+        # every Dear PyGui window but the root (asked for each time, so a
+        # dialog added later is covered), the file dialogs (found once),
+        # and the FLOATING list for anything else.
         holes = []
-        for tag in self.FLOATING:
+        if self._file_dialogs is None:
+            self._file_dialogs = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("mvFileDialog")]
+        tags = [w for w in dpg.get_windows() if dpg.get_item_alias(w) != "root"] + self._file_dialogs + list(self.FLOATING)
+        for tag in tags:
             if dpg.does_item_exist(tag) and dpg.is_item_shown(tag):
-                w, h = dpg.get_item_rect_size(tag)
+                st = dpg.get_item_state(tag)
+                w, h = st.get("rect_size") or (0, 0)
+                if w <= 0 or h <= 0:
+                    cfg = dpg.get_item_configuration(tag)      # a window not yet measured: its set size
+                    w, h = cfg.get("width") or 0, cfg.get("height") or 0
                 if w > 0 and h > 0:
                     x, y = dpg.get_item_pos(tag)
                     holes.append((x - 1, y - 1, x + w + 1, y + h + 1))
