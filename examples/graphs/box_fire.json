@@ -1,0 +1,636 @@
+{
+ "name": "Box Fire",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Rise",
+    "default": 128
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Heat",
+    "default": 170
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Custom 1",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Flicker",
+    "default": 128
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Check 1",
+   "pos": [
+    40,
+    430
+   ],
+   "params": {
+    "label": "Bass flare",
+    "default": true
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Audio",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Time",
+   "pos": [
+    40,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    820
+   ],
+   "params": {
+    "palette": 35,
+    "dimensions": "both",
+    "audio": "frequency",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Cube ring",
+   "pos": [
+    270,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Remap",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.012,
+    "out_hi": 0.05
+   },
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Add",
+   "pos": [
+    500,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Multiply",
+   "pos": [
+    270,
+    690
+   ],
+   "params": {},
+   "inputs": {
+    "b": 2.0
+   }
+  },
+  {
+   "id": 12,
+   "type": "Noise",
+   "pos": [
+    500,
+    690
+   ],
+   "params": {
+    "octaves": 1,
+    "roughness": 0.5
+   },
+   "inputs": {
+    "scale": 6.0
+   }
+  },
+  {
+   "id": 13,
+   "type": "Subtract",
+   "pos": [
+    730,
+    690
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 14,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 0.05
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Multiply",
+   "pos": [
+    960,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Add",
+   "pos": [
+    730,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Ring to uv",
+   "pos": [
+    960,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Field",
+   "pos": [
+    1190,
+    560
+   ],
+   "params": {
+    "field": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.86,
+    "out_hi": 0.975
+   },
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Multiply",
+   "pos": [
+    1420,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 21,
+   "type": "Multiply",
+   "pos": [
+    270,
+    820
+   ],
+   "params": {},
+   "inputs": {
+    "b": 4.0
+   }
+  },
+  {
+   "id": 22,
+   "type": "Noise",
+   "pos": [
+    500,
+    820
+   ],
+   "params": {
+    "octaves": 1,
+    "roughness": 0.5
+   },
+   "inputs": {
+    "y": 0.3,
+    "scale": 8.0
+   }
+  },
+  {
+   "id": 23,
+   "type": "Multiply",
+   "pos": [
+    500,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.5
+   }
+  },
+  {
+   "id": 24,
+   "type": "Select",
+   "pos": [
+    730,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0
+   }
+  },
+  {
+   "id": 25,
+   "type": "Add",
+   "pos": [
+    960,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.8
+   }
+  },
+  {
+   "id": 26,
+   "type": "Multiply",
+   "pos": [
+    1190,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 27,
+   "type": "Smoothstep",
+   "pos": [
+    1190,
+    950
+   ],
+   "params": {
+    "e0": 0.9,
+    "e1": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 28,
+   "type": "Multiply",
+   "pos": [
+    1420,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 29,
+   "type": "Max",
+   "pos": [
+    1650,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 30,
+   "type": "Field write",
+   "pos": [
+    1880,
+    820
+   ],
+   "params": {
+    "field": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 31,
+   "type": "Smoothstep",
+   "pos": [
+    1880,
+    560
+   ],
+   "params": {
+    "e0": 0.02,
+    "e1": 0.3
+   },
+   "inputs": {}
+  },
+  {
+   "id": 32,
+   "type": "Palette",
+   "pos": [
+    2110,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 33,
+   "type": "Output",
+   "pos": [
+    2340,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   9,
+   "x"
+  ],
+  [
+   8,
+   "depth",
+   10,
+   "a"
+  ],
+  [
+   9,
+   "result",
+   10,
+   "b"
+  ],
+  [
+   6,
+   "t",
+   11,
+   "a"
+  ],
+  [
+   8,
+   "around",
+   12,
+   "x"
+  ],
+  [
+   8,
+   "depth",
+   12,
+   "y"
+  ],
+  [
+   11,
+   "result",
+   12,
+   "z"
+  ],
+  [
+   12,
+   "value",
+   13,
+   "a"
+  ],
+  [
+   3,
+   "value",
+   14,
+   "x"
+  ],
+  [
+   13,
+   "result",
+   15,
+   "a"
+  ],
+  [
+   14,
+   "result",
+   15,
+   "b"
+  ],
+  [
+   8,
+   "around",
+   16,
+   "a"
+  ],
+  [
+   15,
+   "result",
+   16,
+   "b"
+  ],
+  [
+   16,
+   "result",
+   17,
+   "around"
+  ],
+  [
+   10,
+   "result",
+   17,
+   "depth"
+  ],
+  [
+   17,
+   "u",
+   18,
+   "u"
+  ],
+  [
+   17,
+   "v",
+   18,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   19,
+   "x"
+  ],
+  [
+   18,
+   "value",
+   20,
+   "a"
+  ],
+  [
+   19,
+   "result",
+   20,
+   "b"
+  ],
+  [
+   6,
+   "t",
+   21,
+   "a"
+  ],
+  [
+   8,
+   "around",
+   22,
+   "x"
+  ],
+  [
+   21,
+   "result",
+   22,
+   "z"
+  ],
+  [
+   5,
+   "bass",
+   23,
+   "a"
+  ],
+  [
+   4,
+   "on",
+   24,
+   "on"
+  ],
+  [
+   23,
+   "result",
+   24,
+   "b"
+  ],
+  [
+   24,
+   "result",
+   25,
+   "b"
+  ],
+  [
+   22,
+   "value",
+   26,
+   "a"
+  ],
+  [
+   25,
+   "result",
+   26,
+   "b"
+  ],
+  [
+   8,
+   "depth",
+   27,
+   "x"
+  ],
+  [
+   26,
+   "result",
+   28,
+   "a"
+  ],
+  [
+   27,
+   "result",
+   28,
+   "b"
+  ],
+  [
+   20,
+   "result",
+   29,
+   "a"
+  ],
+  [
+   28,
+   "result",
+   29,
+   "b"
+  ],
+  [
+   29,
+   "result",
+   30,
+   "value"
+  ],
+  [
+   29,
+   "result",
+   31,
+   "x"
+  ],
+  [
+   29,
+   "result",
+   32,
+   "index"
+  ],
+  [
+   31,
+   "result",
+   32,
+   "brightness"
+  ],
+  [
+   32,
+   "color",
+   33,
+   "color"
+  ]
+ ]
+}

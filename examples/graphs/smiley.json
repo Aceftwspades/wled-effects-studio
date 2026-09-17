@@ -1,0 +1,76 @@
+{
+ "name": "Smiley",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "palette": 11,
+    "dimensions": "2-D",
+    "audio": "none",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Cube face",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Image",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "file": "assets/smiley.png",
+    "width": 16,
+    "height": 16,
+    "colours": 6,
+    "alpha_clear": true
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Output",
+   "pos": [
+    500,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   2,
+   "a",
+   3,
+   "u"
+  ],
+  [
+   2,
+   "b",
+   3,
+   "v"
+  ],
+  [
+   3,
+   "color",
+   4,
+   "color"
+  ]
+ ]
+}

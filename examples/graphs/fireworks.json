@@ -1,0 +1,502 @@
+{
+ "name": "Fireworks",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Launch speed",
+    "default": 140
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Burst size",
+    "default": 150
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Custom 1",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Gravity",
+    "default": 120
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Custom 2",
+   "pos": [
+    40,
+    430
+   ],
+   "params": {
+    "label": "Trail",
+    "default": 150
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Check 1",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {
+    "label": "Bursts on the beat",
+    "default": true
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Audio",
+   "pos": [
+    40,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    820
+   ],
+   "params": {
+    "palette": 11,
+    "dimensions": "both",
+    "audio": "frequency",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Position",
+   "pos": [
+    270,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Loudest bin",
+   "pos": [
+    270,
+    690
+   ],
+   "params": {
+    "from": 1,
+    "to": 15
+   },
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Select",
+   "pos": [
+    270,
+    560
+   ],
+   "params": {},
+   "inputs": {
+    "a": false,
+    "b": true
+   }
+  },
+  {
+   "id": 11,
+   "type": "Multiply",
+   "pos": [
+    500,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 3.0,
+    "out_hi": 24.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Remap",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.4,
+    "out_hi": 2.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": -0.2,
+    "out_hi": -3.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Vector",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "x": 0.0,
+    "y": 0.0
+   }
+  },
+  {
+   "id": 16,
+   "type": "Particles",
+   "pos": [
+    730,
+    430
+   ],
+   "params": {
+    "max": 48,
+    "random_pos": false,
+    "on_surface": true,
+    "floor": "die"
+   },
+   "inputs": {
+    "rate": 2.0,
+    "pos": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "velocity": [
+     0.0,
+     0.0,
+     0.3
+    ],
+    "drag": 0.3,
+    "life": 2.5
+   }
+  },
+  {
+   "id": 17,
+   "type": "Sprites",
+   "pos": [
+    960,
+    690
+   ],
+   "params": {
+    "falloff": "soft"
+   },
+   "inputs": {
+    "size": 0.3
+   }
+  },
+  {
+   "id": 18,
+   "type": "Subtract",
+   "pos": [
+    1190,
+    820
+   ],
+   "params": {},
+   "inputs": {
+    "a": 1.0
+   }
+  },
+  {
+   "id": 19,
+   "type": "Smoothstep",
+   "pos": [
+    1190,
+    690
+   ],
+   "params": {
+    "e0": 0.0,
+    "e1": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Multiply",
+   "pos": [
+    1420,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 21,
+   "type": "Palette",
+   "pos": [
+    1650,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 22,
+   "type": "Previous",
+   "pos": [
+    1420,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 23,
+   "type": "Remap",
+   "pos": [
+    270,
+    430
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.5,
+    "out_hi": 0.92
+   },
+   "inputs": {}
+  },
+  {
+   "id": 24,
+   "type": "Fade",
+   "pos": [
+    1650,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 25,
+   "type": "Blend",
+   "pos": [
+    1880,
+    820
+   ],
+   "params": {
+    "mode": "max"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 26,
+   "type": "Output",
+   "pos": [
+    2110,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   5,
+   "on",
+   10,
+   "on"
+  ],
+  [
+   6,
+   "beat",
+   11,
+   "a"
+  ],
+  [
+   10,
+   "result",
+   11,
+   "b"
+  ],
+  [
+   2,
+   "value",
+   12,
+   "x"
+  ],
+  [
+   1,
+   "value",
+   13,
+   "x"
+  ],
+  [
+   3,
+   "value",
+   14,
+   "x"
+  ],
+  [
+   14,
+   "result",
+   15,
+   "z"
+  ],
+  [
+   11,
+   "result",
+   16,
+   "burst"
+  ],
+  [
+   12,
+   "result",
+   16,
+   "burst_count"
+  ],
+  [
+   13,
+   "result",
+   16,
+   "spread"
+  ],
+  [
+   15,
+   "v",
+   16,
+   "gravity"
+  ],
+  [
+   9,
+   "bin",
+   16,
+   "tag"
+  ],
+  [
+   16,
+   "slots",
+   17,
+   "slots"
+  ],
+  [
+   8,
+   "pos",
+   17,
+   "pos"
+  ],
+  [
+   17,
+   "age",
+   18,
+   "b"
+  ],
+  [
+   17,
+   "value",
+   19,
+   "x"
+  ],
+  [
+   19,
+   "result",
+   20,
+   "a"
+  ],
+  [
+   18,
+   "result",
+   20,
+   "b"
+  ],
+  [
+   17,
+   "tag",
+   21,
+   "index"
+  ],
+  [
+   20,
+   "result",
+   21,
+   "brightness"
+  ],
+  [
+   4,
+   "value",
+   23,
+   "x"
+  ],
+  [
+   22,
+   "color",
+   24,
+   "color"
+  ],
+  [
+   23,
+   "result",
+   24,
+   "keep"
+  ],
+  [
+   24,
+   "color",
+   25,
+   "under"
+  ],
+  [
+   21,
+   "color",
+   25,
+   "over"
+  ],
+  [
+   25,
+   "color",
+   26,
+   "color"
+  ]
+ ]
+}

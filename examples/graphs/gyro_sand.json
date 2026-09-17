@@ -1,0 +1,2434 @@
+{
+ "name": "Gyro Sand",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Pour rate",
+    "default": 120
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Glow",
+    "default": 150
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Custom 1",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Tilt X",
+    "default": 200
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Custom 2",
+   "pos": [
+    40,
+    430
+   ],
+   "params": {
+    "label": "Tilt Y",
+    "default": 190
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Check 1",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {
+    "label": "Beat bursts",
+    "default": true
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Audio",
+   "pos": [
+    40,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Time",
+   "pos": [
+    40,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    950
+   ],
+   "params": {
+    "palette": 8,
+    "dimensions": "both",
+    "audio": "volume",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Position",
+   "pos": [
+    270,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Coords",
+   "pos": [
+    270,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": -0.8,
+    "out_hi": 0.8
+   },
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Remap",
+   "pos": [
+    270,
+    430
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": -0.8,
+    "out_hi": 0.8
+   },
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Gravity",
+   "pos": [
+    500,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Cube face",
+   "pos": [
+    270,
+    1470
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Dot 3",
+   "pos": [
+    500,
+    1470
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1340
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Subtract",
+   "pos": [
+    960,
+    1340
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1470
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Subtract",
+   "pos": [
+    960,
+    1470
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1600
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 21,
+   "type": "Subtract",
+   "pos": [
+    960,
+    1600
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 22,
+   "type": "Divide",
+   "pos": [
+    500,
+    690
+   ],
+   "params": {},
+   "inputs": {
+    "a": 2.6,
+    "b": 16.0
+   }
+  },
+  {
+   "id": 23,
+   "type": "Multiply",
+   "pos": [
+    730,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 24,
+   "type": "Multiply",
+   "pos": [
+    960,
+    690
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.0
+   }
+  },
+  {
+   "id": 25,
+   "type": "Add",
+   "pos": [
+    1190,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 26,
+   "type": "Multiply",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 27,
+   "type": "Multiply",
+   "pos": [
+    960,
+    820
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.0
+   }
+  },
+  {
+   "id": 28,
+   "type": "Add",
+   "pos": [
+    1190,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 29,
+   "type": "Multiply",
+   "pos": [
+    730,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 30,
+   "type": "Multiply",
+   "pos": [
+    960,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.0
+   }
+  },
+  {
+   "id": 31,
+   "type": "Add",
+   "pos": [
+    1190,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 32,
+   "type": "Position to uv",
+   "pos": [
+    1420,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 33,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 34,
+   "type": "Multiply",
+   "pos": [
+    960,
+    1080
+   ],
+   "params": {},
+   "inputs": {
+    "b": -1.0
+   }
+  },
+  {
+   "id": 35,
+   "type": "Add",
+   "pos": [
+    1190,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 36,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1210
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 37,
+   "type": "Multiply",
+   "pos": [
+    960,
+    1210
+   ],
+   "params": {},
+   "inputs": {
+    "b": -1.0
+   }
+  },
+  {
+   "id": 38,
+   "type": "Add",
+   "pos": [
+    1190,
+    1210
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 39,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1340
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 40,
+   "type": "Multiply",
+   "pos": [
+    960,
+    1340
+   ],
+   "params": {},
+   "inputs": {
+    "b": -1.0
+   }
+  },
+  {
+   "id": 41,
+   "type": "Add",
+   "pos": [
+    1190,
+    1340
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 42,
+   "type": "Position to uv",
+   "pos": [
+    1420,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 43,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1860
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 44,
+   "type": "Multiply",
+   "pos": [
+    960,
+    1860
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.0
+   }
+  },
+  {
+   "id": 45,
+   "type": "Add",
+   "pos": [
+    1190,
+    1860
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 46,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1990
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 47,
+   "type": "Multiply",
+   "pos": [
+    960,
+    1990
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.0
+   }
+  },
+  {
+   "id": 48,
+   "type": "Add",
+   "pos": [
+    1190,
+    1990
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 49,
+   "type": "Multiply",
+   "pos": [
+    730,
+    2120
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 50,
+   "type": "Multiply",
+   "pos": [
+    960,
+    2120
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.0
+   }
+  },
+  {
+   "id": 51,
+   "type": "Add",
+   "pos": [
+    1190,
+    2120
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 52,
+   "type": "Position to uv",
+   "pos": [
+    1420,
+    1860
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 53,
+   "type": "Multiply",
+   "pos": [
+    730,
+    2250
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 54,
+   "type": "Multiply",
+   "pos": [
+    960,
+    2250
+   ],
+   "params": {},
+   "inputs": {
+    "b": -1.0
+   }
+  },
+  {
+   "id": 55,
+   "type": "Add",
+   "pos": [
+    1190,
+    2250
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 56,
+   "type": "Multiply",
+   "pos": [
+    730,
+    2380
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 57,
+   "type": "Multiply",
+   "pos": [
+    960,
+    2380
+   ],
+   "params": {},
+   "inputs": {
+    "b": -1.0
+   }
+  },
+  {
+   "id": 58,
+   "type": "Add",
+   "pos": [
+    1190,
+    2380
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 59,
+   "type": "Multiply",
+   "pos": [
+    730,
+    2510
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 60,
+   "type": "Multiply",
+   "pos": [
+    960,
+    2510
+   ],
+   "params": {},
+   "inputs": {
+    "b": -1.0
+   }
+  },
+  {
+   "id": 61,
+   "type": "Add",
+   "pos": [
+    1190,
+    2510
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 62,
+   "type": "Position to uv",
+   "pos": [
+    1420,
+    2250
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 63,
+   "type": "Subtract",
+   "pos": [
+    1650,
+    1860
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 64,
+   "type": "Subtract",
+   "pos": [
+    1650,
+    1990
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 65,
+   "type": "Length",
+   "pos": [
+    1880,
+    1860
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 66,
+   "type": "Threshold",
+   "pos": [
+    2110,
+    1860
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.006
+   }
+  },
+  {
+   "id": 67,
+   "type": "Not",
+   "pos": [
+    2340,
+    1860
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 68,
+   "type": "Subtract",
+   "pos": [
+    1650,
+    2250
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 69,
+   "type": "Subtract",
+   "pos": [
+    1650,
+    2380
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 70,
+   "type": "Length",
+   "pos": [
+    1880,
+    2250
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 71,
+   "type": "Threshold",
+   "pos": [
+    2110,
+    2250
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.006
+   }
+  },
+  {
+   "id": 72,
+   "type": "Not",
+   "pos": [
+    2340,
+    2250
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 73,
+   "type": "Field",
+   "pos": [
+    500,
+    1080
+   ],
+   "params": {
+    "field": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 74,
+   "type": "Field",
+   "pos": [
+    1650,
+    690
+   ],
+   "params": {
+    "field": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 75,
+   "type": "Field",
+   "pos": [
+    1650,
+    1080
+   ],
+   "params": {
+    "field": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 76,
+   "type": "Threshold",
+   "pos": [
+    1880,
+    820
+   ],
+   "params": {},
+   "inputs": {
+    "at": -0.999
+   }
+  },
+  {
+   "id": 77,
+   "type": "Not",
+   "pos": [
+    2110,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 78,
+   "type": "Threshold",
+   "pos": [
+    1880,
+    690
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.5
+   }
+  },
+  {
+   "id": 79,
+   "type": "Max",
+   "pos": [
+    2110,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 80,
+   "type": "Threshold",
+   "pos": [
+    1880,
+    1080
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.5
+   }
+  },
+  {
+   "id": 81,
+   "type": "Multiply",
+   "pos": [
+    2340,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 82,
+   "type": "Subtract",
+   "pos": [
+    2340,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "a": 1.0
+   }
+  },
+  {
+   "id": 83,
+   "type": "Subtract",
+   "pos": [
+    2570,
+    560
+   ],
+   "params": {},
+   "inputs": {
+    "a": 1.0
+   }
+  },
+  {
+   "id": 84,
+   "type": "Multiply",
+   "pos": [
+    2340,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 85,
+   "type": "Hash",
+   "pos": [
+    2570,
+    1340
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 86,
+   "type": "Threshold",
+   "pos": [
+    2800,
+    1340
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.06
+   }
+  },
+  {
+   "id": 87,
+   "type": "Select",
+   "pos": [
+    3030,
+    1340
+   ],
+   "params": {},
+   "inputs": {
+    "a": 1.0
+   }
+  },
+  {
+   "id": 88,
+   "type": "Multiply",
+   "pos": [
+    2570,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 89,
+   "type": "Threshold",
+   "pos": [
+    1880,
+    1210
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.5
+   }
+  },
+  {
+   "id": 90,
+   "type": "Not",
+   "pos": [
+    2110,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 91,
+   "type": "Multiply",
+   "pos": [
+    2340,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 92,
+   "type": "Multiply",
+   "pos": [
+    2570,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 93,
+   "type": "Remap",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 0.35
+   },
+   "inputs": {}
+  },
+  {
+   "id": 94,
+   "type": "Envelope",
+   "pos": [
+    270,
+    820
+   ],
+   "params": {
+    "attack": 5.0,
+    "release": 200.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 95,
+   "type": "Select",
+   "pos": [
+    500,
+    820
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0
+   }
+  },
+  {
+   "id": 96,
+   "type": "Add",
+   "pos": [
+    500,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 97,
+   "type": "Cube ring",
+   "pos": [
+    270,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 98,
+   "type": "Threshold",
+   "pos": [
+    730,
+    1470
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.22
+   }
+  },
+  {
+   "id": 99,
+   "type": "Not",
+   "pos": [
+    960,
+    1470
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 100,
+   "type": "Hash",
+   "pos": [
+    730,
+    1600
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 101,
+   "type": "Threshold",
+   "pos": [
+    960,
+    1600
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 102,
+   "type": "Multiply",
+   "pos": [
+    1190,
+    1600
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 103,
+   "type": "Max",
+   "pos": [
+    2570,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 104,
+   "type": "Max",
+   "pos": [
+    2800,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 105,
+   "type": "Field write",
+   "pos": [
+    3030,
+    820
+   ],
+   "params": {
+    "field": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 106,
+   "type": "Dot 3",
+   "pos": [
+    2800,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 107,
+   "type": "Remap",
+   "pos": [
+    3030,
+    1080
+   ],
+   "params": {
+    "in_lo": -1.0,
+    "in_hi": 1.0,
+    "out_lo": 0.15,
+    "out_hi": 0.8
+   },
+   "inputs": {}
+  },
+  {
+   "id": 108,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.3,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 109,
+   "type": "Multiply",
+   "pos": [
+    3030,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 110,
+   "type": "Palette",
+   "pos": [
+    3260,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 111,
+   "type": "Output",
+   "pos": [
+    3490,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 112,
+   "type": "Vector",
+   "pos": [
+    310,
+    1470
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 113,
+   "type": "Vector",
+   "pos": [
+    310,
+    1510
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 114,
+   "type": "Vector",
+   "pos": [
+    1230,
+    770
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 115,
+   "type": "Vector",
+   "pos": [
+    1230,
+    1200
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 116,
+   "type": "Vector",
+   "pos": [
+    1230,
+    2020
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 117,
+   "type": "Vector",
+   "pos": [
+    1230,
+    2450
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 118,
+   "type": "Vector",
+   "pos": [
+    1690,
+    2100
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 119,
+   "type": "Vector",
+   "pos": [
+    1690,
+    2530
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 120,
+   "type": "Vector",
+   "pos": [
+    2610,
+    1400
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 121,
+   "type": "Vector",
+   "pos": [
+    2610,
+    1440
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   3,
+   "value",
+   11,
+   "x"
+  ],
+  [
+   4,
+   "value",
+   12,
+   "x"
+  ],
+  [
+   11,
+   "result",
+   13,
+   "tilt_x"
+  ],
+  [
+   12,
+   "result",
+   13,
+   "tilt_y"
+  ],
+  [
+   112,
+   "v",
+   15,
+   "a"
+  ],
+  [
+   13,
+   "gx",
+   112,
+   "x"
+  ],
+  [
+   13,
+   "gy",
+   112,
+   "y"
+  ],
+  [
+   13,
+   "gz",
+   112,
+   "z"
+  ],
+  [
+   113,
+   "v",
+   15,
+   "b"
+  ],
+  [
+   14,
+   "nx",
+   113,
+   "x"
+  ],
+  [
+   14,
+   "ny",
+   113,
+   "y"
+  ],
+  [
+   14,
+   "nz",
+   113,
+   "z"
+  ],
+  [
+   15,
+   "result",
+   16,
+   "a"
+  ],
+  [
+   14,
+   "nx",
+   16,
+   "b"
+  ],
+  [
+   13,
+   "gx",
+   17,
+   "a"
+  ],
+  [
+   16,
+   "result",
+   17,
+   "b"
+  ],
+  [
+   15,
+   "result",
+   18,
+   "a"
+  ],
+  [
+   14,
+   "ny",
+   18,
+   "b"
+  ],
+  [
+   13,
+   "gy",
+   19,
+   "a"
+  ],
+  [
+   18,
+   "result",
+   19,
+   "b"
+  ],
+  [
+   15,
+   "result",
+   20,
+   "a"
+  ],
+  [
+   14,
+   "nz",
+   20,
+   "b"
+  ],
+  [
+   13,
+   "gz",
+   21,
+   "a"
+  ],
+  [
+   20,
+   "result",
+   21,
+   "b"
+  ],
+  [
+   17,
+   "result",
+   23,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   23,
+   "b"
+  ],
+  [
+   23,
+   "result",
+   24,
+   "a"
+  ],
+  [
+   9,
+   "x",
+   25,
+   "a"
+  ],
+  [
+   24,
+   "result",
+   25,
+   "b"
+  ],
+  [
+   19,
+   "result",
+   26,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   26,
+   "b"
+  ],
+  [
+   26,
+   "result",
+   27,
+   "a"
+  ],
+  [
+   9,
+   "y",
+   28,
+   "a"
+  ],
+  [
+   27,
+   "result",
+   28,
+   "b"
+  ],
+  [
+   21,
+   "result",
+   29,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   29,
+   "b"
+  ],
+  [
+   29,
+   "result",
+   30,
+   "a"
+  ],
+  [
+   9,
+   "z",
+   31,
+   "a"
+  ],
+  [
+   30,
+   "result",
+   31,
+   "b"
+  ],
+  [
+   114,
+   "v",
+   32,
+   "pos"
+  ],
+  [
+   25,
+   "result",
+   114,
+   "x"
+  ],
+  [
+   28,
+   "result",
+   114,
+   "y"
+  ],
+  [
+   31,
+   "result",
+   114,
+   "z"
+  ],
+  [
+   17,
+   "result",
+   33,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   33,
+   "b"
+  ],
+  [
+   33,
+   "result",
+   34,
+   "a"
+  ],
+  [
+   9,
+   "x",
+   35,
+   "a"
+  ],
+  [
+   34,
+   "result",
+   35,
+   "b"
+  ],
+  [
+   19,
+   "result",
+   36,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   36,
+   "b"
+  ],
+  [
+   36,
+   "result",
+   37,
+   "a"
+  ],
+  [
+   9,
+   "y",
+   38,
+   "a"
+  ],
+  [
+   37,
+   "result",
+   38,
+   "b"
+  ],
+  [
+   21,
+   "result",
+   39,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   39,
+   "b"
+  ],
+  [
+   39,
+   "result",
+   40,
+   "a"
+  ],
+  [
+   9,
+   "z",
+   41,
+   "a"
+  ],
+  [
+   40,
+   "result",
+   41,
+   "b"
+  ],
+  [
+   115,
+   "v",
+   42,
+   "pos"
+  ],
+  [
+   35,
+   "result",
+   115,
+   "x"
+  ],
+  [
+   38,
+   "result",
+   115,
+   "y"
+  ],
+  [
+   41,
+   "result",
+   115,
+   "z"
+  ],
+  [
+   17,
+   "result",
+   43,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   43,
+   "b"
+  ],
+  [
+   43,
+   "result",
+   44,
+   "a"
+  ],
+  [
+   35,
+   "result",
+   45,
+   "a"
+  ],
+  [
+   44,
+   "result",
+   45,
+   "b"
+  ],
+  [
+   19,
+   "result",
+   46,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   46,
+   "b"
+  ],
+  [
+   46,
+   "result",
+   47,
+   "a"
+  ],
+  [
+   38,
+   "result",
+   48,
+   "a"
+  ],
+  [
+   47,
+   "result",
+   48,
+   "b"
+  ],
+  [
+   21,
+   "result",
+   49,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   49,
+   "b"
+  ],
+  [
+   49,
+   "result",
+   50,
+   "a"
+  ],
+  [
+   41,
+   "result",
+   51,
+   "a"
+  ],
+  [
+   50,
+   "result",
+   51,
+   "b"
+  ],
+  [
+   116,
+   "v",
+   52,
+   "pos"
+  ],
+  [
+   45,
+   "result",
+   116,
+   "x"
+  ],
+  [
+   48,
+   "result",
+   116,
+   "y"
+  ],
+  [
+   51,
+   "result",
+   116,
+   "z"
+  ],
+  [
+   17,
+   "result",
+   53,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   53,
+   "b"
+  ],
+  [
+   53,
+   "result",
+   54,
+   "a"
+  ],
+  [
+   25,
+   "result",
+   55,
+   "a"
+  ],
+  [
+   54,
+   "result",
+   55,
+   "b"
+  ],
+  [
+   19,
+   "result",
+   56,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   56,
+   "b"
+  ],
+  [
+   56,
+   "result",
+   57,
+   "a"
+  ],
+  [
+   28,
+   "result",
+   58,
+   "a"
+  ],
+  [
+   57,
+   "result",
+   58,
+   "b"
+  ],
+  [
+   21,
+   "result",
+   59,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   59,
+   "b"
+  ],
+  [
+   59,
+   "result",
+   60,
+   "a"
+  ],
+  [
+   31,
+   "result",
+   61,
+   "a"
+  ],
+  [
+   60,
+   "result",
+   61,
+   "b"
+  ],
+  [
+   117,
+   "v",
+   62,
+   "pos"
+  ],
+  [
+   55,
+   "result",
+   117,
+   "x"
+  ],
+  [
+   58,
+   "result",
+   117,
+   "y"
+  ],
+  [
+   61,
+   "result",
+   117,
+   "z"
+  ],
+  [
+   52,
+   "u",
+   63,
+   "a"
+  ],
+  [
+   10,
+   "u",
+   63,
+   "b"
+  ],
+  [
+   52,
+   "v",
+   64,
+   "a"
+  ],
+  [
+   10,
+   "v",
+   64,
+   "b"
+  ],
+  [
+   118,
+   "v",
+   65,
+   "v"
+  ],
+  [
+   63,
+   "result",
+   118,
+   "x"
+  ],
+  [
+   64,
+   "result",
+   118,
+   "y"
+  ],
+  [
+   65,
+   "result",
+   66,
+   "x"
+  ],
+  [
+   66,
+   "on",
+   67,
+   "on"
+  ],
+  [
+   62,
+   "u",
+   68,
+   "a"
+  ],
+  [
+   10,
+   "u",
+   68,
+   "b"
+  ],
+  [
+   62,
+   "v",
+   69,
+   "a"
+  ],
+  [
+   10,
+   "v",
+   69,
+   "b"
+  ],
+  [
+   119,
+   "v",
+   70,
+   "v"
+  ],
+  [
+   68,
+   "result",
+   119,
+   "x"
+  ],
+  [
+   69,
+   "result",
+   119,
+   "y"
+  ],
+  [
+   70,
+   "result",
+   71,
+   "x"
+  ],
+  [
+   71,
+   "on",
+   72,
+   "on"
+  ],
+  [
+   10,
+   "u",
+   73,
+   "u"
+  ],
+  [
+   10,
+   "v",
+   73,
+   "v"
+  ],
+  [
+   32,
+   "u",
+   74,
+   "u"
+  ],
+  [
+   32,
+   "v",
+   74,
+   "v"
+  ],
+  [
+   42,
+   "u",
+   75,
+   "u"
+  ],
+  [
+   42,
+   "v",
+   75,
+   "v"
+  ],
+  [
+   31,
+   "result",
+   76,
+   "x"
+  ],
+  [
+   76,
+   "on",
+   77,
+   "on"
+  ],
+  [
+   74,
+   "value",
+   78,
+   "x"
+  ],
+  [
+   78,
+   "value",
+   79,
+   "a"
+  ],
+  [
+   77,
+   "result",
+   79,
+   "b"
+  ],
+  [
+   73,
+   "value",
+   80,
+   "x"
+  ],
+  [
+   72,
+   "result",
+   81,
+   "a"
+  ],
+  [
+   79,
+   "result",
+   82,
+   "b"
+  ],
+  [
+   82,
+   "result",
+   81,
+   "b"
+  ],
+  [
+   81,
+   "result",
+   83,
+   "b"
+  ],
+  [
+   80,
+   "value",
+   84,
+   "a"
+  ],
+  [
+   83,
+   "result",
+   84,
+   "b"
+  ],
+  [
+   10,
+   "v",
+   85,
+   "x"
+  ],
+  [
+   10,
+   "u",
+   85,
+   "y"
+  ],
+  [
+   7,
+   "t",
+   85,
+   "seed"
+  ],
+  [
+   85,
+   "value",
+   86,
+   "x"
+  ],
+  [
+   77,
+   "result",
+   87,
+   "on"
+  ],
+  [
+   86,
+   "value",
+   87,
+   "b"
+  ],
+  [
+   84,
+   "result",
+   88,
+   "a"
+  ],
+  [
+   87,
+   "result",
+   88,
+   "b"
+  ],
+  [
+   75,
+   "value",
+   89,
+   "x"
+  ],
+  [
+   80,
+   "on",
+   90,
+   "on"
+  ],
+  [
+   89,
+   "value",
+   91,
+   "a"
+  ],
+  [
+   90,
+   "result",
+   91,
+   "b"
+  ],
+  [
+   91,
+   "result",
+   92,
+   "a"
+  ],
+  [
+   67,
+   "result",
+   92,
+   "b"
+  ],
+  [
+   1,
+   "value",
+   93,
+   "x"
+  ],
+  [
+   6,
+   "hit",
+   94,
+   "x"
+  ],
+  [
+   5,
+   "on",
+   95,
+   "on"
+  ],
+  [
+   94,
+   "value",
+   95,
+   "b"
+  ],
+  [
+   93,
+   "result",
+   96,
+   "a"
+  ],
+  [
+   95,
+   "result",
+   96,
+   "b"
+  ],
+  [
+   97,
+   "depth",
+   98,
+   "x"
+  ],
+  [
+   98,
+   "on",
+   99,
+   "on"
+  ],
+  [
+   10,
+   "u",
+   100,
+   "x"
+  ],
+  [
+   10,
+   "v",
+   100,
+   "y"
+  ],
+  [
+   7,
+   "t",
+   100,
+   "seed"
+  ],
+  [
+   96,
+   "result",
+   101,
+   "x"
+  ],
+  [
+   100,
+   "value",
+   101,
+   "at"
+  ],
+  [
+   101,
+   "value",
+   102,
+   "a"
+  ],
+  [
+   99,
+   "result",
+   102,
+   "b"
+  ],
+  [
+   88,
+   "result",
+   103,
+   "a"
+  ],
+  [
+   92,
+   "result",
+   103,
+   "b"
+  ],
+  [
+   103,
+   "result",
+   104,
+   "a"
+  ],
+  [
+   102,
+   "result",
+   104,
+   "b"
+  ],
+  [
+   104,
+   "result",
+   105,
+   "value"
+  ],
+  [
+   120,
+   "v",
+   106,
+   "a"
+  ],
+  [
+   9,
+   "x",
+   120,
+   "x"
+  ],
+  [
+   9,
+   "y",
+   120,
+   "y"
+  ],
+  [
+   9,
+   "z",
+   120,
+   "z"
+  ],
+  [
+   121,
+   "v",
+   106,
+   "b"
+  ],
+  [
+   13,
+   "gx",
+   121,
+   "x"
+  ],
+  [
+   13,
+   "gy",
+   121,
+   "y"
+  ],
+  [
+   13,
+   "gz",
+   121,
+   "z"
+  ],
+  [
+   106,
+   "result",
+   107,
+   "x"
+  ],
+  [
+   2,
+   "value",
+   108,
+   "x"
+  ],
+  [
+   104,
+   "result",
+   109,
+   "a"
+  ],
+  [
+   108,
+   "result",
+   109,
+   "b"
+  ],
+  [
+   107,
+   "result",
+   110,
+   "index"
+  ],
+  [
+   109,
+   "result",
+   110,
+   "brightness"
+  ],
+  [
+   110,
+   "color",
+   111,
+   "color"
+  ]
+ ]
+}

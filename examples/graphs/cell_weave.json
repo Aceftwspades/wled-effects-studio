@@ -1,0 +1,1287 @@
+{
+ "name": "Cell Weave",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Speed",
+    "default": 128
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Drive",
+    "default": 150
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Custom 1",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Cells X",
+    "default": 200
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Custom 2",
+   "pos": [
+    40,
+    430
+   ],
+   "params": {
+    "label": "Cells Y",
+    "default": 64
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Custom 3",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {
+    "label": "Cells Z",
+    "default": 26
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Check 2",
+   "pos": [
+    40,
+    690
+   ],
+   "params": {
+    "label": "Tumble",
+    "default": true
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Audio",
+   "pos": [
+    40,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    950
+   ],
+   "params": {
+    "palette": 12,
+    "dimensions": "both",
+    "audio": "frequency",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Position",
+   "pos": [
+    270,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Multiply",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.04
+   }
+  },
+  {
+   "id": 11,
+   "type": "Integrate",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {
+    "wrap": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Multiply",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.027
+   }
+  },
+  {
+   "id": 13,
+   "type": "Integrate",
+   "pos": [
+    500,
+    170
+   ],
+   "params": {
+    "wrap": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Rotate",
+   "pos": [
+    500,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Rotate",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Select",
+   "pos": [
+    960,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Select",
+   "pos": [
+    960,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Select",
+   "pos": [
+    960,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.05,
+    "out_hi": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Multiply",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.8
+   }
+  },
+  {
+   "id": 21,
+   "type": "Add",
+   "pos": [
+    730,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.7
+   }
+  },
+  {
+   "id": 22,
+   "type": "Multiply",
+   "pos": [
+    960,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 23,
+   "type": "Remap",
+   "pos": [
+    270,
+    430
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.05,
+    "out_hi": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 24,
+   "type": "Multiply",
+   "pos": [
+    500,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.8
+   }
+  },
+  {
+   "id": 25,
+   "type": "Add",
+   "pos": [
+    730,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.7
+   }
+  },
+  {
+   "id": 26,
+   "type": "Multiply",
+   "pos": [
+    960,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 27,
+   "type": "Remap",
+   "pos": [
+    270,
+    560
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.05,
+    "out_hi": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 28,
+   "type": "Multiply",
+   "pos": [
+    500,
+    560
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.8
+   }
+  },
+  {
+   "id": 29,
+   "type": "Add",
+   "pos": [
+    730,
+    560
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.7
+   }
+  },
+  {
+   "id": 30,
+   "type": "Multiply",
+   "pos": [
+    960,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 31,
+   "type": "Multiply",
+   "pos": [
+    1190,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 32,
+   "type": "Multiply",
+   "pos": [
+    1190,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 33,
+   "type": "Multiply",
+   "pos": [
+    1190,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 34,
+   "type": "Remap",
+   "pos": [
+    270,
+    690
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 0.6
+   },
+   "inputs": {}
+  },
+  {
+   "id": 35,
+   "type": "Integrate",
+   "pos": [
+    500,
+    690
+   ],
+   "params": {
+    "wrap": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 36,
+   "type": "Add",
+   "pos": [
+    1420,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 37,
+   "type": "Sine",
+   "pos": [
+    1650,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 38,
+   "type": "Multiply",
+   "pos": [
+    1880,
+    690
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.25
+   }
+  },
+  {
+   "id": 39,
+   "type": "Add",
+   "pos": [
+    2110,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 40,
+   "type": "Sine",
+   "pos": [
+    2340,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 41,
+   "type": "Remap",
+   "pos": [
+    2570,
+    690
+   ],
+   "params": {
+    "in_lo": -1.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 42,
+   "type": "Add",
+   "pos": [
+    1420,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 43,
+   "type": "Sine",
+   "pos": [
+    1650,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 44,
+   "type": "Multiply",
+   "pos": [
+    1880,
+    820
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.25
+   }
+  },
+  {
+   "id": 45,
+   "type": "Add",
+   "pos": [
+    2110,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 46,
+   "type": "Sine",
+   "pos": [
+    2340,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 47,
+   "type": "Remap",
+   "pos": [
+    2570,
+    820
+   ],
+   "params": {
+    "in_lo": -1.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 48,
+   "type": "Add",
+   "pos": [
+    1420,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 49,
+   "type": "Sine",
+   "pos": [
+    1650,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 50,
+   "type": "Multiply",
+   "pos": [
+    1880,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.25
+   }
+  },
+  {
+   "id": 51,
+   "type": "Add",
+   "pos": [
+    2110,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 52,
+   "type": "Sine",
+   "pos": [
+    2340,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 53,
+   "type": "Remap",
+   "pos": [
+    2570,
+    950
+   ],
+   "params": {
+    "in_lo": -1.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 54,
+   "type": "Multiply",
+   "pos": [
+    2800,
+    560
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.0
+   }
+  },
+  {
+   "id": 55,
+   "type": "Multiply",
+   "pos": [
+    2800,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 56,
+   "type": "Multiply",
+   "pos": [
+    2800,
+    1080
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 57,
+   "type": "Add",
+   "pos": [
+    3030,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 58,
+   "type": "Add",
+   "pos": [
+    3030,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 59,
+   "type": "Integrate",
+   "pos": [
+    3030,
+    950
+   ],
+   "params": {
+    "wrap": 1.0
+   },
+   "inputs": {
+    "rate": 0.01
+   }
+  },
+  {
+   "id": 60,
+   "type": "Add",
+   "pos": [
+    3260,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 61,
+   "type": "Fract",
+   "pos": [
+    3490,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 62,
+   "type": "Envelope",
+   "pos": [
+    270,
+    950
+   ],
+   "params": {
+    "attack": 30.0,
+    "release": 300.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 63,
+   "type": "Remap",
+   "pos": [
+    500,
+    950
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.3,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 64,
+   "type": "Multiply",
+   "pos": [
+    730,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 65,
+   "type": "Add",
+   "pos": [
+    960,
+    1080
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.15
+   }
+  },
+  {
+   "id": 66,
+   "type": "Palette",
+   "pos": [
+    3720,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 67,
+   "type": "Output",
+   "pos": [
+    3950,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   10,
+   "a"
+  ],
+  [
+   10,
+   "result",
+   11,
+   "rate"
+  ],
+  [
+   1,
+   "value",
+   12,
+   "a"
+  ],
+  [
+   12,
+   "result",
+   13,
+   "rate"
+  ],
+  [
+   9,
+   "x",
+   14,
+   "x"
+  ],
+  [
+   9,
+   "y",
+   14,
+   "y"
+  ],
+  [
+   11,
+   "value",
+   14,
+   "turns"
+  ],
+  [
+   14,
+   "y",
+   15,
+   "x"
+  ],
+  [
+   9,
+   "z",
+   15,
+   "y"
+  ],
+  [
+   13,
+   "value",
+   15,
+   "turns"
+  ],
+  [
+   6,
+   "on",
+   16,
+   "on"
+  ],
+  [
+   9,
+   "x",
+   16,
+   "a"
+  ],
+  [
+   14,
+   "x",
+   16,
+   "b"
+  ],
+  [
+   6,
+   "on",
+   17,
+   "on"
+  ],
+  [
+   9,
+   "y",
+   17,
+   "a"
+  ],
+  [
+   15,
+   "x",
+   17,
+   "b"
+  ],
+  [
+   6,
+   "on",
+   18,
+   "on"
+  ],
+  [
+   9,
+   "z",
+   18,
+   "a"
+  ],
+  [
+   15,
+   "y",
+   18,
+   "b"
+  ],
+  [
+   3,
+   "value",
+   19,
+   "x"
+  ],
+  [
+   7,
+   "bass",
+   20,
+   "a"
+  ],
+  [
+   20,
+   "result",
+   21,
+   "b"
+  ],
+  [
+   19,
+   "result",
+   22,
+   "a"
+  ],
+  [
+   21,
+   "result",
+   22,
+   "b"
+  ],
+  [
+   4,
+   "value",
+   23,
+   "x"
+  ],
+  [
+   7,
+   "mid",
+   24,
+   "a"
+  ],
+  [
+   24,
+   "result",
+   25,
+   "b"
+  ],
+  [
+   23,
+   "result",
+   26,
+   "a"
+  ],
+  [
+   25,
+   "result",
+   26,
+   "b"
+  ],
+  [
+   5,
+   "value",
+   27,
+   "x"
+  ],
+  [
+   7,
+   "treble",
+   28,
+   "a"
+  ],
+  [
+   28,
+   "result",
+   29,
+   "b"
+  ],
+  [
+   27,
+   "result",
+   30,
+   "a"
+  ],
+  [
+   29,
+   "result",
+   30,
+   "b"
+  ],
+  [
+   16,
+   "result",
+   31,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   31,
+   "b"
+  ],
+  [
+   17,
+   "result",
+   32,
+   "a"
+  ],
+  [
+   26,
+   "result",
+   32,
+   "b"
+  ],
+  [
+   18,
+   "result",
+   33,
+   "a"
+  ],
+  [
+   30,
+   "result",
+   33,
+   "b"
+  ],
+  [
+   1,
+   "value",
+   34,
+   "x"
+  ],
+  [
+   34,
+   "result",
+   35,
+   "rate"
+  ],
+  [
+   32,
+   "result",
+   36,
+   "a"
+  ],
+  [
+   35,
+   "value",
+   36,
+   "b"
+  ],
+  [
+   36,
+   "result",
+   37,
+   "x"
+  ],
+  [
+   37,
+   "result",
+   38,
+   "a"
+  ],
+  [
+   31,
+   "result",
+   39,
+   "a"
+  ],
+  [
+   38,
+   "result",
+   39,
+   "b"
+  ],
+  [
+   39,
+   "result",
+   40,
+   "x"
+  ],
+  [
+   40,
+   "result",
+   41,
+   "x"
+  ],
+  [
+   33,
+   "result",
+   42,
+   "a"
+  ],
+  [
+   35,
+   "value",
+   42,
+   "b"
+  ],
+  [
+   42,
+   "result",
+   43,
+   "x"
+  ],
+  [
+   43,
+   "result",
+   44,
+   "a"
+  ],
+  [
+   32,
+   "result",
+   45,
+   "a"
+  ],
+  [
+   44,
+   "result",
+   45,
+   "b"
+  ],
+  [
+   45,
+   "result",
+   46,
+   "x"
+  ],
+  [
+   46,
+   "result",
+   47,
+   "x"
+  ],
+  [
+   31,
+   "result",
+   48,
+   "a"
+  ],
+  [
+   35,
+   "value",
+   48,
+   "b"
+  ],
+  [
+   48,
+   "result",
+   49,
+   "x"
+  ],
+  [
+   49,
+   "result",
+   50,
+   "a"
+  ],
+  [
+   33,
+   "result",
+   51,
+   "a"
+  ],
+  [
+   50,
+   "result",
+   51,
+   "b"
+  ],
+  [
+   51,
+   "result",
+   52,
+   "x"
+  ],
+  [
+   52,
+   "result",
+   53,
+   "x"
+  ],
+  [
+   41,
+   "result",
+   54,
+   "a"
+  ],
+  [
+   47,
+   "result",
+   55,
+   "a"
+  ],
+  [
+   53,
+   "result",
+   56,
+   "a"
+  ],
+  [
+   54,
+   "result",
+   57,
+   "a"
+  ],
+  [
+   55,
+   "result",
+   57,
+   "b"
+  ],
+  [
+   57,
+   "result",
+   58,
+   "a"
+  ],
+  [
+   56,
+   "result",
+   58,
+   "b"
+  ],
+  [
+   58,
+   "result",
+   60,
+   "a"
+  ],
+  [
+   59,
+   "value",
+   60,
+   "b"
+  ],
+  [
+   60,
+   "result",
+   61,
+   "x"
+  ],
+  [
+   7,
+   "volume",
+   62,
+   "x"
+  ],
+  [
+   2,
+   "value",
+   63,
+   "x"
+  ],
+  [
+   62,
+   "value",
+   64,
+   "a"
+  ],
+  [
+   63,
+   "result",
+   64,
+   "b"
+  ],
+  [
+   64,
+   "result",
+   65,
+   "a"
+  ],
+  [
+   61,
+   "result",
+   66,
+   "index"
+  ],
+  [
+   65,
+   "result",
+   66,
+   "brightness"
+  ],
+  [
+   66,
+   "color",
+   67,
+   "color"
+  ]
+ ]
+}

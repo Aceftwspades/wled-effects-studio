@@ -1,0 +1,359 @@
+{
+ "name": "Cube Ripples",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Speed",
+    "default": 110
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Thickness",
+    "default": 90
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Custom 2",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Persistence",
+    "default": 140
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Audio",
+   "pos": [
+    40,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {
+    "palette": 11,
+    "dimensions": "both",
+    "audio": "frequency",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Loudest bin",
+   "pos": [
+    270,
+    430
+   ],
+   "params": {
+    "from": 1,
+    "to": 15
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Emitters",
+   "pos": [
+    500,
+    430
+   ],
+   "params": {
+    "random": true
+   },
+   "inputs": {
+    "life": 5.0
+   }
+  },
+  {
+   "id": 8,
+   "type": "Position",
+   "pos": [
+    270,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Remap",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.15,
+    "out_hi": 1.2
+   },
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.08,
+    "out_hi": 0.45
+   },
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Shells",
+   "pos": [
+    730,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Previous",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.6,
+    "out_hi": 0.93
+   },
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Fade",
+   "pos": [
+    960,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Add",
+   "pos": [
+    960,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.0
+   }
+  },
+  {
+   "id": 16,
+   "type": "Palette",
+   "pos": [
+    1190,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Blend",
+   "pos": [
+    1420,
+    690
+   ],
+   "params": {
+    "mode": "add"
+   },
+   "inputs": {
+    "amount": 1.0
+   }
+  },
+  {
+   "id": 18,
+   "type": "Output",
+   "pos": [
+    1650,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Vector",
+   "pos": [
+    540,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   4,
+   "beat",
+   7,
+   "trigger"
+  ],
+  [
+   6,
+   "bin",
+   7,
+   "tag"
+  ],
+  [
+   1,
+   "value",
+   9,
+   "x"
+  ],
+  [
+   2,
+   "value",
+   10,
+   "x"
+  ],
+  [
+   7,
+   "slots",
+   11,
+   "slots"
+  ],
+  [
+   9,
+   "result",
+   11,
+   "speed"
+  ],
+  [
+   10,
+   "result",
+   11,
+   "width"
+  ],
+  [
+   19,
+   "v",
+   11,
+   "pos"
+  ],
+  [
+   8,
+   "x",
+   19,
+   "x"
+  ],
+  [
+   8,
+   "y",
+   19,
+   "y"
+  ],
+  [
+   8,
+   "z",
+   19,
+   "z"
+  ],
+  [
+   3,
+   "value",
+   13,
+   "x"
+  ],
+  [
+   12,
+   "color",
+   14,
+   "color"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "keep"
+  ],
+  [
+   11,
+   "tag",
+   15,
+   "a"
+  ],
+  [
+   15,
+   "result",
+   16,
+   "index"
+  ],
+  [
+   11,
+   "value",
+   16,
+   "brightness"
+  ],
+  [
+   14,
+   "color",
+   17,
+   "under"
+  ],
+  [
+   16,
+   "color",
+   17,
+   "over"
+  ],
+  [
+   17,
+   "color",
+   18,
+   "color"
+  ]
+ ]
+}

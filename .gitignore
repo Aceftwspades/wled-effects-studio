@@ -1,0 +1,13 @@
+# Build products - regenerate with `python build.py`
+cubefx.js
+cubefx.wasm
+gen/
+cubefx.dll
+obj_native/
+__pycache__/
+*.pyc
+cubefx.lib
+cubefx.exp
+build/
+projects/
+examples/_check/
