@@ -1084,6 +1084,11 @@ class GraphPanel:
 
     def rebuild(self):
         self.touch()
+        # the editor's own selection dies with the nodes it is rebuilt from
+        # (a zoom, an edit): it carries on as the key selection, outlined
+        keep = self._clicked()
+        if keep:
+            self.ext_sel = [n for n in dict.fromkeys(list(self.ext_sel) + keep)]
         self._widgets.clear()
         dpg.delete_item("node_editor", children_only=True)
         self.links.clear(); self._pins.clear(); self._ptype.clear(); self._link_normal.clear()
@@ -1110,6 +1115,8 @@ class GraphPanel:
         for a, out, b, inp in self.graph.links:
             self._make_link(a, out, b, inp)
         self._mark_problems()
+        self._ext_last = {n: tuple(dpg.get_item_pos(f"gnode_{n}")) for n in self.ext_sel if dpg.does_item_exist(f"gnode_{n}")}
+        self._focus_sel = None
 
     # --- validation ---------------------------------------------------------------------
     # Problems are painted on the node - a red outline for what stops the
@@ -2078,6 +2085,11 @@ class GraphPanel:
         else:
             self._pending = (frm[0], frm[1], t)
             self.show_add_menu((mx, my), only=self._consumers(t, limit=60))
+
+    def panning(self):
+        """True while the canvas is being dragged (middle button): every
+        node moves with the pointer."""
+        return dpg.is_mouse_button_down(dpg.mvMouseButton_Middle) and dpg.does_item_exist("node_editor")             and dpg.is_item_hovered("node_editor")
 
     def dragging_nodes(self):
         """True while a press that began on a node is held: the selection

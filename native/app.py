@@ -2440,7 +2440,7 @@ class App(Features):
                 # by exactly that. Selected nodes are drawn on top, so
                 # nothing but a window ever covers their frames.
                 mx, my = dpg.get_mouse_pos(local=False)
-                if self.gp.dragging_nodes() and self._glow_mouse is not None:
+                if (self.gp.dragging_nodes() or self.gp.panning()) and self._glow_mouse is not None:
                     dx, dy = mx - self._glow_mouse[0], my - self._glow_mouse[1]
                     boxes = [(x0 + dx, y0 + dy, x1 + dx, y1 + dy) for x0, y0, x1, y1 in boxes]
                 self._glow_mouse = (mx, my)
