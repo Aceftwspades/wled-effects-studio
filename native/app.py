@@ -762,6 +762,17 @@ class App(Features):
     # One folder per project under studio/projects/ (or anywhere, by path).
     # Switching swaps the project object, applies its geometry, re-lists its
     # effects and graphs, and rebuilds the engine for its effects list.
+    def set_feature(self, key, value):
+        """The flash dialog's picker: a feature on or off for this project;
+        the graph's nodes that lean on it follow."""
+        from native import flash
+        f = flash.features_of(self.project)
+        f[key] = value
+        self.project.options["features"] = f
+        self.project.save()
+        self.gp.refresh_features()
+        chrome.refresh_flash(self)
+
     def switch_project(self, path, create=False):
         path = project_path(path)
         if not create and not os.path.isdir(path):
@@ -771,6 +782,9 @@ class App(Features):
         if self.gp.graph:
             self.gp.save()
         self.project = Project(path)
+        if create:
+            from native import flash
+            self.project.options["features"] = dict(flash.NEW_DEFAULTS)     # no hardware assumed until ticked
         remember_project(path)
         self.edit_file = None
         self.gp.graph = None; self.gp.file = None; self.gp.stack.clear()
@@ -2930,6 +2944,8 @@ def service_command(app):
                     app.sec_set(*v)
                 else:
                     app.sec_move(*v)
+            if "feature" in c:                          # test hook: [key, value] of the feature picker
+                app.set_feature(*c["feature"])
             if "popout" in c:                           # test hook: [view, on]
                 app.set_popout(*c["popout"])
             if "layout" in c:

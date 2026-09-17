@@ -1084,6 +1084,13 @@ static inline uint32_t gc_blend_screen(uint32_t u, uint32_t o, float a) {
 '''
 
 
+# The nodes that lean on a firmware feature (flash.py FEATURES / AUDIO): the
+# picker names them, the add menu hides them while the feature is off, and a
+# graph already using one is marked. They still compile - each has a fallback.
+NEEDS = {"Gravity": "imu",
+         "Audio": "audio", "FFT bin": "audio", "Beat kick": "audio", "Spectrum": "audio", "Loudest bin": "audio"}
+
+
 def library(extra=()):
     """The node types by name: the library, then any user nodes over it,
     with the plain-words docs of nodedocs.py on every node and pin."""
@@ -1091,6 +1098,8 @@ def library(extra=()):
     lib = {}
     for d in LIBRARY:
         lib[d["name"]] = copy.deepcopy(d)
+        if d["name"] in NEEDS:
+            lib[d["name"]]["needs"] = NEEDS[d["name"]]
     for d in extra:
         try:
             lib[d["name"]] = d

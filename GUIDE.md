@@ -88,7 +88,10 @@ Three routes, all under File > Project, all needing the device's address:
    (each shows its flash cost after a first build), pick the environment,
    and the studio builds WLED with your effects as a usermod and sends it
    over OTA. The dialog says in plain words when a build will not fit the
-   board's partition.
+   board's partition. Under FEATURES untick what your device has not - the
+   motion sensor, the knob and screen, slider memory - and choose the
+   audio (with the waveform, stock, or none): the firmware gets smaller,
+   and the nodes that lean on a feature you left out say so.
 3. **Export** the usermod folder and zip for a build elsewhere.
 
 "Send the current effect's settings" pushes the sliders, palette, colours

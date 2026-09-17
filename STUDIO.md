@@ -677,6 +677,25 @@ them within each group; ticked when done.
       the type rule, problems, exposed params, the state fallback, arrange,
       JSON round-trip with wire meta, the ledmap format.
 
+### Lighter firmware: the feature picker
+
+- [x] **Features** in the flash dialog (`flash.FEATURES`, `flash.AUDIO`):
+      the IMU driver, the rotary encoder + OLED menu, per-effect slider
+      memory, and the audio choice - audioreactive with the studio's PCM
+      waveform, audioreactive as WLED ships it, or none. Each is a build
+      flag the firmware defaults ON (`CFX_WITH_IMU`, `CFX_WITH_UI`,
+      `CFX_WITH_PARAM_MEMORY`, `CFX_PCM`; the optional files are wrapped
+      in `#if`), so a build outside the studio is unchanged; the studio's
+      env passes =0 for what is unticked, and "no audio" drops
+      audioreactive from the env. Under each the picker says what it
+      brings and which nodes lean on it (`nodedefs.NEEDS`: Gravity on the
+      IMU; Audio, FFT bin, Beat kick, Spectrum, Loudest bin on audio).
+      With a feature off those nodes leave the add menu, a graph already
+      using one wears the warning outline and its description says why -
+      they still compile, each has a fallback (top-face-up gravity, WLED's
+      simulated sound). A new project starts with no hardware ticked but
+      audio; a project from before keeps everything, as it built.
+
 ### A self-contained app (on hold)
 
 The goal: one download that runs, for any WLED user, not a checkout of

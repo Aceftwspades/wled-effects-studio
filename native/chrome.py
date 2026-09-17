@@ -676,7 +676,7 @@ def _gc_delete(app):
 def build_flash_dialog(app):
     app.flash_job = None
     envs, default = flash.read_envs()
-    with dpg.window(tag="flash_win", label="Build firmware + flash", show=False, width=720, height=560, no_collapse=True):
+    with dpg.window(tag="flash_win", label="Build firmware + flash", show=False, width=720, height=700, no_collapse=True):
         dpg.add_text("Stages the project's effects into the WLED tree as a usermod, builds the firmware on an "
                      "environment that extends the one chosen (its usermods plus ours), and sends the binary to "
                      "the device's /update. The device must have OTA unlocked and be on this subnet.", color=DIM, wrap=690)
@@ -691,7 +691,12 @@ def build_flash_dialog(app):
             dpg.add_button(label="all", small=True, callback=lambda: _ship_all(app, True))
             dpg.add_button(label="none", small=True, callback=lambda: _ship_all(app, False))
             dpg.add_text("", tag="flash_budget", color=DIM)
-        with dpg.child_window(tag="flash_fx", height=150, border=True):
+        with dpg.child_window(tag="flash_fx", height=110, border=True):
+            pass
+        with dpg.group(horizontal=True):
+            dpg.add_text("FEATURES", color=ACCENT)
+            dpg.add_text("what the firmware carries - untick what this device has not, and the build is smaller", color=DIM)
+        with dpg.child_window(tag="flash_features", height=232, border=True):
             pass
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="build", tag="flash_build", default_value=True)
@@ -731,6 +736,7 @@ def refresh_flash(app):
     for the chosen environment from its last build."""
     if not dpg.does_item_exist("flash_fx"):
         return
+    _feature_rows(app)
     env = dpg.get_value("flash_env") or ""
     stats = (app.project.options.get("flash_stats") or {}).get(env) or {}
     sizes = stats.get("sizes") or {}                  # the effects in the last build: they set the base
@@ -768,10 +774,38 @@ def refresh_flash(app):
         dpg.configure_item("flash_budget", color=DIM)
 
 
+def _feature_rows(app):
+    """The picker: a checkbox per optional part of the firmware, the audio
+    choice, and under each what it brings and which nodes lean on it."""
+    if not dpg.does_item_exist("flash_features"):
+        return
+    from native.nodedefs import NEEDS
+    f = flash.features_of(app.project)
+    dpg.delete_item("flash_features", children_only=True)
+    for key, label, files, flag, what in flash.FEATURES:
+        with dpg.group(parent="flash_features"):
+            with dpg.group(horizontal=True):
+                dpg.add_checkbox(label=label, default_value=bool(f.get(key)), user_data=key,
+                                 callback=lambda s, a, u: app.set_feature(u, bool(a)))
+                dpg.add_text(files, color=DIM)
+            nodes = sorted(n for n, need in NEEDS.items() if need == key)
+            dpg.add_text("    " + what + (f" Nodes: {', '.join(nodes)}." if nodes else ""), color=DIM, wrap=660)
+    with dpg.group(parent="flash_features"):
+        with dpg.group(horizontal=True):
+            labels = [a[1] for a in flash.AUDIO]
+            cur = next((a[1] for a in flash.AUDIO if a[0] == f["audio"]), labels[0])
+            dpg.add_combo(labels, default_value=cur, width=420, tag="flash_audio",
+                          callback=lambda s, v: app.set_feature("audio", next(a[0] for a in flash.AUDIO if a[1] == v)))
+            dpg.add_text("audio", color=DIM)
+        what = next(a[2] for a in flash.AUDIO if a[0] == f["audio"])
+        nodes = sorted(n for n, need in NEEDS.items() if need == "audio")
+        dpg.add_text("    " + what + f" Nodes: {', '.join(nodes)}.", color=DIM, wrap=660)
+
+
 def show_flash(app):
     dpg.set_value("flash_host", app.project.options.get("device", "") or dpg.get_value("flash_host"))
     refresh_flash(app)
-    _centre("flash_win", 720, 560)
+    _centre("flash_win", 720, 700)
     dpg.show_item("flash_win")
 
 

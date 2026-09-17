@@ -234,6 +234,7 @@ class GraphPanel:
         d = self.sub_dir if sub else self.dir
         self.graph = G.load(os.path.join(d, fname), lib=self.lib, resolver=self.resolve_sub)
         self.graph.project_dir = self.app.project.path
+        self.graph.features = self.features()
         self.file = fname
         self.cur_dir = d
         self._undo.clear(); self._redo.clear(); self._last_snap = None; self._undo_desc.clear(); self.ext_sel = []
@@ -498,7 +499,8 @@ class GraphPanel:
             tag = f"gnode_{nid}"
             if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
                 d = self.graph.node_def(n)
-                self.help(f"{d.get('label') or n['type']}: {d.get('doc', '')}")
+                note = G.feature_note(d.get("needs"), self.graph.features if hasattr(self.graph, "features") else None)
+                self.help((f"[{note}]  " if note else "") + f"{d.get('label') or n['type']}: {d.get('doc', '')}")
                 return
         self.help("")
 
@@ -540,6 +542,23 @@ class GraphPanel:
 
     def _font_px(self):
         return max(8 if (self.overview() and self.zoom >= 0.3) else 6, int(BASE_FONT * self.zoom)) if self._font_file else BASE_FONT
+
+    def features(self):
+        """The project's firmware features (flash.py): what the picker ticked."""
+        from native import flash
+        return flash.features_of(self.app.project)
+
+    def _feature_off(self, type_):
+        """True for a node type whose feature this project leaves out."""
+        d = self.lib.get(type_) or {}
+        return bool(G.feature_note(d.get("needs"), self.features()))
+
+    def refresh_features(self):
+        """The picker changed: the graph's marks and the add menu follow."""
+        if self.graph:
+            self.graph.features = self.features()
+            self._mark_problems()
+        self.fill_add_menu()
 
     def overview(self):
         """Zoomed out past the setting: the nodes are stand-ins - a title
@@ -665,6 +684,7 @@ class GraphPanel:
     def _restore(self, snap):
         self.graph = G.Graph(json.loads(snap), lib=self.lib, resolver=self.resolve_sub)
         self.graph.project_dir = self.app.project.path
+        self.graph.features = self.features()
         self._last_snap = None
         self.rebuild()
 
@@ -807,8 +827,8 @@ class GraphPanel:
         self.offset = [0.0, 0.0]
         w, h = dpg.get_item_rect_size("node_editor") if dpg.does_item_exist("node_editor") else (0, 0)
         if w <= 0 or h <= 0:                             # not drawn since a rebuild: the pane's size, less its rows
-            w, h = dpg.get_item_rect_size("graph_win") if dpg.does_item_exist("graph_win") else (800, 600)
-            h = max(200, h - 160)
+            w, h = dpg.get_item_rect_size("graph_win") if dpg.does_item_exist("graph_win") else (0, 0)
+            w, h = (w, max(200, h - 160)) if w > 60 and h > 200 else (800, 600)
         fit = min((w - 40) / max(1.0, x1 - x0), (h - 40) / max(1.0, y1 - y0))
         z = max([zz for zz in ZOOMS if zz <= fit] or [ZOOMS[0]])
         self.zoom = min(1.0, z) if len(sel) > 1 else min(z, 1.5)
@@ -2232,6 +2252,7 @@ class GraphPanel:
             return
         dpg.delete_item("graph_hits", children_only=True)
         names = only if only is not None else [n.split(" / ", 1)[1] for n in self.type_names()]
+        names = [n for n in names if not self._feature_off(n)]
         if only is None:
             names = ["preset:" + p for p in sorted(self.presets())] + names
         hits = []
@@ -2748,12 +2769,18 @@ class GraphPanel:
                                                callback=lambda s, a, u: self.add_node_at_menu(u))
                             dpg.add_button(label="x", small=True, user_data=name,
                                            callback=lambda s, a, u: self.delete_preset(u))
+            hidden = 0
             for c, names in cats.items():
                 with dpg.collapsing_header(label=c, default_open=(c in ("generate", "colour", "subgraphs"))):
                     for n in names:
+                        if self._feature_off(n):
+                            hidden += 1
+                            continue
                         lbl = self.lib[n].get("label", n) if n in self.lib else n
                         dpg.add_selectable(label=lbl, user_data=n,
                                            callback=lambda s, a, u: self.add_node_at_menu(u))
+            if hidden:
+                dpg.add_text(f"{hidden} node(s) hidden: their feature is off in Flash > Features", color=DIM, wrap=220)
         self._widgets.add("graph_search")
 
     def _fill_quick(self):

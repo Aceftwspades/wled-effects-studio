@@ -102,6 +102,17 @@ def _coerce(expr, have, want):
     raise GraphError(f"cannot connect {have} to {want}")
 
 
+def feature_note(need, feats):
+    """Why a node wanting `need` is worse off under these features, or None."""
+    if not need or not feats:
+        return None
+    if need == "imu" and feats.get("imu") is False:
+        return "needs the IMU feature, off in this project (Flash > Features): its sensor output stays false"
+    if need == "audio" and feats.get("audio") == "none":
+        return "audio is off in this project's features (Flash > Features): this reads WLED's simulated sound"
+    return None
+
+
 def compatible(a, b):
     """Can a pin of type a feed a pin of type b? Everything but colour into
     float/bool - and that one only through Split."""
@@ -382,6 +393,12 @@ class Graph:
                 defs[nid] = self.node_def(n)
             except GraphError as e:
                 out[nid] = "error: " + str(e).split(": ", 1)[-1]
+        # a node leaning on a feature the project's firmware leaves out
+        feats = getattr(self, "features", None) or {}
+        for nid, d in defs.items():
+            msg = feature_note(d.get("needs"), feats)
+            if msg:
+                out.setdefault(nid, "warn: " + msg)
         # cycles: every node still on the stack when one is found
         deps = {nid: set() for nid in self.nodes}
         for a, _, b, _ in self.links:

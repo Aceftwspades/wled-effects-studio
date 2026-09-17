@@ -126,6 +126,54 @@ def effect_sizes(env):
     return sizes
 
 
+# --- features: what the firmware carries -----------------------------------------------
+# Not every setup has a motion sensor, a knob and a screen; the picker in the
+# flash dialog leaves out what a device lacks. Each is a build flag the
+# firmware defaults ON (a build outside the studio is unchanged); the studio
+# passes =0 for what is unticked. `nodes`: the node types that lean on it,
+# from the library's `needs` (nodedefs.py), for the picker's description.
+FEATURES = [
+    ("imu", "IMU - MPU6050 motion sensor", "ace_imu_mpu6050.cpp", "CFX_WITH_IMU",
+     "the Gravity node's sensor output, and motion in Gyro Sand, Gyro Rain, Liquid, Cube Fire, Sauron, Cube Wire, "
+     "Mario Block and Audio Atlas. Without it those settle to 'top face up' and Gravity follows its tilt inputs."),
+    ("ui", "Rotary encoder + OLED menu", "ace_ui_encoder / menu / screen.cpp, the U8g2 library", "CFX_WITH_UI",
+     "the on-device menu (effects, palettes, presets, system). Nothing in the studio needs it; Breakout is played "
+     "from the knob when it is there."),
+    ("param_memory", "Per-effect slider memory", "cube_fx_param_memory.cpp", "CFX_WITH_PARAM_MEMORY",
+     "the device remembers each effect's sliders across switches."),
+]
+AUDIO = [
+    ("pcm", "audioreactive with the PCM waveform (the studio's patch)",
+     "the FFT bands, volume and beat, and the raw waveform: Warp and Scope draw the real signal."),
+    ("stock", "audioreactive as WLED ships it",
+     "the FFT bands, volume and beat; Warp and Scope rebuild a waveform from the bins (-D CFX_PCM=0)."),
+    ("none", "no audio usermod",
+     "the smallest firmware: audio nodes and effects read WLED's simulated sound (audioreactive left out of the env)."),
+]
+DEFAULTS = {"imu": True, "ui": True, "param_memory": True, "audio": "pcm"}       # a project from before: as it built
+NEW_DEFAULTS = {"imu": False, "ui": False, "param_memory": True, "audio": "pcm"}  # a new project: no hardware assumed
+
+
+def features_of(project):
+    f = dict(DEFAULTS)
+    f.update({k: v for k, v in (project.options.get("features") or {}).items() if k in f})
+    if f["audio"] not in {a[0] for a in AUDIO}:
+        f["audio"] = "pcm"
+    return f
+
+
+def feature_flags(project):
+    """The -D flags the picker adds to the studio's env."""
+    f = features_of(project)
+    flags = [f"-D {flag}=0" for key, _, _, flag, _ in FEATURES if not f.get(key)]
+    if f["audio"] == "stock":
+        flags.append("-D CFX_PCM=0")
+    g = project.geometry
+    if g.kind == "cube" and g.params.get("six"):
+        flags.append("-D CFX_SIX_FACES=1")
+    return flags
+
+
 def stage(project, base_env, log, only=None):
     """Export (the effects chosen, or the list), copy the usermod into the
     tree, write the env. Returns the env name to build."""
@@ -138,6 +186,10 @@ def stage(project, base_env, log, only=None):
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
     mods = usermods_of(base_env)
+    feats = features_of(project)
+    if feats["audio"] == "none" and "audioreactive" in mods:
+        mods = [m for m in mods if m != "audioreactive"]
+        log("no audio: audioreactive left out of the environment")
     if "cube_fx" in mods:
         # The effects register through cube_fx's bank; a second copy of the
         # bank's usermod would be the same class twice.
@@ -151,11 +203,11 @@ def stage(project, base_env, log, only=None):
     env = "studio_" + base_env
     lines = [MARK_BEGIN, f"[env:{env}]", f"extends = env:{base_env}", "custom_usermods ="]
     lines += [f"  {m}" for m in mods if m != USERMOD] + [f"  {USERMOD}"]
-    g = project.geometry
-    if g.kind == "cube" and g.params.get("six"):
-        # a lit bottom: the firmware's default, before the settings page says otherwise
-        lines += [f"build_flags = ${{env:{base_env}.build_flags}} -D CFX_SIX_FACES=1"]
-        log("six faces: -D CFX_SIX_FACES=1 (the bottom face in the net's (2,2) block)")
+    flags = feature_flags(project)
+    if flags:
+        # the features left out, and a lit bottom face: the firmware's defaults, before its settings say otherwise
+        lines += [f"build_flags = ${{env:{base_env}.build_flags}} " + " ".join(flags)]
+        log("build flags: " + " ".join(flags))
     lines += [MARK_END, ""]
     path = os.path.join(ROOT, "platformio_override.ini")
     text = open(path, encoding="utf-8").read() if os.path.exists(path) else "[platformio]\n"
