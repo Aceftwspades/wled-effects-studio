@@ -275,6 +275,9 @@ class App(Features):
         self._file_dialogs = None    # the file dialogs, found once for the frames' holes
         self._menus = None           # every menu, found once: an open one is a hole too
         self._glow_mouse = None      # the pointer last frame, to lead a dragged node's frame
+        self._glow_rects = {}        # the selected nodes' rectangles last frame: did they move?
+        self._color_edits = None     # every colour swatch, found once (a rebuild finds them again)
+        self._picker = None          # the swatch whose picker popup is believed open
         # the side panel's sections: their order, and which are folded
         secs = self.prefs.get("sections") or {}
         self.sec_order = [k for k in (secs.get("order") or []) if k in self.SECTIONS]
@@ -2012,7 +2015,29 @@ class App(Features):
     # frame - the cube span at a rate proportional to how far the pointer had
     # moved from where the drag began. A spin control, not a grab, exactly as it
     # felt.
+    def _picker_click(self):
+        """A colour swatch clicked opens ImGui's picker popup, which nothing
+        reports; it is remembered, and a click outside where the popup
+        sits (under the swatch) or Escape forgets it. While remembered, the
+        frames stay off - they would draw over the popup."""
+        if self._color_edits is None:
+            self._color_edits = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvColorEdit")]
+        for i in list(self._color_edits):
+            if not dpg.does_item_exist(i):
+                self._color_edits = None
+                return
+            if dpg.is_item_shown(i) and dpg.is_item_hovered(i):
+                self._picker = i
+                return
+        if self._picker is not None:
+            st = dpg.get_item_state(self._picker) if dpg.does_item_exist(self._picker) else {}
+            mx, my = dpg.get_mouse_pos(local=False)
+            (x0, y0), (x1, y1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
+            if not (x0 - 4 <= mx <= x0 + 360 and y1 <= my <= y1 + 380):
+                self._picker = None
+
     def on_mouse_click(self, sender, app_data):
+        self._picker_click()
         if dpg.does_item_exist("help_split") and dpg.is_item_shown("help_split") and dpg.is_item_hovered("help_split"):
             self._split_drag = ("help_split", dpg.get_mouse_pos(local=False)[1], int(self.prefs.get("help_h", 46)))
             return
@@ -2193,6 +2218,8 @@ class App(Features):
         self.dist = max(1.9, min(14.0, self.dist * np.exp(-app_data * 0.06)))
 
     def on_key(self, sender, app_data):
+        if app_data == dpg.mvKey_Escape:
+            self._picker = None
         # Presentation keys sit under the left hand so the right stays on the
         # mouse for rotating the cube: Q and E either side of W, which is the
         # pair together.
@@ -2408,7 +2435,9 @@ class App(Features):
         if self.frames is None:
             return
         rects = []
-        if self.ui:
+        if self._picker is not None and not dpg.does_item_exist(self._picker):
+            self._picker = None
+        if self.ui and self._picker is None:
             shown = [t for t in ("graph_win", "edit_win", "net_win", "cube_win", "side_win")
                      if dpg.does_item_exist(t) and dpg.is_item_shown(t)]
             if self.focus not in shown:
@@ -2441,9 +2470,15 @@ class App(Features):
                 # by exactly that. Selected nodes are drawn on top, so
                 # nothing but a window ever covers their frames.
                 mx, my = dpg.get_mouse_pos(local=False)
-                if (self.gp.dragging_nodes() or self.gp.panning()) and self._glow_mouse is not None:
+                now = {n: b for n, b in zip(sel, boxes)}
+                moved = any(self._glow_rects.get(n) not in (None, b) for n, b in now.items())
+                if moved and (self.gp.dragging_nodes() or self.gp.panning()) and self._glow_mouse is not None:
+                    # only once the nodes really are moving: a press on a
+                    # node's slider, or a middle click that pans nothing,
+                    # moves the pointer and not the graph
                     dx, dy = mx - self._glow_mouse[0], my - self._glow_mouse[1]
                     boxes = [(x0 + dx, y0 + dy, x1 + dx, y1 + dy) for x0, y0, x1, y1 in boxes]
+                self._glow_rects = now
                 self._glow_mouse = (mx, my)
                 # boxes that overlap merge into one frame round the group
                 boxes = self._merge_boxes(boxes)
@@ -3098,6 +3133,10 @@ def service_command(app):
                 else:
                     u32.mouse_event(2, 0, 0, 0, 0); u32.mouse_event(4, 0, 0, 0, 0)
                 print("click at", x, y, "hwnd", hwnd)
+            if "active" in c:                           # test hook: the active window and an item's state
+                aw = dpg.get_active_window()
+                print("active window", aw, dpg.get_item_alias(aw) if aw and dpg.does_item_exist(aw) else "?",
+                      "item", c["active"], dpg.get_item_state(c["active"]) if dpg.does_item_exist(c["active"]) else None)
             if "menus" in c:                            # test hook: every menu's state (an open one shows)
                 for m in [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]:
                     st = dpg.get_item_state(m)

@@ -544,9 +544,29 @@ class GraphPanel:
     def _graph(self, disp):
         return [disp[0] / self.zoom - self.offset[0], disp[1] / self.zoom - self.offset[1]]
 
+    def _measure_pan(self):
+        """The editor's own panning, read off a node: where imnodes drew it
+        against where it was placed. Counting middle-drags misses the
+        editor's own moves (it pans itself when a node is dragged to an
+        edge), and a wrong pan puts the zoom off the pointer."""
+        if not self.graph or not dpg.does_item_exist("node_editor"):
+            return
+        ex, ey = dpg.get_item_rect_min("node_editor")
+        for nid in self.graph.nodes:
+            tag = f"gnode_{nid}"
+            if not dpg.does_item_exist(tag):
+                continue
+            st = dpg.get_item_state(tag)
+            if "rect_min" not in st or st["rect_min"] == [0, 0]:
+                continue
+            px, py = dpg.get_item_pos(tag)
+            self.pan = [st["rect_min"][0] - ex - px, st["rect_min"][1] - ey - py]
+            return
+
     def _to_graph(self, screen):
         """A screen point -> graph units, allowing for the editor's panning as
         far as it has been watched."""
+        self._measure_pan()
         ex, ey = dpg.get_item_rect_min("node_editor")
         return self._graph([screen[0] - ex - self.pan[0], screen[1] - ey - self.pan[1]])
 
@@ -628,6 +648,7 @@ class GraphPanel:
             self.zoom = z
             return
         self._sync_pos()
+        self._measure_pan()
         ex, ey = dpg.get_item_rect_min("node_editor")
         if at is None:
             w, h = dpg.get_item_rect_size("node_editor")
