@@ -2327,7 +2327,11 @@ class GraphPanel:
         close = lambda: dpg.configure_item(P, show=False)
 
         def row(label, fn):
-            dpg.add_selectable(label=label, parent=P, callback=lambda s, a, u=fn: (close(), u()))
+            # Dear PyGui calls a callback with as many of (sender, app_data,
+            # user_data) as it has parameters - a third one with a default
+            # is overwritten by user_data, a fourth is an error - so what a
+            # row does rides in user_data.
+            dpg.add_selectable(label=label, parent=P, user_data=fn, callback=lambda s, a, u: (close(), u()))
 
         if kind == "in":
             linked = any(l[2] == nid and l[3] == name for l in self.graph.links)
@@ -2516,7 +2520,7 @@ class GraphPanel:
                                        callback=lambda: (dpg.configure_item(P, show=False), self._set_colour(nid, None)))
                     else:
                         dpg.add_color_button(default_value=list(col) + [255], width=18, height=18, no_border=True,
-                                             callback=lambda s, a, c=col: (dpg.configure_item(P, show=False), self._set_colour(nid, c)))
+                                             user_data=col, callback=lambda s, a, u: (dpg.configure_item(P, show=False), self._set_colour(nid, u)))
 
     def _set_colour(self, nid, col):
         self.snapshot(); self._sync_pos()
@@ -2569,10 +2573,10 @@ class GraphPanel:
                 for label, col in chunk:
                     if col is None:
                         dpg.add_button(label="auto", small=True,
-                                       callback=lambda s, a, k=keys: (dpg.configure_item(P, show=False), self._set_wire(k, None)))
+                                       user_data=keys, callback=lambda s, a, u: (dpg.configure_item(P, show=False), self._set_wire(u, None)))
                     else:
                         dpg.add_color_button(default_value=list(col) + [255], width=18, height=18, no_border=True,
-                                             callback=lambda s, a, k=keys, c=col: (dpg.configure_item(P, show=False), self._set_wire(k, c)))
+                                             user_data=(keys, col), callback=lambda s, a, u: (dpg.configure_item(P, show=False), self._set_wire(*u)))
 
     def _set_wire(self, keys, col):
         self.snapshot()

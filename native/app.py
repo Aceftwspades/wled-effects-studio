@@ -2838,9 +2838,8 @@ def build(app):
                     with dpg.group(horizontal=True):
                         for attr, lab in (("gate_bass", "bass"), ("gate_mid", "mid"),
                                           ("gate_treb", "treble")):
-                            dpg.add_checkbox(label=lab, tag=f"chk_{attr}",
-                                             callback=lambda s, v, a=attr:
-                                                 setattr(app.syn, a, bool(v)))
+                            dpg.add_checkbox(label=lab, tag=f"chk_{attr}", user_data=attr,
+                                             callback=lambda s, v, u: setattr(app.syn, u, bool(v)))
                     dpg.add_checkbox(label="silence (mute all bands)",
                                      callback=lambda s, v: setattr(app.syn, "muted", v))
                     dpg.add_color_button(tag="beat_led", default_value=(42, 47, 58, 255),
@@ -3094,7 +3093,10 @@ def service_command(app):
                     vx, vy = dpg.get_viewport_pos()
                     x, y = int(vx + c["click"][0]), int(vy + c["click"][1])
                 u32.SetCursorPos(x, y)
-                u32.mouse_event(2, 0, 0, 0, 0); u32.mouse_event(4, 0, 0, 0, 0)
+                if len(c["click"]) > 2 and c["click"][2] == "right":
+                    u32.mouse_event(8, 0, 0, 0, 0); u32.mouse_event(16, 0, 0, 0, 0)
+                else:
+                    u32.mouse_event(2, 0, 0, 0, 0); u32.mouse_event(4, 0, 0, 0, 0)
                 print("click at", x, y, "hwnd", hwnd)
             if "menus" in c:                            # test hook: every menu's state (an open one shows)
                 for m in [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]:
