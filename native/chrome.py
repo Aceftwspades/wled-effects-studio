@@ -137,6 +137,8 @@ def build_menus(app):
                 callback=lambda: app.toggle_ui())
             dpg.add_menu_item(label="Side panel", check=True, default_value=True, tag="menu_side",
                               callback=lambda: app.toggle_side())
+            _mi(app, "Properties pane (graph)", "props_pane", check=True, tag="menu_props",
+                callback=lambda: app.toggle_props())
             _mi(app, "Focus mode (dim all but the selection)", "focus_mode", check=True, tag="menu_focus",
                 callback=lambda s, a: app.gp.set_focus_mode(bool(a)))
             _mi(app, "Fullscreen", "fullscreen", callback=lambda: dpg.toggle_viewport_fullscreen())
@@ -1243,6 +1245,8 @@ def refresh(app):
         dpg.configure_item(f"tb_view_{key}", tint_color=ACCENT if on else TEXT)
     dpg.set_value("menu_present", not app.ui)
     dpg.set_value("menu_side", app.side)
+    if dpg.does_item_exist("menu_props"):
+        dpg.set_value("menu_props", app.props)
     dpg.set_value("menu_focus", app.gp.focus_mode)
     if dpg.does_item_exist("mi_compare"):
         dpg.configure_item("mi_compare", label="Stop comparing" if app.ab else "Compare with another effect...")

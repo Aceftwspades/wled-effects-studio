@@ -278,6 +278,13 @@ editor. Ticked when done; the order within a group is the order to do them.
       above that pane, in the middle the two swap; the target lights up
       as you go. View > Layout has six presets; the arrangement is
       remembered.
+- [x] **A properties pane** (the fourth slot, "props"; N hides it, View
+      > Properties pane): a node's settings too long for the node - bitmap
+      rows, expressions, files - are edited in a pane of their own, shown
+      in the graph layout, movable and resizable like the others. It
+      replaces the panel that grew above the editor on selection and
+      shrank on deselection, which moved the graph under the pointer
+      every time. Arrangements saved before it get it under the 3-D view.
 - [x] **Panel sections fold and move** (`Section`, `App.sec_*`): every
       section of the side panel has an arrow, a title that folds it and a
       grip that drags it above or below another; order and folded state

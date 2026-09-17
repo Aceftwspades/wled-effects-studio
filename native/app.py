@@ -281,6 +281,7 @@ class App(Features):
         self._sec_drag = None        # the section whose grip is being dragged
         self._sec_target = None      # (section, "above" | "below") under the pointer
         self.side = True             # the side panel shown (Ctrl+Shift+H hides it)
+        self.props = bool(self.prefs.get("props_pane", True))   # the graph's properties pane (N hides it)
         self.focus = None            # the pane last clicked in: it wears the frame
         self.sweep = None            # {"key", "secs", "t0", "loop", "record"} while a slider is swept
         self.show_wiring = False     # the physical order drawn over the net
@@ -1459,13 +1460,17 @@ class App(Features):
     # columns of rows, left to right, top to bottom. A pane moves by its grip
     # (the ::: at its top right) dragged onto another pane: near an edge it
     # goes beside or above that pane, in the middle the two swap.
-    PRESETS = (("Classic: main pane, 3-D, panel", [["main"], ["cube"], ["side"]]),
-               ("Panel on the left", [["side"], ["main"], ["cube"]]),
-               ("3-D on the left", [["cube"], ["main"], ["side"]]),
-               ("3-D under the main pane", [["main", "cube"], ["side"]]),
-               ("3-D above the panel", [["main"], ["cube", "side"]]),
-               ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main"]]))
-    SLOTS = ("main", "cube", "side")
+    # The fourth slot, "props", is the graph's properties pane: a node's
+    # settings too long for the node. It shows in the graph layout only,
+    # and it is a pane of its own so selecting a node never moves the
+    # editor - the panel it used to grow above the editor did.
+    PRESETS = (("Classic: main pane, 3-D, panel", [["main"], ["cube", "props"], ["side"]]),
+               ("Panel on the left", [["side"], ["main"], ["cube", "props"]]),
+               ("3-D on the left", [["cube", "props"], ["main"], ["side"]]),
+               ("3-D under the main pane", [["main", "cube"], ["side", "props"]]),
+               ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
+               ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
+    SLOTS = ("main", "cube", "side", "props")
 
     @classmethod
     def _valid_arrangement(cls, arr):
@@ -1473,7 +1478,15 @@ class App(Features):
             cols = [[str(s) for s in c] for c in arr]
         except Exception:
             return None
-        if sorted(s for c in cols for s in c) != sorted(cls.SLOTS) or not all(cols):
+        flat = sorted(s for c in cols for s in c)
+        if flat == sorted(s for s in cls.SLOTS if s != "props") and all(cols):
+            # saved before the properties pane existed: it goes under the 3-D view
+            for c in cols:
+                if "cube" in c:
+                    c.insert(c.index("cube") + 1, "props")
+                    break
+            return cols
+        if flat != sorted(cls.SLOTS) or not all(cols):
             return None
         return cols
 
@@ -1515,6 +1528,8 @@ class App(Features):
             return "cube_win"
         if slot == "side":
             return "side_win"
+        if slot == "props":
+            return "props_win"
         return {"edit": "edit_win", "graph": "graph_win"}.get(self.layout, "net_win")
 
     def slot_of(self, pane):
@@ -1530,6 +1545,8 @@ class App(Features):
     def slot_shown(self, slot):
         if not self.ui:
             return False
+        if slot == "props":
+            return self.layout == "graph" and self.props
         if slot == "side":
             return self.side
         if slot == "cube":
@@ -1566,6 +1583,8 @@ class App(Features):
             fr = [float(v) for v in stored]
         elif len(col) == 2 and "main" in col:
             fr = [0.58, 0.42] if col[0] == "main" else [0.42, 0.58]
+        elif len(col) == 2 and "props" in col:
+            fr = [0.62, 0.38] if col[1] == "props" else [0.38, 0.62]
         else:
             fr = [1.0 / len(col)] * len(col)
         tot = sum(fr) or 1.0
@@ -1798,6 +1817,7 @@ class App(Features):
         dpg.configure_item("edit_win", show=show_edit)
         dpg.configure_item("graph_win", show=show_graph)
         dpg.configure_item("side_win", show=self.ui and self.side)
+        dpg.configure_item("props_win", show=self.slot_shown("props"))
         # The menu bar is the window's: a hidden mvMenuBar still draws its
         # strip, the window flag takes it away.
         dpg.configure_item("root", menubar=self.ui)
@@ -1838,7 +1858,7 @@ class App(Features):
         if self.ui:
             # A pane once placed no longer flows in its row; every one is
             # placed here, from the arrangement.
-            for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win"):
+            for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win"):
                 dpg.reset_pos(tag)
             for slot, (x, y, w, h) in rects.items():
                 tag = self.pane_of(slot)
@@ -2026,7 +2046,7 @@ class App(Features):
         if dpg.is_item_hovered("cube_img"):
             self._dragging = True
             self._yaw0, self._pitch0 = self.yaw, self.pitch
-        for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win"):
+        for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win"):
             if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_hovered(tag):
                 self.focus = tag
                 break
@@ -2248,6 +2268,7 @@ class App(Features):
             "presentation": self.toggle_ui,
             "fullscreen":   dpg.toggle_viewport_fullscreen,
             "side_panel":   self.toggle_side,
+            "props_pane":   self.toggle_props,
             "play_pause":   self.toggle_play,
             "step":         self.step_once,
             "restart":      lambda: self.eng.select(self.eng.idx),
@@ -2481,6 +2502,12 @@ class App(Features):
         self.side = not self.side
         self.request_layout()
 
+    def toggle_props(self):
+        self.props = not self.props
+        self.prefs["props_pane"] = self.props
+        save_prefs(self.prefs)
+        self.request_layout()
+
     def step_effect(self, d):
         names = self.eng.names
         if names:
@@ -2699,6 +2726,13 @@ def build(app):
                 with dpg.group(horizontal=True):
                     dpg.add_text("3-D - drag to rotate, wheel to zoom",
                                  tag="cube_cap", color=(139, 147, 163))
+            # the graph's properties pane: what a node's settings need that
+            # a node cannot hold (text, files); filled by GraphPanel._poll_props
+            with dpg.child_window(tag="props_win", width=300, height=300, show=False):
+                chrome.grip("props_win")
+                dpg.add_text("Properties", tag="props_cap", color=(139, 147, 163))
+                with dpg.child_window(tag="graph_props", border=False, height=-1):
+                    pass
             with dpg.child_window(tag="side_win", width=app.side_w - 10, height=470):
                 chrome.grip("side_win")
                 with Section(app, "effect", "EFFECT"):

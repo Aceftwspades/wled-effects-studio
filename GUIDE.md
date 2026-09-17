@@ -22,7 +22,9 @@ show one view or both full-frame (press again to come back); **H** hides
 every control; **space** pauses. Every key is on the menus and under
 Settings > Keyboard shortcuts, where any can be changed.
 
-The panes go where you want them: drag one by the `:::` at its top right
+A node's long settings (bitmap rows, expressions, files) are edited in
+the Properties pane, which sits under the 3-D view in the graph layout (N
+hides it). The panes go where you want them: drag one by the `:::` at its top right
 onto another - near an edge it snaps beside or above that pane, in the
 middle the two swap - or pick a preset under View > Layout; the splitters
 between panes resize them. A view can leave for a second monitor: View >

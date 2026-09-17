@@ -24,6 +24,7 @@ ACTIONS = [
     ("presentation",  "Presentation: hide / show the controls",              "H",      "global"),
     ("fullscreen",    "Fullscreen window",                                   "F11",    "global"),
     ("side_panel",    "Hide / show the side panel",                          "Ctrl+Shift+H", "global"),
+    ("props_pane",    "Hide / show the graph's properties pane",             "N",      "graph"),
     # playback
     ("play_pause",    "Play / pause",                                        "Space",  "global"),
     ("step",          "Step one frame",                                      ".",      "global"),

@@ -432,27 +432,37 @@ class GraphPanel:
             return
         sel = self._selected()
         key = (self.file, sel[0]) if sel else None
-        if key == getattr(self, "_props_for", None):
+        if key == getattr(self, "_props_for", "unset"):
             return
         self._props_for = key
+        # the pane is always there (its own pane, sized by the layout): what
+        # changes is what it says, never the editor beside it
         dpg.delete_item("graph_props", children_only=True)
         if not sel:
-            dpg.configure_item("graph_props", show=False); return
+            dpg.add_text("select a node: the settings too long for the node itself - text, files - are edited here",
+                         parent="graph_props", color=DIM, wrap=0)
+            return
         nid = sel[0]
         n = self.graph.nodes.get(nid)
         if not n:
-            dpg.configure_item("graph_props", show=False); return
+            return
         d = self.graph.node_def(n)
+        title = f"{n.get('label') or d.get('label') or n['type']} #{nid}"
+        if n.get("label"):
+            title += f"  ({n['type']})"
+        dpg.add_text(title, parent="graph_props")
+        if len(sel) > 1:
+            dpg.add_text(f"and {len(sel) - 1} more selected", parent="graph_props", color=DIM)
         long_ = [p for p in d["params"] if p["type"] in ("text", "file") and not p.get("lines") is False]
         if not long_:
-            dpg.configure_item("graph_props", show=False); return
-        h = 34 + sum((self.px(120) + 8) if p.get("lines") else 30 for p in long_)
-        dpg.configure_item("graph_props", show=True, height=h)
-        dpg.add_text(f"{d.get('label') or n['type']} #{nid}", parent="graph_props", color=DIM)
+            dpg.add_text("nothing long to edit here: this node's settings are all on the node", parent="graph_props",
+                         color=DIM, wrap=0)
+            return
         for p in long_:
             v = str(n["params"].get(p["name"], p["default"]))
             shown = v.replace("/", "\n") if p.get("lines") else v
-            dpg.add_input_text(parent="graph_props", label=p["name"], width=-90, multiline=bool(p.get("lines")) or len(v) > 60,
+            dpg.add_text(p["name"], parent="graph_props", color=DIM)
+            dpg.add_input_text(parent="graph_props", width=-1, multiline=bool(p.get("lines")) or len(v) > 60,
                                height=self.px(120) if p.get("lines") else 0, default_value=shown,
                                user_data=(nid, p["name"]), callback=self._on_prop)
 
@@ -3161,8 +3171,6 @@ def build_panel(app, panel):
                           no_scrollbar=True, no_scroll_with_mouse=True):
         dpg.add_text("", tag="graph_help", color=(170, 178, 192), wrap=0)
     dpg.add_button(label="", tag="help_split", width=-1, height=5)
-    with dpg.child_window(tag="graph_props", show=False, height=170, border=True):
-        pass
     with dpg.node_editor(tag="node_editor", callback=panel.on_link, delink_callback=panel.on_delink,
                          minimap=True, minimap_location=dpg.mvNodeMiniMap_Location_BottomRight,
                          width=-1, height=-1):
