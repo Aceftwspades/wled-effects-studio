@@ -949,6 +949,41 @@ later goes through), so it retries; and two builds of one tree share a
 build id, so a reboot is recognised by the uptime starting over, not by
 the id changing.
 
+### The Device menu and its frames
+
+The device had been one free-text address per project, shared by four
+menu items in two menus, and the flash environment was a combo that knew
+nothing about the device - which is how this session began with the S3
+being built for esp32dev. Now there is a **Device** menu and three
+frames (`native/device_ui.py`, the network side in `native/devices.py`):
+
+- **Devices**: the list, a scan, an address typed in. "Scan the network"
+  does three things and takes the union: an mDNS query for
+  `_wled._tcp.local` (a hand-written DNS reader; on Windows the system's
+  resolver holds port 5353 and keeps the multicast answers, so it finds
+  nothing there), every known device's `/json/nodes`, and a sweep of the
+  /24 (`/json/info` to 254 addresses, sixty at a time, four seconds).
+  Each find is probed for its chip, version, effect count and whether the
+  Studio Script effect is there. The list is in the app's prefs; the
+  active device is still the project's `device` option, so old projects
+  keep theirs.
+- **Send to device**: the active device, what it runs now (effect, fps,
+  the Script effect's budget line - read on open and after each send),
+  and the four sends.
+- **Flash firmware**: the old dialog, sending to the active device, with
+  the environment its chip suggests (`devices.env_for`: an S3 gets
+  `esp32s3_customfx`) offered as a one-click fix when the combo says
+  otherwise.
+
+Each frame is a Dear PyGui window with the panes' header - title, dock
+button, ::: grip - and three new OPTIONAL slots let the arrangement hold
+them: "dock" puts a frame under the main pane, the grip dragged onto a
+pane puts it beside or above that one (`move_slot` takes a floating slot
+now: a drop in a pane's centre means below it, since a frame cannot take
+a pane's place), "float" takes it out, and the arrangement is saved with
+the rest. Docked, the window is placed and pinned by `relayout`; floating,
+`device_ui.poll` keeps its grip at its top right as it is resized.
+
 ## Where the frame time goes
 
 Measured (16 px cube, Maelstrom, 620 px view) before the GPU view: the

@@ -12,7 +12,8 @@ import time
 import numpy as np
 import dearpygui.dearpygui as dpg
 
-from native import chrome
+from native import chrome, device_ui, devices
+from native.project import save_prefs
 from native.engine import Engine
 from native.geometry import Geometry
 from native.dropfiles import classify
@@ -256,34 +257,35 @@ class Features:
         self.rebuild_params(); self.sync_palette_combo()
         self.gp.status(f"running as a script: {len(prog)} bytes")
     def send_script(self):
-        """The current graph to the device as /studio.bin, then the Studio
-        Script effect selected there with the graph's settings."""
+        """The current graph to the active device as /studio.bin, then the
+        Studio Script effect selected there with the graph's settings."""
         from native import flash
         from native.script import settings_of
-        host = self.project.options.get("device", "")
-        if not host.strip():
-            chrome.show_device(self); self.gp.status("set the device's address first"); return
+        host = self.active_host()
+        if not host:
+            device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
         prog = self.compile_current_script()
         if prog is None:
             return
         ok, msg = flash.send_script(host, prog)
         self.gp.status(msg)
         if not ok:
-            return
+            device_ui.send_log(self, msg); return
         st = settings_of(self.gp.graph)
         params = {k: st[k] for k in ("sx", "ix", "c1", "c2", "c3")}
         params.update({k: bool(st[k]) for k in ("o1", "o2", "o3")})
         pal = self.palette_name_for(st["pal"])
         ok2, msg2 = flash.push_settings(host, "Studio Script", params, pal, self.seg_cols)
-        self.gp.status(msg + ("; " + msg2 if not ok2 else "; the device is running it"))
+        msg = msg + ("; " + msg2 if not ok2 else "; the device is running it")
+        self.gp.status(msg); device_ui.send_log(self, msg)
+        self.probe_active()
     def push_settings(self):
         """The effect on the cube here, with its sliders, checkboxes, palette
-        and colours, becomes the device's first segment."""
+        and colours, becomes the active device's first segment."""
         from native import flash
-        host = self.project.options.get("device", "")
-        if not host.strip():
-            chrome.show_device(self)
-            self.gp.status("set the device's address first"); return
+        host = self.active_host()
+        if not host:
+            device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
         f = self.eng.fx
         params = {k: f.get(k) for k in ("sx", "ix", "c1", "c2", "c3")}
         params.update({k: bool(f.get(k)) for k in ("o1", "o2", "o3")})
@@ -293,7 +295,148 @@ class Features:
         ok, msg = flash.push_settings(host, self.eng.names[self.eng.idx], params,
                                       self.palette_name_for(self.eng.pal), self.seg_cols, seg_id=self.eng.seg, blend=bm, opacity=op,
                                       six=self.eng.six if self.project.geometry.kind == "cube" else None)
-        dpg.set_value("edit_status", msg); self.gp.status(msg)
+        dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
+        self.probe_active()
+
+    # --- the devices: the list, the active one, scans and probes ---------------------
+    # The list is the app's (prefs["devices"]: a network is not a project's);
+    # the ACTIVE device - where every send and the flash go - is the
+    # project's `device` option, as the single address field was before.
+    @property
+    def devices(self):
+        return self.prefs.setdefault("devices", [])
+
+    def active_host(self):
+        return devices.clean_host(self.project.options.get("device", ""))
+
+    def active_device(self):
+        host = self.active_host()
+        return next((d for d in self.devices if d["host"] == host), None)
+
+    def set_active_device(self, host):
+        host = devices.clean_host(host)
+        self.project.options["device"] = host
+        self.project.save()
+        self._active_state = None
+        device_ui.refresh_devices(self)
+        self.gp.status(f"active device: {host}" if host else "no active device")
+        if host:
+            self.probe_active()
+
+    def _merge_device(self, d):
+        """A probed device into the list (by host), keeping the name a user gave it."""
+        for i, old in enumerate(self.devices):
+            if old["host"] == d["host"]:
+                self.devices[i] = dict(old, **d)
+                break
+        else:
+            self.devices.append(d)
+        save_prefs(self.prefs)
+
+    def add_device(self, host):
+        """An address typed in: asked what it is on a worker, then listed;
+        the first device becomes the active one."""
+        host = devices.clean_host(host)
+        if not host:
+            return
+        if dpg.does_item_exist("dev_add_host"):
+            dpg.set_value("dev_add_host", "")
+        if not any(d["host"] == host for d in self.devices):
+            self._merge_device({"host": host, "name": host, "reachable": True})
+        if not self.active_host():
+            self.set_active_device(host)
+        self.refresh_devices_info(only=host)
+        device_ui.refresh_devices(self)
+
+    def remove_device(self, host):
+        self.prefs["devices"] = [d for d in self.devices if d["host"] != host]
+        save_prefs(self.prefs)
+        if self.active_host() == host:
+            self.set_active_device("")
+        device_ui.refresh_devices(self)
+
+    def scan_devices(self, mode="all"):
+        """mDNS, the known devices' node lists and a sweep of the subnet,
+        on a worker; the finds arrive through poll_devices."""
+        if getattr(self, "_scan", None) and not self._scan.done:
+            return
+        self._scan = devices.Scan(mode, known_hosts=[d["host"] for d in self.devices])
+        self._scan.start()
+        if dpg.does_item_exist("dev_scan"):
+            dpg.configure_item("dev_scan", enabled=False); dpg.configure_item("dev_scan_stop", enabled=True)
+            dpg.set_value("dev_status", "scanning...")
+        self.gp.status("scanning the network for WLED devices...")
+
+    def stop_scan(self):
+        if getattr(self, "_scan", None):
+            self._scan.cancel()
+
+    def refresh_devices_info(self, only=None):
+        """Every listed device (or one) asked again what it is."""
+        probes = getattr(self, "_probes", None)
+        if probes is None:
+            probes = self._probes = []
+        for d in self.devices:
+            if only and d["host"] != only:
+                continue
+            p = devices.Probe(d["host"]); p.start(); probes.append(p)
+
+    def probe_active(self):
+        host = self.active_host()
+        if host:
+            self.refresh_devices_info(only=host)
+
+    def open_device_page(self):
+        host = self.active_host()
+        if host:
+            import webbrowser
+            webbrowser.open(f"http://{host}/")
+
+    def poll_devices(self):
+        """Per frame: a scan's lines and finds, and probes' answers, into
+        the list and the frames."""
+        scan = getattr(self, "_scan", None)
+        changed = False
+        if scan is not None:
+            n = 0
+            while n < 20:
+                try:
+                    kind, v = scan.q.get_nowait()
+                except Exception:
+                    break
+                n += 1
+                if kind == "log":
+                    device_ui.dev_log(self, v)
+                elif kind == "device":
+                    self._merge_device(v); changed = True
+                elif kind == "done":
+                    if dpg.does_item_exist("dev_scan"):
+                        dpg.configure_item("dev_scan", enabled=True); dpg.configure_item("dev_scan_stop", enabled=False)
+                    self.gp.status(f"scan done: {v} device(s) answered")
+                    if v and not self.active_host():
+                        self.set_active_device(self.devices[0]["host"])
+                    self._scan = None; changed = True
+                    break
+        for p in list(getattr(self, "_probes", None) or []):
+            while True:
+                try:
+                    kind, v = p.q.get_nowait()
+                except Exception:
+                    break
+                if kind == "device":
+                    if v:
+                        self._merge_device(v)
+                    else:
+                        for d in self.devices:
+                            if d["host"] == p.host:
+                                d["reachable"] = False
+                    changed = True
+                elif kind == "state" and p.host == self.active_host():
+                    self._active_state = v; changed = True
+            if p.done and p.q.empty():
+                self._probes.remove(p)
+        if changed:
+            device_ui.refresh_devices(self)
     # --- A/B: two effects side by side ------------------------------------------
     # The engine is one strip in one DLL, so a second effect needs a second
     # engine: the same library copied under another name (the loader gives

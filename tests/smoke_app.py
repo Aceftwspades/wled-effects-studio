@@ -46,6 +46,11 @@ STEPS = [
     ([{"layout": "both"}, {"arrangement": [["main", "cube"], ["side"]]}, {"pane_move": ["cube", "side", "top"]},
       {"pane_move": ["side", "main", "left"]}, {"pane_move": ["cube", "main", "centre"]}, {"layout": "graph"},
       {"layout": "edit"}, {"arrangement": [["main"], ["cube"], ["side"]]}], 2.5),
+    # the Device frames: floating, docked by the button and by a grip drop, floated again
+    ([{"layout": "graph"}, {"frame": "devices"}, {"frame": "send"}, {"frame": "flash"}, {"dock": ["devices", True]},
+      {"pane_move": ["send", "cube", "bottom"]}, {"pane_move": ["flash", "side", "top"]}, {"pane_move": ["devices", "main", "right"]},
+      {"dock": ["devices", False]}, {"dock": ["send", False]}, {"dock": ["flash", False]},
+      {"arrangement": [["main"], ["cube", "props"], ["side"]]}], 3.0),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": "projects/default/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),

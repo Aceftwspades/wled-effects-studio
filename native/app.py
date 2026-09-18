@@ -40,7 +40,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow
+from native import chrome, glow, device_ui
 from native.gpucube import CubeQuads
 from native.features import Features
 from native.popout import Popouts
@@ -887,18 +887,19 @@ class App(Features):
         self.gp.rebuild()
         self.refresh_import_buttons()
         self.refresh_project_list()
-        dpg.set_value("device_host", self.project.options.get("device", ""))
+        self._active_state = None
+        device_ui.refresh_devices(self)
         name = os.path.basename(path)
         dpg.set_value("edit_status", f"project {name}"); self.gp.status(f"project {name}")
         # the engine holds the previous project's drafts: build this one's list
         self.edit_build()
 
     def send_ledmap(self):
-        host = dpg.get_value("device_host")
-        self.project.options["device"] = host
-        self.project.save()
+        host = self.active_host()
+        if not host:
+            device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
         msg = self.project.send_ledmap(host)
-        dpg.set_value("edit_status", msg); self.gp.status(msg)
+        dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
 
     def new_project(self, name):
         name = (name or "").strip()
@@ -1476,10 +1477,6 @@ class App(Features):
         msg = "exported to " + self.project.export(deps=ours if with_deps else [], requires=sorted(req))
         dpg.set_value("edit_status", msg); self.gp.status(msg)
 
-    def save_device(self):
-        self.project.options["device"] = dpg.get_value("device_host")
-        self.project.save()
-
     def save_editor_cmd(self, cmd):
         cmd = (cmd or "").strip()
         if cmd:
@@ -1508,13 +1505,20 @@ class App(Features):
     # settings too long for the node. It shows in the graph layout only,
     # and it is a pane of its own so selecting a node never moves the
     # editor - the panel it used to grow above the editor did.
+    # Then the Device menu's frames - "devices", "flash", "send" - which
+    # are windows of their own floating over the panes until docked: in
+    # the arrangement they are placed like any pane (dock_slot puts one
+    # under the main pane; the grip dragged onto a pane, beside it) and
+    # out of it they float. OPTIONAL: an arrangement holds any subset.
     PRESETS = (("Classic: main pane, 3-D, panel", [["main"], ["cube", "props"], ["side"]]),
                ("Panel on the left", [["side"], ["main"], ["cube", "props"]]),
                ("3-D on the left", [["cube", "props"], ["main"], ["side"]]),
                ("3-D under the main pane", [["main", "cube"], ["side", "props"]]),
                ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
                ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
-    SLOTS = ("main", "cube", "side", "props")
+    CORE = ("main", "cube", "side", "props")
+    OPTIONAL = ("devices", "flash", "send")
+    SLOTS = CORE + OPTIONAL
 
     @classmethod
     def _valid_arrangement(cls, arr):
@@ -1523,16 +1527,47 @@ class App(Features):
         except Exception:
             return None
         flat = sorted(s for c in cols for s in c)
-        if flat == sorted(s for s in cls.SLOTS if s != "props") and all(cols):
+        if flat == sorted(s for s in cls.CORE if s != "props") and all(cols):
             # saved before the properties pane existed: it goes under the 3-D view
             for c in cols:
                 if "cube" in c:
                     c.insert(c.index("cube") + 1, "props")
                     break
             return cols
-        if flat != sorted(cls.SLOTS) or not all(cols):
+        core = sorted(s for s in flat if s in cls.CORE)
+        extra = [s for s in flat if s not in cls.CORE]
+        if core != sorted(cls.CORE) or not all(cols):
+            return None
+        if any(s not in cls.OPTIONAL for s in extra) or len(set(extra)) != len(extra):
             return None
         return cols
+
+    def docked(self, slot):
+        """Whether a Device frame sits in the pane space."""
+        return any(slot in c for c in self.arrangement)
+
+    def dock_slot(self, slot):
+        """A floating frame into the pane space: under the main pane."""
+        if slot not in self.OPTIONAL or self.docked(slot):
+            return
+        arr = [list(c) for c in self.arrangement]
+        ci = next(i for i, c in enumerate(arr) if "main" in c)
+        arr[ci].insert(arr[ci].index("main") + 1, slot)
+        self.set_arrangement(arr)
+        self.gp.status(f"{slot} docked under the main pane; its grip moves it, float takes it out")
+
+    def undock_slot(self, slot):
+        """A docked frame out of the pane space: a window again, over the panes."""
+        if not self.docked(slot):
+            return
+        arr = [[s for s in c if s != slot] for c in self.arrangement]
+        arr = [c for c in arr if c]
+        tag = self.pane_of(slot)
+        self.set_arrangement(arr)
+        _, _, w, h = device_ui.FRAMES[slot]
+        dpg.configure_item(tag, no_move=False, no_resize=False, width=w, height=h, show=True)
+        chrome._centre(tag, w, h)
+        device_ui.place_header(tag, w, False)
 
     def set_arrangement(self, arr):
         cols = self._valid_arrangement(arr)
@@ -1549,6 +1584,8 @@ class App(Features):
         if slot == target or slot not in self.SLOTS or target not in self.SLOTS or zone is None:
             return
         arr = [list(c) for c in self.arrangement]
+        if zone == "centre" and not self.docked(slot):
+            zone = "bottom"                          # a floating frame cannot take a pane's place
         if zone == "centre":
             arr = [[target if s == slot else slot if s == target else s for s in c] for c in arr]
         else:
@@ -1574,6 +1611,8 @@ class App(Features):
             return "side_win"
         if slot == "props":
             return "props_win"
+        if slot in self.OPTIONAL:
+            return f"{slot}_win"
         return {"edit": "edit_win", "graph": "graph_win"}.get(self.layout, "net_win")
 
     def slot_of(self, pane):
@@ -1589,6 +1628,8 @@ class App(Features):
     def slot_shown(self, slot):
         if not self.ui:
             return False
+        if slot in self.OPTIONAL:
+            return self.docked(slot)
         if slot == "props":
             return self.layout == "graph" and self.props
         if slot == "side":
@@ -1902,6 +1943,11 @@ class App(Features):
         dpg.configure_item("graph_win", show=show_graph)
         dpg.configure_item("side_win", show=self.ui and self.side)
         dpg.configure_item("props_win", show=self.slot_shown("props"))
+        for slot in self.OPTIONAL:
+            tag = self.pane_of(slot)
+            if dpg.does_item_exist(tag) and self.docked(slot):
+                # docked: placed below like the panes, and not movable by hand
+                dpg.configure_item(tag, show=self.ui, no_move=True, no_resize=True)
         # The menu bar is the window's: a hidden mvMenuBar still draws its
         # strip, the window flag takes it away.
         dpg.configure_item("root", menubar=self.ui)
@@ -1947,7 +1993,9 @@ class App(Features):
                 dpg.configure_item(tag, width=w, height=h)
                 dpg.set_item_pos(tag, [x, y])
                 # the grip at the pane's top right, clear of the scrollbar
-                if dpg.does_item_exist(f"grip_{tag}"):
+                if slot in self.OPTIONAL:
+                    device_ui.place_header(tag, w, True)
+                elif dpg.does_item_exist(f"grip_{tag}"):
                     dpg.set_item_pos(f"grip_{tag}", [w - 40 - (14 if slot == "side" else 0), 8])
             app_ed = getattr(self, "code_ed", None)
             if app_ed and show_edit and "main" in rects:
@@ -2121,6 +2169,11 @@ class App(Features):
             if x0 - 4 <= mx <= x0 + 360 and y1 <= my <= y1 + 380:
                 self._picker = prev                           # inside the picker: still open
 
+    def _slot_label(self, slot):
+        return {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
+                "side": "Panel", "props": "Properties", "devices": "Devices", "flash": "Flash firmware",
+                "send": "Send to device"}.get(slot, slot)
+
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
         if dpg.does_item_exist("help_split") and dpg.is_item_shown("help_split") and dpg.is_item_hovered("help_split"):
@@ -2132,8 +2185,17 @@ class App(Features):
                 self._pane_drag = slot
                 self._pane_target = None
                 x, y, w, h = self._rects[slot]
-                self._ghost_start(x, y, w, h, {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
-                                               "side": "Panel", "props": "Properties"}.get(slot, slot))
+                self._ghost_start(x, y, w, h, self._slot_label(slot))
+                return
+        for slot in self.OPTIONAL:
+            tag = self.pane_of(slot)
+            grip = f"grip_{tag}"
+            if not self.docked(slot) and dpg.does_item_exist(grip) and dpg.is_item_shown(tag) and dpg.is_item_hovered(grip):
+                self._pane_drag = slot
+                self._pane_target = None
+                x, y = dpg.get_item_pos(tag)
+                w, h = dpg.get_item_rect_size(tag)
+                self._ghost_start(x, y, w, h, self._slot_label(slot))
                 return
         if self.side and self.ui:
             for key in self.SECTIONS:
@@ -2341,7 +2403,7 @@ class App(Features):
             self.run_action("find_prev" if (dpg.is_key_down(dpg.mvKey_LShift) or dpg.is_key_down(dpg.mvKey_RShift)) else "find_next")
             return
         if any(dpg.does_item_exist(t) and dpg.is_item_active(t)
-               for t in ("find_text", "replace_text", "device_host", "name_input", "editor_cmd") + self.META_FIELDS):
+               for t in ("find_text", "replace_text", "dev_add_host", "name_input", "editor_cmd") + self.META_FIELDS):
             return
         if dpg.does_item_exist("name_dialog") and dpg.is_item_shown("name_dialog"):
             if app_data == dpg.mvKey_Escape:
@@ -2512,7 +2574,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "device_dialog", "editor_dialog", "about_win",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -3005,6 +3067,7 @@ def build(app):
                        "Help > Keyboard shortcuts has the rest", tag="hint1", color=(130, 140, 155))
     chrome.build_dialogs(app)
     chrome.build_pane_menus(app)
+    device_ui.refresh_devices(app)                   # the known devices into the frame and the menu
 
     app._themes['normal'] = apply_theme(app.prefs)
     _cols = theme_colors(app.prefs)
@@ -3133,13 +3196,22 @@ def service_command(app):
                  "shortcuts": lambda: chrome.show_keys(app), "about": lambda: dpg.show_item("about_win"),
                  "search": app.search_nodes, "name_ok": lambda: chrome._name_ok(app),
                  "frames": lambda: chrome.show_frames(app), "flash": lambda: chrome.show_flash(app),
-                 "usermods": lambda: chrome.show_usermods(app),
+                 "usermods": lambda: chrome.show_usermods(app), "devices": lambda: device_ui.show(app, "devices"),
+                 "send": lambda: device_ui.show(app, "send"),
                  "flash_start": lambda: chrome.start_flash(app)}[c["chrome"]]()
             if "flash_opts" in c:                       # test hook: {"env":..., "host":..., "build":..., "upload":...}
                 o = c["flash_opts"]
-                for k, tag in (("env", "flash_env"), ("host", "flash_host"), ("build", "flash_build"), ("upload", "flash_upload")):
+                for k, tag in (("env", "flash_env"), ("build", "flash_build"), ("upload", "flash_upload")):
                     if k in o:
                         dpg.set_value(tag, o[k])
+                if "host" in o:
+                    app.add_device(o["host"]); app.set_active_device(o["host"])
+            if "dock" in c:                             # test hook: [slot, True to dock / False to float]
+                (app.dock_slot if c["dock"][1] else app.undock_slot)(c["dock"][0])
+            if "frame" in c:                            # test hook: show a Device frame by name
+                device_ui.show(app, c["frame"])
+            if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
+                app.scan_devices(c["scan"])
             if "gp_call" in c:                          # test hook: [method of the graph panel, args]
                 getattr(app.gp, c["gp_call"][0])(*c["gp_call"][1])
             if c.get("script_preview"):
@@ -3258,10 +3330,8 @@ def service_command(app):
                     st = dpg.get_item_state(i)
                     if st.get("visible"):
                         print("combo", dpg.get_item_alias(i) or i, dpg.get_value(i), st)
-            if "device" in c:                           # test hook: the project's device address
-                app.project.options["device"] = c["device"]; app.project.save()
-                if dpg.does_item_exist("device_host"):
-                    dpg.set_value("device_host", c["device"])
+            if "device" in c:                           # test hook: the active device's address (listed and chosen)
+                app.add_device(c["device"]); app.set_active_device(c["device"])
             if "menu_walk" in c:                        # test hook: every menu item's callback, in turn; failures printed
                 walk_menus(app, c["menu_walk"] if isinstance(c["menu_walk"], list) else [])
             if "ctx_walk" in c:                         # test hook: every row of a context menu ["node"|"in"|"out", nid, pin]
@@ -3685,7 +3755,8 @@ def main():
                 app.gp.poll()
                 app.poll_watch()
                 chrome.poll(app)
-                chrome.poll_flash(app)
+                device_ui.poll(app)
+                app.poll_devices()
                 app.poll_autosave()
                 app.poll_view_mode()
                 app.poll_drops()

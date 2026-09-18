@@ -80,30 +80,47 @@ the panel) layer several effects with WLED's blend modes and opacity.
 
 ## Getting it onto the cube
 
-Three routes, all under File > Project, all needing the device's address:
+Everything about the device is under the **Device** menu, in three frames.
+Each opens as a window over the panes; its **dock** button slots it into
+the pane space under the main pane (drag its ::: grip onto any pane to put
+it beside or above that one, like the panes themselves), **float** takes
+it out again, and the arrangement is remembered.
 
-1. **Send the graph as a script** (Ctrl+Shift+D). No firmware build: the
-   graph is compiled to bytecode and sent to the Studio Script effect on
-   the device, which runs it within two seconds. Playback > "Run the graph
-   as a script" previews exactly that in the sim first. Not every node is
-   scriptable - the studio names the one that is not.
-2. **Build firmware + flash** (Ctrl+Shift+U). Tick the effects to ship
-   (each shows its flash cost after a first build), pick the environment,
-   and the studio builds WLED with your effects as a usermod and sends it
-   over OTA. The dialog says in plain words when a build will not fit the
-   board's partition. Under FEATURES untick what your device has not - the
-   motion sensor, the knob and screen, slider memory - and choose the
-   audio (with the waveform, stock, or none): the firmware gets smaller,
-   and the nodes that lean on a feature you left out say so. Settings >
-   Usermods and features manages WLED's own usermods for the project as
-   well: tick, untick, add one from the tree, import a folder or zip.
-3. **Export** the usermod folder and zip for a build elsewhere. If the
-   effects (or a graph bundle) need firmware not every WLED tree has -
-   the IMU driver - the studio asks whether to include it; importing such
-   a bundle offers to turn the feature on and install what it carries.
+- **Devices** finds WLED on the network - "Scan the network" asks by mDNS,
+  asks every known device for the nodes it has heard, and sweeps the
+  subnet - or takes an address typed in. Each row says what the device is
+  (chip, WLED version, how many effects, whether it has the Studio Script
+  effect); the tick marks the **active device**, where every send and the
+  flash go (also Device > Active device). The list is the app's; the
+  active choice is the project's.
+- **Send to device** shows the active device and what it runs now (the
+  effect, its fps, the Script effect's frame budget), and has the sends:
+  1. **Send the graph as a script** (Ctrl+Shift+D). No firmware build: the
+     graph is compiled to bytecode and sent to the Studio Script effect on
+     the device, which runs it within two seconds. Playback > "Run the
+     graph as a script" previews exactly that in the sim first. Not every
+     node is scriptable - the studio names the one that is not.
+  2. **Send the current effect's settings** pushes the effect, sliders,
+     palette, colours and the segment's blend mode.
+  3. **Send the ledmap** uploads the wiring; **Import the device's ledmap**
+     reads it back as the geometry.
+- **Flash firmware** (Ctrl+Shift+U). Tick the effects to ship (each shows
+  its flash cost after a first build), pick the environment - the active
+  device's chip suggests one - and the studio builds WLED with your
+  effects as a usermod and sends it over OTA to the active device. The
+  frame says in plain words when a build will not fit the board's
+  partition. Under FEATURES untick what your device has not - the motion
+  sensor, the knob and screen, slider memory - and choose the audio (with
+  the waveform, stock, or none): the firmware gets smaller, and the nodes
+  that lean on a feature you left out say so. Device > Usermods and
+  features manages WLED's own usermods for the project as well: tick,
+  untick, add one from the tree, import a folder or zip.
 
-"Send the current effect's settings" pushes the sliders, palette, colours
-and the segment's blend mode; "Send ledmap" uploads the wiring.
+**Export usermod** (Device menu, or File > Project) writes the usermod
+folder and zip for a build elsewhere. If the effects (or a graph bundle)
+need firmware not every WLED tree has - the IMU driver - the studio asks
+whether to include it; importing such a bundle offers to turn the feature
+on and install what it carries.
 
 ## When something is wrong
 

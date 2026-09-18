@@ -7,7 +7,7 @@ status line); everything that used to be a button in a pane lives here.
 
     build_menus(app)      # inside the root window, first
     build_toolbar(app)    # a row of icon buttons under the menus
-    build_dialogs(app)    # the name box, device, editor command, shortcuts, about
+    build_dialogs(app)    # the name box, editor command, shortcuts, about, the Device frames
     refresh(app)          # menu checks, toolbar tints and labels, the file lists
     poll(app)             # per frame: refresh() when something it shows changed
 """
@@ -18,7 +18,7 @@ import dearpygui.dearpygui as dpg
 
 from native.icons import texture
 from native.keys import ACTIONS, FIXED
-from native import glow, flash
+from native import glow, flash, device_ui
 
 TEXT   = (215, 219, 227, 255)
 DIM    = (139, 147, 163, 255)
@@ -66,15 +66,7 @@ def build_menus(app):
                     pass
                 dpg.add_menu_item(label="Open folder...", callback=lambda: dpg.show_item("project_dialog"))
                 dpg.add_separator()
-                dpg.add_menu_item(label="Device address...", callback=lambda: show_device(app))
-                dpg.add_menu_item(label="Send ledmap to device", callback=lambda: app.send_ledmap())
-                dpg.add_menu_item(label="Import ledmap from the device", callback=lambda: app.import_ledmap(
-                    host=app.project.options.get("device", "")) if app.project.options.get("device") else show_device(app))
-                dpg.add_menu_item(label="Import ledmap file...", callback=lambda: dpg.show_item("ledmap_dialog"))
                 dpg.add_menu_item(label="Export usermod (folder + zip)", callback=lambda: app.export_usermod())
-                _mi(app, "Build firmware + flash the device...", "flash", callback=lambda: show_flash(app))
-                _mi(app, "Send the current effect's settings to the device", "push", callback=lambda: app.push_settings())
-                _mi(app, "Send the graph to the device as a script", "script_send", callback=lambda: app.send_script())
             dpg.add_menu_item(label="Import graph bundle...", callback=lambda: dpg.show_item("graph_import_dialog"))
             dpg.add_menu_item(label="Export graph bundle", callback=lambda: app.gp.export_bundle())
             dpg.add_separator()
@@ -109,6 +101,25 @@ def build_menus(app):
             dpg.add_separator()
             _mi(app, "Find / replace in code", "find", callback=lambda: app.focus_find())
             _mi(app, "Open code in external editor", "external", callback=lambda: app.open_external())
+        with dpg.menu(label="Device"):
+            # the three frames: each a window that floats or docks into the pane space
+            dpg.add_menu_item(label="Devices...", callback=lambda: device_ui.show(app, "devices"))
+            _mi(app, "Flash firmware...", "flash", callback=lambda: device_ui.show(app, "flash"))
+            dpg.add_menu_item(label="Send to device...", callback=lambda: device_ui.show(app, "send"))
+            dpg.add_separator()
+            with dpg.menu(label="Active device", tag="menu_active_device"):
+                pass
+            dpg.add_menu_item(label="Scan the network for devices", callback=lambda: (device_ui.show(app, "devices"), app.scan_devices("all")))
+            dpg.add_separator()
+            _mi(app, "Send the graph as a script", "script_send", callback=lambda: app.send_script())
+            _mi(app, "Send the current effect's settings", "push", callback=lambda: app.push_settings())
+            dpg.add_menu_item(label="Send the ledmap", callback=lambda: app.send_ledmap())
+            dpg.add_menu_item(label="Import the device's ledmap", callback=lambda: app.import_ledmap(host=app.active_host())
+                              if app.active_host() else device_ui.show(app, "devices"))
+            dpg.add_menu_item(label="Import a ledmap file...", callback=lambda: dpg.show_item("ledmap_dialog"))
+            dpg.add_separator()
+            dpg.add_menu_item(label="Usermods and features...", callback=lambda: show_usermods(app))
+            dpg.add_menu_item(label="Export usermod (folder + zip)", callback=lambda: app.export_usermod())
         with dpg.menu(label="View"):
             for key, label, act in LAYOUTS:
                 _mi(app, label, act, check=True, tag=f"menu_view_{key}",
@@ -198,8 +209,6 @@ def build_menus(app):
             dpg.add_menu_item(label="Keyboard shortcuts...", callback=lambda: show_keys(app))
             dpg.add_menu_item(label="Selection frames...", callback=lambda: show_frames(app))
             dpg.add_menu_item(label="Appearance...", callback=lambda: show_appearance(app))
-            dpg.add_menu_item(label="Device address...", callback=lambda: show_device(app))
-            dpg.add_menu_item(label="Usermods and features...", callback=lambda: show_usermods(app))
             dpg.add_menu_item(label="External editor command...", callback=lambda: show_editor(app))
             dpg.add_menu_item(label="Draw the cube on the GPU", check=True, default_value=app.gpu_cube, tag="menu_gpu",
                               callback=lambda s, a: app.set_gpu_cube(bool(a)))
@@ -328,14 +337,6 @@ def build_dialogs(app):
         dpg.add_text("", tag="confirm_text", color=TEXT, wrap=440)
         with dpg.group(horizontal=True, tag="confirm_buttons"):
             pass
-    with dpg.window(tag="device_dialog", label="Device", modal=True, show=False, no_resize=True, width=380, height=140, no_collapse=True):
-        dpg.add_text("the WLED device's address, for sending the ledmap", color=DIM)
-        dpg.add_input_text(tag="device_host", hint="e.g. 192.168.1.50", width=-1,
-                           default_value=app.project.options.get("device", ""))
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Save", width=80, callback=lambda: (app.save_device(), dpg.hide_item("device_dialog")))
-            dpg.add_button(label="Send ledmap", callback=lambda: (app.send_ledmap(), dpg.hide_item("device_dialog")))
-            dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("device_dialog"))
     with dpg.window(tag="editor_dialog", label="External editor", modal=True, show=False, no_resize=True, width=460, height=150, no_collapse=True):
         dpg.add_text("the command that opens a file at a line; {file} and {line} are filled in.\n"
                      "Empty uses VS Code if it is on the path.", color=DIM)
@@ -402,7 +403,7 @@ def build_dialogs(app):
             dpg.add_button(label="Start", callback=lambda: _sweep_start(app))
             dpg.add_button(label="Cancel", callback=lambda: dpg.hide_item("sweep_win"))
     build_frames_dialog(app)
-    build_flash_dialog(app)
+    device_ui.build(app)
     with dpg.window(tag="history_win", label="History", show=False, width=520, height=420, no_collapse=True):
         dpg.add_text("", tag="history_what", color=DIM, wrap=500)
         with dpg.child_window(tag="history_rows", height=-1, border=False):
@@ -503,9 +504,8 @@ def refresh_keys(app):
 
 
 def show_device(app):
-    dpg.set_value("device_host", app.project.options.get("device", ""))
-    _centre("device_dialog", 380)
-    dpg.show_item("device_dialog")
+    """The Devices frame (what "the device address" became)."""
+    device_ui.show(app, "devices")
 
 
 def show_editor(app):
@@ -743,109 +743,6 @@ def _gc_delete(app):
     dpg.set_value("gc_status", f"deleted {name}")
 
 
-# --- build + flash ------------------------------------------------------------------------
-def build_flash_dialog(app):
-    app.flash_job = None
-    envs, default = flash.read_envs()
-    with dpg.window(tag="flash_win", label="Build firmware + flash", show=False, width=720, height=700, no_collapse=True):
-        dpg.add_text("Stages the project's effects into the WLED tree as a usermod, builds the firmware on an "
-                     "environment that extends the one chosen (its usermods plus ours), and sends the binary to "
-                     "the device's /update. The device must have OTA unlocked and be on this subnet.", color=DIM, wrap=690)
-        with dpg.group(horizontal=True):
-            dpg.add_combo(envs, tag="flash_env", width=260, default_value=app.project.options.get("flash_env") or default or "",
-                          callback=lambda: refresh_flash(app))
-            dpg.add_text("environment", color=DIM)
-            dpg.add_input_text(tag="flash_host", hint="device address", width=200,
-                               default_value=app.project.options.get("device", ""))
-        with dpg.group(horizontal=True):
-            dpg.add_text("EFFECTS TO SHIP", color=ACCENT)
-            dpg.add_button(label="all", small=True, callback=lambda: _ship_all(app, True))
-            dpg.add_button(label="none", small=True, callback=lambda: _ship_all(app, False))
-            dpg.add_text("", tag="flash_budget", color=DIM)
-        with dpg.child_window(tag="flash_fx", height=110, border=True):
-            pass
-        with dpg.group(horizontal=True):
-            dpg.add_text("FEATURES", color=ACCENT)
-            dpg.add_text("what the firmware carries - untick what this device has not, and the build is smaller", color=DIM)
-            dpg.add_button(label="Usermods...", small=True, callback=lambda: show_usermods(app))
-        with dpg.child_window(tag="flash_features", height=232, border=True):
-            pass
-        with dpg.group(horizontal=True):
-            dpg.add_checkbox(label="build", tag="flash_build", default_value=True)
-            dpg.add_checkbox(label="send to the device", tag="flash_upload", default_value=True)
-            dpg.add_button(label="Start", tag="flash_start", callback=lambda: start_flash(app))
-            dpg.add_button(label="Cancel", tag="flash_cancel", enabled=False,
-                           callback=lambda: app.flash_job and app.flash_job.cancel())
-            dpg.add_button(label="Open the build folder", callback=lambda: app.reveal(os.path.join(flash.ROOT, ".pio", "build")))
-        dpg.add_text("", tag="flash_status", color=DIM, wrap=690)
-        with dpg.child_window(tag="flash_log", height=-1, border=True):
-            pass
-
-
-def _ship_files(app):
-    """The effects ticked to ship: the project's choice, else all of the list."""
-    files = app.project.build_files()
-    chosen = app.project.options.get("ship")
-    return [f for f in files if chosen is None or f in chosen]
-
-
-def _ship_all(app, on):
-    app.project.options["ship"] = list(app.project.build_files()) if on else []
-    app.project.save()
-    refresh_flash(app)
-
-
-def _ship_toggle(app, fname, on):
-    cur = set(_ship_files(app))
-    (cur.add if on else cur.discard)(fname)
-    app.project.options["ship"] = [f for f in app.project.build_files() if f in cur]
-    app.project.save()
-    refresh_flash(app)
-
-
-def refresh_flash(app):
-    """The checklist of effects with their measured sizes, and the budget
-    for the chosen environment from its last build."""
-    if not dpg.does_item_exist("flash_fx"):
-        return
-    _feature_rows(app)
-    env = dpg.get_value("flash_env") or ""
-    stats = (app.project.options.get("flash_stats") or {}).get(env) or {}
-    sizes = stats.get("sizes") or {}                  # the effects in the last build: they set the base
-    known = stats.get("known") or sizes               # every effect this env has ever measured
-    ship = set(_ship_files(app))
-    files = app.project.build_files()
-    dpg.delete_item("flash_fx", children_only=True)
-    for f in files:
-        with dpg.group(horizontal=True, parent="flash_fx"):
-            dpg.add_checkbox(default_value=f in ship, user_data=f, callback=lambda s, a, u: _ship_toggle(app, u, bool(a)))
-            dpg.add_text(app.project.effect_title(f))
-            kb = known.get(f)
-            dpg.add_text(f"{kb / 1024:.1f} KB" if kb else "not measured yet", color=DIM)
-    if not files:
-        dpg.add_text("the effects list is empty - File > Add to the effects list", parent="flash_fx", color=DIM)
-    if stats.get("partition"):
-        base = stats["firmware"] - sum(sizes.values())
-        avg = (sum(sizes.values()) / len(sizes)) if sizes else 4096
-        est = base + sum(known.get(f, avg) for f in ship)
-        over = est - stats["partition"]
-        if base > stats["partition"]:
-            dpg.set_value("flash_budget", f"no selection fits: {base // 1024} KB before any effect, "
-                                          f"{stats['partition'] // 1024} KB partition")
-            dpg.configure_item("flash_budget", color=RED)
-        elif over > 0:
-            dpg.set_value("flash_budget", f"about {est // 1024} KB of {stats['partition'] // 1024} KB - "
-                                          f"{over // 1024} KB over: untick about {max(1, int(-(-over // avg)))} more")
-            dpg.configure_item("flash_budget", color=RED)
-        else:
-            dpg.set_value("flash_budget", f"about {est // 1024} KB of {stats['partition'] // 1024} KB "
-                                          f"({len(ship)} of {len(files)} effects; base firmware {base // 1024} KB)")
-            dpg.configure_item("flash_budget", color=GREEN if over < -32768 else AMBER)
-    else:
-        dpg.set_value("flash_budget", f"{len(ship)} of {len(files)} - build once to measure the sizes and the room")
-        dpg.configure_item("flash_budget", color=DIM)
-
-
 def _feature_rows(app, parent="flash_features"):
     """The picker: a checkbox per optional part of the firmware, the audio
     choice, and under each what it brings and which nodes lean on it."""
@@ -913,71 +810,21 @@ def refresh_usermods(app):
 
 
 def show_flash(app):
-    dpg.set_value("flash_host", app.project.options.get("device", "") or dpg.get_value("flash_host"))
-    refresh_flash(app)
-    _centre("flash_win", 720, 700)
-    dpg.show_item("flash_win")
+    device_ui.show(app, "flash")
+
+
+def refresh_flash(app):
+    device_ui.refresh_flash(app)
 
 
 def start_flash(app):
-    if app.flash_job and not app.flash_job.done:
-        return
-    env = dpg.get_value("flash_env")
-    host = dpg.get_value("flash_host")
-    if not env:
-        dpg.set_value("flash_status", "choose an environment"); return
-    if dpg.get_value("flash_upload") and not host.strip():
-        dpg.set_value("flash_status", "a device address is needed to send, or untick sending"); return
-    app.project.options["device"] = host
-    app.project.options["flash_env"] = env
-    app.project.save()
-    dpg.delete_item("flash_log", children_only=True)
-    done = app.gp.regenerate(app.project.build_files())
-    if done:
-        dpg.add_text(f"regenerated {len(done)} graph effect(s) with the current compiler", parent="flash_log", color=TEXT)
-    dpg.set_value("flash_status", "working...")
-    dpg.configure_item("flash_start", enabled=False)
-    dpg.configure_item("flash_cancel", enabled=True)
-    only = _ship_files(app)
-    if not only:
-        dpg.set_value("flash_status", "tick at least one effect to ship"); return
-    app.flash_job = flash.Job(app.project, env, host, build=dpg.get_value("flash_build"),
-                              upload=dpg.get_value("flash_upload"), only=only)
-    app.flash_job.start()
+    device_ui.start_flash(app)
 
 
 def poll_flash(app):
-    """Every frame: the job's lines into the log, its end into the status."""
-    job = getattr(app, "flash_job", None)
-    if job is None or not dpg.does_item_exist("flash_log"):
-        return
-    n = 0
-    while n < 60:
-        try:
-            line = job.q.get_nowait()
-        except Exception:
-            break
-        dpg.add_text(line, parent="flash_log", color=RED if "error" in line.lower() else TEXT)
-        n += 1
-    if n:
-        kids = dpg.get_item_children("flash_log", 1) or []
-        for k in kids[:-400]:
-            dpg.delete_item(k)
-        dpg.set_y_scroll("flash_log", -1.0)
-    if job.done and not getattr(job, "_reported", False):
-        job._reported = True
-        if job.stats:
-            app.project.options.setdefault("flash_stats", {})[job.base_env] = job.stats
-            app.project.save()
-            refresh_flash(app)
-        dpg.set_value("flash_status", job.result)
-        dpg.configure_item("flash_status", color=GREEN if job.ok else AMBER)
-        dpg.configure_item("flash_start", enabled=True)
-        dpg.configure_item("flash_cancel", enabled=False)
-        app.gp.status(job.result)
+    device_ui.poll(app)
 
 
-# --- history ----------------------------------------------------------------------------
 def show_history(app):
     """The versions kept of the current graph (graph pane) or code effect
     (code pane), newest first; restore keeps the current one first."""
