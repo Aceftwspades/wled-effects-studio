@@ -1105,6 +1105,7 @@ class GraphPanel:
 
     def rebuild(self):
         self.touch()
+        self.app._color_edits = None                    # the nodes' dropdowns and swatches are new
         # the editor's own selection dies with the nodes it is rebuilt from
         # (a zoom, an edit): it carries on as the key selection, outlined
         keep = self._clicked()
@@ -2027,6 +2028,8 @@ class GraphPanel:
         alt = dpg.is_key_down(dpg.mvKey_LAlt) or dpg.is_key_down(dpg.mvKey_RAlt)
         over = next((nid for nid in self.graph.nodes
                      if dpg.does_item_exist(f"gnode_{nid}") and dpg.is_item_hovered(f"gnode_{nid}")), None)
+        if over is None:
+            over = self._node_at(dpg.get_mouse_pos(local=False))   # over one of its widgets, the node is not "hovered"
         if alt and over is not None:
             self.detach(over); return
         if ctrl and shift and over is not None:
@@ -2036,7 +2039,7 @@ class GraphPanel:
                 k = (outs.index(self.preview[1]) + 1) % len(outs) if self.preview and self.preview[0] == over and self.preview[1] in outs else 0
                 self.preview_pin(over, outs[k])
             return
-        if dpg.is_item_hovered("node_editor") and not ctrl and not shift and self.ext_sel and over not in self.ext_sel:
+        if dpg.is_item_hovered("node_editor") and not ctrl and not shift and self.ext_sel and over not in self.ext_sel                 and not getattr(self.app, "_popup_click", False):
             self.set_selection([])                     # a plain click elsewhere: the key selection is over
         # where every node is now: a node dragged onto a wire is spliced in on release
         self._press_pos = {nid: tuple(dpg.get_item_pos(f"gnode_{nid}")) for nid in self.graph.nodes if dpg.does_item_exist(f"gnode_{nid}")}
@@ -2160,6 +2163,22 @@ class GraphPanel:
             return False
         (x0, y0), (x1, y1) = st["rect_min"], st["rect_max"]
         return x0 - 2 <= mp[0] <= x1 + 2 and y0 - 2 <= mp[1] <= y1 + 2
+
+    def _node_at(self, mp):
+        """The node whose rectangle holds the point, or None."""
+        if not self.graph:
+            return None
+        for nid in self.graph.nodes:
+            tag = f"gnode_{nid}"
+            if not dpg.does_item_exist(tag):
+                continue
+            st = dpg.get_item_state(tag)
+            if "rect_min" not in st or "rect_max" not in st:
+                continue
+            (x0, y0), (x1, y1) = st["rect_min"], st["rect_max"]
+            if x0 <= mp[0] <= x1 and y0 <= mp[1] <= y1 and self.graph.nodes[nid]["type"] != "Frame":
+                return nid
+        return None
 
     def _wire_to_body(self, frm, t, nid, kind):
         """A wire from `frm` dropped on node `nid`: the first free input that

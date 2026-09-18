@@ -276,8 +276,9 @@ class App(Features):
         self._menus = None           # every menu, found once: an open one is a hole too
         self._glow_mouse = None      # the pointer last frame, to lead a dragged node's frame
         self._glow_rects = {}        # the selected nodes' rectangles last frame: did they move?
-        self._color_edits = None     # every colour swatch, found once (a rebuild finds them again)
-        self._picker = None          # the swatch whose picker popup is believed open
+        self._color_edits = None     # every colour swatch and dropdown, found once (a rebuild finds them again)
+        self._picker = None          # the swatch or dropdown whose popup is believed open
+        self._popup_click = False    # the last click landed in such a popup
         # the side panel's sections: their order, and which are folded
         secs = self.prefs.get("sections") or {}
         self.sec_order = [k for k in (secs.get("order") or []) if k in self.SECTIONS]
@@ -2016,25 +2017,33 @@ class App(Features):
     # moved from where the drag began. A spin control, not a grab, exactly as it
     # felt.
     def _picker_click(self):
-        """A colour swatch clicked opens ImGui's picker popup, which nothing
-        reports; it is remembered, and a click outside where the popup
-        sits (under the swatch) or Escape forgets it. While remembered, the
-        frames stay off - they would draw over the popup."""
+        """A colour swatch or a dropdown clicked opens an ImGui popup, which
+        nothing reports; it is remembered, and the frames stay off while it
+        is - they would draw over it. A dropdown closes on the next click
+        wherever it lands (a choice, or a dismissal); a picker stays open
+        for clicks inside it, so only a click outside where it sits (under
+        the swatch) forgets it. Escape forgets either."""
         if self._color_edits is None:
-            self._color_edits = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvColorEdit")]
+            self._color_edits = [i for i in dpg.get_all_items()
+                                 if dpg.get_item_type(i).endswith(("::mvColorEdit", "::mvCombo"))]
+        prev = self._picker
+        self._popup_click = prev is not None                  # this click went to a popup: not a selection
+        self._picker = None                                   # a dropdown, or a click elsewhere: over
         for i in list(self._color_edits):
             if not dpg.does_item_exist(i):
-                self._color_edits = None
+                self._color_edits = None                      # stale: found again next click
                 return
             if dpg.is_item_shown(i) and dpg.is_item_hovered(i):
+                if i == prev and dpg.get_item_type(i).endswith("::mvCombo"):
+                    return                                    # clicked again: it closed
                 self._picker = i
                 return
-        if self._picker is not None:
-            st = dpg.get_item_state(self._picker) if dpg.does_item_exist(self._picker) else {}
+        if prev is not None and dpg.does_item_exist(prev) and dpg.get_item_type(prev).endswith("::mvColorEdit"):
+            st = dpg.get_item_state(prev)
             mx, my = dpg.get_mouse_pos(local=False)
             (x0, y0), (x1, y1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
-            if not (x0 - 4 <= mx <= x0 + 360 and y1 <= my <= y1 + 380):
-                self._picker = None
+            if x0 - 4 <= mx <= x0 + 360 and y1 <= my <= y1 + 380:
+                self._picker = prev                           # inside the picker: still open
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
@@ -3138,6 +3147,13 @@ def service_command(app):
                 aw = dpg.get_active_window()
                 print("active window", aw, dpg.get_item_alias(aw) if aw and dpg.does_item_exist(aw) else "?",
                       "item", c["active"], dpg.get_item_state(c["active"]) if dpg.does_item_exist(c["active"]) else None)
+            if "sel" in c:                              # test hook: print the selection
+                print("SEL clicked", app.gp._clicked(), "ext", app.gp.ext_sel, "picker", app._picker)
+            if "combos" in c:                           # test hook: every visible combo's state
+                for i in [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvCombo")]:
+                    st = dpg.get_item_state(i)
+                    if st.get("visible"):
+                        print("combo", dpg.get_item_alias(i) or i, dpg.get_value(i), st)
             if "menus" in c:                            # test hook: every menu's state (an open one shows)
                 for m in [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]:
                     st = dpg.get_item_state(m)
