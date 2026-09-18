@@ -491,9 +491,13 @@ order is the order they were done.
       other thing): nodes land on the 20-unit grid when let go.
 - [x] **Delete with reconnect** (Ctrl+Delete): what fed the node's first
       wired input feeds whatever its outputs fed, where the types allow.
-- [x] **Drop a node onto a wire** to splice it in, the node downstream
-      pushed right if the two now overlap (the wire is hit-tested along
-      the curve imnodes draws, `_wire_points`).
+- [x] **Drop a node onto a wire** to splice it in: while one node is
+      dragged and the POINTER (not the node's body - a node carried across
+      a wire must not catch on it) is on a wire it could sit on, that wire
+      fades and the wiring it would become is drawn - source to the node's
+      input, its output on to the old end (`_poll_splice`, two curves on
+      the overlay); let go there and it is done, the node downstream
+      pushed right if the two now overlap.
 - [x] **Swap inputs** (Alt+S): a node's first two, wires and typed values.
 - [x] **Node labels** (Shift+F2, or the node's menu): a name of your own
       over the type; `label` on the node.

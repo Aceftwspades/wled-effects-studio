@@ -3022,6 +3022,9 @@ def build(app):
         dpg.draw_rectangle((0, 0), (10, 10), tag="ghost_rect", show=False, thickness=2, rounding=5,
                            color=tuple(chrome.ACCENT[:3]) + (200,), fill=tuple(chrome.ACCENT[:3]) + (28,))
         dpg.draw_text((0, 0), "", tag="ghost_text", show=False, size=14, color=tuple(chrome.ACCENT[:3]) + (230,))
+        # the wiring a dragged node would splice into: two curves, drawn while the pointer is on the wire
+        for t in ("splice_a", "splice_b"):
+            dpg.draw_bezier_cubic((0, 0), (0, 0), (0, 0), (0, 0), tag=t, show=False, thickness=4, color=tuple(chrome.ACCENT[:3]) + (235,))
     dpg.set_primary_window("root", True)
     app.frames = glow.Frames()
     chrome.apply_frames(app)

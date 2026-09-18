@@ -143,6 +143,7 @@ class GraphPanel:
         self.ext_sel = []
         self._ext_last = {}      # node -> its position last poll, while ext_sel has nodes
         self._knife = None       # (x0, y0) while a Ctrl+right-drag cuts wires
+        self._splice = None      # (node, link, a, out, b, inp, my_in, my_out) while a dragged node sits over a wire
         self._press_pos = {}     # node -> position at the last press (a drop onto a wire)
         self._undo_desc = []     # what each undo snapshot precedes
         self.auto = False        # live preview: rebuild after every edit
@@ -1090,6 +1091,7 @@ class GraphPanel:
     def poll(self):
         self._poll_frames()
         self._poll_ext_sel()
+        self._poll_splice()
         self._poll_help()
         self._poll_props()
         self._poll_focus()
@@ -2094,8 +2096,9 @@ class GraphPanel:
                     ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
                     if bool(self.app.prefs.get("snap")) != ctrl:
                         self.snap_selected()
-                    if len(moved) == 1 and self.graph.nodes[moved[0]]["type"] != "Frame":
-                        self._drop_on_wire(moved[0])
+                    if len(moved) == 1 and self._splice and self._splice[0] == moved[0]:
+                        self._splice_apply()
+            self._splice_clear()
             return
         t, frm = self._drag_type, self._drag_from
         self._drag_type = self._drag_from = None
@@ -2234,34 +2237,41 @@ class GraphPanel:
             return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
         return (orient(a, b, c) * orient(a, b, d) < 0) and (orient(c, d, a) * orient(c, d, b) < 0)
 
-    def _drop_on_wire(self, nid):
-        """A node let go over a wire it could sit on is spliced into it, the
-        node downstream pushed right if the two now overlap."""
-        st = dpg.get_item_state(f"gnode_{nid}")
-        if "rect_min" not in st:
-            return
-        (x0, y0), (x1, y1) = st["rect_min"], st["rect_max"]
-        centre = ((x0 + x1) / 2, (y0 + y1) / 2)
+    # --- splicing a dragged node into a wire ---------------------------------------------
+    # While one node is being dragged and the POINTER is over a wire the node
+    # could sit on, that wire lights up and the wiring it would become is
+    # drawn - the source to the node's input, the node's output on to the
+    # wire's old end. Let go there and it is done; anywhere else, nothing.
+    # The pointer, not the node's body: a node carried across a wire on its
+    # way somewhere else must not catch on it.
+    def _poll_splice(self):
+        if not self.graph or not self.dragging_nodes():
+            self._splice_clear(); return
+        moved = [nid for nid, p in self._press_pos.items()
+                 if dpg.does_item_exist(f"gnode_{nid}") and tuple(dpg.get_item_pos(f"gnode_{nid}")) != p]
+        if len(moved) != 1 or self.graph.nodes[moved[0]]["type"] == "Frame":
+            self._splice_clear(); return
+        nid = moved[0]
         d = self.graph.node_def(self.graph.nodes[nid])
         if not d["inputs"] or not d["outputs"]:
-            return
-        mine = {(l[0], l[1]) for l in self.graph.links if l[2] == nid} | {(l[2], l[3]) for l in self.graph.links if l[0] == nid}
+            self._splice_clear(); return
+        mp = dpg.get_mouse_pos(local=False)
         best = None
         for lid, (b, inp) in list(self.links.items()):
             if b == nid or not dpg.does_item_exist(lid):
                 continue
             a = next((l[0] for l in self.graph.links if l[2] == b and l[3] == inp), None)
-            if a == nid or a is None:
+            if a is None or a == nid:
                 continue
             pts = self._wire_points(lid)
             if not pts:
                 continue
-            dist = min(self._seg_dist(centre, pts[k], pts[k + 1]) for k in range(len(pts) - 1))
-            if dist < 14 * self.zoom and (best is None or dist < best[0]):
-                best = (dist, a, b, inp)
+            dist = min(self._seg_dist(mp, pts[k], pts[k + 1]) for k in range(len(pts) - 1))
+            if dist <= 10 and (best is None or dist < best[0]):
+                best = (dist, lid, a, b, inp)
         if best is None:
-            return
-        _, a, b, inp = best
+            self._splice_clear(); return
+        _, lid, a, b, inp = best
         out = next(l[1] for l in self.graph.links if l[2] == b and l[3] == inp)
         at = next((o["type"] for o in self.graph.node_def(self.graph.nodes[a])["outputs"] if o["name"] == out), "float")
         bt = next((i["type"] for i in self.graph.node_def(self.graph.nodes[b])["inputs"] if i["name"] == inp), "float")
@@ -2269,11 +2279,51 @@ class GraphPanel:
         my_in = next((i["name"] for i in d["inputs"] if (nid, i["name"]) not in wired and compatible(at, i["type"])), None)
         my_out = next((o["name"] for o in d["outputs"] if compatible(o["type"], bt)), None)
         if my_in is None or my_out is None:
+            self._splice_clear(); return
+        want = (nid, lid, a, out, b, inp, my_in, my_out)
+        if self._splice != want:
+            self._splice_clear()
+            self._splice = want
+            dpg.bind_item_theme(lid, self._dim_wire())         # the wire that would go fades; the new wiring is drawn
+            self.status(f"drop to splice into {a} . {out} -> {b} . {inp}")
+        # the wiring it would become, drawn over everything, following the node
+        p_src = self._pin_point(a, "out", out)
+        p_in = self._pin_point(nid, "in", my_in) or self._node_edge(nid, "in")
+        p_out = self._pin_point(nid, "out", my_out) or self._node_edge(nid, "out")
+        p_dst = self._pin_point(b, "in", inp)
+        for tag, p0, p1 in (("splice_a", p_src, p_in), ("splice_b", p_out, p_dst)):
+            if dpg.does_item_exist(tag) and p0 and p1:
+                dd = max(50.0, abs(p1[0] - p0[0]) * 0.5)
+                dpg.configure_item(tag, p1=p0, p2=(p0[0] + dd, p0[1]), p3=(p1[0] - dd, p1[1]), p4=p1, show=True)
+
+    def _node_edge(self, nid, side):
+        """A point on a node's left or right edge, for a pin it hides."""
+        st = dpg.get_item_state(f"gnode_{nid}")
+        if "rect_min" not in st:
+            return None
+        (x0, y0), (x1, y1) = st["rect_min"], st["rect_max"]
+        return (x0 if side == "in" else x1, (y0 + y1) / 2)
+
+    def _splice_clear(self):
+        if self._splice:
+            lid = self._splice[1]
+            if dpg.does_item_exist(lid):
+                dpg.bind_item_theme(lid, self._link_normal.get(lid, 0))
+            self._splice = None
+        for tag in ("splice_a", "splice_b"):
+            if dpg.does_item_exist(tag):
+                dpg.configure_item(tag, show=False)
+
+    def _splice_apply(self):
+        """The drop: the node into the wire, the node downstream pushed
+        right if the two now overlap."""
+        nid, lid, a, out, b, inp, my_in, my_out = self._splice
+        self._splice_clear()
+        if nid not in self.graph.nodes or a not in self.graph.nodes or b not in self.graph.nodes:
             return
         self.snapshot(); self._sync_pos()
         self.graph.link(a, out, nid, my_in)
         self.graph.link(nid, my_out, b, inp)
-        # auto-offset: the consumer moves right if the new node now covers it
         pn, sn = self.graph.nodes[nid]["pos"], self._node_size(nid)
         pb, sb = self.graph.nodes[b]["pos"], self._node_size(b)
         if pb[0] < pn[0] + sn[0] + 20 and pb[0] + sb[0] > pn[0] and abs(pb[1] - pn[1]) < max(sn[1], sb[1]):
