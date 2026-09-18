@@ -2081,7 +2081,8 @@ class App(Features):
                 self._pane_drag = slot
                 self._pane_target = None
                 x, y, w, h = self._rects[slot]
-                self._ghost_start(x, y, w, h, {"main": "main pane", "cube": "3-D view", "side": "panel", "props": "properties"}.get(slot, slot))
+                self._ghost_start(x, y, w, h, {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
+                                               "side": "Panel", "props": "Properties"}.get(slot, slot))
                 return
         if self.side and self.ui:
             for key in self.SECTIONS:
@@ -2092,7 +2093,7 @@ class App(Features):
                     st = dpg.get_item_state(f"sec_{key}")
                     if "rect_min" in st and "rect_size" in st:
                         (x, y), (w, h) = st["rect_min"], st["rect_size"]
-                        self._ghost_start(x, y, w, h, key.replace("_", " "))
+                        self._ghost_start(x, y, w, h, dpg.get_value(f"sec_{key}_title") if dpg.does_item_exist(f"sec_{key}_title") else key.upper())
                     return
         mp = dpg.get_mouse_pos(local=False)
         for tag, (kind, i, j) in self._splitters.items():
@@ -3191,7 +3192,7 @@ def service_command(app):
                 app._sec_drag = key; app._sec_target = None
                 st = dpg.get_item_state(f"sec_{key}")
                 if "rect_min" in st:
-                    app._ghost_start(st["rect_min"][0], st["rect_min"][1], st["rect_size"][0], st["rect_size"][1], key)
+                    app._ghost_start(st["rect_min"][0], st["rect_min"][1], st["rect_size"][0], st["rect_size"][1], dpg.get_value(f"sec_{key}_title"))
                 app._sec_target = app.sec_zone(x, y)
                 if not c.get("hold"):
                     app.on_mouse_release(None, None)
@@ -3216,11 +3217,16 @@ def service_command(app):
                     u32.SetForegroundWindow(hwnd); u32.ClientToScreen(hwnd, ctypes.byref(pt))
                 x0, y0, x1, y1 = (int(v) for v in c["drag"][:4])
                 down, up = (0x20, 0x40) if (len(c["drag"]) > 4 and c["drag"][4] == "middle") else (2, 4)
-                u32.SetCursorPos(pt.x + x0, pt.y + y0); _tm.sleep(0.1)          # a frame of hovering first
-                u32.mouse_event(down, 0, 0, 0, 0); _tm.sleep(0.05)
-                for k in range(1, 11):
-                    u32.SetCursorPos(pt.x + x0 + (x1 - x0) * k // 10, pt.y + y0 + (y1 - y0) * k // 10); _tm.sleep(0.02)
-                u32.mouse_event(up, 0, 0, 0, 0)
+                hold = float(c.get("hold") or 0)          # seconds the button stays down at the end, for a capture mid-drag
+
+                def _do(px=pt.x, py=pt.y):                # on a thread: the loop keeps drawing while the mouse moves
+                    u32.SetCursorPos(px + x0, py + y0); _tm.sleep(0.15)
+                    u32.mouse_event(down, 0, 0, 0, 0); _tm.sleep(0.1)
+                    for k in range(1, 21):
+                        u32.SetCursorPos(px + x0 + (x1 - x0) * k // 20, py + y0 + (y1 - y0) * k // 20); _tm.sleep(0.03)
+                    _tm.sleep(hold)
+                    u32.mouse_event(up, 0, 0, 0, 0)
+                threading.Thread(target=_do, daemon=True).start()
             if "confirm" in c:                          # test hook: press button k of the open question box
                 chrome.confirm_pick(app, int(c["confirm"]))
             if "export_usermod" in c:                   # test hook: with or without the dependencies
