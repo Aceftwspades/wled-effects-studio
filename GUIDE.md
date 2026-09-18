@@ -3,7 +3,7 @@
 Effects for a WLED LED cube (or any matrix or strip), built as node graphs
 or as C++, previewed on a simulated cube with synthetic or live audio, and
 sent to the device three ways. STUDIO.md is the long history and roadmap;
-NODES.md lists every node.
+NODES.md lists every node; TUTORIAL.md builds a first effect node by node.
 
 ## First run
 

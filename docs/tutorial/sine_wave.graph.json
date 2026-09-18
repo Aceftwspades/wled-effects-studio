@@ -1,0 +1,211 @@
+{
+ "studio_graph": 1,
+ "graph": {
+  "name": "Sine Wave",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Speed",
+    "pos": [
+     9,
+     9
+    ],
+    "params": {
+     "label": "Speed",
+     "default": 128
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "pos": [
+     9,
+     98
+    ],
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "pos": [
+     117,
+     24
+    ],
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Coords",
+    "pos": [
+     9,
+     176
+    ],
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "pos": [
+     220,
+     24
+    ],
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "pos": [
+     754,
+     58
+    ],
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "pos": [
+     862,
+     58
+    ],
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Wave",
+    "pos": [
+     333,
+     34
+    ],
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 2.0
+    }
+   },
+   {
+    "id": 9,
+    "type": "Subtract",
+    "pos": [
+     441,
+     34
+    ],
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Abs",
+    "pos": [
+     543,
+     34
+    ],
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Smoothstep",
+    "pos": [
+     646,
+     34
+    ],
+    "params": {
+     "e0": 0.12,
+     "e1": 0.02
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "value",
+    3,
+    "a"
+   ],
+   [
+    2,
+    "t",
+    3,
+    "b"
+   ],
+   [
+    4,
+    "u",
+    5,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ],
+   [
+    4,
+    "u",
+    8,
+    "x"
+   ],
+   [
+    5,
+    "result",
+    8,
+    "phase"
+   ],
+   [
+    4,
+    "v",
+    9,
+    "a"
+   ],
+   [
+    8,
+    "value",
+    9,
+    "b"
+   ],
+   [
+    9,
+    "result",
+    10,
+    "x"
+   ],
+   [
+    4,
+    "u",
+    6,
+    "index"
+   ],
+   [
+    10,
+    "result",
+    11,
+    "x"
+   ],
+   [
+    11,
+    "result",
+    6,
+    "brightness"
+   ]
+  ]
+ },
+ "subgraphs": {},
+ "nodes": {},
+ "requires": []
+}

@@ -3190,6 +3190,14 @@ def service_command(app):
             if "graph_link" in c:
                 a, out, b, inp = c["graph_link"]
                 app.gp.snapshot(); app.gp.graph.link(a, out, b, inp); app.gp.rebuild()
+            if "viewport" in c:                         # test hook: the window's size
+                dpg.set_viewport_width(int(c["viewport"][0])); dpg.set_viewport_height(int(c["viewport"][1])); app.request_layout()
+            if "graph_pos" in c:                        # test hook: a node's place in graph units
+                nid, x, y = c["graph_pos"]
+                app.gp._sync_pos(); app.gp.graph.nodes[int(nid)]["pos"] = [float(x), float(y)]; app.gp.rebuild()
+            if "graph_input" in c:                      # test hook: an unwired input's typed value
+                nid, name, val = c["graph_input"]
+                app.gp.snapshot(); app.gp.graph.nodes[int(nid)].setdefault("inputs", {})[name] = val; app.gp.rebuild()
             if "graph_param" in c:
                 nid, name, val = c["graph_param"]
                 app.gp.snapshot(); app.gp.graph.nodes[int(nid)]["params"][name] = val; app.gp.rebuild()
