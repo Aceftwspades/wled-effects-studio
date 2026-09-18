@@ -270,6 +270,7 @@ class App(Features):
         self._free_w = 1             # the width the free columns share
         self._rows_h = []            # per column, the height its rows share
         self._pane_drag = None       # the slot whose grip is being dragged
+        self._ghost = None           # (w, h, grab dx, dy, label) of the pane or section being dragged
         self._pane_target = None     # (slot, zone) under the pointer while dragging
         self.popouts = Popouts()     # views in windows of their own
         self._file_dialogs = None    # the file dialogs, found once for the frames' holes
@@ -1636,6 +1637,27 @@ class App(Features):
             x += w + G
         return rects, splits
 
+    # --- the ghost: what is being dragged, following the pointer ------------------------
+    def _ghost_start(self, x, y, w, h, label):
+        mx, my = dpg.get_mouse_pos(local=False)
+        self._ghost = (w, h, mx - x, my - y, label)
+        self._ghost_move()
+
+    def _ghost_move(self):
+        if not self._ghost or not dpg.does_item_exist("ghost_rect"):
+            return
+        w, h, dx, dy, label = self._ghost
+        mx, my = dpg.get_mouse_pos(local=False)
+        x0, y0 = mx - dx, my - dy
+        dpg.configure_item("ghost_rect", pmin=(x0, y0), pmax=(x0 + w, y0 + h), show=True)
+        dpg.configure_item("ghost_text", pos=(x0 + 10, y0 + 8), text=label, show=True)
+
+    def _ghost_end(self):
+        self._ghost = None
+        for t in ("ghost_rect", "ghost_text"):
+            if dpg.does_item_exist(t):
+                dpg.configure_item(t, show=False)
+
     def drop_zone(self, mx, my):
         """What a dragged pane would do if let go here: (slot, zone) for the
         pane under the pointer - the edge it is nearest, or the centre."""
@@ -1731,7 +1753,10 @@ class App(Features):
 
     def sec_zone(self, mx, my):
         """The section under the pointer and which half of it: (key, "above" | "below")."""
-        if not (dpg.does_item_exist("side_win") and dpg.is_item_hovered("side_win")):
+        # the panel's rectangle, not its hover: while the grip (a button)
+        # is held, ImGui reports nothing under it as hovered
+        pane = self._screen_rect("side_win")
+        if not pane or not (pane[0] <= mx <= pane[2] and pane[1] <= my <= pane[3]):
             return None
         for key in self.sec_order:
             st = dpg.get_item_state(f"sec_{key}")
@@ -2055,6 +2080,8 @@ class App(Features):
             if dpg.does_item_exist(grip) and dpg.is_item_hovered(grip):
                 self._pane_drag = slot
                 self._pane_target = None
+                x, y, w, h = self._rects[slot]
+                self._ghost_start(x, y, w, h, {"main": "main pane", "cube": "3-D view", "side": "panel", "props": "properties"}.get(slot, slot))
                 return
         if self.side and self.ui:
             for key in self.SECTIONS:
@@ -2062,6 +2089,10 @@ class App(Features):
                 if dpg.does_item_exist(grip) and dpg.is_item_hovered(grip):
                     self._sec_drag = key
                     self._sec_target = None
+                    st = dpg.get_item_state(f"sec_{key}")
+                    if "rect_min" in st and "rect_size" in st:
+                        (x, y), (w, h) = st["rect_min"], st["rect_size"]
+                        self._ghost_start(x, y, w, h, key.replace("_", " "))
                     return
         mp = dpg.get_mouse_pos(local=False)
         for tag, (kind, i, j) in self._splitters.items():
@@ -2093,6 +2124,7 @@ class App(Features):
         if self._sec_drag:
             key, target = self._sec_drag, self._sec_target
             self._sec_drag = self._sec_target = None
+            self._ghost_end()
             if dpg.does_item_exist("snap_rect"):
                 dpg.configure_item("snap_rect", show=False)
             if target:
@@ -2101,6 +2133,7 @@ class App(Features):
         if self._pane_drag:
             slot, target = self._pane_drag, self._pane_target
             self._pane_drag = self._pane_target = None
+            self._ghost_end()
             if dpg.does_item_exist("snap_rect"):
                 dpg.configure_item("snap_rect", show=False)
             if target:
@@ -2134,6 +2167,7 @@ class App(Features):
 
     def on_drag(self, sender, app_data):
         if self._sec_drag:
+            self._ghost_move()
             mx, my = dpg.get_mouse_pos(local=False)
             target = self.sec_zone(mx, my)
             if target and target[0] == self._sec_drag:
@@ -2149,6 +2183,7 @@ class App(Features):
             return
         if self._pane_drag:
             # the pane under the pointer lights up where the drop would go
+            self._ghost_move()
             mx, my = dpg.get_mouse_pos(local=False)
             target = self.drop_zone(mx, my)
             if target and target[0] == self._pane_drag:
@@ -2947,6 +2982,10 @@ def build(app):
         dpg.draw_rectangle((0, 0), (10, 10), tag="snap_rect", show=False, thickness=2,
                            color=tuple(chrome.ACCENT[:3]) + (230,), fill=tuple(chrome.ACCENT[:3]) + (50,))
         dpg.draw_line((0, 0), (10, 10), tag="knife_line", show=False, thickness=2, color=(240, 90, 90, 230))
+        # the ghost of a pane or panel section being dragged: its outline, translucent, under the pointer
+        dpg.draw_rectangle((0, 0), (10, 10), tag="ghost_rect", show=False, thickness=2, rounding=5,
+                           color=tuple(chrome.ACCENT[:3]) + (200,), fill=tuple(chrome.ACCENT[:3]) + (28,))
+        dpg.draw_text((0, 0), "", tag="ghost_text", show=False, size=14, color=tuple(chrome.ACCENT[:3]) + (230,))
     dpg.set_primary_window("root", True)
     app.frames = glow.Frames()
     chrome.apply_frames(app)
@@ -3147,6 +3186,15 @@ def service_command(app):
                 aw = dpg.get_active_window()
                 print("active window", aw, dpg.get_item_alias(aw) if aw and dpg.does_item_exist(aw) else "?",
                       "item", c["active"], dpg.get_item_state(c["active"]) if dpg.does_item_exist(c["active"]) else None)
+            if "sec_drag" in c:                         # test hook: [key, x, y] - the grip pressed, dragged to (x, y), released
+                key, x, y = c["sec_drag"]
+                app._sec_drag = key; app._sec_target = None
+                st = dpg.get_item_state(f"sec_{key}")
+                if "rect_min" in st:
+                    app._ghost_start(st["rect_min"][0], st["rect_min"][1], st["rect_size"][0], st["rect_size"][1], key)
+                app._sec_target = app.sec_zone(x, y)
+                if not c.get("hold"):
+                    app.on_mouse_release(None, None)
             if "sel" in c:                              # test hook: print the selection
                 print("SEL clicked", app.gp._clicked(), "ext", app.gp.ext_sel, "picker", app._picker)
             if "combos" in c:                           # test hook: every visible combo's state
