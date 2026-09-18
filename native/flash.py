@@ -532,7 +532,11 @@ def push_settings(host, effect, params, palette, colours, seg_id=0, blend=None, 
     except Exception as e:
         return False, f"could not read the device's lists: {e}"
     want = effect.split("@")[0].strip().lower()
-    fx = next((i for i, n in enumerate(names) if str(n).split("@")[0].strip().lower() == want), None)
+    clean = [str(n).split("@")[0].strip().lower() for n in names]
+    fx = next((i for i, n in enumerate(clean) if n == want), None)
+    if fx is None:
+        # a firmware from before a rename: the name with a family prefix ("Ace 3-D Studio Script")
+        fx = next((i for i, n in enumerate(clean) if n.endswith(" " + want) or want.endswith(" " + n)), None)
     if fx is None:
         return False, f"the device has no effect called {effect!r} - flash the firmware with it first"
     seg = {"id": int(seg_id), "fx": fx, "sx": int(params.get("sx", 128)), "ix": int(params.get("ix", 128)),

@@ -840,6 +840,27 @@ housekeeping above is done:
       firmware's rebuild does (so the two move alike), a WAV or a capture
       gives its own samples. Compiled for the S3 (1.54 MB, no warnings).
 
+## On the cube (18 September 2026)
+
+Against the S3 cube at 192.168.1.17 (WLED 16.0.1, 48 x 48 net as five
+WLED panels, a build from before the Studio Script rename and frame
+budget): **Send the graph as a script** put the sine-wave tutorial graph
+and then Maelstrom on the cube within a couple of seconds each, and WLED's
+own live view (`tests/peek.py`, the web UI's Peek over the websocket)
+showed the same pictures the sim's script preview drew. **Send the
+current effect's settings** set sx / ix on the device's segment, read
+back. The six-face setting is ignored by that build, as designed. The
+device has no ledmap file (its wiring is WLED's panel layout), so the
+ledmap import reports 404 and the export is not needed there.
+
+The finding: the Script effect runs the sine graph at **7 fps** and
+Maelstrom at 5 on the S3, against 43 fps for the compiled effects - the
+bytecode VM is six to eight times slower than compiled code per pixel
+(the sim shows the same ratio: 1.2 ms against 0.15). That build predates
+the frame budget, which would hold the frame near 40 ms by striding, but
+the real fix is the VM: register access, the op dispatch, sinf and the
+palette lookup per pixel are where to look.
+
 ## Where the frame time goes
 
 Measured (16 px cube, Maelstrom, 620 px view) before the GPU view: the

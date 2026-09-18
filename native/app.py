@@ -3258,6 +3258,10 @@ def service_command(app):
                     st = dpg.get_item_state(i)
                     if st.get("visible"):
                         print("combo", dpg.get_item_alias(i) or i, dpg.get_value(i), st)
+            if "device" in c:                           # test hook: the project's device address
+                app.project.options["device"] = c["device"]; app.project.save()
+                if dpg.does_item_exist("device_host"):
+                    dpg.set_value("device_host", c["device"])
             if "menu_walk" in c:                        # test hook: every menu item's callback, in turn; failures printed
                 walk_menus(app, c["menu_walk"] if isinstance(c["menu_walk"], list) else [])
             if "ctx_walk" in c:                         # test hook: every row of a context menu ["node"|"in"|"out", nid, pin]
