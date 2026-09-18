@@ -2438,6 +2438,7 @@ class App(Features):
             "frame_selected": gp.frame_selected,
             "snap":         gp.toggle_snap,
             "dissolve":     gp.dissolve_selected,
+            "disconnect":   gp.disconnect_selected,
             "swap_inputs":  gp.swap_inputs,
             "label_node":   gp.label_selected,
             "frame_sel":    lambda: gp.frame_selection(),
@@ -3246,6 +3247,14 @@ def service_command(app):
                     st = dpg.get_item_state(m)
                     kids = dpg.get_item_children(m, 1) or []
                     print("menu", dpg.get_item_configuration(m).get("label"), st, "first child", dpg.get_item_state(kids[0]) if kids else None)
+            if "move" in c and os.name == "nt":         # test hook: the real pointer to viewport [x, y], no click
+                import ctypes, ctypes.wintypes as wt
+                u32 = ctypes.windll.user32
+                hwnd = u32.FindWindowW(None, "WLED Effects Studio")
+                pt = wt.POINT(0, 0)
+                if hwnd:
+                    u32.SetForegroundWindow(hwnd); u32.ClientToScreen(hwnd, ctypes.byref(pt))
+                u32.SetCursorPos(pt.x + int(c["move"][0]), pt.y + int(c["move"][1]))
             if "drag" in c and os.name == "nt":         # test hook: a real drag [x0, y0, x1, y1, "left"|"middle"]
                 import ctypes, ctypes.wintypes as wt, time as _tm
                 u32 = ctypes.windll.user32

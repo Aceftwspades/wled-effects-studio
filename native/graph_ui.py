@@ -144,6 +144,8 @@ class GraphPanel:
         self._ext_last = {}      # node -> its position last poll, while ext_sel has nodes
         self._knife = None       # (x0, y0) while a Ctrl+right-drag cuts wires
         self._splice = None      # (node, link, a, out, b, inp, my_in, my_out) while a dragged node sits over a wire
+        self._add_preview = None # the node type the add menu is describing in the properties pane
+        self._menu_entries_cache = None
         self._press_pos = {}     # node -> position at the last press (a drop onto a wire)
         self._undo_desc = []     # what each undo snapshot precedes
         self.auto = False        # live preview: rebuild after every edit
@@ -431,6 +433,8 @@ class GraphPanel:
     def _poll_props(self):
         if not dpg.does_item_exist("graph_props") or not self.graph:
             return
+        if self._add_preview is not None:
+            return                                        # the add menu is describing a node there
         sel = self._selected()
         key = (self.file, sel[0]) if sel else None
         if key == getattr(self, "_props_for", "unset"):
@@ -1092,6 +1096,7 @@ class GraphPanel:
         self._poll_frames()
         self._poll_ext_sel()
         self._poll_splice()
+        self._poll_add_preview()
         self._poll_help()
         self._poll_props()
         self._poll_focus()
@@ -2414,6 +2419,7 @@ class GraphPanel:
         if not flat:
             return
         dpg.delete_item("graph_hits", children_only=True)
+        self._menu_entries_cache = None
         names = only if only is not None else [n.split(" / ", 1)[1] for n in self.type_names()]
         names = [n for n in names if not self._feature_off(n)]
         if only is None:
@@ -2458,8 +2464,10 @@ class GraphPanel:
             # Dear PyGui calls a callback with as many of (sender, app_data,
             # user_data) as it has parameters - a third one with a default
             # is overwritten by user_data, a fourth is an error - so what a
-            # row does rides in user_data.
-            dpg.add_selectable(label=label, parent=P, user_data=fn, callback=lambda s, a, u: (close(), u()))
+            # row does rides in user_data. Inside a fold (tree node) the row
+            # goes to the fold: the container stack says where we are.
+            parent = dpg.top_container_stack() or P
+            dpg.add_selectable(label=label, parent=parent, user_data=fn, callback=lambda s, a, u: (close(), u()))
 
         if kind == "in":
             linked = any(l[2] == nid and l[3] == name for l in self.graph.links)
@@ -2467,53 +2475,57 @@ class GraphPanel:
             pd_ = next((x.get("doc") for x in d["inputs"] if x["name"] == name), None)
             if pd_:
                 dpg.add_text(pd_, parent=P, color=(170, 178, 192), wrap=260)
-            if linked:
-                row("disconnect", lambda: self._disconnect_in(nid, name))
-                self._colour_rows(P, [(nid, name)])
             i = next(x for x in d["inputs"] if x["name"] == name)
             if linked:
-                a, out = next((l[0], l[1]) for l in self.graph.links if l[2] == nid and l[3] == name)
-                at = next((o["type"] for o in self.graph.node_def(self.graph.nodes[a])["outputs"] if o["name"] == out), "float")
-                between = self._between(at, i["type"])
-                if between:
-                    dpg.add_text("insert on the wire", parent=P, color=DIM)
-                    for t in between[:8]:
-                        row(f"  {t}", lambda t=t: self._insert_before(nid, name, t))
+                row("disconnect", lambda: self._disconnect_in(nid, name))
             row("reset to default", lambda: self._reset_input(nid, name, i))
             if linked:
                 from native import chrome
                 lbl = (self.graph.link_meta.get((nid, name)) or {}).get("label", "")
-                row("relabel this wire..." if lbl else "label this wire...",
-                    lambda: chrome.ask(self.app, "Wire label", "a few words on what this wire carries", lbl,
-                                       lambda v: self.set_wire_label(nid, name, v)))
-                if lbl:
-                    row("remove the label", lambda: self.set_wire_label(nid, name, ""))
+                with dpg.tree_node(label="this wire", parent=P):
+                    row("relabel..." if lbl else "label...",
+                        lambda: chrome.ask(self.app, "Wire label", "a few words on what this wire carries", lbl,
+                                           lambda v: self.set_wire_label(nid, name, v)))
+                    if lbl:
+                        row("remove the label", lambda: self.set_wire_label(nid, name, ""))
+                    self._colour_rows(dpg.last_container(), [(nid, name)])
+                a, out = next((l[0], l[1]) for l in self.graph.links if l[2] == nid and l[3] == name)
+                at = next((o["type"] for o in self.graph.node_def(self.graph.nodes[a])["outputs"] if o["name"] == out), "float")
+                between = self._between(at, i["type"])
+                if between:
+                    with dpg.tree_node(label="insert on the wire", parent=P):
+                        for t in between[:8]:
+                            row(f"  {t}", lambda t=t: self._insert_before(nid, name, t))
             # expose this input as a control: a slider or checkbox node, wired in
             ctrls = ["Speed", "Intensity", "Custom 1", "Custom 2", "Custom 3"] if i["type"] != "bool" \
                     else ["Check 1", "Check 2", "Check 3"]
             if i["type"] != "color":
-                dpg.add_text("drive with", parent=P, color=DIM)
-                for c in ctrls:
-                    row(f"  {c}", lambda c=c: self._drive_with(nid, name, c))
+                with dpg.tree_node(label="drive with a slider", parent=P):
+                    for c in ctrls:
+                        row(f"  {c}", lambda c=c: self._drive_with(nid, name, c))
         elif kind == "out":
             outs = [l for l in self.graph.links if l[0] == nid and l[1] == name]
             dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
             pd_ = next((x.get("doc") for x in d["outputs"] if x["name"] == name), None)
             if pd_:
                 dpg.add_text(pd_, parent=P, color=(170, 178, 192), wrap=260)
-            if outs:
-                row(f"disconnect all ({len(outs)})", lambda: self._disconnect_out(nid, name))
-                self._colour_rows(P, [(l[2], l[3]) for l in outs])
             o = next(x for x in d["outputs"] if x["name"] == name)
             if self.preview == (nid, name):
                 row("stop previewing this output", self.stop_preview)
             else:
                 row("preview this output", lambda: self.preview_pin(nid, name))
-            dpg.add_text("connect to new", parent=P, color=DIM)
-            for t in self._consumers(o["type"]):
-                row(f"  {t}", lambda t=t: self._connect_new(nid, name, o["type"], t))
+            if outs:
+                row(f"disconnect all ({len(outs)})", lambda: self._disconnect_out(nid, name))
+                with dpg.tree_node(label="these wires' colour", parent=P):
+                    self._colour_rows(dpg.last_container(), [(l[2], l[3]) for l in outs])
+            with dpg.tree_node(label="connect to a new node", parent=P, default_open=True):
+                for t in self._consumers(o["type"]):
+                    row(f"  {t}", lambda t=t: self._connect_new(nid, name, o["type"], t))
         else:
-            dpg.add_text(d.get("label") or n["type"], parent=P, color=DIM)
+            # A node's menu: what is done most on top - duplicate, label,
+            # the shape toggles - and the rest in folds (delete, colour,
+            # settings as pins, sub-graph, more), which open in place.
+            dpg.add_text(n.get("label") or d.get("label") or n["type"], parent=P, color=DIM)
             if d.get("doc"):
                 dpg.add_text(d["doc"], parent=P, color=(170, 178, 192), wrap=300)
             if nid in self.problems:
@@ -2521,53 +2533,57 @@ class GraphPanel:
                 dpg.add_text(m, parent=P, color=(235, 80, 70) if m.startswith("error") else (240, 190, 70))
             if n["type"].startswith(G.SUB):
                 row("edit sub-graph", lambda: self.enter_sub(nid))
-            row("where is this type used", lambda: self.show_where_used(n["type"]))
-            row("remove from favourites" if n["type"] in self.app.prefs.get("fav_nodes", []) else "add to favourites",
-                lambda: self.toggle_favourite(n["type"]))
-            row("label this node...", lambda: (self.set_selection([nid]), self.label_selected()))
-            if self.cur_dir == self.sub_dir and d["params"] and not n["type"].startswith(G.SUB):
-                # inside a sub-graph: a setting can be promoted to the sub node outside
-                prom = n.get("promote") or []
-                free = [p["name"] for p in d["params"] if p["name"] not in prom and p["type"] not in ("file",)]
-                if free:
-                    dpg.add_text("promote a setting to the sub-graph node", parent=P, color=DIM)
-                    for p in free:
-                        row(f"  {p}", lambda p=p: self._promote(nid, p, True))
-                if prom:
-                    dpg.add_text("keep inside", parent=P, color=DIM)
-                    for p in prom:
-                        row(f"  {p}", lambda p=p: self._promote(nid, p, False))
-            if n["type"] == "Image":
-                row("convert to Bitmap + Colour pick", lambda: self.image_to_bitmap(nid))
-            if dpg.get_selected_nodes("node_editor"):
-                row("fold selection into a sub-graph", lambda: self.make_sub_from_selection(None))
-                row("copy selection", self.copy)
-                row("cut selection", self.cut)
             row("duplicate", lambda: self._dup(nid))
-            if not n["type"].startswith(G.SUB) and n["type"] not in ("Frame", "Note", "Knot"):
-                from native import chrome
-                row("save as a preset...", lambda: chrome.ask(self.app, "Node preset", "a name for this node as it is set up",
-                                                              "", lambda v: self.save_preset(nid, v)))
+            row("duplicate with inputs", lambda: self._dup(nid, True))
+            row("label this node...", lambda: (self.set_selection([nid]), self.label_selected()))
             if d["inputs"] or d["params"]:
                 row("expand" if n.get("collapsed") else "collapse", lambda: self._collapse(nid))
                 row("show all pins" if n.get("hide_pins") else "hide unwired pins", lambda: self._toggle(nid, "hide_pins"))
             row("unmute" if n.get("muted") else "mute (pass through)", lambda: self._toggle(nid, "muted"))
+            if n["type"] == "Image":
+                row("convert to Bitmap + Colour pick", lambda: self.image_to_bitmap(nid))
+            selected = bool(self._selected())
+            with dpg.tree_node(label="delete", parent=P):
+                row("delete", lambda: self._delete_node(nid))
+                row("delete and reconnect", lambda: (self.set_selection([nid]), self.dissolve_selected()))
+                row("disconnect all (keep the node)", lambda: self._disconnect_node(nid))
+            with dpg.tree_node(label="colour", parent=P):
+                self._node_colour_rows(dpg.last_container(), nid)
             base = self.lib.get(n["type"])
-            if base and G.exposable(base):
-                exp = n.get("expose") or []
-                free = [p for p in G.exposable(base) if p not in exp]
-                if free:
-                    dpg.add_text("expose a setting as a pin", parent=P, color=DIM)
-                    for p in free:
-                        row(f"  {p}", lambda p=p: self._expose(nid, p, True))
-                if exp:
-                    dpg.add_text("back to a setting", parent=P, color=DIM)
-                    for p in exp:
-                        row(f"  {p}", lambda p=p: self._expose(nid, p, False))
-            row("duplicate with inputs", lambda: self._dup(nid, True))
-            row("disconnect all", lambda: self._disconnect_node(nid))
-            row("delete", lambda: self._delete_node(nid))
-            self._node_colour_rows(P, nid)
+            exp = n.get("expose") or []
+            free = [p for p in G.exposable(base) if p not in exp] if base and G.exposable(base) else []
+            if free or exp:
+                with dpg.tree_node(label="settings as pins", parent=P):
+                    if free:
+                        dpg.add_text("expose a setting as a pin", color=DIM)
+                        for p in free:
+                            row(f"  {p}", lambda p=p: self._expose(nid, p, True))
+                    if exp:
+                        dpg.add_text("back to a setting", color=DIM)
+                        for p in exp:
+                            row(f"  {p}", lambda p=p: self._expose(nid, p, False))
+            if self.cur_dir == self.sub_dir and d["params"] and not n["type"].startswith(G.SUB):
+                # inside a sub-graph: a setting can be promoted to the sub node outside
+                prom = n.get("promote") or []
+                pfree = [p["name"] for p in d["params"] if p["name"] not in prom and p["type"] not in ("file",)]
+                if pfree or prom:
+                    with dpg.tree_node(label="promote to the sub-graph node", parent=P):
+                        for p in pfree:
+                            row(f"  promote {p}", lambda p=p: self._promote(nid, p, True))
+                        for p in prom:
+                            row(f"  keep {p} inside", lambda p=p: self._promote(nid, p, False))
+            with dpg.tree_node(label="selection and sub-graph" if selected else "more", parent=P):
+                if selected:
+                    row("copy selection", self.copy)
+                    row("cut selection", self.cut)
+                    row("fold selection into a sub-graph", lambda: self.make_sub_from_selection(None))
+                if not n["type"].startswith(G.SUB) and n["type"] not in ("Frame", "Note", "Knot"):
+                    from native import chrome
+                    row("save as a preset...", lambda: chrome.ask(self.app, "Node preset", "a name for this node as it is set up",
+                                                                  "", lambda v: self.save_preset(nid, v)))
+                row("where is this type used", lambda: self.show_where_used(n["type"]))
+                row("remove from favourites" if n["type"] in self.app.prefs.get("fav_nodes", []) else "add to favourites",
+                    lambda: self.toggle_favourite(n["type"]))
 
     def where_used(self, type_):
         """Every graph and sub-graph in the project with a node of this type,
@@ -2645,10 +2661,10 @@ class GraphPanel:
                 for label, col in chunk:
                     if col is None:
                         dpg.add_button(label="auto", small=True,
-                                       callback=lambda: (dpg.configure_item(P, show=False), self._set_colour(nid, None)))
+                                       callback=lambda: (self._hide_menus(), self._set_colour(nid, None)))
                     else:
                         dpg.add_color_button(default_value=list(col) + [255], width=18, height=18, no_border=True,
-                                             user_data=col, callback=lambda s, a, u: (dpg.configure_item(P, show=False), self._set_colour(nid, u)))
+                                             user_data=col, callback=lambda s, a, u: (self._hide_menus(), self._set_colour(nid, u)))
 
     def _set_colour(self, nid, col):
         self.snapshot(); self._sync_pos()
@@ -2701,10 +2717,10 @@ class GraphPanel:
                 for label, col in chunk:
                     if col is None:
                         dpg.add_button(label="auto", small=True,
-                                       user_data=keys, callback=lambda s, a, u: (dpg.configure_item(P, show=False), self._set_wire(u, None)))
+                                       user_data=keys, callback=lambda s, a, u: (self._hide_menus(), self._set_wire(u, None)))
                     else:
                         dpg.add_color_button(default_value=list(col) + [255], width=18, height=18, no_border=True,
-                                             user_data=(keys, col), callback=lambda s, a, u: (dpg.configure_item(P, show=False), self._set_wire(*u)))
+                                             user_data=(keys, col), callback=lambda s, a, u: (self._hide_menus(), self._set_wire(*u)))
 
     def _set_wire(self, keys, col):
         self.snapshot()
@@ -2896,6 +2912,18 @@ class GraphPanel:
                     self.status(f"{da.get('label') or da['name']} . {o['name']} -> {i['name']}"); return
         self.status("no free input fits")
 
+    def disconnect_selected(self):
+        """Every wire in and out of the selected nodes; the nodes stay."""
+        sel = self._selected()
+        if not sel:
+            self.status("select nodes first"); return
+        self.snapshot()
+        for nid in sel:
+            for l in [l for l in self.graph.links if l[0] == nid or l[2] == nid]:
+                self.graph.unlink(l[2], l[3])
+        self.rebuild()
+        self.status(f"{len(sel)} node(s) disconnected")
+
     def _delete_node(self, nid):
         self.snapshot(); self.graph.remove(nid); self.rebuild()
 
@@ -2950,12 +2978,79 @@ class GraphPanel:
                 dpg.add_text(f"{hidden} node(s) hidden: their feature is off in Flash > Features", color=DIM, wrap=220)
         self._widgets.add("graph_search")
 
+    # --- a node hovered in the add menu is described in the properties pane ---------------
+    def _menu_entries(self):
+        """Every selectable in the add menu, with the type it adds."""
+        out = []
+        def walk(item):
+            for k in dpg.get_item_children(item, 1) or []:
+                if not dpg.does_item_exist(k):
+                    continue
+                if dpg.get_item_type(k).endswith("::mvSelectable") and dpg.get_item_user_data(k):
+                    out.append(k)
+                else:
+                    walk(k)
+        for root in ("graph_hits", "graph_cats"):
+            if dpg.does_item_exist(root):
+                walk(root)
+        return out
+
+    def _poll_add_preview(self):
+        """While the add menu is up, the node under the pointer is described
+        in the properties pane; the menu gone, the pane goes back to the
+        selection."""
+        if not dpg.does_item_exist("graph_menu") or not dpg.is_item_shown("graph_menu"):
+            if self._add_preview is not None:
+                self._add_preview = None
+                self._menu_entries_cache = None
+                self._props_for = "unset"                 # the pane back to the selection
+            return
+        if self._menu_entries_cache is None:
+            self._menu_entries_cache = self._menu_entries()
+        hovered = None
+        for k in self._menu_entries_cache:
+            if dpg.does_item_exist(k) and dpg.is_item_hovered(k):
+                hovered = dpg.get_item_user_data(k); break
+        if hovered is None or hovered == self._add_preview:
+            return
+        self._add_preview = hovered
+        self.describe_type(hovered)
+
+    def describe_type(self, type_):
+        """A node type in the properties pane: what it is, its pins and
+        settings, each with its words."""
+        if not dpg.does_item_exist("graph_props"):
+            return
+        dpg.delete_item("graph_props", children_only=True)
+        self._props_for = ("preview", type_)
+        if type_.startswith("preset:"):
+            dpg.add_text(f"preset: {type_[7:]}", parent="graph_props")
+            dpg.add_text("a node saved with its settings, from a node's menu", parent="graph_props", color=DIM, wrap=0)
+            return
+        d = self.lib.get(type_)
+        if not d:
+            return
+        dpg.add_text(d.get("label") or type_, parent="graph_props")
+        dpg.add_text(f"{d.get('cat', '')} - runs per {d.get('scope', 'pixel')}", parent="graph_props", color=DIM)
+        if d.get("doc"):
+            dpg.add_text(d["doc"], parent="graph_props", wrap=0)
+        for title, items in (("inputs", d.get("inputs", [])), ("outputs", d.get("outputs", [])), ("settings", d.get("params", []))):
+            if not items:
+                continue
+            dpg.add_text(title, parent="graph_props", color=DIM)
+            for p in items:
+                line = f"  {p['name']} ({p.get('type', '')})"
+                if p.get("doc"):
+                    line += f": {p['doc']}"
+                dpg.add_text(line, parent="graph_props", wrap=0)
+
     def _fill_quick(self):
         """Favourites (starred in a node's menu) and the recently added, at
         the top of the add menu."""
         if not dpg.does_item_exist("graph_quick"):
             return
         dpg.delete_item("graph_quick", children_only=True)
+        self._menu_entries_cache = None
         favs = [n for n in self.app.prefs.get("fav_nodes", []) if n in self.lib]
         rec = [n for n in self.app.prefs.get("recent_nodes", []) if n in self.lib and n not in favs]
         for title, names in (("favourites", favs), ("recent", rec)):

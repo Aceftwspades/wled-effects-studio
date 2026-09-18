@@ -278,6 +278,16 @@ editor. Ticked when done; the order within a group is the order to do them.
       above that pane, in the middle the two swap; the target lights up
       as you go. View > Layout has six presets; the arrangement is
       remembered.
+- [x] **Menus regrouped**: Edit is undo, the clipboard, Delete (delete /
+      delete and reconnect / disconnect) and Select as submenus, the
+      palette, the code editor's two; Node is add, the node-shape actions,
+      Show, Arrange (with align and distribute) and Sub-graph as submenus;
+      View gathers Zoom. A node's context menu keeps the most-used rows on
+      top and folds the rest in place (delete, colour, settings as pins,
+      promote, more); a pin's menu folds the wire, insert-on-the-wire and
+      drive-with lists. Hovering a node in the add menu describes it in
+      the properties pane (`describe_type`), so it can be judged before
+      it is added.
 - [x] **A theme editor** (Settings > Appearance): four presets - dark,
       light, soft light (the light one dimmed for eyes that found it too
       bright), slate - and the seven colours a theme is made of

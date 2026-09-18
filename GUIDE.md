@@ -24,7 +24,8 @@ Settings > Keyboard shortcuts, where any can be changed.
 
 A node's long settings (bitmap rows, expressions, files) are edited in
 the Properties pane, which sits under the 3-D view in the graph layout (N
-hides it). The panes go where you want them: drag one by the `:::` at its top right
+hides it); while the add menu is open, the node under the pointer is
+described there - what it does, every pin and setting - before you add it. The panes go where you want them: drag one by the `:::` at its top right
 onto another - near an edge it snaps beside or above that pane, in the
 middle the two swap - or pick a preset under View > Layout; the splitters
 between panes resize them. A view can leave for a second monitor: View >
