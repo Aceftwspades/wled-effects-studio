@@ -113,5 +113,7 @@ and the segment's blend mode; "Send ledmap" uploads the wiring.
   its main flows and fails on any traceback.
 - A crash's traceback lands in `%TEMP%\cubefx\crash.txt` as well as the
   console.
+- Settings > Appearance: dark, light, soft light or slate, and every one
+  of the theme's seven colours editable.
 - Settings > "Draw the cube on the GPU" / "Scale the net on the GPU" are
   the fast paths; turn them off if the views misbehave on a machine.

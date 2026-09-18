@@ -278,6 +278,14 @@ editor. Ticked when done; the order within a group is the order to do them.
       above that pane, in the middle the two swap; the target lights up
       as you go. View > Layout has six presets; the arrangement is
       remembered.
+- [x] **A theme editor** (Settings > Appearance): four presets - dark,
+      light, soft light (the light one dimmed for eyes that found it too
+      bright), slate - and the seven colours a theme is made of
+      (background, panels, controls, lines, text, dim text, accent), each
+      a swatch that applies as it changes; "Back to the preset" drops the
+      changes. `THEME_PRESETS` / `THEME_ROLES` / `theme_colors()` in app.py;
+      light or dark is decided by the background's brightness, which is
+      what sets which way controls lift.
 - [x] **A properties pane** (the fourth slot, "props"; N hides it, View
       > Properties pane): a node's settings too long for the node - bitmap
       rows, expressions, files - are edited in a pane of their own, shown

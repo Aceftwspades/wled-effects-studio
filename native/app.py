@@ -65,28 +65,55 @@ SECTION = (90, 169, 230)          # section titles in the side panel
 _LUT = (np.arange(256, dtype=np.float32) / 255.0)   # uint8 -> float texture channel, by lookup
 
 
+# The theme is seven colours. The presets are starting points; Settings >
+# Appearance edits any of them and keeps the result (prefs["theme"]).
+THEME_ROLES = (("bg", "background", "behind everything"),
+               ("panel", "panels", "the panes and dialogs"),
+               ("frame", "controls", "boxes, sliders, nodes"),
+               ("line", "lines", "borders and separators"),
+               ("text", "text", "what you read"),
+               ("dim", "dim text", "hints and secondary text"),
+               ("accent", "accent", "whatever is on: checks, grabs, the active view"))
+THEME_PRESETS = {
+    "dark":       {"bg": (14, 16, 20), "panel": (21, 24, 30), "frame": (29, 33, 41), "line": (36, 41, 50),
+                   "text": (222, 226, 234), "dim": (128, 137, 152), "accent": (90, 169, 230)},
+    "light":      {"bg": (232, 234, 238), "panel": (246, 247, 249), "frame": (222, 225, 231), "line": (200, 205, 214),
+                   "text": (30, 34, 42), "dim": (110, 118, 132), "accent": (60, 130, 200)},
+    "soft light": {"bg": (196, 200, 208), "panel": (214, 218, 225), "frame": (188, 194, 204), "line": (166, 173, 186),
+                   "text": (28, 32, 40), "dim": (92, 100, 116), "accent": (50, 120, 190)},
+    "slate":      {"bg": (30, 34, 42), "panel": (38, 43, 53), "frame": (48, 54, 66), "line": (58, 65, 79),
+                   "text": (220, 224, 232), "dim": (140, 148, 164), "accent": (110, 190, 170)},
+}
+
+
+def theme_colors(prefs=None):
+    """The seven colours in force: the preset (light / dark, or a named
+    one), then any the editor changed."""
+    t = (prefs or {}).get("theme") or {}
+    name = t.get("preset") or ("light" if t.get("light") else "dark")
+    cols = dict(THEME_PRESETS.get(name) or THEME_PRESETS["dark"])
+    for k, v in (t.get("colors") or {}).items():
+        if k in cols and isinstance(v, (list, tuple)) and len(v) >= 3:
+            cols[k] = tuple(int(c) for c in v[:3])
+    if t.get("accent") and not (t.get("colors") or {}).get("accent"):
+        cols["accent"] = tuple(int(c) for c in t["accent"][:3])          # the older setting
+    return cols
+
+
+def theme_is_light(prefs=None):
+    """Light or dark, by the background: it decides which way controls lift."""
+    bg = theme_colors(prefs)["bg"]
+    return (bg[0] + bg[1] + bg[2]) / 3 > 128
+
+
 def apply_theme(prefs=None):
     """A dark theme close to the browser build's, so switching between the two
     is not jarring. Default Dear PyGui is grey-blue and tightly packed; the
     views want to sit on near-black or the LED colours read wrong against it.
-    Settings > Appearance picks a light variant and the accent."""
-    th_pref = (prefs or {}).get("theme") or {}
-    light = bool(th_pref.get("light"))
-    accent = tuple(int(v) for v in (th_pref.get("accent") or (90, 169, 230)))[:3]
-    if light:
-        bg      = (232, 234, 238)
-        panel   = (246, 247, 249)
-        frame   = (222, 225, 231)
-        line    = (200, 205, 214)
-        text    = (30, 34, 42)
-        dim     = (110, 118, 132)
-    else:
-        bg      = (14, 16, 20)
-        panel   = (21, 24, 30)
-        frame   = (29, 33, 41)
-        line    = (36, 41, 50)
-        text    = (222, 226, 234)
-        dim     = (128, 137, 152)
+    Settings > Appearance picks a preset and edits its seven colours."""
+    cols = theme_colors(prefs)
+    light = theme_is_light(prefs)
+    bg, panel, frame, line, text, dim, accent = (cols[k] for k in ("bg", "panel", "frame", "line", "text", "dim", "accent"))
     soft    = accent + (60,)
     lift = (lambda c, k: tuple(min(255, v + k) for v in c)) if not light else (lambda c, k: tuple(max(0, v - k) for v in c))
     with dpg.theme() as th:
@@ -528,26 +555,36 @@ class App(Features):
     def toggle_live(self):
         self.stop_live() if self.live else self.start_live()
 
-    def set_appearance(self, light=None, accent=None):
-        """Settings > Appearance: the theme is rebuilt and rebound; the
-        accent reaches the toolbar's tints and the frames' section titles
-        at the next start."""
+    def set_appearance(self, light=None, accent=None, preset=None, colors=None):
+        """Settings > Appearance: a preset (its colours from scratch), or
+        one colour changed; the theme is rebuilt and rebound, the accent
+        reaches the toolbar's tints and the frames' section titles."""
         t = dict(self.prefs.get("theme") or {})
         if light is not None:
-            t["light"] = bool(light)
+            preset = "light" if light else "dark"
+        if preset is not None:
+            t["preset"] = preset
+            t.pop("colors", None); t.pop("accent", None)
         if accent is not None:
-            t["accent"] = [int(v) for v in accent[:3]]
+            colors = dict(colors or {}, accent=accent)
+        if colors:
+            cur = dict(t.get("colors") or {})
+            cur.update({k: [int(v) for v in c[:3]] for k, c in colors.items() if k in THEME_PRESETS["dark"]})
+            t["colors"] = cur
+            t.pop("accent", None)
+        t["light"] = theme_is_light({"theme": t})
         self.prefs["theme"] = t
         save_prefs(self.prefs)
         self._themes["normal"] = apply_theme(self.prefs)
         if self.ui:
             dpg.bind_theme(self._themes["normal"])
-        acc = tuple(t.get("accent") or (90, 169, 230))
-        chrome.ACCENT = acc + (255,)
-        chrome.TEXT = (30, 34, 42, 255) if t.get("light") else (222, 226, 234, 255)
+        cols = theme_colors(self.prefs)
+        chrome.ACCENT = tuple(cols["accent"]) + (255,)
+        chrome.TEXT = tuple(cols["text"]) + (255,)
+        chrome.DIM = tuple(cols["dim"]) + (255,)
         chrome.refresh(self)
-        light = bool(t.get("light"))
-        dpg.set_viewport_clear_color([232, 234, 238, 255] if light and self.ui else ([14, 16, 20, 255] if self.ui else [0, 0, 0, 255]))
+        chrome.refresh_appearance(self)
+        dpg.set_viewport_clear_color(list(cols["bg"]) + [255] if self.ui else [0, 0, 0, 255])
 
     # --- autosave: a version kept while there are unsaved edits -----------------
     AUTOSAVE_S = 20.0
@@ -1860,9 +1897,7 @@ class App(Features):
         th = self._themes.get("present" if not self.ui else "normal")
         if th:
             dpg.bind_theme(th)
-        light = bool((self.prefs.get("theme") or {}).get("light"))
-        dpg.set_viewport_clear_color([0, 0, 0, 255] if not self.ui
-                                     else ([232, 234, 238, 255] if light else [14, 16, 20, 255]))
+        dpg.set_viewport_clear_color([0, 0, 0, 255] if not self.ui else list(theme_colors(self.prefs)["bg"]) + [255])
         for tag in ("net_win", "cube_win", "side_win"):
             dpg.configure_item(tag, border=self.ui)
         # The captions, the grips, the readout and the key hints are UI too -
@@ -2955,10 +2990,10 @@ def build(app):
     chrome.build_pane_menus(app)
 
     app._themes['normal'] = apply_theme(app.prefs)
-    _t = app.prefs.get("theme") or {}
-    if _t.get("light") or _t.get("accent"):
-        chrome.ACCENT = tuple(_t.get("accent") or (90, 169, 230))[:3] + (255,)
-        chrome.TEXT = (30, 34, 42, 255) if _t.get("light") else (222, 226, 234, 255)
+    _cols = theme_colors(app.prefs)
+    chrome.ACCENT = tuple(_cols["accent"]) + (255,)
+    chrome.TEXT = tuple(_cols["text"]) + (255,)
+    chrome.DIM = tuple(_cols["dim"]) + (255,)
     app._themes['present'] = present_theme()
     app.rebuild_params()
     app.rebuild_geom_fields()

@@ -363,14 +363,25 @@ def build_dialogs(app):
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
     th = app.prefs.get("theme") or {}
-    with dpg.window(tag="appearance_win", label="Appearance", show=False, width=380, height=170, no_collapse=True):
-        dpg.add_text("The look: dark or light, and the accent - the colour of whatever is on.", color=DIM, wrap=360)
-        dpg.add_combo(["dark", "light"], tag="app_light", width=120, default_value="light" if th.get("light") else "dark",
-                      callback=lambda s, v: app.set_appearance(light=(v == "light")))
-        dpg.add_color_edit(list(th.get("accent") or [90, 169, 230]) + [255], tag="app_accent", label="accent", width=200,
-                           no_alpha=True, callback=lambda s, v: app.set_appearance(accent=[int(round(c * 255)) if c <= 1.0 else int(c) for c in v[:3]]))
-        dpg.add_button(label="Studio blue", small=True, callback=lambda: (dpg.set_value("app_accent", [90, 169, 230, 255]),
-                                                                          app.set_appearance(accent=[90, 169, 230])))
+    with dpg.window(tag="appearance_win", label="Appearance", show=False, width=560, height=400, no_collapse=True):
+        from native.app import THEME_PRESETS, THEME_ROLES
+        dpg.add_text("The look. A preset to start from, then any of its seven colours - the change shows as you make it "
+                     "and is kept.", color=DIM, wrap=540)
+        with dpg.group(horizontal=True):
+            for name in THEME_PRESETS:
+                dpg.add_button(label=name, small=True, user_data=name, callback=lambda s, a, u: app.set_appearance(preset=u))
+            dpg.add_text("", tag="app_preset", color=DIM)
+        dpg.add_separator()
+        for key, label, what in THEME_ROLES:
+            with dpg.group(horizontal=True):
+                dpg.add_color_edit([0, 0, 0, 255], tag=f"app_col_{key}", width=150, no_alpha=True, no_label=True, user_data=key,
+                                   callback=lambda s, v, u: app.set_appearance(colors={u: [int(round(c * 255)) if c <= 1.0 else int(c) for c in v[:3]]}))
+                dpg.add_text(label, tag=f"app_lbl_{key}")
+                dpg.add_text(what, color=DIM)
+        dpg.add_separator()
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Back to the preset", small=True, callback=lambda: app.set_appearance(preset=(app.prefs.get("theme") or {}).get("preset") or "dark"))
+            dpg.add_text("the preset's colours again, your changes dropped", color=DIM)
     with dpg.window(tag="sweep_win", label="Sweep a slider", show=False, width=400, height=190, no_collapse=True):
         dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
                      "record makes that one pass the GIF.", color=DIM, wrap=380)
@@ -1086,8 +1097,24 @@ def show_compare(app):
 
 # --- appearance, pane menus ----------------------------------------------------------------
 def show_appearance(app):
-    _centre("appearance_win", 380, 170)
+    refresh_appearance(app)
+    _centre("appearance_win", 560, 400)
     dpg.show_item("appearance_win")
+
+
+def refresh_appearance(app):
+    """The editor's swatches show the colours in force."""
+    if not dpg.does_item_exist("app_preset"):
+        return
+    from native.app import theme_colors, THEME_PRESETS
+    t = app.prefs.get("theme") or {}
+    cols = theme_colors(app.prefs)
+    name = t.get("preset") or ("light" if t.get("light") else "dark")
+    changed = sorted(k for k in (t.get("colors") or {}) if k in cols and tuple(cols[k]) != tuple(THEME_PRESETS.get(name, {}).get(k, ())))
+    dpg.set_value("app_preset", f"{name}" + (f", with {', '.join(changed)} changed" if changed else ""))
+    for key in cols:
+        if dpg.does_item_exist(f"app_col_{key}"):
+            dpg.set_value(f"app_col_{key}", list(cols[key]) + [255])
 
 
 def grip(pane):
