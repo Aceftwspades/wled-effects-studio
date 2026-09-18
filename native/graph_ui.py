@@ -2042,15 +2042,29 @@ class GraphPanel:
         self._press_pos = {nid: tuple(dpg.get_item_pos(f"gnode_{nid}")) for nid in self.graph.nodes if dpg.does_item_exist(f"gnode_{nid}")}
         self._node_press = over is not None          # a press on a node: the drag that follows moves the selection
         self._drag_kind = None
+        # The pin pressed: its attribute hovered (the label), or the pointer
+        # within imnodes' hover radius of the circle itself, which sits just
+        # outside the node - where a wire is naturally grabbed.
+        mp = dpg.get_mouse_pos(local=False)
+        hit, best = None, None
         for (nid, kind, name), tag in self._pins.items():
-            if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
-                self._drag_type = self._ptype.get(tag)
-                self._drag_from = (nid, name)
-                self._drag_kind = kind
-                self._press_at = dpg.get_mouse_pos(local=False)
+            if not dpg.does_item_exist(tag):
+                continue
+            if dpg.is_item_hovered(tag) or self._on_pin_label(tag, mp):
+                hit, best = (nid, kind, name, tag), -1.0
                 break
-        else:
+            pt = self._pin_point(nid, kind, name)
+            if pt is not None:
+                d = ((pt[0] - mp[0]) ** 2 + (pt[1] - mp[1]) ** 2) ** 0.5
+                if d <= self.px(12) and (best is None or d < best):
+                    hit, best = (nid, kind, name, tag), d
+        if hit is None:
             return
+        nid, kind, name, tag = hit
+        self._drag_type = self._ptype.get(tag)
+        self._drag_from = (nid, name)
+        self._drag_kind = kind
+        self._press_at = mp
         th = self.themes()
         other = "in" if self._drag_kind == "out" else "out"
         for (nid, kind, name), tag in self._pins.items():
@@ -2093,7 +2107,10 @@ class GraphPanel:
         mx, my = dpg.get_mouse_pos(local=False)
         if abs(mx - self._press_at[0]) + abs(my - self._press_at[1]) < 12:
             return
-        if not dpg.is_item_hovered("node_editor"):
+        # the editor reports no hover while a wire is being dragged: its
+        # rectangle says whether the drop is inside it
+        er = self.editor_rect()
+        if er is None or not (er[0] <= mx <= er[2] and er[1] <= my <= er[3]):
             return
         for (nid, kind, name), tag in self._pins.items():
             if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
@@ -2122,6 +2139,27 @@ class GraphPanel:
         """True while a press that began on a node is held: the selection
         is moving with the pointer."""
         return bool(getattr(self, "_node_press", False)) and dpg.is_mouse_button_down(dpg.mvMouseButton_Left)             and self._drag_type is None
+
+    def editor_rect(self):
+        """The node editor on screen (x0, y0, x1, y1): it reports no position
+        of its own - it is the bottom of its pane, its height from its size."""
+        pane = self.app._screen_rect("graph_win") if hasattr(self.app, "_screen_rect") else None
+        if not pane or not dpg.does_item_exist("node_editor"):
+            return None
+        eh = dpg.get_item_rect_size("node_editor")[1]
+        return (pane[0] + 9, pane[3] - 9 - eh, pane[2] - 9, pane[3] - 9)
+
+    def _on_pin_label(self, tag, mp):
+        """The pointer on a pin's label text (an attribute reports no hover
+        of its own worth having)."""
+        kids = dpg.get_item_children(tag, 1) or []
+        if not kids or not dpg.does_item_exist(kids[0]):
+            return False
+        st = dpg.get_item_state(kids[0])
+        if "rect_min" not in st or "rect_max" not in st:
+            return False
+        (x0, y0), (x1, y1) = st["rect_min"], st["rect_max"]
+        return x0 - 2 <= mp[0] <= x1 + 2 and y0 - 2 <= mp[1] <= y1 + 2
 
     def _wire_to_body(self, frm, t, nid, kind):
         """A wire from `frm` dropped on node `nid`: the first free input that

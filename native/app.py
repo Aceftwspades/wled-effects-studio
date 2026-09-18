@@ -3128,6 +3128,7 @@ def service_command(app):
                     vx, vy = dpg.get_viewport_pos()
                     x, y = int(vx + c["click"][0]), int(vy + c["click"][1])
                 u32.SetCursorPos(x, y)
+                import time as _tm; _tm.sleep(0.1)                                 # a frame of hovering first
                 if len(c["click"]) > 2 and c["click"][2] == "right":
                     u32.mouse_event(8, 0, 0, 0, 0); u32.mouse_event(16, 0, 0, 0, 0)
                 else:
@@ -3142,6 +3143,20 @@ def service_command(app):
                     st = dpg.get_item_state(m)
                     kids = dpg.get_item_children(m, 1) or []
                     print("menu", dpg.get_item_configuration(m).get("label"), st, "first child", dpg.get_item_state(kids[0]) if kids else None)
+            if "drag" in c and os.name == "nt":         # test hook: a real drag [x0, y0, x1, y1, "left"|"middle"]
+                import ctypes, ctypes.wintypes as wt, time as _tm
+                u32 = ctypes.windll.user32
+                hwnd = u32.FindWindowW(None, "WLED Effects Studio")
+                pt = wt.POINT(0, 0)
+                if hwnd:
+                    u32.SetForegroundWindow(hwnd); u32.ClientToScreen(hwnd, ctypes.byref(pt))
+                x0, y0, x1, y1 = (int(v) for v in c["drag"][:4])
+                down, up = (0x20, 0x40) if (len(c["drag"]) > 4 and c["drag"][4] == "middle") else (2, 4)
+                u32.SetCursorPos(pt.x + x0, pt.y + y0); _tm.sleep(0.1)          # a frame of hovering first
+                u32.mouse_event(down, 0, 0, 0, 0); _tm.sleep(0.05)
+                for k in range(1, 11):
+                    u32.SetCursorPos(pt.x + x0 + (x1 - x0) * k // 10, pt.y + y0 + (y1 - y0) * k // 10); _tm.sleep(0.02)
+                u32.mouse_event(up, 0, 0, 0, 0)
             if "confirm" in c:                          # test hook: press button k of the open question box
                 chrome.confirm_pick(app, int(c["confirm"]))
             if "export_usermod" in c:                   # test hook: with or without the dependencies
