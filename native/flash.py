@@ -438,14 +438,23 @@ def upload(host, path, log, timeout=180):
     req = urllib.request.Request(host + "/update", data=body,
                                  headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
     log(f"sending {len(data) // 1024} KB to {host}/update ...")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            page = r.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        page = e.read().decode("utf-8", "replace")
-        return False, f"the device answered {e.code}: " + _message(page)
-    except Exception as e:
-        return False, f"upload failed: {e}"
+    # The first POST after a while can be dropped by the device without an
+    # answer (the connection closes mid-body; the same POST a moment later
+    # goes through), so a closed connection gets one more try.
+    for attempt in (1, 2, 3):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                page = r.read().decode("utf-8", "replace")
+            break
+        except urllib.error.HTTPError as e:
+            page = e.read().decode("utf-8", "replace")
+            return False, f"the device answered {e.code}: " + _message(page)
+        except Exception as e:
+            if attempt < 3 and "closed connection" in str(e):
+                log(f"the device closed the connection ({e}); trying again in 10 s")
+                time.sleep(10)
+                continue
+            return False, f"upload failed: {e}"
     return True, _message(page) or "sent - the device is rebooting"
 
 
@@ -493,8 +502,14 @@ def verify_reboot(host, before, log, timeout=90):
         if info:
             ver, vid = info.get("ver", "?"), info.get("vid", "?")
             was = (before or {}).get("vid")
+            up, was_up = info.get("uptime"), (before or {}).get("uptime")
+            # the build id is the tree's VERSION, which two builds of the same
+            # tree share; the uptime starting over is what says it rebooted
+            rebooted = up is not None and was_up is not None and up < was_up
+            if was is not None and vid == was and not rebooted:
+                return False, f"the device is back on the SAME build ({ver}, {vid}) and did not reboot - the update did not take"
             if was is not None and vid == was:
-                return False, f"the device is back on the SAME build ({ver}, {vid}) - the update did not take"
+                return True, f"the device rebooted into the new firmware (WLED {ver}, build {vid} - the same id as before: the same tree)"
             return True, f"the device is back: WLED {ver}, build {vid}" + (f" (was {was})" if was is not None else "")
         time.sleep(3)
     return False, "the device did not answer within a minute and a half after the update - check it"
@@ -690,9 +705,16 @@ class Job:
                     self.log(f"device before: WLED {before.get('ver', '?')}, build {before.get('vid', '?')}, {before.get('name', '')}")
                 ok, msg = upload(self.host, bin_, self.log)
                 self.log(msg)
-                if ok:
+                # The device can take the whole file and reboot without its
+                # answer reaching us (the reply times out, or the connection
+                # closes); what it runs afterwards is what counts.
+                if ok or "timed out" in msg or "closed connection" in msg:
                     self.log("waiting for the device to reboot...")
-                    ok, msg = verify_reboot(self.host, before, self.log)
+                    back, msg2 = verify_reboot(self.host, before, self.log)
+                    if back or ok:
+                        ok, msg = back, msg2
+                    else:
+                        msg = msg + "; " + msg2
                 self.result = msg
                 self.ok = ok
             else:

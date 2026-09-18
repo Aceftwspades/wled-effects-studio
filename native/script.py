@@ -77,6 +77,7 @@ class Asm:
         self.nf, self.nc = USER0, 0
         self.stream = self.pixel
         self._consts = {}                            # value -> register
+        self.made = {}                               # float register -> the op that set it
 
     def freg(self):
         self.nf += 1
@@ -88,6 +89,8 @@ class Asm:
 
     def emit(self, op, *args):
         self.stream.append((op, args))
+        if args and DESTS.get(op, 1) == 1 and OPS[op][1][0] == "f":
+            self.made[args[0]] = op                  # which op wrote a float register, for the peepholes
 
     def const(self, k):
         k = float(k)
@@ -399,9 +402,13 @@ class Lower:
         self.fail("cannot use that as a vector")
 
     def f1(self, op, a):
+        if op == "TRUNC" and a[0] == "f" and self.asm.made.get(a[1]) == "TRUNC":
+            return a                                   # (int)(int)x: the cast chains the templates write
         r = self.asm.freg(); self.asm.emit(op, r, self.to_f(a)); return ("f", r)
 
     def f2(self, op, a, b):
+        if op == "DIV" and b[0] == "k" and b[1] != 0.0:
+            op, b = "MUL", ("k", 1.0 / b[1])           # a divide is software on an ESP32, twice a multiply
         r = self.asm.freg(); self.asm.emit(op, r, self.to_f(a), self.to_f(b)); return ("f", r)
 
     # -- expressions ------------------------------------------------------------------

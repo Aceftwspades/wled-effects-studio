@@ -853,13 +853,101 @@ back. The six-face setting is ignored by that build, as designed. The
 device has no ledmap file (its wiring is WLED's panel layout), so the
 ledmap import reports 404 and the export is not needed there.
 
-The finding: the Script effect runs the sine graph at **7 fps** and
+The finding: the Script effect ran the sine graph at **7 fps** and
 Maelstrom at 5 on the S3, against 43 fps for the compiled effects - the
-bytecode VM is six to eight times slower than compiled code per pixel
-(the sim shows the same ratio: 1.2 ms against 0.15). That build predates
-the frame budget, which would hold the frame near 40 ms by striding, but
-the real fix is the VM: register access, the op dispatch, sinf and the
-palette lookup per pixel are where to look.
+bytecode VM was six to eight times slower than compiled code per pixel
+(the sim showed the same ratio: 1.2 ms against 0.15).
+
+### The script VM, made five times cheaper
+
+Disassembling the sine graph's program said where the time went: 175 ops
+a pixel, 78 of them CONST and 61 MUL, for a graph that does one sine.
+The compiler was remaking the slider environment - `SEGMENT.speed` as
+`sx * 255`, intensity, three customs, `strip.now` - for every node, into
+that node's stream, twelve ops each, and giving every constant a fresh
+register and a fresh CONST at every use. Now (`native/script.py`):
+
+- **Constants once.** `Asm.const` keeps a table; a value is one register,
+  set once a frame by a CONST in the frame stream, read from either
+  stream (every op's destination is a fresh register, so nothing ever
+  overwrites one).
+- **The slider environment once**, in the frame stream, shared by every
+  node.
+- **Loop-invariant code motion** (`Asm.hoist`): a pixel-stream op whose
+  inputs all hold for the frame - constants, sliders, time, frame-stream
+  results - moves to the frame stream. A node's `speed / 255 * 4` runs
+  once, not 2304 times.
+
+- **Two peepholes**: a divide by a constant is a multiply by its
+  reciprocal (a float divide is software on an ESP32, 250 ns), and
+  `(int)(int)x` - the cast chains the templates write - is one TRUNC.
+
+Programs are four to five times smaller (Moire 8982 -> 1592 bytes; its
+pixel stream 930 -> 119 ops, Maelstrom's 293 -> 49).
+
+Then the runtime (`cube_fx_98_script.cpp`), each step measured on the S3
+with a program of forty copies of one op (`bench_ops.py` in the session's
+scratch; the bank's info line reports the pixel loop's time):
+
+- **The operand signature table** (`SS_SIG`, script.py's OPS letters):
+  `ssParse` range-checks every register when a program arrives and decodes
+  the streams into 16-bit words, so the run loop indexes the register files
+  straight and reads each operand with one aligned load.
+- **-O2 for the file**, with jump tables turned back on. The firmware
+  builds with -Os and the ESP-IDF toolchain's `-fno-jump-tables`: GCC had
+  made the VM's 67-way switch a tree of seven or eight taken branches per
+  op and refused to inline gc_sat, fminf and the rest, so a MOV cost 40
+  cycles (177 ns). A `#pragma GCC optimize("O2", "jump-tables")` above the
+  includes (GCC will not inline across differing optimisation options)
+  took that to 101 ns.
+- **Threaded dispatch**: each op ends with a jump through a table of label
+  addresses to the next op's code (GCC's and clang's labels-as-values; a
+  switch remains for any other compiler, from the same body through the
+  `OP` / `END_OP` macros) - no loop test, no bounds check, no jump back.
+  MOV 68 ns, MUL 88, from 177 and 205.
+- **A sine table**: 256 entries over a turn with a straight line between
+  them, within a hundredth of a per cent of sinf; WLED's `sin_t` was 300
+  ns an op, this is 160. Floor, ceil, fract, round and fmod are inline
+  truncations instead of libm calls (FLOOR 283 -> 82 ns).
+- **PAL reads a 256-entry table** made on the first PAL of each frame
+  instead of calling `color_from_palette` per pixel; the polar and 3-D
+  fixed registers (a root and an arc tangent a pixel) are only filled for
+  a program that reads them; the loop is in IRAM.
+
+What is left costs what the chip costs: a float divide 250 ns, a square
+root 285, fmod 270, the hash 330 (three floorf), perlin 270.
+
+On the cube, full resolution, from the earlier 7 and 5 fps: the sine
+tutorial **39 fps**, Maelstrom **32** (its compiled build 43, WLED's
+cap), Moire **25** (compiled 36), Truchet Cube **22**. In the sim the
+Script effect runs at 1.1-1.8x the compiled effect's time, from 3.7-10x,
+and the pictures are the same (mean difference 0 to 0.3/255 on the
+examples that were exact before; the larger differences some show -
+Truchet Cube 22/255, Candy Knot 14/255 - are `gc_rnd()` picking different
+tiles, there before and expected).
+
+Two things found on the way. **The frame budget** (a program over 40 ms
+runs at half, then a quarter, of the width) coarsened on a single slow
+frame - WiFi, or a program just loaded - and could not climb back, since
+it climbed only below 12 ms: every script sat at half or quarter width and
+looked streaky in the live view while reporting fine fps. It now takes
+three slow frames in a row to coarsen, comes back when the next stride's
+frame (about twice this one) would be under 30 ms, starts over at full
+width with each new program, and says what it is doing on the info page
+("Studio Script: full resolution, 18.2 ms a frame"). And **the bank**:
+WLED saves a usermod's whole config block whenever any setting in it is
+saved, so the studio's six-face push wrote CubeFXBank with every slot 0,
+and the next boot placed no effect at all (255 modes became 220 - the
+device had been running on its "not configured yet" default). An
+all-empty bank is now treated as unconfigured: every effect registers,
+as before the bank existed, and the info line says "none chosen - all 63
+registered".
+
+The flash path learned two things too: the first `/update` POST after a
+while is closed by the device part-way through (the same POST ten seconds
+later goes through), so it retries; and two builds of one tree share a
+build id, so a reboot is recognised by the uptime starting over, not by
+the id changing.
 
 ## Where the frame time goes
 
