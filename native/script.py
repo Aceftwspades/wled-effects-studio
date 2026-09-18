@@ -37,34 +37,46 @@ FIXED_INDEX = {n: i for i, n in enumerate(FIXED)}
 BAND0 = 36                                   # 16 bands follow
 USER0 = 56                                   # programs allocate from here
 
-OPS = {                                      # name: (code, kinds of operands) r=reg u16, k=f32 immediate, i=u16 int
-    "END": (0, ""), "CONST": (1, "rk"), "MOV": (2, "rr"),
-    "ADD": (3, "rrr"), "SUB": (4, "rrr"), "MUL": (5, "rrr"), "DIV": (6, "rrr"), "MIN": (7, "rrr"), "MAX": (8, "rrr"),
-    "POW": (9, "rrr"), "MOD": (10, "rrr"), "ATAN2": (11, "rrr"),
-    "ABS": (12, "rr"), "FLOOR": (13, "rr"), "FRACT": (14, "rr"), "SIN": (15, "rr"), "COS": (16, "rr"), "SQRT": (17, "rr"),
-    "EXP": (18, "rr"), "LOG": (19, "rr"), "SAT": (20, "rr"), "SIGN": (21, "rr"), "ROUND": (22, "rr"), "NOT": (23, "rr"),
-    "TAN": (24, "rr"), "TRUNC": (25, "rr"), "CEIL": (26, "rr"),
-    "LT": (27, "rrr"), "LE": (28, "rrr"), "GT": (29, "rrr"), "GE": (30, "rrr"), "EQ": (31, "rrr"), "NE": (32, "rrr"),
-    "AND": (33, "rrr"), "OR": (34, "rrr"),
-    "SEL": (35, "rrrr"),
-    "NOISE": (36, "rrrr"), "HASH": (37, "rrrr"), "FBM": (38, "rrrrrrr"),
-    "PAL": (39, "rrr"), "HSV": (40, "rrrr"), "RGB": (41, "rrrr"), "CR": (42, "rr"), "CG": (43, "rr"), "CB": (44, "rr"),
-    "CMIX": (45, "rrrr"), "CSCALE": (46, "rrr"), "CADD": (47, "rrr"), "CMUL": (48, "rrr"), "CMAX": (49, "rrr"),
-    "CMIN": (50, "rrr"), "CSEL": (51, "rrrr"), "SEGCOL": (52, "ri"), "CMOV": (53, "rr"), "CCONST": (54, "ri"),
-    "OUT": (55, "r"), "STLD": (56, "ri"), "STST": (57, "ir"), "RND": (58, "r"), "BLEND": (59, "rrrri"),
-    "RINGUV": (60, "rrrr"), "POSUV": (61, "rrrrr"), "FOLD": (62, "rrrrrri"), "KNOT": (63, "rrrrrrrrrrrrrr"),
-    "MANDEL": (64, "rrrrrr"), "EASE": (65, "rrr"), "LOUDEST": (66, "rrii"),
+OPS = {                                      # name: (code, operands) f=float reg, c=colour reg, i=u16 int, k=f32 immediate
+    "END": (0, ""), "CONST": (1, "fk"), "MOV": (2, "ff"),
+    "ADD": (3, "fff"), "SUB": (4, "fff"), "MUL": (5, "fff"), "DIV": (6, "fff"), "MIN": (7, "fff"), "MAX": (8, "fff"),
+    "POW": (9, "fff"), "MOD": (10, "fff"), "ATAN2": (11, "fff"),
+    "ABS": (12, "ff"), "FLOOR": (13, "ff"), "FRACT": (14, "ff"), "SIN": (15, "ff"), "COS": (16, "ff"), "SQRT": (17, "ff"),
+    "EXP": (18, "ff"), "LOG": (19, "ff"), "SAT": (20, "ff"), "SIGN": (21, "ff"), "ROUND": (22, "ff"), "NOT": (23, "ff"),
+    "TAN": (24, "ff"), "TRUNC": (25, "ff"), "CEIL": (26, "ff"),
+    "LT": (27, "fff"), "LE": (28, "fff"), "GT": (29, "fff"), "GE": (30, "fff"), "EQ": (31, "fff"), "NE": (32, "fff"),
+    "AND": (33, "fff"), "OR": (34, "fff"),
+    "SEL": (35, "ffff"),
+    "NOISE": (36, "ffff"), "HASH": (37, "ffff"), "FBM": (38, "fffffff"),
+    "PAL": (39, "cff"), "HSV": (40, "cfff"), "RGB": (41, "cfff"), "CR": (42, "fc"), "CG": (43, "fc"), "CB": (44, "fc"),
+    "CMIX": (45, "cccf"), "CSCALE": (46, "ccf"), "CADD": (47, "ccc"), "CMUL": (48, "ccc"), "CMAX": (49, "ccc"),
+    "CMIN": (50, "ccc"), "CSEL": (51, "cfcc"), "SEGCOL": (52, "ci"), "CMOV": (53, "cc"), "CCONST": (54, "ci"),
+    "OUT": (55, "c"), "STLD": (56, "fi"), "STST": (57, "if"), "RND": (58, "f"), "BLEND": (59, "cccfi"),
+    "RINGUV": (60, "ffff"), "POSUV": (61, "fffff"), "FOLD": (62, "ffffffi"), "KNOT": (63, "ffffffffffffff"),
+    "MANDEL": (64, "ffffff"), "EASE": (65, "fff"), "LOUDEST": (66, "ffii"),
 }
+# how many leading operands an op writes (the rest it reads), and the ops
+# that are not a pure function of their operands
+DESTS = {"END": 0, "OUT": 0, "STST": 0, "RINGUV": 2, "POSUV": 2, "FOLD": 3, "KNOT": 6, "LOUDEST": 2}
+IMPURE = {"END", "OUT", "STST", "STLD", "RND", "LOUDEST"}
+# the fixed registers that change from pixel to pixel; the rest hold for a frame
+PIXEL_FIXED = {FIXED_INDEX[n] for n in ("u", "v", "cx", "cy", "r", "ang", "px", "py", "X3", "Y3", "Z3", "nx", "ny", "nz")}
 MAGIC = b"STUV"
 VERSION = 1
 
 
 class Asm:
-    """Two op streams (frame, pixel) and the register books."""
+    """Two op streams (frame, pixel) and the register books.
+
+    Registers are written once (every op's destination is fresh), so a
+    constant is one register set once per frame in the frame stream and
+    read from either stream after: 0.5 costs a CONST once, not once per
+    node per pixel."""
     def __init__(self):
         self.frame, self.pixel = [], []
         self.nf, self.nc = USER0, 0
         self.stream = self.pixel
+        self._consts = {}                            # value -> register
 
     def freg(self):
         self.nf += 1
@@ -78,21 +90,47 @@ class Asm:
         self.stream.append((op, args))
 
     def const(self, k):
-        r = self.freg()
-        self.emit("CONST", r, float(k))
+        k = float(k)
+        r = self._consts.get(k)
+        if r is None:
+            r = self._consts[k] = self.freg()
+            self.frame.append(("CONST", (r, k)))
         return r
 
+    def hoist(self):
+        """Loop-invariant code motion: a pixel-stream op whose sources all
+        hold for the whole frame (constants, sliders, time, frame-stream
+        results) moves to the frame stream and runs once instead of once
+        per pixel. Sound because every register is written once and the
+        frame stream runs first; a node's `speed / 255 * 4` goes."""
+        pixel = set(PIXEL_FIXED)                 # ("f", n) as plain n; colours as ("c", n)
+        kept = []
+        for op, args in self.pixel:
+            code, kinds = OPS[op]
+            nd = DESTS.get(op, 1)
+            srcs = [(k, int(a)) for k, a in list(zip(kinds, args))[nd:] if k in "fc"]
+            dsts = [(k, int(a)) for k, a in list(zip(kinds, args))[:nd]]
+            movable = op not in IMPURE and not any((n if k == "f" else ("c", n)) in pixel for k, n in srcs)
+            if movable:
+                self.frame.append((op, args))
+            else:
+                kept.append((op, args))
+                for k, n in dsts:
+                    pixel.add(n if k == "f" else ("c", n))
+        self.pixel = kept
+
     def encode(self, nstate):
+        self.hoist()
         def ops(stream):
             out = bytearray()
             for op, args in stream:
                 code, kinds = OPS[op]
                 out.append(code)
                 for kind, a in zip(kinds, args):
-                    if kind == "r" or kind == "i":
-                        out += struct.pack("<H", int(a) & 0xFFFF)
-                    else:
+                    if kind == "k":
                         out += struct.pack("<f", float(a))
+                    else:
+                        out += struct.pack("<H", int(a) & 0xFFFF)
             out.append(0)
             return bytes(out)
         f, p = ops(self.frame), ops(self.pixel)
@@ -750,6 +788,20 @@ def compile_script(graph):
     def fixed(name):
         return ("f", FIXED_INDEX[name])
 
+    # The names every node's code can use: the fixed registers, and the
+    # sliders in WLED's 0..255 units, made once a frame in the frame stream
+    # and shared by every node (they used to be remade per node, per pixel).
+    shared = {k: fixed(k) for k in FIXED}
+    shared["dt"] = fixed("dt")
+    shared["gc_first"] = fixed("first")
+    shared["SEGENV.call"] = fixed("call")
+    for k, name in (("o1", "check1"), ("o2", "check2"), ("o3", "check3")):
+        shared[f"SEGMENT.{name}"] = fixed(k)
+    asm.stream = asm.frame
+    for k, name, scale in (("sx", "SEGMENT.speed", 255.0), ("ix", "SEGMENT.intensity", 255.0), ("c1", "SEGMENT.custom1", 255.0),
+                           ("c2", "SEGMENT.custom2", 255.0), ("c3", "SEGMENT.custom3", 31.0), ("t", "strip.now", 1000.0)):
+        r = asm.freg(); asm.emit("MUL", r, FIXED_INDEX[k], asm.const(scale)); shared[name] = ("f", r)
+
     for nid in order:
         n, d = graph.nodes[nid], defs[nid]
         label = f"{d.get('label') or n['type']} #{nid}"
@@ -758,18 +810,8 @@ def compile_script(graph):
         if n["type"] in ("Expression", "Colour expression"):
             raise ScriptError(f"{label}: hand-written C++ cannot run as a script")
         asm.stream = asm.frame if scope[nid] == "frame" else asm.pixel
-        env = {k: fixed(k) for k in FIXED}
-        env["dt"] = fixed("dt")
-        env["gc_first"] = fixed("first")
-        env["SEGMENT.speed"] = ("f", asm.freg()); asm.emit("MUL", env["SEGMENT.speed"][1], FIXED_INDEX["sx"], asm.const(255.0))
-        env["SEGMENT.intensity"] = ("f", asm.freg()); asm.emit("MUL", env["SEGMENT.intensity"][1], FIXED_INDEX["ix"], asm.const(255.0))
-        for k, name in (("c1", "custom1"), ("c2", "custom2"), ("c3", "custom3")):
-            env[f"SEGMENT.{name}"] = ("f", asm.freg()); asm.emit("MUL", env[f"SEGMENT.{name}"][1], FIXED_INDEX[k], asm.const(255.0 if k != "c3" else 31.0))
-        for k, name in (("o1", "check1"), ("o2", "check2"), ("o3", "check3")):
-            env[f"SEGMENT.{name}"] = fixed(k)
-        env["strip.now"] = ("f", asm.freg()); asm.emit("MUL", env["strip.now"][1], FIXED_INDEX["t"], asm.const(1000.0))
+        env = dict(shared)
         code = _preprocess(d["code"])
-        env["SEGENV.call"] = fixed("call")
         # the Audio node reads the usermod's data straight; it gets the VM's registers instead
         if n["type"] == "Audio":
             for o in d["outputs"]:
