@@ -1737,6 +1737,22 @@ class App(Features):
             self.popouts.close(view)
         self.request_layout()
 
+    def poll_menus_fit(self):
+        """A popup menu that grew past the window's edge - a fold opened
+        near the bottom - is moved back inside, so every row can be reached."""
+        vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+        for tag in ("graph_ctx", "graph_menu", "compare_menu", "open_menu") + tuple(self.pane_menus.values()):
+            if not (dpg.does_item_exist(tag) and dpg.is_item_shown(tag)):
+                continue
+            w, h = dpg.get_item_rect_size(tag)
+            if w <= 0 or h <= 0:
+                continue
+            x, y = dpg.get_item_pos(tag)
+            nx = max(0, min(x, vw - w - 4)) if w < vw else 0
+            ny = max(0, min(y, vh - h - 4)) if h < vh else 0
+            if (nx, ny) != (x, y):
+                dpg.set_item_pos(tag, [nx, ny])
+
     def poll_popouts(self):
         if self.popouts.jobs and self.popouts.poll():
             self.request_layout()
@@ -3670,6 +3686,7 @@ def main():
                 app.poll_view_mode()
                 app.poll_drops()
                 app.poll_popouts()
+                app.poll_menus_fit()
                 if app.code_ed is not None and app.layout == "edit":
                     app.code_ed.poll()
                 app.poll_glow()
