@@ -3242,6 +3242,20 @@ def service_command(app):
                     st = dpg.get_item_state(i)
                     if st.get("visible"):
                         print("combo", dpg.get_item_alias(i) or i, dpg.get_value(i), st)
+            if "menu_walk" in c:                        # test hook: every menu item's callback, in turn; failures printed
+                walk_menus(app, c["menu_walk"] if isinstance(c["menu_walk"], list) else [])
+            if "ctx_walk" in c:                         # test hook: every row of a context menu ["node"|"in"|"out", nid, pin]
+                walk_ctx(app, *c["ctx_walk"])
+            if "pane_walk" in c:                        # test hook: every row of every pane's right-click menu
+                for pane, tag in app.pane_menus.items():
+                    for k in dpg.get_item_children(tag, 1) or []:
+                        lbl = dpg.get_item_configuration(k).get("label", "")
+                        if "Pop out" in lbl or "Record" in lbl or "external" in lbl or "Compile" in lbl:
+                            print(f"pane  skip  {pane} > {lbl}"); continue
+                        print(f"pane  {_call(k, lbl):5s} {pane} > {lbl}")
+                        for w in dpg.get_windows():
+                            if dpg.get_item_alias(w) not in ("root", "") and dpg.is_item_shown(w) and dpg.get_item_alias(w).endswith(("_win", "_dialog")):
+                                dpg.hide_item(w)
             if "menus" in c:                            # test hook: every menu's state (an open one shows)
                 for m in [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]:
                     st = dpg.get_item_state(m)
@@ -3492,6 +3506,135 @@ def service_capture():
         dpg.output_frame_buffer(SHOT_PNG)
     except Exception as e:                  # a capture must never kill the app
         print(f"capture failed: {e}")
+
+
+def _call(item, label):
+    """A menu item's or row's callback, the way Dear PyGui would call it."""
+    import inspect
+    cfg = dpg.get_item_configuration(item)
+    cb, ud = cfg.get("callback"), cfg.get("user_data")
+    if cb is None:
+        return "no callback"
+    try:
+        n = len(inspect.signature(cb).parameters)
+    except (TypeError, ValueError):
+        n = 3
+    args = [item, dpg.get_value(item) if dpg.get_item_type(item).endswith("::mvMenuItem") else None, ud][:n]
+    try:
+        cb(*args)
+        return "ok"
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return f"FAIL {type(e).__name__}: {e}"
+
+
+SKIP_MENU = ("Quit", "Record 15 s GIF", "Fullscreen",     # ends the app, a 15 s recording, flips the window
+             "Open the project folder", "Open the build folder", "Node reference (NODES.md)", "Studio guide (STUDIO.md)",
+             "Open code in external editor")                # these hand a path to the desktop: another program opens
+
+
+def walk_menus(app, skip=()):
+    """Every item of the menu bar, invoked; a dialog it opens is closed
+    again. Prints one line per item."""
+    skip = set(SKIP_MENU) | set(skip)
+    windows_before = {w for w in dpg.get_windows() if dpg.is_item_shown(w)}
+    # the paths first, then each found afresh: an item's callback may
+    # rebuild a submenu (opening a graph refills the Open lists)
+    paths = []
+    def collect(menu, path):
+        for k in dpg.get_item_children(menu, 1) or []:
+            t = dpg.get_item_type(k)
+            lbl = dpg.get_item_configuration(k).get("label", "")
+            if t.endswith("::mvMenu"):
+                collect(k, path + [lbl])
+            elif t.endswith("::mvMenuItem"):
+                paths.append(path + [lbl])
+    for m in dpg.get_item_children("menubar", 1) or []:
+        collect(m, [dpg.get_item_configuration(m).get("label", "")])
+    def find(path):
+        node = "menubar"
+        for lbl in path:
+            nxt = next((k for k in dpg.get_item_children(node, 1) or [] if dpg.get_item_configuration(k).get("label", "") == lbl), None)
+            if nxt is None:
+                return None
+            node = nxt
+        return node
+    for path in paths:
+        label = path[-1]
+        if label in skip:
+            print(f"menu  skip  {' > '.join(path)}"); continue
+        k = find(path)
+        if k is None:
+            print(f"menu  gone  {' > '.join(path)}"); continue
+        if dpg.get_item_configuration(k).get("check"):
+            r1 = _call(k, label)                           # a check item: on, then back
+            k2 = find(path)
+            if k2 is not None:
+                dpg.set_value(k2, not dpg.get_value(k2)); r2 = _call(k2, label)
+            else:
+                r2 = "ok"
+            r = r1 if r1 != "ok" else r2
+        else:
+            r = _call(k, label)
+        print(f"menu  {r:5s} {' > '.join(path)}")
+        for w in dpg.get_windows():
+            if dpg.does_item_exist(w) and dpg.is_item_shown(w) and w not in windows_before and dpg.get_item_alias(w) != "root":
+                dpg.hide_item(w)                           # a dialog it opened
+        for tag in ("graph_menu", "graph_ctx", "confirm_dialog", "name_dialog", "palette_win"):
+            if dpg.does_item_exist(tag) and dpg.is_item_shown(tag):
+                dpg.hide_item(tag)
+    if app.ab:
+        app.stop_ab()
+    if app.sweep:
+        app.stop_sweep()
+    if getattr(app, "rec", None) is not None:
+        app.rec = None
+
+
+def walk_ctx(app, kind, nid, pin=None):
+    """Every row of a node's or a pin's context menu: the menu is refilled,
+    the row found by its label and called; a change to the graph is undone
+    before the next. Prints one line per row."""
+    import json
+    gp = app.gp
+    nid = int(nid)
+    gp._ctx = (kind, nid, pin)
+    gp._fill_ctx_menu()
+    def rows(item, path):
+        out = []
+        for k in dpg.get_item_children(item, 1) or []:
+            t = dpg.get_item_type(k)
+            if t.endswith("::mvSelectable"):
+                out.append((path + [dpg.get_item_configuration(k).get("label", "")], k))
+            elif t.endswith(("::mvTreeNode", "::mvGroup")):
+                out += rows(k, path + ([dpg.get_item_configuration(k).get("label", "")] if t.endswith("::mvTreeNode") else []))
+            elif t.endswith(("::mvButton", "::mvColorButton")):
+                out.append((path + [dpg.get_item_configuration(k).get("label", "") or "swatch"], k))
+        return out
+    labels = [p for p, _ in rows("graph_ctx", [])]
+    for path in labels:
+        if nid not in gp.graph.nodes:
+            print(f"ctx   skip  {' > '.join(path)} (the node is gone)"); continue
+        gp._ctx = (kind, nid, pin)
+        try:
+            gp._fill_ctx_menu()
+        except Exception as e:
+            print(f"ctx   FAIL  refill: {e}"); break
+        k = next((i for p, i in rows("graph_ctx", []) if p == path), None)
+        if k is None:
+            print(f"ctx   gone  {' > '.join(path)}"); continue
+        before = json.dumps(gp.graph.to_json(), sort_keys=True)
+        r = _call(k, path[-1])
+        print(f"ctx   {r:5s} {' > '.join(path)}")
+        for tag in ("confirm_dialog", "name_dialog", "where_win"):
+            if dpg.does_item_exist(tag) and dpg.is_item_shown(tag):
+                dpg.hide_item(tag)
+        if gp.graph is None:
+            print("ctx   FAIL  the graph closed"); break
+        if json.dumps(gp.graph.to_json(), sort_keys=True) != before:
+            gp.undo()
+    gp._hide_menus()
 
 
 def main():

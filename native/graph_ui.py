@@ -805,6 +805,8 @@ class GraphPanel:
         self.status("nothing selected")
 
     def select_invert(self):
+        if not self.graph:
+            return
         cur = set(self._selected())
         self.set_selection([n for n in self.graph.nodes if n not in cur])
         self.status(f"{len(self.ext_sel)} nodes selected")
@@ -812,6 +814,8 @@ class GraphPanel:
     def select_linked(self, direction):
         """Everything feeding the selection ("up"), fed by it ("down") or
         both ("both") - the whole chain, not just the neighbours."""
+        if not self.graph:
+            return
         sel = self._selected()
         if not sel:
             self.status("select a node first"); return

@@ -180,7 +180,7 @@ def build_menus(app):
                 dpg.add_menu_item(label="Back to the parent graph", callback=lambda: app.gp.back())
             dpg.add_menu_item(label="Where is the selected node's type used", callback=lambda: app.where_used_selected())
             dpg.add_separator()
-            _mi(app, "Stop pin preview", "stop_preview", callback=lambda: app.gp.set_preview(None))
+            _mi(app, "Stop pin preview", "stop_preview", callback=lambda: app.gp.stop_preview())
         with dpg.menu(label="Playback"):
             _mi(app, "Play / pause", "play_pause", callback=lambda: app.toggle_play())
             _mi(app, "Step one frame", "step", callback=lambda: app.step_once())

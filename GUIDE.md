@@ -111,7 +111,8 @@ and the segment's blend mode; "Send ledmap" uploads the wiring.
   rebuilt from the firmware's own; `python examples/build_examples.py
   --check` compiles, builds and runs them all (and every scriptable one in
   the Script effect). `python tests/smoke_app.py` drives the app through
-  its main flows and fails on any traceback.
+  its main flows and fails on any traceback; `python tests/walk_menus.py`
+  calls every menu item and context-menu row.
 - A crash's traceback lands in `%TEMP%\cubefx\crash.txt` as well as the
   console.
 - Settings > Appearance: dark, light, soft light or slate, and every one

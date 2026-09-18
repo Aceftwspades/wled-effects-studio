@@ -278,6 +278,14 @@ editor. Ticked when done; the order within a group is the order to do them.
       above that pane, in the middle the two swap; the target lights up
       as you go. View > Layout has six presets; the arrangement is
       remembered.
+- [x] **Every menu item checked** (`tests/walk_menus.py`): the walker
+      hooks call each item of the menu bar, each row of a node's, an
+      input's and an output's context menu (the graph put back after each)
+      and each pane menu row, and read the log for failures - 335 rows,
+      none failing. It found two: Node > Stop pin preview called a method
+      that did not exist, and Select > Invert / linked assumed a graph was
+      open. Skipped on purpose: Quit, the 15 s recording, fullscreen, and
+      the items that hand a path to the desktop.
 - [x] **Menus regrouped**: Edit is undo, the clipboard, Delete (delete /
       delete and reconnect / disconnect) and Select as submenus, the
       palette, the code editor's two; Node is add, the node-shape actions,
