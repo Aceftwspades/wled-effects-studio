@@ -803,7 +803,10 @@ static FX_RET mode_{ident}() {{
       const float r = sqrtf(cx * cx + cy * cy);
       const float ang = cfx_atan2f(cy, cx);
       float nx, ny, nz, X3, Y3, Z3;                 // direction (unit) and position (-1..1 box)
-      if (cube) {{
+      if (cfx_geomFor(W, H)) {{                      // a shape table: the real positions and normals
+        cfx_pos(px, py, W, H, B, false, X3, Y3, Z3);
+        cfx_geomNormal(px, py, W, X3, Y3, Z3, nx, ny, nz);
+      }} else if (cube) {{
         cfx_pos(px, py, W, H, B, true, X3, Y3, Z3);
         const float L = sqrtf(X3 * X3 + Y3 * Y3 + Z3 * Z3); const float iL = L > 1e-6f ? 1.0f / L : 1.0f;
         nx = X3 * iL; ny = Y3 * iL; nz = Z3 * iL;

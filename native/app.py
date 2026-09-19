@@ -40,7 +40,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui
+from native import chrome, glow, device_ui, shape_ui
 from native.gpucube import CubeQuads
 from native.features import Features
 from native.popout import Popouts
@@ -688,6 +688,7 @@ class App(Features):
         "sphere":   [("w", "around", 3, 256), ("h", "rows", 2, 128)],
         "torus":    [("w", "around", 3, 256), ("h", "tube", 3, 64)],
         "xyz":      [],
+        "shape":    [],
     }
 
     def apply_geometry(self, geom):
@@ -702,6 +703,8 @@ class App(Features):
             return
         self.project.geometry = geom
         self.project.save()
+        if dpg.does_item_exist("shape_win") and dpg.is_item_shown("shape_win"):
+            shape_ui.refresh(self)
         self._ab_sync()
         self.rebuild_params()
         self.rebuild_seg_fields()
@@ -717,8 +720,12 @@ class App(Features):
             dpg.show_item("xyz_dialog")
             return
         params = dict(self.project.geometry.params) if self.project.geometry.kind == val else {}
+        if val == "shape" and not params.get("parts"):
+            params["parts"] = [dict(__import__("native.shapes", fromlist=["new_part"]).new_part("ring", n=24), name="ring 1")]
         self.apply_geometry(Geometry(val, **params))
         self.rebuild_geom_fields()
+        if val == "shape":
+            device_ui.show(self, "shape")
 
     def on_geom_field(self, sender, val):
         key = dpg.get_item_user_data(sender)
@@ -761,6 +768,9 @@ class App(Features):
         if g.kind == "xyz":
             dpg.add_text(f"{g.count} points from {g.params.get('source', 'file')}",
                          parent="geom_fields", color=(139, 147, 163), wrap=0)
+        if g.kind == "shape":
+            dpg.add_text(g.describe(), parent="geom_fields", color=(139, 147, 163), wrap=0)
+            dpg.add_button(label="Edit the shape...", parent="geom_fields", callback=lambda: device_ui.show(self, "shape"))
         if g.kind == "cube":
             # the wiring: which face first, how each is turned, how each is
             # walked - what the exported ledmap says
@@ -894,11 +904,39 @@ class App(Features):
         # the engine holds the previous project's drafts: build this one's list
         self.edit_build()
 
-    def send_ledmap(self):
+    def send_ledmap(self, sure=False):
+        """The ledmap to the device - its wiring changes, so it asks first."""
         host = self.active_host()
         if not host:
             device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
+        g = self.project.geometry
+        if not sure:
+            chrome.confirm(self, "Send the ledmap?",
+                           f"The device at {host} will map its LEDs as this project's geometry does ({g.describe()}): "
+                           "its picture changes, and a wiring that is not the device's leaves it dark or scrambled until "
+                           "the ledmap is removed. Send it?",
+                           [("Send", lambda: self.send_ledmap(True)), ("Cancel", None)])
+            return
         msg = self.project.send_ledmap(host)
+        dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
+
+    def send_shape(self, sure=False):
+        """The geometry to the device: its ledmap (the wiring), and its
+        position table when it is a shape cfx_pos has no rule for."""
+        from native import flash
+        host = self.active_host()
+        if not host:
+            device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
+        g = self.project.geometry
+        if not sure:
+            chrome.confirm(self, "Send the shape?",
+                           f"The device at {host} gets this project's ledmap ({g.describe()}) and, for a shape, the "
+                           "positions table the effects read. Its wiring changes with the ledmap. Send both?",
+                           [("Send", lambda: self.send_shape(True)), ("Cancel", None)])
+            return
+        msg = self.project.send_ledmap(host)
+        ok, msg2 = flash.send_geometry(host, g)
+        msg = msg + "; " + msg2
         dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
 
     def new_project(self, name):
@@ -1517,7 +1555,7 @@ class App(Features):
                ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
                ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
     CORE = ("main", "cube", "side", "props")
-    OPTIONAL = ("devices", "flash", "send")
+    OPTIONAL = ("devices", "flash", "send", "shape")
     SLOTS = CORE + OPTIONAL
 
     @classmethod
@@ -2172,7 +2210,7 @@ class App(Features):
     def _slot_label(self, slot):
         return {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
                 "side": "Panel", "props": "Properties", "devices": "Devices", "flash": "Flash firmware",
-                "send": "Send to device"}.get(slot, slot)
+                "send": "Send to device", "shape": "Shape"}.get(slot, slot)
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
@@ -2225,6 +2263,8 @@ class App(Features):
                 self._split_drag = (tag, mp[1], ("row", i, j, rf[j], rf[j + 1]))
             return
         if dpg.is_item_hovered("cube_img"):
+            if shape_ui.click(self):                 # placing an LED, or picking one up
+                return
             self._dragging = True
             self._yaw0, self._pitch0 = self.yaw, self.pitch
         for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win"):
@@ -2235,6 +2275,8 @@ class App(Features):
             self.gp.on_press()
 
     def on_mouse_release(self, sender, app_data):
+        if shape_ui.release(self):
+            return
         if self._sec_drag:
             key, target = self._sec_drag, self._sec_target
             self._sec_drag = self._sec_target = None
@@ -2280,6 +2322,8 @@ class App(Features):
             self.gp.open_menu()
 
     def on_drag(self, sender, app_data):
+        if shape_ui.drag(self):
+            return
         if self._sec_drag:
             self._ghost_move()
             mx, my = dpg.get_mouse_pos(local=False)
@@ -3094,6 +3138,8 @@ def build(app):
             dpg.add_button(label="", tag=f"hsplit_{i}_{j}", width=470, height=8, show=False, parent="root")
             app._splitters[f"hsplit_{i}_{j}"] = ("h", i, j)
     # where a dragged pane would land, drawn over everything
+    with dpg.viewport_drawlist(front=True, tag="shape_dl"):    # the shape editor's rings and wiring line
+        pass
     with dpg.viewport_drawlist(front=True, tag="snap_dl"):
         dpg.draw_rectangle((0, 0), (10, 10), tag="snap_rect", show=False, thickness=2,
                            color=tuple(chrome.ACCENT[:3]) + (230,), fill=tuple(chrome.ACCENT[:3]) + (50,))
@@ -3212,6 +3258,23 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
+            if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
+                try:
+                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np})))
+                except Exception as e:
+                    import traceback; traceback.print_exc()
+            if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]
+                op = c["shape"]
+                if op[0] == "add": shape_ui.add_part(app, op[1])
+                elif op[0] == "clear": shape_ui._apply(app, parts=[])
+                elif op[0] == "import": shape_ui.import_file(app, op[1])
+                elif op[0] == "layout": shape_ui._apply(app, layout=op[1])
+                elif op[0] == "undo": shape_ui.undo(app)
+                elif op[0] == "select": app._shape_sel = int(op[1]); shape_ui.refresh(app)
+                elif op[0] == "place":
+                    app._shape_place = True
+                    st = dpg.get_item_state("cube_img"); (x0, y0) = st["rect_min"]
+                    shape_ui.click(app, at=(x0 + op[1], y0 + op[2]))
             if "gp_call" in c:                          # test hook: [method of the graph panel, args]
                 getattr(app.gp, c["gp_call"][0])(*c["gp_call"][1])
             if c.get("script_preview"):
@@ -3621,7 +3684,9 @@ def _call(item, label):
 
 SKIP_MENU = ("Quit", "Record 15 s GIF", "Fullscreen",     # ends the app, a 15 s recording, flips the window
              "Open the project folder", "Open the build folder", "Node reference (NODES.md)", "Studio guide (STUDIO.md)",
-             "Open code in external editor")                # these hand a path to the desktop: another program opens
+             "Open code in external editor",                # these hand a path to the desktop: another program opens
+             "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
+             "Send the ledmap only", "Scan the network for devices")   # these reach a real device on the network: not a test's to do
 
 
 def walk_menus(app, skip=()):

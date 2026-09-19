@@ -113,7 +113,8 @@ def build_menus(app):
             dpg.add_separator()
             _mi(app, "Send the graph as a script", "script_send", callback=lambda: app.send_script())
             _mi(app, "Send the current effect's settings", "push", callback=lambda: app.push_settings())
-            dpg.add_menu_item(label="Send the ledmap", callback=lambda: app.send_ledmap())
+            dpg.add_menu_item(label="Send the shape (ledmap + positions)", callback=lambda: app.send_shape())
+            dpg.add_menu_item(label="Send the ledmap only", callback=lambda: app.send_ledmap())
             dpg.add_menu_item(label="Import the device's ledmap", callback=lambda: app.import_ledmap(host=app.active_host())
                               if app.active_host() else device_ui.show(app, "devices"))
             dpg.add_menu_item(label="Import a ledmap file...", callback=lambda: dpg.show_item("ledmap_dialog"))
@@ -146,6 +147,7 @@ def build_menus(app):
             dpg.add_menu_item(label="Minimap", check=True, default_value=True, tag="menu_minimap",
                               callback=lambda s, a: dpg.configure_item("node_editor", minimap=bool(a)))
             dpg.add_separator()
+            dpg.add_menu_item(label="Shape editor...", callback=lambda: device_ui.show(app, "shape"))
             with dpg.menu(label="Layout"):
                 for k, (label, arr) in enumerate(app.PRESETS):
                     dpg.add_menu_item(label=label, check=True, tag=f"menu_arr_{k}", user_data=arr,

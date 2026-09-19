@@ -22,6 +22,12 @@ Kinds:
   torus      w round the ring, h round the tube
   xyz        a coordinate list from a file: one logical row of n, positions
              as given, physical order as given
+  shape      built from parts (native/shapes.py): strips, rings, panels,
+             cylinders, spheres, cubes, a strip along a path, loose points -
+             placed, turned and scaled - or read from a mesh or an xLights
+             model; the parts' order is the wiring. Logically a strip of n
+             (`layout` "strip") or a w x h grid the LEDs are projected onto
+             ("grid", or the grid an xLights model came with)
 
 A Geometry is plain data; to_json()/from_json() round-trip it for the project
 file. The engine only ever hears (w, h) via simInit; positions are for the
@@ -33,7 +39,7 @@ import os
 
 import numpy as np
 
-KINDS = ("strip", "matrix", "cube", "cylinder", "sphere", "torus", "xyz")
+KINDS = ("strip", "matrix", "cube", "cylinder", "sphere", "torus", "xyz", "shape")
 
 
 class Geometry:
@@ -46,6 +52,7 @@ class Geometry:
         self.h = 1           # logical height (1 = a 1-D segment)
         self.lit = None      # (h*w,) bool, which logical pixels exist
         self.pos = None      # (h*w, 3) float, positions; NaN where unlit
+        self.nrm = None      # (h*w, 3) float, outward unit normals, or None (the direction from the centre then)
         self.phys = None     # (n_lit,) logical indices in PHYSICAL (wiring) order
         self._build()
         if self.params.get("map") is not None and self.kind in ("strip", "matrix"):
@@ -131,6 +138,7 @@ class Geometry:
             a = xs.ravel() * (2 * math.pi / w)
             r = w / (2 * math.pi) * 0.5
             self.pos = np.stack([np.cos(a) * r, np.sin(a) * r, ((h - 1) / 2.0 - ys.ravel()) * 0.5], 1).astype(np.float32)
+            self.nrm = np.stack([np.cos(a), np.sin(a), np.zeros(w * h)], 1).astype(np.float32)
             self.lit = np.ones(w * h, bool)
             self.phys = self._matrix_order(w, h, p)
         elif k == "sphere":
@@ -144,6 +152,7 @@ class Geometry:
             R = w / (2 * math.pi) * 0.5
             self.pos = np.stack([np.cos(lat) * np.cos(a) * R, np.cos(lat) * np.sin(a) * R,
                                  -np.sin(lat) * R], 1).astype(np.float32)
+            self.nrm = self.pos / R
             self.lit = np.ones(w * h, bool)
             self.phys = self._matrix_order(w, h, p)
         elif k == "torus":
@@ -156,8 +165,41 @@ class Geometry:
             r = h / (2 * math.pi) * 0.5
             self.pos = np.stack([(R + r * np.cos(v)) * np.cos(u), (R + r * np.cos(v)) * np.sin(u),
                                  r * np.sin(v)], 1).astype(np.float32)
+            self.nrm = np.stack([np.cos(v) * np.cos(u), np.cos(v) * np.sin(u), np.sin(v)], 1).astype(np.float32)
             self.lit = np.ones(w * h, bool)
             self.phys = self._matrix_order(w, h, p)
+        elif k == "shape":
+            from native import shapes
+            pos, nrm, owner = shapes.resolve(p.get("parts") or [])
+            pos, nrm = pos[:self.MAX_PIXELS], nrm[:self.MAX_PIXELS] if nrm is not None else None
+            n = len(pos)
+            if n == 0:
+                pos = np.zeros((1, 3), np.float32); nrm = None; n = 1
+            self.owner = owner[:n]
+            self.collisions = 0
+            grid = p.get("grid") if p.get("layout") == "grid" else None
+            if p.get("layout") == "grid" and not grid:
+                w, h, m, self.collisions = shapes.grid_layout(pos, float(p.get("cell", 1.0)) or 1.0)
+                grid = (w, h, m)
+            if grid:
+                w, h, m = int(grid[0]), int(grid[1]), [int(v) for v in grid[2]]
+                m = (m + [-1] * (w * h))[:w * h]
+                self.w, self.h = w, h
+                self.pos = np.full((w * h, 3), np.nan, np.float32)
+                self.nrm = np.zeros((w * h, 3), np.float32) if nrm is not None else None
+                self.lit = np.zeros(w * h, bool)
+                order = []
+                for li, led in enumerate(m):
+                    if 0 <= led < n:
+                        self.pos[li] = pos[led]; self.lit[li] = True; order.append((led, li))
+                        if nrm is not None:
+                            self.nrm[li] = nrm[led]
+                self.phys = np.asarray([li for _, li in sorted(order)], int)
+            else:
+                self.w, self.h = n, 1
+                self.pos, self.nrm = pos, nrm
+                self.lit = np.ones(n, bool)
+                self.phys = np.arange(n)
         elif k == "xyz":
             pts = np.asarray(p.get("points", []), dtype=np.float32).reshape(-1, 3)
             pts = pts[~np.isnan(pts).any(1)][:self.MAX_PIXELS]      # a bad row is dropped, not drawn at NaN
@@ -229,6 +271,37 @@ class Geometry:
         return np.asarray(out)
 
     # --- queries --------------------------------------------------------------
+    # The shape as the firmware's table (cube_fx_00_geometry.cpp): a position
+    # for every logical pixel in the -1..1 box, int8, and the normals when
+    # the shape knows them. A cube net and a flat matrix have a rule of their
+    # own in cfx_pos(), so they send none (and would move their axes if they
+    # did: a matrix's effects live in the X-Y plane there).
+    HAS_RULE = ("cube", "matrix", "strip")
+
+    def table(self):
+        """The `/geometry.bin` bytes, or None for a kind cfx_pos() already knows."""
+        if self.kind in self.HAS_RULE:
+            return None
+        pos = np.asarray(self.pos, np.float32).reshape(-1, 3).copy()
+        lit = np.asarray(self.lit, bool)
+        if not lit.any():
+            return None
+        c = (np.nanmin(pos[lit], 0) + np.nanmax(pos[lit], 0)) * 0.5
+        span = float(np.nanmax(np.abs(pos[lit] - c))) or 1.0
+        q = np.clip(np.round((pos - c) / span * 127.0), -127, 127)
+        q[~np.isfinite(q)] = 0
+        q[~lit] = 0
+        nrm = None
+        if self.nrm is not None:
+            nrm = np.clip(np.round(np.asarray(self.nrm, np.float32).reshape(-1, 3) * 127.0), -127, 127)
+            nrm[~np.isfinite(nrm)] = 0
+        import struct
+        head = b"STGM" + struct.pack("<BHHH", 1, self.w, self.h, 1 if nrm is not None else 0)
+        out = head + q.astype(np.int8).tobytes()
+        if nrm is not None:
+            out += nrm.astype(np.int8).tobytes()
+        return out
+
     @property
     def is2d(self):
         return self.h > 1
@@ -264,6 +337,11 @@ class Geometry:
         if k == "cylinder": return f"cylinder {self.w} round x {self.h}"
         if k == "sphere":   return f"sphere {self.w} round x {self.h} rows"
         if k == "torus":    return f"torus {self.w} x {self.h}"
+        if k == "shape":
+            parts = p.get("parts") or []
+            lay = f", on a {self.w}x{self.h} grid" if p.get("layout") == "grid" else ""
+            hit = f" ({self.collisions} LEDs share a cell: not addressed)" if getattr(self, "collisions", 0) else ""
+            return f"shape of {len(parts)} part(s), {self.count} LEDs{lay}{hit}"
         return f"{self.w} points from file"
 
     # --- persistence --------------------------------------------------------------

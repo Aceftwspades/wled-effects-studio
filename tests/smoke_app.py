@@ -51,6 +51,11 @@ STEPS = [
       {"pane_move": ["send", "cube", "bottom"]}, {"pane_move": ["flash", "side", "top"]}, {"pane_move": ["devices", "main", "right"]},
       {"dock": ["devices", False]}, {"dock": ["send", False]}, {"dock": ["flash", False]},
       {"arrangement": [["main"], ["cube", "props"], ["side"]]}], 3.0),
+    # the shape editor: parts added, one placed by a click on the 3-D view, the grid layout, undo, and back to the cube
+    ([{"layout": "both"}, {"frame": "shape"}, {"shape": ["clear"]}, {"shape": ["add", "ring"]}, {"shape": ["add", "panel"]},
+      {"shape": ["add", "cube"]}, {"shape": ["select", 1]}, {"shape": ["place", 120, 120]}, {"shape": ["layout", "grid"]},
+      {"shape": ["layout", "strip"]}, {"shape": ["undo"]}, {"dock": ["shape", True]}, {"dock": ["shape", False]},
+      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 4.0),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": "projects/default/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),

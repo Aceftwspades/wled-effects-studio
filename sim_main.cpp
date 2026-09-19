@@ -515,4 +515,11 @@ int simScriptOk();
 SIM_API void simScript(const uint8_t *bytes, int n) { simScriptLoad(bytes, n); }
 SIM_API int simScriptValid() { return simScriptOk(); }
 
+// The shape table (cube_fx_00_geometry.cpp): positions for every pixel of a
+// shape that is not a cube net or a flat matrix; null clears it.
+void simGeometryLoad(const uint8_t *bytes, int n);
+int simGeometryOk();
+SIM_API void simGeometry(const uint8_t *bytes, int n) { simGeometryLoad(bytes, n); }
+SIM_API int simGeometryValid() { return simGeometryOk(); }
+
 } // extern "C"

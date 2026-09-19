@@ -163,6 +163,7 @@ class Engine:
         if got != (self.cols, self.rows):
             raise ValueError(f"the engine cannot hold {self.cols} x {self.rows} pixels (max 65536)")
         self.lib.simSetMap1D2D(self.map1d2d)
+        self.geometry_table(geom.table())
         self._px = self.lib.simPixels()
         self._fft = self.lib.simFftPtr()
         self.sim_ms = 0
@@ -362,6 +363,20 @@ class Engine:
         buf = (C.c_uint8 * len(prog)).from_buffer_copy(prog)
         f(buf, len(prog))
         return bool(self.lib.simScriptValid())
+
+    def geometry_table(self, table):
+        """The shape's position table into the engine (cfx_pos reads it for
+        this segment size); None clears it. Ignored by an engine built
+        without it."""
+        try:
+            f = self.lib.simGeometry
+        except AttributeError:
+            return False
+        if not table:
+            f(None, 0); return True
+        buf = (C.c_uint8 * len(table)).from_buffer_copy(table)
+        f(buf, len(table))
+        return bool(self.lib.simGeometryValid())
 
     def script_effect(self):
         return next((i for i, n in enumerate(self.names) if "Studio Script" in n), None)

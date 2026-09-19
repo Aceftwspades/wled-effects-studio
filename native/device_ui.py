@@ -23,7 +23,8 @@ from native import flash, devices
 
 FRAMES = {"devices": ("devices_win", "DEVICES", 640, 420),
           "flash": ("flash_win", "FLASH FIRMWARE", 720, 700),
-          "send": ("send_win", "SEND TO DEVICE", 620, 360)}
+          "send": ("send_win", "SEND TO DEVICE", 620, 360),
+          "shape": ("shape_win", "SHAPE", 560, 640)}          # the shape editor (shape_ui.py), the same kind of frame
 HEADER_H = 30
 
 
@@ -91,7 +92,10 @@ def build(app):
             dpg.add_button(label="Send the current effect's settings", width=250, callback=lambda: app.push_settings())
             dpg.add_text("effect, sliders, palette, colours", color=c.DIM)
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Send the ledmap", width=250, callback=lambda: app.send_ledmap())
+            dpg.add_button(label="Send the shape", width=250, callback=lambda: app.send_shape())
+            dpg.add_text("the ledmap (wiring) and the positions table", color=c.DIM)
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Send the ledmap only", width=250, callback=lambda: app.send_ledmap())
             dpg.add_button(label="Import the device's", callback=lambda: app.import_ledmap(host=app.active_host()))
             dpg.add_button(label="Import a file...", callback=lambda: dpg.show_item("ledmap_dialog"))
         dpg.add_separator()
@@ -99,6 +103,8 @@ def build(app):
         with dpg.child_window(tag="send_log", height=-1, border=False):
             pass
     build_flash(app)
+    from native import shape_ui
+    shape_ui.build(app)
 
 
 def build_flash(app):
@@ -152,6 +158,9 @@ def show(app, which):
         refresh_flash(app)
     elif which == "devices":
         refresh_devices(app)
+    elif which == "shape":
+        from native import shape_ui
+        shape_ui.refresh(app)
     if not app.docked(which):
         if not dpg.is_item_shown(tag):
             _c()._centre(tag, w, h)
@@ -415,3 +424,5 @@ def poll(app):
             if w:
                 place_header(tag, w, False)
     poll_flash(app)
+    from native import shape_ui
+    shape_ui.poll(app)

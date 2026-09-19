@@ -155,6 +155,45 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
     return out
 
 
+def frame_of(pos):
+    """How render_points fits a geometry: (centre, extent) - the middle of
+    its bounding box, and the largest distance from there along an axis."""
+    pos = np.asarray(pos, np.float32)
+    if len(pos) == 0 or not np.isfinite(pos).any():
+        return np.zeros(3, np.float32), 1.0
+    c = (np.nanmin(pos, 0) + np.nanmax(pos, 0)) * 0.5
+    e = float(np.nanmax(np.abs(pos - c)))
+    return c.astype(np.float32), (e if e > 0 else 1.0)
+
+
+def project(pos, size, yaw, pitch, dist, fov=38.0, frame=None):
+    """Where each position lands in the size x size view: (sx, sy, ok)."""
+    c, ext = frame or frame_of(pos)
+    P = (np.asarray(pos, np.float32) - c) * (1.0 / ext)
+    eye, R = _camera(yaw, pitch, dist)
+    cam = (P - eye) @ R.T
+    depth = -cam[:, 2]
+    ok = np.isfinite(depth) & (depth > 0.05)
+    f = (size * 0.5) / np.tan(np.radians(fov) * 0.5)
+    d = np.where(ok, depth, 1.0)
+    return size * 0.5 + f * cam[:, 0] / d, size * 0.5 - f * cam[:, 1] / d, ok
+
+
+def unproject(sx, sy, size, yaw, pitch, dist, frame, axis=2, value=0.0, fov=38.0):
+    """The point of the plane `axis` = `value` (geometry units) under a
+    view pixel, or None when the ray misses it."""
+    c, ext = frame
+    eye, R = _camera(yaw, pitch, dist)
+    f = (size * 0.5) / np.tan(np.radians(fov) * 0.5)
+    d = R.T @ np.array([(sx - size * 0.5) / f, -(sy - size * 0.5) / f, -1.0])
+    if abs(d[axis]) < 1e-9:
+        return None
+    t = ((value - c[axis]) / ext - eye[axis]) / d[axis]
+    if t <= 0:
+        return None
+    return (eye + t * d) * ext + c
+
+
 def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=0.42):
     """Draw any geometry as a cloud of LEDs.
 
@@ -170,9 +209,9 @@ def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=
     n = len(pos)
     if n == 0:
         return out
-    # scale so a shape of any pixel count fills the same frame as the cube
-    ext = float(np.nanmax(np.abs(pos))) or 1.0
-    P = pos * (1.0 / ext)                       # -1..1
+    # scale so a shape of any pixel count fills the same frame as the cube, centred
+    c, ext = frame_of(pos)
+    P = (pos - c) * (1.0 / ext)                 # -1..1
     eye, R = _camera(yaw, pitch, dist)
     cam = (P - eye) @ R.T
     depth = -cam[:, 2]

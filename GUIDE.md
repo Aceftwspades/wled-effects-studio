@@ -78,6 +78,48 @@ file. Playback has A/B compare (two effects side by side), a slider sweep,
 and scrubbing back through the last seconds while paused. Segments (+ in
 the panel) layer several effects with WLED's blend modes and opacity.
 
+## Any shape: the shape editor
+
+GEOMETRY > shape (or View > Shape editor...) opens the **Shape** frame - a
+window like the Device ones, docks the same way. A shape is a list of
+**parts** in wiring order: strips, rings, panels, cylinders, spheres, cubes,
+a strip run along a path (polyline), and loose points. Each part has its
+own settings (LED count, pitch, serpentine...), a position, a rotation and
+a scale; the buttons make a mirror or an array of it; "reverse" turns its
+wiring round; up/down reorder parts, which reorders the wiring. Units are
+LED pitches - a strip with pitch 1 has its LEDs one unit apart - so a
+mesh's own units are the pitch when it is imported.
+
+- **Import a mesh or model...** reads `.obj`, `.ply` and `.stl` from
+  Blender or any CAD program - LEDs **along the edges** at a pitch (a
+  strip run round the outline, chained into as few runs as it can), or
+  one **per vertex**, or **over the surface** - an xLights **`.xmodel`**
+  custom model (the LEDs, their numbering, and its grid), or an `x y z
+  [index]` point list (CSV, whitespace or JSON; the index column is the
+  wiring order).
+- **Place** LEDs by hand: tick "place", click the 3-D view and an LED lands
+  on the working plane (z = 0 by default; choose x, y or z and a value);
+  they go into the selected points part, or a new one. Drag an LED to move
+  it; "renumber: nearest chain" rewires a points part the way a strip
+  would most likely be run through them; "turn into a path" makes a
+  polyline of the points and fills it with LEDs at the pitch.
+- The selected part's LEDs are ringed in the 3-D view with its wiring
+  drawn through them; Undo steps back; Save/Open keep a shape as a file
+  (`.shape.json`) to reuse across projects.
+
+**Layout**: a shape is one logical strip in wiring order (what 1-D effects
+and the 3-D nodes work on), or, as "grid", a w x h matrix the LEDs are
+projected onto from the front - or the grid an xLights model came with.
+On a grid, two LEDs in one cell are reported: the cell keeps the first.
+
+**On the device**: the shape's positions go along with it. Device > Send
+the shape uploads the ledmap (the wiring) and `/geometry.bin`, a table of
+every LED's position and outward direction, which the cube effects read
+instead of their cube-net rule - so Position, Direction, Cube face and
+every effect that asks where a pixel is see the real shape, on the device
+exactly as in the sim. Cylinders, spheres and tori send the table too; a
+cube net and a flat matrix have a rule of their own and send none.
+
 ## Getting it onto the cube
 
 Everything about the device is under the **Device** menu, in three frames.
@@ -102,8 +144,10 @@ it out again, and the arrangement is remembered.
      node is scriptable - the studio names the one that is not.
   2. **Send the current effect's settings** pushes the effect, sliders,
      palette, colours and the segment's blend mode.
-  3. **Send the ledmap** uploads the wiring; **Import the device's ledmap**
-     reads it back as the geometry.
+  3. **Send the shape** uploads the ledmap (the wiring) and, for a shape,
+     its positions table; **Send the ledmap only** just the wiring. Both
+     ask first: a wiring that is not the device's leaves it dark or
+     scrambled. **Import the device's ledmap** reads it back as the geometry.
 - **Flash firmware** (Ctrl+Shift+U). Tick the effects to ship (each shows
   its flash cost after a first build), pick the environment - the active
   device's chip suggests one - and the studio builds WLED with your

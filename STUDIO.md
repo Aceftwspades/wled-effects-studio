@@ -949,6 +949,53 @@ later goes through), so it retries; and two builds of one tree share a
 build id, so a reboot is recognised by the uptime starting over, not by
 the id changing.
 
+### Shapes: a position for every pixel, and an editor
+
+Effects on the device knew where a pixel is only by rule: `cfx_pos()`
+works a cube's face out from the net, and anything else is a flat
+matrix. So the studio's cylinders and spheres, and the `xyz` point lists
+it could already draw, gave every 3-D node the wrong answer on the device
+(and in the engine). Now the shape travels with the effect:
+
+- **The position table** (`cube_fx_00_geometry.cpp`, `/geometry.bin`):
+  "STGM", version, cols, rows, flags, then int8 x y z per logical pixel in
+  the -1..1 box, and with flag bit 0 the outward normals too. `cfx_pos()`
+  answers from it when one is loaded for the segment's size; the graph
+  prelude, the script VM's fixed registers and the compiled cube effects
+  all go through `cfx_pos()`, so every one of them sees the shape.
+  `cfx_geomNormal()` gives the direction (the table's, or from the
+  centre). The device reads the file when it changes (from the bank
+  usermod's loop, every two seconds); the sim is handed the same bytes by
+  `Engine.set_geometry` (`simGeometry`). `Geometry.table()` makes it for
+  every kind but a cube net, a matrix and a strip, which keep their rule
+  (a matrix's effects live in the X-Y plane there, and a table would
+  turn them on their side).
+- **The `shape` geometry** (`native/shapes.py`): parts - strip, ring,
+  panel, cylinder, sphere, cube, polyline, points - each with position,
+  rotation, scale and a reverse flag, resolved to LEDs in wiring order;
+  mirrors, arrays, a nearest-neighbour chain for loose points; a grid
+  layout (from the front, a cell per pitch, collisions counted) or the
+  grid an xLights model brings.
+- **Readers** (`native/shape_io.py`): OBJ (v, vn, f, l), PLY (ascii and
+  binary, vertex normals, faces, edges), STL (ascii and binary, corners
+  merged) into a mesh; LEDs from it at the vertices, along the edges at
+  a pitch (edges chained into runs so the wiring is a plausible strip
+  path) or over the surface; xLights `.xmodel` custom models (rows `;`,
+  columns `,`, layers `|`; the node numbers are the wiring, the grid is
+  the layout); `x y z [i]` point lists.
+- **The Shape frame** (`native/shape_ui.py`): one more dockable frame.
+  Parts list and fields, imports, placing LEDs by clicking the 3-D view
+  (`render.unproject` onto a chosen plane, through the same camera
+  `render_points` draws with - which now centres the shape on its
+  bounding box rather than the origin), dragging them, rings and a
+  wiring line round the selected part on a viewport drawlist, undo, and
+  shape files.
+
+Two guards went in the same day: sending a ledmap or a shape asks first
+(the device's wiring changes), and the menu walker skips every item that
+reaches a real device - the walk had been sending the ledmap, the script
+and the settings to the cube on every run.
+
 ### The Device menu and its frames
 
 The device had been one free-text address per project, shared by four

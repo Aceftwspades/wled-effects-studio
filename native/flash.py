@@ -479,6 +479,38 @@ def send_script(host, prog, log=lambda m: None):
     return True, f"{len(prog)} bytes of script sent to {host} as /studio.bin"
 
 
+def send_file(host, name, data, log=lambda m: None):
+    """Any file to the device's filesystem over /upload."""
+    host = (host or "").strip().rstrip("/")
+    if not host:
+        return False, "no device address"
+    if not host.startswith("http"):
+        host = "http://" + host
+    boundary = "----studio" + str(int(time.time()))
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"data\"; filename=\"{name}\"\r\n"
+            "Content-Type: application/octet-stream\r\n\r\n").encode() + bytes(data) + f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(host + "/upload", data=body,
+                                 headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            r.read()
+    except Exception as e:
+        return False, f"upload failed: {e}"
+    return True, f"{len(data)} bytes sent to {host} as {name}"
+
+
+def send_geometry(host, geom, log=lambda m: None):
+    """The shape's position table to the device as /geometry.bin (the cube
+    effects read it within two seconds); a kind with a rule of its own
+    removes the file instead, so the rule applies again."""
+    table = geom.table()
+    if table is None:
+        ok, msg = send_file(host, "/geometry.bin", b"", log)     # an empty file: too short to parse, as good as gone
+        return ok, ("no table for a " + geom.kind + " (cfx_pos knows it); the device's cleared" if ok else msg)
+    ok, msg = send_file(host, "/geometry.bin", table, log)
+    return ok, (f"shape sent: {geom.count} LEDs' positions ({len(table)} bytes) as /geometry.bin" if ok else msg)
+
+
 def device_info(host, timeout=4):
     """The device's /json/info as a dict, or None."""
     host = (host or "").strip().rstrip("/")
