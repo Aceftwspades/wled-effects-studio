@@ -27,7 +27,8 @@ FRAMES = {"devices": ("devices_win", "DEVICES", 640, 420),
           "shape": ("shape_win", "SHAPE", 560, 640),          # the shape editor (shape_ui.py), the same kind of frame
           "sequence": ("sequence_win", "SEQUENCE", 620, 520),  # steps into presets and a playlist (sequence_ui.py)
           "library": ("library_win", "LIBRARY", 640, 520),     # the graphs as looping thumbnails (library_ui.py)
-          "palettes": ("palettes_win", "PALETTES", 560, 460)}  # gradients of the project's own (palette_ui.py)
+          "palettes": ("palettes_win", "PALETTES", 560, 460),  # gradients of the project's own (palette_ui.py)
+          "outputs": ("outputs_win", "LED OUTPUTS", 680, 460)}  # the wiring as the device's busses, and the power (outputs_ui.py)
 HEADER_H = 30
 
 
@@ -131,11 +132,12 @@ def build(app):
         with dpg.child_window(tag="send_log", height=-1, border=False):
             pass
     build_flash(app)
-    from native import shape_ui, sequence_ui, library_ui, palette_ui
+    from native import shape_ui, sequence_ui, library_ui, palette_ui, outputs_ui
     shape_ui.build(app)
     sequence_ui.build(app)
     library_ui.build(app)
     palette_ui.build(app)
+    outputs_ui.build(app)
 
 
 def build_flash(app):
@@ -207,6 +209,9 @@ def show(app, which):
     elif which == "palettes":
         from native import palette_ui
         palette_ui.refresh(app)
+    elif which == "outputs":
+        from native import outputs_ui
+        outputs_ui.refresh(app)
     if not app.docked(which):
         if not dpg.is_item_shown(tag):
             _c()._centre(tag, w, h)
@@ -558,8 +563,9 @@ def poll(app):
             if w:
                 place_header(tag, w, False)
     poll_flash(app)
-    from native import shape_ui, sequence_ui, library_ui, palette_ui
+    from native import shape_ui, sequence_ui, library_ui, palette_ui, outputs_ui
     shape_ui.poll(app)
     sequence_ui.poll(app)
     library_ui.poll(app)
     palette_ui.poll(app)
+    outputs_ui.poll(app)

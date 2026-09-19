@@ -318,18 +318,43 @@ class Features:
     def frame_rgb(self, eng=None):
         eng = eng or self.eng
         tr = getattr(self, "_transition", None)
-        if eng is not self.eng or tr is None:
+        if eng is not self.eng:
             return eng.rgb()
+        if tr is None:
+            return self._limited(eng.rgb())
         prog = (time.perf_counter() - tr["t0"]) / max(0.05, tr["dur"])
         if prog >= 1.0:
             self._transition = None
             return eng.rgb()
         from native import transition
         try:
-            return transition.blend(tr["old"].rgb(), eng.rgb(), prog, tr["style"])
+            return self._limited(transition.blend(tr["old"].rgb(), eng.rgb(), prog, tr["style"]))
         except Exception:
             self._transition = None
             return eng.rgb()
+
+    def _limited(self, rgb):
+        """The picture dimmed as the device's brightness limiter would dim
+        it, when the Outputs frame asks for the preview."""
+        pw = getattr(self, "_power", None)
+        if pw and pw[1] < 1.0 and (self.project.options.get("outputs") or {}).get("abl_preview"):
+            return (np.asarray(rgb, np.float32) * pw[1]).astype(np.uint8)
+        return rgb
+
+    def poll_power(self):
+        """The current the frame draws, every few frames (the Outputs frame's numbers)."""
+        from native import outputs
+        S = self.project.options.get("outputs") or {}
+        n = getattr(self, "_power_n", 0) + 1
+        self._power_n = n
+        if n % 4:
+            return
+        try:
+            ma, scale = outputs.power(self.eng.rgb(), self.project.geometry.phys, int(S.get("ma_per_led", outputs.LED_MA_DEFAULT)),
+                                      int(S.get("max_ma", outputs.MAX_MA_DEFAULT)), int(getattr(self, "bri", 255)))
+            self._power = (ma, scale, int(S.get("max_ma", outputs.MAX_MA_DEFAULT)))
+        except Exception:
+            self._power = None
 
     def transition_start(self, old_state, dur, style="fade"):
         """The old step into the second engine; the blend runs `dur` seconds."""
@@ -387,6 +412,7 @@ class Features:
         """After each draw: the wiring test's pattern into the engine's
         buffer (paused, so it stays), then the frame to the device."""
         self.poll_transition()
+        self.poll_power()
         wt = getattr(self, "wiring", None)
         if wt is not None and self.playing:
             self.wiring_stop(); wt = None                  # play pressed: the effect takes the buffer back

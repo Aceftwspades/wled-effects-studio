@@ -111,6 +111,7 @@ def build_menus(app):
             _mi(app, "Flash firmware...", "flash", callback=lambda: device_ui.show(app, "flash"))
             dpg.add_menu_item(label="Send to device...", callback=lambda: device_ui.show(app, "send"))
             dpg.add_menu_item(label="Sequence: presets and a playlist...", callback=lambda: device_ui.show(app, "sequence"))
+            dpg.add_menu_item(label="LED outputs and power...", callback=lambda: device_ui.show(app, "outputs"))
             dpg.add_separator()
             with dpg.menu(label="Active device", tag="menu_active_device"):
                 pass

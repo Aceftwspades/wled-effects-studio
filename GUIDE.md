@@ -214,6 +214,15 @@ it out again, and the arrangement is remembered.
   the parts in turn), in the sim and on the device when streaming - the
   way to check a new ledmap or shape before trusting it; play resumes
   the effect.
+- **LED outputs and power** (Device menu): the wiring split into the
+  device's outputs - one, one per part of a shape, or every N LEDs - each
+  a pin, a start, a count, an LED type, a colour order and reversed or
+  not; "Read the device's" shows what it has now; **Send outputs + power
+  limit** writes them as its LED config over /json/cfg. POWER shows what
+  the frame on screen draws at the LED's full-white current (55 mA by
+  default) against the supply you enter, and how far WLED's auto
+  brightness limiter would dim it; "preview the limiter" dims the sim
+  the same way, and the footer shows the amps all the time.
 - **Flash firmware** (Ctrl+Shift+U). WHAT GOES ON THE DEVICE says, before
   anything is built, exactly what the firmware will carry - the tree's
   WLED version and build id, the environment chain with its board and

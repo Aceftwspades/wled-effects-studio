@@ -818,11 +818,13 @@ plugins, FPP scheduling, video playback.
       with the project, shown in the sim as a palette of its own, and sent
       to the device as a WLED custom palette (`/palette{n}.json`, ids 200
       down), so every effect there can use it.
-- [ ] **LED outputs** (the Controllers tab): a shape's wiring split into
+- [x] **LED outputs** (`native/outputs.py`, `outputs_ui.py`; Device > LED
+      outputs and power): a shape's wiring split into
       WLED busses - pin, count, LED type, colour order - per part or by
       count, pushed with the ledmap as the device's LED config; the whole
       new-build flow from model to device.
-- [ ] **Power** (per-model brightness limits): the current a frame would
+- [x] **Power** (per-model brightness limits; the same frame, and the
+      footer): the current a frame would
       draw from the LEDs' mA rating, against the supply, in the footer;
       and WLED's auto-brightness limiter previewed in the sim.
 - [ ] **A schedule** (xSchedule): timed presets - this playlist at 18:00

@@ -1568,7 +1568,7 @@ class App(Features):
                ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
                ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
     CORE = ("main", "cube", "side", "props")
-    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes")
+    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes", "outputs")
     SLOTS = CORE + OPTIONAL
 
     @classmethod
@@ -2223,7 +2223,7 @@ class App(Features):
     def _slot_label(self, slot):
         return {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
                 "side": "Panel", "props": "Properties", "devices": "Devices", "flash": "Flash firmware",
-                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes"}.get(slot, slot)
+                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs"}.get(slot, slot)
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
@@ -2919,9 +2919,13 @@ class App(Features):
         factor = float(self.prefs.get("device_factor", 60.0))
         est = (f"   effect {self.frame_ms:.2f} ms  ->  device ~{1000.0 / max(0.001, self.frame_ms * factor):.0f} fps (x{factor:.0f})"
                f"   app {self.loop_ms:.1f} ms/frame") if self.frame_ms > 0 else ""
+        pw = getattr(self, "_power", None)
+        power = ""
+        if pw:
+            power = f"   power {pw[0] / 1000.0:.2f} A" + (f" (limiter {int(pw[1] * 100)}%)" if pw[2] and pw[1] < 1.0 else "")
         dpg.set_value("stat_txt",
                       f"mean {s['mean']:5.1f}   sigma {s['sigma']:5.1f}   "
-                      f"dark {s['dark']:4.1f}%   sat {s['sat']:3d}" + est)
+                      f"dark {s['dark']:4.1f}%   sat {s['sat']:3d}" + power + est)
         if dpg.does_item_exist("scrub_row"):
             show = (not self.playing) and len(self.history_frames) > 1
             if dpg.is_item_shown("scrub_row") != show:
@@ -3286,6 +3290,12 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
+            if "outputs" in c:                          # test hook: ["split", "one"|"parts"|"count"] | ["abl", true] | ["limit", mA]
+                from native import outputs_ui as OU
+                op = c["outputs"]
+                if op[0] == "split": OU.do_split(app, op[1])
+                elif op[0] == "abl": OU._set(app, "abl_preview", bool(op[1]))
+                elif op[0] == "limit": OU._set(app, "max_ma", int(op[1]))
             if "cpal" in c:                             # test hook: ["new"] | ["current"] | ["stop", pos, r, g, b] | ["use"] | ["del"]
                 from native import palette_ui as PU
                 op = c["cpal"]
