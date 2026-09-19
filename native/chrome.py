@@ -106,6 +106,7 @@ def build_menus(app):
             dpg.add_menu_item(label="Devices...", callback=lambda: device_ui.show(app, "devices"))
             _mi(app, "Flash firmware...", "flash", callback=lambda: device_ui.show(app, "flash"))
             dpg.add_menu_item(label="Send to device...", callback=lambda: device_ui.show(app, "send"))
+            dpg.add_menu_item(label="Sequence: presets and a playlist...", callback=lambda: device_ui.show(app, "sequence"))
             dpg.add_separator()
             with dpg.menu(label="Active device", tag="menu_active_device"):
                 pass
@@ -200,6 +201,7 @@ def build_menus(app):
             _mi(app, "Play / pause", "play_pause", callback=lambda: app.toggle_play())
             _mi(app, "Step one frame", "step", callback=lambda: app.step_once())
             _mi(app, "Restart effect", "restart", callback=lambda: app.eng.select(app.eng.idx))
+            dpg.add_menu_item(label="Sequence...", callback=lambda: device_ui.show(app, "sequence"))
             _mi(app, "Compare with another effect...", "compare", callback=lambda: app.run_action("compare"))
             _mi(app, "Sweep a slider...", "sweep", callback=lambda: app.run_action("sweep"))
             dpg.add_separator()

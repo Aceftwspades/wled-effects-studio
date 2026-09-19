@@ -127,6 +127,22 @@ every effect that asks where a pixel is see the real shape, on the device
 exactly as in the sim. Cylinders, spheres and tori send the table too; a
 cube net and a flat matrix have a rule of their own and send none.
 
+## A show: the Sequence frame
+
+Playback > Sequence... (or Device > Sequence). A **step** is what the sim
+shows when you add it - every segment's effect, sliders, palette, bounds,
+opacity and blend, the colours, the brightness - with a name, how many
+seconds it holds and a transition time. "Update the step from the sim"
+recaptures it, "Load the step into the sim" puts it back to tweak; up /
+down reorder; **Play in the sim** runs the steps in turn (a cut at each
+change - the transition is the device's). **Send presets + playlist**
+saves each step as a WLED preset (ids from "first preset id", existing
+ones overwritten) and the sequence as a playlist preset with the
+durations and transitions; "Send and run it" starts it; "Save
+presets.json" writes the same for a device that is not on the network.
+Effects and palettes are matched by name against the device's own lists,
+and a step whose effect the device does not have is left out and named.
+
 ## Getting it onto the cube
 
 Everything about the device is under the **Device** menu, in three frames.

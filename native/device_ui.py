@@ -24,7 +24,8 @@ from native import flash, devices, live_out
 FRAMES = {"devices": ("devices_win", "DEVICES", 640, 420),
           "flash": ("flash_win", "FLASH FIRMWARE", 720, 660),
           "send": ("send_win", "SEND TO DEVICE", 620, 520),
-          "shape": ("shape_win", "SHAPE", 560, 640)}          # the shape editor (shape_ui.py), the same kind of frame
+          "shape": ("shape_win", "SHAPE", 560, 640),          # the shape editor (shape_ui.py), the same kind of frame
+          "sequence": ("sequence_win", "SEQUENCE", 620, 520)}  # steps into presets and a playlist (sequence_ui.py)
 HEADER_H = 30
 
 
@@ -128,8 +129,9 @@ def build(app):
         with dpg.child_window(tag="send_log", height=-1, border=False):
             pass
     build_flash(app)
-    from native import shape_ui
+    from native import shape_ui, sequence_ui
     shape_ui.build(app)
+    sequence_ui.build(app)
 
 
 def build_flash(app):
@@ -192,6 +194,9 @@ def show(app, which):
     elif which == "shape":
         from native import shape_ui
         shape_ui.refresh(app)
+    elif which == "sequence":
+        from native import sequence_ui
+        sequence_ui.refresh(app)
     if not app.docked(which):
         if not dpg.is_item_shown(tag):
             _c()._centre(tag, w, h)
@@ -543,5 +548,6 @@ def poll(app):
             if w:
                 place_header(tag, w, False)
     poll_flash(app)
-    from native import shape_ui
+    from native import shape_ui, sequence_ui
     shape_ui.poll(app)
+    sequence_ui.poll(app)

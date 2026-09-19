@@ -774,7 +774,8 @@ scheduling, video). These do, in the order to do them; ticked when done:
       index, a mask for a chosen part, the position along it) and an
       option to give every part its own WLED segment, so each runs its
       own effect - xLights' per-strand render styles, the WLED way.
-- [ ] **Sequencing as WLED presets and playlists**: a timeline of effects
+- [x] **Sequencing as WLED presets and playlists** (`native/sequence.py`,
+      the Sequence frame under Playback and Device): a timeline of effects
       with durations and transitions, authored in the sim, exported as
       `presets.json` and a playlist and pushed to the device.
 - [ ] **Value curves**: a Curve node with a drawn spline (edited in the

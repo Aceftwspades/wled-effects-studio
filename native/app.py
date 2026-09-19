@@ -1555,7 +1555,7 @@ class App(Features):
                ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
                ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
     CORE = ("main", "cube", "side", "props")
-    OPTIONAL = ("devices", "flash", "send", "shape")
+    OPTIONAL = ("devices", "flash", "send", "shape", "sequence")
     SLOTS = CORE + OPTIONAL
 
     @classmethod
@@ -2210,7 +2210,7 @@ class App(Features):
     def _slot_label(self, slot):
         return {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
                 "side": "Panel", "props": "Properties", "devices": "Devices", "flash": "Flash firmware",
-                "send": "Send to device", "shape": "Shape"}.get(slot, slot)
+                "send": "Send to device", "shape": "Shape", "sequence": "Sequence"}.get(slot, slot)
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
@@ -3258,6 +3258,12 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
+            if "seq" in c:                              # test hook: ["add"] | ["update"] | ["load", i] | ["del", i] | ["play"] | ["stop"] | ["field", key, v]
+                from native import sequence_ui as SQ
+                op = c["seq"]
+                {"add": lambda: SQ.add_step(app), "update": lambda: SQ.update_step(app), "load": lambda: SQ.load_step(app, op[1]),
+                 "del": lambda: SQ.del_step(app, op[1]), "play": lambda: SQ.play(app), "stop": lambda: SQ.stop(app),
+                 "field": lambda: SQ.set_field(app, op[1], op[2])}[op[0]]()
             if "stream" in c:                           # test hook: a host to stream to over DDP, or false to stop
                 app.stream_start(c["stream"], 30) if c["stream"] else app.stream_stop()
             if "wiring" in c:                           # test hook: a wiring test mode, or "off"
