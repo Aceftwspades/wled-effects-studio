@@ -32,7 +32,7 @@ def _save(app):
 def build(app):
     c = _c()
     from native import device_ui
-    with dpg.window(tag=TAG, show=False, width=620, height=520, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=640, height=660, no_collapse=True, no_title_bar=True):
         device_ui.header(app, "sequence")
         dpg.add_text("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a playlist.",
                      color=c.DIM, wrap=0)
@@ -75,6 +75,19 @@ def build(app):
         dpg.add_text("each step a preset (its id from 'presets from'; ones already there are overwritten), the sequence a playlist preset",
                      color=c.DIM, wrap=0)
         dpg.add_text("", tag="seq_log", color=c.DIM, wrap=0)
+        dpg.add_separator()
+        # SCHEDULE: WLED's timers - a preset at a time of day, sunrise or sunset, on chosen days
+        with dpg.group(horizontal=True):
+            dpg.add_text("SCHEDULE", color=c.ACCENT)
+            dpg.add_button(label="+ run the playlist at", small=True, callback=lambda: add_timer(app, "playlist"))
+            dpg.add_button(label="+ off at", small=True, callback=lambda: add_timer(app, "off"))
+            dpg.add_button(label="Read the device's", small=True, callback=lambda: read_timers(app))
+            dpg.add_button(label="Send the schedule", small=True, callback=lambda: send_timers(app))
+        dpg.add_text("the device's timers (eight, plus sunrise and sunset): what preset runs when, on which days; 'off' saves a preset "
+                     "that turns the lights off (the playlist's id + 1) and times it", color=c.DIM, wrap=0)
+        with dpg.child_window(tag="seq_timers", height=120, border=True):
+            pass
+        dpg.add_text("", tag="seq_tlog", color=c.DIM, wrap=0)
     with dpg.file_dialog(directory_selector=False, show=False, tag="seq_save_dialog", width=640, height=420,
                          default_filename="presets.json", callback=lambda s, a: save_file(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(150, 150, 220))
@@ -115,6 +128,131 @@ def refresh(app):
             + f"; bri {st.get('bri', 128)}; {len(steps)} steps, {total:.0f} s in all")
     else:
         dpg.set_value("seq_step_desc", "")
+    refresh_timers(app)
+
+
+# --- the schedule: WLED's timers ----------------------------------------------------------------
+DAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+WHEN = ["time", "sunrise", "sunset"]
+
+
+def _timers(app):
+    return app.project.options.setdefault("schedule", [])
+
+
+def add_timer(app, what):
+    T = _timers(app)
+    if len(T) >= 10:
+        app.gp.status("ten timers is what the device holds"); return
+    S = _steps(app)
+    pid = int(S.get("pid", 9))
+    T.append({"en": True, "when": "time", "hour": 18 if what == "playlist" else 23, "min": 0, "dow": 127,
+              "preset": pid if what == "playlist" else pid + 1, "what": what})
+    app.project.save(); refresh_timers(app)
+
+
+def refresh_timers(app):
+    if not dpg.does_item_exist("seq_timers"):
+        return
+    c = _c()
+    T = _timers(app)
+    dpg.delete_item("seq_timers", children_only=True)
+    for k, t in enumerate(T):
+        cb = lambda s, v, u: _tfield(app, u[0], u[1], v)
+        with dpg.group(horizontal=True, parent="seq_timers"):
+            dpg.add_checkbox(default_value=bool(t.get("en", True)), user_data=(k, "en"), callback=cb)
+            dpg.add_combo(WHEN, width=80, default_value=t.get("when", "time"), user_data=(k, "when"), callback=cb)
+            dpg.add_input_int(width=40, step=0, default_value=int(t.get("hour", 0)), min_value=0, max_value=23, user_data=(k, "hour"), on_enter=True, callback=cb,
+                              show=t.get("when", "time") == "time")
+            dpg.add_text(":" if t.get("when", "time") == "time" else "+/- min", color=c.DIM)
+            dpg.add_input_int(width=45, step=0, default_value=int(t.get("min", 0)), min_value=-120, max_value=120, user_data=(k, "min"), on_enter=True, callback=cb)
+            dpg.add_text("preset", color=c.DIM)
+            dpg.add_input_int(width=45, step=0, default_value=int(t.get("preset", 1)), min_value=0, max_value=250, user_data=(k, "preset"), on_enter=True, callback=cb)
+            dpg.add_text("off" if t.get("what") == "off" else ("playlist" if t.get("what") == "playlist" else ""), color=c.DIM)
+            for d in range(7):
+                dpg.add_checkbox(label=DAYS[d], default_value=bool(int(t.get("dow", 127)) >> d & 1), user_data=(k, f"d{d}"), callback=cb)
+            dpg.add_button(label="x", small=True, user_data=k, callback=lambda s, a, u: del_timer(app, u))
+    if not T:
+        dpg.add_text("no timers: + run the playlist at, + off at", parent="seq_timers", color=c.DIM)
+
+
+def _tfield(app, k, key, v):
+    T = _timers(app)
+    if not (0 <= k < len(T)):
+        return
+    t = T[k]
+    if key.startswith("d") and key[1:].isdigit():
+        d = int(key[1:]); dow = int(t.get("dow", 127))
+        t["dow"] = (dow | (1 << d)) if v else (dow & ~(1 << d))
+    elif key in ("hour", "min", "preset"):
+        t[key] = int(v)
+    elif key == "en":
+        t["en"] = bool(v)
+    else:
+        t[key] = v
+    app.project.save(); refresh_timers(app)
+
+
+def del_timer(app, k):
+    T = _timers(app)
+    if 0 <= k < len(T):
+        T.pop(k); app.project.save(); refresh_timers(app)
+
+
+def timers_json(T):
+    """WLED's timers.ins: hour 255 is sunrise, 254 sunset, with min the offset; dow bits Mon..Sun."""
+    ins = []
+    for t in T:
+        when = t.get("when", "time")
+        hour = 255 if when == "sunrise" else (254 if when == "sunset" else int(t.get("hour", 0)))
+        ins.append({"en": 1 if t.get("en", True) else 0, "hour": hour, "min": int(t.get("min", 0)), "macro": int(t.get("preset", 0)),
+                    "dow": int(t.get("dow", 127)) & 127, "start": {"mon": 1, "day": 1}, "end": {"mon": 12, "day": 31}})
+    return {"timers": {"ins": ins}}
+
+
+def send_timers(app):
+    import urllib.request
+    from native import device_ui
+    host = app.active_host()
+    T = _timers(app)
+    if not host:
+        device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
+    h = host if host.startswith("http") else "http://" + host
+    S = _steps(app)
+    # an "off" preset for the off timers: the playlist's id + 1, saved as a state that is off
+    if any(t.get("what") == "off" for t in T):
+        body = {"on": False, "psave": int(S.get("pid", 9)) + 1, "n": "Off"}
+        try:
+            urllib.request.urlopen(urllib.request.Request(h + "/json/state", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}), timeout=6).read()
+        except Exception as e:
+            dpg.set_value("seq_tlog", f"the off preset was refused: {e}"); return
+    req = urllib.request.Request(h + "/json/cfg", data=json.dumps(timers_json(T)).encode(), headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=6) as r:
+            r.read()
+        msg = f"{len(T)} timer(s) sent to {host}" + ("; the off preset saved" if any(t.get("what") == "off" for t in T) else "")
+    except Exception as e:
+        msg = f"the device refused the timers: {e}"
+    dpg.set_value("seq_tlog", msg); app.gp.status(msg); device_ui.send_log(app, msg)
+
+
+def read_timers(app):
+    from native import devices, device_ui
+    host = app.active_host()
+    if not host:
+        device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
+    try:
+        cfg = devices._get(host, "/json/cfg", 6)
+    except Exception as e:
+        dpg.set_value("seq_tlog", f"could not read the device's config: {e}"); return
+    T = []
+    for e in ((cfg.get("timers") or {}).get("ins") or []):
+        h = int(e.get("hour", 0))
+        T.append({"en": bool(e.get("en", 0)), "when": "sunrise" if h == 255 else ("sunset" if h == 254 else "time"),
+                  "hour": 0 if h >= 254 else h, "min": int(e.get("min", 0)), "dow": int(e.get("dow", 127)), "preset": int(e.get("macro", 0)), "what": ""})
+    app.project.options["schedule"] = T
+    app.project.save(); refresh_timers(app)
+    dpg.set_value("seq_tlog", f"{len(T)} timer(s) read from the device")
 
 
 # --- steps -------------------------------------------------------------------------------------

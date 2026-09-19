@@ -3315,6 +3315,7 @@ def service_command(app):
                 from native import sequence_ui as SQ
                 op = c["seq"]
                 {"add": lambda: SQ.add_step(app), "update": lambda: SQ.update_step(app), "load": lambda: SQ.load_step(app, op[1]),
+                 "timer": lambda: SQ.add_timer(app, op[1]), "timer_del": lambda: SQ.del_timer(app, op[1]),
                  "del": lambda: SQ.del_step(app, op[1]), "play": lambda: SQ.play(app), "stop": lambda: SQ.stop(app),
                  "field": lambda: SQ.set_field(app, op[1], op[2])}[op[0]]()
             if "stream" in c:                           # test hook: a host to stream to over DDP, or false to stop

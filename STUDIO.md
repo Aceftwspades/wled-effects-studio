@@ -827,7 +827,8 @@ plugins, FPP scheduling, video playback.
       footer): the current a frame would
       draw from the LEDs' mA rating, against the supply, in the footer;
       and WLED's auto-brightness limiter previewed in the sim.
-- [ ] **A schedule** (xSchedule): timed presets - this playlist at 18:00
+- [x] **A schedule** (xSchedule; the Sequence frame's SCHEDULE rows):
+      timed presets - this playlist at 18:00
       or sunset, off at 23:00 - authored in the Sequence frame and pushed
       as WLED's timers.
 - [ ] **Polish nodes** (per-layer settings): Sparkle, Contrast, Flip /

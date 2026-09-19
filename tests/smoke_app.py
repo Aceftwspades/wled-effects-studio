@@ -65,7 +65,8 @@ STEPS = [
     # a sequence: two steps from the sim, played, a step loaded back, one deleted
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},
       {"seq": ["field", "dur", 1.0]}, {"seq": ["play"]}], 3.0),
-    ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["del", 1]}, {"seq": ["del", 0]}], 1.5),
+    ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["del", 1]}, {"seq": ["del", 0]},
+      {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]}, {"seq": ["timer_del", 1]}, {"seq": ["timer_del", 0]}], 1.5),
     # custom palettes: one made, a stop added, used by the sim, one from the sim's palette, both removed
     ([{"frame": "palettes"}, {"cpal": ["new"]}, {"cpal": ["stop", 64, 0, 0, 255]}, {"cpal": ["use"]}, {"cpal": ["current"]},
       {"cpal": ["del"]}, {"cpal": ["del"]}], 2.0),

@@ -175,6 +175,11 @@ durations and transitions; "Send and run it" starts it; "Save
 presets.json" writes the same for a device that is not on the network.
 Effects and palettes are matched by name against the device's own lists,
 and a step whose effect the device does not have is left out and named.
+**SCHEDULE** under it is the device's timers: "+ run the playlist at"
+and "+ off at" add a row - a time of day, or sunrise / sunset with an
+offset in minutes, a preset, the days - "Send the schedule" writes them
+to the device (and saves an "Off" preset, the playlist's id + 1, for the
+off rows); "Read the device's" shows what it has.
 
 ## Getting it onto the cube
 
