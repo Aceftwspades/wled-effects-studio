@@ -310,6 +310,25 @@ class Features:
                 holes = []
         return list(holes)
 
+    # --- randomise: the sliders, the checks and the palette thrown --------------------
+    def randomise(self, palette=True):
+        """xLights' random button: every slider of the effect somewhere new,
+        the checks a coin each, the palette any of them - for exploring."""
+        import random
+        f = self.eng.fx
+        for k in ("sx", "ix", "c1", "c2"):
+            f[k] = random.randint(0, 255)
+        f["c3"] = random.randint(0, 31)
+        for k in ("o1", "o2", "o3"):
+            f[k] = random.randint(0, 1)
+        if palette:
+            pals = self.eng.palette_list()
+            if pals:
+                self.eng.pal = random.choice(pals)[1]
+        self.eng.push()
+        self.rebuild_params(); self.sync_palette_combo()
+        self.gp.status(f"randomised: speed {f['sx']} intensity {f['ix']} customs {f['c1']} {f['c2']} {f['c3']}, palette {self.palette_name_for(self.eng.pal)}")
+
     # --- the picture, with a transition in progress blended in ------------------------
     # A sequence step change with a transition time keeps the old step
     # running in a second engine and blends the two pictures the way the

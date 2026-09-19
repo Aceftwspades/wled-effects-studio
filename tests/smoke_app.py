@@ -42,7 +42,7 @@ STEPS = [
       {"usermod": ["off", "Temperature"]}, {"usermod": ["remove", "Temperature"]}, {"chrome": "about"}], 1.0),
     ([{"appearance": {"light": True}}, {"appearance": {"light": False}}], 1.0),
     ([{"gpu": False}, {"gpu": True}, {"gpu_net": False}, {"gpu_net": True}], 1.5),
-    ([{"ui": False}, {"ui": True}, {"layout": "graph"}, {"measure": True}], 1.0),
+    ([{"ui": False}, {"ui": True}, {"layout": "graph"}, {"measure": True}, {"randomise": True}], 1.0),
     ([{"layout": "both"}, {"arrangement": [["main", "cube"], ["side"]]}, {"pane_move": ["cube", "side", "top"]},
       {"pane_move": ["side", "main", "left"]}, {"pane_move": ["cube", "main", "centre"]}, {"layout": "graph"},
       {"layout": "edit"}, {"arrangement": [["main"], ["cube"], ["side"]]}], 2.5),

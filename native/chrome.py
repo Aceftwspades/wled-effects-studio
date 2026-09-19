@@ -207,6 +207,7 @@ def build_menus(app):
             _mi(app, "Play / pause", "play_pause", callback=lambda: app.toggle_play())
             _mi(app, "Step one frame", "step", callback=lambda: app.step_once())
             _mi(app, "Restart effect", "restart", callback=lambda: app.eng.select(app.eng.idx))
+            dpg.add_menu_item(label="Randomise the settings", callback=lambda: app.randomise())
             dpg.add_menu_item(label="Sequence...", callback=lambda: device_ui.show(app, "sequence"))
             _mi(app, "Compare with another effect...", "compare", callback=lambda: app.run_action("compare"))
             _mi(app, "Sweep a slider...", "sweep", callback=lambda: app.run_action("sweep"))

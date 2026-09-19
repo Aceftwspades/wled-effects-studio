@@ -831,11 +831,12 @@ plugins, FPP scheduling, video playback.
       timed presets - this playlist at 18:00
       or sunset, off at 23:00 - authored in the Sequence frame and pushed
       as WLED's timers.
-- [ ] **Polish nodes** (per-layer settings): Sparkle, Contrast, Flip /
-      Mirror, and Blur if it is missing.
-- [ ] **A States node** (faces): a set of bitmaps chosen by an index -
+- [x] **Polish nodes** (per-layer settings): Levels (brightness, contrast,
+      gamma) and Flip (mirror u, v, swap them); Sparkle and Blur were there.
+- [x] **A States node** (faces): a set of bitmaps chosen by an index -
       mouths, eyes, expressions - switched from a beat or a slider.
-- [ ] **Randomise**: the sliders and palette thrown, for exploring.
+- [x] **Randomise** (Playback > Randomise the settings): the sliders,
+      the checks and the palette thrown, for exploring.
 - [ ] **xLights' effects as example graphs**: the ones WLED lacks -
       Meteors, Spirals, Fan, Pinwheel, Curtain, Marquee, Garlands,
       Snowstorm, Butterfly, Lightning, Shockwave, Morph, Tendril.

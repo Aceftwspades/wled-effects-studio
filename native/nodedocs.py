@@ -350,6 +350,27 @@ DOCS = {
         "out": {"color": "the picture's colour there", "slot": "which of its colours (a number)", "on": "false where the picture is transparent"},
         "params": {"file": "the image file (png, jpg, gif...)", "width": "pixels across", "height": "pixels down",
                    "colours": "how many colours to keep", "alpha_clear": "treat transparent pixels as off"}},
+    "States": {
+        "doc": "Several bitmaps, one shown at a time: the states are separated by '|', each is rows of digits "
+               "separated by '/' ('.' transparent) like Bitmap. The state at index is read at u, v - wire a beat "
+               "counter, a Random hold or a slider into index for a face that changes, a sprite that animates. "
+               "The digit is a colour slot for Colour pick; count says how many states there are.",
+        "in": {"u": "across, 0..1", "v": "down, 0..1", "index": "which state, 0, 1, 2... (rounded down, clamped)"},
+        "out": {"slot": "the digit at the pixel (0 where transparent)", "on": "true where the state has a pixel",
+                "count": "how many states"},
+        "params": {"states": "the states, '|' between them; rows of digits, '/' between rows, '.' for none"}},
+    "Levels": {
+        "doc": "The last touch on a colour: brightness scales it, contrast stretches it about mid grey (above 1 "
+               "punchier, below 1 flatter), gamma bends it (below 1 brightens the darks). 1, 1, 1 changes nothing.",
+        "in": {"color": "the colour to adjust", "brightness": "0..2, 1 as is", "contrast": "0..3, 1 as is",
+               "gamma": "0.2..3, 1 as is"},
+        "out": {"color": "the adjusted colour"}},
+    "Flip": {
+        "doc": "u and v turned round: left for right, top for bottom, or swapped so the picture lies on its "
+               "diagonal. Between Coords and the nodes that draw, to mirror a whole effect without touching it.",
+        "in": {"u": "across, 0..1", "v": "down, 0..1"},
+        "out": {"u": "across, flipped as asked", "v": "down, flipped as asked"},
+        "params": {"flip_u": "mirror left-right", "flip_v": "mirror top-bottom", "swap": "u and v exchanged"}},
     "Bitmap": {
         "doc": "Pixel art you type: one line per row, a digit for a coloured pixel, a dot for an empty one. Read it "
                "with a coordinate and send slot to Colour pick to give each digit a colour.",

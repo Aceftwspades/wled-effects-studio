@@ -3290,6 +3290,8 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
+            if c.get("randomise"):                      # test hook: throw the sliders and the palette
+                app.randomise()
             if "outputs" in c:                          # test hook: ["split", "one"|"parts"|"count"] | ["abl", true] | ["limit", mA]
                 from native import outputs_ui as OU
                 op = c["outputs"]

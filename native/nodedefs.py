@@ -261,6 +261,11 @@ LIBRARY = [
        "$out.color = RGBW32($p.rgb_r, $p.rgb_g, $p.rgb_b, 0);", "a fixed colour"),
 
     # ---- coordinates ----------------------------------------------------------
+    _n("Flip", "coords", "pixel", [("u", F, 0.0), ("v", F, 0.0)], [("u", F), ("v", F)],
+       [_p("flip_u", "bool", True), _p("flip_v", "bool", False), _p("swap", "bool", False)],
+       "{ float fu_ = $p.flip_u ? 1.0f - $in.u : $in.u, fv_ = $p.flip_v ? 1.0f - $in.v : $in.v;\n"
+       "  $out.u = $p.swap ? fv_ : fu_; $out.v = $p.swap ? fu_ : fv_; }",
+       "u and v mirrored left-right, top-bottom, or swapped (the picture turned on its diagonal) - put it between Coords and whatever draws"),
     _n("Coords", "coords", "pixel", [],
        [("u", F), ("v", F), ("cx", F), ("cy", F), ("r", F), ("angle", F)], [],
        "$out.u = u; $out.v = v; $out.cx = cx; $out.cy = cy; $out.r = r; $out.angle = ang;",
@@ -419,6 +424,12 @@ LIBRARY = [
        [dict(_p("rows", "text", "0110/1001/1001/0110"), lines=True)],
        "{ const int s_ = gc_bitmap(\"$p.rows\", $in.u, $in.v); $out.on = s_ >= 0; $out.slot = (float)(s_ < 0 ? 0 : s_); }",
        "pixel art: rows of digits separated by '/', '.' transparent, read at u, v - the digit is a colour slot for Colour pick"),
+    # Several bitmaps, one shown at a time by an index: faces, mouths, eyes,
+    # a sprite's frames. Baked in as strings, like Bitmap.
+    dict(_n("States", "generate", "pixel", [("u", F, 0.0), ("v", F, 0.0), ("index", F, 0.0)], [("slot", F), ("on", B), ("count", F)],
+            [dict(_p("states", "text", "0110/1001/1001/0110|0000/0110/0110/0000|1001/0110/0110/1001"), lines=True)],
+            "", "pixel art in states separated by '|' (each rows of digits separated by '/', '.' transparent): the state at index (0, 1, 2...) is read at u, v - a face that changes with a beat or a slider"),
+         codegen="states"),
     _n("Hash", "generate", "pixel", [("x", F, 0.0), ("y", F, 0.0), ("seed", F, 0.0)], [("value", F)], [],
        "$out.value = gc_hash($in.x, $in.y, $in.seed);",
        "a random 0..1 that is the same every frame for the same x, y, seed - one per cell or column"),
@@ -678,6 +689,11 @@ LIBRARY = [
             "  $out.water = sum_; $out.height = h0_; }",
             "watershed: the water flowing into this pixel from the neighbours that drain to it (their last-frame water), whether it is a sink, and its height - write the height and the water back with Field write"),
          fields=["height_field", "water_field"]),
+    _n("Levels", "colour", "pixel", [("color", C, 0), ("brightness", F, 1.0), ("contrast", F, 1.0), ("gamma", F, 1.0)], [("color", C)], [],
+       "{ const float ig_ = 1.0f / fmaxf(0.05f, $in.gamma); float ch_[3] = {(float)(($in.color >> 16) & 255), (float)(($in.color >> 8) & 255), (float)($in.color & 255)};\n"
+       "  for (int i_ = 0; i_ < 3; i_++) { float x_ = ((ch_[i_] * (1.0f / 255.0f) - 0.5f) * $in.contrast + 0.5f) * $in.brightness; ch_[i_] = powf(gc_sat(x_), ig_) * 255.0f; }\n"
+       "  $out.color = RGBW32((uint8_t)ch_[0], (uint8_t)ch_[1], (uint8_t)ch_[2], 0); }",
+       "a colour's brightness, contrast (about mid grey) and gamma, 1 each for no change - the last touch before Output"),
     _n("Blur", "colour", "pixel", [], [("color", C)], [_p("radius", "int", 1, 1, 3)],
        "$out.color = gc_blur(px, py, $p.radius, W, H, is2d);",
        "last frame's picture, blurred: the average of the pixels around this one - softness, or the base of a glow"),
@@ -1288,4 +1304,14 @@ def codegen_text(n, project_dir=None):
             f"    if (cx_ < 5) $out.on = ((tx_[ci_ * 5 + cx_] >> cy_) & 1) != 0; $out.i = (float)ci_ / {N}.0f; }} }}")
 
 
-CODEGEN = {"image": codegen_image, "ramp": codegen_ramp, "path": codegen_path, "curve": codegen_curve, "text": codegen_text}
+def codegen_states(n, project_dir=None):
+    raw = str(n["params"].get("states") or "0")
+    states = [st.strip().replace("\n", "/") for st in raw.replace("\r", "").split("|") if st.strip()] or ["0"]
+    lits = ",".join('"' + st.replace("\\", "\\\\").replace('"', '\\"') + '"' for st in states)
+    N = len(states)
+    return (f"{{ static const char *st_[{N}] = {{{lits}}}; int k_ = (int)floorf($in.index); if (k_ < 0) k_ = 0; if (k_ >= {N}) k_ = {N} - 1;\n"
+            f"  const int s_ = gc_bitmap(st_[k_], $in.u, $in.v); $out.on = s_ >= 0; $out.slot = (float)(s_ < 0 ? 0 : s_); $out.count = {N}.0f; }}")
+
+
+CODEGEN = {"image": codegen_image, "ramp": codegen_ramp, "path": codegen_path, "curve": codegen_curve, "text": codegen_text,
+           "states": codegen_states}

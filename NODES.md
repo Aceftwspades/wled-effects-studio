@@ -444,6 +444,23 @@ On a cube, the direction from the middle of the cube out through this pixel (a u
 - `ny` *(float)*: its y part
 - `nz` *(float)*: its z part (1 straight up)
 
+### Flip
+
+u and v turned round: left for right, top for bottom, or swapped so the picture lies on its diagonal. Between Coords and the nodes that draw, to mirror a whole effect without touching it.
+
+**Inputs**
+- `u` *(float)*: across, 0..1
+- `v` *(float)*: down, 0..1
+
+**Outputs**
+- `u` *(float)*: across, flipped as asked
+- `v` *(float)*: down, flipped as asked
+
+**Settings**
+- `flip_u` *(bool)*: mirror left-right
+- `flip_v` *(bool)*: mirror top-bottom
+- `swap` *(bool)*: u and v exchanged
+
 ### Pixel
 
 This pixel's whole-number column, row and index. For when you want to count pixels rather than measure in 0..1.
@@ -750,6 +767,23 @@ Draws Particles as dots. At each pixel: how much particle is here (a soft dot `s
 
 **Settings**
 - `falloff` *(choice)*: soft (a smooth dot), hard (a disc), spark (a bright pin with a faint halo)
+
+### States
+
+Several bitmaps, one shown at a time: the states are separated by '|', each is rows of digits separated by '/' ('.' transparent) like Bitmap. The state at index is read at u, v - wire a beat counter, a Random hold or a slider into index for a face that changes, a sprite that animates. The digit is a colour slot for Colour pick; count says how many states there are.
+
+**Inputs**
+- `u` *(float)*: across, 0..1
+- `v` *(float)*: down, 0..1
+- `index` *(float)*: which state, 0, 1, 2... (rounded down, clamped)
+
+**Outputs**
+- `slot` *(float)*: the digit at the pixel (0 where transparent)
+- `on` *(bool)*: true where the state has a pixel
+- `count` *(float)*: how many states
+
+**Settings**
+- `states` *(text)*: the states, '|' between them; rows of digits, '/' between rows, '.' for none
 
 ### Stripes
 
@@ -1453,6 +1487,19 @@ A stack of up to four layers on a base colour, each with its own blend mode and 
 - `mode 2` *(choice)*: for layer 2
 - `mode 3` *(choice)*: for layer 3
 - `mode 4` *(choice)*: for layer 4
+
+### Levels
+
+The last touch on a colour: brightness scales it, contrast stretches it about mid grey (above 1 punchier, below 1 flatter), gamma bends it (below 1 brightens the darks). 1, 1, 1 changes nothing.
+
+**Inputs**
+- `color` *(color)*: the colour to adjust
+- `brightness` *(float)*: 0..2, 1 as is
+- `contrast` *(float)*: 0..3, 1 as is
+- `gamma` *(float)*: 0.2..3, 1 as is
+
+**Outputs**
+- `color` *(color)*: the adjusted colour
 
 ### Mask
 
