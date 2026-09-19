@@ -10,7 +10,7 @@ import os
 import time
 import dearpygui.dearpygui as dpg
 
-from native import sequence
+from native import sequence, transition
 
 TAG = "sequence_win"
 
@@ -54,7 +54,11 @@ def build(app):
             dpg.add_button(label="Stop", callback=lambda: stop(app))
             dpg.add_checkbox(label="repeat", tag="seq_repeat", default_value=False,
                              callback=lambda s, v: (_steps(app).__setitem__("repeat", 0 if v else 1), app.project.save()))
-            dpg.add_text("", tag="seq_status", color=c.TEXT)
+            dpg.add_combo(transition.STYLES, tag="seq_style", width=120, default_value="fade",
+                          callback=lambda s, v: (_steps(app).__setitem__("style", v), app.project.save()))
+            dpg.add_text("transition style", color=c.DIM)
+        dpg.add_text("", tag="seq_status", color=c.TEXT)
+        dpg.add_text("the transition is previewed here with the style chosen; on the device it is the device's blend-style setting", color=c.DIM, wrap=0)
         dpg.add_separator()
         dpg.add_text("ON THE DEVICE", color=c.ACCENT)
         with dpg.group(horizontal=True):
@@ -101,6 +105,7 @@ def refresh(app):
         dpg.add_text("no steps yet: set the sim up (effect, sliders, palette, segments) and add a step", parent="seq_rows", color=c.DIM)
     dpg.set_value("seq_base", int(S.get("base", 10))); dpg.set_value("seq_pid", int(S.get("pid", 9)))
     dpg.set_value("seq_show", S.get("name", "Show")); dpg.set_value("seq_repeat", int(S.get("repeat", 0)) == 0)
+    dpg.set_value("seq_style", S.get("style", "fade"))
     if 0 <= sel < len(steps):
         st = steps[sel]
         dpg.set_value("seq_name", st.get("name", "")); dpg.set_value("seq_dur", float(st.get("dur", 10))); dpg.set_value("seq_trans", float(st.get("trans", 0.7)))
@@ -180,6 +185,7 @@ def play(app):
 
 
 def stop(app):
+    app._transition = None
     if getattr(app, "_seq_play", None) is not None:
         app._seq_play = None
         dpg.set_value("seq_status", "")
@@ -202,9 +208,12 @@ def poll(app):
             if int(S.get("repeat", 0)) != 0:
                 stop(app); app.gp.status("sequence done"); return
             i = 0
+        prev = steps[p["i"]] if 0 <= p["i"] < len(steps) else None
         p["i"] = i
         p["next"] = now + float(steps[i].get("dur", 10))
         app._seq_sel = i
+        if prev is not None and float(steps[i].get("trans", 0)) > 0:
+            app.transition_start(prev, float(steps[i]["trans"]), S.get("style", "fade"))
         load_step(app, i)
         refresh(app)
     i = p["i"]

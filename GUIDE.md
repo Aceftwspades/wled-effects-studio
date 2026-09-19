@@ -146,8 +146,10 @@ shows when you add it - every segment's effect, sliders, palette, bounds,
 opacity and blend, the colours, the brightness - with a name, how many
 seconds it holds and a transition time. "Update the step from the sim"
 recaptures it, "Load the step into the sim" puts it back to tweak; up /
-down reorder; **Play in the sim** runs the steps in turn (a cut at each
-change - the transition is the device's). **Send presets + playlist**
+down reorder; **Play in the sim** runs the steps in turn, each change
+blended over its transition time in the style chosen (fade, swipes,
+pushes, outside-in, inside-out, circular, fairy dust - WLED's own; on the
+device the style is its blend-style setting). **Send presets + playlist**
 saves each step as a WLED preset (ids from "first preset id", existing
 ones overwritten) and the sequence as a playlist preset with the
 durations and transitions; "Send and run it" starts it; "Save

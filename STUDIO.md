@@ -797,9 +797,12 @@ scheduling, video). These do, in the order to do them; ticked when done:
       imported as a wireframe (Import as a reference...), placed, turned
       and scaled like any part, never lit - the tree, the house, the
       enclosure - to place the LEDs against.
-- [ ] **Transition preview**: WLED's blend styles between two effects
-      (fade, swipe, push...) shown in the sim before a preset chain is
-      pushed.
+- [x] **Transition preview** (`native/transition.py`): a sequence step
+      change with a transition time keeps the old step running in a second
+      engine and blends the two pictures the device's way - fade, the
+      swipes, the pushes, outside-in, inside-out, circular, fairy dust
+      (the style chosen in the Sequence frame) - in every view and in the
+      stream, until the time is up.
 
 Not worth chasing: GLSL shaders (the graph is that), audio analysis
 plugins, FPP scheduling, video playback.

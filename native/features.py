@@ -298,6 +298,58 @@ class Features:
         dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
         self.probe_active()
 
+    # --- the picture, with a transition in progress blended in ------------------------
+    # A sequence step change with a transition time keeps the old step
+    # running in a second engine and blends the two pictures the way the
+    # device does (native/transition.py) until the time is up; every view,
+    # the stream and the stats read the blended picture through here.
+    def frame_rgb(self, eng=None):
+        eng = eng or self.eng
+        tr = getattr(self, "_transition", None)
+        if eng is not self.eng or tr is None:
+            return eng.rgb()
+        prog = (time.perf_counter() - tr["t0"]) / max(0.05, tr["dur"])
+        if prog >= 1.0:
+            self._transition = None
+            return eng.rgb()
+        from native import transition
+        try:
+            return transition.blend(tr["old"].rgb(), eng.rgb(), prog, tr["style"])
+        except Exception:
+            self._transition = None
+            return eng.rgb()
+
+    def transition_start(self, old_state, dur, style="fade"):
+        """The old step into the second engine; the blend runs `dur` seconds."""
+        from native import sequence
+        from native.engine import Engine
+        eng2 = getattr(self, "_seq_eng", None)
+        if eng2 is None or getattr(self, "_seq_eng_src", None) != self.eng.library:
+            try:
+                eng2 = Engine(self._b_library()); eng2.set_geometry(self.project.geometry)
+            except Exception as e:
+                self.gp.status(f"no second engine for the transition: {e}"); return
+            self._seq_eng, self._seq_eng_src = eng2, self.eng.library
+        try:
+            if eng2.cols != self.eng.cols or eng2.rows != self.eng.rows:
+                eng2.set_geometry(self.project.geometry)
+            sequence.apply(eng2, old_state)
+        except Exception as e:
+            self.gp.status(f"transition skipped: {e}"); return
+        self._transition = {"t0": time.perf_counter(), "dur": float(dur), "style": style, "old": eng2}
+
+    def poll_transition(self):
+        """The old step keeps running in its engine while the blend lasts."""
+        tr = getattr(self, "_transition", None)
+        if tr is None or not self.playing:
+            return
+        try:
+            tr["old"].fft[:] = self.eng.fft[:]
+            tr["old"].audio(*getattr(self.eng, "last_audio", (0.0, 0)))
+            tr["old"].frame(23)
+        except Exception:
+            self._transition = None
+
     # --- live output: the sim's frames to the device, and the wiring test ------------
     def stream_start(self, host=None, fps=30):
         """The sim's frames to the device over DDP as they are drawn."""
@@ -322,6 +374,7 @@ class Features:
     def poll_stream(self):
         """After each draw: the wiring test's pattern into the engine's
         buffer (paused, so it stays), then the frame to the device."""
+        self.poll_transition()
         wt = getattr(self, "wiring", None)
         if wt is not None and self.playing:
             self.wiring_stop(); wt = None                  # play pressed: the effect takes the buffer back
@@ -345,7 +398,7 @@ class Features:
         if now < self._ddp_next:
             return
         self._ddp_next = now + 1.0 / self._ddp_fps
-        d.send(live_out.frame_bytes(self.eng.rgb(), self.project.geometry.phys))
+        d.send(live_out.frame_bytes(self.frame_rgb(), self.project.geometry.phys))
         if dpg.does_item_exist("live_status") and d.frames % 15 == 0:
             dpg.set_value("live_status", f"{d.frames} frames, {d.bytes // 1024} KB sent" + (f"; {d.errors} send errors: {d.last_error}" if d.errors else ""))
 

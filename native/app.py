@@ -403,7 +403,7 @@ class App(Features):
         """The logical view: the segment as the effect sees it. A 1-D strip is
         one row, drawn tall enough to look at."""
         eng = eng or self.eng
-        rgb = eng.rgb().copy()
+        rgb = self.frame_rgb(eng).copy()
         if not eng.fx.get("o3"):
             # Cube mode: the gap corners are not pixels and effects skip them,
             # so without this they keep whatever flat mode last left there.
@@ -424,9 +424,9 @@ class App(Features):
         eng = eng or self.eng
         g = eng.geom
         if g is not None and g.kind == "cube" and not eng.fx.get("o3"):
-            return render.render(net if net.shape[0] == eng.rows else eng.rgb(),
+            return render.render(net if net.shape[0] == eng.rows else self.frame_rgb(eng),
                                  eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six)
-        rgb = eng.rgb().reshape(-1, 3)
+        rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
         return render.render_points(g.pos, rgb, px, self.yaw, self.pitch, self.dist)
@@ -2890,7 +2890,7 @@ class App(Features):
         if self.rec_msg:
             dpg.set_value("rec_msg", self.rec_msg)
 
-        raw = self.eng.rgb()
+        raw = self.frame_rgb()
         s = stats(raw, self.eng.lit_mask(flat=bool(self.eng.fx.get("o3"))))
         factor = float(self.prefs.get("device_factor", 60.0))
         est = (f"   effect {self.frame_ms:.2f} ms  ->  device ~{1000.0 / max(0.001, self.frame_ms * factor):.0f} fps (x{factor:.0f})"
