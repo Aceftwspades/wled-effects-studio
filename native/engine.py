@@ -322,7 +322,29 @@ class Engine:
         for i in range(self.lib.simUmPalCount()):
             nm = self.lib.simUmPalName(i)
             out.append((nm.decode() if isinstance(nm, bytes) else str(nm), 255 - i))
+        for i, name in enumerate(getattr(self, "custom_names", []) or []):
+            out.append((name, 200 - i))                # the studio's custom palettes: ids 200 down, as on the device
         return out
+
+    def custom_palettes(self, pals):
+        """The project's custom palettes into the engine: a list of
+        {"name", "stops": [[pos, r, g, b], ...]}; ids 200, 199, ... in that
+        order. False for an engine built without them."""
+        try:
+            f = self.lib.simCustomPalette
+        except AttributeError:
+            return False
+        self.lib.simCustomPaletteClear()
+        self.custom_names = []
+        for i, p in enumerate(pals[:10]):
+            stops = sorted([[int(q[0]), int(q[1]), int(q[2]), int(q[3])] for q in (p.get("stops") or [])], key=lambda q: q[0])
+            if len(stops) < 2:
+                stops = [[0, 0, 0, 0], [255, 255, 255, 255]]
+            flat = [max(0, min(255, v)) for q in stops[:18] for v in q]
+            buf = (C.c_uint8 * len(flat))(*flat)
+            f(int(i), buf, len(stops[:18]))
+            self.custom_names.append(str(p.get("name") or f"Custom {i + 1}"))
+        return True
 
     # The audio palettes draw their colours from a SOURCE palette. On the device
     # that is a Usermods setting; here it is a control, because the simulator has

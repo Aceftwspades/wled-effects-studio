@@ -136,6 +136,14 @@ every effect that asks where a pixel is see the real shape, on the device
 exactly as in the sim. Cylinders, spheres and tori send the table too; a
 cube net and a flat matrix have a rule of their own and send none.
 
+**Palettes of your own** (Edit > Palettes...): a gradient drawn by hand -
+click the bar to add a stop, drag it, right-click to remove it, a colour
+and a position each, up to 18 - kept with the project, in the sim as a
+palette of its own (ids 200 down, in the palette combo like any other,
+blended the way the device blends) and sent to the device as its custom
+palettes (`/palette{n}.json`, the same ids there). "From the sim's
+palette" starts from whatever the sim shows.
+
 **The library** (File > Library...) shows every graph of the project as a
 looping thumbnail with its tags (what nodes it uses, audio, 3-D, script);
 type to search; click a tile to open the graph and run its effect.

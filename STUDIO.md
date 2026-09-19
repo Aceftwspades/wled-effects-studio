@@ -810,6 +810,38 @@ scheduling, video). These do, in the order to do them; ticked when done:
 Not worth chasing: GLSL shaders (the graph is that), audio analysis
 plugins, FPP scheduling, video playback.
 
+**Second pass** (after the eight above), in the order to do them:
+
+- [x] **A palette editor** (`native/palette_ui.py`, Edit > Palettes;
+      `simCustomPalette` in the engine): a
+      gradient drawn by hand - stops with a colour and a position - kept
+      with the project, shown in the sim as a palette of its own, and sent
+      to the device as a WLED custom palette (`/palette{n}.json`, ids 200
+      down), so every effect there can use it.
+- [ ] **LED outputs** (the Controllers tab): a shape's wiring split into
+      WLED busses - pin, count, LED type, colour order - per part or by
+      count, pushed with the ledmap as the device's LED config; the whole
+      new-build flow from model to device.
+- [ ] **Power** (per-model brightness limits): the current a frame would
+      draw from the LEDs' mA rating, against the supply, in the footer;
+      and WLED's auto-brightness limiter previewed in the sim.
+- [ ] **A schedule** (xSchedule): timed presets - this playlist at 18:00
+      or sunset, off at 23:00 - authored in the Sequence frame and pushed
+      as WLED's timers.
+- [ ] **Polish nodes** (per-layer settings): Sparkle, Contrast, Flip /
+      Mirror, and Blur if it is missing.
+- [ ] **A States node** (faces): a set of bitmaps chosen by an index -
+      mouths, eyes, expressions - switched from a beat or a slider.
+- [ ] **Randomise**: the sliders and palette thrown, for exploring.
+- [ ] **xLights' effects as example graphs**: the ones WLED lacks -
+      Meteors, Spirals, Fan, Pinwheel, Curtain, Marquee, Garlands,
+      Snowstorm, Butterfly, Lightning, Shockwave, Morph, Tendril.
+- [ ] **The 3-D view's surroundings**: a background image, camera presets
+      and saved views.
+- [ ] **Export a shape as `.xmodel`**.
+- [ ] **Beat alignment**: sequence durations snapped to a WAV's beats,
+      tap tempo.
+
 ### A self-contained app (on hold)
 
 The goal: one download that runs, for any WLED user, not a checkout of

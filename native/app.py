@@ -668,6 +668,17 @@ class App(Features):
                 return n
         return PALETTES[0][0] if PALETTES else ""
 
+    def reload_palettes(self):
+        """The palette list again (a custom palette added or changed): the
+        combos' items, with the sim's choice kept."""
+        global PALETTES
+        PALETTES = self.eng.palette_list()
+        if dpg.does_item_exist("pal_combo"):
+            dpg.configure_item("pal_combo", items=[p[0] for p in PALETTES])
+        if dpg.does_item_exist("pal_src"):
+            dpg.configure_item("pal_src", items=[p[0] for p in PALETTES if p[1] < 201])
+        self.sync_palette_combo()
+
     def sync_palette_combo(self):
         """Selecting an effect now loads ITS palette default, so the combo has
         to follow - otherwise it shows one palette while the cube renders
@@ -899,6 +910,8 @@ class App(Features):
         self.refresh_project_list()
         self._active_state = None
         device_ui.refresh_devices(self)
+        from native import palette_ui
+        palette_ui.sync(self); palette_ui.refresh(self)
         name = os.path.basename(path)
         dpg.set_value("edit_status", f"project {name}"); self.gp.status(f"project {name}")
         # the engine holds the previous project's drafts: build this one's list
@@ -1555,7 +1568,7 @@ class App(Features):
                ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
                ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
     CORE = ("main", "cube", "side", "props")
-    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library")
+    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes")
     SLOTS = CORE + OPTIONAL
 
     @classmethod
@@ -2210,7 +2223,7 @@ class App(Features):
     def _slot_label(self, slot):
         return {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
                 "side": "Panel", "props": "Properties", "devices": "Devices", "flash": "Flash firmware",
-                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library"}.get(slot, slot)
+                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes"}.get(slot, slot)
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
@@ -3123,6 +3136,8 @@ def build(app):
     chrome.build_dialogs(app)
     chrome.build_pane_menus(app)
     device_ui.refresh_devices(app)                   # the known devices into the frame and the menu
+    from native import palette_ui
+    palette_ui.sync(app)                             # the project's custom palettes into the engine and the combos
 
     app._themes['normal'] = apply_theme(app.prefs)
     _cols = theme_colors(app.prefs)
@@ -3271,6 +3286,16 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
+            if "cpal" in c:                             # test hook: ["new"] | ["current"] | ["stop", pos, r, g, b] | ["use"] | ["del"]
+                from native import palette_ui as PU
+                op = c["cpal"]
+                if op[0] == "new": PU.new_palette(app)
+                elif op[0] == "current": PU.from_current(app)
+                elif op[0] == "use": PU.use_palette(app)
+                elif op[0] == "del": PU.del_palette(app)
+                elif op[0] == "stop":
+                    p = PU._pals(app)[PU._sel(app)]; p.setdefault("stops", []).append([int(op[1]), int(op[2]), int(op[3]), int(op[4])])
+                    PU._changed(app); PU.refresh(app)
             if "library" in c:                          # test hook: ["previews", seconds, [files]] | ["refresh"]
                 from native import library_ui as LU
                 op = c["library"]

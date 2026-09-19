@@ -66,6 +66,9 @@ STEPS = [
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},
       {"seq": ["field", "dur", 1.0]}, {"seq": ["play"]}], 3.0),
     ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["del", 1]}, {"seq": ["del", 0]}], 1.5),
+    # custom palettes: one made, a stop added, used by the sim, one from the sim's palette, both removed
+    ([{"frame": "palettes"}, {"cpal": ["new"]}, {"cpal": ["stop", 64, 0, 0, 255]}, {"cpal": ["use"]}, {"cpal": ["current"]},
+      {"cpal": ["del"]}, {"cpal": ["del"]}], 2.0),
     # the library: thumbnails made for the graphs, the frame docked and floated
     ([{"frame": "library"}, {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},

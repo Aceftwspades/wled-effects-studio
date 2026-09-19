@@ -480,6 +480,24 @@ SIM_API void simFrame(int idx, int dtMs) {
 // Queried after the first frame, because registration happens in setup().
 SIM_API int simPalCount() { simEnsureUsermods(); return simPaletteCount(); }
 
+// The studio's custom palettes, as the device holds them (colors.cpp
+// loadCustomPalettes): slot `index` from gradient stops - up to 18 of
+// (position 0..255, r, g, b) - into customPalettes, which are palette ids
+// 200 down (slot 0 is 200). A slot skipped is grey, as on the device.
+SIM_API void simCustomPalette(int index, const uint8_t *stops, int n) {
+  if (index < 0 || index >= 10) return;
+  while ((int)customPalettes.size() <= index) customPalettes.push_back(CRGBPalette16(CRGB(128, 128, 128)));
+  uint8_t tcp[72];
+  memset(tcp, 255, sizeof(tcp));
+  int k = n < 18 ? n : 18;
+  for (int i = 0; i < k * 4; i++) tcp[i] = stops[i];
+  CRGBPalette16 pal;
+  pal.loadDynamicGradientPalette(tcp);
+  customPalettes[index] = pal;
+}
+SIM_API void simCustomPaletteClear() { customPalettes.clear(); }
+SIM_API int simCustomPaletteCount() { return (int)customPalettes.size(); }
+
 // One palette entry as 0x00RRGGBB, so the Python side can draw swatches and a
 // test can check a palette IS what its name says rather than inferring it from
 // an effect's output.

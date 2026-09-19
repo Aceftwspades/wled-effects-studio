@@ -101,6 +101,7 @@ def build_menus(app):
                 _mi(app, "Everything wired to it", "select_linked", callback=lambda: app.gp.select_linked("both"))
             dpg.add_separator()
             _mi(app, "Command palette...", "palette", callback=lambda: show_palette(app))
+            dpg.add_menu_item(label="Palettes (gradients)...", callback=lambda: device_ui.show(app, "palettes"))
             dpg.add_separator()
             _mi(app, "Find / replace in code", "find", callback=lambda: app.focus_find())
             _mi(app, "Open code in external editor", "external", callback=lambda: app.open_external())
