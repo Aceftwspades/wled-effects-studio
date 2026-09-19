@@ -22,7 +22,7 @@ import dearpygui.dearpygui as dpg
 from native import flash, devices
 
 FRAMES = {"devices": ("devices_win", "DEVICES", 640, 420),
-          "flash": ("flash_win", "FLASH FIRMWARE", 720, 700),
+          "flash": ("flash_win", "FLASH FIRMWARE", 720, 660),
           "send": ("send_win", "SEND TO DEVICE", 620, 360),
           "shape": ("shape_win", "SHAPE", 560, 640)}          # the shape editor (shape_ui.py), the same kind of frame
 HEADER_H = 30
@@ -113,7 +113,7 @@ def build_flash(app):
     c = _c()
     app.flash_job = None
     envs, default = flash.read_envs()
-    with dpg.window(tag="flash_win", show=False, width=720, height=700, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag="flash_win", show=False, width=720, height=660, no_collapse=True, no_title_bar=True):
         header(app, "flash")
         dpg.add_text("Stages the project's effects into the WLED tree as a usermod, builds the firmware on an "
                      "environment that extends the one chosen (its usermods plus ours), and sends the binary to "
@@ -126,17 +126,23 @@ def build_flash(app):
             dpg.add_button(label="", tag="flash_env_fit", small=True, show=False,
                            callback=lambda: (dpg.set_value("flash_env", dpg.get_item_user_data("flash_env_fit")), refresh_flash(app)))
         with dpg.group(horizontal=True):
+            dpg.add_text("WHAT GOES ON THE DEVICE", color=c.ACCENT)
+            dpg.add_text("resolved now, the way the build will resolve it", color=c.DIM)
+            dpg.add_button(label="Preview (no compile)", small=True, callback=lambda: preview_build(app))
+        with dpg.child_window(tag="flash_manifest", height=132, border=True):
+            pass
+        with dpg.group(horizontal=True):
             dpg.add_text("EFFECTS TO SHIP", color=c.ACCENT)
             dpg.add_button(label="all", small=True, callback=lambda: _ship_all(app, True))
             dpg.add_button(label="none", small=True, callback=lambda: _ship_all(app, False))
             dpg.add_text("", tag="flash_budget", color=c.DIM)
-        with dpg.child_window(tag="flash_fx", height=110, border=True):
+        with dpg.child_window(tag="flash_fx", height=96, border=True):
             pass
         with dpg.group(horizontal=True):
             dpg.add_text("FEATURES", color=c.ACCENT)
             dpg.add_text("what the firmware carries - untick what this device lacks, the build shrinks", color=c.DIM)
             dpg.add_button(label="Usermods...", small=True, callback=lambda: c.show_usermods(app))
-        with dpg.child_window(tag="flash_features", height=232, border=True):
+        with dpg.child_window(tag="flash_features", height=130, border=True):
             pass
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="build", tag="flash_build", default_value=True)
@@ -319,6 +325,7 @@ def refresh_flash(app):
         dpg.configure_item("flash_env_fit", show=True, label=f"the device is an {d.get('arch')}: use {fit}", user_data=fit)
     else:
         dpg.configure_item("flash_env_fit", show=False)
+    refresh_manifest(app, env)
     stats = (app.project.options.get("flash_stats") or {}).get(env) or {}
     sizes = stats.get("sizes") or {}                  # the effects in the last build: they set the base
     known = stats.get("known") or sizes               # every effect this env has ever measured
@@ -353,6 +360,66 @@ def refresh_flash(app):
     else:
         dpg.set_value("flash_budget", f"{len(ship)} of {len(files)} - build once to measure the sizes and the room")
         dpg.configure_item("flash_budget", color=c.DIM)
+
+
+def refresh_manifest(app, env=None):
+    """The manifest lines into the frame: what this flash would carry, and
+    what the active device runs now (with the last recorded flash to it)."""
+    if not dpg.does_item_exist("flash_manifest"):
+        return
+    c = _c()
+    env = env or dpg.get_value("flash_env") or ""
+    dpg.delete_item("flash_manifest", children_only=True)
+    if not env:
+        dpg.add_text("choose an environment", parent="flash_manifest", color=c.DIM); return
+    d = app.active_device()
+    m = flash.manifest(app.project, env, _ship_files(app))
+    for line in flash.manifest_text(m, d):
+        col = c.RED if line.startswith("!!") else (c.AMBER if "NOT shipped" in line else c.TEXT)
+        dpg.add_text(line, parent="flash_manifest", color=col, wrap=0)
+    rec = flash.last_flash(app.project, app.active_host(), (d or {}).get("mac")) if app.active_host() else None
+    if rec:
+        dpg.add_text(f"last flashed from this project {rec['when']}: {rec['env']}, {len(rec['effects'])} studio effect(s) "
+                     f"({', '.join(rec['effects'][:8])}{'...' if len(rec['effects']) > 8 else ''}), audio {rec['audio']}, sha256 {rec.get('sha256', '?')}",
+                     parent="flash_manifest", color=c.DIM, wrap=0)
+        gone = [e for e in rec["effects"] if e not in [t for _, t, _ in m["effects"]]]
+        new = [t for _, t, _ in m["effects"] if t not in rec["effects"]]
+        if gone or new:
+            dpg.add_text("this flash would " + (f"add {', '.join(new)}" if new else "") + (" and " if new and gone else "")
+                         + (f"drop {', '.join(gone)}" if gone else ""), parent="flash_manifest", color=c.AMBER, wrap=0)
+    elif app.active_host():
+        dpg.add_text("no flash from this project recorded for this device yet", parent="flash_manifest", color=c.DIM)
+
+
+def preview_build(app):
+    """Stage without compiling: the usermod folder written, the environment
+    block written to platformio_override.ini, and both shown in the log."""
+    c = _c()
+    env = dpg.get_value("flash_env")
+    if not env:
+        dpg.set_value("flash_status", "choose an environment"); return
+    dpg.delete_item("flash_log", children_only=True)
+    lines = []
+    try:
+        studio_env = flash.stage(app.project, env, lines.append, _ship_files(app))
+    except Exception as e:
+        dpg.add_text(f"staging failed: {e}", parent="flash_log", color=c.RED); return
+    for l in lines:
+        dpg.add_text(l, parent="flash_log", color=c.TEXT)
+    ini = os.path.join(flash.ROOT, "platformio_override.ini")
+    text = open(ini, encoding="utf-8").read() if os.path.exists(ini) else ""
+    if flash.MARK_BEGIN in text:
+        block = text[text.index(flash.MARK_BEGIN):text.index(flash.MARK_END) + len(flash.MARK_END)]
+        dpg.add_text("--- platformio_override.ini, the block the build uses ---", parent="flash_log", color=c.ACCENT)
+        for l in block.splitlines():
+            dpg.add_text(l, parent="flash_log", color=c.DIM)
+    staged = os.path.join(flash.ROOT, "usermods", flash.USERMOD)
+    if os.path.isdir(staged):
+        names = sorted(os.listdir(staged))
+        dpg.add_text(f"--- usermods/{flash.USERMOD}/: {len(names)} files ---", parent="flash_log", color=c.ACCENT)
+        dpg.add_text(", ".join(names), parent="flash_log", color=c.DIM, wrap=0)
+    dpg.set_value("flash_status", f"staged for {studio_env}; nothing compiled, nothing sent - Start builds this")
+    dpg.configure_item("flash_status", color=c.DIM)
 
 
 def start_flash(app):

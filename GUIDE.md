@@ -148,7 +148,17 @@ it out again, and the arrangement is remembered.
      its positions table; **Send the ledmap only** just the wiring. Both
      ask first: a wiring that is not the device's leaves it dark or
      scrambled. **Import the device's ledmap** reads it back as the geometry.
-- **Flash firmware** (Ctrl+Shift+U). Tick the effects to ship (each shows
+- **Flash firmware** (Ctrl+Shift+U). WHAT GOES ON THE DEVICE says, before
+  anything is built, exactly what the firmware will carry - the tree's
+  WLED version and build id, the environment chain with its board and
+  partition table, the usermods, the features in and out with their flags,
+  the studio effects shipped (and the listed ones that are not), the
+  built-in cube effects - and, when a device is active, what it runs now,
+  the last flash recorded to it from this project, and which effects this
+  flash would add or drop. A board that is not the device's chip is
+  called out in red. "Preview (no compile)" stages the usermod and writes
+  the environment block and shows both in the log, so the build's inputs
+  can be read before Start. Tick the effects to ship (each shows
   its flash cost after a first build), pick the environment - the active
   device's chip suggests one - and the studio builds WLED with your
   effects as a usermod and sends it over OTA to the active device. The

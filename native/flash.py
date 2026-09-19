@@ -423,6 +423,138 @@ def firmware_bin(env):
     return os.path.join(ROOT, ".pio", "build", env, "firmware.bin")
 
 
+# --- the manifest: what the firmware will hold, before anything is built ----------------------
+def _env_chain(env):
+    """An env and what it extends, outermost first, with each one's board and flags."""
+    base = _ini(os.path.join(ROOT, "platformio.ini"))
+    over = _ini(os.path.join(ROOT, "platformio_override.ini"))
+    out, seen = [], set()
+    while env and env not in seen:
+        seen.add(env)
+        sec = "env:" + env
+        cp = next((c for c in (over, base) if c.has_section(sec)), None)
+        if cp is None:
+            break
+        out.append((env, {k: cp.get(sec, k, fallback="").split(";")[0].strip() for k in ("board", "board_build.partitions", "build_flags", "extends")}))
+        nxt = cp.get(sec, "extends", fallback="")
+        env = nxt.strip()[4:] if nxt.strip().startswith("env:") else None
+    return out
+
+
+def wled_version():
+    """WLED's version string and build id from the tree."""
+    ver, vid = "?", "?"
+    try:
+        for line in open(os.path.join(ROOT, "wled00", "wled.h"), encoding="utf-8", errors="replace"):
+            if line.startswith("#define VERSION"):
+                vid = line.split()[2]
+            if line.startswith("#define WLED_VERSION") and '"' in line:
+                ver = line.split('"')[1]
+    except OSError:
+        pass
+    if ver == "?":
+        try:
+            import json
+            ver = json.load(open(os.path.join(ROOT, "package.json"), encoding="utf-8")).get("version", "?")
+        except Exception:
+            pass
+    return ver, vid
+
+
+def builtin_effects():
+    """The cube_fx effects every build with the usermod carries: (count, [names])."""
+    d = os.path.join(ROOT, "usermods", "cube_fx")
+    names = []
+    if os.path.isdir(d):
+        import re
+        for f in sorted(os.listdir(d)):
+            if re.match(r"cube_fx_\d\d_.*\.cpp$", f) and not f.startswith("cube_fx_00_"):   # 00 is the shape table, not an effect
+                names.append(f[11:-4].replace("_", " "))
+    return names
+
+
+def manifest(project, base_env, only=None):
+    """Everything the build would put on the device, resolved the way
+    stage() will resolve it, as a dict: the tree's WLED, the environment
+    chain with its board and partition table, the usermods, the feature
+    flags, the studio effects to ship (with their measured sizes), the
+    firmware's built-in cube effects, and the last build's measurements."""
+    ver, vid = wled_version()
+    chain = _env_chain(base_env)
+    board = next((v["board"] for _, v in chain if v["board"]), "?")
+    parts = next((v["board_build.partitions"] for _, v in chain if v["board_build.partitions"]), "(the board's default)")
+    files = project.build_files()
+    ship = [f for f in files if only is None or f in only]
+    stats = (project.options.get("flash_stats") or {}).get(base_env) or {}
+    known = stats.get("known") or stats.get("sizes") or {}
+    f = features_of(project)
+    feats = [(key, label, bool(f.get(key))) for key, label, _, _, _ in FEATURES]
+    return {"wled": ver, "build_id": vid, "env": base_env, "studio_env": "studio_" + base_env, "chain": [e for e, _ in chain],
+            "board": board, "partitions": os.path.basename(parts), "usermods": staged_usermods(project, base_env) + [USERMOD],
+            "flags": feature_flags(project), "features": feats, "audio": f["audio"],
+            "effects": [(f_, project.effect_title(f_), known.get(f_)) for f_ in ship],
+            "not_shipped": [(f_, project.effect_title(f_)) for f_ in files if f_ not in ship],
+            "builtin": builtin_effects(), "script": True,
+            "partition": stats.get("partition"), "firmware": stats.get("firmware"),
+            "geometry": project.geometry.describe()}
+
+
+def manifest_text(m, device=None):
+    """The manifest as lines for the frame (and the log). `device` is the
+    active device's probe, when there is one, for what changes there."""
+    L = []
+    L.append(f"WLED {m['wled']} (build {m['build_id']}) from this tree, on {m['env']} -> {m['studio_env']}")
+    L.append(f"board {m['board']}, partitions {m['partitions']}" + (f"; app partition {m['partition'] // 1024} KB, last firmware {m['firmware'] // 1024} KB" if m.get("partition") else "; not built yet: sizes unknown"))
+    L.append("usermods: " + ", ".join(m["usermods"]))
+    on = [label for _, label, v in m["features"] if v]
+    off = [label for _, label, v in m["features"] if not v]
+    L.append("features in: " + (", ".join(on) or "none") + ("; out: " + ", ".join(off) if off else ""))
+    L.append(f"audio: {m['audio']}" + ("; flags " + " ".join(m["flags"]) if m["flags"] else "; no extra flags"))
+    n = len(m["effects"])
+    L.append(f"studio effects shipped: {n}" + (" - " + ", ".join(t for _, t, _ in m["effects"]) if n else " (none ticked)"))
+    if m["not_shipped"]:
+        L.append(f"on the list but NOT shipped: {', '.join(t for _, t in m['not_shipped'])}")
+    L.append(f"built in: the cube_fx effects ({len(m['builtin'])} source files, Studio Script among them; the bank places them, all register when no slots are chosen)")
+    L.append(f"the flash sends firmware only - not the ledmap, the shape or a script (Device > Send...); geometry here: {m['geometry']}")
+    if device:
+        L.append(f"device now: {device.get('name', '?')} at {device.get('host', '?')}, WLED {device.get('ver', '?')} build {device.get('vid', '?')}, "
+                 f"{device.get('arch', '?')}, {device.get('fx', '?')} effects" + (", Studio Script" if device.get("script") else ""))
+        if device.get("arch") and m["board"] != "?":
+            a = (device["arch"] or "").lower().replace("-", "")
+            b = m["board"].lower().replace("-", "")
+            if ("s3" in a) != ("s3" in b) or ("8266" in a) != ("8266" in b):
+                L.append(f"!! the environment's board ({m['board']}) is not the device's chip ({device['arch']}) - the device would refuse or brick")
+    return L
+
+
+def record_flash(project, m, bin_path, host, device=None):
+    """What went on the device, kept in the project: the manifest plus the
+    binary's size and hash and when."""
+    import hashlib
+    rec = {"when": time.strftime("%Y-%m-%d %H:%M"), "host": host, "mac": (device or {}).get("mac", ""),
+           "env": m["env"], "wled": m["wled"], "build_id": m["build_id"], "board": m["board"],
+           "usermods": m["usermods"], "features": {k: v for k, _, v in m["features"]}, "audio": m["audio"], "flags": m["flags"],
+           "effects": [t for _, t, _ in m["effects"]], "builtin": len(m["builtin"])}
+    try:
+        data = open(bin_path, "rb").read()
+        rec["size"] = len(data); rec["sha256"] = hashlib.sha256(data).hexdigest()[:16]
+    except OSError:
+        pass
+    hist = list(project.options.get("flash_history") or [])
+    hist.append(rec)
+    project.options["flash_history"] = hist[-20:]
+    project.save()
+    return rec
+
+
+def last_flash(project, host=None, mac=None):
+    """The last recorded flash to a device (by mac, else host), or None."""
+    for rec in reversed(project.options.get("flash_history") or []):
+        if (mac and rec.get("mac") == mac) or (host and rec.get("host") == host):
+            return rec
+    return None
+
+
 def upload(host, path, log, timeout=180):
     """POST the binary to /update. The device checks the subnet, its PIN
     and its OTA lock, and reboots on success."""
@@ -735,6 +867,7 @@ class Job:
                 before = device_info(self.host)
                 if before:
                     self.log(f"device before: WLED {before.get('ver', '?')}, build {before.get('vid', '?')}, {before.get('name', '')}")
+                self.log("manifest: " + " | ".join(manifest_text(manifest(self.project, self.base_env, self.only))[:5]))
                 ok, msg = upload(self.host, bin_, self.log)
                 self.log(msg)
                 # The device can take the whole file and reboot without its
@@ -747,6 +880,9 @@ class Job:
                         ok, msg = back, msg2
                     else:
                         msg = msg + "; " + msg2
+                    if ok:
+                        rec = record_flash(self.project, manifest(self.project, self.base_env, self.only), bin_, self.host, before)
+                        self.log(f"recorded: {rec['when']}, {len(rec['effects'])} studio effect(s), sha256 {rec.get('sha256', '?')}")
                 self.result = msg
                 self.ok = ok
             else:
