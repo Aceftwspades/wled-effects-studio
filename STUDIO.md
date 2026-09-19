@@ -778,8 +778,12 @@ scheduling, video). These do, in the order to do them; ticked when done:
       the Sequence frame under Playback and Device): a timeline of effects
       with durations and transitions, authored in the sim, exported as
       `presets.json` and a playlist and pushed to the device.
-- [ ] **Value curves**: a Curve node with a drawn spline (edited in the
-      properties pane), and keyframed sliders on the timeline above.
+- [x] **Value curves**: the Float curve node's points drawn by hand in the
+      properties pane (click to add, drag, right-click to remove; the
+      node's own preview and the numbers follow), and the curve now runs
+      as a script too (one select per segment, the same smoothstep as the
+      C++). Sliders are keyframed per sequence step; a continuous
+      slider curve along a step is not done.
 - [ ] **An effect library** with looping thumbnails, tags and one-click
       load, the examples first.
 - [ ] **A Text node** (a 5x7 font, scrolling, any 2-D layout) beside the

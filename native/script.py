@@ -813,6 +813,24 @@ def compile_script(graph):
     for nid in order:
         n, d = graph.nodes[nid], defs[nid]
         label = f"{d.get('label') or n['type']} #{nid}"
+        if d.get("codegen") == "curve":
+            # a drawn curve: the same smoothstep between its points as the C++,
+            # one select per segment (the last segment whose start x has passed wins)
+            pts = sorted([[float(q[0]), float(q[1])] for q in (n["params"].get("points") or [[0, 0], [1, 1]])], key=lambda q: q[0])
+            if len(pts) < 2:
+                pts = [[0.0, 0.0], [1.0, 1.0]]
+            asm.stream = asm.frame if scope[nid] == "frame" else asm.pixel
+            L = Lower(asm, env, label)
+            src = src_of.get((nid, "x"))
+            x = values[src] if src and src in values else _lit("float", n.get("inputs", {}).get("x", 0.0))
+            result = ("k", pts[0][1])
+            for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
+                f = L.f1("SAT", L.f2("DIV", L.f2("SUB", x, ("k", xa)), ("k", max(1e-6, xb - xa))))
+                f = L.f2("MUL", L.f2("MUL", f, f), L.f2("SUB", ("k", 3.0), L.f2("MUL", ("k", 2.0), f)))
+                seg = L.f2("ADD", ("k", ya), L.f2("MUL", ("k", yb - ya), f))
+                result = L.select(L.f2("GE", x, ("k", xa)), seg, result)
+            values[(nid, "result")] = result
+            continue
         if d.get("codegen") or d.get("field") or d.get("fields"):
             raise ScriptError(f"{label}: not scriptable ({'per-pixel fields' if not d.get('codegen') else 'a table the device cannot hold'})")
         if n["type"] in ("Expression", "Colour expression"):

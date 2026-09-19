@@ -459,7 +459,17 @@ class GraphPanel:
         if len(sel) > 1:
             dpg.add_text(f"and {len(sel) - 1} more selected", parent="graph_props", color=DIM)
         long_ = [p for p in d["params"] if p["type"] in ("text", "file") and not p.get("lines") is False]
-        if not long_:
+        curves = [p for p in d["params"] if p["type"] == "curve"]
+        self._curve_ed = None
+        for p in curves:
+            # a curve drawn by hand: click to add a point, drag one, right-click to take it out
+            dpg.add_text(f"{p['name']} - click to add a point, drag to move, right-click to remove", parent="graph_props", color=DIM, wrap=0)
+            W = max(200, int(dpg.get_item_rect_size("graph_props")[0] or 300) - 24)
+            H = 180
+            tag = dpg.add_drawlist(width=W, height=H, parent="graph_props")
+            self._curve_ed = {"nid": nid, "name": p["name"], "tag": tag, "W": W, "H": H, "drag": None, "was": False, "rwas": False}
+            self._curve_draw()
+        if not long_ and not curves:
             dpg.add_text("nothing long to edit here: this node's settings are all on the node", parent="graph_props",
                          color=DIM, wrap=0)
             return
@@ -470,6 +480,99 @@ class GraphPanel:
             dpg.add_input_text(parent="graph_props", width=-1, multiline=bool(p.get("lines")) or len(v) > 60,
                                height=self.px(120) if p.get("lines") else 0, default_value=shown,
                                user_data=(nid, p["name"]), callback=self._on_prop)
+
+    # --- the curve editor in the properties pane -------------------------------------------
+    def _curve_pts(self):
+        ed = self._curve_ed
+        n = self.graph.nodes.get(ed["nid"]) if self.graph else None
+        if not n:
+            return None, None
+        d = self.graph.node_def(n)
+        p = next((q for q in d["params"] if q["name"] == ed["name"]), None)
+        pts = sorted([list(q) for q in (n["params"].get(ed["name"]) or (p["default"] if p else [[0, 0], [1, 1]]))], key=lambda q: q[0])
+        return n, pts
+
+    def _curve_draw(self):
+        ed = self._curve_ed
+        if not ed or not dpg.does_item_exist(ed["tag"]):
+            return
+        n, pts = self._curve_pts()
+        if n is None:
+            return
+        W, H, tag = ed["W"], ed["H"], ed["tag"]
+        dpg.delete_item(tag, children_only=True)
+        dpg.draw_rectangle((0, 0), (W - 1, H - 1), color=(70, 74, 82, 255), fill=(24, 26, 30, 255), parent=tag)
+        for k in range(1, 4):
+            dpg.draw_line((k * W / 4, 0), (k * W / 4, H - 1), color=(50, 54, 62, 255), parent=tag)
+            dpg.draw_line((0, k * H / 4), (W - 1, k * H / 4), color=(50, 54, 62, 255), parent=tag)
+        prev = None
+        for x in range(0, W, 2):
+            t = x / max(1, W - 1)
+            y = (1.0 - max(0.0, min(1.0, self._curve_at(pts, t)))) * (H - 1)
+            if prev is not None:
+                dpg.draw_line(prev, (x, y), color=(110, 190, 250, 255), thickness=2, parent=tag)
+            prev = (x, y)
+        for k, q in enumerate(pts):
+            c = (255, 210, 90, 255) if k == ed.get("drag") else (255, 255, 255, 255)
+            dpg.draw_circle((q[0] * (W - 1), (1.0 - q[1]) * (H - 1)), 5, color=c, fill=c, parent=tag)
+            dpg.draw_text((min(W - 60, q[0] * (W - 1) + 8), max(2, (1.0 - q[1]) * (H - 1) - 16)), f"{q[0]:.2f}, {q[1]:.2f}", size=12,
+                          color=(160, 165, 175, 255), parent=tag)
+
+    def _poll_curve_edit(self):
+        ed = getattr(self, "_curve_ed", None)
+        if not ed or not dpg.does_item_exist(ed["tag"]) or not self.graph or ed["nid"] not in self.graph.nodes:
+            return
+        st = dpg.get_item_state(ed["tag"])
+        if "rect_min" not in st:
+            return
+        (x0, y0) = st["rect_min"]
+        W, H = ed["W"], ed["H"]
+        mx, my = dpg.get_mouse_pos(local=False)
+        inside = x0 <= mx <= x0 + W and y0 <= my <= y0 + H
+        t = max(0.0, min(1.0, (mx - x0) / max(1, W - 1)))
+        v = max(0.0, min(1.0, 1.0 - (my - y0) / max(1, H - 1)))
+        down, rdown = dpg.is_mouse_button_down(0), dpg.is_mouse_button_down(1)
+        pressed, rpressed = dpg.is_mouse_button_clicked(0), dpg.is_mouse_button_clicked(1)   # a click within one frame still counts
+        n, pts = self._curve_pts()
+        if n is None:
+            return
+        def nearest():
+            best, bk = 12.0, None
+            for k, q in enumerate(pts):
+                d = ((q[0] * (W - 1) - (mx - x0)) ** 2 + ((1.0 - q[1]) * (H - 1) - (my - y0)) ** 2) ** 0.5
+                if d < best:
+                    best, bk = d, k
+            return bk
+        if (pressed or (down and not ed["was"])) and inside and ed["drag"] is None:   # press: pick a point up, or put one down
+            k = nearest()
+            if k is None:
+                self.touch(); self.snapshot(("curve", ed["nid"], ed["name"], -1, "add"))
+                pts.append([t, v]); pts.sort(key=lambda q: q[0])
+                k = pts.index([t, v])
+                n["params"][ed["name"]] = pts
+            ed["drag"] = k
+            ed["moved"] = False
+        elif down and ed["drag"] is not None:                  # drag: the point follows, kept between its neighbours
+            k = ed["drag"]
+            lo = pts[k - 1][0] + 0.001 if k > 0 else 0.0
+            hi = pts[k + 1][0] - 0.001 if k < len(pts) - 1 else 1.0
+            pts[k] = [max(lo, min(hi, t)), v]
+            n["params"][ed["name"]] = pts
+            ed["moved"] = True
+        elif not down and ed["drag"] is not None:              # release: the node's own widget and the code follow
+            if ed.get("moved"):
+                self.touch(); self.snapshot(("curve", ed["nid"], ed["name"], ed["drag"], "move"))
+            ed["drag"] = None
+            self._sync_pos(); self.rebuild()
+        if (rpressed or (rdown and not ed["rwas"])) and inside and len(pts) > 2:
+            k = nearest()
+            if k is not None:
+                self.touch(); self.snapshot(("curve", ed["nid"], ed["name"], k, "del"))
+                pts.pop(k); n["params"][ed["name"]] = pts
+                self._sync_pos(); self.rebuild()
+        ed["was"], ed["rwas"] = down, rdown
+        if down and ed["drag"] is not None or inside:
+            self._curve_draw()
 
     def _on_prop(self, sender, val):
         nid, name = dpg.get_item_user_data(sender)
@@ -1103,6 +1206,7 @@ class GraphPanel:
         self._poll_add_preview()
         self._poll_help()
         self._poll_props()
+        self._poll_curve_edit()
         self._poll_focus()
         self._poll_labels()
         if not self.auto or not self._dirty or not self.graph:
