@@ -1059,6 +1059,18 @@ per part** makes each part (on the strip layout, where a part is a run of
 LEDs) its own WLED segment with its own effect - xLights' per-strand
 render, the WLED way.
 
+**Overlays keep off what floats over them.** The wiring drawn on the
+net, the shape editor's rings and wiring line and the reference
+wireframes are viewport drawlists, which draw over every window - so
+the wiring ran across the Library when it floated over the net. Every
+one of them now keeps off `compute_holes()`, the same list the gradient
+frames keep off (every window but the root, the file dialogs, the open
+menus): the wiring line is broken under a window, a ring is left out
+when its circle would touch one, a wireframe edge when either end is
+covered; and the overlays are polled after the frames so the holes are
+this frame's. The `wiring` test hook had been taken twice (the net's
+overlay and the wiring test); the test is `wiring_test` now.
+
 **A preview of the shape** (`native/shape_preview.py`): a turn of the
 3-D view rendered off screen by a second engine - the effect the sim
 runs, the parts each a colour, or a chase along the wiring on a dim

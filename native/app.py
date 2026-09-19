@@ -2631,6 +2631,54 @@ class App(Features):
             self._gpu_was = want
             self.request_layout()
 
+    def compute_holes(self):
+        """The screen rectangles of everything drawn over the panes - every
+        window but the root, the file dialogs, the FLOATING list, the open
+        menus - for the gradient frames and every viewport overlay."""
+        # Every window that floats over the panes is a hole in the frames:
+        # every Dear PyGui window but the root (asked for each time, so a
+        # dialog added later is covered), the file dialogs (found once),
+        # and the FLOATING list for anything else.
+        holes = []
+        if self._file_dialogs is None:
+            self._file_dialogs = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("mvFileDialog")]
+        tags = [w for w in dpg.get_windows() if dpg.get_item_alias(w) != "root"] + self._file_dialogs + list(self.FLOATING)
+        # An open menu is an ImGui popup, not a window: it is found by its
+        # items being visible, and its box is theirs plus the padding.
+        if self._menus is None or any(not dpg.does_item_exist(m) for m in self._menus):
+            self._menus = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]
+        # An open menu reports its popup's size (closed, zero) and its own
+        # label's position: a top menu's popup hangs under the menu bar at
+        # that x, a submenu's opens to the right of its parent's popup at
+        # the item's height. Menus come parents first, so a parent's box is
+        # known by the time its child is looked at.
+        bar_bottom = (dpg.get_item_rect_min("toolbar")[1] - 8) if dpg.does_item_exist("toolbar") else 24
+        boxes = {}
+        for m in self._menus:
+            st = dpg.get_item_state(m)
+            w, h = st.get("rect_size") or (0, 0)
+            if w <= 0 or h <= 0:
+                continue
+            px, py = st.get("pos") or (0, 0)
+            parent = boxes.get(dpg.get_item_parent(m))
+            if parent is None:
+                x0, y0 = px - 2, bar_bottom
+            else:
+                x0, y0 = parent[2] - 8, parent[1] + py - 6
+            boxes[m] = (x0, y0, x0 + w, y0 + h)
+            holes.append((x0 - 2, y0 - 2, x0 + w + 2, y0 + h + 2))
+        for tag in tags:
+            if dpg.does_item_exist(tag) and dpg.is_item_shown(tag):
+                st = dpg.get_item_state(tag)
+                w, h = st.get("rect_size") or (0, 0)
+                if w <= 0 or h <= 0:
+                    cfg = dpg.get_item_configuration(tag)      # a window not yet measured: its set size
+                    w, h = cfg.get("width") or 0, cfg.get("height") or 0
+                if w > 0 and h > 0:
+                    x, y = dpg.get_item_pos(tag)
+                    holes.append((x - 1, y - 1, x + w + 1, y + h + 1))
+        return holes
+
     def poll_glow(self):
         """The gradient frames: the pane in focus, and the selected nodes
         (clipped to the editor). None while presenting, or while a menu is
@@ -2690,49 +2738,12 @@ class App(Features):
                 for x0, y0, x1, y1 in boxes:
                     # the node's corners are rounded 4 at this zoom; the frame's hug them
                     rects.append((x0, y0, x1, y1, clip, 1.0, "sel", self.gp.px(4) if len(boxes) == 1 and len(sel) == 1 else glow.RADIUS))
-        # Every window that floats over the panes is a hole in the frames:
-        # every Dear PyGui window but the root (asked for each time, so a
-        # dialog added later is covered), the file dialogs (found once),
-        # and the FLOATING list for anything else.
-        holes = []
-        if self._file_dialogs is None:
-            self._file_dialogs = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("mvFileDialog")]
-        tags = [w for w in dpg.get_windows() if dpg.get_item_alias(w) != "root"] + self._file_dialogs + list(self.FLOATING)
-        # An open menu is an ImGui popup, not a window: it is found by its
-        # items being visible, and its box is theirs plus the padding.
-        if self._menus is None or any(not dpg.does_item_exist(m) for m in self._menus):
-            self._menus = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]
-        # An open menu reports its popup's size (closed, zero) and its own
-        # label's position: a top menu's popup hangs under the menu bar at
-        # that x, a submenu's opens to the right of its parent's popup at
-        # the item's height. Menus come parents first, so a parent's box is
-        # known by the time its child is looked at.
-        bar_bottom = (dpg.get_item_rect_min("toolbar")[1] - 8) if dpg.does_item_exist("toolbar") else 24
-        boxes = {}
-        for m in self._menus:
-            st = dpg.get_item_state(m)
-            w, h = st.get("rect_size") or (0, 0)
-            if w <= 0 or h <= 0:
-                continue
-            px, py = st.get("pos") or (0, 0)
-            parent = boxes.get(dpg.get_item_parent(m))
-            if parent is None:
-                x0, y0 = px - 2, bar_bottom
-            else:
-                x0, y0 = parent[2] - 8, parent[1] + py - 6
-            boxes[m] = (x0, y0, x0 + w, y0 + h)
-            holes.append((x0 - 2, y0 - 2, x0 + w + 2, y0 + h + 2))
-        for tag in tags:
-            if dpg.does_item_exist(tag) and dpg.is_item_shown(tag):
-                st = dpg.get_item_state(tag)
-                w, h = st.get("rect_size") or (0, 0)
-                if w <= 0 or h <= 0:
-                    cfg = dpg.get_item_configuration(tag)      # a window not yet measured: its set size
-                    w, h = cfg.get("width") or 0, cfg.get("height") or 0
-                if w > 0 and h > 0:
-                    x, y = dpg.get_item_pos(tag)
-                    holes.append((x - 1, y - 1, x + w + 1, y + h + 1))
+        holes = self.compute_holes()
         self.frames.update(rects, holes)
+        # Every overlay drawn on the viewport (the wiring on the net, the shape
+        # editor's rings, the reference wireframes) keeps off the same holes:
+        # anything floating over the panes is not to be drawn on.
+        self._holes = holes
 
 
 
@@ -3273,8 +3284,8 @@ def service_command(app):
                  "field": lambda: SQ.set_field(app, op[1], op[2])}[op[0]]()
             if "stream" in c:                           # test hook: a host to stream to over DDP, or false to stop
                 app.stream_start(c["stream"], 30) if c["stream"] else app.stream_stop()
-            if "wiring" in c:                           # test hook: a wiring test mode, or "off"
-                app.wiring_stop() if c["wiring"] == "off" else app.wiring_start(c["wiring"])
+            if "wiring_test" in c:                      # test hook: a wiring test mode, or "off"
+                app.wiring_stop() if c["wiring_test"] == "off" else app.wiring_start(c["wiring_test"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
                     print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np})))
@@ -3840,7 +3851,6 @@ def main():
                 app.gp.poll()
                 app.poll_watch()
                 chrome.poll(app)
-                device_ui.poll(app)
                 app.poll_devices()
                 app.poll_stream()
                 app.poll_autosave()
@@ -3851,6 +3861,7 @@ def main():
                 if app.code_ed is not None and app.layout == "edit":
                     app.code_ed.poll()
                 app.poll_glow()
+                device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 _t.append(time.perf_counter())
                 app.step_sim()
                 _t.append(time.perf_counter())

@@ -298,6 +298,18 @@ class Features:
         dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
         self.probe_active()
 
+    def overlay_holes(self):
+        """The screen rectangles nothing may be drawn over: every window
+        floating over the panes, the dialogs, the open menus - the same
+        list the gradient frames keep off (poll_glow)."""
+        holes = getattr(self, "_holes", None)
+        if holes is None:
+            try:
+                holes = self.compute_holes()
+            except Exception:
+                holes = []
+        return list(holes)
+
     # --- the picture, with a transition in progress blended in ------------------------
     # A sequence step change with a transition time keeps the old step
     # running in a second engine and blends the two pictures the way the
@@ -672,8 +684,22 @@ class Features:
         rows = self.net_image().shape[0]
         ry = rows / max(1, g.h)                      # a strip is drawn tall
         pts = [(x0 + (i % w + 0.5) * sc, y0 + ((i // w) * ry + ry / 2) * sc) for i in g.phys]
-        self._wiring_items.append(dpg.draw_polyline(pts, parent="wiring_overlay", color=(90, 169, 230, 150), thickness=1))
-        self._wiring_items.append(dpg.draw_circle(pts[0], max(3, sc / 2), parent="wiring_overlay",
-                                                  color=(255, 184, 70, 255), fill=(255, 184, 70, 200)))
-        self._wiring_items.append(dpg.draw_circle(pts[-1], max(3, sc / 2), parent="wiring_overlay",
-                                                  color=(255, 96, 96, 255), fill=(255, 96, 96, 200)))
+        # a viewport drawlist draws over every window: the line is broken
+        # wherever a floating frame, a dialog or a menu covers the net
+        holes = self.overlay_holes()
+        def clear(p):
+            return not any(a <= p[0] <= c_ and b <= p[1] <= d for a, b, c_, d in holes)
+        run = []
+        for p in pts:
+            if clear(p):
+                run.append(p)
+            else:
+                if len(run) > 1:
+                    self._wiring_items.append(dpg.draw_polyline(run, parent="wiring_overlay", color=(90, 169, 230, 150), thickness=1))
+                run = []
+        if len(run) > 1:
+            self._wiring_items.append(dpg.draw_polyline(run, parent="wiring_overlay", color=(90, 169, 230, 150), thickness=1))
+        for p, col in ((pts[0], (255, 184, 70)), (pts[-1], (255, 96, 96))):
+            if clear(p):
+                self._wiring_items.append(dpg.draw_circle(p, max(3, sc / 2), parent="wiring_overlay",
+                                                          color=col + (255,), fill=col + (200,)))

@@ -59,8 +59,8 @@ STEPS = [
       {"dock": ["shape", True]}, {"dock": ["shape", False]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 4.0),
     # live output to a listener on this machine (the test's own DDP receiver), and the wiring test
-    ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring": "chase"}, {"wiring": "index"}, {"wiring": "part"},
-      {"wiring": "off"}], 4.0),
+    ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
+      {"wiring_test": "off"}], 4.0),
     ([{"stream": False}], 1.0),
     # a sequence: two steps from the sim, played, a step loaded back, one deleted
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},

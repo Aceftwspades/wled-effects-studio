@@ -612,19 +612,15 @@ def release(app):
 
 
 def _covers(app):
-    """The floating frames over the view: (x0, y0, x1, y1) each, so overlay
-    marks are not drawn on top of a window that covers the LEDs."""
-    from native import device_ui
-    out = []
-    for slot, (tag, _, _, _) in device_ui.FRAMES.items():
-        if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and not app.docked(slot):
-            x, y = dpg.get_item_pos(tag); w, h = dpg.get_item_rect_size(tag)
-            out.append((x, y, x + w, y + h))
-    return out
+    """What is drawn over the view - floating frames, dialogs, open menus:
+    (x0, y0, x1, y1) each - so no mark lands on top of it (the list the
+    gradient frames keep off too)."""
+    return app.overlay_holes()
 
 
-def _clear(covers, x, y):
-    return not any(a <= x <= c and b <= y <= d for a, b, c, d in covers)
+def _clear(covers, x, y, pad=0.0):
+    """Nothing covers (x, y) - with `pad`, nothing within pad of it either (a ring's radius)."""
+    return not any(a - pad <= x <= c + pad and b - pad <= y <= d + pad for a, b, c, d in covers)
 
 
 def _poll_reference(app):
@@ -679,7 +675,7 @@ def poll(app):
     r = max(3.0, 0.42 * (size * 0.5) / np.tan(np.radians(19.0)) / (app.dist * ext[1]) * 0.9)
     col = tuple(c.ACCENT[:3]) + (200,)
     for i in range(len(mine)):
-        if ok[i] and 0 <= sx[i] <= size and 0 <= sy[i] <= size and _clear(covers, x0 + sx[i], y0 + sy[i]):
+        if ok[i] and 0 <= sx[i] <= size and 0 <= sy[i] <= size and _clear(covers, x0 + sx[i], y0 + sy[i], min(r, 14)):
             dpg.draw_circle((x0 + sx[i], y0 + sy[i]), min(r, 14), color=col, thickness=1.5, parent="shape_dl")
     # the wiring: a faint line from LED to LED of the selected part
     if len(mine) > 1 and len(mine) <= 400:
