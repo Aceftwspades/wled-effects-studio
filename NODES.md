@@ -764,6 +764,25 @@ Hard-edged bands along a coordinate. count is how many, duty how wide the bright
 **Outputs**
 - `value` *(float)*: 1 in a stripe, else 0
 
+### Text
+
+Words in a 5x7 pixel font, baked into the effect (only the letters used go in). Wire Coords u, v; colour the 'on' pixels with a Palette, a Colour, anything - 'i' runs 0..1 along the text so each letter can take its own colour. To scroll, wire Time x speed into offset: the text moves left, and with loop on it comes round again after a gap of the matrix's width. size 2 doubles the pixels; row places the top of the letters (-1 centres them).
+
+**Inputs**
+- `u` *(float)*: across, 0..1 (Coords u)
+- `v` *(float)*: down, 0..1 (Coords v)
+- `offset` *(float)*: scroll, in pixels - Time x speed
+
+**Outputs**
+- `on` *(bool)*: true on a letter's pixel
+- `i` *(float)*: which letter, 0..1 along the text
+
+**Settings**
+- `text` *(text)*: the words (ASCII; only their letters are baked in)
+- `size` *(int)*: pixels per font pixel, 1..4
+- `row` *(int)*: the top row of the letters; -1 centres them
+- `loop` *(bool)*: scroll round again after a gap of the width
+
 ### Torus knot
 
 A looping, twisted tube floating inside the cube, seen from the middle. Feed it Direction and it tells you whether this pixel looks at the tube, how far along the tube that spot is (for stripes), how close to its edge (for shading), and which way its surface faces (for lighting).

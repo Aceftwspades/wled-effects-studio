@@ -208,6 +208,16 @@ DOCS = {
                "where a straight line matters (slabs, planes, gravity height); use Direction for angles.",
         "out": {"pos": "the position as one vector wire", "x": "-1 (west) .. 1 (east)", "y": "-1 (south) .. 1 (north)",
                 "z": "-1 (bottom) .. 1 (the lid)"}},
+    "Text": {
+        "doc": "Words in a 5x7 pixel font, baked into the effect (only the letters used go in). Wire Coords u, v; "
+               "colour the 'on' pixels with a Palette, a Colour, anything - 'i' runs 0..1 along the text so each "
+               "letter can take its own colour. To scroll, wire Time x speed into offset: the text moves left, "
+               "and with loop on it comes round again after a gap of the matrix's width. size 2 doubles the "
+               "pixels; row places the top of the letters (-1 centres them).",
+        "in": {"u": "across, 0..1 (Coords u)", "v": "down, 0..1 (Coords v)", "offset": "scroll, in pixels - Time x speed"},
+        "out": {"on": "true on a letter's pixel", "i": "which letter, 0..1 along the text"},
+        "params": {"text": "the words (ASCII; only their letters are baked in)", "size": "pixels per font pixel, 1..4",
+                   "row": "the top row of the letters; -1 centres them", "loop": "scroll round again after a gap of the width"}},
     "Shape part": {
         "doc": "A shape (GEOMETRY > shape) is parts in wiring order - strips, rings, panels, a cube... This says which "
                "part the pixel belongs to and where along that part it sits, so one graph can treat the parts "

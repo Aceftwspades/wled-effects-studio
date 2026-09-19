@@ -790,8 +790,9 @@ scheduling, video). These do, in the order to do them; ticked when done:
       not disturbed), tags read off the graph (node categories, audio,
       motion, 3-D, dimensions, script), a search box, one click to open
       the graph and run its effect.
-- [ ] **A Text node** (a 5x7 font, scrolling, any 2-D layout) beside the
-      picture nodes.
+- [x] **A Text node** (a 5x7 font, scrolling, any 2-D layout) beside the
+      picture nodes: only the letters used are baked in; `on` and `i`
+      (which letter) out, `offset` in for scrolling, loop, size, row.
 - [ ] **Reference geometry** in the 3-D view: a mesh drawn as a wireframe
       that is not LEDs - the tree, the house, the enclosure - to place
       the LEDs against.
