@@ -19,11 +19,11 @@ moved by hand; floating, it can.
 import os
 import dearpygui.dearpygui as dpg
 
-from native import flash, devices
+from native import flash, devices, live_out
 
 FRAMES = {"devices": ("devices_win", "DEVICES", 640, 420),
           "flash": ("flash_win", "FLASH FIRMWARE", 720, 660),
-          "send": ("send_win", "SEND TO DEVICE", 620, 360),
+          "send": ("send_win", "SEND TO DEVICE", 620, 520),
           "shape": ("shape_win", "SHAPE", 560, 640)}          # the shape editor (shape_ui.py), the same kind of frame
 HEADER_H = 30
 
@@ -77,7 +77,7 @@ def build(app):
         with dpg.child_window(tag="dev_log", height=-1, border=False):
             pass
     # SEND: the active device, what it runs, the four sends
-    with dpg.window(tag="send_win", show=False, width=620, height=360, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag="send_win", show=False, width=620, height=520, no_collapse=True, no_title_bar=True):
         header(app, "send")
         dpg.add_text("to: no device chosen - Device > Devices...", tag="send_to", color=c.TEXT, wrap=0)
         dpg.add_text("", tag="send_running", color=c.DIM, wrap=0)
@@ -98,6 +98,31 @@ def build(app):
             dpg.add_button(label="Send the ledmap only", width=250, callback=lambda: app.send_ledmap())
             dpg.add_button(label="Import the device's", callback=lambda: app.import_ledmap(host=app.active_host()))
             dpg.add_button(label="Import a file...", callback=lambda: dpg.show_item("ledmap_dialog"))
+        dpg.add_separator()
+        # LIVE: the sim's frames to the device as they are drawn, and the wiring test
+        with dpg.group(horizontal=True):
+            dpg.add_text("LIVE", color=c.ACCENT)
+            dpg.add_checkbox(label="stream the sim to the device (DDP)", tag="live_on", default_value=False,
+                             callback=lambda s, v: (app.stream_start(fps=int(dpg.get_value("live_fps"))) if v else app.stream_stop()))
+            dpg.add_combo(["15", "30", "60"], tag="live_fps", width=60, default_value="30",
+                          callback=lambda s, v: app.stream_start(fps=int(v)) if getattr(app, "ddp", None) else None)
+            dpg.add_text("fps", color=c.DIM)
+        dpg.add_text("whatever the sim shows - any effect, built or not - on the device now; it returns to its effect when this stops", color=c.DIM, wrap=0)
+        dpg.add_text("", tag="live_status", color=c.DIM, wrap=0)
+        with dpg.group(horizontal=True):
+            dpg.add_text("WIRING TEST", color=c.ACCENT)
+            dpg.add_combo(list(live_out.MODES), tag="wt_mode", width=120, default_value="off",
+                          callback=lambda s, v: app.wiring_stop() if v == "off" else app.wiring_start(v))
+            dpg.add_input_float(tag="wt_speed", width=70, default_value=20.0, step=0, format="%.0f",
+                                callback=lambda s, v: setattr(app.wiring, "speed", max(0.5, float(v))) if getattr(app, "wiring", None) else None)
+            dpg.add_text("LEDs/s", color=c.DIM)
+            dpg.add_button(label="<", small=True, callback=lambda: _wt_step(app, -1))
+            dpg.add_button(label=">", small=True, callback=lambda: _wt_step(app, 1))
+            dpg.add_input_int(tag="wt_index", width=80, default_value=0, min_value=0, min_clamped=True, on_enter=True,
+                              callback=lambda s, v: _wt_set(app, int(v)))
+        dpg.add_text("a chase along the wiring order, one LED by its index, or one part of a shape - in the sim, and on the device when streaming",
+                     color=c.DIM, wrap=0)
+        dpg.add_text("", tag="wt_status", color=c.TEXT, wrap=0)
         dpg.add_separator()
         dpg.add_text("", tag="send_status", color=c.DIM, wrap=0)
         with dpg.child_window(tag="send_log", height=-1, border=False):
@@ -275,6 +300,33 @@ def refresh_send(app):
         dpg.set_value("send_running", "")
     if dpg.does_item_exist("send_script_btn"):
         dpg.configure_item("send_script_btn", enabled=not (d and d.get("script") is False))
+
+
+def refresh_live(app):
+    if dpg.does_item_exist("live_on"):
+        on = getattr(app, "ddp", None) is not None
+        dpg.set_value("live_on", on)
+        if not on:
+            dpg.set_value("live_status", "")
+
+
+def _wt_step(app, d):
+    wt = getattr(app, "wiring", None)
+    if wt is None:
+        app.wiring_start("index"); wt = app.wiring; dpg.set_value("wt_mode", "index")
+    if wt.mode == "chase":
+        wt.mode = "index"; dpg.set_value("wt_mode", "index"); wt.index = int(wt.pos)
+    wt.index = max(0, wt.index + d)
+    dpg.set_value("wt_index", wt.index)
+
+
+def _wt_set(app, k):
+    wt = getattr(app, "wiring", None)
+    if wt is None:
+        app.wiring_start("index"); wt = app.wiring; dpg.set_value("wt_mode", "index")
+    if wt.mode == "chase":
+        wt.mode = "index"; dpg.set_value("wt_mode", "index")
+    wt.index = max(0, k)
 
 
 def send_log(app, line):

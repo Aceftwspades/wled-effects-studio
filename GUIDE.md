@@ -148,6 +148,16 @@ it out again, and the arrangement is remembered.
      its positions table; **Send the ledmap only** just the wiring. Both
      ask first: a wiring that is not the device's leaves it dark or
      scrambled. **Import the device's ledmap** reads it back as the geometry.
+- **LIVE**, in the same frame: **stream the sim to the device** sends
+  every frame the sim draws to the device over DDP (WLED's realtime
+  input, on by default) - any effect, built or not, on the real LEDs at
+  once, in the wiring order the ledmap would use; the device goes back to
+  its own effect a couple of seconds after the stream stops. The
+  **wiring test** under it runs a chase along the wiring order (LEDs/s),
+  lights one LED by its index (< > step it), or one part of a shape (or
+  the parts in turn), in the sim and on the device when streaming - the
+  way to check a new ledmap or shape before trusting it; play resumes
+  the effect.
 - **Flash firmware** (Ctrl+Shift+U). WHAT GOES ON THE DEVICE says, before
   anything is built, exactly what the firmware will carry - the tree's
   WLED version and build id, the environment chain with its board and

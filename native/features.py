@@ -12,7 +12,7 @@ import time
 import numpy as np
 import dearpygui.dearpygui as dpg
 
-from native import chrome, device_ui, devices
+from native import chrome, device_ui, devices, live_out
 from native.project import save_prefs
 from native.engine import Engine
 from native.geometry import Geometry
@@ -297,6 +297,80 @@ class Features:
                                       six=self.eng.six if self.project.geometry.kind == "cube" else None)
         dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
         self.probe_active()
+
+    # --- live output: the sim's frames to the device, and the wiring test ------------
+    def stream_start(self, host=None, fps=30):
+        """The sim's frames to the device over DDP as they are drawn."""
+        host = devices.clean_host(host or self.active_host())
+        if not host:
+            device_ui.show(self, "devices"); self.gp.status("choose a device first"); return False
+        self.stream_stop()
+        self.ddp = live_out.DdpOut(host)
+        self._ddp_fps = max(1.0, float(fps))
+        self._ddp_next = 0.0
+        self.gp.status(f"streaming to {host} over DDP at {int(fps)} fps - the device shows the sim while this runs")
+        device_ui.refresh_live(self)
+        return True
+
+    def stream_stop(self):
+        d = getattr(self, "ddp", None)
+        if d is not None:
+            d.close(); self.ddp = None
+            self.gp.status(f"stream stopped after {d.frames} frames; the device goes back to its effect in a couple of seconds")
+            device_ui.refresh_live(self)
+
+    def poll_stream(self):
+        """After each draw: the wiring test's pattern into the engine's
+        buffer (paused, so it stays), then the frame to the device."""
+        wt = getattr(self, "wiring", None)
+        if wt is not None and self.playing:
+            self.wiring_stop(); wt = None                  # play pressed: the effect takes the buffer back
+            if dpg.does_item_exist("wt_mode"):
+                dpg.set_value("wt_mode", "off")
+        if wt is not None:
+            now = time.perf_counter()
+            dt = min(0.25, now - getattr(self, "_wt_last", now)); self._wt_last = now
+            cols = wt.frame(dt)
+            px = self.eng.pixels().reshape(-1)
+            px[:] = 0
+            phys = np.asarray(self.project.geometry.phys, int)
+            k = min(len(phys), len(cols))
+            px[phys[:k]] = (cols[:k, 0].astype(np.uint32) << 16) | (cols[:k, 1].astype(np.uint32) << 8) | cols[:k, 2].astype(np.uint32)
+            if dpg.does_item_exist("wt_status"):
+                dpg.set_value("wt_status", wt.describe())
+        d = getattr(self, "ddp", None)
+        if d is None:
+            return
+        now = time.perf_counter()
+        if now < self._ddp_next:
+            return
+        self._ddp_next = now + 1.0 / self._ddp_fps
+        d.send(live_out.frame_bytes(self.eng.rgb(), self.project.geometry.phys))
+        if dpg.does_item_exist("live_status") and d.frames % 15 == 0:
+            dpg.set_value("live_status", f"{d.frames} frames, {d.bytes // 1024} KB sent" + (f"; {d.errors} send errors: {d.last_error}" if d.errors else ""))
+
+    def wiring_start(self, mode="chase"):
+        """The wiring test: playback pauses and the pattern takes the buffer."""
+        g = self.project.geometry
+        owner = getattr(g, "owner", None) if g.kind == "shape" else None
+        names = [p.get("name", p["kind"]) for p in (g.params.get("parts") or [])] if g.kind == "shape" else []
+        wt = getattr(self, "wiring", None)
+        if wt is None or wt.n != g.count:
+            wt = live_out.WiringTest(g.count, owner, names)
+            self._wt_was_playing = self.playing
+        wt.mode = mode
+        self.wiring = wt
+        self.playing = False
+        if dpg.does_item_exist("wt_mode"):
+            dpg.set_value("wt_mode", mode)
+        self._wt_last = time.perf_counter()
+        self.gp.status(f"wiring test: {mode} - the sim shows it, and the device when streaming")
+
+    def wiring_stop(self):
+        if getattr(self, "wiring", None) is not None:
+            self.wiring = None
+            self.playing = bool(getattr(self, "_wt_was_playing", True))
+            self.gp.status("wiring test off")
 
     # --- the devices: the list, the active one, scans and probes ---------------------
     # The list is the app's (prefs["devices"]: a network is not a project's);

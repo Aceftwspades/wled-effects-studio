@@ -753,6 +753,44 @@ them within each group; ticked when done.
       where this tree lacks them (only under usermods/, never over a file
       that exists). Audio counts as standard: noted, never bundled.
 
+### What xLights has that the studio should (September 2026)
+
+xLights is a show sequencer and the studio is an effect tool for the
+firmware, so half of it does not apply (a whole-house timeline, FPP
+scheduling, video). These do, in the order to do them; ticked when done:
+
+- [x] **Live output to the device over DDP** (`native/live_out.py`; the
+      Send frame's LIVE row, Device > Stream the sim) - the sim's frames streamed
+      to the device in real time (WLED's realtime protocol, UDP 4048, in
+      physical order), so any effect - compiled, a graph, a script or not
+      - shows on the real hardware before anything is built. With it a
+      **wiring test** (xLights' Test tab): a chase along the wiring order,
+      one LED by index, one part of a shape, with the same pattern shown
+      in the sim - what a new ledmap or shape needs before it is trusted.
+- [ ] **Parts as the effects see them** (sub-models, strands): a part id
+      per pixel in the position table, a **Shape part** node (the part's
+      index, a mask for a chosen part, the position along it) and an
+      option to give every part its own WLED segment, so each runs its
+      own effect - xLights' per-strand render styles, the WLED way.
+- [ ] **Sequencing as WLED presets and playlists**: a timeline of effects
+      with durations and transitions, authored in the sim, exported as
+      `presets.json` and a playlist and pushed to the device.
+- [ ] **Value curves**: a Curve node with a drawn spline (edited in the
+      properties pane), and keyframed sliders on the timeline above.
+- [ ] **An effect library** with looping thumbnails, tags and one-click
+      load, the examples first.
+- [ ] **A Text node** (a 5x7 font, scrolling, any 2-D layout) beside the
+      picture nodes.
+- [ ] **Reference geometry** in the 3-D view: a mesh drawn as a wireframe
+      that is not LEDs - the tree, the house, the enclosure - to place
+      the LEDs against.
+- [ ] **Transition preview**: WLED's blend styles between two effects
+      (fade, swipe, push...) shown in the sim before a preset chain is
+      pushed.
+
+Not worth chasing: GLSL shaders (the graph is that), audio analysis
+plugins, FPP scheduling, video playback.
+
 ### A self-contained app (on hold)
 
 The goal: one download that runs, for any WLED user, not a checkout of

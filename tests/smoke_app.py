@@ -56,6 +56,10 @@ STEPS = [
       {"shape": ["add", "cube"]}, {"shape": ["select", 1]}, {"shape": ["place", 120, 120]}, {"shape": ["layout", "grid"]},
       {"shape": ["layout", "strip"]}, {"shape": ["undo"]}, {"dock": ["shape", True]}, {"dock": ["shape", False]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 4.0),
+    # live output to a listener on this machine (the test's own DDP receiver), and the wiring test
+    ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring": "chase"}, {"wiring": "index"}, {"wiring": "part"},
+      {"wiring": "off"}], 4.0),
+    ([{"stream": False}], 1.0),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": "projects/default/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),
@@ -71,6 +75,33 @@ STEPS = [
 ]
 
 
+class _DdpCount:
+    """A DDP receiver on 4048, counting packets and pushed frames."""
+    def __init__(self):
+        self.packets = self.frames = 0
+        self._stop = False
+    def start(self):
+        import threading
+        threading.Thread(target=self._run, daemon=True).start()
+    def stop(self):
+        self._stop = True
+    def _run(self):
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", 4048)); s.settimeout(0.5)
+        except OSError:
+            return
+        while not self._stop:
+            try:
+                d, _ = s.recvfrom(2048)
+            except socket.timeout:
+                continue
+            self.packets += 1
+            if len(d) >= 10 and d[0] & 0x01:
+                self.frames += 1
+        s.close()
+
+
 def send(cmds, wait):
     json.dump(cmds, open(CMD, "w"))
     time.sleep(wait)
@@ -83,6 +114,7 @@ def main():
     graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
     saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
     before = set(os.listdir(os.path.join(ROOT, "projects", "default", "graphs")))
+    ddp = _DdpCount(); ddp.start()
     with open(LOG, "w") as log:
         proc = subprocess.Popen([sys.executable, "-u", "-m", "native.app"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
     try:
@@ -101,7 +133,11 @@ def main():
         for f in set(os.listdir(os.path.join(ROOT, "projects", "default", "graphs"))) - before:
             os.remove(os.path.join(ROOT, "projects", "default", "graphs", f))     # the import's copy
     text = open(LOG, encoding="utf-8", errors="replace").read()
+    ddp.stop()
+    print(f"ddp: {ddp.packets} packets, {ddp.frames} frames received from the stream")
     bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l]
+    if ddp.frames < 10:
+        bad.append(f"the DDP stream sent {ddp.frames} frames; 10 or more expected")
     if bad:
         print("smoke: FAILED")
         i = text.find("Traceback")

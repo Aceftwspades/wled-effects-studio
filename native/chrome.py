@@ -111,6 +111,8 @@ def build_menus(app):
                 pass
             dpg.add_menu_item(label="Scan the network for devices", callback=lambda: (device_ui.show(app, "devices"), app.scan_devices("all")))
             dpg.add_separator()
+            dpg.add_menu_item(label="Stream the sim to the device (DDP)", check=True, tag="menu_stream", default_value=False,
+                              callback=lambda s, a: app.stream_start() if a else app.stream_stop())
             _mi(app, "Send the graph as a script", "script_send", callback=lambda: app.send_script())
             _mi(app, "Send the current effect's settings", "push", callback=lambda: app.push_settings())
             dpg.add_menu_item(label="Send the shape (ledmap + positions)", callback=lambda: app.send_shape())
@@ -1096,7 +1098,7 @@ def refresh_files(app):
 
 def _signature(app):
     return (app.layout, app.ui, app.side, app.playing, app.gp.auto, app.gp.zoom, bool(app.gp.stack), app.building,
-            app.gp.focus_mode, app.ab_name, bool(app.sweep))
+            app.gp.focus_mode, app.ab_name, bool(app.sweep), getattr(app, "ddp", None) is not None)
 
 
 def refresh(app):
@@ -1136,6 +1138,8 @@ def refresh(app):
     if dpg.does_item_exist("mi_sweep"):
         dpg.configure_item("mi_sweep", label="Stop the sweep" if app.sweep else "Sweep a slider...")
     dpg.set_value("menu_live", app.gp.auto)
+    if dpg.does_item_exist("menu_stream"):
+        dpg.set_value("menu_stream", getattr(app, "ddp", None) is not None)
     dpg.configure_item("tb_live", tint_color=AMBER if app.gp.auto else TEXT)
     dpg.configure_item("tb_build", tint_color=AMBER if app.building else TEXT)
     dpg.configure_item("tb_play", show=not app.playing, tint_color=GREEN)

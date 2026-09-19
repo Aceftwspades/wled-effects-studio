@@ -3258,6 +3258,10 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
+            if "stream" in c:                           # test hook: a host to stream to over DDP, or false to stop
+                app.stream_start(c["stream"], 30) if c["stream"] else app.stream_stop()
+            if "wiring" in c:                           # test hook: a wiring test mode, or "off"
+                app.wiring_stop() if c["wiring"] == "off" else app.wiring_start(c["wiring"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
                     print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np})))
@@ -3686,7 +3690,7 @@ SKIP_MENU = ("Quit", "Record 15 s GIF", "Fullscreen",     # ends the app, a 15 s
              "Open the project folder", "Open the build folder", "Node reference (NODES.md)", "Studio guide (STUDIO.md)",
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
-             "Send the ledmap only", "Scan the network for devices")   # these reach a real device on the network: not a test's to do
+             "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device (DDP)")   # these reach a real device: not a test's to do
 
 
 def walk_menus(app, skip=()):
@@ -3822,6 +3826,7 @@ def main():
                 chrome.poll(app)
                 device_ui.poll(app)
                 app.poll_devices()
+                app.poll_stream()
                 app.poll_autosave()
                 app.poll_view_mode()
                 app.poll_drops()
