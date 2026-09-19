@@ -486,6 +486,19 @@ The reverse of Cube ring: give it a point as around and depth and it tells you w
 - `u` *(float)*: that pixel, across
 - `v` *(float)*: that pixel, down
 
+### Shape part
+
+A shape (GEOMETRY > shape) is parts in wiring order - strips, rings, panels, a cube... This says which part the pixel belongs to and where along that part it sits, so one graph can treat the parts differently: a chase along each strip, ring 2 in another colour. On a cube net or a matrix, or on the device without the shape table sent, every pixel is part 0 of 1.
+
+**Inputs**
+- `pick` *(float)*: the part number whose mask you want (0 is the first)
+
+**Outputs**
+- `part` *(float)*: the part's number, 0 for the first
+- `along` *(float)*: 0 at the part's first LED, 1 at its last
+- `count` *(float)*: how many parts the shape has
+- `mask` *(bool)*: true for pixels on the picked part
+
 ### Transform
 
 Moves, turns and zooms a pair of coordinates about a pivot - feed Coords' u, v through it and anything drawn from the result pans, spins or scales. A clock into turns spins the whole picture.

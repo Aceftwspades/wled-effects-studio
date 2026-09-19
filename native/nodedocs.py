@@ -208,6 +208,14 @@ DOCS = {
                "where a straight line matters (slabs, planes, gravity height); use Direction for angles.",
         "out": {"pos": "the position as one vector wire", "x": "-1 (west) .. 1 (east)", "y": "-1 (south) .. 1 (north)",
                 "z": "-1 (bottom) .. 1 (the lid)"}},
+    "Shape part": {
+        "doc": "A shape (GEOMETRY > shape) is parts in wiring order - strips, rings, panels, a cube... This says which "
+               "part the pixel belongs to and where along that part it sits, so one graph can treat the parts "
+               "differently: a chase along each strip, ring 2 in another colour. On a cube net or a matrix, or on "
+               "the device without the shape table sent, every pixel is part 0 of 1.",
+        "in": {"pick": "the part number whose mask you want (0 is the first)"},
+        "out": {"part": "the part's number, 0 for the first", "along": "0 at the part's first LED, 1 at its last",
+                "count": "how many parts the shape has", "mask": "true for pixels on the picked part"}},
     "Cube face": {
         "doc": "Which face this pixel is on, and where on that face - a and b run 0..1 across each face, so the same "
                "picture repeats on every face (tiles, sprites). nx, ny, nz is the face's outward normal.",

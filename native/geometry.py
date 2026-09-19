@@ -295,11 +295,27 @@ class Geometry:
         if self.nrm is not None:
             nrm = np.clip(np.round(np.asarray(self.nrm, np.float32).reshape(-1, 3) * 127.0), -127, 127)
             nrm[~np.isfinite(nrm)] = 0
+        parts = None
+        if self.kind == "shape" and getattr(self, "owner", None) is not None and len(self.owner):
+            # part id and the place along the part, per logical pixel (0 where unlit)
+            owner = np.asarray(self.owner, int)
+            along = np.zeros(len(owner), np.float32)
+            for k in np.unique(owner):
+                idx = np.nonzero(owner == k)[0]
+                along[idx] = np.linspace(0.0, 1.0, len(idx)) if len(idx) > 1 else 0.0
+            parts = np.zeros((self.w * self.h, 2), np.uint8)
+            phys = np.asarray(self.phys, int)
+            for led, li in enumerate(phys):
+                if led < len(owner) and 0 <= li < len(parts):
+                    parts[li] = (min(255, int(owner[led])), int(round(along[led] * 255)))
         import struct
-        head = b"STGM" + struct.pack("<BHHH", 1, self.w, self.h, 1 if nrm is not None else 0)
+        flags = (1 if nrm is not None else 0) | (2 if parts is not None else 0)
+        head = b"STGM" + struct.pack("<BHHH", 1, self.w, self.h, flags)
         out = head + q.astype(np.int8).tobytes()
         if nrm is not None:
             out += nrm.astype(np.int8).tobytes()
+        if parts is not None:
+            out += parts.tobytes()
         return out
 
     @property

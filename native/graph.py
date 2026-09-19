@@ -39,7 +39,7 @@ import re
 
 from native.nodedefs import library, HELPERS, CODEGEN
 
-PIXEL_NAMES = re.compile(r"\b(px|py|u|v|cx|cy|r|ang|nx|ny|nz|X3|Y3|Z3|W|H|N|gc_out)\b")
+PIXEL_NAMES = re.compile(r"\b(px|py|u|v|cx|cy|r|ang|nx|ny|nz|X3|Y3|Z3|W|H|N|gc_out|part|along|nparts)\b")
 TYPES = {"float": "float", "color": "uint32_t", "bool": "bool", "vector": "GcVec"}
 ZERO = {"float": "0", "color": "0", "bool": "false", "vector": "GcVec{0.0f, 0.0f, 0.0f}"}
 
@@ -816,7 +816,9 @@ static FX_RET mode_{ident}() {{
         const float L = sqrtf(cx * cx + cy * cy + Z * Z); const float iL = L > 1e-6f ? 1.0f / L : 1.0f;
         nx = cx * iL; ny = cy * iL; nz = Z * iL;
       }}
-      (void)u; (void)v; (void)r; (void)ang; (void)nx; (void)ny; (void)nz; (void)X3; (void)Y3; (void)Z3;
+      int part, nparts; float along;                 // the shape's part this pixel is in (0 of 1 without a shape table)
+      cfx_geomPartOf(px, py, W, part, along, nparts);
+      (void)u; (void)v; (void)r; (void)ang; (void)nx; (void)ny; (void)nz; (void)X3; (void)Y3; (void)Z3; (void)part; (void)along; (void)nparts;
       uint32_t gc_out = 0;
 {pixel}
       if (is2d) SEGMENT.setPixelColorXY(px, py, gc_out); else SEGMENT.setPixelColor(px, gc_out);

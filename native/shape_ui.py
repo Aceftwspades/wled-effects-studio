@@ -82,6 +82,9 @@ def build(app):
                           callback=lambda s, v: _apply(app, layout=v))
             dpg.add_text("logical layout: one strip in wiring order, or a grid seen from the front", color=c.DIM)
         with dpg.group(horizontal=True):
+            dpg.add_button(label="One segment per part", small=True, callback=lambda: segments_per_part(app))
+            dpg.add_text("each part its own WLED segment (effect, palette, sliders) - up to eight", color=c.DIM)
+        with dpg.group(horizontal=True):
             dpg.add_button(label="Undo", small=True, callback=lambda: undo(app))
             dpg.add_button(label="Clear", small=True, callback=lambda: _apply(app, parts=[]))
             dpg.add_button(label="Save as file...", small=True, callback=lambda: dpg.show_item("shape_save_dialog"))
@@ -304,6 +307,30 @@ def chain_part(app, i):
         if nr and len(nr) == len(pts):
             parts[i]["params"]["normals"] = np.asarray(nr, np.float32)[order].tolist()
         _apply(app, parts)
+
+
+def segments_per_part(app):
+    """The sim's segments set to the parts: on the strip layout each part is
+    a run of LEDs, so segment k is part k's range (the first eight)."""
+    g = app.project.geometry
+    parts = _parts(app)
+    if not parts:
+        return
+    if g.params.get("layout") == "grid":
+        app.gp.status("segments per part need the strip layout (a part is a run of LEDs there; on the grid the parts interleave)"); return
+    counts = [shapes.part_count(p) for p in parts]
+    if len(counts) > 8:
+        app.gp.status(f"{len(counts)} parts: the first eight get segments")
+    app.eng.seg_truncate(1)
+    start = 0
+    for k, n in enumerate(counts[:8]):
+        app.eng.seg_config(k, start, 0, start + n, 1, 255)
+        start += n
+    app.eng.seg_select(0)
+    app.save_segments()
+    dpg.set_value("fx_combo", app.eng.names[app.eng.idx])
+    app.rebuild_params(); app.sync_palette_combo(); app.rebuild_seg_fields()
+    app.gp.status(f"{min(8, len(counts))} segments, one per part: pick each in SEGMENTS and give it an effect")
 
 
 # --- files -----------------------------------------------------------------------------------

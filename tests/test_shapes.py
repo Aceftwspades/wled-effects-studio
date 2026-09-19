@@ -49,7 +49,9 @@ def test_grid_layout_and_geometry():
     t = g1.table()
     assert t[:4] == b"STGM"
     ver, w, h, flags = struct.unpack_from("<BHHH", t, 4)
-    assert (ver, w, h, flags) == (1, 8, 1, 1) and len(t) == 11 + 8 * 6
+    assert (ver, w, h, flags) == (1, 8, 1, 3) and len(t) == 11 + 8 * 6 + 8 * 2      # normals and parts
+    parts = np.frombuffer(t[11 + 48:], np.uint8).reshape(8, 2)
+    assert parts[:, 0].tolist() == [0] * 8 and parts[0, 1] == 0 and parts[-1, 1] == 255
     assert Geometry("cube", B=4).table() is None and Geometry("matrix", w=4, h=4).table() is None
     assert Geometry("sphere", w=8, h=4).table() is not None
     # round-trips through the project file

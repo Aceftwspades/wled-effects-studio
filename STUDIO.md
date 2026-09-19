@@ -767,7 +767,9 @@ scheduling, video). These do, in the order to do them; ticked when done:
       **wiring test** (xLights' Test tab): a chase along the wiring order,
       one LED by index, one part of a shape, with the same pattern shown
       in the sim - what a new ledmap or shape needs before it is trusted.
-- [ ] **Parts as the effects see them** (sub-models, strands): a part id
+- [x] **Parts as the effects see them** (sub-models, strands; the table's
+      flag bit 1, the Shape part node, the Shape frame's "One segment per
+      part"): a part id
       per pixel in the position table, a **Shape part** node (the part's
       index, a mask for a chosen part, the position along it) and an
       option to give every part its own WLED segment, so each runs its
@@ -1028,6 +1030,17 @@ it could already draw, gave every 3-D node the wrong answer on the device
   bounding box rather than the origin), dragging them, rings and a
   wiring line round the selected part on a viewport drawlist, undo, and
   shape files.
+
+The table also carries the **parts** (flag bit 1: a part id and the
+place along the part, 0..255, per pixel), read by `cfx_geomPartOf()` in
+the graph prelude and as the script VM's `part`, `along` and `parts`
+fixed registers - which uncovered that the VM's sixteen band registers
+started at 36, on top of `SEGENV.call`'s; they start at 40 now. The
+**Shape part** node gives a graph the part's number, the place along it,
+the count and a mask for a chosen part; the Shape frame's **One segment
+per part** makes each part (on the strip layout, where a part is a run of
+LEDs) its own WLED segment with its own effect - xLights' per-strand
+render, the WLED way.
 
 Two guards went in the same day: sending a ledmap or a shape asks first
 (the device's wiring changes), and the menu walker skips every item that

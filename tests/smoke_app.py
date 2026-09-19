@@ -54,7 +54,8 @@ STEPS = [
     # the shape editor: parts added, one placed by a click on the 3-D view, the grid layout, undo, and back to the cube
     ([{"layout": "both"}, {"frame": "shape"}, {"shape": ["clear"]}, {"shape": ["add", "ring"]}, {"shape": ["add", "panel"]},
       {"shape": ["add", "cube"]}, {"shape": ["select", 1]}, {"shape": ["place", 120, 120]}, {"shape": ["layout", "grid"]},
-      {"shape": ["layout", "strip"]}, {"shape": ["undo"]}, {"dock": ["shape", True]}, {"dock": ["shape", False]},
+      {"shape": ["layout", "strip"]}, {"shape": ["undo"]}, {"shape": ["segments"]}, {"seg": "remove"}, {"seg": "remove"},
+      {"dock": ["shape", True]}, {"dock": ["shape", False]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 4.0),
     # live output to a listener on this machine (the test's own DDP receiver), and the wiring test
     ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring": "chase"}, {"wiring": "index"}, {"wiring": "part"},

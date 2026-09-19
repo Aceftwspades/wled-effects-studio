@@ -3271,6 +3271,7 @@ def service_command(app):
                 op = c["shape"]
                 if op[0] == "add": shape_ui.add_part(app, op[1])
                 elif op[0] == "clear": shape_ui._apply(app, parts=[])
+                elif op[0] == "segments": shape_ui.segments_per_part(app)
                 elif op[0] == "import": shape_ui.import_file(app, op[1])
                 elif op[0] == "layout": shape_ui._apply(app, layout=op[1])
                 elif op[0] == "undo": shape_ui.undo(app)

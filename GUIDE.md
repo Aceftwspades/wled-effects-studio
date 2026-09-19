@@ -107,6 +107,13 @@ mesh's own units are the pitch when it is imported.
   drawn through them; Undo steps back; Save/Open keep a shape as a file
   (`.shape.json`) to reuse across projects.
 
+**Parts in a graph**: the **Shape part** node says which part a pixel is
+in, where along it (0..1), how many parts there are, and gives a mask for
+a chosen part - one graph, the parts treated differently. **One segment
+per part** in the frame gives every part its own WLED segment instead,
+each with its own effect, palette and sliders (the strip layout; up to
+eight).
+
 **Layout**: a shape is one logical strip in wiring order (what 1-D effects
 and the 3-D nodes work on), or, as "grid", a w x h matrix the LEDs are
 projected onto from the front - or the grid an xLights model came with.

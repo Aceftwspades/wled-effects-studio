@@ -32,9 +32,9 @@ class ScriptError(GraphError):
 # --- the VM's fixed registers ------------------------------------------------------
 FIXED = ["u", "v", "cx", "cy", "r", "ang", "px", "py", "W", "H", "N", "t", "dt",
          "sx", "ix", "c1", "c2", "c3", "o1", "o2", "o3", "vol", "beat", "first",
-         "X3", "Y3", "Z3", "nx", "ny", "nz", "B", "cube", "hit", "bass", "mid", "treb", "call"]
+         "X3", "Y3", "Z3", "nx", "ny", "nz", "B", "cube", "hit", "bass", "mid", "treb", "call", "part", "along", "parts"]
 FIXED_INDEX = {n: i for i, n in enumerate(FIXED)}
-BAND0 = 36                                   # 16 bands follow
+BAND0 = 40                                   # 16 bands follow (was 36, on top of call)
 USER0 = 56                                   # programs allocate from here
 
 OPS = {                                      # name: (code, operands) f=float reg, c=colour reg, i=u16 int, k=f32 immediate
@@ -60,7 +60,7 @@ OPS = {                                      # name: (code, operands) f=float re
 DESTS = {"END": 0, "OUT": 0, "STST": 0, "RINGUV": 2, "POSUV": 2, "FOLD": 3, "KNOT": 6, "LOUDEST": 2}
 IMPURE = {"END", "OUT", "STST", "STLD", "RND", "LOUDEST"}
 # the fixed registers that change from pixel to pixel; the rest hold for a frame
-PIXEL_FIXED = {FIXED_INDEX[n] for n in ("u", "v", "cx", "cy", "r", "ang", "px", "py", "X3", "Y3", "Z3", "nx", "ny", "nz")}
+PIXEL_FIXED = {FIXED_INDEX[n] for n in ("u", "v", "cx", "cy", "r", "ang", "px", "py", "X3", "Y3", "Z3", "nx", "ny", "nz", "part", "along")}
 MAGIC = b"STUV"
 VERSION = 1
 
@@ -802,6 +802,7 @@ def compile_script(graph):
     shared["dt"] = fixed("dt")
     shared["gc_first"] = fixed("first")
     shared["SEGENV.call"] = fixed("call")
+    shared["part"] = fixed("part"); shared["along"] = fixed("along"); shared["nparts"] = fixed("parts")
     for k, name in (("o1", "check1"), ("o2", "check2"), ("o3", "check3")):
         shared[f"SEGMENT.{name}"] = fixed(k)
     asm.stream = asm.frame
