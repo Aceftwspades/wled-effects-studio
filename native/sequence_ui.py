@@ -50,6 +50,14 @@ def build(app):
                                 callback=lambda s, v: set_field(app, "trans", max(0.0, float(v))))
         dpg.add_text("", tag="seq_step_desc", color=c.DIM, wrap=0)
         with dpg.group(horizontal=True):
+            dpg.add_text("BEATS", color=c.ACCENT)
+            dpg.add_input_float(tag="seq_bpm", label="bpm", width=70, step=0, format="%.1f", default_value=120.0)
+            dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
+            dpg.add_button(label="From the synth", small=True, callback=lambda: dpg.set_value("seq_bpm", float(getattr(app.syn, "bpm", 120))))
+            dpg.add_input_int(tag="seq_bar", label="beats a bar", width=50, step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True)
+            dpg.add_button(label="Snap durations to bars", small=True, callback=lambda: snap_durations(app))
+            dpg.add_text("", tag="seq_tap", color=c.DIM)
+        with dpg.group(horizontal=True):
             dpg.add_button(label="Play in the sim", tag="seq_play", callback=lambda: play(app))
             dpg.add_button(label="Stop", callback=lambda: stop(app))
             dpg.add_checkbox(label="repeat", tag="seq_repeat", default_value=False,
@@ -310,6 +318,36 @@ def set_field(app, key, value):
     if 0 <= i < len(S["steps"]):
         S["steps"][i][key] = value
         _save(app)
+
+
+# --- beats: the steps on the music's bars --------------------------------------------------------
+def tap(app):
+    """Tap tempo: the bpm from the gaps between taps (the last eight; a pause of two seconds starts over)."""
+    now = time.perf_counter()
+    taps = getattr(app, "_taps", [])
+    if taps and now - taps[-1] > 2.0:
+        taps = []
+    taps.append(now); taps = taps[-8:]; app._taps = taps
+    if len(taps) >= 2:
+        bpm = 60.0 * (len(taps) - 1) / (taps[-1] - taps[0])
+        dpg.set_value("seq_bpm", round(bpm, 1)); dpg.set_value("seq_tap", f"{len(taps)} taps: {bpm:.1f} bpm")
+    else:
+        dpg.set_value("seq_tap", "tap again on the beat")
+
+
+def snap_durations(app, bpm=None, bar=None):
+    """Every step's seconds rounded to whole bars of the bpm (a step never
+    shorter than one bar), so the sequence changes on the music."""
+    S = _steps(app)
+    bpm = float(bpm or dpg.get_value("seq_bpm") or 120.0)
+    bar = int(bar or dpg.get_value("seq_bar") or 4)
+    if bpm <= 0:
+        return
+    beat = 60.0 / bpm; barlen = beat * bar
+    for st in S["steps"]:
+        st["dur"] = round(max(barlen, round(float(st.get("dur", 10)) / barlen) * barlen), 3)
+    app.project.save(); refresh(app)
+    app.gp.status(f"durations on {bar}-beat bars at {bpm:.1f} bpm ({barlen:.2f} s a bar)")
 
 
 # --- playing in the sim --------------------------------------------------------------------

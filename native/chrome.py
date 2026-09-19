@@ -155,6 +155,16 @@ def build_menus(app):
             dpg.add_menu_item(label="Minimap", check=True, default_value=True, tag="menu_minimap",
                               callback=lambda s, a: dpg.configure_item("node_editor", minimap=bool(a)))
             dpg.add_separator()
+            with dpg.menu(label="Camera"):
+                for name in ("isometric", "front", "back", "left", "right", "top", "below"):
+                    dpg.add_menu_item(label=name.capitalize(), user_data=name, callback=lambda s, a, u: app.set_camera(u))
+                dpg.add_separator()
+                for k in (1, 2, 3):
+                    dpg.add_menu_item(label=f"Saved view {k}", user_data=str(k), callback=lambda s, a, u: app.set_camera(u))
+                    dpg.add_menu_item(label=f"Save the view as {k}", user_data=k, callback=lambda s, a, u: app.save_view(u))
+                dpg.add_separator()
+                dpg.add_menu_item(label="Background picture...", callback=lambda: dpg.show_item("bg_dialog"))
+                dpg.add_menu_item(label="Clear the background", callback=lambda: app.set_background(""))
             dpg.add_menu_item(label="Shape editor...", callback=lambda: device_ui.show(app, "shape"))
             dpg.add_menu_item(label="Generate a preview of the shape", callback=lambda: (device_ui.show(app, "shape"), shape_ui_preview(app)))
             with dpg.menu(label="Layout"):
@@ -417,6 +427,10 @@ def build_dialogs(app):
             dpg.add_button(label="Cancel", callback=lambda: dpg.hide_item("sweep_win"))
     build_frames_dialog(app)
     device_ui.build(app)
+    with dpg.file_dialog(directory_selector=False, show=False, tag="bg_dialog", width=640, height=420,
+                         callback=lambda s, a: app.set_background(a.get("file_path_name", ""))):
+        for ext in (".png", ".jpg", ".jpeg", ".bmp"):
+            dpg.add_file_extension(ext, color=(120, 200, 120))
     with dpg.window(tag="history_win", label="History", show=False, width=520, height=420, no_collapse=True):
         dpg.add_text("", tag="history_what", color=DIM, wrap=500)
         with dpg.child_window(tag="history_rows", height=-1, border=False):

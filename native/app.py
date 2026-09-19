@@ -425,11 +425,11 @@ class App(Features):
         g = eng.geom
         if g is not None and g.kind == "cube" and not eng.fx.get("o3"):
             return render.render(net if net.shape[0] == eng.rows else self.frame_rgb(eng),
-                                 eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six)
+                                 eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px))
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
-        return render.render_points(g.pos, rgb, px, self.yaw, self.pitch, self.dist)
+        return render.render_points(g.pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px))
 
     # --- audio ---------------------------------------------------------------
     def audio_push(self):
@@ -2893,6 +2893,7 @@ class App(Features):
             src = net if net.shape[0] == self.eng.rows else self.net_image()
             dpg.set_value("cube_src_tex", self._rgba("cube_src", src.repeat(k, 0).repeat(k, 1)))
             self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six)
+            self.cube_quads.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on():
@@ -3292,6 +3293,11 @@ def service_command(app):
                 app.scan_devices(c["scan"])
             if c.get("randomise"):                      # test hook: throw the sliders and the palette
                 app.randomise()
+            if "camera" in c:                           # test hook: a camera name, [yaw, pitch, dist], or ["save", slot]
+                v = c["camera"]
+                app.save_view(v[1]) if isinstance(v, list) and v and v[0] == "save" else app.set_camera(v)
+            if "background" in c:                       # test hook: a picture's path, or "" to clear
+                app.set_background(c["background"])
             if "outputs" in c:                          # test hook: ["split", "one"|"parts"|"count"] | ["abl", true] | ["limit", mA]
                 from native import outputs_ui as OU
                 op = c["outputs"]
@@ -3318,6 +3324,7 @@ def service_command(app):
                 op = c["seq"]
                 {"add": lambda: SQ.add_step(app), "update": lambda: SQ.update_step(app), "load": lambda: SQ.load_step(app, op[1]),
                  "timer": lambda: SQ.add_timer(app, op[1]), "timer_del": lambda: SQ.del_timer(app, op[1]),
+                 "snap": lambda: SQ.snap_durations(app, op[1], op[2]), "tap": lambda: SQ.tap(app),
                  "del": lambda: SQ.del_step(app, op[1]), "play": lambda: SQ.play(app), "stop": lambda: SQ.stop(app),
                  "field": lambda: SQ.set_field(app, op[1], op[2])}[op[0]]()
             if "stream" in c:                           # test hook: a host to stream to over DDP, or false to stop
@@ -3335,6 +3342,7 @@ def service_command(app):
                 elif op[0] == "clear": shape_ui._apply(app, parts=[])
                 elif op[0] == "segments": shape_ui.segments_per_part(app)
                 elif op[0] == "preview": shape_ui.generate_preview(app, op[1] if len(op) > 1 else None, op[2] if len(op) > 2 else None)
+                elif op[0] == "xmodel": shape_ui.export_xmodel(app, op[1])
                 elif op[0] == "import": shape_ui.import_file(app, op[1])
                 elif op[0] == "reference": app._shape_ref = True; shape_ui.import_file(app, op[1])
                 elif op[0] == "layout": shape_ui._apply(app, layout=op[1])

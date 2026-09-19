@@ -36,6 +36,9 @@ class CubeQuads:
         self._last = None
         with dpg.drawlist(width=10, height=10, tag=tag, parent=parent):
             z = (0, 0)
+            # a background picture, drawn first so the faces cover it (see background())
+            self.bg_item = dpg.draw_image(texture, z, z, show=False)
+            self.bg_key = None
             for fi, fc in enumerate(FACES):
                 quads = []
                 bx, by = fc["bx"], fc["by"]
@@ -63,6 +66,33 @@ class CubeQuads:
             self.size, self.w, self.h = size, w, h
             dpg.configure_item(self.tag, width=w, height=h)
             self._last = None
+
+    def background(self, picture):
+        """A (size, size, 3) picture behind the cube, centred like the cube
+        is; None (or a colour) takes it away. A texture of its own, remade
+        when the picture or the size changes."""
+        if not isinstance(picture, np.ndarray) or picture.ndim != 3 or not self.size:
+            if self.bg_key is not None:
+                dpg.configure_item(self.bg_item, show=False); self.bg_key = None
+            return
+        key = (id(picture), self.size, self.w, self.h)
+        if key == self.bg_key:
+            return
+        self.bg_key = key
+        h, w = picture.shape[:2]
+        rgba = np.ones((h, w, 4), np.float32); rgba[:, :, :3] = picture.astype(np.float32) / 255.0
+        tex = f"{self.tag}_bg"
+        if dpg.does_item_exist(tex):
+            cfg = dpg.get_item_configuration(tex)
+            if (cfg.get("width"), cfg.get("height")) == (w, h):
+                dpg.set_value(tex, rgba.ravel())
+            else:
+                dpg.delete_item(tex)
+        if not dpg.does_item_exist(tex):
+            with dpg.texture_registry():
+                dpg.add_dynamic_texture(w, h, rgba.ravel(), tag=tex)
+        ox, oy = (self.w - self.size) * 0.5, (self.h - self.size) * 0.5
+        dpg.configure_item(self.bg_item, texture_tag=tex, pmin=(ox, oy), pmax=(ox + self.size, oy + self.size), show=True)
 
     def camera(self, yaw, pitch, dist, six=False):
         """Project every corner; a face pointing away is hidden, and so is

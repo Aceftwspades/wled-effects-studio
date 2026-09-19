@@ -89,6 +89,7 @@ def build(app):
             dpg.add_button(label="Clear", small=True, callback=lambda: _apply(app, parts=[]))
             dpg.add_button(label="Save as file...", small=True, callback=lambda: dpg.show_item("shape_save_dialog"))
             dpg.add_button(label="Open a shape file...", small=True, callback=lambda: dpg.show_item("shape_open_dialog"))
+            dpg.add_button(label="Export as .xmodel...", small=True, callback=lambda: dpg.show_item("shape_xmodel_dialog"))
         dpg.add_text("PARTS - the order is the wiring", color=c.ACCENT)
         kinds = [k for k in shapes.KINDS if k != "reference"]
         for row in (kinds[:4], kinds[4:]):
@@ -131,6 +132,9 @@ def build(app):
                          callback=lambda s, a: open_shape(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".shape.json", color=(150, 150, 220))
         dpg.add_file_extension(".json", color=(150, 150, 220))
+    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_xmodel_dialog", width=640, height=420,
+                         default_filename="shape.xmodel", callback=lambda s, a: export_xmodel(app, a.get("file_path_name", ""))):
+        dpg.add_file_extension(".xmodel", color=(200, 180, 90))
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_save_dialog", width=640, height=420,
                          default_filename="shape.shape.json", callback=lambda s, a: save_shape(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(150, 150, 220))
@@ -463,6 +467,17 @@ def import_file(app, path):
     app._shape_sel = len(parts) - 1
     _apply(app, parts, **more)
     app.gp.status(note)
+
+
+def export_xmodel(app, path):
+    """The geometry as an xLights custom model - any kind, on its grid."""
+    if not path:
+        return
+    try:
+        w, h, n = shape_io.write_xmodel(app.project.geometry, path)
+    except Exception as e:
+        app.gp.status(f"could not write the model: {e}"); return
+    app.gp.status(f"xLights model written: {os.path.basename(path)}, {w} x {h} grid, {n} LEDs")
 
 
 def save_shape(app, path):

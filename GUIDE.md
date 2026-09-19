@@ -78,6 +78,11 @@ file. Playback has A/B compare (two effects side by side), a slider sweep,
 and scrubbing back through the last seconds while paused. Segments (+ in
 the panel) layer several effects with WLED's blend modes and opacity.
 
+**The 3-D view** turns by dragging and zooms by the wheel; View > Camera
+has presets (isometric, front, back, left, right, top, below), three
+saved views, and a **background picture** - the room, the house - dimmed
+behind the LEDs, for the point cloud and the GPU cube alike.
+
 ## Any shape: the shape editor
 
 GEOMETRY > shape (or View > Shape editor...) opens the **Shape** frame - a
@@ -106,6 +111,8 @@ mesh's own units are the pitch when it is imported.
   it; "renumber: nearest chain" rewires a points part the way a strip
   would most likely be run through them; "turn into a path" makes a
   polyline of the points and fills it with LEDs at the pitch.
+- **Export as .xmodel** writes the shape (any geometry, on its grid) as an
+  xLights custom model, the wiring as the node numbers.
 - **Generate a preview** (the frame's PREVIEW row, or View > Generate a
   preview of the shape) renders a turn of the shape off screen - lit by
   the effect the sim runs, or each part in a colour of its own, or a chase
@@ -175,6 +182,9 @@ durations and transitions; "Send and run it" starts it; "Save
 presets.json" writes the same for a device that is not on the network.
 Effects and palettes are matched by name against the device's own lists,
 and a step whose effect the device does not have is left out and named.
+**BEATS**: a bpm typed, tapped (Tap, on the beat) or taken from the
+synth, and "Snap durations to bars" rounds every step to whole bars of
+it, so the sequence changes on the music.
 **SCHEDULE** under it is the device's timers: "+ run the playlist at"
 and "+ off at" add a row - a time of day, or sunrise / sunset with an
 offset in minutes, a preset, the days - "Send the schedule" writes them

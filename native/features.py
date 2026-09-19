@@ -310,6 +310,56 @@ class Features:
                 holes = []
         return list(holes)
 
+    # --- the 3-D view's surroundings: camera presets, saved views, a background picture --
+    CAMERAS = {"isometric": (-0.6, 0.75, 4.6), "front": (0.0, 0.12, 4.6), "back": (3.14159, 0.12, 4.6),
+               "left": (-1.5708, 0.12, 4.6), "right": (1.5708, 0.12, 4.6), "top": (-0.6, 1.45, 4.6), "below": (-0.6, -1.3, 4.6)}
+
+    def set_camera(self, name_or_view):
+        """A named camera (isometric, front, back, left, right, top, below) or (yaw, pitch, dist)."""
+        v = self.CAMERAS.get(name_or_view) if isinstance(name_or_view, str) else name_or_view
+        if not v:
+            v = (self.prefs.get("views") or {}).get(name_or_view)
+        if not v:
+            return
+        self.yaw, self.pitch, self.dist = float(v[0]), float(v[1]), float(v[2])
+        self.gp.status(f"camera: {name_or_view if isinstance(name_or_view, str) else 'set'}")
+
+    def save_view(self, slot):
+        views = self.prefs.setdefault("views", {})
+        views[str(slot)] = [self.yaw, self.pitch, self.dist]
+        save_prefs(self.prefs)
+        self.gp.status(f"view {slot} saved")
+
+    def set_background(self, path):
+        """A picture behind the 3-D view (the room, the house), dimmed so
+        the LEDs stand out; an empty path clears it."""
+        self.prefs["view_bg"] = path or ""
+        save_prefs(self.prefs)
+        self._bg_cache = {}
+        self.gp.status(f"background: {os.path.basename(path)}" if path else "background cleared")
+
+    def view_background(self, size):
+        """The background at the view's size: a (size, size, 3) picture, or black."""
+        path = self.prefs.get("view_bg") or ""
+        if not path:
+            return (0, 0, 0)
+        cache = getattr(self, "_bg_cache", None)
+        if cache is None:
+            cache = self._bg_cache = {}
+        key = (path, int(size))
+        if key not in cache:
+            try:
+                from PIL import Image
+                im = Image.open(path).convert("RGB")
+                w, h = im.size
+                side = min(w, h)
+                im = im.crop(((w - side) // 2, (h - side) // 2, (w - side) // 2 + side, (h - side) // 2 + side)).resize((int(size), int(size)), Image.BILINEAR)
+                cache[key] = (np.asarray(im, np.float32) * float(self.prefs.get("view_bg_dim", 0.45))).astype(np.uint8)
+            except Exception as e:
+                self.gp.status(f"background not read: {e}")
+                cache[key] = (0, 0, 0)
+        return cache[key]
+
     # --- randomise: the sliders, the checks and the palette thrown --------------------
     def randomise(self, palette=True):
         """xLights' random button: every slider of the effect somewhere new,

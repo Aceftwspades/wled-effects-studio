@@ -320,6 +320,43 @@ def read_xmodel(path):
             "points": pts, "order": order, "grid": grid, "source": os.path.basename(path)}
 
 
+def write_xmodel(geom, path, name=None):
+    """A geometry as an xLights custom model: its LEDs on a grid (the shape's
+    grid layout, or one projected from the front), each cell the LED's
+    number in the wiring order, 1-based; empty cells blank."""
+    from native import shapes
+    g = geom
+    if g.kind == "shape" and g.params.get("layout") == "grid":
+        w, h = g.w, g.h
+        cells = {}
+        for led, li in enumerate(np.asarray(g.phys, int)):
+            cells[(int(li % w), int(li // w))] = led + 1
+    else:
+        pos = np.asarray(g.pos, np.float32)
+        lit = np.asarray(g.lit, bool)
+        phys = np.asarray(g.phys, int)
+        pts = pos[phys]
+        ok = np.isfinite(pts).all(1)
+        pts = np.where(ok[:, None], pts, 0)
+        # a cell the size of the LED pitch: the typical distance to the nearest neighbour, from a sample
+        samp = pts[np.linspace(0, len(pts) - 1, min(len(pts), 300)).astype(int)]
+        d = np.linalg.norm(samp[:, None, :] - pts[None, :, :], axis=2)
+        d[d <= 1e-6] = np.inf
+        cell = float(np.median(d.min(axis=1))) if len(pts) > 1 else 1.0
+        w, h, m, _ = shapes.grid_layout(pts, cell if np.isfinite(cell) and cell > 0 else 1.0)
+        cells = {(k % w, k // w): led + 1 for k, led in enumerate(m) if led >= 0}
+    rows = []
+    for y in range(h):
+        rows.append(",".join(str(cells.get((x, y), "")) for x in range(w)))
+    data = ";".join(rows)
+    name = name or os.path.splitext(os.path.basename(path))[0]
+    xml = (f'<?xml version="1.0" encoding="UTF-8"?>\n<custommodel name="{name}" parm1="{w}" parm2="{h}" Depth="1" '
+           f'StringType="RGB Nodes" Transparency="0" PixelSize="2" ModelBrightness="" Antialias="1" StrandNames="" NodeNames="" '
+           f'CustomModel="{data}" SourceVersion="WLED Effects Studio" />\n')
+    open(path, "w", encoding="utf-8", newline="\n").write(xml)
+    return w, h, len(cells)
+
+
 # --- point lists ------------------------------------------------------------------------------
 def read_points(path):
     """x y z [index] rows - CSV, whitespace or a JSON list (of rows or of

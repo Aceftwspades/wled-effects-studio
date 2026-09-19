@@ -82,6 +82,14 @@ def _grid(size):
     return g
 
 
+def _fill(out, bg):
+    """The background: a colour, or a (size, size, 3) picture."""
+    if isinstance(bg, np.ndarray) and bg.ndim == 3 and bg.shape[:2] == out.shape[:2]:
+        _fill(out, bg)
+    else:
+        _fill(out, bg)
+
+
 def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False):
     """Draw the cube from the unfolded net image.
 

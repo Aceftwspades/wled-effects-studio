@@ -844,11 +844,16 @@ plugins, FPP scheduling, video playback.
       looped forever (`static or take()` skipped the take), and a hex
       literal's suffix strip ate its F digits (`0xFFFFu` -> `0x`).
       Still to do: Fan, Garlands, Lightning, Morph, Tendril.
-- [ ] **The 3-D view's surroundings**: a background image, camera presets
-      and saved views.
-- [ ] **Export a shape as `.xmodel`**.
-- [ ] **Beat alignment**: sequence durations snapped to a WAV's beats,
-      tap tempo.
+- [x] **The 3-D view's surroundings** (View > Camera): a background
+      picture (dimmed, behind the point cloud and the GPU cube alike),
+      camera presets (isometric, front, back, left, right, top, below)
+      and three saved views.
+- [x] **Export a shape as `.xmodel`** (the Shape frame): any geometry on
+      its grid - the shape's own, or one projected from the front at the
+      LED pitch - as an xLights custom model, the wiring as the numbers.
+- [x] **Beat alignment** (the Sequence frame's BEATS row): a bpm typed,
+      tapped or taken from the synth, and every step's seconds snapped to
+      whole bars of it.
 
 ### A self-contained app (on hold)
 
