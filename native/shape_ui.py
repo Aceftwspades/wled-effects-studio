@@ -107,7 +107,19 @@ def build(app):
         with dpg.child_window(tag="shape_parts", height=150, border=True):
             pass
         dpg.add_text("PART", tag="shape_part_title", color=c.ACCENT)
-        with dpg.child_window(tag="shape_fields", height=-1, border=False):
+        with dpg.child_window(tag="shape_fields", height=-250, border=False):
+            pass
+        # PREVIEW: a turntable of the shape, rendered off screen, looping here and saved as a GIF
+        with dpg.group(horizontal=True):
+            dpg.add_text("PREVIEW", color=c.ACCENT)
+            dpg.add_combo(["effect", "parts", "wiring"], tag="shape_prev_mode", width=90, default_value="effect")
+            dpg.add_input_float(tag="shape_prev_secs", width=60, default_value=4.0, step=0, format="%.0f s")
+            dpg.add_button(label="Generate a preview", tag="shape_prev_go", callback=lambda: generate_preview(app))
+            dpg.add_button(label="Open the folder", small=True, callback=lambda: app.reveal(os.path.join(app.project.path, "export")))
+        dpg.add_text("a turn of the shape as the sim lights it, its parts each a colour, or a chase along the wiring - a GIF and a PNG in the project's export folder",
+                     color=c.DIM, wrap=0)
+        dpg.add_text("", tag="shape_prev_status", color=c.DIM, wrap=0)
+        with dpg.group(tag="shape_prev_img"):
             pass
     # the file dialogs: a mesh or model in, a shape file in or out
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_import_dialog", width=640, height=420,
@@ -338,6 +350,67 @@ def segments_per_part(app):
     dpg.set_value("fx_combo", app.eng.names[app.eng.idx])
     app.rebuild_params(); app.sync_palette_combo(); app.rebuild_seg_fields()
     app.gp.status(f"{min(8, len(counts))} segments, one per part: pick each in SEGMENTS and give it an effect")
+
+
+# --- the preview -----------------------------------------------------------------------------
+def generate_preview(app, mode=None, seconds=None):
+    """The turntable rendered on a worker; shown and saved when it is done."""
+    import threading
+    from native import shape_preview
+    if getattr(app, "_prev_job", None) is not None and app._prev_job.is_alive():
+        return
+    mode = mode or dpg.get_value("shape_prev_mode")
+    seconds = float(seconds or dpg.get_value("shape_prev_secs") or 4.0)
+    seconds = max(1.0, min(20.0, seconds))
+    dpg.set_value("shape_prev_status", f"rendering a {seconds:.0f} s turn ({mode})...")
+    dpg.configure_item("shape_prev_go", enabled=False)
+    app._prev_result = None
+
+    def work():
+        try:
+            frames = shape_preview.turntable(app, mode, seconds, 15, 320, 1.0, log=lambda m: None)
+            paths = shape_preview.save(app, frames, 15)
+            app._prev_result = (frames, paths, None)
+        except Exception as e:
+            app._prev_result = (None, None, str(e))
+    app._prev_job = threading.Thread(target=work, daemon=True); app._prev_job.start()
+
+
+def _poll_preview(app):
+    """The finished preview into the frame: a looping texture, the paths."""
+    res = getattr(app, "_prev_result", None)
+    if res is not None:
+        app._prev_result = None
+        frames, paths, err = res
+        if dpg.does_item_exist("shape_prev_go"):
+            dpg.configure_item("shape_prev_go", enabled=True)
+        if err:
+            dpg.set_value("shape_prev_status", f"preview failed: {err}"); return
+        h, w = frames[0].shape[:2]
+        app._prev_frames = frames
+        if dpg.does_item_exist("shape_prev_tex"):
+            dpg.delete_item("shape_prev_tex")
+        with dpg.texture_registry():
+            dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag="shape_prev_tex")
+        dpg.delete_item("shape_prev_img", children_only=True)
+        dpg.add_image("shape_prev_tex", width=200, height=200, parent="shape_prev_img")
+        g = app.project.geometry
+        dpg.set_value("shape_prev_status", f"{g.describe()}: {len(frames)} frames -> {os.path.basename(paths[0])}" + (f", {os.path.basename(paths[1])}" if paths[1] else "") + " in export/")
+        app.gp.status(f"preview saved: {paths[0]}")
+    frames = getattr(app, "_prev_frames", None)
+    if frames and dpg.does_item_exist("shape_prev_tex") and dpg.is_item_shown(TAG):
+        import time as _t
+        k = int(_t.time() * 15) % len(frames)
+        if k != getattr(app, "_prev_k", -1):
+            app._prev_k = k
+            dpg.set_value("shape_prev_tex", _rgba(frames[k]))
+
+
+def _rgba(frame):
+    h, w = frame.shape[:2]
+    out = np.ones((h, w, 4), np.float32)
+    out[:, :, :3] = frame.astype(np.float32) / 255.0
+    return out.ravel()
 
 
 # --- files -----------------------------------------------------------------------------------
@@ -584,6 +657,7 @@ def poll(app):
     """Rings round the selected part's LEDs while the frame shows; the
     dragged LED's new place as a cross; the reference wireframes always."""
     _poll_reference(app)
+    _poll_preview(app)
     if not dpg.does_item_exist("shape_dl"):
         return
     dpg.delete_item("shape_dl", children_only=True)

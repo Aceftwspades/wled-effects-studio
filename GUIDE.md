@@ -106,6 +106,12 @@ mesh's own units are the pitch when it is imported.
   it; "renumber: nearest chain" rewires a points part the way a strip
   would most likely be run through them; "turn into a path" makes a
   polyline of the points and fills it with LEDs at the pitch.
+- **Generate a preview** (the frame's PREVIEW row, or View > Generate a
+  preview of the shape) renders a turn of the shape off screen - lit by
+  the effect the sim runs, or each part in a colour of its own, or a chase
+  along the wiring - loops it in the frame and writes `shape_preview.gif`
+  and `.png` into the project's export folder, for a README or a forum
+  post.
 - The selected part's LEDs are ringed in the 3-D view with its wiring
   drawn through them; Undo steps back; Save/Open keep a shape as a file
   (`.shape.json`) to reuse across projects.

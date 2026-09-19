@@ -1056,6 +1056,12 @@ per part** makes each part (on the strip layout, where a part is a run of
 LEDs) its own WLED segment with its own effect - xLights' per-strand
 render, the WLED way.
 
+**A preview of the shape** (`native/shape_preview.py`): a turn of the
+3-D view rendered off screen by a second engine - the effect the sim
+runs, the parts each a colour, or a chase along the wiring on a dim
+shape - looping in the Shape frame and written as `export/shape_preview.gif`
+and `.png`; on a worker, so the window keeps drawing.
+
 Two guards went in the same day: sending a ledmap or a shape asks first
 (the device's wiring changes), and the menu walker skips every item that
 reaches a real device - the walk had been sending the ledmap, the script

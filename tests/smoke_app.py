@@ -55,6 +55,7 @@ STEPS = [
     ([{"layout": "both"}, {"frame": "shape"}, {"shape": ["clear"]}, {"shape": ["add", "ring"]}, {"shape": ["add", "panel"]},
       {"shape": ["add", "cube"]}, {"shape": ["select", 1]}, {"shape": ["place", 120, 120]}, {"shape": ["layout", "grid"]},
       {"shape": ["layout", "strip"]}, {"shape": ["undo"]}, {"shape": ["segments"]}, {"seg": "remove"}, {"seg": "remove"},
+      {"shape": ["preview", "parts", 1]},
       {"dock": ["shape", True]}, {"dock": ["shape", False]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 4.0),
     # live output to a listener on this machine (the test's own DDP receiver), and the wiring test

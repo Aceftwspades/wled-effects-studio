@@ -152,6 +152,7 @@ def build_menus(app):
                               callback=lambda s, a: dpg.configure_item("node_editor", minimap=bool(a)))
             dpg.add_separator()
             dpg.add_menu_item(label="Shape editor...", callback=lambda: device_ui.show(app, "shape"))
+            dpg.add_menu_item(label="Generate a preview of the shape", callback=lambda: (device_ui.show(app, "shape"), shape_ui_preview(app)))
             with dpg.menu(label="Layout"):
                 for k, (label, arr) in enumerate(app.PRESETS):
                     dpg.add_menu_item(label=label, check=True, tag=f"menu_arr_{k}", user_data=arr,
@@ -814,6 +815,11 @@ def refresh_usermods(app):
     listed = {r[0] for r in rows}
     dpg.configure_item("um_pick", items=[n for n in flash.usermod_dirs() if n not in listed])
     refresh_flash(app)
+
+
+def shape_ui_preview(app):
+    from native import shape_ui
+    shape_ui.generate_preview(app)
 
 
 def show_flash(app):
