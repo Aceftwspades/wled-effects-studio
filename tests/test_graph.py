@@ -116,6 +116,18 @@ def test_script_compiles_and_folds_choices():
     assert prog[:4] == MAGIC and len(prog) > 40
 
 
+def test_script_parses_static_declarations_and_hex():
+    """Two things the xLights example graphs tripped: `static uint16_t x`
+    (two type words after static) looped the parser for ever, and
+    `0xFFFFu` lost its F digits to the suffix strip."""
+    from native.script import tokenize, Parser
+    toks = tokenize("{ static uint16_t owed_ = 0; static float acc_ = 0.0f; uint32_t k = 0xFFFFu; }")
+    tree = Parser(toks).block()
+    assert tree
+    nums = [t[1] for t in toks if t[0] == "num"]
+    assert 65535.0 in nums
+
+
 def test_script_names_the_unscriptable_node():
     from native.script import compile_script, ScriptError
     g = starter()

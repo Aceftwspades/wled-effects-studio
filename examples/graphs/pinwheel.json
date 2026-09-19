@@ -1,0 +1,320 @@
+{
+ "name": "Pinwheel",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Turn speed",
+    "default": 100
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Blade width",
+    "default": 128
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Custom 1",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Blades",
+    "default": 80
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {
+    "palette": 11,
+    "dimensions": "both",
+    "audio": "none",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Coords",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Remap",
+   "pos": [
+    270,
+    430
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 2.0,
+    "out_hi": 12.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Floor",
+   "pos": [
+    500,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.1,
+    "out_hi": 0.9
+   },
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Remap",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": -1.0,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Integrate",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {
+    "wrap": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Multiply",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.15915
+   }
+  },
+  {
+   "id": 12,
+   "type": "Stripes",
+   "pos": [
+    730,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Add",
+   "pos": [
+    730,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Subtract",
+   "pos": [
+    730,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "a": 1.0
+   }
+  },
+  {
+   "id": 15,
+   "type": "Multiply",
+   "pos": [
+    960,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Palette",
+   "pos": [
+    1190,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Output",
+   "pos": [
+    1420,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   3,
+   "value",
+   6,
+   "x"
+  ],
+  [
+   6,
+   "result",
+   7,
+   "x"
+  ],
+  [
+   2,
+   "value",
+   8,
+   "x"
+  ],
+  [
+   1,
+   "value",
+   9,
+   "x"
+  ],
+  [
+   9,
+   "result",
+   10,
+   "rate"
+  ],
+  [
+   5,
+   "angle",
+   11,
+   "a"
+  ],
+  [
+   11,
+   "result",
+   12,
+   "x"
+  ],
+  [
+   7,
+   "result",
+   12,
+   "count"
+  ],
+  [
+   10,
+   "value",
+   12,
+   "phase"
+  ],
+  [
+   8,
+   "result",
+   12,
+   "duty"
+  ],
+  [
+   11,
+   "result",
+   13,
+   "a"
+  ],
+  [
+   10,
+   "value",
+   13,
+   "b"
+  ],
+  [
+   5,
+   "r",
+   14,
+   "b"
+  ],
+  [
+   12,
+   "value",
+   15,
+   "a"
+  ],
+  [
+   14,
+   "result",
+   15,
+   "b"
+  ],
+  [
+   13,
+   "result",
+   16,
+   "index"
+  ],
+  [
+   15,
+   "result",
+   16,
+   "brightness"
+  ],
+  [
+   16,
+   "color",
+   17,
+   "color"
+  ]
+ ]
+}

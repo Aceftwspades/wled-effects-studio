@@ -1300,9 +1300,232 @@ def fireworks():
     return b.save("fireworks.json")
 
 
+
+
+# ---------------------------------------------------------------------------
+# xLights' effects the firmware lacks, as graphs: Meteors, Spirals, Pinwheel,
+# Curtain, Marquee, Shockwave, Butterfly, Snowstorm. Each in the studio's own
+# terms - a hash a column, a wave on an angle, a beat kick on a radius.
+def meteors():
+    """Meteors: columns each falling at their own speed with a bright head
+    and a fading tail, the palette colour a column's own."""
+    b = GB("Meteors")
+    sp = b.n("Speed", 0, 0, {"label": "Fall speed", "default": 128})
+    it = b.n("Intensity", 0, 1, {"label": "Tail", "default": 120})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Columns", "default": 96})
+    b.n("Effect settings", 0, 4, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    ncol = b.n("Remap", 1, 1, {"out_lo": 4.0, "out_hi": 32.0}); b.l(c1, "value", ncol, "x")
+    cf = b.n("Multiply", 2, 1); b.l(co, "u", cf, "a"); b.l(ncol, "result", cf, "b")
+    col = b.n("Floor", 3, 1); b.l(cf, "result", col, "x")
+    h1 = b.n("Hash", 4, 0, inputs={"y": 0.0, "seed": 3.0}); b.l(col, "result", h1, "x")
+    h2 = b.n("Hash", 4, 1, inputs={"y": 1.0, "seed": 3.0}); b.l(col, "result", h2, "x")
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.15, "out_hi": 1.6}); b.l(sp, "value", spd, "x")
+    vary = b.n("Remap", 5, 0, {"out_lo": 0.4, "out_hi": 1.0}); b.l(h1, "value", vary, "x")
+    speed = b.n("Multiply", 6, 0); b.l(vary, "result", speed, "a"); b.l(spd, "result", speed, "b")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}, inputs={"rate": 1.0})
+    pos = b.n("Multiply", 7, 0); b.l(tt, "value", pos, "a"); b.l(speed, "result", pos, "b")
+    ph = b.n("Add", 8, 0); b.l(pos, "result", ph, "a"); b.l(h2, "value", ph, "b")
+    head = b.n("Fract", 9, 0); b.l(ph, "result", head, "x")
+    rel = b.n("Subtract", 9, 2); b.l(head, "result", rel, "a"); b.l(co, "v", rel, "b")
+    behind = b.n("Modulo", 10, 2, inputs={"m": 1.0}); b.l(rel, "result", behind, "x")
+    inv = b.n("Subtract", 11, 2, inputs={"a": 1.0}); b.l(behind, "result", inv, "b")
+    tl = b.n("Remap", 1, 3, {"out_lo": 16.0, "out_hi": 3.0}); b.l(it, "value", tl, "x")
+    tail = b.n("Power", 12, 2); b.l(inv, "result", tail, "x"); b.l(tl, "result", tail, "e")
+    ishead = b.n("Threshold", 11, 3, inputs={"at": 0.04}); b.l(behind, "result", ishead, "x")
+    headm = b.n("Select", 12, 3, inputs={"a": 1.0, "b": 0.0}); b.l(ishead, "on", headm, "on")
+    pal = b.n("Palette", 13, 2); b.l(h1, "value", pal, "index"); b.l(tail, "result", pal, "brightness")
+    white = b.n("Colour", 13, 3, {"rgb": [255, 255, 255]})
+    mix = b.n("Blend", 14, 2, {"mode": "over"}); b.l(pal, "color", mix, "under"); b.l(white, "color", mix, "over"); b.l(headm, "result", mix, "amount")
+    out = b.n("Output", 15, 2); b.l(mix, "color", out, "color")
+    return b.save("meteors.json")
+
+
+def spirals():
+    """Spirals: arms wound round the centre, turning; the twist slider
+    winds them tighter, intensity sets how many."""
+    b = GB("Spirals")
+    sp = b.n("Speed", 0, 0, {"label": "Turn speed", "default": 100})
+    it = b.n("Intensity", 0, 1, {"label": "Arms", "default": 80})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Twist", "default": 128})
+    b.n("Effect settings", 0, 4, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    arms = b.n("Remap", 1, 1, {"out_lo": 1.0, "out_hi": 6.0}); b.l(it, "value", arms, "x")
+    armsf = b.n("Floor", 2, 1); b.l(arms, "result", armsf, "x")
+    tw = b.n("Remap", 1, 3, {"out_lo": -3.0, "out_hi": 3.0}); b.l(c1, "value", tw, "x")
+    ang = b.n("Multiply", 2, 2, inputs={"b": 0.15915}); b.l(co, "angle", ang, "a")           # turns
+    a2 = b.n("Multiply", 3, 2); b.l(ang, "result", a2, "a"); b.l(armsf, "result", a2, "b")
+    r2 = b.n("Multiply", 3, 3); b.l(co, "r", r2, "a"); b.l(tw, "result", r2, "b")
+    spd = b.n("Remap", 1, 0, {"out_lo": -1.0, "out_hi": 1.0}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    s1 = b.n("Add", 4, 2); b.l(a2, "result", s1, "a"); b.l(r2, "result", s1, "b")
+    s2 = b.n("Subtract", 5, 2); b.l(s1, "result", s2, "a"); b.l(tt, "value", s2, "b")
+    wv = b.n("Wave", 6, 2, {"shape": "sine"}, inputs={"cycles": 1.0}); b.l(s2, "result", wv, "x")
+    sharp = b.n("Smoothstep", 7, 2, {"e0": 0.35, "e1": 0.75}); b.l(wv, "value", sharp, "x")
+    idx = b.n("Add", 7, 3); b.l(co, "r", idx, "a"); b.l(tt, "value", idx, "b")
+    pal = b.n("Palette", 8, 2); b.l(idx, "result", pal, "index"); b.l(sharp, "result", pal, "brightness")
+    out = b.n("Output", 9, 2); b.l(pal, "color", out, "color")
+    return b.save("spirals.json")
+
+
+def pinwheel():
+    """Pinwheel: blades from the centre, turning; the duty slider makes the
+    blades thin or fat, the colour goes round with them."""
+    b = GB("Pinwheel")
+    sp = b.n("Speed", 0, 0, {"label": "Turn speed", "default": 100})
+    it = b.n("Intensity", 0, 1, {"label": "Blade width", "default": 128})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Blades", "default": 80})
+    b.n("Effect settings", 0, 4, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    n = b.n("Remap", 1, 3, {"out_lo": 2.0, "out_hi": 12.0}); b.l(c1, "value", n, "x")
+    nf = b.n("Floor", 2, 3); b.l(n, "result", nf, "x")
+    duty = b.n("Remap", 1, 1, {"out_lo": 0.1, "out_hi": 0.9}); b.l(it, "value", duty, "x")
+    spd = b.n("Remap", 1, 0, {"out_lo": -1.0, "out_hi": 1.0}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    ang = b.n("Multiply", 2, 2, inputs={"b": 0.15915}); b.l(co, "angle", ang, "a")
+    st = b.n("Stripes", 3, 2); b.l(ang, "result", st, "x"); b.l(nf, "result", st, "count"); b.l(tt, "value", st, "phase"); b.l(duty, "result", st, "duty")
+    idx = b.n("Add", 3, 1); b.l(ang, "result", idx, "a"); b.l(tt, "value", idx, "b")
+    fade = b.n("Subtract", 3, 3, inputs={"a": 1.0}); b.l(co, "r", fade, "b")
+    br = b.n("Multiply", 4, 2); b.l(st, "value", br, "a"); b.l(fade, "result", br, "b")
+    pal = b.n("Palette", 5, 2); b.l(idx, "result", pal, "index"); b.l(br, "result", pal, "brightness")
+    out = b.n("Output", 6, 2); b.l(pal, "color", out, "color")
+    return b.save("pinwheel.json")
+
+
+def curtain():
+    """Curtain: the colour revealed from the middle out to the edges and
+    covered again, a gradient down the drop; intensity sets how far it opens."""
+    b = GB("Curtain")
+    sp = b.n("Speed", 0, 0, {"label": "Open speed", "default": 80})
+    it = b.n("Intensity", 0, 1, {"label": "Opens to", "default": 255})
+    b.n("Effect settings", 0, 3, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.05, "out_hi": 0.8}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    tri = b.n("Wave", 3, 0, {"shape": "triangle"}, inputs={"cycles": 1.0}); b.l(tt, "value", tri, "x")
+    far = b.n("Remap", 1, 1, {"out_lo": 0.2, "out_hi": 1.0}); b.l(it, "value", far, "x")
+    open_ = b.n("Multiply", 4, 0); b.l(tri, "value", open_, "a"); b.l(far, "result", open_, "b")
+    ax = b.n("Abs", 2, 2); b.l(co, "cx", ax, "x")
+    edge = b.n("Subtract", 5, 1); b.l(open_, "result", edge, "a"); b.l(ax, "result", edge, "b")   # lit inside the opening: the curtain draws back to reveal the colour
+    soft = b.n("Smoothstep", 6, 1, {"e0": 0.0, "e1": 0.08}); b.l(edge, "result", soft, "x")
+    idx = b.n("Add", 5, 2); b.l(co, "v", idx, "a"); b.l(tt, "value", idx, "b")
+    pal = b.n("Palette", 7, 2); b.l(idx, "result", pal, "index"); b.l(soft, "result", pal, "brightness")
+    out = b.n("Output", 8, 2); b.l(pal, "color", out, "color")
+    return b.save("curtain.json")
+
+
+def marquee():
+    """Marquee: a theatre chase, bulbs on and off along the strip and
+    marching; intensity sets how many are lit, the palette colours them."""
+    b = GB("Marquee")
+    sp = b.n("Speed", 0, 0, {"label": "March speed", "default": 128})
+    it = b.n("Intensity", 0, 1, {"label": "Bulbs lit", "default": 128})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Bulbs", "default": 64})
+    k1 = b.n("Check 1", 0, 3, {"label": "Reverse", "default": False})
+    b.n("Effect settings", 0, 4, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    n = b.n("Remap", 1, 3, {"out_lo": 4.0, "out_hi": 24.0}); b.l(c1, "value", n, "x")
+    nf = b.n("Floor", 2, 3); b.l(n, "result", nf, "x")
+    duty = b.n("Remap", 1, 1, {"out_lo": 0.15, "out_hi": 0.85}); b.l(it, "value", duty, "x")
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.2, "out_hi": 3.0}); b.l(sp, "value", spd, "x")
+    neg = b.n("Multiply", 2, 0, inputs={"b": -1.0}); b.l(spd, "result", neg, "a")
+    dir_ = b.n("Select", 3, 0); b.l(k1, "on", dir_, "on"); b.l(neg, "result", dir_, "a"); b.l(spd, "result", dir_, "b")
+    tt = b.n("Integrate", 4, 0, {"wrap": 0.0}); b.l(dir_, "result", tt, "rate")
+    st = b.n("Stripes", 3, 2); b.l(co, "u", st, "x"); b.l(nf, "result", st, "count"); b.l(tt, "value", st, "phase"); b.l(duty, "result", st, "duty")
+    pal = b.n("Palette", 4, 2); b.l(co, "u", pal, "index"); b.l(st, "value", pal, "brightness")
+    out = b.n("Output", 5, 2); b.l(pal, "color", out, "color")
+    return b.save("marquee.json")
+
+
+def shockwave():
+    """Shockwave: rings racing out from the centre, and a kick on the beat
+    that throws the next one; intensity sets the ring's width."""
+    b = GB("Shockwave")
+    sp = b.n("Speed", 0, 0, {"label": "Ring speed", "default": 128})
+    it = b.n("Intensity", 0, 1, {"label": "Ring width", "default": 100})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Rings", "default": 64})
+    au = b.n("Audio", 0, 3)
+    b.n("Effect settings", 0, 4, {"palette": 11, "dimensions": "both", "audio": "volume"})
+    co = b.n("Coords", 1, 2)
+    n = b.n("Remap", 1, 3, {"out_lo": 1.0, "out_hi": 5.0}); b.l(c1, "value", n, "x")
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.3, "out_hi": 2.5}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    kick = b.n("Beat kick", 3, 0, inputs={"throw": 0.5}); b.l(au, "beat", kick, "beat")
+    t2 = b.n("Add", 4, 0); b.l(tt, "value", t2, "a"); b.l(kick, "phase", t2, "b")
+    rr = b.n("Multiply", 2, 2); b.l(co, "r", rr, "a"); b.l(n, "result", rr, "b")
+    ph = b.n("Subtract", 3, 2); b.l(rr, "result", ph, "a"); b.l(t2, "result", ph, "b")
+    fr = b.n("Fract", 4, 2); b.l(ph, "result", fr, "x")
+    w = b.n("Remap", 1, 1, {"out_lo": 0.05, "out_hi": 0.5}); b.l(it, "value", w, "x")
+    band = b.n("Subtract", 5, 2, inputs={"a": 1.0}); b.l(fr, "result", band, "b")
+    pw = b.n("Divide", 6, 2); b.l(band, "result", pw, "a"); b.l(w, "result", pw, "b")
+    ring = b.n("Smoothstep", 7, 2, {"e0": 0.0, "e1": 1.0}); b.l(pw, "result", ring, "x")
+    inv = b.n("Subtract", 8, 2, inputs={"a": 1.0}); b.l(ring, "result", inv, "b")
+    fade = b.n("Subtract", 5, 3, inputs={"a": 1.2}); b.l(co, "r", fade, "b")
+    br = b.n("Multiply", 9, 2); b.l(inv, "result", br, "a"); b.l(fade, "result", br, "b")
+    pal = b.n("Palette", 10, 2); b.l(co, "r", pal, "index"); b.l(br, "result", pal, "brightness")
+    out = b.n("Output", 11, 2); b.l(pal, "color", out, "color")
+    return b.save("shockwave.json")
+
+
+def butterfly():
+    """Butterfly: xLights' own - the colour from (x^2 - y^2) sin(t + (x + y)k)
+    over x^2 + y^2 - the wings folding as it turns."""
+    b = GB("Butterfly")
+    sp = b.n("Speed", 0, 0, {"label": "Speed", "default": 100})
+    it = b.n("Intensity", 0, 1, {"label": "Detail", "default": 128})
+    b.n("Effect settings", 0, 3, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.1, "out_hi": 1.5}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    k = b.n("Remap", 1, 1, {"out_lo": 1.0, "out_hi": 8.0}); b.l(it, "value", k, "x")
+    xx = b.n("Multiply", 2, 2); b.l(co, "cx", xx, "a"); b.l(co, "cx", xx, "b")
+    yy = b.n("Multiply", 2, 3); b.l(co, "cy", yy, "a"); b.l(co, "cy", yy, "b")
+    diff = b.n("Subtract", 3, 2); b.l(xx, "result", diff, "a"); b.l(yy, "result", diff, "b")
+    summ = b.n("Add", 3, 3, inputs={"b": 0.05}); b.l(xx, "result", summ, "a"); b.l(yy, "result", summ, "b")
+    xy = b.n("Add", 3, 4); b.l(co, "cx", xy, "a"); b.l(co, "cy", xy, "b")
+    xyk = b.n("Multiply", 4, 4); b.l(xy, "result", xyk, "a"); b.l(k, "result", xyk, "b")
+    arg = b.n("Add", 5, 4); b.l(xyk, "result", arg, "a"); b.l(tt, "value", arg, "b")
+    sn = b.n("Wave", 6, 4, {"shape": "sine"}, inputs={"cycles": 1.0}); b.l(arg, "result", sn, "x")
+    num = b.n("Multiply", 7, 3); b.l(diff, "result", num, "a"); b.l(sn, "value", num, "b")
+    an = b.n("Abs", 8, 3); b.l(num, "result", an, "x")
+    ratio = b.n("Divide", 9, 3); b.l(an, "result", ratio, "a"); b.l(summ, "result", ratio, "b")
+    idx = b.n("Add", 10, 3); b.l(ratio, "result", idx, "a"); b.l(tt, "value", idx, "b")
+    pal = b.n("Palette", 11, 3); b.l(idx, "result", pal, "index")
+    out = b.n("Output", 12, 3); b.l(pal, "color", out, "color")
+    return b.save("butterfly.json")
+
+
+def snowstorm():
+    """Snowstorm: flakes drifting down through noise, a twinkle on top,
+    over a cold dark ground; intensity is how much snow."""
+    b = GB("Snowstorm")
+    sp = b.n("Speed", 0, 0, {"label": "Fall speed", "default": 100})
+    it = b.n("Intensity", 0, 1, {"label": "Snow", "default": 128})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Wind", "default": 100})
+    b.n("Effect settings", 0, 4, {"palette": 0, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.1, "out_hi": 1.2}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    wind = b.n("Remap", 1, 3, {"out_lo": -0.5, "out_hi": 0.5}); b.l(c1, "value", wind, "x")
+    wt = b.n("Multiply", 2, 3); b.l(wind, "result", wt, "a"); b.l(tt, "value", wt, "b")
+    y = b.n("Subtract", 3, 2); b.l(co, "v", y, "a"); b.l(tt, "value", y, "b")
+    x = b.n("Add", 3, 3); b.l(co, "u", x, "a"); b.l(wt, "result", x, "b")
+    nz = b.n("Noise", 4, 2, {"octaves": 2}, inputs={"scale": 9.0, "z": 0.0}); b.l(x, "result", nz, "x"); b.l(y, "result", nz, "y")
+    thr = b.n("Remap", 1, 1, {"out_lo": 0.78, "out_hi": 0.55}); b.l(it, "value", thr, "x")
+    sub = b.n("Subtract", 4, 3); b.l(nz, "value", sub, "a"); b.l(thr, "result", sub, "b")
+    flake = b.n("Smoothstep", 5, 2, {"e0": 0.0, "e1": 0.12}); b.l(sub, "result", flake, "x")
+    tw = b.n("Sparkle", 5, 3, inputs={"density": 0.08, "seed": 2.0})
+    lit = b.n("Max", 6, 2); b.l(flake, "result", lit, "a"); b.l(tw, "value", lit, "b")
+    white = b.n("Colour", 6, 3, {"rgb": [235, 240, 255]})
+    ground = b.n("Colour", 6, 4, {"rgb": [4, 8, 24]})
+    mix = b.n("Blend", 7, 3, {"mode": "over"}); b.l(ground, "color", mix, "under"); b.l(white, "color", mix, "over"); b.l(lit, "result", mix, "amount")
+    out = b.n("Output", 8, 3); b.l(mix, "color", out, "color")
+    return b.save("snowstorm.json")
+
+
 ALL = [slab_cut, cell_weave, truchet, ring_rain, box_fire, maelstrom, kaleidoscope, mandelbrot, watershed, moire,
        ripples, chladni, candy_knot, gyro_sand, breakout, cube_axes, liquid_tunnel, question_block, feigenbaum, liquid,
-       smiley, fireworks]
+       smiley, fireworks, meteors, spirals, pinwheel, curtain, marquee, shockwave, butterfly, snowstorm]
 STATIC_EXTRA = {"Smiley"}
 
 

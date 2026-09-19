@@ -1,0 +1,277 @@
+{
+ "name": "Curtain",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Open speed",
+    "default": 80
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Opens to",
+    "default": 255
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    430
+   ],
+   "params": {
+    "palette": 11,
+    "dimensions": "both",
+    "audio": "none",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Coords",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Remap",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.05,
+    "out_hi": 0.8
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Integrate",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {
+    "wrap": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Wave",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {
+    "shape": "triangle"
+   },
+   "inputs": {
+    "cycles": 1.0
+   }
+  },
+  {
+   "id": 8,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.2,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Multiply",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Abs",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Subtract",
+   "pos": [
+    1190,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Smoothstep",
+   "pos": [
+    1420,
+    170
+   ],
+   "params": {
+    "e0": 0.0,
+    "e1": 0.08
+   },
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Add",
+   "pos": [
+    1190,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Palette",
+   "pos": [
+    1650,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Output",
+   "pos": [
+    1880,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   5,
+   "x"
+  ],
+  [
+   5,
+   "result",
+   6,
+   "rate"
+  ],
+  [
+   6,
+   "value",
+   7,
+   "x"
+  ],
+  [
+   2,
+   "value",
+   8,
+   "x"
+  ],
+  [
+   7,
+   "value",
+   9,
+   "a"
+  ],
+  [
+   8,
+   "result",
+   9,
+   "b"
+  ],
+  [
+   4,
+   "cx",
+   10,
+   "x"
+  ],
+  [
+   9,
+   "result",
+   11,
+   "a"
+  ],
+  [
+   10,
+   "result",
+   11,
+   "b"
+  ],
+  [
+   11,
+   "result",
+   12,
+   "x"
+  ],
+  [
+   4,
+   "v",
+   13,
+   "a"
+  ],
+  [
+   6,
+   "value",
+   13,
+   "b"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "index"
+  ],
+  [
+   12,
+   "result",
+   14,
+   "brightness"
+  ],
+  [
+   14,
+   "color",
+   15,
+   "color"
+  ]
+ ]
+}

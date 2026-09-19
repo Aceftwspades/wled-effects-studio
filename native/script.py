@@ -165,8 +165,11 @@ def tokenize(src):
             continue
         text = m.group(kind)
         if kind == "num":
-            t = text.rstrip("fFuUlL")
-            val = float(int(t, 16)) if t.lower().startswith("0x") else float(t)
+            if text.lower().startswith("0x"):
+                t = re.sub(r"[uUlL]+$", "", text)         # only the suffix: rstrip would eat a hex digit F too (0xFFFFu -> 0x)
+                val = float(int(t, 16))
+            else:
+                val = float(re.sub(r"[fFuUlL]+$", "", text))
             out.append(("num", val))
         elif kind == "str":
             out.append(("str", bytes(text[1:-1], "utf-8").decode("unicode_escape")))
@@ -240,7 +243,8 @@ class Parser:
             # a declaration: qualifiers and type words, then name [= expr] {, name [= expr]}
             static = False
             while self.peek()[0] == "id" and self.peek()[1] in DECL_TYPES:
-                static = static or self.take()[1] == "static"
+                tok = self.take()                     # taken whatever it is (`static or take()` skipped the take once static was seen)
+                static = static or tok[1] == "static"
             while self.accept("op", "*"):
                 pass
             decls = []

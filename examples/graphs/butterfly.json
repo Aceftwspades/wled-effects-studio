@@ -1,0 +1,408 @@
+{
+ "name": "Butterfly",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Speed",
+    "default": 100
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Detail",
+    "default": 128
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    430
+   ],
+   "params": {
+    "palette": 11,
+    "dimensions": "both",
+    "audio": "none",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Coords",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Remap",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.1,
+    "out_hi": 1.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Integrate",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {
+    "wrap": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 1.0,
+    "out_hi": 8.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Multiply",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Multiply",
+   "pos": [
+    500,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Subtract",
+   "pos": [
+    730,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Add",
+   "pos": [
+    730,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.05
+   }
+  },
+  {
+   "id": 12,
+   "type": "Add",
+   "pos": [
+    730,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Multiply",
+   "pos": [
+    960,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Add",
+   "pos": [
+    1190,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Wave",
+   "pos": [
+    1420,
+    560
+   ],
+   "params": {
+    "shape": "sine"
+   },
+   "inputs": {
+    "cycles": 1.0
+   }
+  },
+  {
+   "id": 16,
+   "type": "Multiply",
+   "pos": [
+    1650,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Abs",
+   "pos": [
+    1880,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Divide",
+   "pos": [
+    2110,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Add",
+   "pos": [
+    2340,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Palette",
+   "pos": [
+    2570,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 21,
+   "type": "Output",
+   "pos": [
+    2800,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   5,
+   "x"
+  ],
+  [
+   5,
+   "result",
+   6,
+   "rate"
+  ],
+  [
+   2,
+   "value",
+   7,
+   "x"
+  ],
+  [
+   4,
+   "cx",
+   8,
+   "a"
+  ],
+  [
+   4,
+   "cx",
+   8,
+   "b"
+  ],
+  [
+   4,
+   "cy",
+   9,
+   "a"
+  ],
+  [
+   4,
+   "cy",
+   9,
+   "b"
+  ],
+  [
+   8,
+   "result",
+   10,
+   "a"
+  ],
+  [
+   9,
+   "result",
+   10,
+   "b"
+  ],
+  [
+   8,
+   "result",
+   11,
+   "a"
+  ],
+  [
+   9,
+   "result",
+   11,
+   "b"
+  ],
+  [
+   4,
+   "cx",
+   12,
+   "a"
+  ],
+  [
+   4,
+   "cy",
+   12,
+   "b"
+  ],
+  [
+   12,
+   "result",
+   13,
+   "a"
+  ],
+  [
+   7,
+   "result",
+   13,
+   "b"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "a"
+  ],
+  [
+   6,
+   "value",
+   14,
+   "b"
+  ],
+  [
+   14,
+   "result",
+   15,
+   "x"
+  ],
+  [
+   10,
+   "result",
+   16,
+   "a"
+  ],
+  [
+   15,
+   "value",
+   16,
+   "b"
+  ],
+  [
+   16,
+   "result",
+   17,
+   "x"
+  ],
+  [
+   17,
+   "result",
+   18,
+   "a"
+  ],
+  [
+   11,
+   "result",
+   18,
+   "b"
+  ],
+  [
+   18,
+   "result",
+   19,
+   "a"
+  ],
+  [
+   6,
+   "value",
+   19,
+   "b"
+  ],
+  [
+   19,
+   "result",
+   20,
+   "index"
+  ],
+  [
+   20,
+   "color",
+   21,
+   "color"
+  ]
+ ]
+}

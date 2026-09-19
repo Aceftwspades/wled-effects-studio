@@ -837,9 +837,13 @@ plugins, FPP scheduling, video playback.
       mouths, eyes, expressions - switched from a beat or a slider.
 - [x] **Randomise** (Playback > Randomise the settings): the sliders,
       the checks and the palette thrown, for exploring.
-- [ ] **xLights' effects as example graphs**: the ones WLED lacks -
-      Meteors, Spirals, Fan, Pinwheel, Curtain, Marquee, Garlands,
-      Snowstorm, Butterfly, Lightning, Shockwave, Morph, Tendril.
+- [x] **xLights' effects as example graphs** (`examples/build_examples.py`,
+      first eight): Meteors, Spirals, Pinwheel, Curtain, Marquee,
+      Shockwave, Butterfly, Snowstorm. Writing them found two script
+      compiler bugs: a declaration with two type words after `static`
+      looped forever (`static or take()` skipped the take), and a hex
+      literal's suffix strip ate its F digits (`0xFFFFu` -> `0x`).
+      Still to do: Fan, Garlands, Lightning, Morph, Tendril.
 - [ ] **The 3-D view's surroundings**: a background image, camera presets
       and saved views.
 - [ ] **Export a shape as `.xmodel`**.
