@@ -97,6 +97,9 @@ mesh's own units are the pitch when it is imported.
   custom model (the LEDs, their numbering, and its grid), or an `x y z
   [index]` point list (CSV, whitespace or JSON; the index column is the
   wiring order).
+- **Import as a reference** puts a mesh in the 3-D view as a wireframe
+  that is not LEDs - the tree, the house, the enclosure - moved, turned
+  and scaled like any part, to place the LEDs against.
 - **Place** LEDs by hand: tick "place", click the 3-D view and an LED lands
   on the working plane (z = 0 by default; choose x, y or z and a value);
   they go into the selected points part, or a new one. Drag an LED to move

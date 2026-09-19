@@ -32,6 +32,7 @@ KINDS = {
     "cube":     ({"B": 8, "pitch": 1.0, "six": False}, "B x B a face, five faces (six with the bottom)"),
     "polyline": ({"points": [[0, 0, 0], [8, 0, 0], [8, 8, 0]], "pitch": 1.0}, "a strip run laid along a path, an LED every pitch"),
     "points":   ({"points": [[0, 0, 0]]}, "LEDs where they are put, in that order"),
+    "reference": ({"vertices": [], "edges": [], "file": ""}, "a mesh drawn as a wireframe to place LEDs against - not LEDs"),
 }
 
 
@@ -129,6 +130,8 @@ def part_points(part):
             t = (s - cum[i]) / L[i] if L[i] > 0 else 0.0
             out.append(pts[i] + seg[i] * t)
         return np.asarray(out, np.float32), None
+    if k == "reference":
+        return np.zeros((0, 3), np.float32), None          # drawn, never lit
     if k == "points":
         pts = np.asarray(p.get("points") or [[0, 0, 0]], np.float32).reshape(-1, 3)
         nrm = p.get("normals")
@@ -166,6 +169,22 @@ def transform(part, pos, nrm):
     return out.astype(np.float32), None if nrm is None else nrm.astype(np.float32)
 
 
+def reference_segments(parts, limit=3000):
+    """The wireframe of every reference part, transformed: (m, 2, 3) segments."""
+    out = []
+    for part in parts:
+        if part.get("kind") != "reference":
+            continue
+        v = np.asarray(part["params"].get("vertices") or [], np.float32).reshape(-1, 3)
+        e = np.asarray(part["params"].get("edges") or [], int).reshape(-1, 2)
+        if len(v) == 0 or len(e) == 0:
+            continue
+        e = e[(e[:, 0] >= 0) & (e[:, 1] >= 0) & (e[:, 0] < len(v)) & (e[:, 1] < len(v))][:limit]
+        tv, _ = transform(dict(part, reverse=False), v, None)
+        out.append(np.stack([tv[e[:, 0]], tv[e[:, 1]]], 1))
+    return np.concatenate(out) if out else np.zeros((0, 2, 3), np.float32)
+
+
 def resolve(parts):
     """Every part's LEDs, in wiring order: (pos (n, 3), nrm (n, 3) or None, owner (n,))."""
     P, N, O = [], [], []
@@ -179,7 +198,7 @@ def resolve(parts):
             N.append(np.zeros_like(pos))
         else:
             N.append(nrm)
-    if not P:
+    if not P or sum(len(p) for p in P) == 0:
         return np.zeros((0, 3), np.float32), None, np.zeros(0, int)
     pos = np.concatenate(P)
     nrm = np.concatenate(N) if have_nrm else None

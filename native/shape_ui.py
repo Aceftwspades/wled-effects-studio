@@ -90,7 +90,7 @@ def build(app):
             dpg.add_button(label="Save as file...", small=True, callback=lambda: dpg.show_item("shape_save_dialog"))
             dpg.add_button(label="Open a shape file...", small=True, callback=lambda: dpg.show_item("shape_open_dialog"))
         dpg.add_text("PARTS - the order is the wiring", color=c.ACCENT)
-        kinds = list(shapes.KINDS)
+        kinds = [k for k in shapes.KINDS if k != "reference"]
         for row in (kinds[:4], kinds[4:]):
             with dpg.group(horizontal=True):
                 for k in row:
@@ -100,6 +100,10 @@ def build(app):
             dpg.add_combo([m[1] for m in MESH_MODES], tag="shape_mesh_mode", width=230, default_value=MESH_MODES[0][1])
             dpg.add_input_float(tag="shape_mesh_pitch", width=70, default_value=1.0, step=0, format="%.2f")
             dpg.add_text("pitch", color=c.DIM)
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Import as a reference (drawn, not LEDs)...", small=True,
+                           callback=lambda: (setattr(app, "_shape_ref", True), dpg.show_item("shape_import_dialog")))
+            dpg.add_text("a mesh to place LEDs against: the tree, the house, the enclosure", color=c.DIM)
         with dpg.child_window(tag="shape_parts", height=150, border=True):
             pass
         dpg.add_text("PART", tag="shape_part_title", color=c.ACCENT)
@@ -156,8 +160,11 @@ def refresh(app):
     P = "shape_fields"
     dpg.add_input_text(label="name", parent=P, width=200, default_value=str(part.get("name", "")), on_enter=True,
                        callback=lambda s, v: set_part(app, sel, name=v))
+    if part["kind"] == "reference":
+        dpg.add_text(f"{part['params'].get('file', '?')}: {len(part['params'].get('vertices') or [])} vertices, "
+                     f"{len(part['params'].get('edges') or [])} edges - drawn in the 3-D view, not LEDs", parent=P, color=c.DIM, wrap=0)
     for key, default in shapes.KINDS[part["kind"]][0].items():
-        if key in ("points", "normals"):
+        if key in ("points", "normals", "vertices", "edges", "file"):
             continue
         val = part["params"].get(key, default)
         if isinstance(default, bool):
@@ -343,8 +350,16 @@ def import_file(app, path):
     ext = os.path.splitext(path)[1].lower()
     parts = list(_parts(app) or [])
     more = {}
+    as_ref = bool(getattr(app, "_shape_ref", False)); app._shape_ref = False
     try:
-        if ext in (".obj", ".ply", ".stl"):
+        if as_ref:
+            if ext not in (".obj", ".ply", ".stl"):
+                raise ValueError("a reference is a mesh (.obj, .ply or .stl)")
+            mesh = shape_io.read_mesh(path)
+            part = shapes.new_part("reference", vertices=mesh.v.tolist(), edges=[list(e) for e in mesh.edges], file=mesh.source)
+            part["name"] = f"{mesh.source} (reference)"
+            note = f"reference {mesh.source}: {len(mesh.v)} vertices, {len(mesh.edges)} edges drawn, no LEDs"
+        elif ext in (".obj", ".ply", ".stl"):
             mesh = shape_io.read_mesh(path)
             mode = next(m[0] for m in MESH_MODES if m[1] == dpg.get_value("shape_mesh_mode"))
             pts, nrm = shape_io.mesh_leds(mesh, mode, float(dpg.get_value("shape_mesh_pitch")) or 1.0)
@@ -523,9 +538,52 @@ def release(app):
     return True
 
 
+def _covers(app):
+    """The floating frames over the view: (x0, y0, x1, y1) each, so overlay
+    marks are not drawn on top of a window that covers the LEDs."""
+    from native import device_ui
+    out = []
+    for slot, (tag, _, _, _) in device_ui.FRAMES.items():
+        if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and not app.docked(slot):
+            x, y = dpg.get_item_pos(tag); w, h = dpg.get_item_rect_size(tag)
+            out.append((x, y, x + w, y + h))
+    return out
+
+
+def _clear(covers, x, y):
+    return not any(a <= x <= c and b <= y <= d for a, b, c, d in covers)
+
+
+def _poll_reference(app):
+    """The reference meshes as wireframes over the 3-D view, redrawn when
+    the camera or the shape moves."""
+    if not dpg.does_item_exist("ref_dl"):
+        return
+    v = _view(app)
+    parts = _parts(app)
+    segs = shapes.reference_segments(parts) if (v is not None and parts) else None
+    covers = _covers(app)
+    key = None if segs is None or len(segs) == 0 else (round(app.yaw, 4), round(app.pitch, 4), round(app.dist, 3), v[0], v[1], len(segs), id(parts), tuple(covers))
+    if key == getattr(app, "_ref_key", "unset"):
+        return
+    app._ref_key = key
+    dpg.delete_item("ref_dl", children_only=True)
+    if key is None:
+        return
+    (x0, y0), size, ext = v
+    ax, ay, aok = render.project(segs[:, 0], size, app.yaw, app.pitch, app.dist, frame=ext)
+    bx, by, bok = render.project(segs[:, 1], size, app.yaw, app.pitch, app.dist, frame=ext)
+    col = (150, 160, 180, 110)
+    inside = lambda x, y: 0 <= x <= size and 0 <= y <= size          # the view's square only: no lines into the panels
+    for i in range(len(segs)):
+        if aok[i] and bok[i] and inside(ax[i], ay[i]) and inside(bx[i], by[i]) and _clear(covers, x0 + ax[i], y0 + ay[i]) and _clear(covers, x0 + bx[i], y0 + by[i]):
+            dpg.draw_line((x0 + ax[i], y0 + ay[i]), (x0 + bx[i], y0 + by[i]), color=col, thickness=1, parent="ref_dl")
+
+
 def poll(app):
     """Rings round the selected part's LEDs while the frame shows; the
-    dragged LED's new place as a cross."""
+    dragged LED's new place as a cross; the reference wireframes always."""
+    _poll_reference(app)
     if not dpg.does_item_exist("shape_dl"):
         return
     dpg.delete_item("shape_dl", children_only=True)
@@ -542,15 +600,16 @@ def poll(app):
     if len(mine) == 0:
         return
     c = _c()
+    covers = _covers(app)
     sx, sy, ok = render.project(pos[mine], size, app.yaw, app.pitch, app.dist, frame=ext)
     r = max(3.0, 0.42 * (size * 0.5) / np.tan(np.radians(19.0)) / (app.dist * ext[1]) * 0.9)
     col = tuple(c.ACCENT[:3]) + (200,)
     for i in range(len(mine)):
-        if ok[i]:
+        if ok[i] and 0 <= sx[i] <= size and 0 <= sy[i] <= size and _clear(covers, x0 + sx[i], y0 + sy[i]):
             dpg.draw_circle((x0 + sx[i], y0 + sy[i]), min(r, 14), color=col, thickness=1.5, parent="shape_dl")
     # the wiring: a faint line from LED to LED of the selected part
     if len(mine) > 1 and len(mine) <= 400:
-        pts = [(x0 + sx[i], y0 + sy[i]) for i in range(len(mine)) if ok[i]]
+        pts = [(x0 + sx[i], y0 + sy[i]) for i in range(len(mine)) if ok[i] and _clear(covers, x0 + sx[i], y0 + sy[i])]
         if len(pts) > 1:
             dpg.draw_polyline(pts, color=tuple(c.ACCENT[:3]) + (90,), thickness=1, parent="shape_dl")
     to = getattr(app, "_shape_drag_to", None)

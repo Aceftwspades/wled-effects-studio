@@ -3138,6 +3138,8 @@ def build(app):
             dpg.add_button(label="", tag=f"hsplit_{i}_{j}", width=470, height=8, show=False, parent="root")
             app._splitters[f"hsplit_{i}_{j}"] = ("h", i, j)
     # where a dragged pane would land, drawn over everything
+    with dpg.viewport_drawlist(front=True, tag="ref_dl"):      # reference meshes as wireframes over the 3-D view
+        pass
     with dpg.viewport_drawlist(front=True, tag="shape_dl"):    # the shape editor's rings and wiring line
         pass
     with dpg.viewport_drawlist(front=True, tag="snap_dl"):
@@ -3279,6 +3281,7 @@ def service_command(app):
                 elif op[0] == "clear": shape_ui._apply(app, parts=[])
                 elif op[0] == "segments": shape_ui.segments_per_part(app)
                 elif op[0] == "import": shape_ui.import_file(app, op[1])
+                elif op[0] == "reference": app._shape_ref = True; shape_ui.import_file(app, op[1])
                 elif op[0] == "layout": shape_ui._apply(app, layout=op[1])
                 elif op[0] == "undo": shape_ui.undo(app)
                 elif op[0] == "select": app._shape_sel = int(op[1]); shape_ui.refresh(app)

@@ -793,9 +793,10 @@ scheduling, video). These do, in the order to do them; ticked when done:
 - [x] **A Text node** (a 5x7 font, scrolling, any 2-D layout) beside the
       picture nodes: only the letters used are baked in; `on` and `i`
       (which letter) out, `offset` in for scrolling, loop, size, row.
-- [ ] **Reference geometry** in the 3-D view: a mesh drawn as a wireframe
-      that is not LEDs - the tree, the house, the enclosure - to place
-      the LEDs against.
+- [x] **Reference geometry** in the 3-D view: a `reference` part - a mesh
+      imported as a wireframe (Import as a reference...), placed, turned
+      and scaled like any part, never lit - the tree, the house, the
+      enclosure - to place the LEDs against.
 - [ ] **Transition preview**: WLED's blend styles between two effects
       (fade, swipe, push...) shown in the sim before a preset chain is
       pushed.

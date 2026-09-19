@@ -59,6 +59,18 @@ def test_grid_layout_and_geometry():
     assert g2.describe() == g.describe() and g2.phys.tolist() == g.phys.tolist()
 
 
+def test_reference_draws_but_does_not_light():
+    ref = shapes.new_part("reference", vertices=[[0, 0, 0], [1, 0, 0], [1, 1, 0]], edges=[[0, 1], [1, 2]], file="t.obj")
+    ref["pos"] = [5, 0, 0]
+    pos, nrm, owner = shapes.resolve([ref, shapes.new_part("strip", n=3)])
+    assert len(pos) == 3 and owner.tolist() == [1, 1, 1]
+    segs = shapes.reference_segments([ref])
+    assert segs.shape == (2, 2, 3) and segs[0, 0, 0] == 5.0
+    assert len(shapes.resolve([ref])[0]) == 0
+    g = Geometry("shape", parts=[ref])
+    assert g.count == 1                                          # a placeholder pixel, so the engine has a segment
+
+
 def test_chain_mirror_array():
     pts = np.array([[0, 0, 0], [5, 0, 0], [1, 0, 0], [4, 0, 0]], np.float32)
     assert shapes.chain_order(pts, 0).tolist() == [0, 2, 3, 1]
