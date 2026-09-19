@@ -127,6 +127,10 @@ every effect that asks where a pixel is see the real shape, on the device
 exactly as in the sim. Cylinders, spheres and tori send the table too; a
 cube net and a flat matrix have a rule of their own and send none.
 
+**The library** (File > Library...) shows every graph of the project as a
+looping thumbnail with its tags (what nodes it uses, audio, 3-D, script);
+type to search; click a tile to open the graph and run its effect.
+
 **Curves by hand**: select a Float curve node and the Properties pane
 shows its curve large - click to add a point, drag one, right-click to
 remove it; the node's small preview and its numbers follow, and the

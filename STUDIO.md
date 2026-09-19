@@ -784,8 +784,12 @@ scheduling, video). These do, in the order to do them; ticked when done:
       as a script too (one select per segment, the same smoothstep as the
       C++). Sliders are keyframed per sequence step; a continuous
       slider curve along a step is not done.
-- [ ] **An effect library** with looping thumbnails, tags and one-click
-      load, the examples first.
+- [x] **An effect library** (`native/library_ui.py`, File > Library): every
+      graph of the project as a looping thumbnail (24 frames from a second
+      engine, the same library copied as A/B does, so the one on screen is
+      not disturbed), tags read off the graph (node categories, audio,
+      motion, 3-D, dimensions, script), a search box, one click to open
+      the graph and run its effect.
 - [ ] **A Text node** (a 5x7 font, scrolling, any 2-D layout) beside the
       picture nodes.
 - [ ] **Reference geometry** in the 3-D view: a mesh drawn as a wireframe
