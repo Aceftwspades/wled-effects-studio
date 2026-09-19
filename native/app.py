@@ -3260,6 +3260,11 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
+            if "library" in c:                          # test hook: ["previews", seconds, [files]] | ["refresh"]
+                from native import library_ui as LU
+                op = c["library"]
+                if op[0] == "previews": LU.generate_previews(app, op[1] if len(op) > 1 else None, op[2] if len(op) > 2 else None)
+                else: LU.refresh(app)
             if "seq" in c:                              # test hook: ["add"] | ["update"] | ["load", i] | ["del", i] | ["play"] | ["stop"] | ["field", key, v]
                 from native import sequence_ui as SQ
                 op = c["seq"]

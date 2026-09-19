@@ -46,17 +46,22 @@ def frame_colours(app, eng, mode, wt, dt):
     return rgb.reshape(g.h, g.w, 3)
 
 
-def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=lambda m: None):
-    """The turntable: a list of (size, size, 3) frames."""
+def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=lambda m: None, eng=None, effect=None, params=None):
+    """The turntable: a list of (size, size, 3) frames. `eng`, `effect`
+    (an index) and `params` pick another effect on a second engine already
+    made - the library's previews; without them, the sim's own."""
     from native.engine import Engine
     g = app.project.geometry
-    eng = None
     if mode == "effect":
         try:
-            eng = Engine(app._b_library())
-            eng.set_geometry(g)
-            eng.select(app.eng.idx, params=dict(app.eng.fx, pal=app.eng.pal))
-            eng.colors(*app.seg_cols)
+            if eng is None:
+                eng = Engine(app._b_library())
+                eng.set_geometry(g)
+            if effect is None:
+                eng.select(app.eng.idx, params=dict(app.eng.fx, pal=app.eng.pal))
+                eng.colors(*app.seg_cols)
+            else:
+                eng.select(int(effect), params=params or None)
             for _ in range(10):
                 eng.frame(23)                        # a moment in, so the picture is not the first frame's
         except Exception as e:
@@ -84,8 +89,8 @@ def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=
 def save(app, frames, fps=15, name="shape_preview"):
     """The frames as a GIF and the first as a PNG in the project's export folder: (gif path, png path)."""
     out = os.path.join(app.project.path, "export")
-    os.makedirs(out, exist_ok=True)
     gpath = os.path.join(out, name + ".gif")
+    os.makedirs(os.path.dirname(gpath), exist_ok=True)
     gif.write(gpath, frames, fps=fps)
     ppath = os.path.join(out, name + ".png")
     try:

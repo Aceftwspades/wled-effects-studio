@@ -56,6 +56,8 @@ def build_menus(app):
             _mi(app, "Add to the effects list", "import", tag="menu_import", callback=lambda: app.toggle_import_current())
             _mi(app, "History...", "history", callback=lambda: show_history(app))
             dpg.add_menu_item(label="Library...", callback=lambda: device_ui.show(app, "library"))
+            dpg.add_menu_item(label="Generate previews of every effect", callback=lambda: (device_ui.show(app, "library"),
+                              __import__("native.library_ui", fromlist=["x"]).generate_previews(app)))
             dpg.add_menu_item(label="Open graph as code", callback=lambda: app.open_graph_code())
             dpg.add_separator()
             with dpg.menu(label="Project"):

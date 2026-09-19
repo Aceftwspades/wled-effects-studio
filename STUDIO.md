@@ -789,7 +789,10 @@ scheduling, video). These do, in the order to do them; ticked when done:
       engine, the same library copied as A/B does, so the one on screen is
       not disturbed), tags read off the graph (node categories, audio,
       motion, 3-D, dimensions, script), a search box, one click to open
-      the graph and run its effect.
+      the graph and run its effect. **Generate previews** renders a turn
+      of the 3-D view for every effect on the project's shape (its own
+      settings, a second engine on a worker), a GIF and a PNG each in
+      `export/library/` with a README index, and the tiles show the turns.
 - [x] **A Text node** (a 5x7 font, scrolling, any 2-D layout) beside the
       picture nodes: only the letters used are baked in; `on` and `i`
       (which letter) out, `offset` in for scrolling, loop, size, row.

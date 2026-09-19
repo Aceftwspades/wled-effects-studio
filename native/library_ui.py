@@ -38,7 +38,15 @@ def build(app):
             dpg.add_input_text(tag="lib_search", hint="search names and tags", width=220, callback=lambda s, v: refresh(app))
             dpg.add_button(label="Remake the thumbnails", small=True, callback=lambda: (app._lib_thumbs.clear() if hasattr(app, "_lib_thumbs") else None, refresh(app)))
             dpg.add_text("", tag="lib_status", color=c.DIM)
-        dpg.add_text("click a tile to open the graph and run its effect; the tags are what the graph uses", color=c.DIM, wrap=0)
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Generate previews", tag="lib_gen", callback=lambda: generate_previews(app))
+            dpg.add_input_float(tag="lib_gen_secs", width=60, default_value=3.0, step=0, format="%.0f s")
+            dpg.add_checkbox(label="only the ones shown", tag="lib_gen_shown", default_value=False)
+            dpg.add_button(label="Open the folder", small=True, callback=lambda: app.reveal(os.path.join(app.project.path, "export", "library")))
+            dpg.add_text("", tag="lib_gen_status", color=c.DIM)
+        dpg.add_text("click a tile to open the graph and run its effect; the tags are what the graph uses. Generate previews renders a "
+                     "turn of the 3-D view for every effect on the project's shape - a GIF and a PNG each in export/library, with an index - "
+                     "and the tiles show those turns", color=c.DIM, wrap=0)
         with dpg.child_window(tag="lib_tiles", height=-1, border=False):
             pass
 
@@ -140,6 +148,7 @@ def refresh(app):
         if fn not in app._lib_thumbs and eng is not None and made < 12:
             app._lib_thumbs[fn] = _make_thumb(app, eng, g.name); made += 1
         rows.append((fn, g.name, tags))
+    app._lib_shown = [fn for fn, _, _ in rows]
     width = max(TILE + 20, int(dpg.get_item_rect_size("lib_tiles")[0] or 600))
     per_row = max(1, (width - 12) // (TILE + 14))
     app._lib_tex = getattr(app, "_lib_tex", {})
@@ -163,6 +172,109 @@ def refresh(app):
     dpg.set_value("lib_status", f"{len(rows)} graph(s)" + (f", {made} thumbnails made in {time.time() - t0:.1f} s" if made else "") + (f", {left} more next refresh" if left else ""))
     if left:
         app._lib_more = True
+
+
+# --- previews: a turntable GIF for every effect, and the tiles from them ---------------------
+def generate_previews(app, seconds=None, only=None):
+    """Every graph's effect (or the tiles shown) rendered as a turn of the
+    3-D view on a worker: export/library/<stem>.gif and .png each, an
+    index README, and the tiles take the turns as they finish."""
+    import threading, queue
+    from native.shape_preview import turntable, save
+    from native.script import settings_of
+    if getattr(app, "_lib_job", None) is not None and app._lib_job.is_alive():
+        return
+    seconds = max(1.0, min(15.0, float(seconds or dpg.get_value("lib_gen_secs") or 3.0)))
+    files = list(only) if only else (list(getattr(app, "_lib_shown", [])) if dpg.get_value("lib_gen_shown") else app.gp.files())
+    graphs = []
+    for fn in files:
+        try:
+            graphs.append((fn, G.load(os.path.join(app.gp.dir, fn), lib=app.gp.lib, resolver=app.gp.resolve_sub)))
+        except Exception:
+            pass
+    out_dir = os.path.join(app.project.path, "export", "library")
+    os.makedirs(out_dir, exist_ok=True)
+    app._lib_q = queue.Queue(); app._lib_made = 0
+    dpg.configure_item("lib_gen", enabled=False)
+    dpg.set_value("lib_gen_status", f"0 of {len(graphs)}")
+    lib_path = app._b_library()
+    geom = app.project.geometry
+
+    def work():
+        from native.engine import Engine
+        try:
+            eng = Engine(lib_path); eng.set_geometry(geom)
+        except Exception as e:
+            app._lib_q.put(("done", f"no second engine: {e}")); return
+        index = ["# Effects\n", f"Previews of every effect on the project's shape ({geom.describe()}), a turn each.\n"]
+        n = 0
+        for fn, g in graphs:
+            k = _effect_index(app, eng, g.name)
+            if k is None:
+                app._lib_q.put(("skip", fn, g.name)); continue
+            try:
+                st = settings_of(g); pal = st.pop("pal")
+                frames = turntable(app, "effect", seconds, 15, 320, 1.0, eng=eng, effect=k, params=dict(st, pal=pal))
+                stem = os.path.splitext(fn)[0]
+                gpath, ppath = save(app, frames, 15, name=os.path.join("library", stem))
+                small = [_shrink(f, TILE) for f in frames]
+                app._lib_q.put(("made", fn, small, gpath))
+                index.append(f"\n## {g.name}\n\n![{g.name}]({stem}.gif)\n\n`{fn}`\n")
+                n += 1
+            except Exception as e:
+                app._lib_q.put(("skip", fn, f"{g.name}: {e}"))
+        try:
+            open(os.path.join(out_dir, "README.md"), "w", encoding="utf-8", newline="\n").write("".join(index))
+        except OSError:
+            pass
+        app._lib_q.put(("done", f"{n} preview(s) in export/library"))
+    app._lib_job = threading.Thread(target=work, daemon=True); app._lib_job.start()
+
+
+def _shrink(frame, size):
+    """A frame to size x size (the tiles)."""
+    try:
+        from PIL import Image
+        return np.asarray(Image.fromarray(frame).resize((size, size), Image.BILINEAR))
+    except Exception:
+        h, w = frame.shape[:2]
+        k = max(1, min(h, w) // size)
+        return frame[::k, ::k][:size, :size]
+
+
+def _poll_previews(app):
+    q = getattr(app, "_lib_q", None)
+    if q is None:
+        return
+    c = _c()
+    changed = False
+    for _ in range(4):
+        try:
+            item = q.get_nowait()
+        except Exception:
+            break
+        if item[0] == "made":
+            _, fn, small, gpath = item
+            if not hasattr(app, "_lib_thumbs"):
+                app._lib_thumbs = {}; app._lib_tags = {}
+            app._lib_thumbs[fn] = small
+            tag = f"lib_tex_{abs(hash(fn)) % 10**8}"
+            if tag in getattr(app, "_lib_tex", {}):
+                app._lib_tex.pop(tag, None)
+                if dpg.does_item_exist(tag):
+                    dpg.delete_item(tag)
+            app._lib_made = getattr(app, "_lib_made", 0) + 1
+            dpg.set_value("lib_gen_status", f"{app._lib_made} made - {os.path.basename(gpath)}")
+            changed = True
+        elif item[0] == "skip":
+            dpg.set_value("lib_gen_status", f"skipped {item[2]} (no effect of that name in the build)")
+        elif item[0] == "done":
+            dpg.set_value("lib_gen_status", item[1]); dpg.configure_item("lib_gen", enabled=True)
+            app._lib_q = None; changed = True
+            app.gp.status(item[1])
+            break
+    if changed:
+        refresh(app)
 
 
 def _texture(app, fn, frames):
@@ -190,6 +302,7 @@ def _rgba(frame):
 
 def poll(app):
     """The thumbnails loop while the frame shows: the next frame of each every 80 ms."""
+    _poll_previews(app)
     if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG):
         return
     now = time.time()
