@@ -1003,9 +1003,22 @@ this repo with a compiler beside it. Done so far:
       release. Verified: the packaged app runs from `_internal`, makes
       its project beside the exe, loads the prebuilt engine, builds an
       effect against runtime/, opens a popout (`--popout`, the same exe).
-- [ ] A bundled compiler tried end to end (a MinGW-w64 in toolchain/):
-      the code path is there, the g++ build of the engine is not yet
-      proven.
+- [x] **A compiler in the folder**: winlibs' MinGW-w64 GCC (16.2, UCRT)
+      builds the engine and every example with the same numbers as clang
+      (`STUDIO_TOOLCHAIN=<folder>` tries one out from the tree; the app
+      finds `toolchain/` beside itself first); `package.py --toolchain`
+      cuts a full winlibs (940 MB) down to what a build uses, by asking
+      g++ - `-print-prog-name` for its programs, `-MM` for the headers the
+      engine pulls in, `-Wl,--trace` for the archives a DLL link takes,
+      `objdump -p` for the DLLs those programs import - the whole C++
+      library kept, the Windows SDK's thousands of API headers, cc1, gdb,
+      cmake and fortran dropped: 121 MB, with a NOTICE for the licence.
+      The link is `-static`, so a built DLL needs only KERNEL32 and the
+      UCRT. The engine's objects ship too, named by paths relative to the
+      folder and stamped by contents (not mtimes), so a first build in a
+      fresh copy compiles only the new effect: five seconds. The release
+      zip is 86 MB; unpacked and run from another folder with no env, it
+      built Fan and Garlands with its own g++.
 - [ ] A Linux / macOS pass: run it there, fix what falls over (font
       paths, viewport flags, audio device listing).
 - [ ] Housekeeping first: the studio no longer assumes a cube anywhere a

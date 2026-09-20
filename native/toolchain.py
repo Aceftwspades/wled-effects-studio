@@ -111,7 +111,7 @@ def bundled_compiler():
     """A compiler shipped beside the app (HOME/toolchain/: a MinGW-w64 g++
     or a clang++, any layout - the first found under it), which needs no
     MSVC environment. None when there is none."""
-    root = os.path.join(paths.HOME, "toolchain")
+    root = os.environ.get("STUDIO_TOOLCHAIN") or os.path.join(paths.HOME, "toolchain")   # the env: to try one out
     if not os.path.isdir(root):
         return None
     for name in (("g++.exe", "clang++.exe") if IS_WIN else ("g++", "clang++")):
@@ -153,31 +153,65 @@ def find_compiler():
 
 # --- the cache --------------------------------------------------------------------
 def _header_stamp(include_dirs):
-    """Newest mtime among every header a TU could see. Coarse on purpose: a
-    header change rebuilds everything, which is right, and it is cheap to
-    compute against a few hundred files."""
-    newest = 0.0
+    """A digest of every header a TU could see - their names and contents.
+    Coarse on purpose: a header change rebuilds everything, which is right,
+    and a few hundred small files hash in milliseconds. Contents, not
+    mtimes: an object then stays good across a copy, a move, a zip - the
+    packaged app ships its objects and a first build compiles only the
+    effect being added."""
+    h = hashlib.sha1()
     for d in include_dirs:
-        for pat in ("*.h", "*.hpp", "**/*.h"):
-            for f in glob.glob(os.path.join(d, pat), recursive=True):
-                try:
-                    newest = max(newest, os.path.getmtime(f))
-                except OSError:
-                    pass
-    return newest
+        files = set()
+        for pat in ("*.h", "*.hpp", "*.tcc", "**/*.h"):
+            files.update(glob.glob(os.path.join(d, pat), recursive=True))
+        for f in sorted(files):
+            try:
+                h.update(os.path.relpath(f, d).encode("utf-8", "replace")); h.update(open(f, "rb").read())
+            except OSError:
+                pass
+    return h.hexdigest()
+
+
+def _source_key(src):
+    """What names an object: the source's path relative to where it lives
+    (the resources, the home, or its own folder) - the same on every
+    machine the folder is copied to."""
+    src = os.path.abspath(src)
+    bases = [(paths.RES, "")]                             # the studio's own first: it sits inside the tree
+    if paths.TREE:
+        bases.append((paths.TREE, "runtime/"))            # a firmware file: named as the packaged runtime/ copy names it
+    bases.append((paths.HOME, ""))
+    for base, prefix in bases:
+        try:
+            rel = os.path.relpath(src, base)
+        except ValueError:
+            continue
+        if not rel.startswith(".."):
+            return prefix + rel.replace("\\", "/")
+    return src.replace("\\", "/")
 
 
 def _obj_path(src):
-    h = hashlib.sha1(os.path.abspath(src).encode("utf-8")).hexdigest()[:8]
+    h = hashlib.sha1(_source_key(src).encode("utf-8")).hexdigest()[:8]
     base = os.path.splitext(os.path.basename(src))[0]
     return os.path.join(OBJ, f"{base}_{h}.o")
+
+
+def _obj_stamp(src, hstamp):
+    """What an object was made from: the source's contents and the headers' digest."""
+    try:
+        return hashlib.sha1(open(src, "rb").read()).hexdigest() + ":" + hstamp
+    except OSError:
+        return ""
 
 
 def _needs_compile(src, obj, hstamp):
     if not os.path.exists(obj):
         return True
-    om = os.path.getmtime(obj)
-    return om < os.path.getmtime(src) or om < hstamp
+    try:
+        return open(obj + ".stamp", encoding="utf-8").read().strip() != _obj_stamp(src, hstamp)
+    except OSError:
+        return True
 
 
 # --- compiling and linking ----------------------------------------------------------
@@ -185,8 +219,9 @@ def _is_gcc(compiler):
     return os.path.basename(compiler).lower().startswith(("g++", "gcc"))
 
 
-def compile_tu(compiler, env, src, obj, include_dirs, extra_flags=()):
-    """One translation unit to one object. Returns (ok, output text)."""
+def compile_tu(compiler, env, src, obj, include_dirs, extra_flags=(), stamp=None):
+    """One translation unit to one object. Returns (ok, output text). With
+    a `stamp`, what the object was made from is written beside it."""
     os.makedirs(os.path.dirname(obj), exist_ok=True)
     flags = [f for f in COMMON_FLAGS if not (_is_gcc(compiler) and f == "-Wno-vla-cxx-extension")]
     cmd = [compiler] + flags + list(extra_flags) + ["-c"]
@@ -200,6 +235,11 @@ def compile_tu(compiler, env, src, obj, include_dirs, extra_flags=()):
     if r.returncode != 0 and os.path.exists(obj):
         try:
             os.remove(obj)
+        except OSError:
+            pass
+    if r.returncode == 0 and stamp is not None:
+        try:
+            open(obj + ".stamp", "w", encoding="utf-8").write(stamp)
         except OSError:
             pass
     return r.returncode == 0, txt
@@ -310,7 +350,7 @@ def build_engine(sources, include_dirs, jobs=None, force=False, log=print):
         log(f"  compiling {len(todo)} of {len(sources)} translation units")
         jobs = jobs or max(2, (os.cpu_count() or 4))
         with ThreadPoolExecutor(max_workers=jobs) as ex:
-            futs = {ex.submit(compile_tu, compiler, env, s, o, include_dirs): s for s, o in todo}
+            futs = {ex.submit(compile_tu, compiler, env, s, o, include_dirs, (), _obj_stamp(s, hstamp)): s for s, o in todo}
             for fut, src in futs.items():
                 ok, txt = fut.result()
                 rep.compiled.append(src)

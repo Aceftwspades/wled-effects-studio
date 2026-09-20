@@ -11,11 +11,10 @@ NODES.md lists every node; TUTORIAL.md builds a first effect node by node.
 tree): unzip anywhere and run `WLED Effects Studio.exe`. It is portable -
 projects, builds and captures land in its folder (or in `%LOCALAPPDATA%\WLED
 Effects Studio` when the folder cannot be written to). The engine comes
-prebuilt, so viewing, the examples, the script preview and every send to
-a device work at once; building an effect of your own needs a C++
-compiler - a MinGW-w64 in `toolchain\` beside the exe, or emsdk's clang
-with the MSVC Build Tools - and flashing firmware needs a WLED checkout
-(set `WLED_ROOT`) and PlatformIO. `WLED Effects Studio (console).exe` is
+prebuilt, and the release ships a compiler (a cut-down MinGW-w64 GCC in
+`toolchain\`), so everything works at once, building your own effects
+included - a new effect builds in seconds. Only flashing firmware needs
+more: a WLED checkout (set `WLED_ROOT`) and PlatformIO. `WLED Effects Studio (console).exe` is
 the same app with a console, for when something goes wrong.
 
 **From the tree**:
