@@ -1523,9 +1523,171 @@ def snowstorm():
     return b.save("snowstorm.json")
 
 
+def fan():
+    """Fan: blades from the centre sweeping to and fro, brightest at the
+    hub; intensity is the sweep, custom 1 the blades."""
+    b = GB("Fan")
+    sp = b.n("Speed", 0, 0, {"label": "Sweep speed", "default": 110})
+    it = b.n("Intensity", 0, 1, {"label": "Sweep", "default": 160})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Blades", "default": 100})
+    b.n("Effect settings", 0, 4, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    n = b.n("Remap", 1, 3, {"out_lo": 2.0, "out_hi": 10.0}); b.l(c1, "value", n, "x")
+    nf = b.n("Floor", 2, 3); b.l(n, "result", nf, "x")
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.1, "out_hi": 1.2}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    sw = b.n("Wave", 3, 0, {"shape": "triangle"}, inputs={"cycles": 1.0}); b.l(tt, "value", sw, "x")
+    amp = b.n("Remap", 1, 1, {"out_lo": 0.05, "out_hi": 0.5}); b.l(it, "value", amp, "x")
+    ph = b.n("Multiply", 4, 0); b.l(sw, "value", ph, "a"); b.l(amp, "result", ph, "b")
+    ang = b.n("Multiply", 2, 2, inputs={"b": 0.15915}); b.l(co, "angle", ang, "a")
+    st = b.n("Stripes", 3, 2, inputs={"duty": 0.45}); b.l(ang, "result", st, "x"); b.l(nf, "result", st, "count"); b.l(ph, "result", st, "phase")
+    hub = b.n("Subtract", 3, 3, inputs={"a": 1.15}); b.l(co, "r", hub, "b")
+    br = b.n("Multiply", 4, 2); b.l(st, "value", br, "a"); b.l(hub, "result", br, "b")
+    idx = b.n("Add", 4, 3); b.l(ang, "result", idx, "a"); b.l(ph, "result", idx, "b")
+    pal = b.n("Palette", 5, 2); b.l(idx, "result", pal, "index"); b.l(br, "result", pal, "brightness")
+    out = b.n("Output", 6, 2); b.l(pal, "color", out, "color")
+    return b.save("fan.json")
+
+
+def garlands():
+    """Garlands: rows of swags hung between points, swaying; custom 1 sets
+    the swags across, intensity how deep they hang."""
+    b = GB("Garlands")
+    sp = b.n("Speed", 0, 0, {"label": "Sway speed", "default": 90})
+    it = b.n("Intensity", 0, 1, {"label": "Droop", "default": 128})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Swags", "default": 90})
+    c2 = b.n("Custom 2", 0, 3, {"label": "Rows", "default": 96})
+    b.n("Effect settings", 0, 5, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    swags = b.n("Remap", 1, 3, {"out_lo": 1.0, "out_hi": 6.0}); b.l(c1, "value", swags, "x")
+    rows = b.n("Remap", 1, 4, {"out_lo": 1.0, "out_hi": 6.0}); b.l(c2, "value", rows, "x")
+    rowsf = b.n("Floor", 2, 4); b.l(rows, "result", rowsf, "x")
+    droop = b.n("Remap", 1, 1, {"out_lo": 0.1, "out_hi": 0.6}); b.l(it, "value", droop, "x")
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.2, "out_hi": 2.0}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    sway = b.n("Wave", 3, 0, {"shape": "sine"}, inputs={"cycles": 1.0}); b.l(tt, "value", sway, "x")
+    sw2 = b.n("Remap", 4, 0, {"out_lo": -0.08, "out_hi": 0.08}); b.l(sway, "value", sw2, "x")
+    ux = b.n("Add", 2, 2); b.l(co, "u", ux, "a"); b.l(sw2, "result", ux, "b")
+    arc = b.n("Wave", 3, 2, {"shape": "triangle"}); b.l(ux, "result", arc, "x"); b.l(swags, "result", arc, "cycles")
+    hang = b.n("Multiply", 4, 2); b.l(arc, "value", hang, "a"); b.l(droop, "result", hang, "b")
+    vr = b.n("Multiply", 3, 3); b.l(co, "v", vr, "a"); b.l(rowsf, "result", vr, "b")
+    y = b.n("Subtract", 5, 2); b.l(vr, "result", y, "a"); b.l(hang, "result", y, "b")
+    fr = b.n("Fract", 6, 2); b.l(y, "result", fr, "x")
+    band = b.n("Subtract", 7, 2, inputs={"a": 0.5}); b.l(fr, "result", band, "b")
+    ab = b.n("Abs", 8, 2); b.l(band, "result", ab, "x")
+    lit = b.n("Smoothstep", 9, 2, {"e0": 0.16, "e1": 0.05}); b.l(ab, "result", lit, "x")
+    idx = b.n("Add", 8, 3); b.l(co, "u", idx, "a"); b.l(tt, "value", idx, "b")
+    pal = b.n("Palette", 10, 2); b.l(idx, "result", pal, "index"); b.l(lit, "result", pal, "brightness")
+    out = b.n("Output", 11, 2); b.l(pal, "color", out, "color")
+    return b.save("garlands.json")
+
+
+def lightning():
+    """Lightning: a bolt of noise down the matrix, flashing and fading, a
+    new path each strike; intensity is how often it strikes."""
+    b = GB("Lightning")
+    sp = b.n("Speed", 0, 0, {"label": "Fade speed", "default": 128})
+    it = b.n("Intensity", 0, 1, {"label": "Strikes", "default": 100})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Jaggedness", "default": 128})
+    b.n("Effect settings", 0, 4, {"palette": 0, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    tt = b.n("Integrate", 1, 0, {"wrap": 0.0}, inputs={"rate": 1.0})
+    rate = b.n("Remap", 2, 0, {"out_lo": 0.5, "out_hi": 4.0}); b.l(it, "value", rate, "x")
+    slot = b.n("Multiply", 3, 0); b.l(tt, "value", slot, "a"); b.l(rate, "result", slot, "b")
+    strike = b.n("Floor", 4, 0); b.l(slot, "result", strike, "x")
+    within = b.n("Fract", 4, 1); b.l(slot, "result", within, "x")
+    hs = b.n("Hash", 5, 0, inputs={"y": 7.0, "seed": 2.0}); b.l(strike, "result", hs, "x")
+    fire = b.n("Threshold", 6, 0, inputs={"at": 0.55}); b.l(hs, "value", fire, "x")
+    gate = b.n("Select", 7, 0, inputs={"a": 0.0, "b": 1.0}); b.l(fire, "on", gate, "on")
+    fade = b.n("Remap", 2, 1, {"out_lo": 2.0, "out_hi": 12.0}); b.l(sp, "value", fade, "x")
+    inv = b.n("Subtract", 5, 1, inputs={"a": 1.0}); b.l(within, "result", inv, "b")
+    glow = b.n("Power", 6, 1); b.l(inv, "result", glow, "x"); b.l(fade, "result", glow, "e")
+    bright = b.n("Multiply", 8, 1); b.l(gate, "result", bright, "a"); b.l(glow, "result", bright, "b")
+    jag = b.n("Remap", 1, 3, {"out_lo": 0.05, "out_hi": 0.35}); b.l(c1, "value", jag, "x")
+    vy = b.n("Multiply", 2, 2, inputs={"b": 6.0}); b.l(co, "v", vy, "a")
+    nz = b.n("Noise", 3, 2, {"octaves": 2}, inputs={"scale": 1.0, "x": 0.5}); b.l(vy, "result", nz, "y"); b.l(strike, "result", nz, "z")
+    off = b.n("Subtract", 4, 2, inputs={"b": 0.5}); b.l(nz, "value", off, "a")
+    wob = b.n("Multiply", 5, 2); b.l(off, "result", wob, "a"); b.l(jag, "result", wob, "b")
+    bx = b.n("Add", 6, 2, inputs={"a": 0.5}); b.l(wob, "result", bx, "b")
+    dx = b.n("Subtract", 7, 2); b.l(co, "u", dx, "a"); b.l(bx, "result", dx, "b")
+    adx = b.n("Abs", 8, 2); b.l(dx, "result", adx, "x")
+    bolt = b.n("Smoothstep", 9, 2, {"e0": 0.06, "e1": 0.01}); b.l(adx, "result", bolt, "x")
+    halo = b.n("Smoothstep", 9, 3, {"e0": 0.3, "e1": 0.0}); b.l(adx, "result", halo, "x")
+    h2 = b.n("Multiply", 10, 3, inputs={"b": 0.25}); b.l(halo, "result", h2, "a")
+    shape = b.n("Max", 10, 2); b.l(bolt, "result", shape, "a"); b.l(h2, "result", shape, "b")
+    lum = b.n("Multiply", 11, 2); b.l(shape, "result", lum, "a"); b.l(bright, "result", lum, "b")
+    white = b.n("Colour", 11, 3, {"rgb": [225, 235, 255]})
+    sky = b.n("Colour", 11, 4, {"rgb": [6, 6, 20]})
+    mix = b.n("Blend", 12, 3, {"mode": "over"}); b.l(sky, "color", mix, "under"); b.l(white, "color", mix, "over"); b.l(lum, "result", mix, "amount")
+    out = b.n("Output", 13, 3); b.l(mix, "color", out, "color")
+    return b.save("lightning.json")
+
+
+def morph():
+    """Morph: a soft bar sweeping across and back while its colour walks
+    the palette; intensity is the bar's width."""
+    b = GB("Morph")
+    sp = b.n("Speed", 0, 0, {"label": "Sweep speed", "default": 100})
+    it = b.n("Intensity", 0, 1, {"label": "Bar width", "default": 100})
+    k1 = b.n("Check 1", 0, 2, {"label": "Vertical", "default": False})
+    b.n("Effect settings", 0, 4, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.1, "out_hi": 1.2}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    pos = b.n("Wave", 3, 0, {"shape": "triangle"}, inputs={"cycles": 1.0}); b.l(tt, "value", pos, "x")
+    axis = b.n("Select", 2, 2); b.l(k1, "on", axis, "on"); b.l(co, "v", axis, "a"); b.l(co, "u", axis, "b")
+    d = b.n("Subtract", 4, 2); b.l(axis, "result", d, "a"); b.l(pos, "value", d, "b")
+    ad = b.n("Abs", 5, 2); b.l(d, "result", ad, "x")
+    w = b.n("Remap", 1, 1, {"out_lo": 0.04, "out_hi": 0.4}); b.l(it, "value", w, "x")
+    rel = b.n("Divide", 6, 2); b.l(ad, "result", rel, "a"); b.l(w, "result", rel, "b")
+    bar = b.n("Smoothstep", 7, 2, {"e0": 1.0, "e1": 0.2}); b.l(rel, "result", bar, "x")
+    idx = b.n("Add", 6, 3, inputs={"b": 0.0}); b.l(tt, "value", idx, "a"); b.l(axis, "result", idx, "b")
+    pal = b.n("Palette", 8, 2); b.l(idx, "result", pal, "index"); b.l(bar, "result", pal, "brightness")
+    out = b.n("Output", 9, 2); b.l(pal, "color", out, "color")
+    return b.save("morph.json")
+
+
+def tendril():
+    """Tendril: a rope waving from the top, thick at the root and fine at
+    the tip; intensity is the wave, custom 1 the sway."""
+    b = GB("Tendril")
+    sp = b.n("Speed", 0, 0, {"label": "Wave speed", "default": 110})
+    it = b.n("Intensity", 0, 1, {"label": "Wave", "default": 128})
+    c1 = b.n("Custom 1", 0, 2, {"label": "Sway", "default": 100})
+    b.n("Effect settings", 0, 4, {"palette": 11, "dimensions": "both"})
+    co = b.n("Coords", 1, 2)
+    spd = b.n("Remap", 1, 0, {"out_lo": 0.2, "out_hi": 2.5}); b.l(sp, "value", spd, "x")
+    tt = b.n("Integrate", 2, 0, {"wrap": 0.0}); b.l(spd, "result", tt, "rate")
+    amp = b.n("Remap", 1, 1, {"out_lo": 0.03, "out_hi": 0.3}); b.l(it, "value", amp, "x")
+    swa = b.n("Remap", 1, 3, {"out_lo": 0.0, "out_hi": 0.3}); b.l(c1, "value", swa, "x")
+    v3 = b.n("Multiply", 2, 2, inputs={"b": 2.0}); b.l(co, "v", v3, "a")
+    arg = b.n("Subtract", 3, 2); b.l(v3, "result", arg, "a"); b.l(tt, "value", arg, "b")
+    wv = b.n("Wave", 4, 2, {"shape": "sine"}, inputs={"cycles": 1.0}); b.l(arg, "result", wv, "x")
+    c = b.n("Remap", 5, 2, {"out_lo": -1.0, "out_hi": 1.0}); b.l(wv, "value", c, "x")
+    grow = b.n("Multiply", 5, 3); b.l(co, "v", grow, "a"); b.l(amp, "result", grow, "b")           # more wave towards the tip
+    wig = b.n("Multiply", 6, 2); b.l(c, "result", wig, "a"); b.l(grow, "result", wig, "b")
+    slow = b.n("Multiply", 3, 0, inputs={"b": 0.37}); b.l(tt, "value", slow, "a")
+    sw = b.n("Wave", 4, 0, {"shape": "sine"}, inputs={"cycles": 1.0}); b.l(slow, "result", sw, "x")
+    sw2 = b.n("Remap", 5, 0, {"out_lo": -1.0, "out_hi": 1.0}); b.l(sw, "value", sw2, "x")
+    lean = b.n("Multiply", 6, 0); b.l(sw2, "result", lean, "a"); b.l(swa, "result", lean, "b")
+    leanv = b.n("Multiply", 7, 0); b.l(lean, "result", leanv, "a"); b.l(co, "v", leanv, "b")
+    x = b.n("Add", 7, 2, inputs={"a": 0.5}); b.l(wig, "result", x, "b")
+    x2 = b.n("Add", 8, 2); b.l(x, "result", x2, "a"); b.l(leanv, "result", x2, "b")
+    dx = b.n("Subtract", 9, 2); b.l(co, "u", dx, "a"); b.l(x2, "result", dx, "b")
+    adx = b.n("Abs", 10, 2); b.l(dx, "result", adx, "x")
+    thick = b.n("Remap", 9, 3, {"in_lo": 0.0, "in_hi": 1.0, "out_lo": 0.12, "out_hi": 0.02}); b.l(co, "v", thick, "x")
+    rel = b.n("Divide", 11, 2); b.l(adx, "result", rel, "a"); b.l(thick, "result", rel, "b")
+    rope = b.n("Smoothstep", 12, 2, {"e0": 1.0, "e1": 0.3}); b.l(rel, "result", rope, "x")
+    idx = b.n("Add", 11, 3); b.l(co, "v", idx, "a"); b.l(tt, "value", idx, "b")
+    pal = b.n("Palette", 13, 2); b.l(idx, "result", pal, "index"); b.l(rope, "result", pal, "brightness")
+    out = b.n("Output", 14, 2); b.l(pal, "color", out, "color")
+    return b.save("tendril.json")
+
+
 ALL = [slab_cut, cell_weave, truchet, ring_rain, box_fire, maelstrom, kaleidoscope, mandelbrot, watershed, moire,
        ripples, chladni, candy_knot, gyro_sand, breakout, cube_axes, liquid_tunnel, question_block, feigenbaum, liquid,
-       smiley, fireworks, meteors, spirals, pinwheel, curtain, marquee, shockwave, butterfly, snowstorm]
+       smiley, fireworks, meteors, spirals, pinwheel, curtain, marquee, shockwave, butterfly, snowstorm,
+       fan, garlands, lightning, morph, tendril]
 STATIC_EXTRA = {"Smiley"}
 
 

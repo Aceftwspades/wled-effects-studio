@@ -54,6 +54,16 @@ ACTIONS = [
     ("push",          "Send the current effect's settings to the device",     "Ctrl+Shift+P", "global"),
     ("script_preview", "Run the graph as a script (what the device would run)", "Ctrl+Shift+R", "global"),
     ("script_send",   "Send the graph to the device as a script",             "Ctrl+Shift+D", "global"),
+    ("stream",        "Stream the sim to the device (DDP), on / off",         "Ctrl+Shift+T", "global"),
+    # the frames (Device and View menus): each floats over the panes or docks into them
+    ("devices",       "Devices on the network",                              "Ctrl+Shift+N", "global"),
+    ("send_frame",    "Send to device: the effects, a script, the shape",    "Ctrl+Shift+S", "global"),
+    ("shape",         "Shape editor",                                        "Ctrl+Shift+E", "global"),
+    ("sequence",      "Sequence: presets, a playlist and the schedule",      "Ctrl+Shift+Q", "global"),
+    ("library",       "Library: every effect as a looping thumbnail",        "Ctrl+Shift+L", "global"),
+    ("palettes",      "Palettes: gradients of the project's own",            "Ctrl+Shift+G", "global"),
+    ("outputs",       "LED outputs and power",                               "Ctrl+Shift+O", "global"),
+    ("randomise",     "Randomise the settings",                              "Ctrl+Shift+X", "global"),
     # the graph
     ("undo",          "Undo (the graph, or the code)",                       "Ctrl+Z", "global"),
     ("redo",          "Redo (the graph, or the code)",                       "Ctrl+Y", "global"),

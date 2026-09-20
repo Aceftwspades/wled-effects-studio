@@ -55,7 +55,7 @@ def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=
     if mode == "effect":
         try:
             if eng is None:
-                eng = Engine(app._b_library())
+                eng = app.second_engine("shape")
                 eng.set_geometry(g)
             if effect is None:
                 eng.select(app.eng.idx, params=dict(app.eng.fx, pal=app.eng.pal))

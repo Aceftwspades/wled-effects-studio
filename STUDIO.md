@@ -838,12 +838,30 @@ plugins, FPP scheduling, video playback.
 - [x] **Randomise** (Playback > Randomise the settings): the sliders,
       the checks and the palette thrown, for exploring.
 - [x] **xLights' effects as example graphs** (`examples/build_examples.py`,
-      first eight): Meteors, Spirals, Pinwheel, Curtain, Marquee,
-      Shockwave, Butterfly, Snowstorm. Writing them found two script
-      compiler bugs: a declaration with two type words after `static`
-      looped forever (`static or take()` skipped the take), and a hex
-      literal's suffix strip ate its F digits (`0xFFFFu` -> `0x`).
-      Still to do: Fan, Garlands, Lightning, Morph, Tendril.
+      thirteen): Meteors, Spirals, Pinwheel, Curtain, Marquee, Shockwave,
+      Butterfly, Snowstorm, Fan, Garlands, Lightning, Morph, Tendril.
+      Writing them found two script compiler bugs: a declaration with
+      two type words after `static` looped forever (`static or take()`
+      skipped the take), and a hex literal's suffix strip ate its F
+      digits (`0xFFFFu` -> `0x`) - and one in the bank: the roster's
+      count was a byte, so the sim's 256-effect roster wrapped at the
+      257th effect and the examples check found four effects.
+- [x] **Icons and a bug sweep** after the second pass: the toolbar's
+      right half opens the frames (devices, flash, send, the stream as
+      a toggle; shape, sequence, library, palettes, outputs), each with
+      a key (Ctrl+Shift+N/U/S/T, E/Q/L/G/O; randomise X); the frames'
+      dock button is an icon that flips to "float" when docked. Fixed on
+      the way: hotkeys fired while typing in any of the new frames'
+      boxes (the guard now asks what has the focus, not a fixed list);
+      every shape preview, thumbnail and transition made another engine
+      on another copy of the DLL, none ever let go (a pool, one engine a
+      purpose, reloaded when the library is rebuilt); the schedule's Off
+      preset was the playlist's id + 1 = the first step's preset, so the
+      off timer played the first step (a fixed id, 250); a part of a kind
+      this version does not know made the project unopenable (now no
+      LEDs); a sequence step saved on a bigger shape put a segment off
+      the matrix (bounds clamped); popouts outlived a crashed or killed
+      app (they watch the parent's pid).
 - [x] **The 3-D view's surroundings** (View > Camera): a background
       picture (dimmed, behind the point cloud and the GPU cube alike),
       camera presets (isometric, front, back, left, right, top, below)

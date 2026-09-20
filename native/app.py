@@ -333,7 +333,6 @@ class App(Features):
         self.cube_quads = None       # CubeQuads while the GPU view is up
         self.ab = None               # a second engine, for comparing two effects side by side
         self.ab_name = None
-        self._ab_n = 0
         self._code_undo, self._code_redo, self._code_text, self._code_t = [], [], "", 0.0
         self.frames = None           # glow.Frames, once the viewport exists
         self.keys = Keymap(self.prefs)
@@ -2432,6 +2431,23 @@ class App(Features):
         # Multiplicative, so a notch moves the same proportion at every range.
         self.dist = max(1.9, min(14.0, self.dist * np.exp(-app_data * 0.06)))
 
+    TYPING = ("mvAppItemType::mvInputText", "mvAppItemType::mvInputInt", "mvAppItemType::mvInputFloat",
+              "mvAppItemType::mvInputDouble", "mvAppItemType::mvInputIntMulti", "mvAppItemType::mvInputFloatMulti",
+              "mvAppItemType::mvInputDoubleMulti", "mvAppItemType::mvSliderFloat", "mvAppItemType::mvSliderInt",
+              "mvAppItemType::mvDragFloat", "mvAppItemType::mvDragInt")
+
+    def typing(self):
+        """True while a box somewhere has the keyboard: the focused item is
+        an input (any frame's - the sequence's name, the library's search,
+        a shape's size...) and active, or one of the boxes registered by
+        hand. The key handler is global, so without this a letter typed
+        into a name would also be a hotkey."""
+        f = dpg.get_focused_item()
+        if f and dpg.does_item_exist(f) and dpg.get_item_type(f) in self.TYPING and dpg.is_item_active(f):
+            return True
+        return any(dpg.does_item_exist(t) and dpg.is_item_active(t)
+                   for t in tuple(self._inputs) + ("find_text", "replace_text", "dev_add_host", "name_input", "editor_cmd") + self.META_FIELDS)
+
     def on_key(self, sender, app_data):
         if app_data == dpg.mvKey_Escape:
             self._picker = None
@@ -2454,13 +2470,10 @@ class App(Features):
                 return
             if not ctrl_ and app_data not in (dpg.mvKey_F1, dpg.mvKey_F2, dpg.mvKey_F3, dpg.mvKey_F5, dpg.mvKey_F11, dpg.mvKey_F12):
                 return                                   # plain keys are typing
-        if any(dpg.does_item_exist(t) and dpg.is_item_active(t) for t in self._inputs):
-            return
         if app_data == dpg.mvKey_F3 and dpg.does_item_exist("find_text") and dpg.is_item_active("find_text"):
             self.run_action("find_prev" if (dpg.is_key_down(dpg.mvKey_LShift) or dpg.is_key_down(dpg.mvKey_RShift)) else "find_next")
             return
-        if any(dpg.does_item_exist(t) and dpg.is_item_active(t)
-               for t in ("find_text", "replace_text", "dev_add_host", "name_input", "editor_cmd") + self.META_FIELDS):
+        if self.typing():
             return
         if dpg.does_item_exist("name_dialog") and dpg.is_item_shown("name_dialog"):
             if app_data == dpg.mvKey_Escape:
@@ -2536,6 +2549,15 @@ class App(Features):
             "shortcuts":    lambda: chrome.show_keys(self),
             "flash":        lambda: chrome.show_flash(self),
             "push":         self.push_settings,
+            "stream":       lambda: self.stream_stop() if getattr(self, "ddp", None) is not None else self.stream_start(),
+            "devices":      lambda: device_ui.show(self, "devices"),
+            "send_frame":   lambda: device_ui.show(self, "send"),
+            "shape":        lambda: device_ui.show(self, "shape"),
+            "sequence":     lambda: device_ui.show(self, "sequence"),
+            "library":      lambda: device_ui.show(self, "library"),
+            "palettes":     lambda: device_ui.show(self, "palettes"),
+            "outputs":      lambda: device_ui.show(self, "outputs"),
+            "randomise":    self.randomise,
             "undo":         lambda: self.code_undo() if self.layout == "edit" else gp.undo(),
             "redo":         lambda: self.code_redo() if self.layout == "edit" else gp.redo(),
             "cut":          gp.cut,

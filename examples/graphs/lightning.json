@@ -1,0 +1,640 @@
+{
+ "name": "Lightning",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Fade speed",
+    "default": 128
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Strikes",
+    "default": 100
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Custom 1",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Jaggedness",
+    "default": 128
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {
+    "palette": 0,
+    "dimensions": "both",
+    "audio": "none",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Coords",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Integrate",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "wrap": 0.0
+   },
+   "inputs": {
+    "rate": 1.0
+   }
+  },
+  {
+   "id": 7,
+   "type": "Remap",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.5,
+    "out_hi": 4.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Multiply",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Floor",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Fract",
+   "pos": [
+    960,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Hash",
+   "pos": [
+    1190,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "y": 7.0,
+    "seed": 2.0
+   }
+  },
+  {
+   "id": 12,
+   "type": "Threshold",
+   "pos": [
+    1420,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.55
+   }
+  },
+  {
+   "id": 13,
+   "type": "Select",
+   "pos": [
+    1650,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 14,
+   "type": "Remap",
+   "pos": [
+    500,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 2.0,
+    "out_hi": 12.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Subtract",
+   "pos": [
+    1190,
+    170
+   ],
+   "params": {},
+   "inputs": {
+    "a": 1.0
+   }
+  },
+  {
+   "id": 16,
+   "type": "Power",
+   "pos": [
+    1420,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Multiply",
+   "pos": [
+    1880,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Remap",
+   "pos": [
+    270,
+    430
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.05,
+    "out_hi": 0.35
+   },
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Multiply",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "b": 6.0
+   }
+  },
+  {
+   "id": 20,
+   "type": "Noise",
+   "pos": [
+    730,
+    300
+   ],
+   "params": {
+    "octaves": 2,
+    "roughness": 0.5
+   },
+   "inputs": {
+    "scale": 1.0,
+    "x": 0.5
+   }
+  },
+  {
+   "id": 21,
+   "type": "Subtract",
+   "pos": [
+    960,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 22,
+   "type": "Multiply",
+   "pos": [
+    1190,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 23,
+   "type": "Add",
+   "pos": [
+    1420,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.5
+   }
+  },
+  {
+   "id": 24,
+   "type": "Subtract",
+   "pos": [
+    1650,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 25,
+   "type": "Abs",
+   "pos": [
+    1880,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 26,
+   "type": "Smoothstep",
+   "pos": [
+    2110,
+    300
+   ],
+   "params": {
+    "e0": 0.06,
+    "e1": 0.01
+   },
+   "inputs": {}
+  },
+  {
+   "id": 27,
+   "type": "Smoothstep",
+   "pos": [
+    2110,
+    430
+   ],
+   "params": {
+    "e0": 0.3,
+    "e1": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 28,
+   "type": "Multiply",
+   "pos": [
+    2340,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.25
+   }
+  },
+  {
+   "id": 29,
+   "type": "Max",
+   "pos": [
+    2340,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 30,
+   "type": "Multiply",
+   "pos": [
+    2570,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 31,
+   "type": "Colour",
+   "pos": [
+    2570,
+    430
+   ],
+   "params": {
+    "rgb": [
+     225,
+     235,
+     255
+    ]
+   },
+   "inputs": {}
+  },
+  {
+   "id": 32,
+   "type": "Colour",
+   "pos": [
+    2570,
+    560
+   ],
+   "params": {
+    "rgb": [
+     6,
+     6,
+     20
+    ]
+   },
+   "inputs": {}
+  },
+  {
+   "id": 33,
+   "type": "Blend",
+   "pos": [
+    2800,
+    430
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 34,
+   "type": "Output",
+   "pos": [
+    3030,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   2,
+   "value",
+   7,
+   "x"
+  ],
+  [
+   6,
+   "value",
+   8,
+   "a"
+  ],
+  [
+   7,
+   "result",
+   8,
+   "b"
+  ],
+  [
+   8,
+   "result",
+   9,
+   "x"
+  ],
+  [
+   8,
+   "result",
+   10,
+   "x"
+  ],
+  [
+   9,
+   "result",
+   11,
+   "x"
+  ],
+  [
+   11,
+   "value",
+   12,
+   "x"
+  ],
+  [
+   12,
+   "on",
+   13,
+   "on"
+  ],
+  [
+   1,
+   "value",
+   14,
+   "x"
+  ],
+  [
+   10,
+   "result",
+   15,
+   "b"
+  ],
+  [
+   15,
+   "result",
+   16,
+   "x"
+  ],
+  [
+   14,
+   "result",
+   16,
+   "e"
+  ],
+  [
+   13,
+   "result",
+   17,
+   "a"
+  ],
+  [
+   16,
+   "result",
+   17,
+   "b"
+  ],
+  [
+   3,
+   "value",
+   18,
+   "x"
+  ],
+  [
+   5,
+   "v",
+   19,
+   "a"
+  ],
+  [
+   19,
+   "result",
+   20,
+   "y"
+  ],
+  [
+   9,
+   "result",
+   20,
+   "z"
+  ],
+  [
+   20,
+   "value",
+   21,
+   "a"
+  ],
+  [
+   21,
+   "result",
+   22,
+   "a"
+  ],
+  [
+   18,
+   "result",
+   22,
+   "b"
+  ],
+  [
+   22,
+   "result",
+   23,
+   "b"
+  ],
+  [
+   5,
+   "u",
+   24,
+   "a"
+  ],
+  [
+   23,
+   "result",
+   24,
+   "b"
+  ],
+  [
+   24,
+   "result",
+   25,
+   "x"
+  ],
+  [
+   25,
+   "result",
+   26,
+   "x"
+  ],
+  [
+   25,
+   "result",
+   27,
+   "x"
+  ],
+  [
+   27,
+   "result",
+   28,
+   "a"
+  ],
+  [
+   26,
+   "result",
+   29,
+   "a"
+  ],
+  [
+   28,
+   "result",
+   29,
+   "b"
+  ],
+  [
+   29,
+   "result",
+   30,
+   "a"
+  ],
+  [
+   17,
+   "result",
+   30,
+   "b"
+  ],
+  [
+   32,
+   "color",
+   33,
+   "under"
+  ],
+  [
+   31,
+   "color",
+   33,
+   "over"
+  ],
+  [
+   30,
+   "result",
+   33,
+   "amount"
+  ],
+  [
+   33,
+   "color",
+   34,
+   "color"
+  ]
+ ]
+}

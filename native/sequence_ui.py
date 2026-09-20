@@ -148,6 +148,9 @@ def _timers(app):
     return app.project.options.setdefault("schedule", [])
 
 
+OFF_PRESET = 250          # the "Off" preset the off timers call: high, out of the steps' way
+
+
 def add_timer(app, what):
     T = _timers(app)
     if len(T) >= 10:
@@ -155,7 +158,7 @@ def add_timer(app, what):
     S = _steps(app)
     pid = int(S.get("pid", 9))
     T.append({"en": True, "when": "time", "hour": 18 if what == "playlist" else 23, "min": 0, "dow": 127,
-              "preset": pid if what == "playlist" else pid + 1, "what": what})
+              "preset": pid if what == "playlist" else OFF_PRESET, "what": what})
     app.project.save(); refresh_timers(app)
 
 
@@ -227,9 +230,12 @@ def send_timers(app):
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
     h = host if host.startswith("http") else "http://" + host
     S = _steps(app)
-    # an "off" preset for the off timers: the playlist's id + 1, saved as a state that is off
+    # an "off" preset for the off timers, saved as a state that is off. A fixed
+    # high id: the playlist's id + 1 used to be it, which is the first step's
+    # preset by default (playlist 9, steps from 10) - the off timer then played
+    # the first step.
     if any(t.get("what") == "off" for t in T):
-        body = {"on": False, "psave": int(S.get("pid", 9)) + 1, "n": "Off"}
+        body = {"on": False, "psave": OFF_PRESET, "n": "Off"}
         try:
             urllib.request.urlopen(urllib.request.Request(h + "/json/state", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}), timeout=6).read()
         except Exception as e:

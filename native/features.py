@@ -429,13 +429,10 @@ class Features:
         """The old step into the second engine; the blend runs `dur` seconds."""
         from native import sequence
         from native.engine import Engine
-        eng2 = getattr(self, "_seq_eng", None)
-        if eng2 is None or getattr(self, "_seq_eng_src", None) != self.eng.library:
-            try:
-                eng2 = Engine(self._b_library()); eng2.set_geometry(self.project.geometry)
-            except Exception as e:
-                self.gp.status(f"no second engine for the transition: {e}"); return
-            self._seq_eng, self._seq_eng_src = eng2, self.eng.library
+        try:
+            eng2 = self.second_engine("transition")
+        except Exception as e:
+            self.gp.status(f"no second engine for the transition: {e}"); return
         try:
             if eng2.cols != self.eng.cols or eng2.rows != self.eng.rows:
                 eng2.set_geometry(self.project.geometry)
@@ -676,20 +673,41 @@ class Features:
     # engine: the same library copied under another name (the loader gives
     # one process one instance per FILE). B gets A's geometry, colours and
     # audio each frame; the view splits, the camera is shared.
-    def _b_library(self):
+    def _b_library(self, purpose="b"):
+        """A copy of the current library for a second engine. A DLL loaded
+        twice by its path is the SAME module - one set of statics - so each
+        engine needs a file of its own; one per purpose per build
+        (cubefx_338_shape.dll), so the copies do not pile up."""
         lib = self.eng.library
-        self._ab_n += 1
         root, ext = os.path.splitext(lib)
-        path = f"{root}_b{self._ab_n}{ext}"
-        shutil.copyfile(lib, path)
+        path = f"{root}_{purpose}{ext}"
+        if not os.path.exists(path):
+            shutil.copyfile(lib, path)
         return path
+
+    def second_engine(self, purpose):
+        """A second engine for a purpose - "shape" (the shape's preview),
+        "library" (the thumbnails), "library_gen" (the previews of every
+        effect, on a thread), "transition" (the old step during a blend) -
+        made once and kept, its library swapped when the sim's is rebuilt.
+        Without the pool every preview made another engine on another copy
+        of the DLL, none of them ever let go."""
+        from native.engine import Engine
+        pool = self.__dict__.setdefault("_engines", {})
+        eng, src = pool.get(purpose, (None, None))
+        if eng is None:
+            eng = Engine(self._b_library(purpose))
+        elif src != self.eng.library:
+            eng.reload(self._b_library(purpose))      # unloads the old copy for the prune
+        pool[purpose] = (eng, self.eng.library)
+        return eng
     def start_ab(self, name):
         if name not in self.eng.names:
             return
         self._gpu_was = None
         try:
             if self.ab is None:
-                self.ab = Engine(self._b_library())
+                self.ab = Engine(self._b_library("ab"))
             self._ab_sync()
             self.ab.select(self.ab.names.index(name))
         except Exception as e:
@@ -718,7 +736,7 @@ class Features:
         if not self.ab:
             return
         try:
-            self.ab.reload(self._b_library())
+            self.ab.reload(self._b_library("ab"))
             self._ab_sync()
             if self.ab_name in self.ab.names:
                 self.ab.select(self.ab.names.index(self.ab_name))

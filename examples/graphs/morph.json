@@ -1,0 +1,320 @@
+{
+ "name": "Morph",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Sweep speed",
+    "default": 100
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Bar width",
+    "default": 100
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Check 1",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Vertical",
+    "default": false
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {
+    "palette": 11,
+    "dimensions": "both",
+    "audio": "none",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Coords",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Remap",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.1,
+    "out_hi": 1.2
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Integrate",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {
+    "wrap": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Wave",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {
+    "shape": "triangle"
+   },
+   "inputs": {
+    "cycles": 1.0
+   }
+  },
+  {
+   "id": 9,
+   "type": "Select",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Subtract",
+   "pos": [
+    960,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Abs",
+   "pos": [
+    1190,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.04,
+    "out_hi": 0.4
+   },
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Divide",
+   "pos": [
+    1420,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Smoothstep",
+   "pos": [
+    1650,
+    300
+   ],
+   "params": {
+    "e0": 1.0,
+    "e1": 0.2
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Add",
+   "pos": [
+    1420,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.0
+   }
+  },
+  {
+   "id": 16,
+   "type": "Palette",
+   "pos": [
+    1880,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Output",
+   "pos": [
+    2110,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   6,
+   "x"
+  ],
+  [
+   6,
+   "result",
+   7,
+   "rate"
+  ],
+  [
+   7,
+   "value",
+   8,
+   "x"
+  ],
+  [
+   3,
+   "on",
+   9,
+   "on"
+  ],
+  [
+   5,
+   "v",
+   9,
+   "a"
+  ],
+  [
+   5,
+   "u",
+   9,
+   "b"
+  ],
+  [
+   9,
+   "result",
+   10,
+   "a"
+  ],
+  [
+   8,
+   "value",
+   10,
+   "b"
+  ],
+  [
+   10,
+   "result",
+   11,
+   "x"
+  ],
+  [
+   2,
+   "value",
+   12,
+   "x"
+  ],
+  [
+   11,
+   "result",
+   13,
+   "a"
+  ],
+  [
+   12,
+   "result",
+   13,
+   "b"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "x"
+  ],
+  [
+   7,
+   "value",
+   15,
+   "a"
+  ],
+  [
+   9,
+   "result",
+   15,
+   "b"
+  ],
+  [
+   15,
+   "result",
+   16,
+   "index"
+  ],
+  [
+   14,
+   "result",
+   16,
+   "brightness"
+  ],
+  [
+   16,
+   "color",
+   17,
+   "color"
+  ]
+ ]
+}

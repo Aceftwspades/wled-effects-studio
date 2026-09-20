@@ -90,7 +90,7 @@ class Popouts:
             self._write(view, blk, np.zeros((eng.rows, eng.cols, 3), np.uint8), eng, cam)
         except Exception:
             pass
-        proc = subprocess.Popen([sys.executable, "-m", "native.popout", view, name], cwd=HERE)
+        proc = subprocess.Popen([sys.executable, "-m", "native.popout", view, name, str(os.getpid())], cwd=HERE)
         self.jobs[view] = (proc, blk)
 
     def close(self, view):
@@ -171,7 +171,30 @@ def _load_pos(view):
         return {}
 
 
-def run(view, name):
+def _parent_alive(pid):
+    """Is the app still there? Its clean exit clears the block's alive word,
+    but a crash or a kill does not, and a window left behind showing a
+    frozen frame is not what anyone wants."""
+    if not pid:
+        return True
+    try:
+        if os.name == "nt":
+            import ctypes
+            k32 = ctypes.windll.kernel32
+            h = k32.OpenProcess(0x1000, False, int(pid))      # PROCESS_QUERY_LIMITED_INFORMATION
+            if not h:
+                return False
+            code = ctypes.c_ulong()
+            ok = k32.GetExitCodeProcess(h, ctypes.byref(code))
+            k32.CloseHandle(h)
+            return bool(ok) and code.value == 259               # STILL_ACTIVE
+        os.kill(int(pid), 0)
+        return True
+    except Exception:
+        return True
+
+
+def run(view, name, parent=0):
     import dearpygui.dearpygui as dpg
     from native import render
     from native.gpucube import CubeQuads
@@ -326,6 +349,8 @@ def run(view, name):
         while dpg.is_dearpygui_running():
             if int(blk.i[0]) == 0:
                 break
+            if stale % 60 == 59 and not _parent_alive(parent):
+                break
             seq = int(blk.i[1])
             if seq != last:
                 last = seq
@@ -357,4 +382,4 @@ def run(view, name):
 
 
 if __name__ == "__main__":
-    run(sys.argv[1], sys.argv[2])
+    run(sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 0)

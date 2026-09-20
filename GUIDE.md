@@ -20,7 +20,13 @@ the project, the effect, its sliders, the segments, the geometry, colours
 and audio. **G** opens the graph pane, **C** the code pane; **Q / E / W**
 show one view or both full-frame (press again to come back); **H** hides
 every control; **space** pauses. Every key is on the menus and under
-Settings > Keyboard shortcuts, where any can be changed.
+Settings > Keyboard shortcuts, where any can be changed. The toolbar's
+right half is the device and the frames: devices (Ctrl+Shift+N), flash
+(Ctrl+Shift+U), send to device (Ctrl+Shift+S), the DDP stream on or off
+(Ctrl+Shift+T, lit amber while it runs); then the shape editor
+(Ctrl+Shift+E), the sequence (Ctrl+Shift+Q), the library (Ctrl+Shift+L),
+the palettes (Ctrl+Shift+G) and the LED outputs (Ctrl+Shift+O). Playback
+> Randomise is Ctrl+Shift+X.
 
 A node's long settings (bitmap rows, expressions, files) are edited in
 the Properties pane, which sits under the 3-D view in the graph layout (N
@@ -188,16 +194,17 @@ it, so the sequence changes on the music.
 **SCHEDULE** under it is the device's timers: "+ run the playlist at"
 and "+ off at" add a row - a time of day, or sunrise / sunset with an
 offset in minutes, a preset, the days - "Send the schedule" writes them
-to the device (and saves an "Off" preset, the playlist's id + 1, for the
+to the device (and saves an "Off" preset, id 250, for the
 off rows); "Read the device's" shows what it has.
 
 ## Getting it onto the cube
 
 Everything about the device is under the **Device** menu, in three frames.
-Each opens as a window over the panes; its **dock** button slots it into
-the pane space under the main pane (drag its ::: grip onto any pane to put
-it beside or above that one, like the panes themselves), **float** takes
-it out again, and the arrangement is remembered.
+Each opens as a window over the panes; the button beside its ::: grip
+**docks** it into the pane space under the main pane (drag the grip onto
+any pane to put it beside or above that one, like the panes themselves)
+and, once docked, **floats** it out again; the arrangement is remembered.
+While you type in any frame's box the hotkeys stay quiet.
 
 - **Devices** finds WLED on the network - "Scan the network" asks by mDNS,
   asks every known device for the nodes it has heard, and sweeps the

@@ -254,6 +254,73 @@ def _mute(ic):
     ic.poly([(0.12, 0.38), (0.32, 0.38), (0.56, 0.16), (0.56, 0.84), (0.32, 0.62), (0.12, 0.62)])
     ic.seg((0.66, 0.38), (0.9, 0.62), w=0.09); ic.seg((0.9, 0.38), (0.66, 0.62), w=0.09)
 
+# --- the device and the frames ---------------------------------------------------------
+def _devices(ic):
+    # a wifi fan: the devices on the network
+    ic.circle((0.5, 0.8), 0.09)
+    ic.arc((0.5, 0.8), 0.32, -140, -40, w=0.1)
+    ic.arc((0.5, 0.8), 0.56, -140, -40, w=0.1)
+
+def _flash(ic):
+    # a chip with its pins: the firmware
+    ic.box(0.3, 0.3, 0.7, 0.7, w=0.09)
+    for t in (0.4, 0.5, 0.6):
+        ic.seg((t, 0.1), (t, 0.3), w=0.07); ic.seg((t, 0.7), (t, 0.9), w=0.07)
+        ic.seg((0.1, t), (0.3, t), w=0.07); ic.seg((0.7, t), (0.9, t), w=0.07)
+    ic.rect(0.42, 0.42, 0.58, 0.58)
+
+def _stream(ic):
+    # a dot broadcasting to the right: the sim's frames to the device
+    ic.circle((0.26, 0.5), 0.1)
+    ic.arc((0.26, 0.5), 0.3, -52, 52, w=0.1)
+    ic.arc((0.26, 0.5), 0.54, -52, 52, w=0.1)
+
+def _shape(ic):
+    # a globe: the shape editor
+    ic.ring((0.5, 0.5), 0.4, w=0.09)
+    for rx, ry in ((0.4, 0.15), (0.15, 0.4)):
+        ic.add(np.abs(np.hypot((ic.x - 0.5) / rx, (ic.y - 0.5) / ry) - 1.0) * min(rx, ry) <= 0.045)
+
+def _sequence(ic):
+    # three steps on a timeline
+    ic.seg((0.08, 0.8), (0.92, 0.8), w=0.08)
+    for x0, x1 in ((0.08, 0.36), (0.42, 0.58), (0.64, 0.92)):
+        ic.rect(x0, 0.22, x1, 0.62)
+
+def _library(ic):
+    # four tiles, one lit
+    ic.box(0.1, 0.1, 0.44, 0.44, w=0.08); ic.box(0.56, 0.1, 0.9, 0.44, w=0.08)
+    ic.box(0.1, 0.56, 0.44, 0.9, w=0.08); ic.rect(0.56, 0.56, 0.9, 0.9)
+
+def _palette(ic):
+    # a gradient bar: dark to light along it
+    ic.box(0.08, 0.3, 0.92, 0.7, w=0.08)
+    inside = (ic.x >= 0.14) & (ic.x <= 0.86) & (ic.y >= 0.36) & (ic.y <= 0.64)
+    ic.add(inside * np.clip((ic.x - 0.14) / 0.72, 0.0, 1.0))
+
+def _outputs(ic):
+    # a plug: the LED outputs and their power
+    ic.rect(0.3, 0.42, 0.7, 0.72)
+    ic.seg((0.4, 0.14), (0.4, 0.42), w=0.09); ic.seg((0.6, 0.14), (0.6, 0.42), w=0.09)
+    ic.seg((0.5, 0.72), (0.5, 0.92), w=0.09)
+
+def _dice(ic):
+    # a die: randomise
+    ic.box(0.14, 0.14, 0.86, 0.86, w=0.09)
+    for c in ((0.33, 0.33), (0.67, 0.67), (0.5, 0.5), (0.33, 0.67), (0.67, 0.33)):
+        ic.circle(c, 0.075)
+
+def _dock(ic):
+    # a pane with a bar along the bottom: into the pane space
+    ic.box(0.12, 0.12, 0.88, 0.88, w=0.08)
+    ic.rect(0.12, 0.6, 0.88, 0.88)
+
+def _float(ic):
+    # a window over another: out again, over the panes
+    ic.path([(0.34, 0.3), (0.34, 0.12), (0.9, 0.12), (0.9, 0.68), (0.66, 0.68)], w=0.08)
+    ic.box(0.1, 0.32, 0.66, 0.88, w=0.08)
+    ic.rect(0.1, 0.32, 0.66, 0.46)
+
 
 ICONS = {
     "new": _new, "open": _open, "save": _save, "build": _build, "live": _live,
@@ -263,6 +330,8 @@ ICONS = {
     "camera": _camera, "record": _record, "trash": _trash, "arrange": _arrange, "fold": _fold,
     "export": _export, "import": _import, "send": _send, "external": _external, "gear": _gear,
     "search": _search, "rename": _rename, "mute": _mute,
+    "devices": _devices, "flash": _flash, "stream": _stream, "shape": _shape, "sequence": _sequence,
+    "library": _library, "palette": _palette, "outputs": _outputs, "dice": _dice, "dock": _dock, "float": _float,
 }
 
 _made = {}

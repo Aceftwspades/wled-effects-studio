@@ -45,10 +45,18 @@ def header(app, slot):
     c = _c()
     dpg.add_text(title, tag=f"{tag}_title", color=c.ACCENT)
     c.grip(tag)
-    dpg.add_button(label="dock", tag=f"dock_{tag}", small=True, width=48, pos=(300, 9), user_data=slot,
-                   callback=lambda s, a, u: app.undock_slot(u) if app.docked(u) else app.dock_slot(u))
+    from native.icons import texture
+    dpg.add_image_button(texture("dock", 14), tag=f"dock_{tag}", width=14, height=14, frame_padding=2, tint_color=c.TEXT,
+                         pos=(300, 8), user_data=slot,
+                         callback=lambda s, a, u: app.undock_slot(u) if app.docked(u) else app.dock_slot(u))
     with dpg.tooltip(f"dock_{tag}"):
-        dpg.add_text("dock: into the pane space, under the main pane (or drag the grip onto a pane)\nfloat: out again, over the panes")
+        dpg.add_text("", tag=f"dock_{tag}_tip")
+    _dock_tip(tag, False)
+
+
+def _dock_tip(tag, docked):
+    dpg.set_value(f"dock_{tag}_tip", "float: out again, over the panes" if docked
+                  else "dock: into the pane space, under the main pane (or drag the grip onto a pane)")
 
 
 def place_header(tag, w, docked):
@@ -56,8 +64,10 @@ def place_header(tag, w, docked):
     if dpg.does_item_exist(f"grip_{tag}"):
         dpg.set_item_pos(f"grip_{tag}", [w - 40, 8])
     if dpg.does_item_exist(f"dock_{tag}"):
-        dpg.set_item_pos(f"dock_{tag}", [w - 40 - 54, 9])
-        dpg.configure_item(f"dock_{tag}", label="float" if docked else "dock")
+        from native.icons import texture
+        dpg.set_item_pos(f"dock_{tag}", [w - 40 - 26, 8])
+        dpg.configure_item(f"dock_{tag}", texture_tag=texture("float" if docked else "dock", 14))
+        _dock_tip(tag, docked)
 
 
 # --- build --------------------------------------------------------------------------------

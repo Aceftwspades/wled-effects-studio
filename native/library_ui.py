@@ -87,20 +87,18 @@ def _effect_index(app, eng, name):
 
 
 def _thumb_engine(app):
-    eng = getattr(app, "_lib_eng", None)
-    if eng is None or getattr(app, "_lib_eng_src", None) != app.eng.library:
+    if getattr(app, "_lib_eng_src", None) != app.eng.library:
         # a new library (the effects rebuilt): the thumbnails are stale too
         app._lib_thumbs = {}; app._lib_eng_src = app.eng.library
-        from native.engine import Engine
-        try:
-            eng = Engine(app._b_library())
-        except Exception as e:
-            app.gp.status(f"no second engine for thumbnails: {e}"); return None
-        try:
+    try:
+        eng = app.second_engine("library")
+    except Exception as e:
+        app.gp.status(f"no second engine for thumbnails: {e}"); return None
+    try:
+        if eng.cols != app.eng.cols or eng.rows != app.eng.rows:
             eng.set_geometry(app.project.geometry)
-        except Exception:
-            pass
-        app._lib_eng = eng
+    except Exception:
+        pass
     return eng
 
 
@@ -197,13 +195,15 @@ def generate_previews(app, seconds=None, only=None):
     app._lib_q = queue.Queue(); app._lib_made = 0
     dpg.configure_item("lib_gen", enabled=False)
     dpg.set_value("lib_gen_status", f"0 of {len(graphs)}")
-    lib_path = app._b_library()
     geom = app.project.geometry
+    try:
+        eng = app.second_engine("library_gen")   # made here, used only by the thread
+    except Exception as e:
+        dpg.configure_item("lib_gen", enabled=True); dpg.set_value("lib_gen_status", f"no second engine: {e}"); return
 
     def work():
-        from native.engine import Engine
         try:
-            eng = Engine(lib_path); eng.set_geometry(geom)
+            eng.set_geometry(geom)
         except Exception as e:
             app._lib_q.put(("done", f"no second engine: {e}")); return
         index = ["# Effects\n", f"Previews of every effect on the project's shape ({geom.describe()}), a turn each.\n"]

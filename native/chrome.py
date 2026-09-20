@@ -55,7 +55,7 @@ def build_menus(app):
             dpg.add_separator()
             _mi(app, "Add to the effects list", "import", tag="menu_import", callback=lambda: app.toggle_import_current())
             _mi(app, "History...", "history", callback=lambda: show_history(app))
-            dpg.add_menu_item(label="Library...", callback=lambda: device_ui.show(app, "library"))
+            _mi(app, "Library...", "library", callback=lambda: device_ui.show(app, "library"))
             dpg.add_menu_item(label="Generate previews of every effect", callback=lambda: (device_ui.show(app, "library"),
                               __import__("native.library_ui", fromlist=["x"]).generate_previews(app)))
             dpg.add_menu_item(label="Open graph as code", callback=lambda: app.open_graph_code())
@@ -101,24 +101,24 @@ def build_menus(app):
                 _mi(app, "Everything wired to it", "select_linked", callback=lambda: app.gp.select_linked("both"))
             dpg.add_separator()
             _mi(app, "Command palette...", "palette", callback=lambda: show_palette(app))
-            dpg.add_menu_item(label="Palettes (gradients)...", callback=lambda: device_ui.show(app, "palettes"))
+            _mi(app, "Palettes (gradients)...", "palettes", callback=lambda: device_ui.show(app, "palettes"))
             dpg.add_separator()
             _mi(app, "Find / replace in code", "find", callback=lambda: app.focus_find())
             _mi(app, "Open code in external editor", "external", callback=lambda: app.open_external())
         with dpg.menu(label="Device"):
             # the three frames: each a window that floats or docks into the pane space
-            dpg.add_menu_item(label="Devices...", callback=lambda: device_ui.show(app, "devices"))
+            _mi(app, "Devices...", "devices", callback=lambda: device_ui.show(app, "devices"))
             _mi(app, "Flash firmware...", "flash", callback=lambda: device_ui.show(app, "flash"))
-            dpg.add_menu_item(label="Send to device...", callback=lambda: device_ui.show(app, "send"))
-            dpg.add_menu_item(label="Sequence: presets and a playlist...", callback=lambda: device_ui.show(app, "sequence"))
-            dpg.add_menu_item(label="LED outputs and power...", callback=lambda: device_ui.show(app, "outputs"))
+            _mi(app, "Send to device...", "send_frame", callback=lambda: device_ui.show(app, "send"))
+            _mi(app, "Sequence: presets and a playlist...", "sequence", callback=lambda: device_ui.show(app, "sequence"))
+            _mi(app, "LED outputs and power...", "outputs", callback=lambda: device_ui.show(app, "outputs"))
             dpg.add_separator()
             with dpg.menu(label="Active device", tag="menu_active_device"):
                 pass
             dpg.add_menu_item(label="Scan the network for devices", callback=lambda: (device_ui.show(app, "devices"), app.scan_devices("all")))
             dpg.add_separator()
-            dpg.add_menu_item(label="Stream the sim to the device (DDP)", check=True, tag="menu_stream", default_value=False,
-                              callback=lambda s, a: app.stream_start() if a else app.stream_stop())
+            _mi(app, "Stream the sim to the device (DDP)", "stream", check=True, tag="menu_stream", default_value=False,
+                callback=lambda s, a: app.stream_start() if a else app.stream_stop())
             _mi(app, "Send the graph as a script", "script_send", callback=lambda: app.send_script())
             _mi(app, "Send the current effect's settings", "push", callback=lambda: app.push_settings())
             dpg.add_menu_item(label="Send the shape (ledmap + positions)", callback=lambda: app.send_shape())
@@ -165,7 +165,7 @@ def build_menus(app):
                 dpg.add_separator()
                 dpg.add_menu_item(label="Background picture...", callback=lambda: dpg.show_item("bg_dialog"))
                 dpg.add_menu_item(label="Clear the background", callback=lambda: app.set_background(""))
-            dpg.add_menu_item(label="Shape editor...", callback=lambda: device_ui.show(app, "shape"))
+            _mi(app, "Shape editor...", "shape", callback=lambda: device_ui.show(app, "shape"))
             dpg.add_menu_item(label="Generate a preview of the shape", callback=lambda: (device_ui.show(app, "shape"), shape_ui_preview(app)))
             with dpg.menu(label="Layout"):
                 for k, (label, arr) in enumerate(app.PRESETS):
@@ -217,7 +217,7 @@ def build_menus(app):
             _mi(app, "Play / pause", "play_pause", callback=lambda: app.toggle_play())
             _mi(app, "Step one frame", "step", callback=lambda: app.step_once())
             _mi(app, "Restart effect", "restart", callback=lambda: app.eng.select(app.eng.idx))
-            dpg.add_menu_item(label="Randomise the settings", callback=lambda: app.randomise())
+            _mi(app, "Randomise the settings", "randomise", callback=lambda: app.randomise())
             dpg.add_menu_item(label="Sequence...", callback=lambda: device_ui.show(app, "sequence"))
             _mi(app, "Compare with another effect...", "compare", callback=lambda: app.run_action("compare"))
             _mi(app, "Sweep a slider...", "sweep", callback=lambda: app.run_action("sweep"))
@@ -284,6 +284,11 @@ def _btn(app, icon, tip, cb, tag=None, action=None):
 
 def build_toolbar(app):
     app._tips = {"zoom_reset": "Zoom 100%"}
+    # the buttons sit closer than the default spacing puts them: forty of
+    # them have to fit a 1280-wide window
+    with dpg.theme(tag="toolbar_theme"):
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 4, 4)
     with dpg.group(horizontal=True, tag="toolbar"):
         _btn(app, "new", "New effect", lambda: app.new_effect(), action="new")
         _btn(app, "open", "Open a graph or a code effect", lambda: show_open(app), tag="tb_open", action="open")
@@ -316,11 +321,22 @@ def build_toolbar(app):
         _btn(app, "arrange", "Arrange the graph", lambda: app.gp.arrange(), action="arrange")
         _btn(app, "fold", "Fold the selection into a sub-graph", lambda: app.run_action("fold"), action="fold")
         _sep()
-        _btn(app, "send", "Build the firmware and flash the device", lambda: show_flash(app), action="flash")
+        _btn(app, "devices", "Devices on the network", lambda: device_ui.show(app, "devices"), action="devices")
+        _btn(app, "flash", "Build the firmware and flash the device", lambda: show_flash(app), action="flash")
+        _btn(app, "send", "Send to the device: the effects, a script, the shape", lambda: device_ui.show(app, "send"), action="send_frame")
+        _btn(app, "stream", "Stream the sim to the device (DDP)", lambda: app.run_action("stream"), tag="tb_stream", action="stream")
+        _sep()
+        _btn(app, "shape", "Shape editor", lambda: device_ui.show(app, "shape"), action="shape")
+        _btn(app, "sequence", "Sequence: presets, a playlist and the schedule", lambda: device_ui.show(app, "sequence"), action="sequence")
+        _btn(app, "library", "Library: every effect as a looping thumbnail", lambda: device_ui.show(app, "library"), action="library")
+        _btn(app, "palette", "Palettes: gradients of the project's own", lambda: device_ui.show(app, "palettes"), action="palettes")
+        _btn(app, "outputs", "LED outputs and power", lambda: device_ui.show(app, "outputs"), action="outputs")
+        _sep()
         _btn(app, "external", "Open the code in an external editor", lambda: app.open_external(), action="external")
         _btn(app, "camera", "Screenshot of the 3-D view", lambda: setattr(app, "shot_req", True), tag="shot_btn", action="screenshot")
         _btn(app, "record", "Record a 15 s GIF", lambda: app.start_rec(15.0), tag="rec_btn", action="record")
         dpg.add_text("", tag="rec_msg", color=DIM)
+    dpg.bind_item_theme("toolbar", "toolbar_theme")
     refresh_keys(app)
 
 
@@ -1166,8 +1182,11 @@ def refresh(app):
     if dpg.does_item_exist("mi_sweep"):
         dpg.configure_item("mi_sweep", label="Stop the sweep" if app.sweep else "Sweep a slider...")
     dpg.set_value("menu_live", app.gp.auto)
+    streaming = getattr(app, "ddp", None) is not None
     if dpg.does_item_exist("menu_stream"):
-        dpg.set_value("menu_stream", getattr(app, "ddp", None) is not None)
+        dpg.set_value("menu_stream", streaming)
+    if dpg.does_item_exist("tb_stream"):
+        dpg.configure_item("tb_stream", tint_color=AMBER if streaming else TEXT)
     dpg.configure_item("tb_live", tint_color=AMBER if app.gp.auto else TEXT)
     dpg.configure_item("tb_build", tint_color=AMBER if app.building else TEXT)
     dpg.configure_item("tb_play", show=not app.playing, tint_color=GREEN)

@@ -172,14 +172,15 @@ def refresh(app):
         dpg.set_value("shape_part_title", "")
         return
     part = parts[sel]
-    dpg.set_value("shape_part_title", f"PART {sel + 1}: {part.get('name', part['kind'])} - {shapes.KINDS[part['kind']][1]}")
+    kind = shapes.KINDS.get(part["kind"], ({}, f"unknown kind {part['kind']!r} - no LEDs"))
+    dpg.set_value("shape_part_title", f"PART {sel + 1}: {part.get('name', part['kind'])} - {kind[1]}")
     P = "shape_fields"
     dpg.add_input_text(label="name", parent=P, width=200, default_value=str(part.get("name", "")), on_enter=True,
                        callback=lambda s, v: set_part(app, sel, name=v))
     if part["kind"] == "reference":
         dpg.add_text(f"{part['params'].get('file', '?')}: {len(part['params'].get('vertices') or [])} vertices, "
                      f"{len(part['params'].get('edges') or [])} edges - drawn in the 3-D view, not LEDs", parent=P, color=c.DIM, wrap=0)
-    for key, default in shapes.KINDS[part["kind"]][0].items():
+    for key, default in kind[0].items():
         if key in ("points", "normals", "vertices", "edges", "file"):
             continue
         val = part["params"].get(key, default)

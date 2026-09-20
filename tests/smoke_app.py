@@ -130,6 +130,8 @@ def main():
     graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
     saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
     before = set(os.listdir(os.path.join(ROOT, "projects", "default", "graphs")))
+    STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs: a saved view would otherwise stay
+    saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
     ddp = _DdpCount(); ddp.start()
     with open(LOG, "w") as log:
         proc = subprocess.Popen([sys.executable, "-u", "-m", "native.app"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
@@ -146,6 +148,8 @@ def main():
             open(project, "w", encoding="utf-8").write(saved)
         if saved_graph is not None:
             open(graph, "w", encoding="utf-8").write(saved_graph)
+        if saved_prefs is not None:
+            open(STUDIO_FILE, "w", encoding="utf-8").write(saved_prefs)
         for f in set(os.listdir(os.path.join(ROOT, "projects", "default", "graphs"))) - before:
             os.remove(os.path.join(ROOT, "projects", "default", "graphs", f))     # the import's copy
     text = open(LOG, encoding="utf-8", errors="replace").read()

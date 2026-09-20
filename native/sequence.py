@@ -28,7 +28,16 @@ def apply(eng, step):
     """The step's state into the sim; the caller refreshes the panel."""
     segs = step.get("segments") or []
     if segs:
-        eng.load_segments(segs)
+        # a step saved on another shape: its bounds clamped to this one, so
+        # a segment never lands off the matrix (WLED would drop it)
+        fixed = []
+        for sg in segs:
+            b = sg.get("bounds")
+            if b and (b[2] > eng.cols or b[3] > eng.rows or b[0] >= eng.cols or b[1] >= eng.rows):
+                sg = dict(sg, bounds=[min(int(b[0]), eng.cols - 1), min(int(b[1]), eng.rows - 1),
+                                      min(int(b[2]), eng.cols), min(int(b[3]), eng.rows)])
+            fixed.append(sg)
+        eng.load_segments(fixed)
     cols = step.get("colors")
     if cols and len(cols) == 3:
         eng.colors(*[int(c) for c in cols])

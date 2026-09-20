@@ -137,7 +137,9 @@ def part_points(part):
         nrm = p.get("normals")
         nrm = np.asarray(nrm, np.float32).reshape(-1, 3) if nrm is not None and len(nrm) == len(pts) else None
         return pts, nrm
-    raise ValueError(f"unknown part kind {k!r}")
+    # a kind this version does not know (a project from a newer studio, a
+    # hand-edited file): no LEDs, rather than a project that will not open
+    return np.zeros((0, 3), np.float32), None
 
 
 def rotation(rx, ry, rz):
