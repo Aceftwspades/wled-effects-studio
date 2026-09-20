@@ -19,7 +19,10 @@ import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+# STUDIO_EXE: the packaged app's exe to test instead of the tree - its
+# folder is then the home (projects/, build/) the test saves and restores
+EXE = os.environ.get("STUDIO_EXE")
+ROOT = os.path.dirname(os.path.abspath(EXE)) if EXE else os.path.dirname(HERE)
 CMD = os.path.join(tempfile.gettempdir(), "cubefx", "command.json")
 LOG = os.path.join(tempfile.gettempdir(), "cubefx", "smoke.log")
 
@@ -135,9 +138,11 @@ def main():
     saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
     ddp = _DdpCount(); ddp.start()
     with open(LOG, "w") as log:
-        proc = subprocess.Popen([sys.executable, "-u", "-m", "native.app"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+        # the console variant of the packaged app keeps its stdout, which is the log the test reads
+        cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
+        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
     try:
-        time.sleep(9)
+        time.sleep(9 if not EXE else 30)                 # the packaged app unpacks itself first
         for cmds, wait in STEPS:
             if proc.poll() is not None:
                 print("the app exited early"); break
@@ -158,6 +163,8 @@ def main():
     ddp.stop()
     print(f"ddp: {ddp.packets} packets, {ddp.frames} frames received from the stream")
     bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l]
+    if "remote control" not in text:
+        bad.append("the app's output was not captured (no 'remote control' line): a buffered stdout, or the wrong exe")
     if ddp.frames < 10:
         bad.append(f"the DDP stream sent {ddp.frames} frames; 10 or more expected")
     if bad:

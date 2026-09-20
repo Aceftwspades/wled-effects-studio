@@ -482,6 +482,16 @@ def refresh_manifest(app, env=None):
     c = _c()
     env = env or dpg.get_value("flash_env") or ""
     dpg.delete_item("flash_manifest", children_only=True)
+    from native import paths
+    if not paths.has_tree():
+        dpg.add_text("Flashing builds the firmware in a WLED checkout, which this app does not have beside it: "
+                     "set WLED_ROOT to a checkout of the WLED repo (with PlatformIO installed) and start the app again. "
+                     "Everything else - the sim, building effects, every send to the device - needs none of that.",
+                     parent="flash_manifest", color=c.AMBER, wrap=0)
+        for t in ("flash_start", "flash_env"):
+            if dpg.does_item_exist(t):
+                dpg.configure_item(t, enabled=False)
+        return
     if not env:
         dpg.add_text("choose an environment", parent="flash_manifest", color=c.DIM); return
     d = app.active_device()
@@ -508,6 +518,9 @@ def preview_build(app):
     block written to platformio_override.ini, and both shown in the log."""
     c = _c()
     env = dpg.get_value("flash_env")
+    from native import paths
+    if not paths.has_tree():
+        dpg.set_value("flash_status", "no WLED checkout: set WLED_ROOT to one and start the app again"); return
     if not env:
         dpg.set_value("flash_status", "choose an environment"); return
     dpg.delete_item("flash_log", children_only=True)
@@ -540,6 +553,9 @@ def start_flash(app):
     c = _c()
     env = dpg.get_value("flash_env")
     host = app.active_host()
+    from native import paths
+    if not paths.has_tree():
+        dpg.set_value("flash_status", "no WLED checkout: set WLED_ROOT to one and start the app again"); return
     if not env:
         dpg.set_value("flash_status", "choose an environment"); return
     if dpg.get_value("flash_upload") and not host:

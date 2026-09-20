@@ -1019,8 +1019,35 @@ this repo with a compiler beside it. Done so far:
       fresh copy compiles only the new effect: five seconds. The release
       zip is 86 MB; unpacked and run from another folder with no env, it
       built Fan and Garlands with its own g++.
-- [ ] A Linux / macOS pass: run it there, fix what falls over (font
-      paths, viewport flags, audio device listing).
+- [x] **The standalone app tested as itself**: `STUDIO_EXE=<the console
+      exe>` points `tests/smoke_app.py` and `tests/walk_menus.py` at a
+      packaged app instead of the tree - its folder is the home they save
+      and restore, they wait for it to unpack, and the app's output is
+      line-buffered (studio.py) so a killed process leaves its log. On a
+      fresh unzip in another folder: smoke 31 steps ok (the DDP stream
+      received), walk 338 rows ok, no frame exception, the doctor from
+      `--doctor` all green with the bundled g++; by hand: a script sent
+      to the cube and running, a settings push refused with the right
+      words, a DDP stream, three effects built with the bundled g++ in
+      five seconds each. Found and fixed on the way: the flash frame and
+      the usermods dialog were blank in a bundle (no WLED checkout) - they
+      say so now, with WLED_ROOT as the way in, and Start / Preview refuse
+      rather than staging into the app's own folder.
+- [ ] A Linux / macOS pass. What is there: `paths.py` puts the home in
+      `~/.local/share` or `~/Library/Application Support`, the toolchain
+      takes clang or gcc from the path (`-fPIC`, `.so` / `.dylib`,
+      `-undefined dynamic_lookup`), every Windows-only call (drag and
+      drop, the loopback capture, the popout's parent check, the test
+      hooks' real clicks) is behind a platform check, `run_studio.sh` is
+      the launcher, and `studio.spec` skips the .ico off Windows. What is
+      not: none of it has been run there yet - this machine has no Linux
+      or macOS to hand (WSL holds only Docker's distro, and Docker Desktop
+      would not come up). The pass, when a machine is there: `python3 -m
+      native.doctor`, `python3 build.py --native-only`, the four test
+      scripts, `python3 package.py` (PyInstaller builds for the platform
+      it runs on; no toolchain bundling - the system compiler), and the
+      things that only show on a screen: fonts, the viewport's flags, the
+      audio device list.
 - [ ] Housekeeping first: the studio no longer assumes a cube anywhere a
       user reads - `studio/` (was `cube_sim/`), "WLED Effects Studio"; the
       firmware usermod stays `cube_fx` and its effect names keep the "Ace

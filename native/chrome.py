@@ -826,7 +826,10 @@ def refresh_usermods(app):
     _feature_rows(app, "um_features")
     env = dpg.get_value("flash_env") if dpg.does_item_exist("flash_env") else ""
     env = env or app.project.options.get("flash_env") or ""
-    dpg.set_value("um_env", f"the environment {env}'s, then this project's" if env else "choose an environment in the flash dialog to see its own")
+    from native import paths
+    dpg.set_value("um_env", f"the environment {env}'s, then this project's" if env
+                  else ("WLED's usermods live in a checkout of the repo, which this app does not have beside it (set WLED_ROOT)"
+                        if not paths.has_tree() else "choose an environment in the flash dialog to see its own"))
     rows = flash.usermod_rows(app.project, env)
     dpg.delete_item("um_rows", children_only=True)
     for name, on, source in rows:

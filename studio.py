@@ -5,6 +5,14 @@ import sys
 
 
 def main():
+    # the console variant, or a test reading the output: lines as they happen,
+    # not a buffer lost when the process is killed
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            if stream is not None:
+                stream.reconfigure(line_buffering=True)
+        except Exception:
+            pass
     if len(sys.argv) > 1 and sys.argv[1] == "--popout":
         from native.popout import run
         run(sys.argv[2], sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 0)

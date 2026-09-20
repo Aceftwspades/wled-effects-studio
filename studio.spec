@@ -37,9 +37,10 @@ a = Analysis([os.path.join(HERE, "studio.py")],
              noarchive=False)
 pyz = PYZ(a.pure)
 
-icon = os.path.join(HERE, "build", "app.ico")
+import sys
+icon = os.path.join(HERE, "build", "app.ico")                      # an .ico: Windows; macOS wants .icns, Linux has none
 common = dict(exclude_binaries=True, debug=False, bootloader_ignore_signals=False, strip=False, upx=False,
-              icon=icon if os.path.exists(icon) else None)
+              icon=icon if os.path.exists(icon) and sys.platform.startswith("win") else None)
 exe = EXE(pyz, a.scripts, [], name="WLED Effects Studio", console=False, **common)
 # the same app with a console: what went wrong stays on screen (the launcher's reason for keeping one)
 dbg = EXE(pyz, a.scripts, [], name="WLED Effects Studio (console)", console=True, **common)

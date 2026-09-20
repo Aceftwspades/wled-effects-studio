@@ -46,7 +46,12 @@ def _writable(d):
 def _home():
     if not FROZEN or _writable(EXE_DIR):
         return EXE_DIR
-    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    if sys.platform.startswith("win"):
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
     return os.path.join(base, APP_NAME)
 
 
