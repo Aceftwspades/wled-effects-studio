@@ -1129,8 +1129,13 @@ What would say the studio is complete, in the order to do them:
 - [ ] **Round-trip serialisation**: project, graph, shape, sequence and
       palette files saved and reloaded equal; older project files from
       the history still opening.
-- [ ] **A scrubbed-PATH run of the packaged app**: no emsdk, MSVC or git
-      on the path - the bundled toolchain builds, the fork comes as a zip.
+- [x] **A scrubbed-PATH run of the packaged app**: the package (built
+      with the toolchain it ships, so its objects are the bundled g++'s),
+      its doctor and the smoke test run with PATH cut to System32 - the
+      bundled g++ builds (the smoke test now expects "loaded cubefx_"
+      after a compile), every send reaches the fake device; and with no
+      git on the path `wledtree.fetch` brings the fork as GitHub's zip
+      (9 s). The release workflow's smoke test runs scrubbed too.
 - [ ] **A soak**: effects and geometries switched for ten minutes, RSS watched.
 - [ ] **A docs cross-check**: every menu label, frame button and key
       action found in GUIDE.md.

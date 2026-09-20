@@ -72,7 +72,11 @@ jobs:
         run: |
           Expand-Archive dist\WLED_Effects_Studio.zip -DestinationPath packaged
           $env:STUDIO_EXE = "$PWD\packaged\WLED Effects Studio\WLED Effects Studio (console).exe"
-          python tests\smoke_app.py
+          $env:STUDIO_NO_UPDATE_CHECK = "1"
+          # a user's machine: no git, no MSVC, no emsdk on the path - the bundled toolchain has to do
+          $py = (Get-Command python).Source
+          $env:PATH = "C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem"
+          & $py tests\smoke_app.py
         continue-on-error: true            # a headless runner has no display for Dear PyGui; the run is a bonus where it works
 
       - uses: actions/upload-artifact@v4

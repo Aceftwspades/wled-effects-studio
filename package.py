@@ -191,7 +191,11 @@ def main():
     toolchain = args[args.index("--toolchain") + 1] if "--toolchain" in args else None
     if "--trim" in args:                                   # python package.py --trim <mingw64> <out>: the cut-down toolchain alone
         i = args.index("--trim"); trim_toolchain(args[i + 1], args[i + 2]); return
-    print("package: the engine")
+    print("package: the engine" + (" (with the toolchain that ships)" if toolchain else ""))
+    if toolchain:
+        # the engine and its objects are made by the compiler the release ships, so the
+        # app's first build reuses them (an object is stamped with the compiler that made it)
+        os.environ["STUDIO_TOOLCHAIN"] = os.path.abspath(toolchain)
     run([sys.executable, "build.py", "--native-only"])
     sys.path.insert(0, HERE)
     from native import paths

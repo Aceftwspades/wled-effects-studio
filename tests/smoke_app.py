@@ -29,7 +29,9 @@ LOG = os.path.join(tempfile.gettempdir(), "cubefx", "smoke.log")
 
 STEPS = [
     ([{"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
-    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"key": "Home"}], 1.5),
+    # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
+    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile()"}], 20.0),
+    ([{"expect": ["edit_status", "loaded cubefx_"]}, {"graph_zoom": 1.0}, {"key": "Home"}], 1.5),
     ([{"graph_selected": [1, 2]}, {"action": "align_left"}, {"action": "arrange"}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
     ([{"graph_hover": ["out", 1, "value"]}, {"graph_hover": ["node", 9, ""]}], 0.6),
     ([{"gp_call": ["set_focus_mode", [True]]}, {"gp_call": ["set_focus_mode", [False]]}, {"graph_selected": []}], 0.6),
@@ -100,7 +102,8 @@ STEPS = [
              "next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Output'), 'color'))"}, {"py": "app.gp.compile()"}], 3.0),
     ([{"expect": ["graph_status", "cannot take a float"]},
       {"py": "[app.gp._delete_node(i) for i, n in list(app.gp.graph.nodes.items()) if n['type'] == 'Output']"}, {"py": "app.gp.compile()"}], 3.0),
-    ([{"expect": ["graph_status", "exactly one Output"]}, {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
+    ([{"expect": ["graph_status", "exactly one Output"]}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile(False)"},
+      {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
       {"ed_type": "this is not C++ ;"}, {"ed_key": ["Return", False, False]}, {"py": "app.edit_build()"}], 12.0),
     ([{"expect": ["edit_status", "problem"]}, {"action": "undo"}, {"action": "undo"}, {"layout": "graph"}, {"graph_open": "fan.json"},
       {"device": "127.0.0.1:1"}, {"py": "app.send_script()"}], 8.0),
