@@ -236,9 +236,10 @@ and a step whose effect the device does not have is left out and named.
 or found in the WAV playing as live audio (WAV's: the tempo and the
 beats themselves, from the loudness rising - rough the way tapping is),
 and "Snap durations to bars" rounds every step to whole bars of it, so
-the sequence changes on the music. **Render** plays the sequence once
-and records it into `captures/` - a GIF, and an mp4 too when ffmpeg is
-on the path (so is every recording from the toolbar's record button).
+the sequence changes on the music. **Render GIF** and **Render video**
+play the sequence once and record it into `captures/` - a GIF, or an
+mp4 (which needs ffmpeg on the path). The toolbar's record button and
+File > Record 15 s GIF / video do the same for whatever the sim shows.
 **SCHEDULE** under it is the device's timers: "+ run the playlist at"
 and "+ off at" add a row - a time of day, or sunrise / sunset with an
 offset in minutes, a preset, the days - "Send the schedule" writes them

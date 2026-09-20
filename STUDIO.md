@@ -896,10 +896,11 @@ the order to do them:
       sliders follow as it plays; on the device `sequence.sub_steps`
       makes it a sub-step a second (2..12), a preset each, so a playlist
       of ramps stays under WLED's hundred entries.
-- [x] **Render to video** (`App.write_video`): every recording's
-      frames piped to ffmpeg as raw RGB when it is on the path, an H.264
-      mp4 beside the GIF; the sequence frame's Render plays the sequence
-      once and records its whole length.
+- [x] **Render to video** (`App.write_video`): a recording is a GIF or
+      an mp4 - the frames piped to ffmpeg as raw RGB, H.264 out - chosen
+      where it starts (the record button and Ctrl+F12 a GIF; File >
+      Record 15 s video and Ctrl+Shift+F12 an mp4; the sequence frame's
+      Render GIF / Render video for the sequence's whole length).
 
 - [x] **The panels succinct**: every explanatory paragraph in the
       frames became a tooltip on the control it explained (`chrome.tip`)

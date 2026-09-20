@@ -73,8 +73,10 @@ def build(app):
             dpg.add_text("PLAY", color=c.ACCENT)
             dpg.add_button(label="Play in the sim", tag="seq_play", small=True, callback=lambda: play(app))
             dpg.add_button(label="Stop", small=True, callback=lambda: stop(app))
-            dpg.add_button(label="Render", small=True, callback=lambda: render(app))
-            c.tip("plays the sequence once and records it - a GIF, and an mp4 too when ffmpeg is on the path - into the project's export folder")
+            dpg.add_button(label="Render GIF", small=True, callback=lambda: render(app, "gif"))
+            c.tip("plays the sequence once and records it as a GIF, into captures/")
+            dpg.add_button(label="Render video", small=True, callback=lambda: render(app, "mp4"))
+            c.tip("plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path")
             dpg.add_checkbox(label="repeat", tag="seq_repeat", default_value=False,
                              callback=lambda s, v: (_steps(app).__setitem__("repeat", 0 if v else 1), app.project.save()))
             dpg.add_combo(transition.STYLES, tag="seq_style", width=110, default_value="fade",
@@ -461,21 +463,23 @@ def play(app):
     poll(app)
 
 
-def render(app):
-    """The sequence played once from the top, recorded for its whole length."""
+def render(app, fmt="gif"):
+    """The sequence played once from the top, recorded for its whole length - a GIF or an mp4."""
     S = _steps(app)
     total = sum(float(st.get("dur", 10)) for st in S["steps"])
     if total <= 0:
         app.gp.status("no steps to render"); return
     if getattr(app, "rec", None) is not None:
         app.gp.status("a recording is already going"); return
+    if fmt == "mp4" and not app.has_ffmpeg():
+        app.gp.status("a video needs ffmpeg on the path - not found"); return
     was = int(S.get("repeat", 0))
     S["repeat"] = 1                                       # once through, then stop
     play(app)
     S["repeat"] = was
     app._seq_play["once"] = True
-    app.start_rec(total)
-    app.gp.status(f"rendering {total:.0f} s of the sequence...")
+    app.start_rec(total, fmt)
+    app.gp.status(f"rendering {total:.0f} s of the sequence to {fmt}...")
 
 
 def stop(app):

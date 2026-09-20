@@ -486,28 +486,38 @@ class App(Features):
     # --- recording ------------------------------------------------------------
     REC_FPS = 15
 
-    def start_rec(self, secs=15.0):
+    def start_rec(self, secs=15.0, fmt="gif"):
+        """A recording of the views for `secs`: a GIF, or an mp4 (fmt "mp4",
+        which needs ffmpeg on the path)."""
         if self.rec is not None:
             return
+        if fmt == "mp4" and not self.has_ffmpeg():
+            self.rec_msg = "a video needs ffmpeg on the path - not found"
+            self.gp.status(self.rec_msg); return
         self.rec = []
+        self.rec_fmt = fmt
         self.rec_left = secs
         self.rec_next = time.perf_counter()
-        self.rec_msg = f"recording {secs:.0f} s..."
+        self.rec_msg = f"recording {secs:.0f} s ({fmt})..."
 
-    def _encode(self, frames, path):
+    @staticmethod
+    def has_ffmpeg():
+        import shutil
+        return bool(shutil.which("ffmpeg"))
+
+    def _encode(self, frames, path, fmt="gif"):
         """Runs on a worker thread: encoding 225 frames takes several seconds
-        and the window must keep drawing while it does. With ffmpeg on the
-        path the same frames go to an mp4 beside the GIF (xLights' render
-        to video; a GIF of a minute is huge, an mp4 is not)."""
+        and the window must keep drawing while it does. A GIF by the studio's
+        own writer; an mp4 by ffmpeg (a GIF of a minute is huge, an mp4 is not)."""
         try:
+            if fmt == "mp4":
+                if self.write_video(frames, path):
+                    self.rec_msg = f"{os.path.basename(path)}  {os.path.getsize(path)/1024:.0f} KB"
+                return
             n = gif.write(path, frames, fps=self.REC_FPS)
             self.rec_msg = f"{os.path.basename(path)}  {n/1024:.0f} KB"
         except Exception as e:
-            self.rec_msg = f"gif failed: {e}"
-            return
-        mp4 = self.write_video(frames, os.path.splitext(path)[0] + ".mp4")
-        if mp4:
-            self.rec_msg += f"  + {os.path.basename(mp4)}"
+            self.rec_msg = f"{fmt} failed: {e}"
 
     def write_video(self, frames, path, fps=None):
         """The frames as an mp4 through ffmpeg (raw RGB piped in, H.264 out,
@@ -573,12 +583,13 @@ class App(Features):
             self.rec_msg = f"recording {self.rec_left:4.1f} s..."
             return
         frames, self.rec = self.rec, None
+        fmt = getattr(self, "rec_fmt", "gif")
         name = "".join(c if c.isalnum() else "_" for c in self.eng.names[self.eng.idx])
         os.makedirs(GIF_DIR, exist_ok=True)
-        path = os.path.join(GIF_DIR, f"{name}_{int(time.time())}.gif")
-        self.rec_msg = f"encoding {len(frames)} frames..."
+        path = os.path.join(GIF_DIR, f"{name}_{int(time.time())}.{fmt}")
+        self.rec_msg = f"encoding {len(frames)} frames ({fmt})..."
         import threading
-        threading.Thread(target=self._encode, args=(frames, path), daemon=True).start()
+        threading.Thread(target=self._encode, args=(frames, path, fmt), daemon=True).start()
 
     def toggle_live(self):
         self.stop_live() if self.live else self.start_live()
@@ -2589,6 +2600,7 @@ class App(Features):
             "external":     self.open_external,
             "screenshot":   lambda: setattr(self, "shot_req", True),
             "record":       lambda: self.start_rec(15.0),
+            "record_video": lambda: self.start_rec(15.0, "mp4"),
             "shortcuts":    lambda: chrome.show_keys(self),
             "flash":        lambda: chrome.show_flash(self),
             "push":         self.push_settings,
@@ -3832,7 +3844,7 @@ def _call(item, label):
         return f"FAIL {type(e).__name__}: {e}"
 
 
-SKIP_MENU = ("Quit", "Record 15 s", "Fullscreen",     # ends the app, a 15 s recording, flips the window
+SKIP_MENU = ("Quit", "Record 15 s GIF", "Record 15 s video", "Fullscreen",     # ends the app, a 15 s recording, flips the window
              "Open the project folder", "Open the build folder", "Node reference (NODES.md)", "Studio guide (STUDIO.md)",
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
