@@ -232,10 +232,13 @@ def build_menus(app):
             dpg.add_menu_item(label="Selection frames...", callback=lambda: show_frames(app))
             dpg.add_menu_item(label="Appearance...", callback=lambda: show_appearance(app))
             dpg.add_menu_item(label="External editor command...", callback=lambda: show_editor(app))
-            dpg.add_menu_item(label="Draw the cube on the GPU", check=True, default_value=app.gpu_cube, tag="menu_gpu",
+            dpg.add_menu_item(label="Draw the 3-D view on the GPU", check=True, default_value=app.gpu_cube, tag="menu_gpu",
                               callback=lambda s, a: app.set_gpu_cube(bool(a)))
-            dpg.add_menu_item(label="Scale the net on the GPU (softer LED edges, faster)", check=True, default_value=app.gpu_net,
+            tip("the shape's faces as textured quads on the GPU, where it has them; loose LEDs are drawn as points either way. "
+                "Off: the software renderer for everything - the fallback when a machine's GPU misbehaves")
+            dpg.add_menu_item(label="Scale the logical view on the GPU", check=True, default_value=app.gpu_net,
                               tag="menu_gpu_net", callback=lambda s, a: app.set_gpu_net(bool(a)))
+            tip("softer LED edges and faster; off: the CPU repeats each LED's pixels")
             with dpg.menu(label="Simplified nodes below"):
                 from native.graph_ui import OVERVIEW_CHOICES
                 for z, lbl in OVERVIEW_CHOICES:

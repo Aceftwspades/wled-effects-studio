@@ -352,5 +352,7 @@ on and install what it carries.
   status line says so; the sim pauses.
 - Settings > Appearance: dark, light, soft light or slate, and every one
   of the theme's seven colours editable.
-- Settings > "Draw the cube on the GPU" / "Scale the net on the GPU" are
-  the fast paths; turn them off if the views misbehave on a machine.
+- Settings > "Draw the 3-D view on the GPU" / "Scale the logical view on
+  the GPU" are the fast paths (the faces of a shape as textured quads;
+  loose LEDs are points either way); turn them off if the views misbehave
+  on a machine.

@@ -1347,7 +1347,7 @@ it was the display path that moved to the GPU:
   the sampling is bilinear and the LEDs should stay square). The CPU
   projects 405 corners when the camera moves and uploads the net each
   frame; the warp is gone. Sub-quads are grown a third of a pixel so no
-  crack opens between them. Settings > "Draw the cube on the GPU" turns it
+  crack opens between them. Settings > "Draw the 3-D view on the GPU" turns it
   off; flat mode, point clouds and A/B keep the software renderer.
 - **Texture conversion by lookup** (a 256-entry table) instead of a
   multiply over every channel.
