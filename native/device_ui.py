@@ -170,6 +170,7 @@ def build(app):
         with dpg.child_window(tag="send_log", height=-1, border=False):
             pass
     build_flash(app)
+    build_wled_dialog(app)
     from native import shape_ui, sequence_ui, library_ui, palette_ui, outputs_ui
     shape_ui.build(app)
     sequence_ui.build(app)
@@ -227,6 +228,99 @@ def build_flash(app):
         dpg.add_text("", tag="flash_status", color=c.DIM, wrap=0)
         with dpg.child_window(tag="flash_log", height=-1, border=True):
             pass
+
+
+# --- a WLED checkout for the flash -----------------------------------------------------------
+def build_wled_dialog(app):
+    from native import wledtree
+    c = _c()
+    with dpg.window(tag="wled_dialog", label="A WLED checkout", show=False, width=560, height=300, no_collapse=True):
+        dpg.add_text(f"The fork's {wledtree.BRANCH} branch - the firmware side the studio flashes - into:", color=c.DIM, wrap=540)
+        dpg.add_input_text(tag="wled_dest", width=-1, default_value=wledtree.default_dest())
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Clone" if wledtree.has_git() else "Download", tag="wled_go", callback=lambda: fetch_wled(app))
+            dpg.add_button(label="Restart the studio", tag="wled_restart", show=False, callback=lambda: (wledtree.restart(), dpg.stop_dearpygui()))
+            dpg.add_button(label="Close", callback=lambda: dpg.hide_item("wled_dialog"))
+            dpg.add_text("" if wledtree.has_git() else "no git on the path: the branch comes as a zip (not a repository, which PlatformIO does not mind)",
+                         color=c.DIM)
+        with dpg.child_window(tag="wled_log", height=-1, border=True):
+            pass
+    with dpg.file_dialog(directory_selector=True, show=False, tag="wled_pick_dialog", width=640, height=420,
+                         callback=lambda s, a: use_wled(app, a.get("file_path_name", ""))):
+        pass
+
+
+def show_wled_dialog(app):
+    _c()._centre("wled_dialog", 560, 300)
+    dpg.show_item("wled_dialog")
+
+
+def _wled_log(line):
+    if dpg.does_item_exist("wled_log"):
+        dpg.add_text(line, parent="wled_log", color=_c().DIM, wrap=520)
+        kids = dpg.get_item_children("wled_log", 1) or []
+        for k in kids[:-12]:
+            dpg.delete_item(k)
+        dpg.set_y_scroll("wled_log", -1.0)                 # the newest line in view
+
+
+def fetch_wled(app):
+    """The clone (or the download) on a thread; its lines into the dialog;
+    remembered and offered a restart when it lands."""
+    import threading, queue
+    from native import wledtree
+    dest = (dpg.get_value("wled_dest") or "").strip()
+    if not dest:
+        return
+    dpg.configure_item("wled_go", enabled=False)
+    q = app._wled_q = queue.Queue()
+
+    def work():
+        try:
+            got = wledtree.fetch(dest, log=lambda l: q.put(("line", l)))
+            wledtree.remember(got)
+            q.put(("done", got))
+        except Exception as e:
+            q.put(("fail", str(e)))
+    threading.Thread(target=work, daemon=True).start()
+
+
+def use_wled(app, folder):
+    """A checkout the user already has, chosen in the file dialog."""
+    import os as _os
+    if not folder or not _os.path.isdir(_os.path.join(folder, "wled00")):
+        app.gp.status(f"{folder or 'that'} is not a WLED checkout (no wled00/)"); return
+    _remember_wled(app, folder)
+    app.gp.status(f"WLED checkout remembered: {folder} - restart the studio to flash")
+    show_wled_dialog(app); _wled_log(f"WLED checkout: {folder}"); dpg.configure_item("wled_restart", show=True)
+
+
+def _remember_wled(app, folder):
+    """Into the prefs file and the app's own prefs (which save_prefs writes whole)."""
+    from native import wledtree
+    from native.project import save_prefs
+    wledtree.remember(folder)
+    app.prefs["wled_root"] = folder
+    save_prefs(app.prefs)
+
+
+def poll_wled(app):
+    q = getattr(app, "_wled_q", None)
+    if q is None:
+        return
+    for _ in range(20):
+        try:
+            kind, v = q.get_nowait()
+        except Exception:
+            break
+        if kind == "line":
+            _wled_log(v)
+        elif kind == "done":
+            _remember_wled(app, v)
+            _wled_log("remembered; restart the studio and the flash frame has it")
+            dpg.configure_item("wled_restart", show=True); app._wled_q = None
+        else:
+            _wled_log(f"failed: {v}"); dpg.configure_item("wled_go", enabled=True); app._wled_q = None
 
 
 # --- showing -----------------------------------------------------------------------------
@@ -484,10 +578,15 @@ def refresh_manifest(app, env=None):
     dpg.delete_item("flash_manifest", children_only=True)
     from native import paths
     if not paths.has_tree():
-        dpg.add_text("Flashing builds the firmware in a WLED checkout, which this app does not have beside it: "
-                     "set WLED_ROOT to a checkout of the WLED repo (with PlatformIO installed) and start the app again. "
-                     "Everything else - the sim, building effects, every send to the device - needs none of that.",
+        dpg.add_text("Flashing builds the firmware in a checkout of the WLED fork, and there is none here. "
+                     "Get one below (a minute), or set WLED_ROOT to one you have; PlatformIO is needed too. "
+                     "Everything else - the sim, building effects, every send to the device - needs neither.",
                      parent="flash_manifest", color=c.AMBER, wrap=0)
+        with dpg.group(horizontal=True, parent="flash_manifest"):
+            dpg.add_button(label="Get the WLED fork...", small=True, callback=lambda: show_wled_dialog(app))
+            c.tip("clones the fork's branch beside the studio (or downloads it as a zip when git is not installed), "
+                  "remembers where, and restarts the studio with it")
+            dpg.add_button(label="I have one: choose its folder...", small=True, callback=lambda: dpg.show_item("wled_pick_dialog"))
         for t in ("flash_start", "flash_env"):
             if dpg.does_item_exist(t):
                 dpg.configure_item(t, enabled=False)
@@ -613,6 +712,7 @@ def poll_flash(app):
 def poll(app):
     """Floating frames keep their grip and dock button at the top right
     as they are resized; docked ones are placed by the layout."""
+    poll_wled(app)
     for slot, (tag, _, _, _) in FRAMES.items():
         if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and not app.docked(slot):
             w = dpg.get_item_rect_size(tag)[0] or dpg.get_item_configuration(tag).get("width") or 0

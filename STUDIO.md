@@ -1069,6 +1069,15 @@ this repo with a compiler beside it. Done so far:
       version tag - winlibs downloaded and trimmed on the runner - and
       attaches it to a draft release for the update check to find once
       published.
+- [x] **The checkout fetched from the Flash frame** (`native/wledtree.py`):
+      with no WLED tree, the frame offers "Get the WLED fork..." - a
+      shallow `git clone` of the fork's branch into a folder the dialog
+      names (WLED beside the app), its progress in the dialog; without
+      git, the branch as GitHub's zip, unpacked - remembered in the prefs
+      (`ui.wled_root`, which `paths.py` reads at start; WLED_ROOT still
+      wins) and a restart offered; or "I have one" for a checkout that
+      exists. Tried from a copy with no tree: the clone, the restart, the
+      flash frame listing the checkout's environments.
 - [ ] A Linux / macOS pass. What is there: `paths.py` puts the home in
       `~/.local/share` or `~/Library/Application Support`, the toolchain
       takes clang or gcc from the path (`-fPIC`, `.so` / `.dylib`,

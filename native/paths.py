@@ -12,7 +12,8 @@ from its own file:
            keeps everything beside itself - else %LOCALAPPDATA%\\WLED
            Effects Studio (a Program Files install).
     TREE   the WLED checkout, when there is one: the repo above studio/,
-           a WLED/ beside the studio's own checkout, or WLED_ROOT. The engine's firmware sources come from it and
+           a WLED/ beside the studio's own checkout, WLED_ROOT, or the one
+           the flash frame fetched and remembered in the prefs. The engine's firmware sources come from it and
            the flash builds in it. Without one, the engine builds from
            runtime/ - the same files, copied in when the app was packaged -
            and the flash says it needs a checkout.
@@ -72,6 +73,14 @@ def _tree():
     beside = os.path.join(above, "WLED")
     if not FROZEN and os.path.isdir(os.path.join(beside, "wled00")):
         return beside                                    # the studio's own checkout beside a WLED one (../WLED)
+    try:                                                 # one the studio fetched itself (the flash frame), remembered in the prefs
+        import json
+        d = json.load(open(os.path.join(PROJECTS, "studio.json"), encoding="utf-8"))
+        p = (d.get("ui") or {}).get("wled_root") or ""
+        if p and os.path.isdir(os.path.join(p, "wled00")):
+            return os.path.abspath(p)
+    except Exception:
+        pass
     return None
 
 

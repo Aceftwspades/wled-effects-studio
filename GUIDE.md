@@ -14,7 +14,10 @@ Effects Studio` when the folder cannot be written to). The engine comes
 prebuilt, and the release ships a compiler (a cut-down MinGW-w64 GCC in
 `toolchain\`), so everything works at once, building your own effects
 included - a new effect builds in seconds. Only flashing firmware needs
-more: a WLED checkout (set `WLED_ROOT`) and PlatformIO. `WLED Effects Studio (console).exe` is
+more: a checkout of the WLED fork and PlatformIO. The Flash frame offers
+to get the checkout itself (**Get the WLED fork...**: a clone beside the
+app, or the branch as a zip when git is not installed; then a restart),
+or takes one you have (**I have one**, or `WLED_ROOT`). `WLED Effects Studio (console).exe` is
 the same app with a console, for when something goes wrong.
 
 **Updates**: the app asks the studio's releases on GitHub once a day

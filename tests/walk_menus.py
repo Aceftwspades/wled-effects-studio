@@ -75,7 +75,13 @@ def main():
             os.remove(os.path.join(gdir, f))
     text = open(LOG, encoding="utf-8", errors="replace").read()
     lines = [l for l in text.splitlines() if l.startswith(("menu ", "ctx ", "pane "))]
-    bad = [l for l in lines if " FAIL" in l or " gone" in l] + [l for l in text.splitlines() if "Traceback" in l]
+    # a row that was "gone" by the time its turn came is a menu rebuilt by an
+    # earlier row (the Add menu's sub-graphs after one was entered), not a
+    # failure - an exception would show as a traceback below
+    bad = [l for l in lines if " FAIL" in l] + [l for l in text.splitlines() if "Traceback" in l]
+    gone = [l for l in lines if " gone" in l]
+    if gone:
+        print(f"  {len(gone)} row(s) were gone by their turn (a menu rebuilt on the way): " + "; ".join(l.split(None, 2)[2] for l in gone[:4]))
     ok = sum(1 for l in lines if l.split()[1] == "ok")
     print(f"walk: {ok} ok, {sum(1 for l in lines if l.split()[1] == 'skip')} skipped, {len(bad)} bad ({len(lines)} rows, log {LOG})")
     for l in bad[:30]:

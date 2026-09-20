@@ -2744,7 +2744,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -3414,6 +3414,8 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "frame_close" in c:                      # test hook: close one
                 device_ui.close(app, c["frame_close"])
+            if "wled" in c:                             # test hook: ["fetch", dest] | ["use", folder]
+                (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
             if "update" in c:                           # test hook: "check" (the dialog when newer), "show", "get"
                 {"check": lambda: chrome.check_updates(app, by_hand=True), "show": lambda: chrome.show_update(app),
                  "get": lambda: chrome.get_update(app)}[c["update"]]()
