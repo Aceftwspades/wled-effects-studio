@@ -10,7 +10,6 @@ same drivers, the same look - not a line-for-line port. Where the original
 keeps per-pixel state (Cube Fire's heat field, Matrix Rain's drops) the graph
 uses the feedback and hash nodes instead, the way a shader would.
 """
-import json
 import os
 import sys
 
@@ -1001,7 +1000,6 @@ def liquid_tunnel():
     rc = b.n("Clamp", 5, 6, {"lo": 0.06, "hi": 3.0}); b.l(r, "result", rc, "x")      # the vanishing point is clamped
     lr = b.n("Log", 6, 6); b.l(rc, "result", lr, "x")
     # the azimuth, folded: symmetry n mirrors the tunnel n times round
-    ang = b.n("Coords", 1, 8)
     sym = b.n("Remap", 1, 3, {"out_lo": 1.0, "out_hi": 6.99}); b.l(c3, "value", sym, "x")
     nsym = b.n("Floor", 2, 3); b.l(sym, "result", nsym, "x")
     az = b.n("Multiply", 4, 8); b.l(d, "nx", az, "a")      # placeholder replaced below
@@ -1192,7 +1190,6 @@ def liquid():
     k1 = b.n("Check 1", 0, 5, {"label": "Bass fills", "default": True})
     k2 = b.n("Check 2", 0, 6, {"label": "Splash on beat", "default": True})
     au = b.n("Audio", 0, 7)
-    tm = b.n("Time", 0, 8)
     b.n("Effect settings", 0, 9, {"palette": 9, "audio": "frequency"})
     pos = b.n("Position", 1, 6)
     # the tilt: two springs kicked by the beat, alternating sides
@@ -1749,7 +1746,7 @@ def check():
         g = G.load(os.path.join(OUT, fn)); g.project_dir = HERE
         try:
             prog = compile_script(g)
-        except ScriptError as ex:
+        except ScriptError:
             n_no += 1; continue
         if si is None or not e.script(prog):
             print(f"  script {g.name}: the engine did not take it"); ok = False; continue

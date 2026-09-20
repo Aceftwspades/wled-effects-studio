@@ -90,7 +90,8 @@ def build(app):
     from native import device_ui
     with dpg.window(tag=TAG, show=False, width=560, height=460, no_collapse=True, no_title_bar=True):
         device_ui.header(app, "palettes")
-        dpg.add_text("Gradients of your own: in the sim as palettes (ids 200 down), on the device as its custom palettes.", color=c.DIM, wrap=0)
+        dpg.add_text("Gradients of your own: in the sim as palettes (ids 200 down), on the device as its custom palettes - "
+                     "sent by position, so the first here replaces the device's palette0.json, the second its palette1.json.", color=c.DIM, wrap=0)
         with dpg.group(horizontal=True):
             dpg.add_button(label="+ New", small=True, callback=lambda: new_palette(app))
             dpg.add_button(label="From the sim's palette", small=True, callback=lambda: from_current(app))
@@ -375,7 +376,6 @@ def send(app, all_):
 
 def remove_there(app):
     import urllib.request
-    from native import device_ui
     host = app.active_host(); sel = _sel(app)
     if not host or sel < 0:
         return

@@ -862,6 +862,28 @@ plugins, FPP scheduling, video playback.
       LEDs); a sequence step saved on a bigger shape put a segment off
       the matrix (bounds clamped); popouts outlived a crashed or killed
       app (they watch the parent's pid).
+- [x] **A cleanup and bug pass over the suite**, with the cube back on
+      the network. Found on the device: a `psave` answers success at once
+      but WLED writes the preset from its main loop, and a second psave
+      before the write replaces the one pending - the sequence's presets
+      fired back to back and only the first landed (each is now waited
+      for by the presets file's modified time in `info.fs.pmt`; not by
+      reading presets.json, which loses the write); a playlist psave
+      without WLED's `"o": true` stores the device's current state under
+      the id, so the playlist never was one; the Off preset lacked `ib`,
+      so it did not carry "on": false; the device went dark for the Off
+      preset's save (switched back on after); rows read back from the
+      device's timers lost their kind. In the studio: pyflakes over
+      everything (a real one: the script compiler's curve lowering read a
+      name only a code node before it would have bound - a NameError
+      for a curve-first graph); `tests/test_graph.py` had no runner, so
+      `python tests/test_graph.py` had been running nothing; the shape
+      preview deleted its texture while the image still drew it (the
+      alias then stays taken); crash.txt grew for ever (9 MB) with the
+      same frame's failure written every frame; the menu walker imported
+      the device's ledmap when a device was there; a frame scrolled while
+      docked came back floating with its title hidden; the roster's
+      `_ident` and the texture `rgba` helpers were each in two places.
 - [x] **The 3-D view's surroundings** (View > Camera): a background
       picture (dimmed, behind the point cloud and the GPU cube alike),
       camera presets (isometric, front, back, left, right, top, below)

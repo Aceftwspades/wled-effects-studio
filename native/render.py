@@ -163,6 +163,14 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
     return out
 
 
+def texture_rgba(frame):
+    """An (h, w, 3) uint8 frame as the flat RGBA floats a Dear PyGui texture takes."""
+    h, w = frame.shape[:2]
+    out = np.ones((h, w, 4), np.float32)
+    out[:, :, :3] = frame.astype(np.float32) / 255.0
+    return out.ravel()
+
+
 def frame_of(pos):
     """How render_points fits a geometry: (centre, extent) - the middle of
     its bounding box, and the largest distance from there along an axis."""

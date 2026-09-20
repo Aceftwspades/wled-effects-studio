@@ -18,7 +18,6 @@ that silently omits things is worse than one that says what it left out.
 import json
 import os
 import re
-import sys
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT = os.path.dirname(HERE)

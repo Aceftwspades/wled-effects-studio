@@ -50,7 +50,6 @@ def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=
     """The turntable: a list of (size, size, 3) frames. `eng`, `effect`
     (an index) and `params` pick another effect on a second engine already
     made - the library's previews; without them, the sim's own."""
-    from native.engine import Engine
     g = app.project.geometry
     if mode == "effect":
         try:

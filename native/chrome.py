@@ -12,8 +12,6 @@ status line); everything that used to be a button in a pane lives here.
     poll(app)             # per frame: refresh() when something it shows changed
 """
 import os
-import sys
-import subprocess
 import dearpygui.dearpygui as dpg
 
 from native.icons import texture
@@ -409,7 +407,6 @@ def build_dialogs(app):
         pass
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
-    th = app.prefs.get("theme") or {}
     with dpg.window(tag="appearance_win", label="Appearance", show=False, width=560, height=400, no_collapse=True):
         from native.app import THEME_PRESETS, THEME_ROLES
         dpg.add_text("The look. A preset to start from, then any of its seven colours - the change shows as you make it "

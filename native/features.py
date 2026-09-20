@@ -7,7 +7,6 @@ views. Nothing here is called from outside the app.
 import json
 import os
 import shutil
-import threading
 import time
 import numpy as np
 import dearpygui.dearpygui as dpg
@@ -31,7 +30,6 @@ class Features:
     def import_ledmap(self, path=None, host=None):
         """A WLED ledmap, from a file or fetched from the device, becomes the
         geometry: a matrix with its gaps and wiring, or a strip."""
-        import json
         try:
             if host:
                 import urllib.request
@@ -230,7 +228,7 @@ class Features:
     # --- the scripted runtime ---------------------------------------------------------
     def compile_current_script(self):
         """The current graph as bytecode, or None with the reason in the status."""
-        from native.script import compile_script, ScriptError
+        from native.script import compile_script
         if not self.gp.graph:
             self.gp.status("open a graph first"); return None
         try:
@@ -428,7 +426,6 @@ class Features:
     def transition_start(self, old_state, dur, style="fade"):
         """The old step into the second engine; the blend runs `dur` seconds."""
         from native import sequence
-        from native.engine import Engine
         try:
             eng2 = self.second_engine("transition")
         except Exception as e:

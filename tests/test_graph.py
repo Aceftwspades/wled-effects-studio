@@ -128,6 +128,18 @@ def test_script_parses_static_declarations_and_hex():
     assert 65535.0 in nums
 
 
+def test_script_lowers_a_curve_first():
+    """A Float curve as the first node lowered used to read a name (`env`)
+    that only a code node before it would have bound: a NameError, not a
+    ScriptError, out of the compiler."""
+    from native.script import compile_script, MAGIC
+    g = starter()
+    f = g.add("Float curve", (100, 0)); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+    g.link(f, "result", p, "index"); g.link(p, "color", o, "color")     # nothing with code before the curve
+    prog = compile_script(g)
+    assert prog[:4] == MAGIC
+
+
 def test_script_names_the_unscriptable_node():
     from native.script import compile_script, ScriptError
     g = starter()
@@ -159,3 +171,15 @@ def test_segment_blend_modes_follow_the_firmware():
     assert (np.abs(res[8] - np.maximum(top, bot)) <= 1).all()
     assert (np.abs(res[9] - np.minimum(top, bot)) <= 1).all()
     assert (np.abs(res[3] - np.clip(bot - top, 0, 255)) <= 1).all()
+
+
+if __name__ == "__main__":                        # without pytest: every test_ function, in order
+    import inspect
+    bad = 0
+    for name, fn in list(globals().items()):
+        if name.startswith("test_") and inspect.isfunction(fn):
+            try:
+                fn(); print("ok  ", name)
+            except Exception as e:
+                bad += 1; print("FAIL", name, repr(e))
+    sys.exit(1 if bad else 0)

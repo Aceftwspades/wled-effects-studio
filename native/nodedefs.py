@@ -1296,7 +1296,7 @@ def codegen_text(n, project_dir=None):
     y0 = f"{row}" if row >= 0 else f"((H - {7 * sz}) / 2)"
     return (f"{{ static const uint8_t tx_[{N * 5}] = {{{table}}}; const int cw_ = {6 * sz}, tw_ = {N * 6 * sz};\n"
             f"  int px_ = (int)floorf(gc_sat($in.u) * (float)(W - 1) + 0.5f) - (int)floorf($in.offset);\n"
-            + (f"  {{ const int span_ = tw_ + W; px_ = ((px_ % span_) + span_) % span_; }}\n" if loop else "")
+            + ("  { const int span_ = tw_ + W; px_ = ((px_ % span_) + span_) % span_; }\n" if loop else "")
             + f"  const int py_ = (int)floorf(gc_sat($in.v) * (float)(H - 1) + 0.5f) - {y0};\n"
             f"  $out.on = false; $out.i = 0.0f;\n"
             f"  if (px_ >= 0 && px_ < tw_ && py_ >= 0 && py_ < {7 * sz}) {{\n"

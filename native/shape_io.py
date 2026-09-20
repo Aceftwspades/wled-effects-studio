@@ -333,7 +333,6 @@ def write_xmodel(geom, path, name=None):
             cells[(int(li % w), int(li // w))] = led + 1
     else:
         pos = np.asarray(g.pos, np.float32)
-        lit = np.asarray(g.lit, bool)
         phys = np.asarray(g.phys, int)
         pts = pos[phys]
         ok = np.isfinite(pts).all(1)

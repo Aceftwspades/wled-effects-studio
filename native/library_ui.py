@@ -17,7 +17,7 @@ import time
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from native import graph as G
+from native import graph as G, render
 
 TAG = "library_win"
 FRAMES = 24
@@ -246,7 +246,6 @@ def _poll_previews(app):
     q = getattr(app, "_lib_q", None)
     if q is None:
         return
-    c = _c()
     changed = False
     for _ in range(4):
         try:
@@ -293,11 +292,7 @@ def _texture(app, fn, frames):
     return tag
 
 
-def _rgba(frame):
-    h, w = frame.shape[:2]
-    out = np.ones((h, w, 4), np.float32)
-    out[:, :, :3] = frame.astype(np.float32) / 255.0
-    return out.ravel()
+_rgba = render.texture_rgba
 
 
 def poll(app):

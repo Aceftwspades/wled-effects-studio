@@ -19,7 +19,6 @@ buffer (so the sim's views show it) and streamed like any other frame.
 """
 import socket
 import struct
-import time
 
 import numpy as np
 

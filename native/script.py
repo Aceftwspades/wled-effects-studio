@@ -824,7 +824,7 @@ def compile_script(graph):
             if len(pts) < 2:
                 pts = [[0.0, 0.0], [1.0, 1.0]]
             asm.stream = asm.frame if scope[nid] == "frame" else asm.pixel
-            L = Lower(asm, env, label)
+            L = Lower(asm, dict(shared), label)
             src = src_of.get((nid, "x"))
             x = values[src] if src and src in values else _lit("float", n.get("inputs", {}).get("x", 0.0))
             result = ("k", pts[0][1])

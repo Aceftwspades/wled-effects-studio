@@ -87,10 +87,8 @@ static CfxBankReg {ident}_reg(&mode_{ident}, _data_FX_MODE_{upper});
 
 
 def _ident(name):
-    s = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_").lower()
-    if not s or s[0].isdigit():
-        s = "fx_" + s
-    return s
+    from native.graph import _ident as ident            # the same rule as a graph's effect name
+    return ident(name)
 
 
 class Project:

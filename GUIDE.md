@@ -154,8 +154,9 @@ click the bar to add a stop, drag it, right-click to remove it, a colour
 and a position each, up to 18 - kept with the project, in the sim as a
 palette of its own (ids 200 down, in the palette combo like any other,
 blended the way the device blends) and sent to the device as its custom
-palettes (`/palette{n}.json`, the same ids there). "From the sim's
-palette" starts from whatever the sim shows.
+palettes (`/palette{n}.json`, the same ids there - by position, so the
+first here replaces whatever the device had as palette 0). "From the
+sim's palette" starts from whatever the sim shows.
 
 **The library** (File > Library...) shows every graph of the project as a
 looping thumbnail with its tags (what nodes it uses, audio, 3-D, script);
@@ -184,8 +185,10 @@ pushes, outside-in, inside-out, circular, fairy dust - WLED's own; on the
 device the style is its blend-style setting). **Send presets + playlist**
 saves each step as a WLED preset (ids from "first preset id", existing
 ones overwritten) and the sequence as a playlist preset with the
-durations and transitions; "Send and run it" starts it; "Save
-presets.json" writes the same for a device that is not on the network.
+durations and transitions - about a second a preset, since the device
+writes each one from its main loop and the next is only sent once it
+has; "Send and run it" starts it; "Save presets.json" writes the same
+for a device that is not on the network.
 Effects and palettes are matched by name against the device's own lists,
 and a step whose effect the device does not have is left out and named.
 **BEATS**: a bpm typed, tapped (Tap, on the beat) or taken from the
@@ -281,8 +284,9 @@ on and install what it carries.
   the Script effect). `python tests/smoke_app.py` drives the app through
   its main flows and fails on any traceback; `python tests/walk_menus.py`
   calls every menu item and context-menu row.
-- A crash's traceback lands in `%TEMP%\cubefx\crash.txt` as well as the
-  console.
+- A frame that throws is written once to `%TEMP%\cubefx\crash.txt` (this
+  run's; the last run's is `crash.prev.txt`) and to the console, and the
+  status line says so; the sim pauses.
 - Settings > Appearance: dark, light, soft light or slate, and every one
   of the theme's seven colours editable.
 - Settings > "Draw the cube on the GPU" / "Scale the net on the GPU" are

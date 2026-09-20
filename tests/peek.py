@@ -8,7 +8,7 @@ matrix over 1024 LEDs comes every nth pixel (a 48 x 48 net as 24 x 24).
 What the cube actually shows, for checking a script or a flash against
 the sim; stdlib only.
 """
-import base64, os, socket, struct, sys, json
+import base64, os, socket, struct, sys
 
 def ws_connect(host, port=80, path="/ws"):
     s = socket.create_connection((host, port), timeout=8)

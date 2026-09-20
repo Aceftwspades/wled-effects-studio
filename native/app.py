@@ -44,7 +44,7 @@ from native import chrome, glow, device_ui, shape_ui
 from native.gpucube import CubeQuads
 from native.features import Features
 from native.popout import Popouts
-from native.dropfiles import DropFiles, classify
+from native.dropfiles import DropFiles
 from native.codeedit import CodeEditor
 from native.keys import Keymap, combo as key_combo
 from native import render, gif
@@ -1604,6 +1604,10 @@ class App(Features):
         ci = next(i for i, c in enumerate(arr) if "main" in c)
         arr[ci].insert(arr[ci].index("main") + 1, slot)
         self.set_arrangement(arr)
+        try:
+            dpg.set_y_scroll(self.pane_of(slot), 0)
+        except Exception:
+            pass
         self.gp.status(f"{slot} docked under the main pane; its grip moves it, float takes it out")
 
     def undock_slot(self, slot):
@@ -1618,6 +1622,10 @@ class App(Features):
         dpg.configure_item(tag, no_move=False, no_resize=False, width=w, height=h, show=True)
         chrome._centre(tag, w, h)
         device_ui.place_header(tag, w, False)
+        try:
+            dpg.set_y_scroll(tag, 0)        # scrolled while docked short, the title would come back hidden
+        except Exception:
+            pass
 
     def set_arrangement(self, arr):
         cols = self._valid_arrangement(arr)
@@ -2215,7 +2223,7 @@ class App(Features):
         if prev is not None and dpg.does_item_exist(prev) and dpg.get_item_type(prev).endswith("::mvColorEdit"):
             st = dpg.get_item_state(prev)
             mx, my = dpg.get_mouse_pos(local=False)
-            (x0, y0), (x1, y1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
+            (x0, _), (_, y1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
             if x0 - 4 <= mx <= x0 + 360 and y1 <= my <= y1 + 380:
                 self._picker = prev                           # inside the picker: still open
 
@@ -3356,7 +3364,7 @@ def service_command(app):
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
                     print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np})))
-                except Exception as e:
+                except Exception:
                     import traceback; traceback.print_exc()
             if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]
                 op = c["shape"]
@@ -3458,7 +3466,6 @@ def service_command(app):
                 hwnd = u32.FindWindowW(None, "WLED Effects Studio")
                 if hwnd:
                     u32.SetForegroundWindow(hwnd)
-                    r = ctypes.wintypes.RECT() if hasattr(ctypes, "wintypes") else None
                     import ctypes.wintypes as wt
                     pt = wt.POINT(0, 0); u32.ClientToScreen(hwnd, ctypes.byref(pt))
                     x, y = int(pt.x + c["click"][0]), int(pt.y + c["click"][1])
@@ -3785,7 +3792,8 @@ SKIP_MENU = ("Quit", "Record 15 s GIF", "Fullscreen",     # ends the app, a 15 s
              "Open the project folder", "Open the build folder", "Node reference (NODES.md)", "Studio guide (STUDIO.md)",
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
-             "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device (DDP)")   # these reach a real device: not a test's to do
+             "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device (DDP)",
+             "Import the device's ledmap")                   # these reach a real device: not a test's to do (the import would replace the shape)
 
 
 def walk_menus(app, skip=()):
@@ -3898,7 +3906,13 @@ def main():
     app.drops = DropFiles("WLED Effects Studio")
     os.makedirs(SHOT_DIR, exist_ok=True)
     os.makedirs(GIF_DIR, exist_ok=True)
-    print(f"if a frame throws, the traceback lands in {os.path.join(SHOT_DIR, 'crash.txt')}")
+    crash = os.path.join(SHOT_DIR, "crash.txt")
+    try:                                     # this run's own file; the last run's kept beside it
+        if os.path.exists(crash):
+            os.replace(crash, os.path.join(SHOT_DIR, "crash.prev.txt"))
+    except OSError:
+        pass
+    print(f"if a frame throws, the traceback lands in {crash}")
     print(f"frame capture: create {SHOT_REQ} to get a PNG at {SHOT_PNG}")
     print(f"remote control: write a JSON list of commands to {CMD_FILE}")
     try:
@@ -3942,12 +3956,16 @@ def main():
                 # console scrolls away and the interesting one is always the
                 # first, not the hundredth.
                 import traceback
-                traceback.print_exc()
-                try:
-                    with open(os.path.join(SHOT_DIR, "crash.txt"), "a") as fh:
-                        fh.write(traceback.format_exc() + "\n")
-                except Exception:
-                    pass
+                tb = traceback.format_exc()
+                if tb != getattr(app, "_last_tb", None):     # the same frame failing the same way is written once
+                    app._last_tb = tb
+                    traceback.print_exc()
+                    try:
+                        with open(crash, "a", encoding="utf-8") as fh:
+                            fh.write(tb + "\n")
+                    except Exception:
+                        pass
+                    app.gp.status(f"a frame failed: {tb.strip().splitlines()[-1][:90]} - see crash.txt")
                 app.playing = False
             _r0 = time.perf_counter()
             dpg.render_dearpygui_frame()

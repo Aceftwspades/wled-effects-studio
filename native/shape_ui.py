@@ -392,13 +392,19 @@ def _poll_preview(app):
         if err:
             dpg.set_value("shape_prev_status", f"preview failed: {err}"); return
         h, w = frames[0].shape[:2]
-        app._prev_frames = frames
-        if dpg.does_item_exist("shape_prev_tex"):
-            dpg.delete_item("shape_prev_tex")
-        with dpg.texture_registry():
-            dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag="shape_prev_tex")
-        dpg.delete_item("shape_prev_img", children_only=True)
-        dpg.add_image("shape_prev_tex", width=200, height=200, parent="shape_prev_img")
+        app._prev_frames = frames; app._prev_k = -1
+        if dpg.does_item_exist("shape_prev_tex") and getattr(app, "_prev_tex_size", None) == (w, h):
+            dpg.set_value("shape_prev_tex", _rgba(frames[0]))
+        else:
+            # the image goes before its texture: a texture cannot be deleted
+            # while something draws it (the alias then stays taken)
+            dpg.delete_item("shape_prev_img", children_only=True)
+            if dpg.does_item_exist("shape_prev_tex"):
+                dpg.delete_item("shape_prev_tex")
+            with dpg.texture_registry():
+                dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag="shape_prev_tex")
+            dpg.add_image("shape_prev_tex", width=200, height=200, parent="shape_prev_img")
+            app._prev_tex_size = (w, h)
         g = app.project.geometry
         dpg.set_value("shape_prev_status", f"{g.describe()}: {len(frames)} frames -> {os.path.basename(paths[0])}" + (f", {os.path.basename(paths[1])}" if paths[1] else "") + " in export/")
         app.gp.status(f"preview saved: {paths[0]}")
@@ -411,11 +417,7 @@ def _poll_preview(app):
             dpg.set_value("shape_prev_tex", _rgba(frames[k]))
 
 
-def _rgba(frame):
-    h, w = frame.shape[:2]
-    out = np.ones((h, w, 4), np.float32)
-    out[:, :, :3] = frame.astype(np.float32) / 255.0
-    return out.ravel()
+_rgba = render.texture_rgba
 
 
 # --- files -----------------------------------------------------------------------------------
@@ -513,7 +515,7 @@ def _view(app):
     st = dpg.get_item_state("cube_img")
     if "rect_min" not in st:
         return None
-    (x0, y0), (w, h) = st["rect_min"], st["rect_size"]
+    (x0, y0), (w, _) = st["rect_min"], st["rect_size"]
     if w <= 0:
         return None
     return (x0, y0), float(w), render.frame_of(g.pos)
@@ -530,7 +532,6 @@ def _hit(app, mx, my):
     if v is None:
         return None
     (x0, y0), size, ext = v
-    g = app.project.geometry
     parts = _parts(app) or []
     pos, _, owner = shapes.resolve(parts)
     if len(pos) == 0:

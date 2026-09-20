@@ -644,7 +644,6 @@ class Graph:
                     code = CODEGEN[d["codegen"]](n, getattr(self, "project_dir", None))
                 except Exception as e:
                     raise GraphError(f"{d['name']} #{nid}: {e}")
-            otypes = {o["name"]: o["type"] for o in d["outputs"]}
             # inputs
             for i in d["inputs"]:
                 key = (nid, i["name"])
@@ -862,8 +861,6 @@ def migrate(g):
                 joins[key] = g.add("Vector", (pos[0] - 190, pos[1] + 40 * len(joins)))
                 g.nodes[b]["inputs"].pop(vpin, None)
                 new_links.append((joins[key], "v", b, vpin))
-            # typed values on the old pins become the Vector node's inputs
-            vals = g.nodes[b].get("inputs", {})
             if (at, o) in MIGRATE_OUT:
                 svpin, scomp = MIGRATE_OUT[(at, o)]
                 skey = (a, svpin)

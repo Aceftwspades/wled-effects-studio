@@ -121,7 +121,7 @@ def extract_palettes():
     prev = open(path, encoding="utf-8").read() if os.path.exists(path) else None
     if prev != out:
         open(path, "w", encoding="utf-8").write(out)
-        print(f"  extracted palettes -> gen/wled_palettes.cpp")
+        print("  extracted palettes -> gen/wled_palettes.cpp")
     else:
         print("  palettes unchanged")
     return path
@@ -378,7 +378,7 @@ def build_native(srcs, force=False):
     there. cubefx.dll beside this script is still refreshed when it is not
     locked, so the CLI and older scripts keep working unchanged.
     """
-    from native.toolchain import build_engine, lib_ext, ToolchainError
+    from native.toolchain import build_engine, lib_ext
     inc = [os.path.join(HERE, "shim"), os.path.join(ROOT, "usermods", "cube_fx"),
            os.path.join(HERE, "gen")]
     rep = build_engine(srcs, inc, force=force, log=print)

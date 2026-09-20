@@ -15,6 +15,7 @@ dozen screens for.
     presets, playlist = to_wled(steps, names, pals, base=10, pid=9, name="Show", repeat=0)
 """
 import json
+import time
 import urllib.request
 
 
@@ -97,28 +98,60 @@ def to_wled(steps, names, pals, base=10, pid=9, name="Show", repeat=0):
     return presets, playlist
 
 
+def _host(host):
+    host = host.strip().rstrip("/")
+    return host if host.startswith("http") else "http://" + host
+
+
+def _pmt(host, timeout):
+    """When the device last wrote its presets file, by its own clock (whole seconds)."""
+    with urllib.request.urlopen(_host(host) + "/json/info", timeout=timeout) as r:
+        return int((json.loads(r.read()).get("fs") or {}).get("pmt", 0))
+
+
+def psave(host, k, body, timeout=6.0, gap=1.1):
+    """One preset saved on the device, and WAITED for. A psave answers
+    "success" at once but the write happens in the device's main loop, and
+    a second psave arriving before it replaces the one pending - fired
+    back to back, only the first of a run lands. So: send, then watch the
+    presets file's modified time (info.fs.pmt) move. Not by reading
+    presets.json: a GET of the file while the device rewrites it loses the
+    write. pmt is whole seconds, so saves are kept `gap` apart to make each
+    one's tick visible. Raises on a refusal or a timeout."""
+    host = _host(host)
+    before = _pmt(host, timeout)
+    body = dict(body); body["psave"] = int(k)
+    req = urllib.request.Request(host + "/json/state", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    sent = time.time()
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        r.read()
+    while time.time() - sent < timeout:
+        time.sleep(0.3)
+        try:
+            if _pmt(host, timeout) != before:
+                time.sleep(max(0.0, gap - (time.time() - sent)))     # into the next second before the next save
+                return
+        except Exception:
+            pass
+    raise TimeoutError(f"preset {k} was accepted but never written")
+
+
 def send(host, presets, playlist, pid):
     """The presets and the playlist onto the device, one psave each. (ok, message)."""
-    host = host.strip().rstrip("/")
-    if not host.startswith("http"):
-        host = "http://" + host
     n = 0
     for k, state in presets.items():
         if k is None:
             continue
-        body = dict(state); body.update({"psave": int(k), "ib": True, "sb": True})
-        req = urllib.request.Request(host + "/json/state", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=6) as r:
-                r.read()
+            psave(host, k, dict(state, ib=True, sb=True))
             n += 1
         except Exception as e:
             return False, f"preset {k} ({state.get('n')}) refused: {e}"
-    body = {"psave": int(pid), "n": playlist["n"], "playlist": playlist["playlist"]}
-    req = urllib.request.Request(host + "/json/state", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=6) as r:
-            r.read()
+        # "o": the object itself is the preset (WLED's "API command" form) -
+        # without it the device stores its current state under the id and
+        # the playlist is lost; "on" so the playlist switches the lights on
+        psave(host, pid, {"n": playlist["n"], "playlist": playlist["playlist"], "on": True, "o": True})
     except Exception as e:
         return False, f"{n} presets saved, the playlist refused: {e}"
     skipped = presets.get(None) or []
