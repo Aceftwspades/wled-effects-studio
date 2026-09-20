@@ -25,6 +25,30 @@ def default_library():
     return latest_library() or os.path.join(paths.RES, "cubefx.dll")
 
 
+def ensure_library(project=None, log=print):
+    """The library to load, built first when there is none (a build/ that
+    was cleared, a checkout not built yet): the project's imported effects
+    with the toolchain, as the editor's build would. Raises RuntimeError
+    with what went wrong, and what to do, when it cannot."""
+    lib = default_library()
+    if os.path.exists(lib):
+        return lib
+    log("no engine built yet - building one (a minute the first time)...")
+    try:
+        import build as B
+        from native.toolchain import build_engine
+        srcs = B.engine_sources([project.effect_path(f) for f in project.build_files()] if project else [], log=log)
+        rep = build_engine(srcs, B.include_dirs(), log=log)
+    except Exception as e:
+        raise RuntimeError(f"the engine could not be built: {e} - python -m native.doctor says what is missing")
+    if not rep.ok:
+        lines = [l for l in rep.link_output.splitlines() if l.strip()][-6:]
+        for src, txt in rep.errors.items():
+            lines += [l for l in txt.splitlines() if "error" in l][:3]
+        raise RuntimeError("the engine could not be built:\n  " + "\n  ".join(lines) + "\n  python -m native.doctor says what is missing")
+    return rep.library
+
+
 def _unload(lib):
     """Drop a ctypes library so its file can be replaced. Best effort; a
     library that refuses to unload is simply left until the process exits."""

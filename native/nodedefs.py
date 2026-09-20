@@ -713,7 +713,7 @@ LIBRARY = [
     _n("Fade", "colour", "pixel", [("color", C, 0), ("keep", F, 0.9)], [("color", C)], [],
        "$out.color = mq_scale($in.color, (uint8_t)(gc_sat($in.keep) * 255.0f));", "same as Scale; reads better after Previous"),
     _n("Split", "colour", "pixel", [("color", C, 0)], [("r", F), ("g", F), ("b", F), ("luma", F)], [],
-       "$out.r = (($in.color >> 16) & 255) * (1.0f / 255.0f); $out.g = (($in.color >> 8) & 255) * (1.0f / 255.0f); $out.b = ($in.color & 255) * (1.0f / 255.0f); $out.luma = $out.r * 0.3f + $out.g * 0.59f + $out.b * 0.11f;"),
+       "{ const GcVec c_ = gc_col2v($in.color); $out.r = c_.x; $out.g = c_.y; $out.b = c_.z; $out.luma = c_.x * 0.3f + c_.y * 0.59f + c_.z * 0.11f; }"),
     _n("Combine", "colour", "pixel", [("r", F, 0.0), ("g", F, 0.0), ("b", F, 0.0)], [("color", C)], [],
        "$out.color = RGBW32((uint8_t)(gc_sat($in.r) * 255.0f), (uint8_t)(gc_sat($in.g) * 255.0f), (uint8_t)(gc_sat($in.b) * 255.0f), 0);"),
 
@@ -1114,6 +1114,8 @@ static inline uint32_t gc_blend_screen(uint32_t u, uint32_t o, float a) {
 # graph already using one is marked. They still compile - each has a fallback.
 NEEDS = {"Gravity": "imu",
          "Audio": "audio", "FFT bin": "audio", "Beat kick": "audio", "Spectrum": "audio", "Loudest bin": "audio"}
+# an input that must be wired, and from what: the node reads another's state through it
+WIRED = {"Sprites": ("slots", "Particles or Emitters"), "Shells": ("slots", "Emitters or Particles")}
 
 
 def library(extra=()):
@@ -1125,6 +1127,8 @@ def library(extra=()):
         lib[d["name"]] = copy.deepcopy(d)
         if d["name"] in NEEDS:
             lib[d["name"]]["needs"] = NEEDS[d["name"]]
+        if d["name"] in WIRED:
+            lib[d["name"]]["wired"] = WIRED[d["name"]]
     for d in extra:
         try:
             lib[d["name"]] = d

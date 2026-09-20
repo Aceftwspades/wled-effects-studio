@@ -1095,12 +1095,27 @@ What would say the studio is complete, in the order to do them:
       effects the device does not have crashed the send's summary
       (`min()` over the skipped key), leaving the log at "sending..."
       and the buttons off for good.
-- [ ] **A node census** (`tests/test_nodes.py`): every node type as a
-      minimal graph, compiled to C++ and that C++ compiled by the
-      toolchain; scripted where scriptable.
-- [ ] **Sad paths**: a graph with a bad wire, a C++ effect that does not
-      compile, a device that is off, a missing engine - each a status
-      line, never a traceback (an `expect` hook for the smoke test).
+- [x] **A node census** (`tests/test_nodes.py`): every node type alone
+      in a minimal graph (every output folded into the Output), compiled
+      to C++, all 126 built into one engine by the toolchain and each run
+      for 40 frames; then through the script compiler - 91 scripted and
+      run in the Script effect, 35 refused, each as a ScriptError that
+      names the node. Found: Sprites and Shells without their slots wired
+      were a C++ error (`gc_st` undeclared) instead of a graph problem -
+      now a "must be wired from" error on the node, and Split was not
+      scriptable for its shifts (it reads the channels through
+      `gc_col2v` now). Found beside it: the object cache did not know
+      which compiler made an object, so objects the bundled g++ made for
+      a package were handed to clang and MSVC's linker ("invalid or
+      corrupt file") - the compiler is in the stamp now.
+- [x] **Sad paths**: a wire between types that do not convert (an error
+      on the node it lands on, and the compile names both ends), a wire to
+      a node or pin that is not there (dropped on load, counted in the
+      status), a graph without its Output, a C++ effect that does not
+      compile, a device that is off, a missing engine (built at start
+      from the project's effects, or the app exits saying why) - each a
+      status line, never a traceback; the smoke test walks them with the
+      `expect` hook, `tests/test_graph.py` the graph ones.
 - [ ] **A frame-button walk and an action walk**: every button of every
       frame clicked, every key action fired, as the menu walker does for
       menus.

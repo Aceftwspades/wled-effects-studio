@@ -228,6 +228,29 @@ class Graph:
         # per-link decoration, keyed by the input it lands on: {"color": [r,g,b]}
         self.link_meta = {(int(l[2]), l[3]): dict(l[4]) for l in d.get("links", []) if len(l) > 4 and l[4]}
         self._next = max(self.nodes.keys(), default=0) + 1
+        self.stray = self.prune_links()
+
+    def prune_links(self):
+        """Wires with an end that is not there - a node or a pin missing,
+        as a hand-edited or half-written file can have - dropped, and
+        listed, so the graph loads and compiles instead of failing on
+        them. A node whose definition cannot be resolved keeps its wires:
+        that is its own problem to report."""
+        keep, stray = [], []
+        for l in self.links:
+            a, out, b, inp = l[:4]
+            ok = a in self.nodes and b in self.nodes
+            if ok:
+                try:
+                    ad, bd = self.node_def(self.nodes[a]), self.node_def(self.nodes[b])
+                    ok = any(o["name"] == out for o in ad["outputs"]) and any(i["name"] == inp for i in bd["inputs"])
+                except GraphError:
+                    pass
+            (keep if ok else stray).append(l)
+        self.links = keep
+        for l in stray:
+            self.link_meta.pop((l[2], l[3]), None)
+        return stray
 
     # --- definitions -----------------------------------------------------------
     def node_def(self, n):
@@ -422,6 +445,19 @@ class Graph:
         if len(outs) > 1:
             for nid in outs:
                 out.setdefault(nid, "error: more than one Output")
+        # a wire between types that do not convert (a colour into a number)
+        for a, o, b, i in self.links:
+            if a in defs and b in defs and b not in out:
+                at = next((x["type"] for x in defs[a]["outputs"] if x["name"] == o), None)
+                it = next((x["type"] for x in defs[b]["inputs"] if x["name"] == i), None)
+                if at and it and not compatible(at, it):
+                    out[b] = f"error: {i} cannot take a {at} (from {defs[a]['name']} #{a})"
+        # an input that reads another node's state must be wired, or the C++ would not build
+        linked = {(b, i) for _, _, b, i in self.links}
+        for nid, d in defs.items():
+            w = d.get("wired")
+            if w and (nid, w[0]) not in linked:
+                out[nid] = f"error: {w[0]} must be wired from {w[1]}"
         fed = {a for a, _, _, _ in self.links}
         for nid, d in defs.items():
             if nid in out or d.get("decor") or not d["outputs"]:
@@ -531,6 +567,10 @@ class Graph:
         defs = {nid: self.node_def(n) for nid, n in self.nodes.items()}
         order = [nid for nid in self._order() if not defs[nid].get("decor")]
         src_of = {(b, inp): (a, out) for a, out, b, inp in self.links}
+        for nid, d in defs.items():
+            w = d.get("wired")
+            if w and (nid, w[0]) not in src_of:
+                raise GraphError(f"{d['name']} #{nid}: {w[0]} must be wired from {w[1]}")
         scope = {}
         for nid in order:
             d = defs[nid]
@@ -581,6 +621,10 @@ class Graph:
         defs = {nid: self.node_def(n) for nid, n in self.nodes.items()}
         order = [nid for nid in self._order() if not defs[nid].get("decor")]
         src_of = {(b, inp): (a, out) for a, out, b, inp in self.links}
+        for nid, d in defs.items():
+            w = d.get("wired")
+            if w and (nid, w[0]) not in src_of:
+                raise GraphError(f"{d['name']} #{nid}: {w[0]} must be wired from {w[1]}")
 
         # scope: frame nodes, then anything hoistable whose inputs are all frame
         scope = {}
@@ -653,7 +697,10 @@ class Graph:
                     at = next((o["type"] for o in ad["outputs"] if o["name"] == out), None)
                     if at is None:
                         raise GraphError(f"node {a} has no output {out!r}")
-                    expr = _coerce(var(a, out), at, i["type"])
+                    try:
+                        expr = _coerce(var(a, out), at, i["type"])
+                    except GraphError:
+                        raise GraphError(f"{d['name']} #{nid}: {i['name']} cannot take a {at} (from {ad['name']} #{a})")
                 else:
                     # the value typed on the node stands in for the wire
                     v = n.get("inputs", {}).get(i["name"], i.get("default", 0))

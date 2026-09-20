@@ -246,7 +246,9 @@ class GraphPanel:
         dpg.configure_item("graph_file", items=self.files())
         dpg.set_value("graph_file", fname if not sub else "")
         dpg.configure_item("graph_back", show=bool(self.stack))
-        self.status(("sub-graph " if sub else "") + fname)
+        stray = getattr(self.graph, "stray", None) or []
+        self.status(("sub-graph " if sub else "") + fname
+                    + (f" - {len(stray)} wire(s) to nodes or pins that are not there dropped" if stray else ""))
         self.app.refresh_import_buttons()
 
     def save(self):

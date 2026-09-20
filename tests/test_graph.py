@@ -58,6 +58,40 @@ def test_problems_flag_missing_output():
     assert probs, "a graph with no Output is a problem"
 
 
+def test_bad_and_stray_wires():
+    """A wire between types that do not convert is an error on the node it
+    lands on, and the compile names both ends; a wire to a node or a pin
+    that is not there (a hand-edited file) is dropped on load and listed."""
+    g = starter()
+    c = g.add("Coords", (0, 0)); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0)); q = g.add("Colour 1", (0, 100))
+    g.link(c, "u", p, "index"); g.link(p, "color", o, "color")
+    g.links.append((q, "color", p, "brightness"))
+    assert "cannot take a color" in g.problems().get(p, "")
+    try:
+        g.compile(); assert False, "compiled a colour into a number"
+    except G.GraphError as e:
+        assert "Palette" in str(e) and "Colour 1" in str(e)
+    d = g.to_json(); d["links"] = [l for l in d["links"] if l[0] != q]
+    d["links"] += [[999, "x", p, "brightness"], [c, "nope", p, "brightness"], [c, "u", p, "nope"]]
+    g2 = G.Graph(d, lib=LIB)
+    assert len(g2.stray) == 3 and p not in g2.problems() and "SEGMENT" in g2.compile()
+
+
+def test_wired_input_is_required():
+    """Sprites reads the Particles' state through its slots pin: unwired,
+    it is a problem on the node and a refusal to compile, not a C++ error."""
+    g = starter()
+    s = g.add("Sprites", (0, 0)); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+    g.link(s, "value", p, "index"); g.link(p, "color", o, "color")
+    assert "must be wired" in g.problems().get(s, "")
+    try:
+        g.compile(); assert False, "compiled without its slots"
+    except G.GraphError as e:
+        assert "slots" in str(e)
+    q = g.add("Particles", (-200, 0)); g.link(q, "slots", s, "slots")
+    assert s not in g.problems() and "SEGMENT" in g.compile()
+
+
 def test_exposed_param_becomes_a_pin_and_compiles():
     g = starter()
     c = g.add("Coords", (0, 0)); n = g.add("Noise", (100, 0)); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))

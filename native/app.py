@@ -276,7 +276,12 @@ class Section:
 class App(Features):
     def __init__(self):
         self.project = default_project()
-        self.eng = Engine()
+        from native.engine import ensure_library
+        try:
+            lib = ensure_library(self.project)          # built now when build/ is empty, rather than a traceback
+        except RuntimeError as e:
+            print(e); sys.exit(str(e))
+        self.eng = Engine(lib)
         self.eng.set_geometry(self.project.geometry)
         # --- the editor ------------------------------------------------------
         self.edit_file = None       # file name in the project's effects/

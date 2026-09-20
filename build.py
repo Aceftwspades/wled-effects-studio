@@ -488,9 +488,11 @@ def main():
     # and a usermod list, and emcc links as C: the wasm link failed on
     # operator new, __cxa_throw and class vtables. emcc says so itself in
     # the failure - "try linking with em++ or passing -sDEFAULT_TO_CXX".
-    cmd = ["em++", "-std=gnu++17", "-O2", "-I", "shim",
-           "-DWLED_PS_DONT_REPLACE_2D_FX", "-DCFX_BANK_MAX_FX=256",
-           "-DCFX_SIM"] + srcs + [
+    cmd = ["em++", "-std=gnu++17", "-O2"]
+    for d in include_dirs():                    # the same includes as the native build: the shim, the firmware, gen/, FastLED's slim copy
+        cmd += ["-I", d]
+    cmd += ["-DWLED_PS_DONT_REPLACE_2D_FX", "-DCFX_BANK_MAX_FX=256",
+            "-DCFX_SIM"] + srcs + [
         "-o", "cubefx.js",
         # HEAPU8/HEAPU32 must be listed explicitly - current Emscripten does not
         # attach the heap views to the module by default, and reading pixels

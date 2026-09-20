@@ -1715,7 +1715,7 @@ def check():
         srcs.append(p)
     rep = build_engine(B.engine_sources(srcs, log=lambda *a: None),
                        B.include_dirs(),
-                       log=lambda *a: None)
+                       log=lambda *a: None, point_latest=False)     # the app keeps its own engine
     if not rep.ok:
         for e in rep.error_lines():
             if e[2].startswith("error"): print("  ", os.path.basename(e[0]), e[1], e[2])

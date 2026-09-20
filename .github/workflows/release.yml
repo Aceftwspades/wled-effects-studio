@@ -62,7 +62,7 @@ jobs:
         run: |
           $env:STUDIO_TOOLCHAIN = "$PWD\mingw\mingw64"
           $env:STUDIO_NO_UPDATE_CHECK = "1"
-          foreach ($t in "test_shapes", "test_device", "test_graph") {
+          foreach ($t in "test_shapes", "test_device", "test_graph", "test_nodes") {
             python tests\$t.py
             if ($LASTEXITCODE) { exit 1 }
           }

@@ -93,10 +93,14 @@ STEPS = [
       {"py": "__import__('native.outputs_ui', fromlist=['x']).read_device(app)"}], 3.0),
     ([{"expect": ["out_log", "output(s) read"]}, {"py": "__import__('native.outputs_ui', fromlist=['x']).send(app)"}], 3.0),
     ([{"expect": ["out_log", "sent"]}], 0.5),
-    # sad paths: a graph with no output, a C++ effect that does not compile, a device that is off - a status line each
+    # sad paths: a wire between types that do not convert, a graph with no output, a C++ effect that does not
+    # compile, a device that is off - a status line each, never a traceback
     ([{"layout": "graph"}, {"py": "app.gp.new('sad_smoke')"},
+      {"py": "app.gp.graph.links.append((next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Speed'), 'value', "
+             "next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Output'), 'color'))"}, {"py": "app.gp.compile()"}], 3.0),
+    ([{"expect": ["graph_status", "cannot take a float"]},
       {"py": "[app.gp._delete_node(i) for i, n in list(app.gp.graph.nodes.items()) if n['type'] == 'Output']"}, {"py": "app.gp.compile()"}], 3.0),
-    ([{"expect": ["graph_status", "graph:"]}, {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
+    ([{"expect": ["graph_status", "exactly one Output"]}, {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
       {"ed_type": "this is not C++ ;"}, {"ed_key": ["Return", False, False]}, {"py": "app.edit_build()"}], 12.0),
     ([{"expect": ["edit_status", "problem"]}, {"action": "undo"}, {"action": "undo"}, {"layout": "graph"}, {"graph_open": "fan.json"},
       {"device": "127.0.0.1:1"}, {"py": "app.send_script()"}], 8.0),

@@ -197,19 +197,37 @@ def _obj_path(src):
     return os.path.join(OBJ, f"{base}_{h}.o")
 
 
-def _obj_stamp(src, hstamp):
-    """What an object was made from: the source's contents and the headers' digest."""
+_CID = {}
+
+
+def _compiler_id(compiler, env):
+    """Which compiler, by its own account (`--version`, first line): an
+    object one compiler made is no good to another's linker - g++'s COFF
+    to MSVC's link, say - so the compiler is part of what an object was
+    made from."""
+    if compiler not in _CID:
+        try:
+            r = subprocess.run([compiler, "--version"], capture_output=True, text=True, env=env, timeout=30)
+            line = (r.stdout or r.stderr or "").strip().splitlines()[0]
+        except Exception:
+            line = ""
+        _CID[compiler] = hashlib.sha1((os.path.basename(compiler).lower() + "|" + line).encode("utf-8", "replace")).hexdigest()[:12]
+    return _CID[compiler]
+
+
+def _obj_stamp(src, hstamp, cid=""):
+    """What an object was made from: the source's contents, the headers' digest, the compiler."""
     try:
-        return hashlib.sha1(open(src, "rb").read()).hexdigest() + ":" + hstamp
+        return hashlib.sha1(open(src, "rb").read()).hexdigest() + ":" + hstamp + (":" + cid if cid else "")
     except OSError:
         return ""
 
 
-def _needs_compile(src, obj, hstamp):
+def _needs_compile(src, obj, hstamp, cid=""):
     if not os.path.exists(obj):
         return True
     try:
-        return open(obj + ".stamp", encoding="utf-8").read().strip() != _obj_stamp(src, hstamp)
+        return open(obj + ".stamp", encoding="utf-8").read().strip() != _obj_stamp(src, hstamp, cid)
     except OSError:
         return True
 
@@ -287,12 +305,16 @@ def latest_library():
 
 
 def prune_versions(keep=2):
-    """Delete old versioned libraries that nothing holds open. A file the app
-    still has loaded refuses to be removed on Windows and is simply left for
-    the next prune."""
+    """Delete old versioned libraries that nothing holds open, never the one
+    `latest` names (a side build - a test's - may have moved on past it). A
+    file the app still has loaded refuses to be removed on Windows and is
+    simply left for the next prune."""
     files = sorted(glob.glob(os.path.join(BUILD, "cubefx_*" + lib_ext())),
                    key=lambda f: int(os.path.basename(f).split("_")[1].split(".")[0]))
+    current = latest_library()
     for f in files[:-keep] if keep else files:
+        if current and os.path.normcase(os.path.abspath(f)) == os.path.normcase(os.path.abspath(current)):
+            continue
         for side in (f, f[:-len(lib_ext())] + ".lib", f[:-len(lib_ext())] + ".exp"):
             try:
                 os.remove(side)
@@ -325,9 +347,10 @@ class BuildReport:
         return out
 
 
-def build_engine(sources, include_dirs, jobs=None, force=False, log=print):
+def build_engine(sources, include_dirs, jobs=None, force=False, log=print, point_latest=True):
     """Compile whatever is stale, link a new versioned library, point latest at
-    it. Returns a BuildReport; .library is the path to load on success."""
+    it (unless told not to: a side build, a test's, that the app should not
+    pick up). Returns a BuildReport; .library is the path to load on success."""
     rep = BuildReport()
     try:
         compiler, env = find_compiler()
@@ -338,19 +361,20 @@ def build_engine(sources, include_dirs, jobs=None, force=False, log=print):
         return rep
 
     hstamp = _header_stamp(include_dirs)
+    cid = _compiler_id(compiler, env)
     todo = []
     objs = []
     for src in sources:
         obj = _obj_path(src)
         objs.append(obj)
-        if force or _needs_compile(src, obj, hstamp):
+        if force or _needs_compile(src, obj, hstamp, cid):
             todo.append((src, obj))
 
     if todo:
         log(f"  compiling {len(todo)} of {len(sources)} translation units")
         jobs = jobs or max(2, (os.cpu_count() or 4))
         with ThreadPoolExecutor(max_workers=jobs) as ex:
-            futs = {ex.submit(compile_tu, compiler, env, s, o, include_dirs, (), _obj_stamp(s, hstamp)): s for s, o in todo}
+            futs = {ex.submit(compile_tu, compiler, env, s, o, include_dirs, (), _obj_stamp(s, hstamp, cid)): s for s, o in todo}
             for fut, src in futs.items():
                 ok, txt = fut.result()
                 rep.compiled.append(src)
@@ -375,8 +399,9 @@ def build_engine(sources, include_dirs, jobs=None, force=False, log=print):
         log("  link FAILED")
         log("    " + "\n    ".join(txt.splitlines()[-12:]))
         return rep
-    with open(os.path.join(BUILD, "latest"), "w", encoding="utf-8") as f:
-        f.write(os.path.basename(out))                # a name, not a path: the folder may move (a portable install)
+    if point_latest:
+        with open(os.path.join(BUILD, "latest"), "w", encoding="utf-8") as f:
+            f.write(os.path.basename(out))            # a name, not a path: the folder may move (a portable install)
     rep.library = out
     log(f"  {os.path.basename(out)}: {os.path.getsize(out):,} bytes")
     prune_versions(keep=3)
