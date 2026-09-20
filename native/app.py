@@ -330,7 +330,8 @@ class App(Features):
         self.gpu_cube = bool(self.prefs.get("gpu_cube", True))   # the cube as textured quads, not a numpy warp
         self.gpu_net = bool(self.prefs.get("gpu_net", True))     # the net scaled by the GPU, not repeated on the CPU
         self.code_ed = None          # CodeEditor, made in build()
-        self.cube_quads = None       # CubeQuads while the GPU view is up
+        self.cube_quads = None       # CubeQuads while the GPU view draws a cube
+        self.point_quads = None      # PointQuads while it draws any other geometry
         self.ab = None               # a second engine, for comparing two effects side by side
         self.ab_name = None
         self._code_undo, self._code_redo, self._code_text, self._code_t = [], [], "", 0.0
@@ -428,7 +429,8 @@ class App(Features):
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
-        return render.render_points(g.pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px))
+        pos = self.view_positions() if eng is self.eng else g.pos
+        return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px))
 
     # --- audio ---------------------------------------------------------------
     def audio_push(self):
@@ -2149,7 +2151,7 @@ class App(Features):
         for win, img in (("net_win", "net_img"), ("cube_win", "cube_img")):
             if not (dpg.does_item_exist(win) and dpg.does_item_exist(img)):
                 continue
-            if img == "cube_img" and self.cube_quads is not None:
+            if img == "cube_img" and (self.cube_quads is not None or self.point_quads is not None):
                 continue                                  # the drawlist fills the pane and centres itself
             cw = dpg.get_item_configuration(win).get("width") or 0
             ch = dpg.get_item_configuration(win).get("height") or 0
@@ -2186,11 +2188,25 @@ class App(Features):
         self._bufs.pop("net", None)
 
     def gpu_cube_active(self):
-        """The GPU view draws the cube itself: five flat faces, one segment.
-        Everything else - flat mode, point clouds, two effects side by side -
-        keeps the software renderer."""
+        """The GPU view draws a cube as its faces: five flat faces, one
+        segment. Flat mode and two effects side by side keep the software
+        renderer."""
         g = self.eng.geom
         return bool(self.gpu_cube and g is not None and g.kind == "cube" and not self.eng.fx.get("o3") and not self.ab)
+
+    def gpu_points_active(self):
+        """The GPU view draws every other geometry as a cloud of squares."""
+        g = self.eng.geom
+        return bool(self.gpu_cube and g is not None and g.kind != "cube" and not self.ab)
+
+    def view_positions(self):
+        """The LEDs' positions the 3-D view draws: the project's geometry
+        when it is the engine's shape moved (a part being dragged), else
+        the engine's own."""
+        g, p = self.eng.geom, self.project.geometry
+        if g is not None and p is not None and p.kind == g.kind and len(p.pos) == len(g.pos):
+            return p.pos
+        return g.pos if g is not None else np.zeros((1, 3), np.float32)
 
     def remake_cube_texture(self):
         p = self.cube_px
@@ -2198,8 +2214,22 @@ class App(Features):
         if dpg.does_item_exist("cube_img"):
             dpg.delete_item("cube_img")
         self.cube_quads = None
+        if self.point_quads is not None and dpg.does_item_exist(self.point_quads.tex):
+            dpg.delete_item(self.point_quads.tex)
+        self.point_quads = None
         if dpg.does_item_exist("cube_tex"):
             dpg.delete_item("cube_tex")
+        if self.gpu_points_active():
+            from native.gpucube import PointQuads
+            self.point_quads = PointQuads("cube_win", "cube_img", self.view_positions())
+            r = self._rects.get("cube")
+            if r and self.ui:
+                self.point_quads.resize(self.view_side, r[2] - 22, r[3] - CAP_H)
+            else:
+                self.point_quads.resize(self.view_side)
+            if dpg.does_item_exist("cube_cap"):
+                dpg.set_value("cube_cap", "3-D - drag to rotate, wheel to zoom")
+            return
         if self.gpu_cube_active():
             # the net, a few times its size so bilinear sampling keeps the
             # LEDs square, is the one texture the quads draw from
@@ -2717,7 +2747,7 @@ class App(Features):
     def poll_view_mode(self):
         """The 3-D view is remade when what it should draw changes: flat
         mode toggled, A/B started or stopped, the GPU view switched."""
-        want = self.gpu_cube_active()
+        want = (self.gpu_cube_active(), self.gpu_points_active())
         if want != getattr(self, "_gpu_was", None):
             self._gpu_was = want
             self.request_layout()
@@ -2972,6 +3002,16 @@ class App(Features):
             dpg.set_value("cube_src_tex", self._rgba("cube_src", src.repeat(k, 0).repeat(k, 1)))
             self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six)
             self.cube_quads.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
+            if self.shot_req or self.rec is not None:
+                img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
+        elif self.cube_on() and self.point_quads is not None:
+            pq = self.point_quads
+            pos = self.view_positions()
+            if pos is not pq.pos and (len(pos) != pq.n or not np.array_equal(pos, pq.pos)):
+                pq.set_points(pos)                         # a part dragged, a shape changed
+            pq.camera(self.yaw, self.pitch, self.dist)
+            pq.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
+            pq.colours(self.frame_rgb(self.eng).reshape(-1, 3))
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on():

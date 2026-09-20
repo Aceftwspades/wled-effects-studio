@@ -902,6 +902,19 @@ the order to do them:
       Record 15 s video and Ctrl+Shift+F12 an mp4; the sequence frame's
       Render GIF / Render video for the sequence's whole length).
 
+- [x] **Every geometry on the GPU** (`gpucube.PointQuads`): a cube is
+      still its textured faces; everything else - a matrix, a strip, a
+      sphere, a shape of parts - is a cloud of squares, one draw_image_quad
+      per LED, each sampling one texel of an N-wide colour texture that is
+      written once a frame in one call. The squares are placed only when
+      the camera moves, far first so nearer ones cover (the software
+      renderer's painter's order), and the k-th square shows the k-th
+      farthest LED, so the draw order is the depth order without moving
+      items. A 2,048-LED sphere: 5.7 ms a frame (draw 0.7) against 33.6
+      (draw 28) on the CPU. The 3-D view draws the project's geometry when
+      it is the engine's shape moved, so a dragged part moves on the GPU
+      path too; the shape editor's rings know the drawlist's centring.
+      Pictures, recordings, popouts and previews keep the software path.
 - [x] **The node menu grew** a few pixels a frame once "delete" or "more"
       was unfolded, until it met the screen's edge: a selectable with no
       width takes the width there is, and in a window that sizes itself

@@ -353,6 +353,8 @@ on and install what it carries.
 - Settings > Appearance: dark, light, soft light or slate, and every one
   of the theme's seven colours editable.
 - Settings > "Draw the 3-D view on the GPU" / "Scale the logical view on
-  the GPU" are the fast paths (the faces of a shape as textured quads;
-  loose LEDs are points either way); turn them off if the views misbehave
-  on a machine.
+  the GPU" are the fast paths: a cube is drawn as its faces, textured;
+  every other geometry as a cloud of squares, one per LED, coloured from
+  one texture written once a frame (a 2,000-LED sphere: 6 ms a frame
+  against 34 on the CPU). Turn them off if the views misbehave on a
+  machine; pictures and recordings always come from the software renderer.

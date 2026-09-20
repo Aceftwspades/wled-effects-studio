@@ -689,9 +689,12 @@ def _view(app):
     st = dpg.get_item_state("cube_img")
     if "rect_min" not in st:
         return None
-    (x0, y0), (w, _) = st["rect_min"], st["rect_size"]
+    (x0, y0), (w, h) = st["rect_min"], st["rect_size"]
     if w <= 0:
         return None
+    pq = getattr(app, "point_quads", None)
+    if pq is not None and pq.size:                        # the GPU cloud: a square of the view's side, centred in its drawlist
+        x0 += (w - pq.size) * 0.5; y0 += (h - pq.size) * 0.5; w = pq.size
     return (x0, y0), float(w), render.frame_of(g.pos)
 
 
