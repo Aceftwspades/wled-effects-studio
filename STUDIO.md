@@ -968,26 +968,44 @@ the order to do them:
       tapped or taken from the synth, and every step's seconds snapped to
       whole bars of it.
 
-### A self-contained app (on hold)
+### A self-contained app (September 2026)
 
 The goal: one download that runs, for any WLED user, not a checkout of
-this repo with a compiler beside it. Today the studio is a source tree
-inside the WLED checkout, run in place with hand-installed packages, and
-the engine is compiled from the firmware's own sources by clang - which
-is also what every graph build needs. In the order to do them, when the
-housekeeping above is done:
+this repo with a compiler beside it. Done so far:
 
-- [ ] `pyproject.toml` + `requirements.txt` with pins, and `python -m
-      native.doctor`: Python version, packages, the compiler, PlatformIO,
-      and exactly what is missing.
-- [ ] A prebuilt engine in releases (`cubefx.dll` for the commit), so a
-      first run needs no compiler: viewing, the examples, the script
-      preview and device pushes work at once; the compiler is needed only
-      to build.
-- [ ] A PyInstaller one-folder build (Windows first) - the app, its
-      packages, the prebuilt engine - and the handful of firmware files
-      the engine compiles copied in as a runtime folder, which is the step
-      that cuts the dependency on the full WLED tree.
+- [x] **`native/paths.py`**: the one place that knows where things are -
+      RES (what ships and is read: shim/, gen/, runtime/, examples, docs;
+      the studio folder, or the bundle's `_internal`), HOME (what the
+      user makes: projects/, build/, captures/; the studio folder, or the
+      exe's folder when writable, else %LOCALAPPDATA%), TREE (the WLED
+      checkout, or WLED_ROOT, or none). Every module asks it; nothing
+      works a path out from its own file any more. `build/latest` holds
+      a name, not a path, so the folder can move.
+- [x] **`runtime/`** (`python build.py --runtime`): the firmware files the
+      engine compiles from - usermods/cube_fx, wled_math.cpp, FastLED's
+      slim copy - copied out of the checkout; with gen/ as generated, the
+      engine and every effect build with no WLED tree beside them. The
+      sources include by name (`"wled.h"`, `"cube_fx_bank.h"`,
+      `"fastled_slim.h"`, `"fx_modes.h"`) from an include path
+      (`build.include_dirs()`), never by a path relative to the file.
+- [x] **`python -m native.doctor`** (also `studio.py --doctor`): Python,
+      the packages, the compiler, the engine, the checkout or runtime/,
+      PlatformIO, ffmpeg - each with the line that fixes it; exit 1 when
+      the app cannot run. `requirements.txt`, `pyproject.toml`.
+- [x] **`python package.py`** (`studio.spec`): the engine built and
+      copied in as a prebuilt library, runtime/ written, an icon drawn
+      from the toolbar's cube, PyInstaller's one folder - `dist/WLED
+      Effects Studio/`, about 80 MB, with a console variant beside the
+      windowed exe for when something goes wrong; `--toolchain <folder>`
+      copies a MinGW-w64 (or a clang) in as toolchain/, which the
+      toolchain finds before any installed compiler and links with
+      `-static` so the DLL needs nothing beside it; `--zip` for a
+      release. Verified: the packaged app runs from `_internal`, makes
+      its project beside the exe, loads the prebuilt engine, builds an
+      effect against runtime/, opens a popout (`--popout`, the same exe).
+- [ ] A bundled compiler tried end to end (a MinGW-w64 in toolchain/):
+      the code path is there, the g++ build of the engine is not yet
+      proven.
 - [ ] A Linux / macOS pass: run it there, fix what falls over (font
       paths, viewport flags, audio device listing).
 - [ ] Housekeeping first: the studio no longer assumes a cube anywhere a

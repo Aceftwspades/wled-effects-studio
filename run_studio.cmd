@@ -33,7 +33,8 @@ echo.
 echo  Common causes:
 echo    - the native DLL will not build: needs MSVC Build Tools and the
 echo      clang inside emsdk. Run  python build.py --native-only
-echo    - missing packages:  pip install numpy dearpygui pyaudiowpatch sounddevice
+echo    - missing packages:  pip install -r requirements.txt
+echo    - python -m native.doctor  says exactly what is missing
 echo ---------------------------------------------------------------
 echo.
 pause

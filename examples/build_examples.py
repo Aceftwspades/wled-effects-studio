@@ -1714,7 +1714,7 @@ def check():
         open(p, "w", encoding="utf-8", newline="\n").write(g.compile())
         srcs.append(p)
     rep = build_engine(B.engine_sources(srcs, log=lambda *a: None),
-                       [os.path.join(B.HERE, "shim"), os.path.join(B.ROOT, "usermods", "cube_fx"), B.GEN],
+                       B.include_dirs(),
                        log=lambda *a: None)
     if not rep.ok:
         for e in rep.error_lines():

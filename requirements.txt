@@ -1,0 +1,7 @@
+# the studio's packages (python -m pip install -r requirements.txt)
+numpy>=1.26
+dearpygui>=1.11
+pillow>=10
+# optional: live audio - a microphone or line-in (sounddevice), what the PC plays (pyaudiowpatch, Windows)
+sounddevice>=0.4
+pyaudiowpatch>=0.2.12; sys_platform == "win32"

@@ -43,7 +43,7 @@
 using std::min;
 using std::max;
 #include "pgmspace.h"
-#include "../../wled00/src/dependencies/fastled_slim/fastled_slim.h"
+#include "fastled_slim.h"                   // wled00/src/dependencies/fastled_slim, on the include path
 
 typedef uint8_t byte;
 
@@ -728,7 +728,7 @@ static inline uint32_t micros() { return strip.now * 1000u; }
 // The FX_MODE_* ids, lifted from FX.h by build.py so an effect that compares
 // SEGMENT.mode against one - mode_android does - sees the device's numbers.
 #if __has_include("../gen/fx_modes.h")
-  #include "../gen/fx_modes.h"
+  #include "fx_modes.h"                     // gen/, on the include path
 #endif
 
 #define SEGMENT      (*strip._currentSegment)

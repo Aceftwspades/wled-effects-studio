@@ -129,7 +129,8 @@ def main():
     saved = open(project, encoding="utf-8").read() if os.path.exists(project) else None
     graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
     saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
-    before = set(os.listdir(os.path.join(ROOT, "projects", "default", "graphs")))
+    gdir = os.path.join(ROOT, "projects", "default", "graphs")
+    before = set(os.listdir(gdir)) if os.path.isdir(gdir) else set()      # a first run makes the project
     STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs: a saved view would otherwise stay
     saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
     ddp = _DdpCount(); ddp.start()
@@ -150,8 +151,9 @@ def main():
             open(graph, "w", encoding="utf-8").write(saved_graph)
         if saved_prefs is not None:
             open(STUDIO_FILE, "w", encoding="utf-8").write(saved_prefs)
-        for f in set(os.listdir(os.path.join(ROOT, "projects", "default", "graphs"))) - before:
-            os.remove(os.path.join(ROOT, "projects", "default", "graphs", f))     # the import's copy
+        for f in (set(os.listdir(gdir)) if os.path.isdir(gdir) else set()) - before:
+            if before:                                                         # a project made by this run keeps its examples
+                os.remove(os.path.join(gdir, f))                               # the import's copy
     text = open(LOG, encoding="utf-8", errors="replace").read()
     ddp.stop()
     print(f"ddp: {ddp.packets} packets, {ddp.frames} frames received from the stream")

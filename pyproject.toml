@@ -1,0 +1,13 @@
+[project]
+name = "wled-effects-studio"
+version = "0.9.0"
+description = "Node graphs and C++ compiled into WLED effects, previewed on a simulated cube, sphere, matrix or strip"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26", "dearpygui>=1.11", "pillow>=10"]
+
+[project.optional-dependencies]
+audio = ["sounddevice>=0.4", "pyaudiowpatch>=0.2.12; sys_platform == 'win32'"]
+package = ["pyinstaller>=6"]
+
+[project.scripts]
+wled-studio = "native.app:main"

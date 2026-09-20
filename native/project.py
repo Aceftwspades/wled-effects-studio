@@ -24,9 +24,10 @@ import time
 
 from native.geometry import Geometry
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ROOT = os.path.dirname(HERE)
-PROJECTS = os.path.join(HERE, "projects")
+from native import paths
+HERE = paths.RES                         # what ships: examples/, the docs
+ROOT = paths.TREE                        # the WLED checkout, or None (native/paths.py)
+PROJECTS = paths.PROJECTS
 
 TEMPLATE = r'''#include "wled.h"
 #include "cube_fx_common.h"
@@ -272,7 +273,7 @@ class Project:
         # builds on its own as a usermod: the two headers, the bank's
         # implementation, and a library.json PlatformIO can pick up
         for h in ("cube_fx_common.h", "cube_fx_bank.h", "cube_fx_bank.cpp", "cube_fx_imu.h"):
-            src = os.path.join(ROOT, "usermods", "cube_fx", h)
+            src = os.path.join(paths.firmware_dir(), h)
             if os.path.exists(src):
                 shutil.copyfile(src, os.path.join(um, h))
         # the firmware behind a feature the effects need, when asked for
@@ -280,7 +281,7 @@ class Project:
         dep_files = []
         for k in deps:
             for rel in DEPENDENCIES.get(k, {}).get("files", []):
-                src = os.path.join(ROOT, rel)
+                src = os.path.join(ROOT, rel) if ROOT else ""
                 if os.path.exists(src):
                     shutil.copyfile(src, os.path.join(um, os.path.basename(rel)))
                     dep_files.append(os.path.basename(rel))

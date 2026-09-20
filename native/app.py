@@ -1278,7 +1278,7 @@ class App(Features):
                 with contextlib.redirect_stdout(buf):
                     srcs = B.engine_sources([self.project.effect_path(f)
                                              for f in self.project.build_files(self.edit_file)])
-                inc = [os.path.join(B.HERE, "shim"), os.path.join(B.ROOT, "usermods", "cube_fx"), B.GEN]
+                inc = B.include_dirs()
                 rep = build_engine(srcs, inc, log=lambda *a: None)
             except Exception as e:
                 rep = None
@@ -1973,7 +1973,8 @@ class App(Features):
 
     @staticmethod
     def doc_path(name):
-        return os.path.join(os.path.dirname(PROJECTS), name)
+        from native import paths
+        return os.path.join(paths.RES, name)
 
     def reveal(self, path):
         """Open a file or folder with whatever the system uses for it."""
@@ -3794,8 +3795,8 @@ def service_command(app):
 # nobody minds losing, whereas a recording is a thing you made and meant to
 # keep, and Windows is entitled to empty %TEMP% whenever it likes. Gitignored,
 # so keeping them here does not mean committing them.
-GIF_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                       "captures")
+from native import paths as _paths
+GIF_DIR = _paths.CAPTURES
 
 
 def service_capture():

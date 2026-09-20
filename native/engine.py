@@ -21,7 +21,8 @@ def default_library():
     """The library to load: the newest versioned build, else the legacy
     cubefx.dll beside build.py. See native/toolchain.py."""
     from native.toolchain import latest_library
-    return latest_library() or os.path.join(os.path.dirname(HERE), "cubefx.dll")
+    from native import paths
+    return latest_library() or os.path.join(paths.RES, "cubefx.dll")
 
 
 def _unload(lib):

@@ -8,7 +8,7 @@
 // ===========================================================================
 #include <stdio.h>
 #include "shim/wled.h"
-#include "../usermods/cube_fx/cube_fx_bank.h"
+#include "cube_fx_bank.h"                 // usermods/cube_fx, on the include path
 
 // The same C surface serves two front ends. It was written for a browser and
 // turned out to be exactly what a native host wants as well, because ctypes and

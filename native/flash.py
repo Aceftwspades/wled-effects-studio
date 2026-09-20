@@ -20,7 +20,8 @@ import threading
 import time
 import urllib.request
 
-from native.project import ROOT
+from native import paths
+ROOT = paths.TREE or paths.RES           # the flash builds in the WLED checkout; without one the frame says so
 
 USERMOD = "usermod_studio"
 MARK_BEGIN = ";; --- WLED Effects Studio: generated environment (rewritten on every flash) ---"

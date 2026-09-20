@@ -7,9 +7,23 @@ NODES.md lists every node; TUTORIAL.md builds a first effect node by node.
 
 ## First run
 
+**The packaged app** (a release zip, or `python package.py` from the
+tree): unzip anywhere and run `WLED Effects Studio.exe`. It is portable -
+projects, builds and captures land in its folder (or in `%LOCALAPPDATA%\WLED
+Effects Studio` when the folder cannot be written to). The engine comes
+prebuilt, so viewing, the examples, the script preview and every send to
+a device work at once; building an effect of your own needs a C++
+compiler - a MinGW-w64 in `toolchain\` beside the exe, or emsdk's clang
+with the MSVC Build Tools - and flashing firmware needs a WLED checkout
+(set `WLED_ROOT`) and PlatformIO. `WLED Effects Studio (console).exe` is
+the same app with a console, for when something goes wrong.
+
+**From the tree**:
+
 ```bash
 cd studio
-pip install dearpygui numpy pillow sounddevice        # pyaudiowpatch on Windows for loopback
+pip install -r requirements.txt                        # dearpygui, numpy, pillow; the audio packages
+python -m native.doctor                                # what is here and what is missing
 python build.py --native-only                          # once; the app rebuilds the engine as it needs
 python -m native.app                                   # or the desktop shortcut
 ```

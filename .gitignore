@@ -11,3 +11,5 @@ cubefx.exp
 build/
 projects/
 examples/_check/
+runtime/
+dist/

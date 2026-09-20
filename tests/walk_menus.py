@@ -47,7 +47,7 @@ def main():
     graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
     saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
     gdir = os.path.join(ROOT, "projects", "default", "graphs")
-    before = set(os.listdir(gdir))
+    before = set(os.listdir(gdir)) if os.path.isdir(gdir) else set()
     with open(LOG, "w") as log:
         proc = subprocess.Popen([sys.executable, "-u", "-m", "native.app"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
     try:
@@ -65,7 +65,7 @@ def main():
             open(graph, "w", encoding="utf-8").write(saved_graph)
         if saved_prefs is not None:
             open(prefs, "w", encoding="utf-8").write(saved_prefs)
-        for f in set(os.listdir(gdir)) - before:
+        for f in (set(os.listdir(gdir)) if os.path.isdir(gdir) else set()) - before:
             os.remove(os.path.join(gdir, f))
     text = open(LOG, encoding="utf-8", errors="replace").read()
     lines = [l for l in text.splitlines() if l.startswith(("menu ", "ctx ", "pane "))]

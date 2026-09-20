@@ -90,7 +90,9 @@ class Popouts:
             self._write(view, blk, np.zeros((eng.rows, eng.cols, 3), np.uint8), eng, cam)
         except Exception:
             pass
-        proc = subprocess.Popen([sys.executable, "-m", "native.popout", view, name, str(os.getpid())], cwd=HERE)
+        # frozen, the exe is the app: told to be a popout by its arguments (studio.py)
+        args = ([sys.executable, "--popout"] if getattr(sys, "frozen", False) else [sys.executable, "-m", "native.popout"])
+        proc = subprocess.Popen(args + [view, name, str(os.getpid())], cwd=HERE)
         self.jobs[view] = (proc, blk)
 
     def close(self, view):

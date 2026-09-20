@@ -32,9 +32,10 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))     # studio/
-ROOT = os.path.dirname(HERE)                                            # repo
-BUILD = os.path.join(HERE, "build")
+from native import paths
+HERE = paths.RES                        # studio/, or the bundle: shim/, gen/
+ROOT = paths.TREE                       # the WLED checkout, or None
+BUILD = paths.BUILD                     # writable: the versioned libraries
 OBJ = os.path.join(BUILD, "obj")
 IS_WIN = sys.platform.startswith("win")
 IS_MAC = sys.platform == "darwin"
@@ -106,8 +107,26 @@ def _msvc_env():
     return env
 
 
+def bundled_compiler():
+    """A compiler shipped beside the app (HOME/toolchain/: a MinGW-w64 g++
+    or a clang++, any layout - the first found under it), which needs no
+    MSVC environment. None when there is none."""
+    root = os.path.join(paths.HOME, "toolchain")
+    if not os.path.isdir(root):
+        return None
+    for name in (("g++.exe", "clang++.exe") if IS_WIN else ("g++", "clang++")):
+        for p in glob.glob(os.path.join(root, "**", "bin", name), recursive=True):
+            return p
+    return None
+
+
 def find_compiler():
     """(compiler path, environment dict) for this machine, or raise."""
+    bundled = bundled_compiler()
+    if bundled:
+        env = dict(os.environ)
+        env["PATH"] = os.path.dirname(bundled) + os.pathsep + env.get("PATH", "")
+        return bundled, env
     if IS_WIN:
         clang = os.environ.get("SIM_CLANG") or os.path.join(
             os.path.expanduser("~"), "emsdk", "upstream", "bin", "clang++.exe")
@@ -162,10 +181,15 @@ def _needs_compile(src, obj, hstamp):
 
 
 # --- compiling and linking ----------------------------------------------------------
+def _is_gcc(compiler):
+    return os.path.basename(compiler).lower().startswith(("g++", "gcc"))
+
+
 def compile_tu(compiler, env, src, obj, include_dirs, extra_flags=()):
     """One translation unit to one object. Returns (ok, output text)."""
     os.makedirs(os.path.dirname(obj), exist_ok=True)
-    cmd = [compiler] + COMMON_FLAGS + list(extra_flags) + ["-c"]
+    flags = [f for f in COMMON_FLAGS if not (_is_gcc(compiler) and f == "-Wno-vla-cxx-extension")]
+    cmd = [compiler] + flags + list(extra_flags) + ["-c"]
     if not IS_WIN:
         cmd.append("-fPIC")
     for d in include_dirs:
@@ -185,6 +209,8 @@ def link_shared(compiler, env, objs, out):
     cmd = [compiler, "-shared"]
     if IS_MAC:
         cmd += ["-undefined", "dynamic_lookup"]
+    if IS_WIN and _is_gcc(compiler):
+        cmd += ["-static", "-static-libgcc", "-static-libstdc++"]      # a DLL that needs no MinGW runtime beside it
     cmd += objs + ["-o", out]
     r = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=HERE)
     txt = (r.stdout or "") + (r.stderr or "")
@@ -212,6 +238,8 @@ def latest_library():
     p = os.path.join(BUILD, "latest")
     if os.path.exists(p):
         target = open(p, encoding="utf-8").read().strip()
+        if target and not os.path.isabs(target):
+            target = os.path.join(BUILD, target)
         if target and os.path.exists(target):
             return target
     legacy = os.path.join(HERE, "cubefx" + lib_ext())
@@ -308,7 +336,7 @@ def build_engine(sources, include_dirs, jobs=None, force=False, log=print):
         log("    " + "\n    ".join(txt.splitlines()[-12:]))
         return rep
     with open(os.path.join(BUILD, "latest"), "w", encoding="utf-8") as f:
-        f.write(out)
+        f.write(os.path.basename(out))                # a name, not a path: the folder may move (a portable install)
     rep.library = out
     log(f"  {os.path.basename(out)}: {os.path.getsize(out):,} bytes")
     prune_versions(keep=3)
