@@ -3621,6 +3621,10 @@ def service_command(app):
                 walk_menus(app, c["menu_walk"] if isinstance(c["menu_walk"], list) else [])
             if "ctx_walk" in c:                         # test hook: every row of a context menu ["node"|"in"|"out", nid, pin]
                 walk_ctx(app, *c["ctx_walk"])
+            if "frame_walk" in c:                       # test hook: every button of a frame (or a window, or "root"), clicked
+                walk_frame(app, c["frame_walk"])
+            if "action_walk" in c:                      # test hook: every keymap action run (toggles twice), the graph put back
+                walk_actions(app, c["action_walk"] if isinstance(c["action_walk"], list) else [])
             if "pane_walk" in c:                        # test hook: every row of every pane's right-click menu
                 for pane, tag in app.pane_menus.items():
                     for k in dpg.get_item_children(tag, 1) or []:
@@ -3968,6 +3972,128 @@ def walk_menus(app, skip=()):
         app.stop_sweep()
     if getattr(app, "rec", None) is not None:
         app.rec = None
+
+
+# buttons a walk leaves alone: a flash or a firmware build, a render or a preview that takes minutes,
+# a clone or a download from the network, a restart, a program opened on the desktop, a key capture
+SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "rec_btn")
+SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Open in the browser", "Open the build folder",
+               "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
+               "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
+
+
+def _close_dialogs(keep=()):
+    """Every window a click opened, hidden again; file dialogs too."""
+    for w in dpg.get_windows():
+        alias = dpg.get_item_alias(w) or ""
+        if alias in ("root", "") or alias in keep or not dpg.is_item_shown(w):
+            continue
+        if alias.endswith(("_win", "_dialog", "_menu")) or dpg.get_item_configuration(w).get("modal"):
+            dpg.hide_item(w)
+    for w in dpg.get_all_items():
+        if dpg.get_item_type(w).endswith("::mvFileDialog") and dpg.is_item_shown(w):
+            dpg.hide_item(w)
+
+
+def walk_frame(app, which):
+    """Every button of a frame (device_ui.FRAMES), a window by tag, or
+    "root" (the panes), clicked in turn - found afresh each time, since a
+    click may rebuild the rows - and whatever it opened closed again.
+    Prints one line per button; the walker reads them for FAILs."""
+    if which in device_ui.FRAMES:
+        root = device_ui.FRAMES[which][0]
+        device_ui.show(app, which)
+    else:
+        root = which
+        if root != "root" and dpg.does_item_exist(root):
+            dpg.show_item(root)
+    if not dpg.does_item_exist(root):
+        print(f"frame FAIL  {which}: no such item"); return
+
+    def name(k, after):
+        """A button's label; an icon button's alias, else its tooltip's
+        first line (the tooltip is the sibling made right after it)."""
+        lbl = dpg.get_item_configuration(k).get("label", "") or dpg.get_item_alias(k) or ""
+        if not lbl and after is not None and dpg.get_item_type(after).endswith("::mvTooltip"):
+            for t in dpg.get_item_children(after, 1) or []:
+                if dpg.get_item_type(t).endswith("::mvText") and dpg.get_value(t):
+                    lbl = str(dpg.get_value(t)).split("  ")[0].split("\n")[0][:40]; break
+        return lbl.replace("\n", " ") or "?"
+
+    def buttons(item, path):
+        out = []
+        kids = dpg.get_item_children(item, 1) or []
+        for j, k in enumerate(kids):
+            t = dpg.get_item_type(k)
+            if t.endswith(("::mvButton", "::mvImageButton")):
+                out.append((k, path + [name(k, kids[j + 1] if j + 1 < len(kids) else None)]))
+            elif t.endswith(("::mvTab", "::mvCollapsingHeader", "::mvTreeNode", "::mvMenu")):
+                out += buttons(k, path + [dpg.get_item_configuration(k).get("label", "")])
+            elif t.endswith(("::mvMenuItem", "::mvSelectable")):
+                pass                                          # menus have their own walk
+            else:
+                out += buttons(k, path)
+        return out
+
+    def keyed(item):
+        seen, out = {}, []
+        for k, p in buttons(item, []):
+            key = tuple(p); n = seen.get(key, 0); seen[key] = n + 1
+            out.append(((key, n), k))
+        return out
+    plan = [key for key, _ in keyed(root)]
+    print(f"frame {which}: {len(plan)} button(s)")
+    for key, n in plan:
+        label = key[-1]
+        shown = " > ".join(key) + (f" [{n + 1}]" if n else "")
+        k = next((i for kk, i in keyed(root) if kk == (key, n)), None)
+        if k is None:
+            print(f"frame gone  {which} > {shown}"); continue
+        alias = dpg.get_item_alias(k) or ""
+        if alias in SKIP_BUTTON_TAGS or any(label.startswith(sk) for sk in SKIP_BUTTON):
+            print(f"frame skip  {which} > {shown}"); continue
+        if not dpg.get_item_configuration(k).get("enabled", True):
+            print(f"frame off   {which} > {shown}"); continue
+        r = _call(k, label)
+        print(f"frame {r:5s} {which} > {shown}")
+        _close_dialogs(keep=(root,))
+        if which in device_ui.FRAMES and not dpg.is_item_shown(root):
+            device_ui.show(app, which)                        # a close button: the frame back for the rest
+
+
+# actions a walk leaves alone: the window's shape, a 15 s recording, another program, the firmware, the app's end
+SKIP_ACTION = ("fullscreen", "record", "record_video", "external", "flash", "shortcuts", "palette")
+# actions that flip something: run twice, so the app is as it was
+TOGGLE_ACTION = ("view_net", "view_cube", "view_both", "pane_code", "pane_graph", "presentation", "side_panel", "props_pane",
+                 "play_pause", "live", "compare", "sweep", "stream", "focus_mode", "snap", "hide_pins", "collapse", "mute",
+                 "enter_sub", "stop_preview")
+
+
+def walk_actions(app, skip=()):
+    """Every keymap action by name, in the keymap's order; a toggle run
+    again to put it back; a change to the graph undone. One line each."""
+    import json
+    from native.keys import ACTIONS
+    skip = set(SKIP_ACTION) | set(skip)
+    gp = app.gp
+    for name, label, _, ctx in ACTIONS:
+        if name in skip:
+            print(f"act   skip  {name}"); continue
+        before = json.dumps(gp.graph.to_json(), sort_keys=True) if gp.graph else None
+        try:
+            app.run_action(name)
+            if name in TOGGLE_ACTION:
+                app.run_action(name)
+            r = "ok"
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            r = f"FAIL {type(e).__name__}: {e}"
+        print(f"act   {r:5s} {name} - {label}")
+        _close_dialogs()
+        if gp.graph is not None and before is not None and json.dumps(gp.graph.to_json(), sort_keys=True) != before:
+            gp.undo()
+    gp._hide_menus()
 
 
 def walk_ctx(app, kind, nid, pin=None):

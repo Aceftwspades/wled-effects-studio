@@ -1116,9 +1116,14 @@ What would say the studio is complete, in the order to do them:
       from the project's effects, or the app exits saying why) - each a
       status line, never a traceback; the smoke test walks them with the
       `expect` hook, `tests/test_graph.py` the graph ones.
-- [ ] **A frame-button walk and an action walk**: every button of every
-      frame clicked, every key action fired, as the menu walker does for
-      menus.
+- [x] **A frame-button walk and an action walk**: `tests/walk_menus.py`
+      now also clicks every button of every frame, of the settings-type
+      windows (keys, appearance, selection frames, history, undo, about,
+      usermods) and of the panes (`frame_walk`: 190 buttons; the sends go
+      to the fake WLED it starts; flashing, rendering, cloning, recording
+      and the desktop are skipped), and runs every keymap action
+      (`action_walk`: 82, toggles twice, the graph undone after each).
+      894 rows, none failing.
 - [ ] **Script / C++ parity**: the same graph through the VM and as its
       compiled effect, frames compared.
 - [ ] **Round-trip serialisation**: project, graph, shape, sequence and
