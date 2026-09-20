@@ -176,6 +176,16 @@ def psave(host, k, body, timeout=6.0, gap=1.1):
                 return
         except Exception:
             pass
+    # pmt is whole seconds: a write in the same second as one just before it
+    # leaves it as it was. By now the device has long written or dropped it,
+    # so one read of the file is safe - it is the polling during the write
+    # that loses it.
+    try:
+        with urllib.request.urlopen(host + "/presets.json", timeout=timeout) as r:
+            if str(int(k)) in json.loads(r.read()):
+                return
+    except Exception:
+        pass
     raise TimeoutError(f"preset {k} was accepted but never written")
 
 
@@ -198,7 +208,9 @@ def send(host, presets, playlist, pid):
     except Exception as e:
         return False, f"{n} presets saved, the playlist refused: {e}"
     skipped = presets.get(None) or []
-    return True, f"{n} presets ({min(presets) if n else '-'}..{max(k for k in presets if k is not None) if n else '-'}) and playlist {pid} '{playlist['n']}' saved on the device" + (f"; skipped, no such effect there: {', '.join(skipped)}" if skipped else "")
+    ids = [k for k in presets if k is not None]
+    span = f"{min(ids)}..{max(ids)}" if ids else "-"
+    return True, f"{n} presets ({span}) and playlist {pid} '{playlist['n']}' saved on the device" + (f"; skipped, no such effect there: {', '.join(skipped)}" if skipped else "")
 
 
 def presets_file(presets, playlist, pid):

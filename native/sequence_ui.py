@@ -729,10 +729,13 @@ def send(app, run=False):
             dpg.configure_item(t, enabled=False)
 
     def work():
-        ok, msg = sequence.send(host, presets, playlist, pid)
-        if ok and run:
-            ok2, msg2 = sequence.start(host, pid)
-            msg += "; " + msg2
+        try:
+            ok, msg = sequence.send(host, presets, playlist, pid)
+            if ok and run:
+                ok2, msg2 = sequence.start(host, pid)
+                msg += "; " + msg2
+        except Exception as e:                            # the buttons come back and the log says, whatever went wrong
+            msg = f"send failed: {e}"
         app._seq_send_result = msg
     app._seq_send = threading.Thread(target=work, daemon=True); app._seq_send.start()
 

@@ -56,6 +56,17 @@ jobs:
           $env:STUDIO_TOOLCHAIN = "$PWD\mingw\mingw64"
           python package.py --toolchain "$PWD\mingw\mingw64" --zip
 
+      # no display needed: the graph compiler, the shapes, every device path against the fake WLED
+      - name: the tests
+        shell: pwsh
+        run: |
+          $env:STUDIO_TOOLCHAIN = "$PWD\mingw\mingw64"
+          $env:STUDIO_NO_UPDATE_CHECK = "1"
+          foreach ($t in "test_shapes", "test_device", "test_graph") {
+            python tests\$t.py
+            if ($LASTEXITCODE) { exit 1 }
+          }
+
       - name: the tests, against the packaged app
         shell: pwsh
         run: |

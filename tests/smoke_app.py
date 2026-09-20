@@ -19,6 +19,7 @@ import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 # STUDIO_EXE: the packaged app's exe to test instead of the tree - its
 # folder is then the home (projects/, build/) the test saves and restores
 EXE = os.environ.get("STUDIO_EXE")
@@ -61,22 +62,45 @@ STEPS = [
       {"shape": ["preview", "parts", 1]}, {"shape": ["xmodel", "projects/default/export/_smoke.xmodel"]},
       {"dock": ["shape", True]}, {"dock": ["shape", False]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 4.0),
-    # live output to a listener on this machine (the test's own DDP receiver), and the wiring test
+    # live output to the fake device on this machine, and the wiring test
     ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
-      {"wiring_test": "off"}], 4.0),
+      {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),
     ([{"stream": False}], 1.0),
+    # every send to a device, against the fake WLED: the script, the settings, the shape, the ledmap
+    ([{"frame": "devices"}, {"device": "127.0.0.1:8770"}, {"scan": "all"}], 6.0),
+    ([{"layout": "graph"}, {"graph_open": "fan.json"}, {"py": "app.send_script()"}], 6.0),
+    ([{"expect": ["send_status", "the device is running it"]}, {"effect": "Rainbow"}, {"py": "app.push_settings()"}], 3.0),
+    ([{"expect": ["edit_status", "Rainbow"]}, {"py": "app.send_shape(True)"}, {"py": "app.send_ledmap(True)"}], 4.0),
+    ([{"expect": ["edit_status", "ledmap"]}], 0.5),
     # a sequence: two steps from the sim, played, a step loaded back, one deleted
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},
       {"seq": ["field", "dur", 1.0]}, {"seq": ["play"]}], 3.0),
-    ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["del", 1]}, {"seq": ["del", 0]},
-      {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]}, {"seq": ["timer_del", 1]}, {"seq": ["timer_del", 0]},
+    # the sequence and the schedule sent to the fake: presets, the playlist, the timers with their Off preset
+    ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["ramp", "sx", 250]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).send(app, run=True)"}], 22.0),
+    ([{"expect": ["seq_log", "saved on the device"]}, {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).send_timers(app)"}], 6.0),
+    ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).read_timers(app)"}], 3.0),
+    ([{"expect": ["seq_tlog", "read from the device"]}, {"seq": ["del", 1]}, {"seq": ["del", 0]}, {"seq": ["timer_del", 1]}, {"seq": ["timer_del", 0]},
       {"seq": ["tap"]}, {"seq": ["snap", 120.0, 4]}, {"camera": "front"}, {"camera": ["save", 1]}, {"camera": "isometric"}], 1.5),
     # custom palettes: one made, a stop added, used by the sim, one from the sim's palette, both removed
     ([{"frame": "palettes"}, {"cpal": ["new"]}, {"cpal": ["stop", 64, 0, 0, 255]}, {"cpal": ["use"]}, {"cpal": ["current"]},
+      {"py": "__import__('native.palette_ui', fromlist=['x']).send(app, True)"}], 3.0),
+    ([{"expect": ["pal_log", "palette(s) sent"]}, {"py": "__import__('native.palette_ui', fromlist=['x']).remove_there(app)"},
       {"cpal": ["del"]}, {"cpal": ["del"]}], 2.0),
-    # LED outputs and power: the wiring split three ways, the limiter previewed and off again
+    # LED outputs and power: the wiring split three ways, the limiter previewed and off again, the device's read and sent
     ([{"frame": "outputs"}, {"outputs": ["split", "one"]}, {"outputs": ["split", "count"]}, {"outputs": ["limit", 850]},
-      {"outputs": ["abl", True]}, {"outputs": ["abl", False]}, {"outputs": ["limit", 0]}], 2.0),
+      {"outputs": ["abl", True]}, {"outputs": ["abl", False]}, {"outputs": ["limit", 0]},
+      {"py": "__import__('native.outputs_ui', fromlist=['x']).read_device(app)"}], 3.0),
+    ([{"expect": ["out_log", "output(s) read"]}, {"py": "__import__('native.outputs_ui', fromlist=['x']).send(app)"}], 3.0),
+    ([{"expect": ["out_log", "sent"]}], 0.5),
+    # sad paths: a graph with no output, a C++ effect that does not compile, a device that is off - a status line each
+    ([{"layout": "graph"}, {"py": "app.gp.new('sad_smoke')"},
+      {"py": "[app.gp._delete_node(i) for i, n in list(app.gp.graph.nodes.items()) if n['type'] == 'Output']"}, {"py": "app.gp.compile()"}], 3.0),
+    ([{"expect": ["graph_status", "graph:"]}, {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
+      {"ed_type": "this is not C++ ;"}, {"ed_key": ["Return", False, False]}, {"py": "app.edit_build()"}], 12.0),
+    ([{"expect": ["edit_status", "problem"]}, {"action": "undo"}, {"action": "undo"}, {"layout": "graph"}, {"graph_open": "fan.json"},
+      {"device": "127.0.0.1:1"}, {"py": "app.send_script()"}], 8.0),
+    ([{"expect": ["graph_status", "failed"]}, {"device": "127.0.0.1:8770"}], 1.0),
     # the library: thumbnails made for the graphs, the frame docked and floated
     ([{"frame": "library"}, {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
@@ -94,32 +118,6 @@ STEPS = [
 ]
 
 
-class _DdpCount:
-    """A DDP receiver on 4048, counting packets and pushed frames."""
-    def __init__(self):
-        self.packets = self.frames = 0
-        self._stop = False
-    def start(self):
-        import threading
-        threading.Thread(target=self._run, daemon=True).start()
-    def stop(self):
-        self._stop = True
-    def _run(self):
-        import socket
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", 4048)); s.settimeout(0.5)
-        except OSError:
-            return
-        while not self._stop:
-            try:
-                d, _ = s.recvfrom(2048)
-            except socket.timeout:
-                continue
-            self.packets += 1
-            if len(d) >= 10 and d[0] & 0x01:
-                self.frames += 1
-        s.close()
-
 
 def send(cmds, wait):
     json.dump(cmds, open(CMD, "w"))
@@ -136,7 +134,8 @@ def main():
     before = set(os.listdir(gdir)) if os.path.isdir(gdir) else set()      # a first run makes the project
     STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs: a saved view would otherwise stay
     saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
-    ddp = _DdpCount(); ddp.start()
+    from fake_wled import FakeWled                          # the device every send goes to, and the DDP receiver
+    ddp = FakeWled(port=8770, ddp_port=4048).start()
     with open(LOG, "w") as log:
         # the console variant of the packaged app keeps its stdout, which is the log the test reads
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
@@ -162,12 +161,17 @@ def main():
                 os.remove(os.path.join(gdir, f))                               # the import's copy
     text = open(LOG, encoding="utf-8", errors="replace").read()
     ddp.stop()
-    print(f"ddp: {ddp.packets} packets, {ddp.frames} frames received from the stream")
+    print(f"ddp: {ddp.ddp_packets} packets, {ddp.ddp_frames} frames received from the stream; "
+          f"the fake got {len(ddp.files)} file(s), {len(ddp.presets) - 1} preset(s), {len(ddp.cfg['timers']['ins'])} timer(s)")
     bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l]
     if "remote control" not in text:
         bad.append("the app's output was not captured (no 'remote control' line): a buffered stdout, or the wrong exe")
-    if ddp.frames < 10:
-        bad.append(f"the DDP stream sent {ddp.frames} frames; 10 or more expected")
+    if ddp.ddp_frames < 10:
+        bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
+    bad += [l for l in text.splitlines() if "EXPECT FAILED" in l]
+    for name in ("/studio.bin", "/ledmap.json", "/geometry.bin"):
+        if name not in ddp.files:
+            bad.append(f"the fake device never received {name}")
     if bad:
         print("smoke: FAILED")
         i = text.find("Traceback")

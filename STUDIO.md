@@ -1078,6 +1078,48 @@ this repo with a compiler beside it. Done so far:
       wins) and a restart offered; or "I have one" for a checkout that
       exists. Tried from a copy with no tree: the clone, the restart, the
       flash frame listing the checkout's environments.
+### Completeness (September 2026)
+
+What would say the studio is complete, in the order to do them:
+
+- [x] **A fake WLED device** (`tests/fake_wled.py`): an HTTP server with
+      `/json/info`, `/json/effects`, `/json/state` (psave written a beat
+      later from a "loop", a second psave before it replacing the one
+      pending, a playlist stored only with "o", pdel, ps, pl, rmcpal),
+      `/presets.json`, `/upload`, `/json/cfg` (timers cleared then set,
+      the LED outputs) and a DDP counter - so every device path is
+      exercised by the tests and CI, offline. `tests/test_device.py`
+      drives the modules against it (11 tests); the smoke test sends
+      everything to it and checks each frame's log with the `expect`
+      hook. It found one real bug on its first run: a sequence whose
+      effects the device does not have crashed the send's summary
+      (`min()` over the skipped key), leaving the log at "sending..."
+      and the buttons off for good.
+- [ ] **A node census** (`tests/test_nodes.py`): every node type as a
+      minimal graph, compiled to C++ and that C++ compiled by the
+      toolchain; scripted where scriptable.
+- [ ] **Sad paths**: a graph with a bad wire, a C++ effect that does not
+      compile, a device that is off, a missing engine - each a status
+      line, never a traceback (an `expect` hook for the smoke test).
+- [ ] **A frame-button walk and an action walk**: every button of every
+      frame clicked, every key action fired, as the menu walker does for
+      menus.
+- [ ] **Script / C++ parity**: the same graph through the VM and as its
+      compiled effect, frames compared.
+- [ ] **Round-trip serialisation**: project, graph, shape, sequence and
+      palette files saved and reloaded equal; older project files from
+      the history still opening.
+- [ ] **A scrubbed-PATH run of the packaged app**: no emsdk, MSVC or git
+      on the path - the bundled toolchain builds, the fork comes as a zip.
+- [ ] **A soak**: effects and geometries switched for ten minutes, RSS watched.
+- [ ] **A docs cross-check**: every menu label, frame button and key
+      action found in GUIDE.md.
+- [ ] **Audits**: which of WLED's stock effects the sim cannot run and
+      why; GPU against software renderer positions for every geometry.
+- [ ] **Product**: undo for segments, sequence steps and palette edits;
+      a project as one zip; "report a problem" bundling version.json,
+      crash.txt and the doctor.
+
 - [ ] A Linux / macOS pass. What is there: `paths.py` puts the home in
       `~/.local/share` or `~/Library/Application Support`, the toolchain
       takes clang or gcc from the path (`-fPIC`, `.so` / `.dylib`,

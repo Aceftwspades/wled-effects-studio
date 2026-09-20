@@ -3416,6 +3416,10 @@ def service_command(app):
                 device_ui.close(app, c["frame_close"])
             if "wled" in c:                             # test hook: ["fetch", dest] | ["use", folder]
                 (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
+            if "expect" in c:                           # test hook: [tag, substring] - the value of a text/status item must contain it
+                tag, sub = c["expect"]
+                val = str(dpg.get_value(tag)) if dpg.does_item_exist(tag) else "(no such item)"
+                print(("expect ok   " if sub in val else "EXPECT FAILED ") + f"{tag} has {sub!r}: {val[:120]!r}")
             if "update" in c:                           # test hook: "check" (the dialog when newer), "show", "get"
                 {"check": lambda: chrome.check_updates(app, by_hand=True), "show": lambda: chrome.show_update(app),
                  "get": lambda: chrome.get_update(app)}[c["update"]]()
