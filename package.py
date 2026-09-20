@@ -230,6 +230,7 @@ def main():
         "Tools. Without one, the effects already built, the examples, the script preview and every send to a device still work."
         "\n\nFlashing firmware needs a WLED checkout and PlatformIO: set WLED_ROOT to the checkout.\n\n"
         "The guide is _internal\\GUIDE.md; Help > Studio guide opens it.\n")
+    shutil.copyfile(os.path.join(HERE, "Desktop shortcut.cmd"), os.path.join(DIST, "Desktop shortcut.cmd"))   # a .lnk holds a path: made where it lands
     size = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(DIST) for f in fs)
     print(f"package: {DIST}  ({size / 1e6:.0f} MB)")
     if "--zip" in args:
