@@ -902,6 +902,10 @@ the order to do them:
       Record 15 s video and Ctrl+Shift+F12 an mp4; the sequence frame's
       Render GIF / Render video for the sequence's whole length).
 
+- [x] **The node menu grew** a few pixels a frame once "delete" or "more"
+      was unfolded, until it met the screen's edge: a selectable with no
+      width takes the width there is, and in a window that sizes itself
+      to its content the two chase each other. The rows have a width now.
 - [x] **The panels succinct**: every explanatory paragraph in the
       frames became a tooltip on the control it explained (`chrome.tip`)
       or a dim (?) at the end of its row (`chrome.info`); labels

@@ -2574,8 +2574,12 @@ class GraphPanel:
             # is overwritten by user_data, a fourth is an error - so what a
             # row does rides in user_data. Inside a fold (tree node) the row
             # goes to the fold: the container stack says where we are.
+            # A set width: a selectable with none takes the width there is,
+            # and in a window that sizes itself to its content the two chase
+            # each other - the menu grew a few pixels every frame until it met
+            # the screen's edge, once a fold was opened.
             parent = dpg.top_container_stack() or P
-            dpg.add_selectable(label=label, parent=parent, user_data=fn, callback=lambda s, a, u: (close(), u()))
+            dpg.add_selectable(label=label, parent=parent, user_data=fn, width=280, callback=lambda s, a, u: (close(), u()))
 
         if kind == "in":
             linked = any(l[2] == nid and l[3] == name for l in self.graph.links)
@@ -2723,7 +2727,7 @@ class GraphPanel:
         if not rows:
             dpg.add_text("used in no graph", parent=P, color=DIM)
         for f, sub, n in rows:
-            dpg.add_selectable(label=f"{f[:-5]}{'  (sub-graph)' if sub else ''}   x{n}", parent=P, user_data=(f, sub),
+            dpg.add_selectable(label=f"{f[:-5]}{'  (sub-graph)' if sub else ''}   x{n}", parent=P, user_data=(f, sub), width=300,
                                callback=lambda s, a, u: (dpg.hide_item(P), self.app.show_layout("graph"), self.open(u[0], sub=u[1])))
         vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
         dpg.configure_item(P, pos=(vw // 2 - 180, vh // 3), show=True)
