@@ -231,6 +231,15 @@ def main():
         "\n\nFlashing firmware needs a WLED checkout and PlatformIO: set WLED_ROOT to the checkout.\n\n"
         "The guide is _internal\\GUIDE.md; Help > Studio guide opens it.\n")
     shutil.copyfile(os.path.join(HERE, "Desktop shortcut.cmd"), os.path.join(DIST, "Desktop shortcut.cmd"))   # a .lnk holds a path: made where it lands
+    # what this build is: the version, the commit, the day - for the About dialog and a bug report
+    import json, time
+    from native import version
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=HERE).stdout.strip()
+    except Exception:
+        commit = ""
+    json.dump({"version": version.__version__, "commit": commit, "built": time.strftime("%Y-%m-%d")},
+              open(os.path.join(DIST, "version.json"), "w", encoding="utf-8"), indent=1)
     size = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(DIST) for f in fs)
     print(f"package: {DIST}  ({size / 1e6:.0f} MB)")
     if "--zip" in args:

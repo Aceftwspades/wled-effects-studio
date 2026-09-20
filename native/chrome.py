@@ -12,9 +12,11 @@ status line); everything that used to be a button in a pane lives here.
     poll(app)             # per frame: refresh() when something it shows changed
 """
 import os
+import time
 import dearpygui.dearpygui as dpg
 
 from native.icons import texture
+from native.project import save_prefs
 from native.keys import ACTIONS, FIXED
 from native import glow, flash, device_ui
 
@@ -257,6 +259,7 @@ def build_menus(app):
             dpg.add_menu_item(label="Studio guide (STUDIO.md)", callback=lambda: app.reveal(app.doc_path("STUDIO.md")))
             dpg.add_menu_item(label="Effect API reference", callback=lambda: app.show_api())
             dpg.add_separator()
+            dpg.add_menu_item(label="Check for updates...", tag="menu_update", callback=lambda: check_updates(app, by_hand=True))
             dpg.add_menu_item(label="About", callback=lambda: dpg.show_item("about_win"))
 
 
@@ -402,12 +405,32 @@ def build_dialogs(app):
             dpg.add_button(label="Reset all to defaults", callback=lambda: (app.keys.reset(), refresh_keys(app)))
         with dpg.child_window(tag="keys_rows", height=-1, border=False):
             pass
-    with dpg.window(tag="about_win", label="About", show=False, width=460, height=200, no_collapse=True):
-        dpg.add_text("WLED Effects Studio")
+    from native import version
+    with dpg.window(tag="about_win", label="About", show=False, width=520, height=250, no_collapse=True):
+        dpg.add_text(f"WLED Effects Studio {version.__version__}")
         dpg.add_text("Node graphs and C++ compiled into WLED effects, previewed on a\n"
                      "simulated cube, sphere, matrix or strip with synthetic or live audio.", color=DIM)
         dpg.add_spacer(height=6)
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="The studio on GitHub", small=True, callback=lambda: app.open_url(f"https://github.com/{version.REPO}"))
+            dpg.add_button(label="The WLED fork", small=True, callback=lambda: app.open_url(f"https://github.com/{version.WLED_REPO}"))
+            dpg.add_button(label="WLED", small=True, callback=lambda: app.open_url(f"https://github.com/{version.WLED_UPSTREAM}"))
+        dpg.add_text("Built on WLED (Christian Schwinne and contributors), EUPL v1.2: the effects, palettes and colour maths the sim\n"
+                     "runs are WLED's own, compiled from its sources; the firmware side lives in the fork.", color=DIM)
+        dpg.add_spacer(height=6)
         dpg.add_text("", tag="about_paths", color=DIM)
+    # UPDATE: what the check found, and the way to get it in
+    with dpg.window(tag="update_win", label="Update", show=False, width=560, height=360, no_collapse=True):
+        dpg.add_text("", tag="update_head", wrap=540)
+        with dpg.child_window(tag="update_notes", height=180, border=True):
+            pass
+        dpg.add_text("", tag="update_status", color=DIM, wrap=540)
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Download and install", tag="update_go", callback=lambda: get_update(app))
+            dpg.add_button(label="Release page", callback=lambda: app.open_url(getattr(app, "_update", {}).get("url") or f"https://github.com/{version.REPO}/releases"))
+            dpg.add_button(label="Not now", callback=lambda: dpg.hide_item("update_win"))
+            dpg.add_checkbox(label="check once a day", tag="update_daily", default_value=bool(app.prefs.get("update_check", True)),
+                             callback=lambda s, v: (app.prefs.__setitem__("update_check", bool(v)), save_prefs(app.prefs)))
     with dpg.window(tag="open_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
@@ -1157,6 +1180,115 @@ def refresh_files(app):
     dpg.configure_item("menu_import", label="Remove from the effects list" if on else "Add to the effects list",
                        enabled=bool(f))
     dpg.set_value("about_paths", f"project  {app.project.path}\nbuild    {app.build_dir()}")
+
+
+# --- updates ------------------------------------------------------------------------
+def check_updates(app, by_hand=False):
+    """The releases asked, on a thread; the answer lands in app._update and
+    poll_update shows it - a dialog when asked by hand or when there is a
+    newer release, a status line otherwise."""
+    import threading
+    from native import update
+    if getattr(app, "_update_job", None) is not None and app._update_job.is_alive():
+        return
+    app._update_by_hand = by_hand
+    if by_hand:
+        app.gp.status("checking for updates...")
+
+    def work():
+        app._update = update.check() or {}
+        app._update_ready = True
+    app._update_job = threading.Thread(target=work, daemon=True); app._update_job.start()
+
+
+def poll_update(app):
+    from native import version
+    if not getattr(app, "_update_ready", False):
+        return
+    app._update_ready = False
+    app.prefs["update_checked_at"] = time.time(); save_prefs(app.prefs)
+    u = app._update or {}
+    by_hand = getattr(app, "_update_by_hand", False)
+    if not u:
+        if by_hand:
+            app.gp.status("could not reach the releases (offline, or none published yet)")
+        return
+    if not u.get("newer"):
+        if by_hand:
+            app.gp.status(f"this is the newest release ({version.__version__})")
+        dpg.configure_item("menu_update", label="Check for updates...")
+        return
+    dpg.configure_item("menu_update", label=f"Update available: {u['tag']}")
+    app.gp.status(f"a newer release: {u['tag']} - Help > Update available")
+    show_update(app)
+
+
+def show_update(app):
+    from native import version, update
+    u = getattr(app, "_update", None) or {}
+    if not u:
+        check_updates(app, by_hand=True); return
+    dpg.set_value("update_head", f"{u.get('name') or u.get('tag')} is out; this is {version.__version__}.")
+    dpg.delete_item("update_notes", children_only=True)
+    notes = u.get("notes") or "(no notes)"
+    dpg.add_text(notes[:4000], parent="update_notes", wrap=520)
+    if not update.can_apply():
+        how = "run from a checkout: git pull, then start again" if not __import__("native.paths", fromlist=["x"]).FROZEN \
+              else "download the zip and unpack it over the app's folder (projects and captures are yours, keep them)"
+        dpg.configure_item("update_go", label="Download the zip")
+        dpg.set_value("update_status", how)
+    else:
+        dpg.configure_item("update_go", label="Download and install")
+        dpg.set_value("update_status", "the zip is downloaded, the studio closes, the new one is copied in and starts - projects, captures and the toolchain are left alone")
+    dpg.configure_item("update_go", enabled=bool(u.get("asset")))
+    _centre("update_win", 560, 360)
+    dpg.show_item("update_win")
+
+
+def get_update(app):
+    """The zip down on a thread; then applied (Windows, packaged) or shown."""
+    import threading
+    from native import update, paths
+    u = getattr(app, "_update", None) or {}
+    if not u.get("asset"):
+        dpg.set_value("update_status", "the release has no zip to download"); return
+    if not paths.FROZEN:
+        app.open_url(u.get("url") or ""); return
+    dpg.configure_item("update_go", enabled=False)
+
+    def prog(done, total):
+        app._update_progress = f"downloading... {done / 1e6:.0f} of {total / 1e6:.0f} MB" if total else f"downloading... {done / 1e6:.0f} MB"
+
+    def work():
+        try:
+            path = update.download(u["asset"], prog)
+            app._update_progress = ("ready: closing to update..." if update.can_apply() else f"downloaded: {path}")
+            app._update_zip = path
+        except Exception as e:
+            app._update_progress = f"download failed: {e}"
+            app._update_zip = None
+        app._update_done = True
+    app._update_done = False
+    threading.Thread(target=work, daemon=True).start()
+
+
+def poll_update_download(app):
+    from native import update
+    p = getattr(app, "_update_progress", None)
+    if p is not None and dpg.does_item_exist("update_status"):
+        dpg.set_value("update_status", p)
+    if not getattr(app, "_update_done", False):
+        return
+    app._update_done = False
+    z = getattr(app, "_update_zip", None)
+    if not z:
+        dpg.configure_item("update_go", enabled=True); return
+    if update.can_apply():
+        update.apply(z)
+        dpg.stop_dearpygui()
+    else:
+        app.reveal(os.path.dirname(z))
+        dpg.configure_item("update_go", enabled=True)
 
 
 def _signature(app):

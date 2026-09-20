@@ -1,0 +1,78 @@
+# The Windows release: on a version tag (v1.2.3), the engine built, a
+# MinGW-w64 fetched from winlibs and cut down, PyInstaller's folder made
+# and zipped by package.py, the zip attached to a DRAFT release for the
+# tag. Publish it by hand; the app's update check reads the newest
+# published release. The tag must match native/version.py's __version__.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  WINLIBS_URL: https://github.com/brechtsanders/winlibs_mingw/releases/download/16.2.0posix-14.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-16.2.0-mingw-w64ucrt-14.0.0-r1.zip
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: the packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: the version tag matches native/version.py
+        shell: python
+        run: |
+          import os, re, sys
+          v = re.search(r'__version__\s*=\s*"([^"]+)"', open("native/version.py").read()).group(1)
+          ref = os.environ.get("GITHUB_REF_NAME", "")
+          if ref.startswith("v") and ref[1:] != v:
+              sys.exit(f"the tag {ref} does not match version {v}")
+          print("version", v)
+
+      - name: MinGW-w64 from winlibs
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri $env:WINLIBS_URL -OutFile winlibs.zip
+          Expand-Archive winlibs.zip -DestinationPath mingw
+          Get-ChildItem mingw
+
+      # the engine is built with the same compiler the release ships (no
+      # MSVC on the runner is needed then), and the objects go into the zip
+      - name: the release folder and zip
+        shell: pwsh
+        run: |
+          $env:STUDIO_TOOLCHAIN = "$PWD\mingw\mingw64"
+          python package.py --toolchain "$PWD\mingw\mingw64" --zip
+
+      - name: the tests, against the packaged app
+        shell: pwsh
+        run: |
+          Expand-Archive dist\WLED_Effects_Studio.zip -DestinationPath packaged
+          $env:STUDIO_EXE = "$PWD\packaged\WLED Effects Studio\WLED Effects Studio (console).exe"
+          python tests\smoke_app.py
+        continue-on-error: true            # a headless runner has no display for Dear PyGui; the run is a bonus where it works
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WLED_Effects_Studio
+          path: dist/WLED_Effects_Studio.zip
+
+      - name: the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: dist/WLED_Effects_Studio.zip
+          generate_release_notes: true

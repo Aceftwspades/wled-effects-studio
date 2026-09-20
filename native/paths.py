@@ -12,7 +12,7 @@ from its own file:
            keeps everything beside itself - else %LOCALAPPDATA%\\WLED
            Effects Studio (a Program Files install).
     TREE   the WLED checkout, when there is one: the repo above studio/,
-           or WLED_ROOT. The engine's firmware sources come from it and
+           a WLED/ beside the studio's own checkout, or WLED_ROOT. The engine's firmware sources come from it and
            the flash builds in it. Without one, the engine builds from
            runtime/ - the same files, copied in when the app was packaged -
            and the flash says it needs a checkout.
@@ -68,7 +68,10 @@ def _tree():
         return os.path.abspath(env)
     above = os.path.dirname(RES)
     if not FROZEN and os.path.isdir(os.path.join(above, "wled00")):
-        return above
+        return above                                     # the studio inside a WLED checkout (studio/)
+    beside = os.path.join(above, "WLED")
+    if not FROZEN and os.path.isdir(os.path.join(beside, "wled00")):
+        return beside                                    # the studio's own checkout beside a WLED one (../WLED)
     return None
 
 

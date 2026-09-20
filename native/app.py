@@ -1978,6 +1978,11 @@ class App(Features):
         from native import paths
         return os.path.join(paths.RES, name)
 
+    def open_url(self, url):
+        import webbrowser
+        if url:
+            webbrowser.open(url)
+
     def reveal(self, path):
         """Open a file or folder with whatever the system uses for it."""
         try:
@@ -2739,7 +2744,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -3409,6 +3414,9 @@ def service_command(app):
                 device_ui.show(app, c["frame"])
             if "frame_close" in c:                      # test hook: close one
                 device_ui.close(app, c["frame_close"])
+            if "update" in c:                           # test hook: "check" (the dialog when newer), "show", "get"
+                {"check": lambda: chrome.check_updates(app, by_hand=True), "show": lambda: chrome.show_update(app),
+                 "get": lambda: chrome.get_update(app)}[c["update"]]()
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
             if c.get("randomise"):                      # test hook: throw the sliders and the palette
@@ -3885,7 +3893,7 @@ def _call(item, label):
         return f"FAIL {type(e).__name__}: {e}"
 
 
-SKIP_MENU = ("Quit", "Record 15 s GIF", "Record 15 s video", "Fullscreen",     # ends the app, a 15 s recording, flips the window
+SKIP_MENU = ("Quit", "Record 15 s GIF", "Record 15 s video", "Fullscreen", "Check for updates...",     # ends the app, a 15 s recording, flips the window
              "Open the project folder", "Open the build folder", "Node reference (NODES.md)", "Studio guide (STUDIO.md)",
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
@@ -4012,6 +4020,9 @@ def main():
     print(f"if a frame throws, the traceback lands in {crash}")
     print(f"frame capture: create {SHOT_REQ} to get a PNG at {SHOT_PNG}")
     print(f"remote control: write a JSON list of commands to {CMD_FILE}")
+    from native import update as _update
+    if _update.due(app.prefs) and not os.environ.get("STUDIO_NO_UPDATE_CHECK"):
+        chrome.check_updates(app)                    # once a day, on a thread; the tests set STUDIO_NO_UPDATE_CHECK
     try:
         while dpg.is_dearpygui_running():
             try:
@@ -4041,6 +4052,7 @@ def main():
                     app.code_ed.poll()
                 app.poll_glow()
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
+                chrome.poll_update(app); chrome.poll_update_download(app)
                 _t.append(time.perf_counter())
                 app.step_sim()
                 _t.append(time.perf_counter())

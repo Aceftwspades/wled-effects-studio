@@ -1,7 +1,9 @@
 # Build products - regenerate with `python build.py`
+# (gen/ and runtime/ are vendored: generated from the pinned WLED commit in WLED_SOURCE.json)
 cubefx.js
 cubefx.wasm
-gen/
+gen/_probe.cpp
+gen/*.o
 cubefx.dll
 obj_native/
 __pycache__/
@@ -11,5 +13,4 @@ cubefx.exp
 build/
 projects/
 examples/_check/
-runtime/
 dist/

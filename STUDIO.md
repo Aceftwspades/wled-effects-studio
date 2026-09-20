@@ -1046,6 +1046,29 @@ this repo with a compiler beside it. Done so far:
       the usermods dialog were blank in a bundle (no WLED checkout) - they
       say so now, with WLED_ROOT as the way in, and Start / Preview refuse
       rather than staging into the app's own folder.
+- [x] **Updates** (`native/update.py`, `native/version.py`): the app
+      reads the newest release of `version.REPO` from GitHub's API once a
+      day (no token), compares the tag with `__version__`, and offers the
+      zip: downloaded to `updates/`, then a script that outlives the app
+      waits for it to close, unpacks, robocopies over the folder with
+      projects, captures, toolchain and updates left alone, and starts it
+      again. Tried end to end against a local fake release: found at
+      start, the dialog, the download, the swap, the restart. From a
+      checkout: git pull. `STUDIO_UPDATE_URL` points a test at another
+      releases JSON; `STUDIO_NO_UPDATE_CHECK` keeps the tests offline.
+      `package.py` writes `version.json` (version, commit, day).
+- [x] **Its own repository**: the studio moves to `Aceftwspades/
+      wled-effects-studio` with its history (git subtree split); the WLED
+      fork keeps the firmware side (usermods/cube_fx, the playground
+      branch) and a pointer. The studio vendors `gen/` and `runtime/` from
+      a pinned fork commit (`WLED_SOURCE.json`; `build.py --runtime` with
+      WLED_ROOT refreshes them), finds a WLED checkout beside it or by
+      WLED_ROOT for the flash, and carries WLED's licence (EUPL v1.2)
+      since it compiles WLED's own effects, palettes and colour maths.
+      A GitHub Actions workflow builds the Windows release zip on a
+      version tag - winlibs downloaded and trimmed on the runner - and
+      attaches it to a draft release for the update check to find once
+      published.
 - [ ] A Linux / macOS pass. What is there: `paths.py` puts the home in
       `~/.local/share` or `~/Library/Application Support`, the toolchain
       takes clang or gcc from the path (`-fPIC`, `.so` / `.dylib`,

@@ -140,7 +140,8 @@ def main():
     with open(LOG, "w") as log:
         # the console variant of the packaged app keeps its stdout, which is the log the test reads
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
-        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1")
+        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env)
     try:
         time.sleep(9 if not EXE else 30)                 # the packaged app unpacks itself first
         for cmds, wait in STEPS:

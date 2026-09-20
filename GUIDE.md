@@ -17,6 +17,13 @@ included - a new effect builds in seconds. Only flashing firmware needs
 more: a WLED checkout (set `WLED_ROOT`) and PlatformIO. `WLED Effects Studio (console).exe` is
 the same app with a console, for when something goes wrong.
 
+**Updates**: the app asks the studio's releases on GitHub once a day
+(Help > Check for updates... asks now; the dialog's checkbox turns the
+daily check off). A newer release shows in Help as "Update available";
+**Download and install** fetches the zip, closes the studio, copies the new
+one over its folder - projects, captures and the toolchain untouched - and
+starts it again. From a checkout the answer is `git pull`.
+
 **From the tree**:
 
 ```bash
