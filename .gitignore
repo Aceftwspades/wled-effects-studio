@@ -14,3 +14,4 @@ build/
 projects/
 examples/_check/
 dist/
+gen/stock1d_skip.json
