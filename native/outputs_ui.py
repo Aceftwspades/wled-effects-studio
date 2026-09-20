@@ -38,24 +38,28 @@ def build(app):
             dpg.add_input_int(tag="out_per", width=60, step=0, default_value=300, min_value=1, min_clamped=True)
             dpg.add_button(label="+ output", small=True, callback=lambda: add_output(app))
             dpg.add_button(label="Read the device's", small=True, callback=lambda: read_device(app))
+            c.info("The wiring split into the device's LED outputs: a pin, a start and a count each, the LED type and colour order, "
+                   "reversed or not. Sent as the device's LED config.")
         with dpg.child_window(tag="out_rows", height=170, border=True):
             pass
         with dpg.group(horizontal=True):
             dpg.add_text("POWER", color=c.ACCENT)
             dpg.add_input_int(tag="out_ledma", label="mA per LED", width=60, step=0, min_value=0, max_value=255, min_clamped=True, max_clamped=True,
                               callback=lambda s, v: _set(app, "ma_per_led", int(v)))
-            dpg.add_input_int(tag="out_maxma", label="supply mA (0: no limit)", width=70, step=0, min_value=0, max_value=65000, min_clamped=True, max_clamped=True,
+            dpg.add_input_int(tag="out_maxma", label="supply mA", width=70, step=0, min_value=0, max_value=65000, min_clamped=True, max_clamped=True,
                               callback=lambda s, v: _set(app, "max_ma", int(v)))
-            dpg.add_checkbox(label="preview the limiter in the sim", tag="out_abl",
+            c.tip("0: no limit")
+            dpg.add_checkbox(label="limiter in the sim", tag="out_abl",
                              callback=lambda s, v: _set(app, "abl_preview", bool(v)))
-        dpg.add_text("", tag="out_power", color=c.TEXT, wrap=0)
-        dpg.add_text("what this frame draws at full white 55 mA an LED (WLED's default; ~12 mA for WS2815 12 V), and how far the "
-                     "device's auto brightness limiter would dim it to fit the supply, less the ESP's 120 mA", color=c.DIM, wrap=0)
+        with dpg.group(horizontal=True):
+            dpg.add_text("", tag="out_power", color=c.TEXT, wrap=0)
+            c.info("What this frame draws, by WLED's own maths: full white is the mA per LED (55 is WLED's default; ~12 for WS2815 at 12 V). "
+                   "The supply less the ESP's 120 mA is what the device's auto brightness limiter dims to fit; the sim previews that dimming.")
         dpg.add_separator()
         with dpg.group(horizontal=True):
             dpg.add_text("ON THE DEVICE", color=c.ACCENT)
             dpg.add_button(label="Send outputs + power limit", small=True, callback=lambda: send(app))
-            dpg.add_text("over /json/cfg: the device re-initialises its outputs (a reboot if it does not)", color=c.DIM)
+            c.tip("over /json/cfg; the device re-initialises its outputs (reboot it if it does not)")
         dpg.add_text("", tag="out_log", color=c.DIM, wrap=0)
 
 
@@ -67,7 +71,7 @@ def refresh(app):
     g = app.project.geometry
     outs = S["outs"]
     covered = sum(o["len"] for o in outs)
-    dpg.set_value("out_desc", f"{g.describe()}: {g.count} LEDs in the wiring; {len(outs)} output(s) cover {covered}"
+    dpg.set_value("out_desc", f"{g.describe()}; {len(outs)} output(s) cover {covered} of {g.count}"
                   + ("" if covered == g.count else f" - {'short by' if covered < g.count else 'over by'} {abs(g.count - covered)}"))
     dpg.set_value("out_ledma", int(S.get("ma_per_led", 55))); dpg.set_value("out_maxma", int(S.get("max_ma", 850)))
     dpg.set_value("out_abl", bool(S.get("abl_preview")))

@@ -347,9 +347,10 @@ def build_dialogs(app):
             dpg.add_button(label="OK", width=80, callback=lambda: _name_ok(app))
             dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("name_dialog"))
     with dpg.window(tag="usermods_win", label="Usermods and features", show=False, width=720, height=600, no_collapse=True):
-        dpg.add_text("What the firmware carries, for this project. The features are the studio's own optional parts; "
-                     "the usermods are WLED's, from this tree's usermods/ folder - the environment's, and any you add. "
-                     "Unticked ones are left out of the build.", color=DIM, wrap=690)
+        with dpg.group(horizontal=True):
+            dpg.add_text("What the firmware carries for this project; unticked is left out of the build.", color=DIM)
+            info("The features are the studio's own optional parts. The usermods are WLED's, from this tree's "
+                 "usermods/ folder: the environment's, and any you add.")
         dpg.add_text("FEATURES", color=ACCENT)
         with dpg.child_window(tag="um_features", height=200, border=True):
             pass
@@ -425,7 +426,7 @@ def build_dialogs(app):
         dpg.add_separator()
         with dpg.group(horizontal=True):
             dpg.add_button(label="Back to the preset", small=True, callback=lambda: app.set_appearance(preset=(app.prefs.get("theme") or {}).get("preset") or "dark"))
-            dpg.add_text("the preset's colours again, your changes dropped", color=DIM)
+            tip("the preset's colours again, your changes dropped")
     with dpg.window(tag="sweep_win", label="Sweep a slider", show=False, width=400, height=190, no_collapse=True):
         dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
                      "record makes that one pass the GIF.", color=DIM, wrap=380)
@@ -791,24 +792,23 @@ def _feature_rows(app, parent="flash_features"):
     from native.nodedefs import NEEDS
     f = flash.features_of(app.project)
     dpg.delete_item(parent, children_only=True)
+    # a row each: the check, its files; what it brings and which nodes lean on it on hover
     for key, label, files, flag, what in flash.FEATURES:
-        with dpg.group(parent=parent):
-            with dpg.group(horizontal=True):
-                dpg.add_checkbox(label=label, default_value=bool(f.get(key)), user_data=key,
-                                 callback=lambda s, a, u: app.set_feature(u, bool(a)))
-                dpg.add_text(files, color=DIM)
+        with dpg.group(horizontal=True, parent=parent):
+            dpg.add_checkbox(label=label, default_value=bool(f.get(key)), user_data=key,
+                             callback=lambda s, a, u: app.set_feature(u, bool(a)))
             nodes = sorted(n for n, need in NEEDS.items() if need == key)
-            dpg.add_text("    " + what + (f" Nodes: {', '.join(nodes)}." if nodes else ""), color=DIM, wrap=660)
-    with dpg.group(parent=parent):
-        with dpg.group(horizontal=True):
-            labels = [a[1] for a in flash.AUDIO]
-            cur = next((a[1] for a in flash.AUDIO if a[0] == f["audio"]), labels[0])
-            dpg.add_combo(labels, default_value=cur, width=420, tag=f"{parent}_audio",
-                          callback=lambda s, v: app.set_feature("audio", next(a[0] for a in flash.AUDIO if a[1] == v)))
-            dpg.add_text("audio", color=DIM)
+            tip(what + (f" Nodes: {', '.join(nodes)}." if nodes else ""))
+            dpg.add_text(files, color=DIM)
+    with dpg.group(horizontal=True, parent=parent):
+        labels = [a[1] for a in flash.AUDIO]
+        cur = next((a[1] for a in flash.AUDIO if a[0] == f["audio"]), labels[0])
+        dpg.add_combo(labels, default_value=cur, width=420, tag=f"{parent}_audio",
+                      callback=lambda s, v: app.set_feature("audio", next(a[0] for a in flash.AUDIO if a[1] == v)))
         what = next(a[2] for a in flash.AUDIO if a[0] == f["audio"])
         nodes = sorted(n for n, need in NEEDS.items() if need == "audio")
-        dpg.add_text("    " + what + f" Nodes: {', '.join(nodes)}.", color=DIM, wrap=660)
+        tip(what + f" Nodes: {', '.join(nodes)}.")
+        dpg.add_text("audio", color=DIM)
 
 
 def show_usermods(app):
@@ -1014,6 +1014,20 @@ def refresh_appearance(app):
     for key in cols:
         if dpg.does_item_exist(f"app_col_{key}"):
             dpg.set_value(f"app_col_{key}", list(cols[key]) + [255])
+
+
+def tip(text, item=None, wrap=360):
+    """The explanation of a control as its tooltip: on the last item made,
+    or `item`. The panel shows the control; the words come on hover."""
+    with dpg.tooltip(item or dpg.last_item()):
+        dpg.add_text(text, wrap=wrap)
+
+
+def info(text, wrap=360):
+    """A dim (?) that explains the row it sits on, on hover - for what has
+    no single control to hang the words on."""
+    dpg.add_text("(?)", color=DIM)
+    tip(text, wrap=wrap)
 
 
 def grip(pane):

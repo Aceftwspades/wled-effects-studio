@@ -357,6 +357,8 @@ class Geometry:
             parts = p.get("parts") or []
             lay = f", on a {self.w}x{self.h} grid" if p.get("layout") == "grid" else ""
             hit = f" ({self.collisions} LEDs share a cell: not addressed)" if getattr(self, "collisions", 0) else ""
+            if not parts:
+                return "shape: no parts yet"
             return f"shape of {len(parts)} part(s), {self.count} LEDs{lay}{hit}"
         return f"{self.w} points from file"
 

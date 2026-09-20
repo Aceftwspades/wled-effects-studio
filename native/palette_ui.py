@@ -90,20 +90,21 @@ def build(app):
     from native import device_ui
     with dpg.window(tag=TAG, show=False, width=560, height=460, no_collapse=True, no_title_bar=True):
         device_ui.header(app, "palettes")
-        dpg.add_text("Gradients of your own: in the sim as palettes (ids 200 down), on the device as its custom palettes - "
-                     "sent by position, so the first here replaces the device's palette0.json, the second its palette1.json.", color=c.DIM, wrap=0)
         with dpg.group(horizontal=True):
             dpg.add_button(label="+ New", small=True, callback=lambda: new_palette(app))
             dpg.add_button(label="From the sim's palette", small=True, callback=lambda: from_current(app))
+            c.tip("a new one that starts as the palette the sim shows")
             dpg.add_button(label="Copy", small=True, callback=lambda: dup_palette(app))
             dpg.add_button(label="Remove", small=True, callback=lambda: del_palette(app))
             dpg.add_button(label="Use in the sim", small=True, callback=lambda: use_palette(app))
+            c.info("Gradients of your own: in the sim as palettes (ids 200 down), on the device as its custom palettes - "
+                   "sent by position, so the first here replaces the device's palette0.json, the second its palette1.json.")
         with dpg.child_window(tag="pal_rows", height=120, border=True):
             pass
         with dpg.group(horizontal=True):
             dpg.add_input_text(tag="pal_name", label="name", width=200, on_enter=True, callback=lambda s, v: rename(app, v))
             dpg.add_text("", tag="pal_id", color=c.DIM)
-        dpg.add_text("click the bar to add a stop, drag one to move it, right-click to remove it", color=c.DIM, wrap=0)
+        dpg.add_text("click: a stop  -  drag: move it  -  right-click: remove it", color=c.DIM, wrap=0)
         dpg.add_drawlist(tag="pal_bar", width=520, height=64)
         with dpg.group(horizontal=True):
             dpg.add_color_edit(tag="pal_col", default_value=(255, 255, 255, 255), no_alpha=True, width=200,
@@ -115,9 +116,9 @@ def build(app):
         with dpg.group(horizontal=True):
             dpg.add_text("ON THE DEVICE", color=c.ACCENT)
             dpg.add_button(label="Send this one", small=True, callback=lambda: send(app, False))
+            c.tip("slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload")
             dpg.add_button(label="Send all", small=True, callback=lambda: send(app, True))
             dpg.add_button(label="Remove this one there", small=True, callback=lambda: remove_there(app))
-        dpg.add_text("slot n is /palette{n}.json on the device and palette id 200 - n everywhere; the device reloads them on upload", color=c.DIM, wrap=0)
         dpg.add_text("", tag="pal_log", color=c.DIM, wrap=0)
 
 

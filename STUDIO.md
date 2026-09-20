@@ -862,6 +862,15 @@ plugins, FPP scheduling, video playback.
       LEDs); a sequence step saved on a bigger shape put a segment off
       the matrix (bounds clamped); popouts outlived a crashed or killed
       app (they watch the parent's pid).
+- [x] **The panels succinct**: every explanatory paragraph in the
+      frames became a tooltip on the control it explained (`chrome.tip`)
+      or a dim (?) at the end of its row (`chrome.info`); labels
+      shortened, rows merged, the sequence's PLAY and BEATS rows put
+      together after the steps, the shape frame's layout and segment
+      controls moved onto the PARTS row and its preview to the end, the
+      flash frame's feature descriptions on hover. The GEOMETRY section
+      of the panel now follows any geometry change (a shape opened, a
+      ledmap imported), where it used to go stale.
 - [x] **Shapes with control**: polygon parts (sides x LEDs a side) and
       polyhedron parts (the edges of a tetrahedron, cube, octahedron,
       dodecahedron, icosahedron or soccer ball, or every face outlined;

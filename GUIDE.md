@@ -20,7 +20,9 @@ the project, the effect, its sliders, the segments, the geometry, colours
 and audio. **G** opens the graph pane, **C** the code pane; **Q / E / W**
 show one view or both full-frame (press again to come back); **H** hides
 every control; **space** pauses. Every key is on the menus and under
-Settings > Keyboard shortcuts, where any can be changed. The toolbar's
+Settings > Keyboard shortcuts, where any can be changed. Every control
+explains itself on hover; a dim **(?)** at the end of a row holds what
+the row as a whole is for. The toolbar's
 right half is the device and the frames: devices (Ctrl+Shift+N), flash
 (Ctrl+Shift+U), send to device (Ctrl+Shift+S), the DDP stream on or off
 (Ctrl+Shift+T, lit amber while it runs); then the shape editor
@@ -122,14 +124,14 @@ high; a path takes a count and sets its pitch - then:
 Units are LED pitches - a strip with pitch 1 has its LEDs one unit apart
 - so a mesh's own units are the pitch when it is imported.
 
-- **Import a mesh or model...** reads `.obj`, `.ply` and `.stl` from
+- **Import...** reads `.obj`, `.ply` and `.stl` from
   Blender or any CAD program - LEDs **along the edges** at a pitch (a
   strip run round the outline, chained into as few runs as it can), or
   one **per vertex**, or **over the surface** - an xLights **`.xmodel`**
   custom model (the LEDs, their numbering, and its grid), or an `x y z
   [index]` point list (CSV, whitespace or JSON; the index column is the
   wiring order).
-- **Import as a reference** puts a mesh in the 3-D view as a wireframe
+- **Reference...** puts a mesh in the 3-D view as a wireframe
   that is not LEDs - the tree, the house, the enclosure - moved, turned
   and scaled like any part, to place the LEDs against.
 - **Place** LEDs by hand: tick "place", click the 3-D view and an LED lands
@@ -138,7 +140,7 @@ Units are LED pitches - a strip with pitch 1 has its LEDs one unit apart
   it; "renumber: nearest chain" rewires a points part the way a strip
   would most likely be run through them; "turn into a path" makes a
   polyline of the points and fills it with LEDs at the pitch.
-- **Export as .xmodel** writes the shape (any geometry, on its grid) as an
+- **Export .xmodel** writes the shape (any geometry, on its grid) as an
   xLights custom model, the wiring as the node numbers.
 - **Generate a preview** (the frame's PREVIEW fold, or View > Generate a
   preview of the shape) renders a turn of the shape off screen - lit by
@@ -200,13 +202,13 @@ curve runs as a script as well as compiled.
 Playback > Sequence... (or Device > Sequence). A **step** is what the sim
 shows when you add it - every segment's effect, sliders, palette, bounds,
 opacity and blend, the colours, the brightness - with a name, how many
-seconds it holds and a transition time. "Update the step from the sim"
-recaptures it, "Load the step into the sim" puts it back to tweak; up /
+seconds it holds and a transition time. "Update from the sim"
+recaptures it, "Load into the sim" puts it back to tweak; up /
 down reorder; **Play in the sim** runs the steps in turn, each change
 blended over its transition time in the style chosen (fade, swipes,
 pushes, outside-in, inside-out, circular, fairy dust - WLED's own; on the
 device the style is its blend-style setting). **Send presets + playlist**
-saves each step as a WLED preset (ids from "first preset id", existing
+saves each step as a WLED preset (ids from "presets from", existing
 ones overwritten) and the sequence as a playlist preset with the
 durations and transitions - about a second a preset, since the device
 writes each one from its main loop and the next is only sent once it
@@ -248,7 +250,7 @@ stay quiet.
      the device, which runs it within two seconds. Playback > "Run the
      graph as a script" previews exactly that in the sim first. Not every
      node is scriptable - the studio names the one that is not.
-  2. **Send the current effect's settings** pushes the effect, sliders,
+  2. **Send the effect's settings** pushes the effect, sliders,
      palette, colours and the segment's blend mode.
   3. **Send the shape** uploads the ledmap (the wiring) and, for a shape,
      its positions table; **Send the ledmap only** just the wiring. Both

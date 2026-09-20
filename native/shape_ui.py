@@ -78,57 +78,60 @@ def build(app):
     from native import device_ui
     with dpg.window(tag=TAG, show=False, width=560, height=640, no_collapse=True, no_title_bar=True):
         device_ui.header(app, "shape")
-        dpg.add_text("", tag="shape_desc", color=c.DIM, wrap=0)
         with dpg.group(horizontal=True):
-            dpg.add_combo(["strip", "grid"], tag="shape_layout", width=90, default_value="strip",
-                          callback=lambda s, v: _apply(app, layout=v))
-            dpg.add_text("logical layout", color=c.DIM)
-            with dpg.tooltip(dpg.last_item()):
-                dpg.add_text("one strip in wiring order, or a grid seen from the front")
-            dpg.add_button(label="One segment per part", small=True, callback=lambda: segments_per_part(app))
-            with dpg.tooltip(dpg.last_item()):
-                dpg.add_text("each part its own WLED segment (effect, palette, sliders) - up to eight")
+            dpg.add_text("", tag="shape_desc", color=c.DIM)
+            c.info("A shape is a list of parts in wiring order. Units are LED pitches: a strip of pitch 1 has its LEDs one unit apart. "
+                   "The selected part's LEDs are ringed in the 3-D view, its wiring drawn through them, its axis an arrow.")
         with dpg.group(horizontal=True):
             dpg.add_button(label="Undo", small=True, callback=lambda: undo(app))
             dpg.add_button(label="Clear", small=True, callback=lambda: _apply(app, parts=[]))
-            dpg.add_button(label="Save as file...", small=True, callback=lambda: dpg.show_item("shape_save_dialog"))
-            dpg.add_button(label="Open a shape file...", small=True, callback=lambda: dpg.show_item("shape_open_dialog"))
-            dpg.add_button(label="Export as .xmodel...", small=True, callback=lambda: dpg.show_item("shape_xmodel_dialog"))
-        dpg.add_text("PARTS - the order is the wiring", color=c.ACCENT)
+            dpg.add_button(label="Open...", small=True, callback=lambda: dpg.show_item("shape_open_dialog"))
+            c.tip("a shape file (.shape.json) saved from here")
+            dpg.add_button(label="Save...", small=True, callback=lambda: dpg.show_item("shape_save_dialog"))
+            dpg.add_button(label="Export .xmodel...", small=True, callback=lambda: dpg.show_item("shape_xmodel_dialog"))
+            c.tip("the shape as an xLights custom model, the wiring as its node numbers")
+        with dpg.group(horizontal=True):
+            dpg.add_text("PARTS", color=c.ACCENT)
+            dpg.add_combo(["strip", "grid"], tag="shape_layout", width=70, default_value="strip",
+                          callback=lambda s, v: _apply(app, layout=v))
+            c.tip("the logical layout the effects see: one strip in wiring order, or a grid seen from the front")
+            dpg.add_button(label="Segment per part", small=True, callback=lambda: segments_per_part(app))
+            c.tip("each part its own WLED segment - effect, palette, sliders - up to eight")
         kinds = [k for k in shapes.KINDS if k != "reference"]
         for row in (kinds[:5], kinds[5:]):
             with dpg.group(horizontal=True):
                 for k in row:
                     dpg.add_button(label="+ " + k, small=True, width=100, user_data=k, callback=lambda s, a, u: add_part(app, u))
+                    c.tip(shapes.KINDS[k][1])
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Import a mesh or model...", small=True, callback=lambda: dpg.show_item("shape_import_dialog"))
+            dpg.add_button(label="Import...", small=True, callback=lambda: dpg.show_item("shape_import_dialog"))
+            c.tip("a mesh or model as LEDs: .obj, .ply, .stl from Blender or CAD; an xLights .xmodel; an x y z [index] point list (CSV, text, JSON)")
             dpg.add_combo([m[1] for m in MESH_MODES], tag="shape_mesh_mode", width=170, default_value=MESH_MODES[0][1])
-            with dpg.tooltip(dpg.last_item()):
-                dpg.add_text("how a mesh becomes LEDs: one every pitch along its edges, one at each vertex, or spread over its surface")
-            dpg.add_input_float(tag="shape_mesh_pitch", width=70, default_value=1.0, step=0, format="%.2f")
+            c.tip("how a mesh becomes LEDs: one every pitch along its edges, one at each vertex, or spread over its surface")
+            dpg.add_input_float(tag="shape_mesh_pitch", width=60, default_value=1.0, step=0, format="%.2f")
             dpg.add_text("pitch", color=c.DIM)
-            dpg.add_button(label="as a reference...", small=True,
+            dpg.add_button(label="Reference...", small=True,
                            callback=lambda: (setattr(app, "_shape_ref", True), dpg.show_item("shape_import_dialog")))
-            with dpg.tooltip(dpg.last_item()):
-                dpg.add_text("a mesh drawn to place LEDs against, not LEDs: the tree, the house, the enclosure")
+            c.tip("a mesh drawn in the 3-D view to place LEDs against, not LEDs: the tree, the house, the enclosure")
         with dpg.child_window(tag="shape_parts", height=110, border=True):
             pass
-        dpg.add_text("PART", tag="shape_part_title", color=c.ACCENT)
-        dpg.add_text("", tag="shape_part_kind", color=c.DIM, wrap=0)
+        with dpg.group(horizontal=True):
+            dpg.add_text("PART", tag="shape_part_title", color=c.ACCENT)
+            dpg.add_text("", tag="shape_part_kind", color=c.DIM)
+        with dpg.child_window(tag="shape_fields", height=-30, border=False):
+            pass
         # PREVIEW: a turntable of the shape, rendered off screen, looping here and saved as a GIF - folded away until wanted
         with dpg.collapsing_header(label="PREVIEW", tag="shape_prev_hdr", default_open=False):
             with dpg.group(horizontal=True):
                 dpg.add_combo(["effect", "parts", "wiring"], tag="shape_prev_mode", width=90, default_value="effect")
+                c.tip("lit by the effect the sim runs, or each part in a colour of its own, or a chase along the wiring")
                 dpg.add_input_float(tag="shape_prev_secs", width=60, default_value=4.0, step=0, format="%.0f s")
-                dpg.add_button(label="Generate a preview", tag="shape_prev_go", callback=lambda: generate_preview(app))
+                dpg.add_button(label="Generate a preview", tag="shape_prev_go", small=True, callback=lambda: generate_preview(app))
+                c.tip("a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here")
                 dpg.add_button(label="Open the folder", small=True, callback=lambda: app.reveal(os.path.join(app.project.path, "export")))
-            dpg.add_text("a turn of the shape as the sim lights it, its parts each a colour, or a chase along the wiring - a GIF and a PNG in the project's export folder",
-                         color=c.DIM, wrap=0)
             dpg.add_text("", tag="shape_prev_status", color=c.DIM, wrap=0)
             with dpg.group(tag="shape_prev_img"):
                 pass
-        with dpg.child_window(tag="shape_fields", height=-1, border=False):
-            pass
     # the file dialogs: a mesh or model in, a shape file in or out
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_import_dialog", width=640, height=420,
                          callback=lambda s, a: import_file(app, a.get("file_path_name", ""))):
@@ -160,7 +163,7 @@ def refresh(app):
         dpg.set_value("shape_desc", "the geometry is not a shape: choose 'shape' under GEOMETRY in the panel, or add a part below to start one")
         dpg.set_value("shape_part_title", "")
         return
-    dpg.set_value("shape_desc", g.describe() + f"; {g.count} LEDs; from the parts' units, a pitch is 1")
+    dpg.set_value("shape_desc", g.describe())
     dpg.set_value("shape_layout", g.params.get("layout", "strip"))
     sel = _sel(app)
     for i, part in enumerate(parts):
@@ -174,22 +177,25 @@ def refresh(app):
             dpg.add_button(label="copy", small=True, user_data=i, callback=lambda s, a, u: dup_part(app, u))
             dpg.add_button(label="x", small=True, user_data=i, callback=lambda s, a, u: del_part(app, u))
     if not parts:
-        dpg.add_text("no parts yet: add one above, import a file, or place LEDs by hand (a points part)", parent="shape_parts", color=c.DIM)
+        dpg.add_text("no parts yet: + one above, import a file, or place LEDs by hand", parent="shape_parts", color=c.DIM)
     if sel < 0:
         dpg.set_value("shape_part_title", ""); dpg.set_value("shape_part_kind", "")
         return
     part = parts[sel]
     kind = shapes.KINDS.get(part["kind"], ({}, f"unknown kind {part['kind']!r} - no LEDs"))
-    dpg.set_value("shape_part_title", f"PART {sel + 1}: {part.get('name', part['kind'])} ({part['kind']}, {shapes.part_count(part)} LEDs)")
-    dpg.set_value("shape_part_kind", kind[1])
+    dpg.set_value("shape_part_title", f"PART {sel + 1}: {part.get('name', part['kind'])}")
+    dpg.set_value("shape_part_kind", f"- {part['kind']}, {shapes.part_count(part)} LEDs")
     P = "shape_fields"
     dpg.add_input_text(label="name", parent=P, width=200, default_value=str(part.get("name", "")), on_enter=True,
                        callback=lambda s, v: set_part(app, sel, name=v))
     if part["kind"] == "reference":
         dpg.add_text(f"{part['params'].get('file', '?')}: {len(part['params'].get('vertices') or [])} vertices, "
                      f"{len(part['params'].get('edges') or [])} edges - drawn in the 3-D view, not LEDs", parent=P, color=c.DIM, wrap=0)
-    HINT = {"n": "LEDs", "per_side": "LEDs a side", "per_edge": "LEDs an edge", "sides": "sides", "pitch": "pitch (LED spacing)",
-            "radius": "radius (0: from the pitch)", "start_deg": "start angle", "w": "wide (LEDs)", "h": "high (LEDs)", "B": "LEDs a face edge"}
+    HINT = {"n": "LEDs", "per_side": "LEDs a side", "per_edge": "LEDs an edge", "sides": "sides", "pitch": "pitch",
+            "radius": "radius", "start_deg": "start angle", "w": "wide", "h": "high", "B": "a face edge"}
+    TIPS = {"pitch": "the LED spacing, in the shape's units", "radius": "0: sized so the LEDs sit a pitch apart",
+            "start_deg": "degrees round from +X to the first LED (or corner)", "w": "LEDs", "h": "LEDs", "B": "LEDs along a face's edge",
+            "serpentine": "every other row runs back the other way", "vertical": "the rows run up and down", "six": "the bottom face too"}
     for key, default in kind[0].items():
         if key in ("points", "normals", "vertices", "edges", "file"):
             continue
@@ -207,18 +213,17 @@ def refresh(app):
         else:
             dpg.add_input_float(label=label, parent=P, width=90, default_value=float(val), step=0, format="%.2f",
                                 on_enter=True, user_data=key, callback=lambda s, v, u: set_param(app, sel, u, float(v)))
+        if key in TIPS and not (key == "radius" and part["kind"] == "polyhedron"):
+            c.tip(TIPS[key])
     if part["kind"] == "polyline":
         # the count as a field too: the pitch follows (LEDs at both ends)
         n = shapes.part_count(part)
         dpg.add_input_int(label="LEDs (sets the pitch)", parent=P, width=90, default_value=n, min_value=2, max_value=4096, min_clamped=True,
                           on_enter=True, callback=lambda s, v: set_polyline_count(app, sel, int(v)))
-    if part["kind"] == "polygon":
-        dpg.add_text(f"{shapes.part_count(part)} LEDs: sides x LEDs a side; the radius is the corners' (0: sized so the LEDs sit a pitch apart)",
-                     parent=P, color=c.DIM, wrap=0)
     if part["kind"] == "polyhedron":
         with dpg.group(horizontal=True, parent=P):
             dpg.add_button(label="split into parts", small=True, callback=lambda: split_polyhedron(app, sel))
-            dpg.add_text("a strip per edge, or a polygon per face - each then moved, turned and sized alone", color=c.DIM)
+            c.tip("a strip per edge (or a polygon per face, in faces mode), the LEDs where they were - each then moved, turned and counted alone")
     if part["kind"] in ("points", "polyline"):
         pts = part["params"].get("points") or []
         dpg.add_text(f"{len(pts)} point(s)" + (" - place more: tick 'place', click the 3-D view" if part["kind"] == "points" else " on the path"),
@@ -228,8 +233,9 @@ def refresh(app):
             dpg.add_button(label="renumber: nearest chain from the first", small=True, callback=lambda: chain_part(app, sel))
             if part["kind"] == "points":
                 dpg.add_button(label="turn into a path", small=True, callback=lambda: set_part(app, sel, kind="polyline"))
-    dpg.add_text("PLACE - drag a number to move it live, ctrl-click to type; the view follows, the sim takes it when you let go",
-                 parent=P, color=c.DIM, wrap=0)
+    with dpg.group(horizontal=True, parent=P):
+        dpg.add_text("PLACE", color=c.ACCENT)
+        c.info("drag a number and the part moves in the 3-D view as you drag; the sim takes the shape when you let go; ctrl-click to type")
     dpg.add_drag_floatx(label="position x y z", parent=P, width=240, size=3, default_value=list(part.get("pos", [0, 0, 0])) + [0.0], format="%.2f",
                         speed=0.05, callback=lambda s, v: nudge(app, sel, pos=[float(x) for x in v[:3]]))
     dpg.add_drag_floatx(label="rotation x y z (deg)", parent=P, width=240, size=3, default_value=list(part.get("rot", [0, 0, 0])) + [0.0], format="%.1f",
@@ -245,8 +251,11 @@ def refresh(app):
     axname = {(1.0, 0.0, 0.0): "its length", (0.0, -1.0, 0.0): "its face"}.get(tuple(ax), "its normal (+Z)")
     ppos = np.asarray(part.get("pos", [0, 0, 0]), np.float64); dist = float(np.linalg.norm(ppos))
     d0 = (ppos / dist) if dist > 1e-6 else np.array([0.0, 0.0, 1.0])
-    dpg.add_text(f"AIM - point {axname} along a direction; 'outward' also puts it that far from the origin along it",
-                 parent=P, color=c.DIM, wrap=0)
+    with dpg.group(horizontal=True, parent=P):
+        dpg.add_text("AIM", color=c.ACCENT)
+        c.info(f"point {axname} along the direction (x y z, or azimuth and elevation, or an axis button). 'aim outward' also puts the part "
+               "the distance from the origin along it; 'turn only' keeps its place; 'aim at the origin' points it inward from where it is. "
+               "Spin turns it about the direction. The yellow arrow in the 3-D view is the axis.")
     with dpg.group(horizontal=True, parent=P):
         dpg.add_input_floatx(tag="shape_aim_dir", width=200, size=3, default_value=[float(v) for v in d0] + [0.0], format="%.3f",
                              callback=lambda s, v: _dir_to_angles(v))
@@ -267,7 +276,8 @@ def refresh(app):
         dpg.add_button(label="aim outward", small=True, callback=lambda: aim_part(app, sel, "outward"))
         dpg.add_button(label="turn only", small=True, callback=lambda: aim_part(app, sel, "turn"))
         dpg.add_button(label="aim at the origin", small=True, callback=lambda: aim_part(app, sel, "origin"))
-        dpg.add_button(label="direction from its place", small=True, callback=lambda: _set_dir(list(d0), dist))
+        dpg.add_button(label="from its place", small=True, callback=lambda: _set_dir(list(d0), dist))
+        c.tip("the direction and distance the part is at now, into the fields")
     with dpg.group(horizontal=True, parent=P):
         dpg.add_text("mirror", color=c.DIM)
         for ax, lbl in enumerate("XYZ"):
@@ -278,16 +288,16 @@ def refresh(app):
         dpg.add_button(label="make", small=True, callback=lambda: array_part(app, sel))
     dpg.add_separator(parent=P)
     with dpg.group(horizontal=True, parent=P):
+        dpg.add_text("BY HAND", color=c.ACCENT)
         dpg.add_checkbox(label="place", tag="shape_place", default_value=bool(getattr(app, "_shape_place", False)),
                          callback=lambda s, v: setattr(app, "_shape_place", bool(v)))
-        dpg.add_text("click the 3-D view to put an LED on the plane", color=c.DIM)
+        c.tip("click the 3-D view to put an LED on the plane; they go into the selected points part, or a new one; drag one to move it")
+        dpg.add_text("plane", color=c.DIM)
         dpg.add_combo(["z", "y", "x"], tag="shape_plane_axis", width=50, default_value=getattr(app, "_shape_plane", ("z", 0.0))[0],
                       callback=lambda s, v: setattr(app, "_shape_plane", (v, getattr(app, "_shape_plane", ("z", 0.0))[1])))
         dpg.add_text("=", color=c.DIM)
         dpg.add_input_float(tag="shape_plane_v", width=70, default_value=getattr(app, "_shape_plane", ("z", 0.0))[1], step=0, format="%.1f",
                             callback=lambda s, v: setattr(app, "_shape_plane", (getattr(app, "_shape_plane", ("z", 0.0))[0], float(v))))
-    dpg.add_text("placed LEDs go into the selected points part (a new one when none is selected); drag one to move it",
-                 parent=P, color=c.DIM, wrap=0)
 
 
 # --- edits -----------------------------------------------------------------------------------

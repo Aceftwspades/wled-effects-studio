@@ -714,6 +714,10 @@ class App(Features):
             return
         self.project.geometry = geom
         self.project.save()
+        if dpg.does_item_exist("geom_kind"):            # the panel's GEOMETRY section follows, whoever changed it
+            if dpg.get_value("geom_kind") != geom.kind:
+                dpg.set_value("geom_kind", geom.kind)
+            self.rebuild_geom_fields()
         if dpg.does_item_exist("shape_win") and dpg.is_item_shown("shape_win"):
             shape_ui.refresh(self)
         self._ab_sync()
@@ -779,8 +783,7 @@ class App(Features):
         if g.kind == "xyz":
             dpg.add_text(f"{g.count} points from {g.params.get('source', 'file')}",
                          parent="geom_fields", color=(139, 147, 163), wrap=0)
-        if g.kind == "shape":
-            dpg.add_text(g.describe(), parent="geom_fields", color=(139, 147, 163), wrap=0)
+        if g.kind == "shape":                             # the description line below says what it is
             dpg.add_button(label="Edit the shape...", parent="geom_fields", callback=lambda: device_ui.show(self, "shape"))
         if g.kind == "cube":
             # the wiring: which face first, how each is turned, how each is
@@ -2722,7 +2725,7 @@ class App(Features):
                     w, h = cfg.get("width") or 0, cfg.get("height") or 0
                 if w > 0 and h > 0:
                     x, y = dpg.get_item_pos(tag)
-                    holes.append((x - 1, y - 1, x + w + 1, y + h + 1))
+                    holes.append((x - 2, y - 2, x + w + 3, y + h + 3))   # the frame's border and rounding
         return holes
 
     def poll_glow(self):

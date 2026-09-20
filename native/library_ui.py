@@ -37,16 +37,17 @@ def build(app):
         with dpg.group(horizontal=True):
             dpg.add_input_text(tag="lib_search", hint="search names and tags", width=220, callback=lambda s, v: refresh(app))
             dpg.add_button(label="Remake the thumbnails", small=True, callback=lambda: (app._lib_thumbs.clear() if hasattr(app, "_lib_thumbs") else None, refresh(app)))
+            c.info("Every graph of the project as a looping thumbnail with its tags (what it uses). Click a tile: its effect runs in the sim, "
+                   "built first if it never was, and its graph waits in the graph pane.")
             dpg.add_text("", tag="lib_status", color=c.DIM)
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Generate previews", tag="lib_gen", callback=lambda: generate_previews(app))
+            dpg.add_button(label="Generate previews", tag="lib_gen", small=True, callback=lambda: generate_previews(app))
+            c.tip("a turn of the 3-D view for every effect on the project's shape - a GIF and a PNG each in export/library, with an index; "
+                   "the tiles then show those turns")
             dpg.add_input_float(tag="lib_gen_secs", width=60, default_value=3.0, step=0, format="%.0f s")
             dpg.add_checkbox(label="only the ones shown", tag="lib_gen_shown", default_value=False)
             dpg.add_button(label="Open the folder", small=True, callback=lambda: app.reveal(os.path.join(app.project.path, "export", "library")))
             dpg.add_text("", tag="lib_gen_status", color=c.DIM)
-        dpg.add_text("click a tile to open the graph and run its effect; the tags are what the graph uses. Generate previews renders a "
-                     "turn of the 3-D view for every effect on the project's shape - a GIF and a PNG each in export/library, with an index - "
-                     "and the tiles show those turns", color=c.DIM, wrap=0)
         with dpg.child_window(tag="lib_tiles", height=-1, border=False):
             pass
 

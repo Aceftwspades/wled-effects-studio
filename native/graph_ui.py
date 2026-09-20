@@ -444,7 +444,7 @@ class GraphPanel:
         # changes is what it says, never the editor beside it
         dpg.delete_item("graph_props", children_only=True)
         if not sel:
-            dpg.add_text("select a node: the settings too long for the node itself - text, files - are edited here",
+            dpg.add_text("select a node: its longer settings (text, files) are edited here",
                          parent="graph_props", color=DIM, wrap=0)
             return
         nid = sel[0]
@@ -470,7 +470,7 @@ class GraphPanel:
             self._curve_ed = {"nid": nid, "name": p["name"], "tag": tag, "W": W, "H": H, "drag": None, "was": False, "rwas": False}
             self._curve_draw()
         if not long_ and not curves:
-            dpg.add_text("nothing long to edit here: this node's settings are all on the node", parent="graph_props",
+            dpg.add_text("all of this node's settings are on the node", parent="graph_props",
                          color=DIM, wrap=0)
             return
         for p in long_:

@@ -34,54 +34,63 @@ def build(app):
     from native import device_ui
     with dpg.window(tag=TAG, show=False, width=640, height=660, no_collapse=True, no_title_bar=True):
         device_ui.header(app, "sequence")
-        dpg.add_text("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a playlist.",
-                     color=c.DIM, wrap=0)
         with dpg.group(horizontal=True):
-            dpg.add_button(label="+ Add a step from the sim", callback=lambda: add_step(app))
-            dpg.add_button(label="Update the step from the sim", callback=lambda: update_step(app))
-            dpg.add_button(label="Load the step into the sim", callback=lambda: load_step(app))
-        with dpg.child_window(tag="seq_rows", height=170, border=True):
+            dpg.add_text("STEPS", color=c.ACCENT)
+            dpg.add_button(label="+ Add from the sim", small=True, callback=lambda: add_step(app))
+            c.tip("a new step: what the sim shows now - effect, sliders, palette, colours, segments")
+            dpg.add_button(label="Update from the sim", small=True, callback=lambda: update_step(app))
+            c.tip("the selected step becomes what the sim shows now")
+            dpg.add_button(label="Load into the sim", small=True, callback=lambda: load_step(app))
+            c.tip("the sim shows the selected step")
+            c.info("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a playlist.")
+        with dpg.child_window(tag="seq_rows", height=150, border=True):
             pass
         with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="seq_name", label="name", width=200, on_enter=True, callback=lambda s, v: set_field(app, "name", v))
-            dpg.add_input_float(tag="seq_dur", label="seconds", width=80, step=0, format="%.1f", on_enter=True,
+            dpg.add_input_text(tag="seq_name", label="name", width=180, on_enter=True, callback=lambda s, v: set_field(app, "name", v))
+            dpg.add_input_float(tag="seq_dur", label="seconds", width=70, step=0, format="%.1f", on_enter=True,
                                 callback=lambda s, v: set_field(app, "dur", max(0.1, float(v))))
-            dpg.add_input_float(tag="seq_trans", label="transition s", width=80, step=0, format="%.1f", on_enter=True,
+            dpg.add_input_float(tag="seq_trans", label="transition", width=70, step=0, format="%.1f", on_enter=True,
                                 callback=lambda s, v: set_field(app, "trans", max(0.0, float(v))))
+            c.tip("seconds of blend into this step")
         dpg.add_text("", tag="seq_step_desc", color=c.DIM, wrap=0)
         with dpg.group(horizontal=True):
-            dpg.add_text("BEATS", color=c.ACCENT)
-            dpg.add_input_float(tag="seq_bpm", label="bpm", width=70, step=0, format="%.1f", default_value=120.0)
-            dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
-            dpg.add_button(label="From the synth", small=True, callback=lambda: dpg.set_value("seq_bpm", float(getattr(app.syn, "bpm", 120))))
-            dpg.add_input_int(tag="seq_bar", label="beats a bar", width=50, step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True)
-            dpg.add_button(label="Snap durations to bars", small=True, callback=lambda: snap_durations(app))
-            dpg.add_text("", tag="seq_tap", color=c.DIM)
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Play in the sim", tag="seq_play", callback=lambda: play(app))
-            dpg.add_button(label="Stop", callback=lambda: stop(app))
+            dpg.add_text("PLAY", color=c.ACCENT)
+            dpg.add_button(label="Play in the sim", tag="seq_play", small=True, callback=lambda: play(app))
+            dpg.add_button(label="Stop", small=True, callback=lambda: stop(app))
             dpg.add_checkbox(label="repeat", tag="seq_repeat", default_value=False,
                              callback=lambda s, v: (_steps(app).__setitem__("repeat", 0 if v else 1), app.project.save()))
-            dpg.add_combo(transition.STYLES, tag="seq_style", width=120, default_value="fade",
+            dpg.add_combo(transition.STYLES, tag="seq_style", width=110, default_value="fade",
                           callback=lambda s, v: (_steps(app).__setitem__("style", v), app.project.save()))
-            dpg.add_text("transition style", color=c.DIM)
-        dpg.add_text("", tag="seq_status", color=c.TEXT)
-        dpg.add_text("the transition is previewed here with the style chosen; on the device it is the device's blend-style setting", color=c.DIM, wrap=0)
-        dpg.add_separator()
-        dpg.add_text("ON THE DEVICE", color=c.ACCENT)
+            c.tip("the transition's style, previewed here; on the device the transitions use its own blend-style setting")
+            dpg.add_text("", tag="seq_status", color=c.TEXT)
         with dpg.group(horizontal=True):
-            dpg.add_input_int(tag="seq_base", label="first preset id", width=70, default_value=10, min_value=1, max_value=240, min_clamped=True,
+            dpg.add_text("BEATS", color=c.ACCENT)
+            dpg.add_input_float(tag="seq_bpm", label="bpm", width=60, step=0, format="%.1f", default_value=120.0)
+            dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
+            c.tip("tap tempo: tap on the beat, the bpm from the gaps")
+            dpg.add_button(label="Synth's", small=True, callback=lambda: dpg.set_value("seq_bpm", float(getattr(app.syn, "bpm", 120))))
+            c.tip("the bpm of the sim's synthetic beat")
+            dpg.add_input_int(tag="seq_bar", label="a bar", width=40, step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True)
+            dpg.add_button(label="Snap durations to bars", small=True, callback=lambda: snap_durations(app))
+            c.tip("every step's seconds rounded to whole bars, so the sequence changes on the music")
+            dpg.add_text("", tag="seq_tap", color=c.DIM)
+        dpg.add_separator()
+        with dpg.group(horizontal=True):
+            dpg.add_text("ON THE DEVICE", color=c.ACCENT)
+            dpg.add_input_int(tag="seq_base", label="presets from", width=50, step=0, default_value=10, min_value=1, max_value=240, min_clamped=True,
                               callback=lambda s, v: (_steps(app).__setitem__("base", int(v)), app.project.save()))
-            dpg.add_input_int(tag="seq_pid", label="playlist id", width=70, default_value=9, min_value=1, max_value=250, min_clamped=True,
+            c.tip("each step is saved as a preset, ids from here up; ones already there are overwritten")
+            dpg.add_input_int(tag="seq_pid", label="playlist", width=50, step=0, default_value=9, min_value=1, max_value=250, min_clamped=True,
                               callback=lambda s, v: (_steps(app).__setitem__("pid", int(v)), app.project.save()))
-            dpg.add_input_text(tag="seq_show", label="name", width=120, default_value="Show", on_enter=True,
+            c.tip("the preset id the playlist is saved as")
+            dpg.add_input_text(tag="seq_show", label="name", width=100, default_value="Show", on_enter=True,
                                callback=lambda s, v: (_steps(app).__setitem__("name", v), app.project.save()))
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Send presets + playlist", tag="seq_send", callback=lambda: send(app))
-            dpg.add_button(label="Send and run it", tag="seq_send_run", callback=lambda: send(app, run=True))
-            dpg.add_button(label="Save presets.json...", callback=lambda: dpg.show_item("seq_save_dialog"))
-        dpg.add_text("each step a preset (its id from 'presets from'; ones already there are overwritten), the sequence a playlist preset",
-                     color=c.DIM, wrap=0)
+            dpg.add_button(label="Send presets + playlist", tag="seq_send", small=True, callback=lambda: send(app))
+            c.tip("about a second a preset: the device writes each one from its main loop, and the next is sent once it has")
+            dpg.add_button(label="Send and run it", tag="seq_send_run", small=True, callback=lambda: send(app, run=True))
+            dpg.add_button(label="Save presets.json...", small=True, callback=lambda: dpg.show_item("seq_save_dialog"))
+            c.tip("the same presets and playlist as a file, for a device that is not on the network")
         dpg.add_text("", tag="seq_log", color=c.DIM, wrap=0)
         dpg.add_separator()
         # SCHEDULE: WLED's timers - a preset at a time of day, sunrise or sunset, on chosen days
@@ -89,10 +98,11 @@ def build(app):
             dpg.add_text("SCHEDULE", color=c.ACCENT)
             dpg.add_button(label="+ run the playlist at", small=True, callback=lambda: add_timer(app, "playlist"))
             dpg.add_button(label="+ off at", small=True, callback=lambda: add_timer(app, "off"))
+            c.tip("a time the lights go off: an Off preset (id 250) is saved on the device and timed")
             dpg.add_button(label="Read the device's", small=True, callback=lambda: read_timers(app))
             dpg.add_button(label="Send the schedule", small=True, callback=lambda: send_timers(app))
-        dpg.add_text("the device's timers (eight, plus sunrise and sunset): what preset runs when, on which days; 'off' saves a preset "
-                     "that turns the lights off (the playlist's id + 1) and times it", color=c.DIM, wrap=0)
+            c.info("The device's timers - eight, plus sunrise and sunset: what preset runs when, on which days. "
+                   "The device needs the time (NTP) for them to fire.")
         with dpg.child_window(tag="seq_timers", height=120, border=True):
             pass
         dpg.add_text("", tag="seq_tlog", color=c.DIM, wrap=0)
@@ -123,7 +133,7 @@ def refresh(app):
             dpg.add_button(label="down", small=True, user_data=i, callback=lambda s, a, u: move_step(app, u, 1), show=i < len(steps) - 1)
             dpg.add_button(label="x", small=True, user_data=i, callback=lambda s, a, u: del_step(app, u))
     if not steps:
-        dpg.add_text("no steps yet: set the sim up (effect, sliders, palette, segments) and add a step", parent="seq_rows", color=c.DIM)
+        dpg.add_text("no steps yet: set the sim up, then + Add from the sim", parent="seq_rows", color=c.DIM)
     dpg.set_value("seq_base", int(S.get("base", 10))); dpg.set_value("seq_pid", int(S.get("pid", 9)))
     dpg.set_value("seq_show", S.get("name", "Show")); dpg.set_value("seq_repeat", int(S.get("repeat", 0)) == 0)
     dpg.set_value("seq_style", S.get("style", "fade"))
