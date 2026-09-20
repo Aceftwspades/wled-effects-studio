@@ -193,8 +193,15 @@ def main():
         i = args.index("--trim"); trim_toolchain(args[i + 1], args[i + 2]); return
     print("package: the engine")
     run([sys.executable, "build.py", "--native-only"])
-    print("package: runtime/")
-    run([sys.executable, "build.py", "--runtime"])
+    sys.path.insert(0, HERE)
+    from native import paths
+    if paths.has_tree():
+        print("package: runtime/ from the WLED checkout")
+        run([sys.executable, "build.py", "--runtime"])
+    else:
+        print("package: runtime/ as vendored (no WLED checkout here)")     # a release runner: the pinned copy in the repository
+        if not os.path.isdir(paths.RUNTIME):
+            sys.exit("package: no runtime/ and no WLED checkout - nothing to build the engine from")
     print("package: the icon")
     icon_file()
     print("package: PyInstaller")
