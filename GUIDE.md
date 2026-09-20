@@ -94,12 +94,33 @@ behind the LEDs, for the point cloud and the GPU cube alike.
 GEOMETRY > shape (or View > Shape editor...) opens the **Shape** frame - a
 window like the Device ones, docks the same way. A shape is a list of
 **parts** in wiring order: strips, rings, panels, cylinders, spheres, cubes,
-a strip run along a path (polyline), and loose points. Each part has its
-own settings (LED count, pitch, serpentine...), a position, a rotation and
-a scale; the buttons make a mirror or an array of it; "reverse" turns its
-wiring round; up/down reorder parts, which reorders the wiring. Units are
-LED pitches - a strip with pitch 1 has its LEDs one unit apart - so a
-mesh's own units are the pitch when it is imported.
+polygons (sides of so many LEDs each), polyhedra (the edges of a solid -
+tetrahedron to icosahedron, and the **soccer ball**, a truncated
+icosahedron - or every face outlined on its own), a strip run along a
+path (polyline), and loose points. Each part has its own settings - the
+LED count is always among them: LEDs, LEDs a side, LEDs an edge, wide x
+high; a path takes a count and sets its pitch - then:
+
+- **PLACE**: position, rotation and scale as drag-numbers - drag one and
+  the part moves in the 3-D view as you drag (the sim takes the new
+  shape when you let go; ctrl-click to type a value). "reverse" turns its
+  wiring round; mirror and array make copies; up/down reorder parts,
+  which reorders the wiring.
+- **AIM**: a direction (x y z, or azimuth and elevation, or one of the
+  six axis buttons), a distance and a spin. **aim outward** turns the
+  part so its axis - a strip's length, a panel's face, a flat part's
+  normal - runs along the direction and puts it that far from the
+  origin along it; **turn only** keeps its place; **aim at the origin**
+  points it inward from where it is. The yellow arrow in the 3-D view is
+  the selected part's axis. This is how a ball is built by hand: a
+  pentagon aimed outward at radius 9, then a hexagon beside it at
+  another direction, and so on - or start from a polyhedron in "faces"
+  mode and **split into parts**, which gives every face its own polygon
+  (every edge its own strip in "edges" mode) with the LEDs exactly where
+  they were, each then moved, turned and re-counted alone.
+
+Units are LED pitches - a strip with pitch 1 has its LEDs one unit apart
+- so a mesh's own units are the pitch when it is imported.
 
 - **Import a mesh or model...** reads `.obj`, `.ply` and `.stl` from
   Blender or any CAD program - LEDs **along the edges** at a pitch (a
@@ -119,7 +140,7 @@ mesh's own units are the pitch when it is imported.
   polyline of the points and fills it with LEDs at the pitch.
 - **Export as .xmodel** writes the shape (any geometry, on its grid) as an
   xLights custom model, the wiring as the node numbers.
-- **Generate a preview** (the frame's PREVIEW row, or View > Generate a
+- **Generate a preview** (the frame's PREVIEW fold, or View > Generate a
   preview of the shape) renders a turn of the shape off screen - lit by
   the effect the sim runs, or each part in a colour of its own, or a chase
   along the wiring - loops it in the frame and writes `shape_preview.gif`

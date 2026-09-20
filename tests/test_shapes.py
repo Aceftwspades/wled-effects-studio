@@ -113,6 +113,50 @@ def test_mesh_readers():
     assert len(m.v) == 3 and len(m.faces) == 1
 
 
+def test_solids_polygons_and_the_soccer_ball():
+    """The solids come out with the right counts (a soccer ball: 60
+    vertices, 90 edges, 12 pentagons and 20 hexagons); a polygon has
+    sides x per_side LEDs; a polyhedron split into parts keeps every
+    LED where it was, in either mode."""
+    from collections import Counter
+    want = {"tetrahedron": (4, 6, {3: 4}), "cube": (8, 12, {4: 6}), "octahedron": (6, 12, {3: 8}),
+            "dodecahedron": (20, 30, {5: 12}), "icosahedron": (12, 30, {3: 20}), "soccer ball": (60, 90, {5: 12, 6: 20})}
+    for solid, (nv, ne, sides) in want.items():
+        V, E, F = shapes.polyhedron(solid)
+        assert (len(V), len(E)) == (nv, ne), solid
+        assert dict(Counter(len(f) for f in F)) == sides, solid
+        assert np.allclose(np.linalg.norm(V, axis=1), 1.0, atol=1e-5)
+    assert len(shapes.part_points(shapes.new_part("polygon", sides=6, per_side=5))[0]) == 30
+    for mode in ("edges", "faces"):
+        part = shapes.new_part("polyhedron", solid="soccer ball", mode=mode, per_edge=3, radius=10.0)
+        part["rot"] = [20, 30, 40]; part["pos"] = [1, 2, 3]
+        whole, _, _ = shapes.resolve([part])
+        pieces = shapes.split_part(part)
+        assert len(pieces) == (90 if mode == "edges" else 32)
+        split, _, _ = shapes.resolve(pieces)
+        assert len(whole) == len(split) and np.allclose(whole, split, atol=1e-2), mode
+    # a split face's +Z points outward
+    q = shapes.split_part(shapes.new_part("polyhedron", solid="soccer ball", mode="faces", radius=10.0))[0]
+    z = shapes.rotation(*q["rot"]) @ np.array([0, 0, 1.0])
+    assert np.dot(z, np.asarray(q["pos"]) / np.linalg.norm(q["pos"])) > 0.9
+
+
+def test_aim_and_euler():
+    """aim_rotation lands a part's axis on a direction (any axis, any
+    direction, the opposite one too); euler_of round-trips rotation()."""
+    for rot in ([10, 20, 30], [0, 90, 0], [-45, 60, 120]):
+        R = shapes.rotation(*rot)
+        assert np.allclose(R, shapes.rotation(*shapes.euler_of(R)), atol=1e-5)
+    for ax, d in (((1, 0, 0), (0, 0, 1)), ((0, 0, 1), (1, 1, 0)), ((0, 0, 1), (0, 0, -1)), ((0, -1, 0), (0.3, -0.5, 0.8))):
+        R = shapes.rotation(*shapes.aim_rotation(ax, d, 33.0))
+        assert np.allclose(R @ np.asarray(ax, float), np.asarray(d, float) / np.linalg.norm(d), atol=1e-4)
+    p = shapes.aimed(shapes.new_part("polygon"), (0, 0, 1), 9.0)
+    assert p["pos"] == [0.0, 0.0, 9.0]
+    p = shapes.aimed(shapes.new_part("strip", n=4), (0, 1, 0), 5.0)
+    pos, _, _ = shapes.resolve([p])
+    assert np.allclose(pos[:, 0], 0, atol=1e-4) and np.allclose(pos[:, 2], 0, atol=1e-4)      # the strip now runs along Y
+
+
 def test_xmodel_and_points():
     xm = _write("arrow.xmodel", '<custommodel name="Arrow" parm1="5" parm2="3" Depth="1" CustomModel=",,1,,;6,5,4,3,2;,,7,," />')
     m = shape_io.read_xmodel(xm)

@@ -3378,6 +3378,11 @@ def service_command(app):
                 elif op[0] == "segments": shape_ui.segments_per_part(app)
                 elif op[0] == "preview": shape_ui.generate_preview(app, op[1] if len(op) > 1 else None, op[2] if len(op) > 2 else None)
                 elif op[0] == "xmodel": shape_ui.export_xmodel(app, op[1])
+                elif op[0] == "aim": (dpg.set_value("shape_aim_dir", list(op[2]) + [0.0]), dpg.set_value("shape_aim_dist", float(op[3])),
+                                      shape_ui.aim_part(app, shape_ui._sel(app), op[1]))      # ["aim", how, [dx, dy, dz], dist]
+                elif op[0] == "split": shape_ui.split_polyhedron(app, shape_ui._sel(app))
+                elif op[0] == "nudge": (shape_ui.nudge(app, shape_ui._sel(app), **op[1]), shape_ui._poll_pending(app, force=True))
+                elif op[0] == "param": shape_ui.set_param(app, shape_ui._sel(app), op[1], op[2])
                 elif op[0] == "import": shape_ui.import_file(app, op[1])
                 elif op[0] == "reference": app._shape_ref = True; shape_ui.import_file(app, op[1])
                 elif op[0] == "layout": shape_ui._apply(app, layout=op[1])

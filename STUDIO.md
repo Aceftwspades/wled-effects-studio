@@ -862,6 +862,18 @@ plugins, FPP scheduling, video playback.
       LEDs); a sequence step saved on a bigger shape put a segment off
       the matrix (bounds clamped); popouts outlived a crashed or killed
       app (they watch the parent's pid).
+- [x] **Shapes with control**: polygon parts (sides x LEDs a side) and
+      polyhedron parts (the edges of a tetrahedron, cube, octahedron,
+      dodecahedron, icosahedron or soccer ball, or every face outlined;
+      the faces traced from the edges by the sharpest left turn, the
+      edges wired on from the end just reached), split into a polygon
+      per face or a strip per edge with the LEDs where they were; the
+      LED count a field on every kind (a path takes a count and sets
+      its pitch); PLACE as drag-numbers that move the part live in the
+      view (the sim takes it on release; the undo step is where the drag
+      began); AIM - a direction, a distance, a spin - to point a part's
+      axis and put it there, with the axis drawn as an arrow; the
+      preview folded away so the fields have the room.
 - [x] **Frames close; a library tile selects.** The frames had no way
       out but dock/float: an x beside the grip now (Esc too, for a
       floating frame with the focus), the menu opens them again. A

@@ -30,10 +30,22 @@ KINDS = {
     "cylinder": ({"w": 24, "h": 8, "pitch": 1.0}, "w round, h tall, seamless"),
     "sphere":   ({"w": 24, "h": 12, "pitch": 1.0}, "w round, h latitude rows"),
     "cube":     ({"B": 8, "pitch": 1.0, "six": False}, "B x B a face, five faces (six with the bottom)"),
+    "polygon":  ({"sides": 5, "per_side": 6, "pitch": 1.0, "radius": 0.0, "start_deg": 0.0},
+                 "sides straight sides of per_side LEDs each, in the X-Y plane (radius 0: from the pitch)"),
+    "polyhedron": ({"solid": "soccer ball", "mode": "edges", "per_edge": 5, "radius": 12.0},
+                   "the edges of a solid, per_edge LEDs each (mode faces: every face outlined on its own)"),
     "polyline": ({"points": [[0, 0, 0], [8, 0, 0], [8, 8, 0]], "pitch": 1.0}, "a strip run laid along a path, an LED every pitch"),
     "points":   ({"points": [[0, 0, 0]]}, "LEDs where they are put, in that order"),
     "reference": ({"vertices": [], "edges": [], "file": ""}, "a mesh drawn as a wireframe to place LEDs against - not LEDs"),
 }
+
+
+# the choices a text parameter takes (the editor shows a combo)
+CHOICES = {"solid": ["tetrahedron", "cube", "octahedron", "dodecahedron", "icosahedron", "soccer ball"],
+           "mode": ["edges", "faces"]}
+
+# the axis "aim" points: a strip's length, a panel's face, a flat part's normal
+AXIS = {"strip": (1.0, 0.0, 0.0), "panel": (0.0, -1.0, 0.0), "polyline": (1.0, 0.0, 0.0)}
 
 
 def new_part(kind, **params):
@@ -112,6 +124,29 @@ def part_points(part):
             for a, b in grid:
                 pos.append(f(a, b)); nrm.append(n)
         return np.asarray(pos, np.float32), np.asarray(nrm, np.float32)
+    if k == "polygon":
+        sides, m = max(3, int(p.get("sides", 5))), max(1, int(p.get("per_side", 6)))
+        side = m * pitch                                                # LEDs a pitch apart along each side
+        r = float(p.get("radius", 0.0)) or side / (2.0 * math.sin(math.pi / sides))
+        a0 = math.radians(float(p.get("start_deg", 0.0)))
+        corners = np.stack([np.cos(a0 + np.arange(sides + 1) * 2 * math.pi / sides) * r,
+                            np.sin(a0 + np.arange(sides + 1) * 2 * math.pi / sides) * r, np.zeros(sides + 1)], 1)
+        t = (np.arange(m) + 0.5) / m                                    # centred on each side: no LED on a corner
+        pos = np.concatenate([corners[i] + (corners[i + 1] - corners[i]) * t[:, None] for i in range(sides)])
+        return pos.astype(np.float32), None                             # no normals: the shape's centre gives them
+    if k == "polyhedron":
+        V, E, F = polyhedron(p.get("solid", "soccer ball"))
+        V = V * float(p.get("radius", 12.0))
+        m = max(1, int(p.get("per_edge", 5)))
+        t = (np.arange(m) + 0.5) / m
+        if p.get("mode", "edges") == "faces":
+            out = []
+            for face in face_order(V, F):
+                ring = list(face) + [face[0]]
+                out += [V[ring[i]] + (V[ring[i + 1]] - V[ring[i]]) * t[:, None] for i in range(len(face))]
+        else:
+            out = [V[a] + (V[b] - V[a]) * t[:, None] for a, b in edge_walk(V, E)]
+        return np.concatenate(out).astype(np.float32), None
     if k == "polyline":
         pts = np.asarray(p.get("points") or [[0, 0, 0]], np.float32).reshape(-1, 3)
         if len(pts) < 2:
@@ -140,6 +175,253 @@ def part_points(part):
     # a kind this version does not know (a project from a newer studio, a
     # hand-edited file): no LEDs, rather than a project that will not open
     return np.zeros((0, 3), np.float32), None
+
+
+# --- the solids ---------------------------------------------------------------------------
+_PHI = (1.0 + 5 ** 0.5) / 2.0
+
+
+def _even_perms(v):
+    """The three cyclic permutations of a triple."""
+    x, y, z = v
+    return [(x, y, z), (y, z, x), (z, x, y)]
+
+
+def _signs(v, which):
+    """Every sign choice of the chosen components (a mask of 1s)."""
+    out = [tuple(v)]
+    for i in range(3):
+        if which[i] and v[i] != 0:
+            out = [tuple(-c if j == i else c for j, c in enumerate(o)) for o in out] + out
+    return out
+
+
+def polyhedron(solid):
+    """A solid's (vertices (n, 3) on the unit sphere, edges (m, 2), faces:
+    lists of vertex indices, each in order round the face)."""
+    P = _PHI
+    if solid == "tetrahedron":
+        V = [(1, 1, 1), (1, -1, -1), (-1, 1, -1), (-1, -1, 1)]
+    elif solid == "cube":
+        V = _signs((1, 1, 1), (1, 1, 1))
+    elif solid == "octahedron":
+        V = [v for base in ((1, 0, 0), (0, 1, 0), (0, 0, 1)) for v in _signs(base, (1, 1, 1))]
+    elif solid == "icosahedron":
+        V = [v for base in _even_perms((0, 1, P)) for v in _signs(base, (1, 1, 1))]
+    elif solid == "dodecahedron":
+        V = _signs((1, 1, 1), (1, 1, 1)) + [v for base in _even_perms((0, 1 / P, P)) for v in _signs(base, (1, 1, 1))]
+    else:                                                               # the soccer ball: a truncated icosahedron
+        V = []
+        for base in ((0, 1, 3 * P), (1, 2 + P, 2 * P), (P, 2, 2 * P + 1)):
+            for perm in _even_perms(base):
+                V += _signs(perm, (1, 1, 1))
+    V = np.unique(np.round(np.asarray(V, np.float64), 9), axis=0)
+    V = V / np.linalg.norm(V, axis=1, keepdims=True)
+    # edges: every pair at the shortest distance
+    D = np.linalg.norm(V[:, None] - V[None], axis=2)
+    D[np.arange(len(V)), np.arange(len(V))] = np.inf
+    lo = D.min()
+    E = np.asarray([(i, j) for i in range(len(V)) for j in range(i + 1, len(V)) if D[i, j] <= lo * 1.001], int)
+    return V.astype(np.float32), E, faces_of(V, E)
+
+
+def faces_of(V, E):
+    """The faces of a convex polyhedron from its edges: each directed edge
+    followed by the sharpest left turn (seen from outside) until it
+    closes, so a face runs counter-clockwise about its outward normal -
+    the way a polygon part runs about its +Z; every directed edge is on
+    one face."""
+    nbrs = {i: [] for i in range(len(V))}
+    for a, b in E:
+        nbrs[int(a)].append(int(b)); nbrs[int(b)].append(int(a))
+    todo = {(int(a), int(b)) for a, b in E} | {(int(b), int(a)) for a, b in E}
+    faces = []
+    while todo:
+        u, v = min(todo)
+        face = [u]
+        while True:
+            todo.discard((u, v))
+            face.append(v)
+            n = V[v] / (np.linalg.norm(V[v]) or 1.0)                     # outward at v
+            d = V[v] - V[u]
+            best, best_a = None, None
+            for w in nbrs[v]:
+                if w == u and len(nbrs[v]) > 1:
+                    continue
+                e = V[w] - V[v]
+                # the turn from d to e about n: the sharpest left turn wins
+                a = math.atan2(float(np.dot(np.cross(d, e), n)), float(np.dot(d, e)))
+                if best is None or a > best_a:
+                    best, best_a = w, a
+            u, v = v, best
+            if v == face[0]:
+                todo.discard((u, v))
+                break
+            if len(face) > 64:
+                break
+        faces.append(face[:-1] if face[-1] == face[0] else face)
+    # each face once, in a fixed order (by its centre), its vertices as traced
+    seen, out = set(), []
+    for f in faces:
+        key = tuple(sorted(f))
+        if key not in seen and len(f) >= 3:
+            seen.add(key); out.append(f)
+    return out
+
+
+def edge_walk(V, E):
+    """The edges in a wiring order: on from the end just reached when an
+    unused edge starts there, else the nearest unused edge. (a, b) pairs."""
+    left = [(int(a), int(b)) for a, b in E]
+    out = []
+    at = None
+    while left:
+        if at is not None:
+            k = next((i for i, (a, b) in enumerate(left) if at in (a, b)), None)
+        else:
+            k = None
+        if k is None:
+            here = V[at] if at is not None else V[0]
+            k = min(range(len(left)), key=lambda i: min(np.linalg.norm(V[left[i][0]] - here), np.linalg.norm(V[left[i][1]] - here)))
+            a, b = left[k]
+            if at is not None and np.linalg.norm(V[b] - here) < np.linalg.norm(V[a] - here):
+                a, b = b, a
+        else:
+            a, b = left[k]
+            if b == at:
+                a, b = b, a
+        left.pop(k); out.append((a, b)); at = b
+    return out
+
+
+def face_order(V, F):
+    """The faces nearest-next from the first, each started at the vertex
+    nearest where the last ended."""
+    F = [list(f) for f in F]
+    cent = [V[f].mean(0) for f in F]
+    left = list(range(len(F)))
+    out, at = [], None
+    while left:
+        k = left[0] if at is None else min(left, key=lambda i: np.linalg.norm(cent[i] - at))
+        left.remove(k)
+        f = F[k]
+        if at is not None:
+            j = min(range(len(f)), key=lambda i: np.linalg.norm(V[f[i]] - at))
+            f = f[j:] + f[:j]
+        out.append(f); at = V[f[0]]
+    return out
+
+
+# --- aiming: a part's axis along a direction ------------------------------------------------
+def axis_of(part):
+    return np.asarray(AXIS.get(part.get("kind"), (0.0, 0.0, 1.0)), np.float64)
+
+
+def euler_of(R):
+    """(rx, ry, rz) degrees with rotation(rx, ry, rz) == R (Rz Ry Rx)."""
+    sy = -float(R[2, 0])
+    sy = max(-1.0, min(1.0, sy))
+    ry = math.asin(sy)
+    if abs(math.cos(ry)) > 1e-6:
+        rx = math.atan2(float(R[2, 1]), float(R[2, 2]))
+        rz = math.atan2(float(R[1, 0]), float(R[0, 0]))
+    else:                                                               # looking straight up or down: roll into rx
+        rx = math.atan2(-float(R[1, 2]), float(R[1, 1]))
+        rz = 0.0
+    return [round(math.degrees(v), 3) for v in (rx, ry, rz)]
+
+
+def aim_rotation(axis, direction, spin_deg=0.0):
+    """The rotation taking `axis` onto `direction`, then `spin` degrees
+    about the direction: (rx, ry, rz) for the part."""
+    a = np.asarray(axis, np.float64); a /= (np.linalg.norm(a) or 1.0)
+    d = np.asarray(direction, np.float64)
+    L = np.linalg.norm(d)
+    if L < 1e-9:
+        return [0.0, 0.0, 0.0]
+    d /= L
+    c = float(np.dot(a, d))
+    v = np.cross(a, d)
+    s = np.linalg.norm(v)
+    if s < 1e-9:
+        if c > 0:
+            R = np.eye(3)
+        else:                                                           # opposite: half a turn about any perpendicular
+            p = np.cross(a, [1.0, 0.0, 0.0])
+            if np.linalg.norm(p) < 1e-6:
+                p = np.cross(a, [0.0, 1.0, 0.0])
+            p /= np.linalg.norm(p)
+            R = 2.0 * np.outer(p, p) - np.eye(3)
+    else:
+        v /= s
+        K = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+        ang = math.atan2(s, c)
+        R = np.eye(3) + math.sin(ang) * K + (1 - math.cos(ang)) * (K @ K)
+    if spin_deg:
+        t = math.radians(spin_deg)
+        K = np.array([[0, -d[2], d[1]], [d[2], 0, -d[0]], [-d[1], d[0], 0]])
+        R = (np.eye(3) + math.sin(t) * K + (1 - math.cos(t)) * (K @ K)) @ R
+    return euler_of(R)
+
+
+def aimed(part, direction, distance=None, spin_deg=0.0):
+    """A copy of the part turned so its axis runs along `direction`, and
+    (with a distance) moved to that far from the origin along it."""
+    q = {k: (list(v) if isinstance(v, list) else (dict(v) if isinstance(v, dict) else v)) for k, v in part.items()}
+    d = np.asarray(direction, np.float64)
+    L = np.linalg.norm(d)
+    if L < 1e-9:
+        return q
+    d /= L
+    q["rot"] = aim_rotation(axis_of(part), d, spin_deg)
+    if distance is not None:
+        q["pos"] = [round(float(c), 3) for c in d * float(distance)]
+    return q
+
+
+def split_part(part):
+    """A polyhedron part as parts of its own: a strip per edge, or a
+    polygon per face - each placed where the solid had it, so the LEDs
+    stay put and every piece can then be moved, turned and resized alone."""
+    if part.get("kind") != "polyhedron":
+        return [part]
+    p = part.get("params", {})
+    V, E, F = polyhedron(p.get("solid", "soccer ball"))
+    V = V * float(p.get("radius", 12.0))
+    m = max(1, int(p.get("per_edge", 5)))
+    Rp = rotation(*part.get("rot", [0, 0, 0]))
+    sc = part.get("scale", 1.0); sc = float(sc[0] if isinstance(sc, list) else sc)
+    at = np.asarray(part.get("pos", [0, 0, 0]), np.float64)
+    world = lambda v: (np.asarray(v, np.float64) * sc) @ Rp.T + at
+    out = []
+    if p.get("mode", "edges") == "faces":
+        for k, face in enumerate(face_order(V, F)):
+            c = world(V[face].mean(0))
+            v0 = world(V[face[0]])
+            x = v0 - c; r = float(np.linalg.norm(x)); x /= (r or 1.0)
+            z = np.cross(world(V[face[1]]) - v0, x)                     # the face's normal, outward for a traced face
+            if np.dot(z, c) < 0:
+                z = -z
+            z /= (np.linalg.norm(z) or 1.0)
+            y = np.cross(z, x)
+            R = np.stack([x, y, z], 1)
+            q = new_part("polygon", sides=len(face), per_side=m, radius=round(r, 4),
+                         pitch=round(float(np.linalg.norm(world(V[face[1]]) - v0)) / m, 4), start_deg=0.0)
+            q["name"] = f"{p.get('solid', 'solid')} face {k + 1}"
+            q["pos"] = [round(float(v), 3) for v in c]; q["rot"] = euler_of(R)
+            out.append(q)
+    else:
+        for k, (a, b) in enumerate(edge_walk(V, E)):
+            A, B = world(V[a]), world(V[b])
+            d = B - A; L = float(np.linalg.norm(d))
+            q = new_part("strip", n=m, pitch=round(L / m, 4))
+            q["name"] = f"{p.get('solid', 'solid')} edge {k + 1}"
+            q["pos"] = [round(float(v), 3) for v in (A + B) / 2]
+            q["rot"] = aim_rotation((1.0, 0.0, 0.0), d)
+            out.append(q)
+    if part.get("reverse"):
+        out = [dict(q, reverse=True) for q in out][::-1]
+    return out
 
 
 def rotation(rx, ry, rz):

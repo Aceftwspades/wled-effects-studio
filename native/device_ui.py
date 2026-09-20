@@ -24,7 +24,7 @@ from native import flash, devices, live_out
 FRAMES = {"devices": ("devices_win", "DEVICES", 640, 420),
           "flash": ("flash_win", "FLASH FIRMWARE", 720, 660),
           "send": ("send_win", "SEND TO DEVICE", 620, 520),
-          "shape": ("shape_win", "SHAPE", 560, 640),          # the shape editor (shape_ui.py), the same kind of frame
+          "shape": ("shape_win", "SHAPE", 600, 700),          # the shape editor (shape_ui.py), the same kind of frame
           "sequence": ("sequence_win", "SEQUENCE", 640, 660),  # steps into presets and a playlist, and the schedule (sequence_ui.py)
           "library": ("library_win", "LIBRARY", 640, 520),     # the graphs as looping thumbnails (library_ui.py)
           "palettes": ("palettes_win", "PALETTES", 560, 460),  # gradients of the project's own (palette_ui.py)
