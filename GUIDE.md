@@ -160,7 +160,9 @@ sim's palette" starts from whatever the sim shows.
 
 **The library** (File > Library...) shows every graph of the project as a
 looping thumbnail with its tags (what nodes it uses, audio, 3-D, script);
-type to search; click a tile to open the graph and run its effect.
+type to search; click a tile to run its effect in the sim (built first if
+it never was) - the layout stays as it is, and its graph is waiting in
+the graph pane (G).
 **Generate previews** renders a turn of the 3-D view for every effect (or
 only the tiles shown) on the project's shape, each with the graph's own
 settings - a GIF and a PNG per effect in `export/library/` with a
@@ -203,11 +205,13 @@ off rows); "Read the device's" shows what it has.
 ## Getting it onto the cube
 
 Everything about the device is under the **Device** menu, in three frames.
-Each opens as a window over the panes; the button beside its ::: grip
-**docks** it into the pane space under the main pane (drag the grip onto
-any pane to put it beside or above that one, like the panes themselves)
-and, once docked, **floats** it out again; the arrangement is remembered.
-While you type in any frame's box the hotkeys stay quiet.
+Each opens as a window over the panes. At its top right: **dock** slots
+it into the pane space under the main pane (drag the ::: grip onto any
+pane to put it beside or above that one, like the panes themselves) and,
+once docked, **float** takes it out again; **x** closes it (so does Esc
+while a floating frame has the focus), and the menu opens it again. The
+arrangement is remembered. While you type in any frame's box the hotkeys
+stay quiet.
 
 - **Devices** finds WLED on the network - "Scan the network" asks by mDNS,
   asks every known device for the nodes it has heard, and sweeps the

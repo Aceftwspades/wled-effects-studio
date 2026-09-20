@@ -52,6 +52,26 @@ def header(app, slot):
     with dpg.tooltip(f"dock_{tag}"):
         dpg.add_text("", tag=f"dock_{tag}_tip")
     _dock_tip(tag, False)
+    dpg.add_image_button(texture("close", 14), tag=f"close_{tag}", width=14, height=14, frame_padding=2, tint_color=c.TEXT,
+                         pos=(340, 8), user_data=slot, callback=lambda s, a, u: close(app, u))
+    with dpg.tooltip(f"close_{tag}"):
+        dpg.add_text("close (Esc while the frame has the focus); the menu opens it again")
+
+
+def close(app, which):
+    """The frame away: hidden, and out of the pane space first if docked."""
+    tag = FRAMES[which][0]
+    if app.docked(which):
+        app.undock_slot(which)
+    dpg.hide_item(tag)
+
+
+def focused_frame(app):
+    """The floating frame that has the keyboard, if any (its slot name)."""
+    for slot, (tag, _, _, _) in FRAMES.items():
+        if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_focused(tag) and not app.docked(slot):
+            return slot
+    return None
 
 
 def _dock_tip(tag, docked):
@@ -60,12 +80,15 @@ def _dock_tip(tag, docked):
 
 
 def place_header(tag, w, docked):
-    """The grip and the dock button at the frame's top right for its width."""
+    """The dock button, the grip and the close button at the frame's top
+    right for its width: [dock] [:::] [x]."""
+    if dpg.does_item_exist(f"close_{tag}"):
+        dpg.set_item_pos(f"close_{tag}", [w - 30, 8])
     if dpg.does_item_exist(f"grip_{tag}"):
-        dpg.set_item_pos(f"grip_{tag}", [w - 40, 8])
+        dpg.set_item_pos(f"grip_{tag}", [w - 30 - 36, 8])
     if dpg.does_item_exist(f"dock_{tag}"):
         from native.icons import texture
-        dpg.set_item_pos(f"dock_{tag}", [w - 40 - 26, 8])
+        dpg.set_item_pos(f"dock_{tag}", [w - 30 - 36 - 26, 8])
         dpg.configure_item(f"dock_{tag}", texture_tag=texture("float" if docked else "dock", 14))
         _dock_tip(tag, docked)
 

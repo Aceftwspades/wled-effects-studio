@@ -862,6 +862,14 @@ plugins, FPP scheduling, video playback.
       LEDs); a sequence step saved on a bigger shape put a segment off
       the matrix (bounds clamped); popouts outlived a crashed or killed
       app (they watch the parent's pid).
+- [x] **Frames close; a library tile selects.** The frames had no way
+      out but dock/float: an x beside the grip now (Esc too, for a
+      floating frame with the focus), the menu opens them again. A
+      library tile used to throw the window into the full-frame graph
+      (`set_layout` is the presentation mode); it now runs the effect
+      where you are, building it first if it never was, and leaves the
+      graph in the graph pane. The segment row names the effect even
+      with one segment.
 - [x] **A cleanup and bug pass over the suite**, with the cube back on
       the network. Found on the device: a `psave` answers success at once
       but WLED writes the preset from its main loop, and a second psave

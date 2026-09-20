@@ -649,7 +649,8 @@ class App(Features):
         self.rebuild_params()
         self.sync_palette_combo()
         if self.eng.seg_count() > 1:
-            self.save_segments(); self.rebuild_seg_fields()
+            self.save_segments()
+        self.rebuild_seg_fields()                        # the segment row names the effect too
         self.project.selected = val
         self.project.save()
 
@@ -2504,6 +2505,8 @@ class App(Features):
                 self._capture = None
                 chrome.refresh_keys(self)
             return
+        if app_data == dpg.mvKey_Escape and device_ui.focused_frame(self):
+            device_ui.close(self, device_ui.focused_frame(self)); return    # Esc closes the floating frame with the focus
         if self.layout == "graph" and app_data == dpg.mvKey_Back and self.gp.reset_hovered():
             return                                       # Backspace over a value: its default
         if self.layout == "graph" and binding is None:
@@ -3319,6 +3322,8 @@ def service_command(app):
                 (app.dock_slot if c["dock"][1] else app.undock_slot)(c["dock"][0])
             if "frame" in c:                            # test hook: show a Device frame by name
                 device_ui.show(app, c["frame"])
+            if "frame_close" in c:                      # test hook: close one
+                device_ui.close(app, c["frame_close"])
             if "scan" in c:                             # test hook: a device scan ("all" | "sweep" | "mdns")
                 app.scan_devices(c["scan"])
             if c.get("randomise"):                      # test hook: throw the sliders and the palette

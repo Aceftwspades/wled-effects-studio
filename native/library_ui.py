@@ -314,14 +314,23 @@ def poll(app):
 
 
 def open_graph(app, fn):
+    """A tile clicked: its effect runs in the sim and its graph is the one
+    the graph pane holds - the layout stays as it is (it used to jump to
+    the full-frame graph, which nobody asked for by clicking a tile)."""
     app.gp.open(fn)
-    if app.layout != "graph":
-        app.set_layout("graph")
+    name = None
     try:
         g = G.load(os.path.join(app.gp.dir, fn), lib=app.gp.lib, resolver=app.gp.resolve_sub)
         k = _effect_index(app, app.eng, g.name)
         if k is not None:
-            app.on_effect(None, app.eng.names[k]); dpg.set_value("fx_combo", app.eng.names[k])
+            name = app.eng.names[k]
+            app.on_effect(None, name); dpg.set_value("fx_combo", name)
     except Exception:
         pass
-    app.gp.status(f"opened {fn}")
+    if name:
+        app.gp.status(f"{name} running; its graph is in the graph pane ({app.keys.label('pane_graph')})")
+    else:
+        # not built yet (a graph never compiled in this project): compile it and
+        # rebuild the sim, which then selects it - the same as F5 on the graph
+        app.gp.status(f"building {fn}...")
+        app.gp.compile()

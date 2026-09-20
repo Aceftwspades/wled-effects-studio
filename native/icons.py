@@ -310,6 +310,9 @@ def _dice(ic):
     for c in ((0.33, 0.33), (0.67, 0.67), (0.5, 0.5), (0.33, 0.67), (0.67, 0.33)):
         ic.circle(c, 0.075)
 
+def _close(ic):
+    ic.seg((0.22, 0.22), (0.78, 0.78), w=0.13); ic.seg((0.78, 0.22), (0.22, 0.78), w=0.13)
+
 def _dock(ic):
     # a pane with a bar along the bottom: into the pane space
     ic.box(0.12, 0.12, 0.88, 0.88, w=0.08)
@@ -331,7 +334,7 @@ ICONS = {
     "export": _export, "import": _import, "send": _send, "external": _external, "gear": _gear,
     "search": _search, "rename": _rename, "mute": _mute,
     "devices": _devices, "flash": _flash, "stream": _stream, "shape": _shape, "sequence": _sequence,
-    "library": _library, "palette": _palette, "outputs": _outputs, "dice": _dice, "dock": _dock, "float": _float,
+    "library": _library, "palette": _palette, "outputs": _outputs, "dice": _dice, "dock": _dock, "float": _float, "close": _close,
 }
 
 _made = {}
