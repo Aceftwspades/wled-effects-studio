@@ -157,6 +157,58 @@ def test_aim_and_euler():
     assert np.allclose(pos[:, 0], 0, atol=1e-4) and np.allclose(pos[:, 2], 0, atol=1e-4)      # the strip now runs along Y
 
 
+def test_xlights_layout():
+    """An xLights layout: a matrix, a line, a custom model and a poly line
+    come out with their counts where they stand; a kind the reader does
+    not know is a strip and named."""
+    xml = ('<xrgb><models>'
+           '<model name="M" DisplayAs="Horiz Matrix" parm1="4" parm2="8" WorldPosX="0" WorldPosY="100" WorldPosZ="0" ScaleX="2" ScaleY="2"/>'
+           '<model name="L" DisplayAs="Single Line" parm1="1" parm2="10" WorldPosX="-50" WorldPosY="0" WorldPosZ="0" X2="100" Y2="0" Z2="0"/>'
+           '<model name="C" DisplayAs="Custom" parm1="3" parm2="2" CustomModel="1,,2;,3," WorldPosX="5" WorldPosY="5" WorldPosZ="5"/>'
+           '<model name="P" DisplayAs="Poly Line" parm1="1" parm2="6" PointData="0,0,0,10,0,0"/>'
+           '<model name="X" DisplayAs="Icicles" parm1="2" parm2="5" ScaleX="10"/>'
+           '</models></xrgb>')
+    d = tempfile.mkdtemp(); path = os.path.join(d, "xlights_rgbeffects.xml")
+    open(path, "w").write(xml)
+    parts, notes = shape_io.read_layout(path)
+    counts = {q["name"]: shapes.part_count(q) for q in parts}
+    assert counts == {"M": 32, "L": 10, "C": 3, "P": 6, "X": 10}
+    pos, _, owner = shapes.resolve(parts)
+    m = pos[owner == 0]
+    assert abs(float(m[:, 2].mean()) - 100) < 1e-3 and abs(float(m[:, 0].max() - m[:, 0].min()) - 14) < 1e-3   # 8 wide at 2 apart, Y up -> Z up
+    line = pos[owner == 1]
+    assert abs(float(line[:, 0].min()) + 50) < 1e-3 and abs(float(line[:, 0].max()) - 50) < 1e-3
+    assert any("X" in n for n in notes)
+
+
+def test_beats_of_a_click_track():
+    """A 128 bpm click track: the tempo within a beat a minute, the first beat near the first click."""
+    from native import audio
+    rate = 22050; secs = 20.0; bpm = 128.0
+    t = np.arange(int(rate * secs)) / rate
+    x = 0.05 * np.sin(2 * np.pi * 110 * t)
+    for k in range(int(secs * bpm / 60.0)):
+        s0 = int((0.25 + k * 60.0 / bpm) * rate)
+        x[s0:s0 + 800] += np.exp(-np.arange(800) / 120.0) * 0.8
+    got = audio.beats_of(x.astype(np.float32), rate)
+    assert got is not None
+    found, first, beats = got
+    assert abs(found - bpm) < 1.0 and abs(first - 0.25) < 0.05 and len(beats) > 30
+
+
+def test_ramps_become_sub_steps():
+    """A step with a slider ramp: the device gets a sub-step a second, the
+    slider stepping from the step's value to the end; without a ramp the
+    step is itself."""
+    from native import sequence
+    st = {"name": "fade", "dur": 6.0, "trans": 0.5, "segments": [{"effect": "Rainbow", "params": {"sx": 20}, "bounds": [0, 0, 16, 1]}], "ramps": {"sx": 220}}
+    subs = sequence.sub_steps(st)
+    assert len(subs) == 6 and [q["segments"][0]["params"]["sx"] for q in subs] == [20, 60, 100, 140, 180, 220]
+    assert subs[0]["trans"] == 0.5 and subs[1]["trans"] == 0.0 and abs(sum(q["dur"] for q in subs) - 6.0) < 1e-6
+    assert sequence.sub_steps({"name": "plain", "dur": 3, "segments": st["segments"]}) == [{"name": "plain", "dur": 3, "segments": st["segments"]}]
+    assert sequence.ramp_value(st, "sx", 0.5) == 120
+
+
 def test_xmodel_and_points():
     xm = _write("arrow.xmodel", '<custommodel name="Arrow" parm1="5" parm2="3" Depth="1" CustomModel=",,1,,;6,5,4,3,2;,,7,," />')
     m = shape_io.read_xmodel(xm)

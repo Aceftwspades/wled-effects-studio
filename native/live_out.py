@@ -77,7 +77,7 @@ def frame_bytes(rgb, phys):
 
 
 # --- the wiring test -------------------------------------------------------------------
-MODES = ("off", "chase", "index", "part", "parts in turn")
+MODES = ("off", "chase", "index", "part", "parts in turn", "output", "red", "green", "blue", "white", "alternate", "twinkle")
 
 
 class WiringTest:
@@ -86,10 +86,11 @@ class WiringTest:
         t = WiringTest(n_leds, owner=None)   # owner: part index per LED (a shape), or None
         colours = t.frame(dt)                # (n_leds, 3) uint8, in WIRING order
     """
-    def __init__(self, n, owner=None, names=None):
+    def __init__(self, n, owner=None, names=None, outputs=None):
         self.n = max(1, int(n))
         self.owner = None if owner is None else np.asarray(owner, int)
         self.names = names or []
+        self.outputs = outputs or []     # [(start, count)] of the device's LED outputs, for the "output" mode
         self.mode = "chase"
         self.speed = 20.0            # LEDs a second (chase), or parts a second / 2 (parts in turn)
         self.trail = 6               # LEDs lit behind the head
@@ -109,6 +110,17 @@ class WiringTest:
         elif self.mode == "parts in turn":
             p = int(self.t * self.speed / 20.0) % max(1, self._parts())
             return f"part {p + 1}" + (f": {self.names[p]}" if p < len(self.names) else "")
+        elif self.mode == "output":
+            if not self.outputs:
+                return "no outputs: split the wiring in the LED outputs frame"
+            o = self.index % len(self.outputs)
+            return f"output {o + 1} of {len(self.outputs)}: LEDs {self.outputs[o][0]}..{self.outputs[o][0] + self.outputs[o][1] - 1}"
+        elif self.mode in ("red", "green", "blue", "white"):
+            return f"all {self.mode}: every LED the one colour - a colour-order check"
+        elif self.mode == "alternate":
+            return "every other LED, swapping"
+        elif self.mode == "twinkle":
+            return "random LEDs, briefly"
         else:
             return ""
         s = f"LED {k} of {self.n}"
@@ -140,4 +152,16 @@ class WiringTest:
             out[self.owner == p] = c
         elif self.mode in ("part", "parts in turn"):
             out[:] = c
+        elif self.mode == "output" and self.outputs:
+            start, count = self.outputs[self.index % len(self.outputs)]
+            out[max(0, start):max(0, start) + max(0, count)] = c
+        elif self.mode in ("red", "green", "blue", "white"):
+            out[:] = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255), "white": (255, 255, 255)}[self.mode]
+        elif self.mode == "alternate":
+            phase = int(self.t * self.speed / 20.0) % 2
+            out[phase::2] = c
+        elif self.mode == "twinkle":
+            rng = np.random.default_rng(int(self.t * self.speed / 4.0))
+            k = max(1, self.n // 12)
+            out[rng.choice(self.n, size=min(k, self.n), replace=False)] = c
         return out

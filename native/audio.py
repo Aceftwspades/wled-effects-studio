@@ -296,6 +296,49 @@ class FileAudio:
         pass
 
 
+def beats_of(samples, rate, lo_bpm=60.0, hi_bpm=200.0):
+    """The tempo of a recording and where its beats fall: (bpm, first beat
+    in seconds, [beat times]). An onset envelope (the rise of the loudness
+    frame to frame), its autocorrelation over the lags of 60..200 bpm for
+    the period, then the phase that lines a comb of beats up with the
+    onsets best. Rough, the way tapping along is rough - but from the
+    music, not a guess. None when there is too little to go on."""
+    x = np.asarray(samples, np.float32)
+    hop = 256
+    n = len(x) // hop
+    if n < 64:
+        return None
+    frames = x[:n * hop].reshape(n, hop)
+    rms = np.sqrt((frames * frames).mean(1) + 1e-9)
+    env = np.diff(np.log(rms + 1e-6)); env[env < 0] = 0
+    env -= env.mean()
+    if not env.any():
+        return None
+    fps = rate / hop
+    lags = np.arange(int(fps * 60.0 / hi_bpm), int(fps * 60.0 / lo_bpm) + 1)
+    ac = np.array([float(np.dot(env[:-L], env[L:])) for L in lags])
+    if ac.max() <= 0:
+        return None
+    # a mild lean to the middle of the range: 120 over its half and double
+    bpms = 60.0 * fps / lags
+    ac *= np.exp(-0.5 * ((np.log2(bpms / 120.0)) / 1.0) ** 2)
+    j = int(np.argmax(ac))
+    L = int(lags[j])
+    Lf = float(L)                                          # the peak between two lags: a parabola through three
+    if 0 < j < len(ac) - 1:
+        den = ac[j - 1] - 2 * ac[j] + ac[j + 1]
+        if den < 0:
+            Lf += 0.5 * float(ac[j - 1] - ac[j + 1]) / float(den)
+    bpm = 60.0 * fps / Lf
+    # the phase: the comb offset the onsets like best
+    scores = [float(env[ph::L].sum()) for ph in range(L)]
+    ph = int(np.argmax(scores))
+    first = ph / fps
+    period = Lf / fps
+    beats = [first + k * period for k in range(int((len(x) / rate - first) / period) + 1)]
+    return round(bpm, 1), first, beats
+
+
 def list_inputs():
     """[(index, name)] of devices that can capture, for a picker."""
     if sd is None:

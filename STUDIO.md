@@ -862,6 +862,45 @@ plugins, FPP scheduling, video playback.
       LEDs); a sequence step saved on a bigger shape put a segment off
       the matrix (bounds clamped); popouts outlived a crashed or killed
       app (they watch the parent's pid).
+**Third pass** (September 2026; after the panels were made succinct), in
+the order to do them:
+
+- [x] **WLED's segment options** - reverse, mirror, reverse Y, mirror Y,
+      transpose, grouping, spacing, offset - in the sim (`simSegOptions`;
+      `simSegLand` places each virtual pixel the way `setPixelColor` and
+      `setPixelColorXY` do, so spacing shows what is under), in the
+      panel's SEGMENTS section, saved with segments, and sent with the
+      effect's settings and with every preset (WLED's own names: rev, mi,
+      rY, mY, tp, grp, spc, of).
+- [x] **A timeline** under the sequence's steps: the steps as blocks
+      along the time, the transition into each shaded, the selected one
+      outlined, a playhead while it plays, the bpm's bars, the WAV's wave
+      behind (Play restarts the WAV with the sequence); click a step to
+      select it, drag the line between two to retime the one on the left.
+- [x] **Beats from the WAV** (`audio.beats_of`): an onset envelope, its
+      autocorrelation over 60..200 bpm for the period (the peak refined
+      between lags), the comb phase the onsets like best - the bpm into
+      the BEATS row, the beats as ticks on the timeline; then "Snap
+      durations to bars" follows the actual music.
+- [x] **Test patterns** in the wiring test: all red / green / blue /
+      white (the colour order), alternate, twinkle, and one LED output
+      at a time (the outputs frame's ranges).
+- [x] **Import an xLights layout** (`shape_io.read_layout`): every
+      model of `xlights_rgbeffects.xml` as a part, placed by its world
+      position and rotation (xLights' Y-up to the studio's Z-up), sized
+      by its scale: custom models, matrices, single lines and poly lines
+      exactly; circles, spheres, cubes, window frames, arches, trees and
+      stars approximated and named in the status; the rest a strip.
+- [x] **Value curves** as a RAMP per step: one slider of the first
+      segment from the step's value to an end value, straight; the sim's
+      sliders follow as it plays; on the device `sequence.sub_steps`
+      makes it a sub-step a second (2..12), a preset each, so a playlist
+      of ramps stays under WLED's hundred entries.
+- [x] **Render to video** (`App.write_video`): every recording's
+      frames piped to ffmpeg as raw RGB when it is on the path, an H.264
+      mp4 beside the GIF; the sequence frame's Render plays the sequence
+      once and records its whole length.
+
 - [x] **The panels succinct**: every explanatory paragraph in the
       frames became a tooltip on the control it explained (`chrome.tip`)
       or a dim (?) at the end of its row (`chrome.info`); labels

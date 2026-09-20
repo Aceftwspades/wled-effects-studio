@@ -68,16 +68,59 @@ def segment_json(k, sg, names, pals, is2d, colours):
          "col": [[(c >> 16) & 255, (c >> 8) & 255, c & 255] for c in colours]}
     if is2d:
         d["startY"], d["stopY"] = int(b[1]), int(b[3])
+    for key, v in (sg.get("options") or {}).items():          # rev, mi, rY, mY, tp, grp, spc, of - WLED's own names
+        d[key] = bool(v) if key in ("rev", "mi", "rY", "mY", "tp") else int(v)
     pal = sg.get("pal")
     if isinstance(pal, int) and 0 <= pal < len(pals):
         d["pal"] = pal                       # a palette id means the same on both sides (the sim carries WLED's set)
     return d
 
 
+RAMP_KEYS = ("sx", "ix", "c1", "c2", "c3")
+
+
+def ramp_value(step, key, t):
+    """The first segment's slider `key` at t (0..1) into the step: from the
+    step's value to the ramp's end, straight."""
+    segs = step.get("segments") or []
+    start = int((segs[0].get("params") or {}).get(key, 128)) if segs else 128
+    end = (step.get("ramps") or {}).get(key)
+    if end is None:
+        return start
+    return int(round(start + (int(end) - start) * max(0.0, min(1.0, t))))
+
+
+def sub_steps(step):
+    """A step with ramps as the steps the device can play: the slider held
+    at each of n values in turn, a step apiece (WLED presets cannot move a
+    slider). n from the duration - a second a sub-step, 2..12 - so a
+    playlist stays under its hundred entries."""
+    ramps = {k: v for k, v in (step.get("ramps") or {}).items() if k in RAMP_KEYS}
+    if not ramps or not step.get("segments"):
+        return [step]
+    dur = float(step.get("dur", 10))
+    n = max(2, min(12, int(dur)))
+    out = []
+    for j in range(n):
+        t = j / (n - 1)
+        q = json.loads(json.dumps(step))
+        q["dur"] = round(dur / n, 3)
+        q["name"] = f"{step.get('name', 'step')} {j + 1}/{n}"
+        if j > 0:
+            q["trans"] = 0.0
+        for k in ramps:
+            q["segments"][0].setdefault("params", {})[k] = ramp_value(step, k, t)
+        q.pop("ramps", None)
+        out.append(q)
+    return out
+
+
 def to_wled(steps, names, pals, base=10, pid=9, name="Show", repeat=0):
     """(presets, playlist): the presets as {id: state} and the playlist
     preset, ready for psave or a presets.json. Steps with no effect the
-    device has are left out (returned in presets[None] as a list of names)."""
+    device has are left out (returned in presets[None] as a list of names);
+    a step with a ramp becomes its sub-steps."""
+    steps = [q for st in steps for q in sub_steps(st)]
     presets, ids, missing = {}, [], []
     for i, st in enumerate(steps):
         is2d = int(st.get("rows", 1)) > 1

@@ -173,6 +173,32 @@ def test_segment_blend_modes_follow_the_firmware():
     assert (np.abs(res[3] - np.clip(bot - top, 0, 255)) <= 1).all()
 
 
+def test_segment_options_follow_the_firmware():
+    """WLED's segment options in the sim: reverse mirrors the strip, offset
+    rolls it, grouping and spacing make their pattern, and on a matrix
+    reverse Y flips the rows; they travel with segments() for the presets."""
+    from native.engine import Engine
+    e = Engine(); e.set_geometry(Geometry("matrix", w=16, h=1))
+    k = e.names.index("Solid Pattern")
+    def run(**opt):
+        e.seg_set_options(0, **dict(dict(rev=False, mi=False, rY=False, mY=False, tp=False, grp=1, spc=0, of=0), **opt))
+        e.select(k, params={"sx": 3, "ix": 5}); e.colors(0xFF0000, 0x0000FF, 0)
+        for _ in range(3): e.frame(28)
+        return "".join("R" if p[0] > 0 else ("B" if p[2] > 0 else ".") for p in e.rgb()[0])
+    base = run()
+    assert run(rev=True) == base[::-1]
+    assert run(of=3) == base[-3:] + base[:-3]
+    assert run(grp=2, spc=1).startswith("RR.RR.")
+    assert e.segments()[0]["options"]["grp"] == 2
+    e.set_geometry(Geometry("matrix", w=8, h=4))
+    def rows(**opt):
+        e.seg_set_options(0, **dict(dict(rev=False, mi=False, rY=False, mY=False, tp=False, grp=1, spc=0, of=0), **opt))
+        e.select(k, params={"sx": 3, "ix": 5}); e.colors(0xFF0000, 0x0000FF, 0)
+        for _ in range(3): e.frame(28)
+        return ["".join("R" if p[0] > 0 else "B" for p in row) for row in e.rgb()]
+    assert rows(rY=True) == rows()[::-1]
+
+
 if __name__ == "__main__":                        # without pytest: every test_ function, in order
     import inspect
     bad = 0

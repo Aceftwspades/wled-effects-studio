@@ -105,7 +105,8 @@ def build(app):
                     c.tip(shapes.KINDS[k][1])
         with dpg.group(horizontal=True):
             dpg.add_button(label="Import...", small=True, callback=lambda: dpg.show_item("shape_import_dialog"))
-            c.tip("a mesh or model as LEDs: .obj, .ply, .stl from Blender or CAD; an xLights .xmodel; an x y z [index] point list (CSV, text, JSON)")
+            c.tip("a mesh or model as LEDs: .obj, .ply, .stl from Blender or CAD; an xLights .xmodel, or a whole xLights layout "
+                  "(xlights_rgbeffects.xml: every model a part, where it stands); an x y z [index] point list (CSV, text, JSON)")
             dpg.add_combo([m[1] for m in MESH_MODES], tag="shape_mesh_mode", width=170, default_value=MESH_MODES[0][1])
             c.tip("how a mesh becomes LEDs: one every pitch along its edges, one at each vertex, or spread over its surface")
             dpg.add_input_float(tag="shape_mesh_pitch", width=60, default_value=1.0, step=0, format="%.2f")
@@ -136,7 +137,7 @@ def build(app):
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_import_dialog", width=640, height=420,
                          callback=lambda s, a: import_file(app, a.get("file_path_name", ""))):
         for ext, col in ((".obj", (120, 200, 120)), (".ply", (120, 200, 120)), (".stl", (120, 200, 120)),
-                         (".xmodel", (200, 180, 90)), (".csv", (150, 150, 220)), (".txt", (150, 150, 220)), (".json", (150, 150, 220))):
+                         (".xmodel", (200, 180, 90)), (".xml", (200, 180, 90)), (".csv", (150, 150, 220)), (".txt", (150, 150, 220)), (".json", (150, 150, 220))):
             dpg.add_file_extension(ext, color=col)
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_open_dialog", width=640, height=420,
                          callback=lambda s, a: open_shape(app, a.get("file_path_name", ""))):
@@ -616,6 +617,13 @@ def import_file(app, path):
                 part["params"]["normals"] = nrm.tolist()
             part["name"] = f"{mesh.source} ({mode})"
             note = f"{len(pts)} LEDs {mode} of {mesh.source} ({len(mesh.v)} vertices, {len(mesh.edges)} edges, {len(mesh.faces)} faces)"
+        elif ext == ".xml":
+            new, notes = shape_io.read_layout(path)
+            parts += new
+            app._shape_sel = len(parts) - 1
+            _apply(app, parts)
+            app.gp.status(f"{len(new)} model(s) from the layout" + (f"; approximated: {'; '.join(notes[:4])}" + (" ..." if len(notes) > 4 else "") if notes else ""))
+            return
         elif ext == ".xmodel":
             m = shape_io.read_xmodel(path)
             part = shapes.new_part("points", points=m["points"].tolist())

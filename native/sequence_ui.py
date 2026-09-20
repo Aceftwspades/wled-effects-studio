@@ -9,6 +9,7 @@ import json
 import os
 import time
 import dearpygui.dearpygui as dpg
+import numpy as np
 
 from native import sequence, transition
 
@@ -42,9 +43,13 @@ def build(app):
             c.tip("the selected step becomes what the sim shows now")
             dpg.add_button(label="Load into the sim", small=True, callback=lambda: load_step(app))
             c.tip("the sim shows the selected step")
-            c.info("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a playlist.")
-        with dpg.child_window(tag="seq_rows", height=150, border=True):
+            c.info("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a playlist. "
+                   "The timeline under the list: click a step to select it, drag the line between two to retime the one on the left; "
+                   "the faint lines are the bpm's bars, the ticks the beats found in the WAV, the wave the WAV itself.")
+        with dpg.child_window(tag="seq_rows", height=130, border=True):
             pass
+        # the timeline: the steps as blocks along the time, the playhead, bars, the WAV
+        dpg.add_drawlist(tag="seq_tl", width=600, height=54)
         with dpg.group(horizontal=True):
             dpg.add_input_text(tag="seq_name", label="name", width=180, on_enter=True, callback=lambda s, v: set_field(app, "name", v))
             dpg.add_input_float(tag="seq_dur", label="seconds", width=70, step=0, format="%.1f", on_enter=True,
@@ -52,11 +57,24 @@ def build(app):
             dpg.add_input_float(tag="seq_trans", label="transition", width=70, step=0, format="%.1f", on_enter=True,
                                 callback=lambda s, v: set_field(app, "trans", max(0.0, float(v))))
             c.tip("seconds of blend into this step")
-        dpg.add_text("", tag="seq_step_desc", color=c.DIM, wrap=0)
+        with dpg.group(horizontal=True):
+            dpg.add_text("", tag="seq_step_desc", color=c.DIM)
+        with dpg.group(horizontal=True):
+            dpg.add_text("RAMP", color=c.ACCENT)
+            dpg.add_combo(["none", "sx", "ix", "c1", "c2", "c3"], tag="seq_ramp_key", width=70, default_value="none",
+                          callback=lambda s, v: _ramp_pick(app, v))
+            c.tip("a slider of the first segment that moves over the step, from the step's value to the end value - "
+                  "in the sim as it plays; on the device as sub-steps (a second apiece, up to twelve), since a preset cannot move a slider")
+            dpg.add_slider_int(tag="seq_ramp_end", width=160, min_value=0, max_value=255, default_value=128,
+                               callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), int(v)))
+            dpg.add_text("to", color=c.DIM)
+            dpg.add_text("", tag="seq_ramp_desc", color=c.DIM)
         with dpg.group(horizontal=True):
             dpg.add_text("PLAY", color=c.ACCENT)
             dpg.add_button(label="Play in the sim", tag="seq_play", small=True, callback=lambda: play(app))
             dpg.add_button(label="Stop", small=True, callback=lambda: stop(app))
+            dpg.add_button(label="Render", small=True, callback=lambda: render(app))
+            c.tip("plays the sequence once and records it - a GIF, and an mp4 too when ffmpeg is on the path - into the project's export folder")
             dpg.add_checkbox(label="repeat", tag="seq_repeat", default_value=False,
                              callback=lambda s, v: (_steps(app).__setitem__("repeat", 0 if v else 1), app.project.save()))
             dpg.add_combo(transition.STYLES, tag="seq_style", width=110, default_value="fade",
@@ -65,12 +83,16 @@ def build(app):
             dpg.add_text("", tag="seq_status", color=c.TEXT)
         with dpg.group(horizontal=True):
             dpg.add_text("BEATS", color=c.ACCENT)
-            dpg.add_input_float(tag="seq_bpm", label="bpm", width=60, step=0, format="%.1f", default_value=120.0)
+            dpg.add_input_float(tag="seq_bpm", label="bpm", width=60, step=0, format="%.1f", default_value=120.0,
+                                callback=lambda: setattr(app, "_tl_dirty", True))
             dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
             c.tip("tap tempo: tap on the beat, the bpm from the gaps")
             dpg.add_button(label="Synth's", small=True, callback=lambda: dpg.set_value("seq_bpm", float(getattr(app.syn, "bpm", 120))))
             c.tip("the bpm of the sim's synthetic beat")
-            dpg.add_input_int(tag="seq_bar", label="a bar", width=40, step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True)
+            dpg.add_button(label="WAV's", small=True, callback=lambda: beats_from_wav(app))
+            c.tip("the tempo and the beats found in the WAV playing as live audio (AUDIO > play a WAV file)")
+            dpg.add_input_int(tag="seq_bar", label="a bar", width=40, step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True,
+                              callback=lambda: setattr(app, "_tl_dirty", True))
             dpg.add_button(label="Snap durations to bars", small=True, callback=lambda: snap_durations(app))
             c.tip("every step's seconds rounded to whole bars, so the sequence changes on the music")
             dpg.add_text("", tag="seq_tap", color=c.DIM)
@@ -134,10 +156,17 @@ def refresh(app):
             dpg.add_button(label="x", small=True, user_data=i, callback=lambda s, a, u: del_step(app, u))
     if not steps:
         dpg.add_text("no steps yet: set the sim up, then + Add from the sim", parent="seq_rows", color=c.DIM)
+    app._tl_dirty = True
     dpg.set_value("seq_base", int(S.get("base", 10))); dpg.set_value("seq_pid", int(S.get("pid", 9)))
     dpg.set_value("seq_show", S.get("name", "Show")); dpg.set_value("seq_repeat", int(S.get("repeat", 0)) == 0)
     dpg.set_value("seq_style", S.get("style", "fade"))
     if 0 <= sel < len(steps):
+        ramps = steps[sel].get("ramps") or {}
+        first = next(iter(ramps), "none")
+        dpg.set_value("seq_ramp_key", first)
+        if first != "none":
+            dpg.set_value("seq_ramp_end", int(ramps[first]))
+        _ramp_desc(app, steps[sel])
         st = steps[sel]
         dpg.set_value("seq_name", st.get("name", "")); dpg.set_value("seq_dur", float(st.get("dur", 10))); dpg.set_value("seq_trans", float(st.get("trans", 0.7)))
         segs = st.get("segments") or []
@@ -304,6 +333,39 @@ def update_step(app):
         _save(app)
 
 
+def _ramp_pick(app, key):
+    """The RAMP combo: the key's end value into the slider, or the ramp removed."""
+    S = _steps(app); sel = getattr(app, "_seq_sel", 0)
+    if not (0 <= sel < len(S["steps"])):
+        return
+    st = S["steps"][sel]
+    ramps = st.get("ramps") or {}
+    if key == "none":
+        st.pop("ramps", None); app.project.save(); refresh(app); return
+    if key not in ramps:
+        segs = st.get("segments") or []
+        ramps[key] = int((segs[0].get("params") or {}).get(key, 128)) if segs else 128
+        st["ramps"] = ramps; app.project.save()
+    dpg.set_value("seq_ramp_end", int(ramps[key])); refresh(app)
+
+
+def set_ramp(app, key, end):
+    S = _steps(app); sel = getattr(app, "_seq_sel", 0)
+    if key == "none" or not (0 <= sel < len(S["steps"])):
+        return
+    st = S["steps"][sel]
+    st.setdefault("ramps", {})[key] = int(end)
+    app.project.save(); _ramp_desc(app, st); app._tl_dirty = True
+
+
+def _ramp_desc(app, st):
+    ramps = st.get("ramps") or {}
+    if not ramps:
+        dpg.set_value("seq_ramp_desc", ""); return
+    n = len(sequence.sub_steps(st))
+    dpg.set_value("seq_ramp_desc", ", ".join(f"{k} {sequence.ramp_value(st, k, 0)} -> {v}" for k, v in ramps.items()) + f"; {n} sub-steps on the device")
+
+
 def load_step(app, i=None):
     S = _steps(app)
     i = getattr(app, "_seq_sel", 0) if i is None else i
@@ -342,6 +404,21 @@ def set_field(app, key, value):
 
 
 # --- beats: the steps on the music's bars --------------------------------------------------------
+def beats_from_wav(app):
+    """The bpm and the beat marks from the WAV the sim plays as live audio."""
+    from native import audio
+    live = getattr(app, "live", None)
+    if not isinstance(live, audio.FileAudio):
+        app.gp.status("play a WAV file first: AUDIO > play a WAV file..."); return
+    got = audio.beats_of(live.samples, live.rate)
+    if not got:
+        app.gp.status("no beat found in the file"); return
+    bpm, first, beats = got
+    dpg.set_value("seq_bpm", bpm); app._seq_beats = beats
+    dpg.set_value("seq_tap", f"{live.name}: {bpm:.1f} bpm, {len(beats)} beats")
+    app.gp.status(f"{bpm:.1f} bpm from {live.name}")
+
+
 def tap(app):
     """Tap tempo: the bpm from the gaps between taps (the last eight; a pause of two seconds starts over)."""
     now = time.perf_counter()
@@ -376,9 +453,29 @@ def play(app):
     S = _steps(app)
     if not S["steps"]:
         app.gp.status("no steps to play"); return
-    app._seq_play = {"i": -1, "next": 0.0}
+    app._seq_play = {"i": -1, "next": 0.0, "t0": time.perf_counter()}
     app.playing = True
+    live = getattr(app, "live", None)
+    if live is not None and hasattr(live, "t0"):
+        live.t0 = time.perf_counter()                    # the WAV from its start, with the sequence
     poll(app)
+
+
+def render(app):
+    """The sequence played once from the top, recorded for its whole length."""
+    S = _steps(app)
+    total = sum(float(st.get("dur", 10)) for st in S["steps"])
+    if total <= 0:
+        app.gp.status("no steps to render"); return
+    if getattr(app, "rec", None) is not None:
+        app.gp.status("a recording is already going"); return
+    was = int(S.get("repeat", 0))
+    S["repeat"] = 1                                       # once through, then stop
+    play(app)
+    S["repeat"] = was
+    app._seq_play["once"] = True
+    app.start_rec(total)
+    app.gp.status(f"rendering {total:.0f} s of the sequence...")
 
 
 def stop(app):
@@ -392,6 +489,10 @@ def stop(app):
 
 def poll(app):
     _poll_send(app)
+    if dpg.is_item_shown(TAG):
+        timeline_mouse(app)
+        if getattr(app, "_seq_play", None) is not None or getattr(app, "_tl_dirty", True):
+            draw_timeline(app); app._tl_dirty = False
     p = getattr(app, "_seq_play", None)
     if p is None:
         return
@@ -403,7 +504,7 @@ def poll(app):
     if now >= p["next"]:
         i = p["i"] + 1
         if i >= len(steps):
-            if int(S.get("repeat", 0)) != 0:
+            if int(S.get("repeat", 0)) != 0 or p.get("once"):
                 stop(app); app.gp.status("sequence done"); return
             i = 0
         prev = steps[p["i"]] if 0 <= p["i"] < len(steps) else None
@@ -417,6 +518,172 @@ def poll(app):
     i = p["i"]
     if 0 <= i < len(steps) and dpg.does_item_exist("seq_status"):
         dpg.set_value("seq_status", f"step {i + 1}/{len(steps)}: {steps[i].get('name')}, {max(0.0, p['next'] - now):.1f} s left")
+    if 0 <= i < len(steps) and steps[i].get("ramps"):
+        # the ramps: the first segment's sliders move with the time into the step
+        dur = float(steps[i].get("dur", 10)) or 1.0
+        t = 1.0 - max(0.0, p["next"] - now) / dur
+        changed = False
+        for k in steps[i]["ramps"]:
+            v = sequence.ramp_value(steps[i], k, t)
+            if app.eng.seg == 0 and app.eng.fx.get(k) != v:
+                app.eng.fx[k] = v; changed = True
+                for tag in (f"sld_{k}", f"inp_{k}"):
+                    if dpg.does_item_exist(tag):
+                        dpg.set_value(tag, v)
+        if changed:
+            app.eng.push()
+
+
+# --- the timeline ---------------------------------------------------------------------------------
+def _tl_geometry(app):
+    """(x0, y0, w, h, total seconds, [(start, dur, trans)]) of the timeline, or None."""
+    if not dpg.does_item_exist("seq_tl") or not dpg.is_item_shown(TAG):
+        return None
+    st = dpg.get_item_state("seq_tl")
+    if "rect_min" not in st:
+        return None
+    (x0, y0), (w, h) = st["rect_min"], st["rect_size"]
+    steps = _steps(app)["steps"]
+    spans, t = [], 0.0
+    for s in steps:
+        d = float(s.get("dur", 10)); spans.append((t, d, float(s.get("trans", 0)))); t += d
+    return x0, y0, w, h, t, spans
+
+
+def _tl_playhead(app, total):
+    """Seconds into the sequence while it plays, else None."""
+    p = getattr(app, "_seq_play", None)
+    if p is None or p["i"] < 0:
+        return None
+    steps = _steps(app)["steps"]
+    before = sum(float(s.get("dur", 10)) for s in steps[:p["i"]])
+    return before + float(steps[p["i"]].get("dur", 10)) - max(0.0, p["next"] - time.perf_counter())
+
+
+def _wave(app, cols):
+    """The WAV's loudness in `cols` columns (0..1 each), cached per file."""
+    from native import audio
+    live = getattr(app, "live", None)
+    if not isinstance(live, audio.FileAudio):
+        return None
+    key = (id(live), cols)
+    if getattr(app, "_wave_key", None) != key:
+        n = len(live.samples) // cols
+        if n < 1:
+            return None
+        a = np.abs(live.samples[:n * cols].reshape(cols, n)).mean(1)
+        app._wave_key, app._wave = key, a / (a.max() or 1.0)
+    return app._wave
+
+
+def draw_timeline(app):
+    """The steps as blocks along the time, the transition into each shaded,
+    the selected one outlined; the WAV's wave behind; bar lines at the
+    bpm; the beats found in the WAV as ticks; the playhead."""
+    g = _tl_geometry(app)
+    if g is None:
+        return
+    x0, y0, w, h, total, spans = g
+    c = _c()
+    dpg.delete_item("seq_tl", children_only=True)
+    if dpg.does_item_exist(TAG):
+        want = max(200, int(dpg.get_item_rect_size(TAG)[0]) - 24)
+        if abs(want - w) > 4:
+            dpg.configure_item("seq_tl", width=want); w = want
+    dpg.draw_rectangle((0, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 60), parent="seq_tl")
+    if total <= 0:
+        dpg.draw_text((6, h / 2 - 7), "the timeline: the steps along the time", color=c.DIM, size=13, parent="seq_tl"); return
+    sx = w / total
+    # the WAV's wave, over the sequence's time (the WAV plays from 0 when the sequence starts)
+    from native import audio
+    live = getattr(app, "live", None)
+    if isinstance(live, audio.FileAudio) and live.seconds > 0:
+        cols = max(50, min(int(w), 600))
+        wave = _wave(app, cols)
+        if wave is not None:
+            span = min(live.seconds, total)                 # only as far as the sequence goes
+            n = int(cols * span / live.seconds)
+            for k in range(n):
+                x = k * (span * sx) / max(1, n)
+                a = float(wave[k]) * (h * 0.45)
+                dpg.draw_line((x, h / 2 - a), (x, h / 2 + a), color=(120, 140, 170, 70), thickness=1, parent="seq_tl")
+    # the bars
+    bpm = float(dpg.get_value("seq_bpm") or 0) if dpg.does_item_exist("seq_bpm") else 0
+    bar = int(dpg.get_value("seq_bar") or 4) if dpg.does_item_exist("seq_bar") else 4
+    if bpm > 0:
+        barlen = 60.0 / bpm * bar
+        if barlen * sx >= 4:
+            t = 0.0
+            while t <= total:
+                dpg.draw_line((t * sx, 0), (t * sx, h), color=(255, 255, 255, 22), thickness=1, parent="seq_tl"); t += barlen
+    for b in getattr(app, "_seq_beats", None) or []:
+        if b <= total:
+            dpg.draw_line((b * sx, h - 6), (b * sx, h), color=(255, 200, 80, 140), thickness=1, parent="seq_tl")
+    # the steps
+    sel = min(getattr(app, "_seq_sel", 0), len(spans) - 1)
+    for i, (t, d, tr) in enumerate(spans):
+        a, b = t * sx, (t + d) * sx
+        hue = (i * 47) % 360
+        col = _hsv(hue, 0.5, 0.55) + (150,)
+        dpg.draw_rectangle((a + 1, 4), (b - 1, h - 10), color=(0, 0, 0, 0), fill=col, parent="seq_tl")
+        if tr > 0:
+            dpg.draw_rectangle((a + 1, 4), (min(b - 1, (t + tr) * sx), h - 10), color=(0, 0, 0, 0), fill=(255, 255, 255, 40), parent="seq_tl")
+        if i == sel:
+            dpg.draw_rectangle((a + 1, 4), (b - 1, h - 10), color=c.ACCENT, thickness=1.5, parent="seq_tl")
+        name = str(_steps(app)["steps"][i].get("name", ""))
+        if b - a > 8 * len(name[:12]) + 8:
+            dpg.draw_text((a + 5, 8), name[:12], color=(235, 238, 245, 220), size=13, parent="seq_tl")
+    # the playhead
+    at = _tl_playhead(app, total)
+    if at is not None:
+        dpg.draw_line((at * sx, 0), (at * sx, h), color=(255, 255, 255, 230), thickness=2, parent="seq_tl")
+    # the time scale
+    dpg.draw_text((2, h - 14), "0", color=c.DIM, size=11, parent="seq_tl")
+    dpg.draw_text((w - 8 * len(f"{total:.0f} s") - 2, h - 14), f"{total:.0f} s", color=c.DIM, size=11, parent="seq_tl")
+
+
+def _hsv(h, s, v):
+    import colorsys
+    r, g, b = colorsys.hsv_to_rgb((h % 360) / 360.0, s, v)
+    return (int(r * 255), int(g * 255), int(b * 255))
+
+
+def timeline_mouse(app):
+    """Clicks and drags on the timeline: a click selects the step under the
+    pointer; a press within a few pixels of the line between two steps
+    picks it up, and the step on its left is retimed as it is dragged."""
+    g = _tl_geometry(app)
+    if g is None:
+        return
+    x0, y0, w, h, total, spans = g
+    mx, my = dpg.get_mouse_pos(local=False)
+    inside = x0 <= mx <= x0 + w and y0 <= my <= y0 + h
+    down = dpg.is_mouse_button_down(dpg.mvMouseButton_Left)
+    drag = getattr(app, "_tl_drag", None)
+    if drag is not None:
+        if down:
+            t = max(0.0, (mx - x0) / (w / total) if total > 0 else 0.0)
+            i, start = drag
+            steps = _steps(app)["steps"]
+            if 0 <= i < len(steps):
+                steps[i]["dur"] = round(max(0.5, t - start), 2)
+                draw_timeline(app)
+        else:
+            app._tl_drag = None
+            app.project.save(); refresh(app)
+        return
+    if not inside or total <= 0:
+        app._tl_was_down = down; return
+    was = getattr(app, "_tl_was_down", False)
+    app._tl_was_down = down
+    if down and not was:                                  # a press: a boundary, or a step
+        sx = w / total
+        for i, (t, d, tr) in enumerate(spans):
+            if abs((t + d) * sx - (mx - x0)) <= 5:
+                app._tl_drag = (i, t); return
+        for i, (t, d, tr) in enumerate(spans):
+            if t * sx <= mx - x0 < (t + d) * sx:
+                app._seq_sel = i; refresh(app); return
 
 
 # --- the device --------------------------------------------------------------------------------

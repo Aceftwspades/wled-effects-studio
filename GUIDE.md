@@ -84,7 +84,10 @@ first, turns, serpentine - which is what the exported ledmap says. Audio
 comes from the synth (sliders, a beat clock), a live capture, or a WAV
 file. Playback has A/B compare (two effects side by side), a slider sweep,
 and scrubbing back through the last seconds while paused. Segments (+ in
-the panel) layer several effects with WLED's blend modes and opacity.
+the panel) layer several effects with WLED's blend modes and opacity, and
+carry WLED's segment options - reverse, mirror (and Y, and swap XY on a
+matrix), group, space, offset - which the sim lays out the way the device
+does and every send and preset carries.
 
 **The 3-D view** turns by dragging and zooms by the wheel; View > Camera
 has presets (isometric, front, back, left, right, top, below), three
@@ -124,7 +127,12 @@ high; a path takes a count and sets its pitch - then:
 Units are LED pitches - a strip with pitch 1 has its LEDs one unit apart
 - so a mesh's own units are the pitch when it is imported.
 
-- **Import...** reads `.obj`, `.ply` and `.stl` from
+- **Import...** reads a whole xLights layout (`xlights_rgbeffects.xml`:
+  every model a part, placed by its world position and rotation, sized by
+  its scale - custom models, matrices, lines and poly lines exactly,
+  circles, spheres, cubes, window frames, arches, trees and stars near
+  enough and named in the status; anything else as a strip of its LEDs),
+  or `.obj`, `.ply` and `.stl` from
   Blender or any CAD program - LEDs **along the edges** at a pitch (a
   strip run round the outline, chained into as few runs as it can), or
   one **per vertex**, or **over the surface** - an xLights **`.xmodel`**
@@ -204,7 +212,15 @@ shows when you add it - every segment's effect, sliders, palette, bounds,
 opacity and blend, the colours, the brightness - with a name, how many
 seconds it holds and a transition time. "Update from the sim"
 recaptures it, "Load into the sim" puts it back to tweak; up /
-down reorder; **Play in the sim** runs the steps in turn, each change
+down reorder. The **timeline** under the list shows the steps as blocks
+along the time: click one to select it, drag the line between two to
+retime the one on the left; the faint lines are the bpm's bars, the
+ticks the beats found in the WAV, the wave the WAV itself (Play restarts
+the WAV with the sequence). **RAMP** moves one slider of the first
+segment over the step, from the step's value to the end value - in the
+sim as it plays; on the device as sub-steps in the playlist (a second
+apiece, up to twelve), since a preset cannot move a slider. **Play in
+the sim** runs the steps in turn, each change
 blended over its transition time in the style chosen (fade, swipes,
 pushes, outside-in, inside-out, circular, fairy dust - WLED's own; on the
 device the style is its blend-style setting). **Send presets + playlist**
@@ -216,9 +232,13 @@ has; "Send and run it" starts it; "Save presets.json" writes the same
 for a device that is not on the network.
 Effects and palettes are matched by name against the device's own lists,
 and a step whose effect the device does not have is left out and named.
-**BEATS**: a bpm typed, tapped (Tap, on the beat) or taken from the
-synth, and "Snap durations to bars" rounds every step to whole bars of
-it, so the sequence changes on the music.
+**BEATS**: a bpm typed, tapped (Tap, on the beat), taken from the synth,
+or found in the WAV playing as live audio (WAV's: the tempo and the
+beats themselves, from the loudness rising - rough the way tapping is),
+and "Snap durations to bars" rounds every step to whole bars of it, so
+the sequence changes on the music. **Render** plays the sequence once
+and records it into `captures/` - a GIF, and an mp4 too when ffmpeg is
+on the path (so is every recording from the toolbar's record button).
 **SCHEDULE** under it is the device's timers: "+ run the playlist at"
 and "+ off at" add a row - a time of day, or sunrise / sunset with an
 offset in minutes, a preset, the days - "Send the schedule" writes them
@@ -262,9 +282,11 @@ stay quiet.
   once, in the wiring order the ledmap would use; the device goes back to
   its own effect a couple of seconds after the stream stops. The
   **wiring test** under it runs a chase along the wiring order (LEDs/s),
-  lights one LED by its index (< > step it), or one part of a shape (or
-  the parts in turn), in the sim and on the device when streaming - the
-  way to check a new ledmap or shape before trusting it; play resumes
+  lights one LED by its index (< > step it), one part of a shape (or the
+  parts in turn), one LED output (the outputs frame's ranges), all red /
+  green / blue / white for the colour order, every other LED, or a
+  twinkle - in the sim and on the device when streaming - the way to
+  check a new ledmap, shape or wiring before trusting it; play resumes
   the effect.
 - **LED outputs and power** (Device menu): the wiring split into the
   device's outputs - one, one per part of a shape, or every N LEDs - each

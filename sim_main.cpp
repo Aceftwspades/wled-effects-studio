@@ -51,9 +51,33 @@ struct SimSeg {
   uint8_t opacity = 255;
   uint8_t blend = 0;                       // WLED's segment blend mode ("bm"), 0..16
   uint8_t map1d2d = 0;
+  // WLED's segment options (index.js: rev, mi, rY, mY, tp, grp, spc, of):
+  // the effect draws a virtual segment, these say how it lands on the LEDs
+  bool reverse = false, mirror = false, reverseY = false, mirrorY = false, transpose = false;
+  uint8_t grouping = 1, spacing = 0;
+  uint16_t offset = 0;
   uint32_t *buf = nullptr;
   size_t bufLen = 0;
   bool used = false;
+  int groupLength() const { return grouping + spacing; }
+  bool is2D() const { return y1 - y0 > 1; }
+  // the virtual size the effect sees: Segment::virtualWidth()/virtualHeight()/virtualLength()
+  int vw() const {
+    const int sw = x1 - x0, sh = y1 - y0;
+    if (!is2D()) { int v = (sw - 1) / groupLength() + 1; if (mirror) v = (v + 1) / 2; return v < 1 ? 1 : v; }
+    int w = (sw + groupLength() - 1) / groupLength(), h = (sh + groupLength() - 1) / groupLength();
+    if (mirror) w = (w + 1) / 2;
+    if (mirrorY) h = (h + 1) / 2;
+    return transpose ? h : w;
+  }
+  int vh() const {
+    const int sw = x1 - x0, sh = y1 - y0;
+    if (!is2D()) return 1;
+    int w = (sw + groupLength() - 1) / groupLength(), h = (sh + groupLength() - 1) / groupLength();
+    if (mirror) w = (w + 1) / 2;
+    if (mirrorY) h = (h + 1) / 2;
+    return transpose ? w : h;
+  }
 };
 static SimSeg gSegs[SIM_MAX_SEGS];
 static int gSegCount = 1;
@@ -246,7 +270,7 @@ SIM_API const char *simEffectMeta(int i) {
 // a device with no 2-D configured. The buffer is bounded by the static
 // gPixels; a request past it is clamped rather than overrun.
 static void simSegBuffer(SimSeg &S) {
-  const size_t need = (size_t)(S.x1 - S.x0) * (size_t)(S.y1 - S.y0);
+  const size_t need = (size_t)(S.x1 - S.x0) * (size_t)(S.y1 - S.y0);   // the virtual size never exceeds the bounds' 
   if (S.bufLen < need) { free(S.buf); S.buf = (uint32_t *)calloc(need ? need : 1, sizeof(uint32_t)); S.bufLen = need; }
   S.seg.pixels = S.buf;
 }
@@ -322,11 +346,13 @@ SIM_API void simSegEffect(int k, int idx) {
   gSegs[k].fx = idx;
 }
 
-SIM_API int simSegGet(int k, int what) {           // 0 x0, 1 y0, 2 x1, 3 y1, 4 opacity, 5 fx, 6 blend
-  if (k < 0 || k >= gSegCount) return 0;
+SIM_API int simSegGet(int k, int what) {           // 0 x0, 1 y0, 2 x1, 3 y1, 4 opacity, 5 fx, 6 blend,
+  if (k < 0 || k >= gSegCount) return 0;           // 7 rev, 8 mi, 9 rY, 10 mY, 11 tp, 12 grp, 13 spc, 14 of
   const SimSeg &S = gSegs[k];
   switch (what) { case 0: return S.x0; case 1: return S.y0; case 2: return S.x1; case 3: return S.y1;
-                  case 4: return S.opacity; case 5: return S.fx; case 6: return S.blend; }
+                  case 4: return S.opacity; case 5: return S.fx; case 6: return S.blend;
+                  case 7: return S.reverse; case 8: return S.mirror; case 9: return S.reverseY; case 10: return S.mirrorY;
+                  case 11: return S.transpose; case 12: return S.grouping; case 13: return S.spacing; case 14: return S.offset; }
   return 0;
 }
 
@@ -367,6 +393,47 @@ static uint32_t simSegBlend(uint8_t mode, uint32_t t, uint32_t b) {
   return RGBW32(f(R(t), R(b)), f(G(t), G(b)), f(B(t), B(b)), f(W(t), W(b)));
 }
 
+// One virtual pixel onto the LEDs it lights, the way Segment::setPixelColor
+// and setPixelColorXY place it: reversed, mirrored, grouped, spaced, offset,
+// transposed. Only the LEDs hit are touched, so what is under shows through
+// the spacing, as on the device.
+static inline void simSegLand(const SimSeg &S, int x, int y, uint32_t c) {
+  const int sw = S.x1 - S.x0, sh = S.y1 - S.y0, gl = S.groupLength();
+  if (!S.is2D()) {
+    int i = x;
+    if (S.reverse) i = S.vw() - i - 1;
+    i *= gl;
+    for (int j = 0; j < S.grouping; j++) {
+      int set = i + j;
+      if (set < 0 || set >= sw) continue;
+      if (S.mirror) {
+        int mir = sw - set - 1 + S.offset; if (mir >= sw) mir -= sw;
+        uint32_t &d = gPixels[S.y0 * gStripW + S.x0 + mir]; d = color_blend(d, simSegBlend(S.blend, c, d), S.opacity);
+      }
+      set += S.offset; if (set >= sw) set -= sw;
+      uint32_t &d = gPixels[S.y0 * gStripW + S.x0 + set]; d = color_blend(d, simSegBlend(S.blend, c, d), S.opacity);
+    }
+    return;
+  }
+  if (S.reverse)  x = S.vw() - x - 1;
+  if (S.reverseY) y = S.vh() - y - 1;
+  if (S.transpose) { const int t = x; x = y; y = t; }
+  x *= gl; y *= gl;
+  for (int j = 0; j < S.grouping; j++) {
+    for (int g = 0; g < S.grouping; g++) {
+      const int xX = x + j, yY = y + g;
+      if (xX < 0 || xX >= sw || yY < 0 || yY >= sh) continue;
+      const int xs[2] = { xX, sw - xX - 1 }, ys[2] = { yY, sh - yY - 1 };
+      for (int mx = 0; mx < (S.mirror ? 2 : 1); mx++) {
+        for (int my = 0; my < (S.mirrorY ? 2 : 1); my++) {
+          uint32_t &d = gPixels[(S.y0 + ys[my]) * gStripW + S.x0 + xs[mx]];
+          d = color_blend(d, simSegBlend(S.blend, c, d), S.opacity);
+        }
+      }
+    }
+  }
+}
+
 // Each segment's frame into the strip, in order, later over earlier, by its
 // blend mode and opacity, as the firmware composites them.
 static void simComposite() {
@@ -374,15 +441,25 @@ static void simComposite() {
   for (int k = 0; k < gSegCount; k++) {
     const SimSeg &S = gSegs[k];
     if (!S.used || !S.buf) continue;
-    const int sw = S.x1 - S.x0;
-    for (int y = S.y0; y < S.y1; y++) {
-      for (int x = S.x0; x < S.x1; x++) {
-        const uint32_t c = S.buf[(y - S.y0) * sw + (x - S.x0)];
-        uint32_t &dst = gPixels[y * gStripW + x];
-        dst = color_blend(dst, simSegBlend(S.blend, c, dst), S.opacity);
-      }
-    }
+    const int vw = S.vw(), vh = S.vh();
+    for (int y = 0; y < vh; y++)
+      for (int x = 0; x < vw; x++)
+        simSegLand(S, x, y, S.buf[y * vw + x]);
   }
+}
+
+// WLED's segment options, as index.js sends them: rev, mi, rY, mY, tp
+// (flags), grp (1..), spc (0..), of. The virtual size changes, so the
+// effect restarts, as it does on the device.
+SIM_API void simSegOptions(int k, int rev, int mi, int rY, int mY, int tp, int grp, int spc, int of) {
+  if (k < 0 || k >= SIM_MAX_SEGS) return;
+  SimSeg &S = gSegs[k];
+  const int vw0 = S.vw(), vh0 = S.vh();
+  S.reverse = rev != 0; S.mirror = mi != 0; S.reverseY = rY != 0; S.mirrorY = mY != 0; S.transpose = tp != 0;
+  S.grouping = (uint8_t)(grp < 1 ? 1 : (grp > 255 ? 255 : grp));
+  S.spacing = (uint8_t)(spc < 0 ? 0 : (spc > 255 ? 255 : spc));
+  S.offset = (uint16_t)(of < 0 ? 0 : of);
+  if (S.used && (S.vw() != vw0 || S.vh() != vh0)) { simSegReset(S); if (S.buf) memset(S.buf, 0, S.bufLen * sizeof(uint32_t)); }
 }
 
 SIM_API void simSegBlendMode(int k, int mode) {
@@ -462,16 +539,18 @@ SIM_API void simFrame(int idx, int dtMs) {
   for (int k = 0; k < gSegCount; k++) {
     SimSeg &S = gSegs[k];
     if (!S.used || S.fx < 0 || S.fx >= (int)cfxBankCount()) continue;
-    Segment::_vw = S.x1 - S.x0; Segment::_vh = S.y1 - S.y0;
+    Segment::_vw = S.vw(); Segment::_vh = S.vh();
     Segment::map1D2D = S.map1d2d;
     strip.isMatrix = (Segment::_vh > 1);
+    S.seg.reverse = S.reverse; S.seg.mirror = S.mirror; S.seg.reverse_y = S.reverseY; S.seg.mirror_y = S.mirrorY;
+    S.seg.start = 0; S.seg.stop = (uint16_t)Segment::_vw; S.seg.offset = S.offset;
     _segPtr = &S.seg; strip._currentSegment = &S.seg;
     cfxBankRoster()[S.fx].fn();
     S.seg.call++;
   }
   gCurSeg = keep;
   _segPtr = &gSegs[keep].seg; strip._currentSegment = &gSegs[keep].seg;
-  Segment::_vw = gSegs[keep].x1 - gSegs[keep].x0; Segment::_vh = gSegs[keep].y1 - gSegs[keep].y0;
+  Segment::_vw = gSegs[keep].vw(); Segment::_vh = gSegs[keep].vh();
   Segment::map1D2D = gSegs[keep].map1d2d;
   simComposite();
 }

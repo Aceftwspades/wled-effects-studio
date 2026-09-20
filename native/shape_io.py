@@ -320,6 +320,141 @@ def read_xmodel(path):
             "points": pts, "order": order, "grid": grid, "source": os.path.basename(path)}
 
 
+# --- an xLights layout: every model of xlights_rgbeffects.xml as a part -----------------------
+def _f(a, key, default=0.0):
+    try:
+        return float(a.get(key, default) or default)
+    except ValueError:
+        return default
+
+
+def _xl_to_studio(x, y, z):
+    """xLights' world axes (Y up, Z toward the viewer) to the studio's (Z up, Y away)."""
+    return [round(float(x), 3), round(-float(z), 3), round(float(y), 3)]
+
+
+def _grid_points(cols, rows, sx, sy, serpentine=True, vertical=False):
+    """A cols x rows grid, LEDs sx and sy apart, centred; in wiring order."""
+    from native import shapes
+    ys, xs = np.mgrid[0:rows, 0:cols]
+    pos = np.stack([(xs.ravel() - (cols - 1) / 2.0) * sx, np.zeros(cols * rows), ((rows - 1) / 2.0 - ys.ravel()) * sy], 1)
+    return pos[shapes._matrix_order(cols, rows, serpentine, vertical)]
+
+
+def read_layout(path):
+    """An xLights layout (xlights_rgbeffects.xml): each model as a part -
+    placed by its world position, turned by its rotation, its LEDs sized
+    by its scale - and a note per model the reader could only approximate.
+    (parts, notes)."""
+    from native import shapes
+    root = ET.parse(path).getroot()
+    models = root.find("models")
+    if models is None:
+        raise ValueError("no <models> in the file - an xlights_rgbeffects.xml is expected")
+    parts, notes = [], []
+    for m in models.findall("model"):
+        a = m.attrib
+        kind = a.get("DisplayAs", "")
+        name = a.get("name", kind)
+        p1, p2, p3 = int(_f(a, "parm1", 1)), int(_f(a, "parm2", 1)), int(_f(a, "parm3", 1))
+        sx, sy, sz = _f(a, "ScaleX", 1.0) or 1.0, _f(a, "ScaleY", 1.0) or 1.0, _f(a, "ScaleZ", 1.0) or 1.0
+        pos = _xl_to_studio(_f(a, "WorldPosX"), _f(a, "WorldPosY"), _f(a, "WorldPosZ"))
+        rot = [round(_f(a, "RotateX"), 2), round(-_f(a, "RotateZ"), 2), round(_f(a, "RotateY"), 2)]
+        serp = a.get("StartSide", "B") in ("B", "T")                       # the strings snake unless told otherwise
+        part = None
+        if kind == "Custom":
+            data = a.get("CustomModel", "")
+            if not data and m.find("CustomModelData") is not None:
+                data = m.find("CustomModelData").text or ""
+            w, h = max(1, p1), max(1, p2)
+            cells = {}
+            for li, layer in enumerate(data.split("|")):
+                for y, row in enumerate(layer.split(";")):
+                    for x, tok in enumerate(row.split(",")):
+                        tok = tok.strip()
+                        if tok.isdigit() and int(tok) > 0:
+                            cells.setdefault(int(tok), (x, y, li))
+            if cells:
+                pts = [[(cells[k][0] - (w - 1) / 2.0) * sx, cells[k][2] * sz, ((h - 1) / 2.0 - cells[k][1]) * sy] for k in sorted(cells)]
+                part = shapes.new_part("points", points=[[round(v, 3) for v in q] for q in pts])
+        elif kind in ("Horiz Matrix", "Vert Matrix"):
+            cols, rows = (p2, p1) if kind == "Horiz Matrix" else (p1, p2)
+            pts = _grid_points(cols, rows, sx, sy, serp, kind == "Vert Matrix")
+            part = shapes.new_part("points", points=np.round(pts, 3).tolist())
+        elif kind == "Single Line":
+            n = max(2, p1 * p2)
+            end = _xl_to_studio(_f(a, "WorldPosX") + _f(a, "X2"), _f(a, "WorldPosY") + _f(a, "Y2"), _f(a, "WorldPosZ") + _f(a, "Z2"))
+            d = np.asarray(end) - np.asarray(pos)
+            L = float(np.linalg.norm(d))
+            part = shapes.new_part("strip", n=n, pitch=round(L / (n - 1), 4) if L > 0 else 1.0)
+            part["rot"] = shapes.aim_rotation((1.0, 0.0, 0.0), d) if L > 0 else [0, 0, 0]
+            pos = [round(float(v), 3) for v in (np.asarray(pos) + np.asarray(end)) / 2]; rot = part["rot"]
+        elif kind == "Poly Line":
+            raw = [float(v) for v in (a.get("PointData", "") or "").replace(";", ",").split(",") if v.strip()]
+            pts = [_xl_to_studio(*raw[i:i + 3]) for i in range(0, len(raw) - 2, 3)]
+            if len(pts) >= 2:
+                n = max(2, p1 * p2)
+                total = float(sum(np.linalg.norm(np.asarray(pts[i + 1]) - np.asarray(pts[i])) for i in range(len(pts) - 1)))
+                part = shapes.new_part("polyline", points=pts, pitch=round(total / (n - 1) - 1e-6, 5) if total > 0 else 1.0)
+                pos, rot = [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]                  # the points are already in the world
+        elif kind in ("Circle", "Wreath"):
+            n = max(3, p1 * p2)
+            part = shapes.new_part("ring", n=n, radius=round(sx * 0.5, 3), pitch=1.0)
+            rot = [90.0 + rot[0], rot[1], rot[2]]                            # stood up, facing the viewer
+            notes.append(f"{name}: {kind} as one ring")
+        elif kind == "Sphere":
+            part = shapes.new_part("sphere", w=max(3, p1), h=max(2, p2), pitch=round(sx / max(1, p1) * 3.1416, 3))
+            notes.append(f"{name}: sphere sized by its width")
+        elif kind == "Cube":
+            part = shapes.new_part("cube", B=max(2, p2), pitch=round(sx / max(1, p2), 3), six=True)
+            notes.append(f"{name}: cube from its nodes per side")
+        elif kind == "Window Frame":
+            top, side, bottom = max(1, p1), max(1, p2), max(1, p3)
+            w, h = sx, sy
+            pts = [[-w / 2, 0, -h / 2], [-w / 2, 0, h / 2], [w / 2, 0, h / 2], [w / 2, 0, -h / 2], [-w / 2, 0, -h / 2]]
+            n = top + 2 * side + bottom
+            total = 2 * w + 2 * h
+            part = shapes.new_part("polyline", points=[[round(v, 3) for v in q] for q in pts], pitch=round(total / n - 1e-6, 5))
+        elif kind == "Arches":
+            arches, per = max(1, p1), max(2, p2)
+            pts = []
+            for k in range(arches):
+                cx = (k - (arches - 1) / 2.0) * (sx / arches)
+                r = sx / arches * 0.45
+                ang = np.linspace(np.pi, 0, per) if k % 2 == 0 else np.linspace(0, np.pi, per)
+                pts += [[round(cx + r * float(np.cos(t)), 3), 0.0, round(r * float(np.sin(t)) * (sy / max(sx, 1e-6)) * 2, 3)] for t in ang]
+            part = shapes.new_part("points", points=pts)
+            notes.append(f"{name}: arches as half rings")
+        elif kind.startswith("Tree"):
+            strings, per = max(1, p1), max(2, p2)
+            pts = []
+            for k in range(strings):
+                ang = 2 * np.pi * k / strings
+                for j in range(per):
+                    t = j / (per - 1)
+                    r = (sx / 2) * (1 - t) * 0.5
+                    pts.append([round(r * float(np.cos(ang)), 3), round(r * float(np.sin(ang)), 3), round((t - 0.5) * sy, 3)])
+                if k % 2 == 1:
+                    pts[-per:] = pts[-per:][::-1]
+            part = shapes.new_part("points", points=pts)
+            notes.append(f"{name}: tree as a cone of strings")
+        elif kind == "Star":
+            n = max(5, p1 * p2)
+            part = shapes.new_part("polygon", sides=5, per_side=max(1, n // 5), radius=round(sx * 0.5, 3))
+            rot = [90.0 + rot[0], rot[1], rot[2]]
+            notes.append(f"{name}: star as a pentagon outline")
+        if part is None:
+            n = max(1, p1 * p2)
+            part = shapes.new_part("strip", n=n, pitch=round(sx / max(1, n), 3) if sx > 0 else 1.0)
+            notes.append(f"{name}: {kind or 'unknown'} as a strip of {n}")
+        part["name"] = name
+        part["pos"] = pos; part["rot"] = rot
+        parts.append(part)
+    if not parts:
+        raise ValueError("no models in the layout")
+    return parts, notes
+
+
 def write_xmodel(geom, path, name=None):
     """A geometry as an xLights custom model: its LEDs on a grid (the shape's
     grid layout, or one projected from the front), each cell the LED's

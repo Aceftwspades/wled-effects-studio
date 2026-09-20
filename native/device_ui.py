@@ -153,7 +153,9 @@ def build(app):
             dpg.add_text("WIRING TEST", color=c.ACCENT)
             dpg.add_combo(list(live_out.MODES), tag="wt_mode", width=120, default_value="off",
                           callback=lambda s, v: app.wiring_stop() if v == "off" else app.wiring_start(v))
-            c.tip("a chase along the wiring order, one LED by its index, or one part of a shape - in the sim, and on the device while streaming")
+            c.tip("in the sim, and on the device while streaming: a chase along the wiring order; one LED by its index; one part of a shape, "
+                  "or the parts in turn; one LED output (the LED outputs frame's ranges); all red / green / blue / white for the colour "
+                  "order; every other LED; a twinkle")
             dpg.add_input_float(tag="wt_speed", width=70, default_value=20.0, step=0, format="%.0f",
                                 callback=lambda s, v: setattr(app.wiring, "speed", max(0.5, float(v))) if getattr(app, "wiring", None) else None)
             dpg.add_text("LEDs/s", color=c.DIM)
@@ -161,7 +163,7 @@ def build(app):
             dpg.add_button(label=">", small=True, callback=lambda: _wt_step(app, 1))
             dpg.add_input_int(tag="wt_index", width=80, default_value=0, min_value=0, min_clamped=True, on_enter=True,
                               callback=lambda s, v: _wt_set(app, int(v)))
-            c.tip("the LED (or the part) lit in the 'one LED' and 'one part' modes; < and > step it")
+            c.tip("the LED, the part or the output lit in the index, part and output modes; < and > step it")
         dpg.add_text("", tag="wt_status", color=c.TEXT, wrap=0)
         dpg.add_separator()
         dpg.add_text("", tag="send_status", color=c.DIM, wrap=0)

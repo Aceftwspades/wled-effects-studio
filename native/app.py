@@ -496,12 +496,41 @@ class App(Features):
 
     def _encode(self, frames, path):
         """Runs on a worker thread: encoding 225 frames takes several seconds
-        and the window must keep drawing while it does."""
+        and the window must keep drawing while it does. With ffmpeg on the
+        path the same frames go to an mp4 beside the GIF (xLights' render
+        to video; a GIF of a minute is huge, an mp4 is not)."""
         try:
             n = gif.write(path, frames, fps=self.REC_FPS)
             self.rec_msg = f"{os.path.basename(path)}  {n/1024:.0f} KB"
         except Exception as e:
             self.rec_msg = f"gif failed: {e}"
+            return
+        mp4 = self.write_video(frames, os.path.splitext(path)[0] + ".mp4")
+        if mp4:
+            self.rec_msg += f"  + {os.path.basename(mp4)}"
+
+    def write_video(self, frames, path, fps=None):
+        """The frames as an mp4 through ffmpeg (raw RGB piped in, H.264 out,
+        yuv420p so anything plays it). None without ffmpeg on the path."""
+        import shutil, subprocess
+        ff = shutil.which("ffmpeg")
+        if not ff or not frames:
+            return None
+        h, w = frames[0].shape[:2]
+        w2, h2 = w - w % 2, h - h % 2                     # yuv420p wants even sides
+        cmd = [ff, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w2}x{h2}",
+               "-r", str(fps or self.REC_FPS), "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", path]
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            for f in frames:
+                proc.stdin.write(np.ascontiguousarray(f[:h2, :w2, :3]).tobytes())
+            proc.stdin.close()
+            err = proc.stderr.read().decode("utf-8", "replace")
+            if proc.wait() != 0:
+                self.rec_msg = f"ffmpeg: {err.strip()[-120:]}"; return None
+            return path
+        except Exception as e:
+            self.rec_msg = f"video failed: {e}"; return None
 
     def rec_frame(self, net_img, cube_img):
         """Offered every drawn frame; takes one only when the clock says so."""
@@ -3363,6 +3392,8 @@ def service_command(app):
                 {"add": lambda: SQ.add_step(app), "update": lambda: SQ.update_step(app), "load": lambda: SQ.load_step(app, op[1]),
                  "timer": lambda: SQ.add_timer(app, op[1]), "timer_del": lambda: SQ.del_timer(app, op[1]),
                  "snap": lambda: SQ.snap_durations(app, op[1], op[2]), "tap": lambda: SQ.tap(app),
+                 "wav_beats": lambda: SQ.beats_from_wav(app),
+                 "ramp": lambda: SQ.set_ramp(app, op[1], op[2]),
                  "del": lambda: SQ.del_step(app, op[1]), "play": lambda: SQ.play(app), "stop": lambda: SQ.stop(app),
                  "field": lambda: SQ.set_field(app, op[1], op[2])}[op[0]]()
             if "stream" in c:                           # test hook: a host to stream to over DDP, or false to stop
@@ -3801,7 +3832,7 @@ def _call(item, label):
         return f"FAIL {type(e).__name__}: {e}"
 
 
-SKIP_MENU = ("Quit", "Record 15 s GIF", "Fullscreen",     # ends the app, a 15 s recording, flips the window
+SKIP_MENU = ("Quit", "Record 15 s", "Fullscreen",     # ends the app, a 15 s recording, flips the window
              "Open the project folder", "Open the build folder", "Node reference (NODES.md)", "Studio guide (STUDIO.md)",
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",

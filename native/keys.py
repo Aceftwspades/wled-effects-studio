@@ -48,7 +48,7 @@ ACTIONS = [
     ("find_prev",     "Find the previous match",                             "Shift+F3", "global"),
     ("external",      "Open the code in the external editor",                "Ctrl+E", "global"),
     ("screenshot",    "Screenshot of the 3-D view",                          "F12",    "global"),
-    ("record",        "Record a 15 s GIF",                                   "Ctrl+F12", "global"),
+    ("record",        "Record 15 s (a GIF, and an mp4 with ffmpeg)",                                   "Ctrl+F12", "global"),
     ("shortcuts",     "Keyboard shortcuts",                                  "F1",     "global"),
     ("flash",         "Build the firmware and flash the device",             "Ctrl+Shift+U", "global"),
     ("push",          "Send the current effect's settings to the device",     "Ctrl+Shift+P", "global"),

@@ -208,6 +208,22 @@ class Engine:
         """(x0, y0, x1, y1, opacity, effect index, blend mode) of segment k."""
         return tuple(int(self.lib.simSegGet(int(k), w)) for w in range(7))
 
+    OPTION_KEYS = ("rev", "mi", "rY", "mY", "tp", "grp", "spc", "of")       # WLED's names, as index.js sends them
+
+    def seg_options(self, k):
+        """WLED's segment options of segment k: {rev, mi, rY, mY, tp, grp, spc, of}."""
+        vals = [int(self.lib.simSegGet(int(k), 7 + i)) for i in range(8)]
+        return {key: (bool(v) if i < 5 else v) for i, (key, v) in enumerate(zip(self.OPTION_KEYS, vals))}
+
+    def seg_set_options(self, k, **opt):
+        """Some of the options changed (the rest kept): reverse, mirror (x and y), transpose, grouping, spacing, offset."""
+        cur = self.seg_options(k); cur.update(opt)
+        try:
+            self.lib.simSegOptions(int(k), int(cur["rev"]), int(cur["mi"]), int(cur["rY"]), int(cur["mY"]), int(cur["tp"]),
+                                   int(cur["grp"]), int(cur["spc"]), int(cur["of"]))
+        except AttributeError:
+            pass                                                    # an older library
+
     def seg_blend(self, k, mode):
         self.lib.simSegBlendMode(int(k), int(mode))
 
@@ -248,7 +264,11 @@ class Engine:
             x0, y0, x1, y1, op, fx, bm = self.seg_get(k)
             st = cur if k == self.seg else (self._segstate.get(k) or {"idx": fx, "fx": {}, "pal": self.pal, "colors": self._colors})
             name = self.names[st["idx"]] if 0 <= st["idx"] < len(self.names) else ""
-            out.append({"bounds": [x0, y0, x1, y1], "opacity": op, "blend": bm, "effect": name, "params": dict(st["fx"]), "pal": st["pal"]})
+            row = {"bounds": [x0, y0, x1, y1], "opacity": op, "blend": bm, "effect": name, "params": dict(st["fx"]), "pal": st["pal"]}
+            opts = self.seg_options(k)
+            if any(opts[key] for key in ("rev", "mi", "rY", "mY", "tp", "spc", "of")) or opts["grp"] != 1:
+                row["options"] = opts                                # only when something is set: older files stay as they were
+            out.append(row)
         return out
 
     def load_segments(self, segs):
@@ -261,6 +281,8 @@ class Engine:
             b = sg.get("bounds") or [0, 0, self.cols, self.rows]
             self.seg_config(k, b[0], b[1], b[2], b[3], sg.get("opacity", 255))
             self.seg_blend(k, sg.get("blend", 0))
+            opts = dict(rev=False, mi=False, rY=False, mY=False, tp=False, grp=1, spc=0, of=0); opts.update(sg.get("options") or {})
+            self.seg_set_options(k, **opts)
         for k, sg in enumerate(segs[:8]):
             self.seg_select(k) if k != self.seg else None
             if sg.get("effect") in self.names:

@@ -146,6 +146,28 @@ class Features:
         modes = self.eng.BLEND_MODES
         dpg.add_combo(modes, label="blend mode", parent="seg_fields", width=200, default_value=modes[bm if bm < len(modes) else 0],
                       callback=lambda s, v: self.on_seg_blend(modes.index(v)))
+        self._seg_option_rows(y1 - y0 > 1)
+    def _seg_option_rows(self, is2d):
+        """WLED's segment options, as its UI has them: reverse and mirror (X, and
+        Y on a matrix), transpose, grouping, spacing, offset."""
+        o = self.eng.seg_options(self.eng.seg)
+        rows = [(("rev", "reverse"), ("mi", "mirror")) + ((("tp", "swap XY"),) if is2d else ())]
+        if is2d:
+            rows.append((("rY", "reverse Y"), ("mY", "mirror Y")))
+        for row in rows:
+            with dpg.group(horizontal=True, parent="seg_fields"):
+                for key, label in row:
+                    dpg.add_checkbox(label=label, default_value=bool(o[key]), user_data=key,
+                                     callback=lambda s, v, u: self.on_seg_option(u, bool(v)))
+        with dpg.group(horizontal=True, parent="seg_fields"):
+            for key, label, lo, hi in (("grp", "group", 1, 255), ("spc", "space", 0, 255), ("of", "offset", 0, 65535)):
+                dpg.add_input_int(label=label, width=50, step=0, default_value=int(o[key]), min_value=lo, max_value=hi, min_clamped=True, max_clamped=True,
+                                  on_enter=True, user_data=key, callback=lambda s, v, u: self.on_seg_option(u, int(v)))
+            chrome.info("WLED's segment options: reverse runs the effect the other way, mirror folds it, transpose swaps the axes; "
+                        "group lights that many LEDs as one, space leaves that many dark between, offset rotates along the strip.")
+    def on_seg_option(self, key, val):
+        self.eng.seg_set_options(self.eng.seg, **{key: val})
+        self.save_segments()
     def on_seg_blend(self, mode):
         self.eng.seg_blend(self.eng.seg, mode)
         self.save_segments()
@@ -292,7 +314,8 @@ class Features:
             g = self.eng.seg_get(self.eng.seg); bm, op = g[6], g[4]
         ok, msg = flash.push_settings(host, self.eng.names[self.eng.idx], params,
                                       self.palette_name_for(self.eng.pal), self.seg_cols, seg_id=self.eng.seg, blend=bm, opacity=op,
-                                      six=self.eng.six if self.project.geometry.kind == "cube" else None)
+                                      six=self.eng.six if self.project.geometry.kind == "cube" else None,
+                                      options=self.eng.seg_options(self.eng.seg))
         dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
         self.probe_active()
 
@@ -512,6 +535,8 @@ class Features:
         if wt is None or wt.n != g.count:
             wt = live_out.WiringTest(g.count, owner, names)
             self._wt_was_playing = self.playing
+        outs = (self.project.options.get("outputs") or {}).get("outs") or []
+        wt.outputs = [(int(o.get("start", 0)), int(o.get("len", 0))) for o in outs]
         wt.mode = mode
         self.wiring = wt
         self.playing = False

@@ -72,7 +72,7 @@ def build_menus(app):
             dpg.add_menu_item(label="Export graph bundle", callback=lambda: app.gp.export_bundle())
             dpg.add_separator()
             _mi(app, "Screenshot of the 3-D view", "screenshot", callback=lambda: setattr(app, "shot_req", True))
-            _mi(app, "Record 15 s GIF", "record", callback=lambda: app.start_rec(15.0))
+            _mi(app, "Record 15 s", "record", callback=lambda: app.start_rec(15.0))
             dpg.add_separator()
             dpg.add_menu_item(label="Quit", callback=lambda: dpg.stop_dearpygui())
         with dpg.menu(label="Edit"):
@@ -332,7 +332,7 @@ def build_toolbar(app):
         _sep()
         _btn(app, "external", "Open the code in an external editor", lambda: app.open_external(), action="external")
         _btn(app, "camera", "Screenshot of the 3-D view", lambda: setattr(app, "shot_req", True), tag="shot_btn", action="screenshot")
-        _btn(app, "record", "Record a 15 s GIF", lambda: app.start_rec(15.0), tag="rec_btn", action="record")
+        _btn(app, "record", "Record 15 s (a GIF, and an mp4 with ffmpeg)", lambda: app.start_rec(15.0), tag="rec_btn", action="record")
         dpg.add_text("", tag="rec_msg", color=DIM)
     dpg.bind_item_theme("toolbar", "toolbar_theme")
     refresh_keys(app)
@@ -1065,7 +1065,7 @@ def build_pane_menus(app):
     code. The graph has its own."""
     _pane_menu(app, "cube_win", [
         ("Screenshot", lambda: setattr(app, "shot_req", True)),
-        ("Record 15 s GIF", lambda: app.start_rec(15.0)),
+        ("Record 15 s", lambda: app.start_rec(15.0)),
         ("Reset the camera", lambda: (setattr(app, "yaw", -0.6), setattr(app, "pitch", 0.75), setattr(app, "dist", 4.6))),
         ("Compare with another effect...", lambda: app.run_action("compare")),
         ("Full frame (E)", lambda: app.set_layout("cube")),
