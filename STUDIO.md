@@ -1206,9 +1206,16 @@ the order to do them:
 - [x] **Modules that show what they do**: a gradient strip on Palette, the
       bands on Audio, a period of the Wave, a thumbnail of the Noise - the
       graph readable like a rack.
-- [ ] **Wireless sends** (a named Send / Receive pair, the Knot's cousin)
+- [x] **Wireless sends** (a named Send / Receive pair, the Knot's cousin)
       and **loops closed with a delay**: a cycle offered a one-frame Delay
-      at its back edge instead of a refusal.
+      at its back edge instead of a refusal. Send / Receive (and the
+      colour pair) are joined by a pass before plan and compile, so both
+      back ends see one wire and the nodes cost nothing; a Send fed by a
+      Receive chains; a Receive with no Send is an error on the node, a
+      Send nothing receives a warning; a loop through a pair is a cycle
+      like any other. A wire that closes a loop gets a Delay when its
+      source runs once a frame and carries a number (undo takes both
+      out); a colour or per-pixel loop is linked and refused as before.
 - [ ] **MIDI learn**: a controller's knobs onto the panel's sliders (and
       through them the device), an optional python-rtmidi.
 

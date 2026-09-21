@@ -150,7 +150,8 @@ DOCS = {
     "Delay": {
         "doc": "Remembers a number for one frame. It is the one node a wire may loop back through: feed it a value "
                "and plug its output back into what made that value, and each frame sees last frame's result. "
-               "For 'only restart the cycle when the cycle is over' and the like.",
+               "For 'only restart the cycle when the cycle is over' and the like. The editor puts one on a wire "
+               "for you when the wire would close a loop (undo takes it out again).",
         "in": {"x": "the value to remember"},
         "out": {"value": "what x was last frame (0 on the first)"}},
     "Spring": {
@@ -687,6 +688,23 @@ DOCS = {
         "params": {"name": "the pin's name on the outer node", "type": "number, colour or switch"}},
     "Knot": {"doc": "A bend in a wire, to route it neatly. Changes nothing.", "in": {"in": "any number"}, "out": {"out": "the same value"}},
     "Knot colour": {"doc": "A bend in a colour wire. Changes nothing.", "in": {"in": "any colour"}, "out": {"out": "the same colour"}},
+    "Send": {
+        "doc": "A wire with no line drawn. Whatever feeds a Send named `bass` reaches every Receive named `bass`, "
+               "wherever they sit - the compiler joins each pair and both nodes vanish, so they cost nothing. "
+               "For a value used all over a big graph (the beat, the time, a master speed) without wires crossing "
+               "everything. Names are local to one graph file; a Send with nothing wired in sends the value typed "
+               "on it. A loop through a pair is a loop like any other.",
+        "in": {"in": "the number to send"}, "params": {"name": "the name its Receives answer to"}},
+    "Receive": {
+        "doc": "The other end of a Send: gives what feeds the Send of the same name. A Receive with no Send of its "
+               "name is an error (the node says so).",
+        "out": {"out": "what the Send is fed"}, "params": {"name": "the Send to listen to"}},
+    "Send colour": {
+        "doc": "A Send for a colour: what feeds it reaches every Receive colour of the same name.",
+        "in": {"in": "the colour to send"}, "params": {"name": "the name its Receive colours answer to"}},
+    "Receive colour": {
+        "doc": "The other end of a Send colour: the colour fed to the Send colour of the same name.",
+        "out": {"out": "the colour the Send colour is fed"}, "params": {"name": "the Send colour to listen to"}},
     "Note": {"doc": "A note to yourself on the graph. Not part of the effect.", "params": {"text": "the note"}},
     "Frame": {"doc": "A titled box to group nodes. Drag it and the nodes inside come along. Not part of the effect.",
               "params": {"title": "the box's title", "w": "width", "h": "height", "colour": "its colour"}},

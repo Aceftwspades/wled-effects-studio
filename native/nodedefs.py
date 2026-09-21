@@ -796,6 +796,17 @@ LIBRARY = [
             "$out.out = $in.in;", "a bend in a wire - a pass-through with no cost"), narrow=True),
     dict(_n("Knot colour", "graph", "frame", [("in", C, 0)], [("out", C)], [],
             "$out.out = $in.in;", "a bend in a colour wire"), narrow=True),
+    # Wireless sends: a Send named X feeds every Receive named X with no
+    # wire drawn - the compiler joins them and both vanish (a Receive with
+    # no Send of its name is an error). Names are local to one graph file.
+    dict(_n("Send", "graph", "frame", [("in", F, 0.0)], [], [_p("name", "text", "a")],
+            "", "a wire with no line: what feeds this reaches every Receive of the same name"), narrow=True),
+    dict(_n("Receive", "graph", "frame", [], [("out", F)], [_p("name", "text", "a")],
+            "$out.out = 0.0f;", "the Send of this name, wherever it is"), narrow=True),
+    dict(_n("Send colour", "graph", "frame", [("in", C, 0)], [], [_p("name", "text", "a")],
+            "", "a colour wire with no line: what feeds this reaches every Receive colour of the same name"), narrow=True),
+    dict(_n("Receive colour", "graph", "frame", [], [("out", C)], [_p("name", "text", "a")],
+            "$out.out = 0;", "the Send colour of this name, wherever it is"), narrow=True),
     dict(_n("Note", "graph", "frame", [], [], [_p("text", "text", "note")],
             "", "a comment on the graph - not compiled"), decor=True, multiline=True),
     dict(_n("Frame", "graph", "frame", [], [],

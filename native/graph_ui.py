@@ -1470,7 +1470,7 @@ class GraphPanel:
         linked = {(b, inp) for _, _, b, inp in self.graph.links}
         n.setdefault("inputs", {})
         label = n.get("label") or d.get("label") or n["type"]
-        if n["type"] in ("Graph input", "Graph output"):
+        if n["type"] in ("Graph input", "Graph output") or n["type"] in G.SENDS or n["type"] in G.RECEIVES:
             label = f"{n['type']}: {n['params'].get('name', '')}"
         if n["type"] == "Frame":
             label = str(n["params"].get("title", "group"))
@@ -2543,6 +2543,9 @@ class GraphPanel:
                 # the pin changed type: its wires no longer fit
                 self.graph.links = [l for l in self.graph.links if l[0] != nid and l[2] != nid]
             self.rebuild()
+        elif name == "name" and (self.graph.nodes[nid]["type"] in G.SENDS or self.graph.nodes[nid]["type"] in G.RECEIVES):
+            t = self.graph.nodes[nid]["type"]
+            dpg.configure_item(f"gnode_{nid}", label=f"{t}: {val}")   # the title names the pair
 
     def _make_link(self, a, out, b, inp):
         ta, tb = self._pins.get((a, "out", out)), self._pins.get((b, "in", inp))
@@ -2590,6 +2593,14 @@ class GraphPanel:
             _, _, scope, _, _, _ = self.graph.plan()
         except Exception:
             scope = {}
+        if scope and self.graph.has_sends():
+            # the plan joins the pairs away: a Send takes what feeds it, a Receive its Send
+            src = {(b, i): a for a, _, b, i in self.graph.links}
+            for nid, n in self.graph.nodes.items():
+                if n["type"] in G.SENDS:
+                    scope[nid] = scope.get(src.get((nid, "in")), "frame")
+            for rcv, snd in self.graph._send_pairs().items():
+                scope[rcv] = scope.get(snd, "frame")
         self._scope_cache = (self.edits, scope, self.graph)
         return scope
 
@@ -2604,11 +2615,17 @@ class GraphPanel:
             self.status(f"cannot connect {ta} to {tb}")
             return
         self.snapshot()
+        pre = self.scopes()                                # the scopes before this wire (a loop has none)
         # replace whatever fed this input
         for lid, (bb, ii) in list(self.links.items()):
             if bb == b and ii == inp:
                 dpg.delete_item(lid); self.links.pop(lid, None)
-        self.graph.link(a, out, b, inp)
+        d = self.graph.link_with_delay(a, out, b, inp, pre)
+        if d is not None:
+            # the wire closed a loop: a Delay went on it, so the loop carries last frame's value
+            self.rebuild()
+            self.status("that wire closed a loop: a Delay on it hands last frame's value round (undo takes both out)")
+            return
         self._make_link(a, out, b, inp)
 
     def on_delink(self, sender, app_data):

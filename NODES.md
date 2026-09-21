@@ -151,7 +151,7 @@ A fixed colour you pick.
 
 ### Delay
 
-Remembers a number for one frame. It is the one node a wire may loop back through: feed it a value and plug its output back into what made that value, and each frame sees last frame's result. For 'only restart the cycle when the cycle is over' and the like.
+Remembers a number for one frame. It is the one node a wire may loop back through: feed it a value and plug its output back into what made that value, and each frame sees last frame's result. For 'only restart the cycle when the cycle is over' and the like. The editor puts one on a wire for you when the wire would close a loop (undo takes it out again).
 
 **Inputs**
 - `x` *(float)*: the value to remember
@@ -1726,3 +1726,43 @@ A note to yourself on the graph. Not part of the effect.
 
 **Settings**
 - `text` *(text)*: the note
+
+### Receive
+
+The other end of a Send: gives what feeds the Send of the same name. A Receive with no Send of its name is an error (the node says so).
+
+**Outputs**
+- `out` *(float)*: what the Send is fed
+
+**Settings**
+- `name` *(text)*: the Send to listen to
+
+### Receive colour
+
+The other end of a Send colour: the colour fed to the Send colour of the same name.
+
+**Outputs**
+- `out` *(color)*: the colour the Send colour is fed
+
+**Settings**
+- `name` *(text)*: the Send colour to listen to
+
+### Send
+
+A wire with no line drawn. Whatever feeds a Send named `bass` reaches every Receive named `bass`, wherever they sit - the compiler joins each pair and both nodes vanish, so they cost nothing. For a value used all over a big graph (the beat, the time, a master speed) without wires crossing everything. Names are local to one graph file; a Send with nothing wired in sends the value typed on it. A loop through a pair is a loop like any other.
+
+**Inputs**
+- `in` *(float)*: the number to send
+
+**Settings**
+- `name` *(text)*: the name its Receives answer to
+
+### Send colour
+
+A Send for a colour: what feeds it reaches every Receive colour of the same name.
+
+**Inputs**
+- `in` *(color)*: the colour to send
+
+**Settings**
+- `name` *(text)*: the name its Receive colours answer to

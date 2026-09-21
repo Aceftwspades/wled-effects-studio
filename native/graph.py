@@ -113,6 +113,11 @@ def feature_note(need, feats):
     return None
 
 
+# the wireless pairs: a Send named X feeds every Receive named X
+SENDS = {"Send": "Receive", "Send colour": "Receive colour"}
+RECEIVES = {v: k for k, v in SENDS.items()}
+
+
 def compatible(a, b):
     """Can a pin of type a feed a pin of type b? Everything but colour into
     float/bool - and that one only through Split."""
@@ -575,6 +580,91 @@ class Graph:
             touched.append(nid)
         return touched
 
+    # --- wireless sends --------------------------------------------------------
+    def _send_pairs(self):
+        """{Receive id: the Send id of its name} - a Send colour pairs with a
+        Receive colour; a Receive with no Send of its name is left out."""
+        sends = {}
+        for nid, n in self.nodes.items():
+            if n["type"] in SENDS:
+                sends[(SENDS[n["type"]], str(n["params"].get("name", "")))] = nid
+        pairs = {}
+        for nid, n in self.nodes.items():
+            if n["type"] in RECEIVES:
+                s = sends.get((n["type"], str(n["params"].get("name", ""))))
+                if s is not None:
+                    pairs[nid] = s
+        return pairs
+
+    def has_sends(self):
+        return any(n["type"] in SENDS or n["type"] in RECEIVES for n in self.nodes.values())
+
+    def resolve_sends(self):
+        """A copy with every Send / Receive pair joined: whatever fed the
+        Send now feeds everything its Receives fed (a Send with a typed
+        value leaves that value typed into them), and the nodes vanish.
+        A Receive with no Send of its name is an error."""
+        r = Graph(self.to_json(), lib=self.lib, resolver=self.resolver)
+        r.project_dir = getattr(self, "project_dir", None)
+        pairs = r._send_pairs()
+        for nid, n in r.nodes.items():
+            if n["type"] in RECEIVES and nid not in pairs:
+                raise GraphError(f"{n['type']} #{nid}: no {RECEIVES[n['type']]} named {n['params'].get('name', '')!r}")
+        src_of = {(b, i): (a, o) for a, o, b, i in r.links}
+
+        def feed(a, o):
+            """Through Receives (a Send fed by a Receive chains): the source
+            that is not a Receive, or (None, the typed value) when the Send
+            at the end has nothing wired in."""
+            for _ in range(len(pairs) + 1):
+                if a not in pairs:
+                    return a, o
+                s = pairs[a]
+                if (s, "in") not in src_of:
+                    d = r.node_def(r.nodes[s])
+                    return None, r.nodes[s].get("inputs", {}).get("in", d["inputs"][0]["default"])
+                a, o = src_of[(s, "in")]
+            raise GraphError("Sends fed by their own Receives - a loop with no node in it")
+        links = []
+        for a, o, b, i in r.links:
+            if r.nodes[b]["type"] in SENDS:
+                continue                                    # into a Send: it goes with the Send
+            if a in pairs:
+                a, o = feed(a, o)
+                if a is None:
+                    r.nodes[b].setdefault("inputs", {})[i] = o
+                    continue
+            links.append((a, o, b, i))
+        for nid in [k for k, n in r.nodes.items() if n["type"] in SENDS or n["type"] in RECEIVES]:
+            r.nodes.pop(nid)
+        r.links = links
+        r.link_meta = {k: v for k, v in r.link_meta.items() if k[0] in r.nodes}
+        return r
+
+    def link_with_delay(self, a, out, b, inp, scope):
+        """link(), unless the wire closes a loop: then, when the source runs
+        once a frame (`scope`, {nid: "frame" | "pixel"} for the graph before
+        the wire) and carries a number, a Delay goes on the wire - last
+        frame's value is the only thing a loop can carry - and its id comes
+        back. A colour or per-pixel loop is linked as it is: the compile
+        refuses it, naming the fix. Returns the Delay's id, or None."""
+        self.link(a, out, b, inp)
+        try:
+            self._order()
+            return None
+        except GraphError:
+            pass
+        da, db = self.node_def(self.nodes[a]), self.node_def(self.nodes[b])
+        ta = next((o["type"] for o in da["outputs"] if o["name"] == out), None)
+        tb = next((i["type"] for i in db["inputs"] if i["name"] == inp), None)
+        if ta == "color" or tb == "color" or scope.get(a) != "frame":
+            return None
+        self.unlink(b, inp)
+        (ax, ay), (bx, by) = self.nodes[a]["pos"], self.nodes[b]["pos"]
+        d = self.add("Delay", ((ax + bx) / 2, (ay + by) / 2 + 90))
+        self.link(a, out, d, "x"); self.link(d, "value", b, inp)
+        return d
+
     # --- compile -------------------------------------------------------------
     def _late(self, nid):
         try:
@@ -587,6 +677,8 @@ class Graph:
         for a, _, b, _ in self.links:
             if a in deps and b in deps and not self._late(b):
                 deps[b].add(a)
+        for rcv, snd in self._send_pairs().items():      # a Receive is fed by its Send, wire or no wire
+            deps[rcv].add(snd)
         out, seen, temp = [], set(), set()
 
         def visit(n):
@@ -620,11 +712,20 @@ class Graph:
             msg = feature_note(d.get("needs"), feats)
             if msg:
                 out.setdefault(nid, "warn: " + msg)
+        # a Receive with no Send of its name (an error), a Send nothing receives
+        pairs = self._send_pairs()
+        for nid, n in self.nodes.items():
+            if n["type"] in RECEIVES and nid not in pairs:
+                out[nid] = f"error: no {RECEIVES[n['type']]} named {n['params'].get('name', '')!r}"
+            elif n["type"] in SENDS and nid not in pairs.values():
+                out.setdefault(nid, f"warn: no {SENDS[n['type']]} named {n['params'].get('name', '')!r}")
         # cycles: every node still on the stack when one is found
         deps = {nid: set() for nid in self.nodes}
         for a, _, b, _ in self.links:
             if a in deps and b in deps and not self._late(b):
                 deps[b].add(a)
+        for rcv, snd in pairs.items():
+            deps[rcv].add(snd)
         seen, stack = set(), []
         def visit(n):
             if n in seen:
@@ -756,12 +857,15 @@ class Graph:
                 if t == "Graph output" or (t == "Graph input" and new not in used):
                     flat.nodes.pop(new, None)
         flat.links = [l for l in links if l[0] in flat.nodes and l[2] in flat.nodes]
-        return flat
+        return flat.resolve_sends() if flat.has_sends() else flat
 
     def plan(self):
         """What both back ends need: the nodes in order with their
         definitions, each one's scope (frame or pixel), the source of every
-        wired input, and the state slots. Raises GraphError as compile does."""
+        wired input, and the state slots. Raises GraphError as compile does.
+        Sends are joined first, so their nodes are not in the plan."""
+        if self.has_sends():
+            return self.resolve_sends().plan()
         defs = {nid: self.node_def(n) for nid, n in self.nodes.items()}
         order = [nid for nid in self._order() if not defs[nid].get("decor")]
         src_of = {(b, inp): (a, out) for a, out, b, inp in self.links}
@@ -794,11 +898,24 @@ class Graph:
                 nstate += len(st) if isinstance(st, (list, tuple)) else int(st)
         return order, defs, scope, src_of, slots, nstate
 
+    def _compile_as(self, other, title):
+        """Compile a derived graph (flattened, sends joined, an Output added
+        for a preview) and keep what the panel reads back after a compile -
+        the probes, the scopes, the live-parameter table - on this one."""
+        src = other.compile(title or self.name)
+        self.probes = dict(getattr(other, "probes", {}) or {})
+        self.last_scope = dict(getattr(other, "last_scope", {}) or {})
+        self.live = dict(getattr(other, "live", {}) or {})
+        self.live_init = list(getattr(other, "live_init", []) or [])
+        return src
+
     def compile(self, title=None):
         """The effect as C++ text. Raises GraphError with a message worth
         showing when the graph cannot be compiled."""
         if any(n["type"].startswith(SUB) for n in self.nodes.values()):
-            return self.flatten().compile(title or self.name)
+            return self._compile_as(self.flatten(), title)
+        if self.has_sends():
+            return self._compile_as(self.resolve_sends(), title)
         title = title or self.name
         ident = _ident(title)
         outs = [n for n in self.nodes.values() if n["type"] == "Output"]
@@ -813,7 +930,7 @@ class Graph:
                     prev = Graph(self.to_json(), lib=self.lib, resolver=self.resolver)
                     o = prev.add("Output", gouts[0]["pos"])
                     prev.link(src[0], src[1], o, "color")
-                    return prev.compile(title)
+                    return self._compile_as(prev, title)
         if len(outs) != 1:
             raise GraphError("the graph needs exactly one Output node" + (f" (it has {len(outs)})" if outs else ""))
         defs = {nid: self.node_def(n) for nid, n in self.nodes.items()}

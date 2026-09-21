@@ -106,7 +106,14 @@ node's menu can
 settings**, and **unfold** a sub-graph node back into its nodes; with
 several nodes selected, **merge selection through** an Add, Multiply,
 Mix, Blend... wires their outputs together. Inside a sub-graph the trail
-above the graph (breadcrumbs) leads back up. A **Bitmap** node's pixels
+above the graph (breadcrumbs) leads back up. A value used all over a big
+graph - the beat, a master speed - can travel without a wire: a **Send**
+named `beat` feeds every **Receive** named `beat` (Send colour / Receive
+colour for a colour); the compiler joins each pair, so they cost nothing.
+A wire that would close a **loop** gets a **Delay** put on it for you
+(the loop then carries last frame's value, the only thing a loop can
+carry); a loop through a per-pixel node or a colour is refused as
+before, and the message names the fix (Previous, for a colour). A **Bitmap** node's pixels
 are painted in the properties pane: the left button sets the pen's
 digit (a colour slot for Colour pick), the right empties a pixel, and
 the rows follow. Zoomed out past 50% (Settings > Simplified nodes

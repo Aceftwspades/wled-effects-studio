@@ -219,6 +219,82 @@ def test_snapshots_and_morph():
     assert sorted(g2.snapshots) == ["calm", "wild"] and "SEGMENT" in g2.compile()
 
 
+def test_sends_join_without_a_wire():
+    """A Send named t and a Receive named t are one wire to the compiler:
+    both back ends see the Time feeding the Wave, in frame scope, and the
+    nodes are gone from the plan. A Send with a typed value types it into
+    the readers; a Receive with no Send is an error, a loop through a pair
+    a cycle; a Send fed by a Receive chains."""
+    from native.script import compile_script
+    g = starter()
+    t = g.add("Time", (0, 0)); s = g.add("Send", (200, 0), {"name": "t"}); g.link(t, "t", s, "in")
+    r = g.add("Receive", (0, 200), {"name": "t"}); w = g.add("Wave", (200, 200)); g.link(r, "out", w, "x")
+    c = g.add("Coords", (0, 400)); n = g.add("Noise", (400, 200)); g.link(c, "u", n, "x"); g.link(w, "value", n, "y")
+    p = g.add("Palette", (600, 200)); o = g.add("Output", (800, 200)); g.link(n, "value", p, "index"); g.link(p, "color", o, "color")
+    src = g.compile()
+    assert "SEGMENT" in src and "Send" not in src and "Receive" not in src
+    assert g.last_scope[w] == "frame" and s not in g.last_scope and r not in g.last_scope
+    order, defs, scope, src_of, _, _ = g.plan()
+    assert src_of[(w, "x")] == (t, "t") and s not in order and r not in order
+    compile_script(g)                                                          # the script back end goes through flatten()
+    assert not [m for m in g.problems().values() if m.startswith("error")]
+    # a typed value with nothing wired in: typed into the reader
+    g.unlink(s, "in"); g.nodes[s]["inputs"]["in"] = 0.75
+    _, _, _, src_of, _, _ = g.plan()
+    assert (w, "x") not in src_of
+    assert g.resolve_sends().nodes[w]["inputs"]["x"] == 0.75
+    # a Send fed by a Receive chains through
+    r2 = g.add("Receive", (0, 600), {"name": "t"}); s2 = g.add("Send", (200, 600), {"name": "u"}); g.link(r2, "out", s2, "in")
+    r3 = g.add("Receive", (0, 800), {"name": "u"}); g.link(r3, "out", w, "cycles")
+    assert g.resolve_sends().nodes[w]["inputs"]["cycles"] == 0.75
+    g.link(t, "t", s, "in")
+    _, _, _, src_of, _, _ = g.plan()
+    assert src_of[(w, "cycles")] == (t, "t")
+    # no Send of that name: an error, in the problems and at compile
+    g.nodes[r3]["params"]["name"] = "nobody"
+    assert "no Send named 'nobody'" in g.problems()[r3]
+    try:
+        g.compile(); assert False, "compiled with a Receive nothing sends to"
+    except G.GraphError as e:
+        assert "nobody" in str(e)
+    g.remove(r3); g.remove(r2); g.remove(s2)
+    # a loop through a pair is a cycle, wire or no wire
+    g.link(w, "value", s, "in")
+    assert any("cycle" in m for m in g.problems().values())
+    try:
+        g.compile(); assert False, "a loop through a Send compiled"
+    except G.GraphError as e:
+        assert "cycle" in str(e)
+
+
+def test_loop_closed_with_a_delay():
+    """A wire that closes a loop gets a Delay when its source runs once a
+    frame and carries a number; a colour or per-pixel loop is refused as
+    before (linked, and the compile names the fix)."""
+    g = starter()
+    t = g.add("Time", (0, 0)); a = g.add("Add", (200, 0)); m = g.add("Multiply", (400, 0))
+    g.link(t, "t", a, "a"); g.link(a, "result", m, "a")
+    c = g.add("Coords", (0, 300)); n = g.add("Noise", (600, 0)); g.link(c, "u", n, "x"); g.link(m, "result", n, "y")
+    p = g.add("Palette", (800, 0)); o = g.add("Output", (1000, 0)); g.link(n, "value", p, "index"); g.link(p, "color", o, "color")
+    _, _, scope, _, _, _ = g.plan()
+    d = g.link_with_delay(m, "result", a, "b", scope)                        # Multiply back into the Add: a loop
+    assert d is not None and g.nodes[d]["type"] == "Delay"
+    assert (m, "result", d, "x") in g.links and (d, "value", a, "b") in g.links
+    src = g.compile()
+    assert "SEGMENT" in src and g.last_scope[d] == "frame"
+    # an ordinary wire is just linked
+    _, _, scope, _, _, _ = g.plan()
+    assert g.link_with_delay(t, "t", m, "b", scope) is None and (t, "t", m, "b") in g.links
+    # a per-pixel loop: no Delay can hold one value per pixel
+    f = g.add("Fade", (900, 300)); g.link(p, "color", f, "color")
+    _, _, scope, _, _, _ = g.plan()
+    assert g.link_with_delay(n, "value", a, "b", scope) is None
+    try:
+        g.compile(); assert False, "a per-pixel loop compiled"
+    except G.GraphError as e:
+        assert "cycle" in str(e)
+
+
 def test_wired_input_is_required():
     """Sprites reads the Particles' state through its slots pin: unwired,
     it is a problem on the node and a refusal to compile, not a C++ error."""

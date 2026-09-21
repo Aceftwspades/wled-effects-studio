@@ -21,7 +21,8 @@ LIB = library()
 OUT = os.path.join(ROOT, "build", "census")
 
 # structural nodes: nothing to compute, or only meaningful inside a sub-graph
-STRUCTURAL = {"Output", "Effect settings", "Note", "Frame", "Graph input", "Graph output"}
+STRUCTURAL = {"Output", "Effect settings", "Note", "Frame", "Graph input", "Graph output",
+              "Send", "Receive", "Send colour", "Receive colour"}        # the pairs: test_graph joins them
 # nodes whose C++ is expected to be missing something at the defaults, and why
 KNOWN = {}
 
