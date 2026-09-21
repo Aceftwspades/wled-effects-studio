@@ -65,6 +65,24 @@ STEPS = [
       {"py": "app.gp.set_overview_zoom(0.0)"}, {"graph_zoom": 1.0}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
     ([{"check": "app.gp.summary(12).startswith('scale ')"}, {"py": "app.prefs.__setitem__('cat_colours', False) or app.gp.rebind_themes()"},
       {"py": "app.prefs.__setitem__('cat_colours', True) or app.gp.rebind_themes()"}], 0.5),
+    # the thin ones fleshed out: an expression into a typed input and a setting (x, the node's own numbers, the
+    # maths functions; a refusal in the status), a modulator's range under the pin it feeds (Ctrl+wheel nudges an
+    # end), the speed factor measured against the fake device
+    ([{"graph_open": "box_fire.json"}, {"py": "app.gp.graph.nodes[13]['inputs'].__setitem__('b', 0.5)"},
+      {"expr": [13, "b", "input", "x * 2 + sqrt(4)"]}, {"expr": [9, "out_hi", "param", "out_lo + pi/10"]},
+      {"expr": [9, "out_lo", "param", "nope(1)"]}], 0.8),
+    ([{"check": "abs(app.gp.graph.nodes[13]['inputs']['b'] - 3.0) < 1e-6"},
+      {"check": "abs(app.gp.graph.nodes[9]['params']['out_hi'] - (app.gp.graph.nodes[9]['params']['out_lo'] + 0.3141592653589793)) < 1e-6"},
+      {"expect": ["graph_status", "the functions here"]}, {"py": "app.gp.expr_for(13, 'b', 'input')"}], 0.6),
+    ([{"check": "dpg.is_item_shown('expr_win')"}, {"key": "Escape"}, {"py": "app.gp.modulate(13, 'b', ('lfo', 'value', {}))"},
+      {"py": "app.gp.set_selection([13])"}, {"action": "frame_selected"}, {"graph_zoom": 1.0}], 1.0),
+    ([{"check": "[r for r in app.gp.mod_ranges() if r[1] == 13 and app.gp.graph.nodes[r[0]].get('modulator')]"},
+      {"check": "any(dpg.get_item_type(i).endswith('DrawRect') for i in app.gp._readout_items)"},
+      {"py": "(lambda r: (app.gp.graph.nodes[r]['params']['out_lo'], app.gp.graph.nodes[r]['params']['out_hi']))(next(r for r, b, i in app.gp.mod_ranges() if b == 13))"},
+      {"graph_undo": True}, {"graph_undo": True}, {"graph_undo": True}, {"graph_undo": True}, {"graph_undo": True}], 0.8),
+    ([{"check": "not [r for r in app.gp.mod_ranges() if r[1] == 13]"}, {"device": "127.0.0.1:8770"}, {"calibrate": True}], 5.0),
+    ([{"check": "app.prefs.get('device_factor_measured', {}).get('fps') == 40.0"},
+      {"py": "(app.prefs.pop('device_factor_measured', None), app.prefs.__setitem__('device_factor', 60.0))"}], 0.5),
     # every kind of face, live: the demo graph written into the project, built, and its glyphs asked after -
     # the Wave's dot moves, the Scope and the sparklines draw, the lights and meters are on the pins, the
     # Noise scrolls with its z, the Steps node lights its step, a hovered output shows its plot
@@ -117,6 +135,19 @@ STEPS = [
     ([{"script_preview": True}], 3.0),
     ([{"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30}, {"ed_type": "// smoke"}, {"ed_key": ["Return", False, False]},
       {"find": "gc_sat"}, {"action": "find_next"}, {"action": "undo"}, {"action": "undo"}], 1.5),
+    # find and replace, whole: the place and count, replace one, match case and whole word; the API reference inserts
+    ([{"find": "SEGMENT"}, {"check": "app.code_ed.find_place()[1] > 2 and app.code_ed.find_place()[0] == 1"}, {"action": "find_next"},
+      {"check": "app.code_ed.find_place()[0] == 2"}, {"action": "find_prev"}, {"check": "app.code_ed.find_place()[0] == 1"},
+      {"py": "dpg.set_value('find_case', True) or dpg.set_value('find_text', 'sEGMENT') or app.find(False)"},
+      {"check": "app.code_ed.find_place()[1] == 0"}, {"py": "dpg.set_value('find_case', False) or app.find(False)"},
+      {"check": "app.code_ed.find_place()[1] > 2"},
+      {"py": "dpg.set_value('find_word', True) or dpg.set_value('find_text', 'SEGMEN') or app.find(False)"},
+      {"check": "app.code_ed.find_place()[1] == 0"}, {"py": "dpg.set_value('find_word', False) or dpg.set_value('find_text', 'gc_sat') or app.find(False)"},
+      {"py": "(app.code_ed.find_place(), dpg.set_value('replace_text', 'gc_satX'), app.replace_one())"},
+      {"check": "'gc_satX' in dpg.get_value('code') and dpg.get_value('code').count('gc_satX') == 1"},
+      {"py": "app.api_pick('gc_sat(x)', 'test')"}, {"expect": ["edit_status", "inserted at the cursor"]},
+      {"check": "'gc_sat(x)' in dpg.get_value('code')"},
+      {"action": "undo"}, {"action": "undo"}, {"action": "undo"}], 1.5),
     ([{"layout": "both"}, {"geometry": {"kind": "matrix", "params": {"w": 32, "h": 16}}}, {"seg": "add"},
       {"seg": {"k": 1, "x0": 8, "y0": 4, "x1": 24, "y1": 12, "opacity": 160, "blend": 10}}, {"seg": "remove"},
       {"seg": "undo"}, {"py": "app.eng.seg_count()"}, {"expect": ["graph_status", "segments: undo"]}, {"seg": "remove"}], 1.5),
@@ -160,7 +191,11 @@ STEPS = [
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},
       {"seq": ["field", "dur", 1.0]}, {"seq": ["play"]}], 3.0),
     # the sequence and the schedule sent to the fake: presets, the playlist, the timers with their Off preset
-    ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["ramp", "sx", 250]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).send(app, run=True)"}], 22.0),
+    ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["ramp", "sx", 250]}, {"seq": ["ramp", "ix", 40, "up and back"]},
+      {"check": "__import__('native.sequence', fromlist=['x']).ramp_of(app.project.options['sequence']['steps'][0], 'ix') == (40, 'up and back')"},
+      {"seq": ["ramp_del", "ix"]}, {"check": "'ix' not in (app.project.options['sequence']['steps'][0].get('ramps') or {})"},
+      {"seq": ["ramp", "ix", 40, "ease out"]},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).send(app, run=True)"}], 22.0),
     ([{"expect": ["seq_log", "saved on the device"]}, {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
       {"py": "__import__('native.sequence_ui', fromlist=['x']).send_timers(app)"}], 6.0),
     ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).read_timers(app)"}], 3.0),

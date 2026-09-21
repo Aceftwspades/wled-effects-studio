@@ -91,6 +91,17 @@ def test_ramps_become_sub_presets():
     ids = sorted(k for k in presets if k is not None)
     assert ids == [40, 41, 42, 43] and [presets[k]["seg"][0]["ix"] for k in ids] == [10, 90, 170, 250]
     assert playlist["playlist"]["dur"] == [10, 10, 10, 10]
+    # a shape: up and back returns to where it began, eased ends stay put longer; two sliders at once
+    st["ramps"] = {"ix": {"end": 250, "shape": "up and back"}, "sx": {"end": 0, "shape": "ease in"}}
+    st["segments"][0]["params"]["sx"] = 200
+    subs = sequence.sub_steps(st)
+    ix = [q["segments"][0]["params"]["ix"] for q in subs]
+    sx = [q["segments"][0]["params"]["sx"] for q in subs]
+    assert len(subs) == 7 and ix[0] == 10 and ix[-1] == 10 and max(ix) == 250          # up and back: seven samples, the top among them
+    assert sx[0] == 200 and sx[-1] == 0 and sx[1] > 200 - 200 * (1 / 5)                 # ease in: slow to leave
+    assert sequence.ramp_value(st, "ix", 0.5) == 250 and sequence.ramp_value(st, "sx", 1.0) == 0
+    assert sequence.ramp_of({"ramps": {"c1": 7}, "segments": []}, "c1") == (7, "linear")  # a ramp saved before shapes
+    assert sequence.shape_t("step", 0.49) == 0.0 and sequence.shape_t("step", 0.5) == 1.0
 
 
 def test_off_preset_and_timers():

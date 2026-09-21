@@ -257,7 +257,7 @@ editor. Ticked when done; the order within a group is the order to do them.
 - [x] **Keyboard**: arrows nudge the selection 10 px (Shift: 1 px); Home
       brings the graph's top-left to the origin. Ctrl+A and true panning are
       not possible: the node editor exposes neither.
-- [x] **Zoom** — 50% to 200% in nine steps: the wheel over the editor
+- [x] **Zoom** — 10% to 200% in fourteen steps (50% to 200% at first): the wheel over the editor
       (about the cursor), Ctrl+= / Ctrl+- / Ctrl+0. DearPyGui's node editor
       cannot zoom, so the panel does: every size it lays nodes out with is
       scaled, the editor gets a font and style theme to match (a monospace
@@ -479,16 +479,18 @@ within each group is the order to do them.
 - [x] **Arrange** (a layered layout by depth) — worth more here than in
       Blender, our nodes are wide.
 - [x] **Hide unwired pins** on a node.
-- [ ] **Live values** on frame-scope pins (sliders, audio, Integrate) when
-      hovered - deferred: pin preview covers it for one pin at a time.
+- [x] **Live values** on frame-scope pins (sliders, audio, Integrate) when
+      hovered - done in the fifth pass, and more: a readout on every
+      frame-scope output all the time, a plot beside a hovered one.
 - [x] Wire-drag from an *input* to an empty spot (the menu lists what could
       feed it); Alt-click to detach a node from its wires; F to connect two
       selected nodes.
 - [x] A **properties side panel** for the long params (Bitmap rows,
       Expression, Image file).
-- [ ] Preview thumbnails on nodes - deferred: — the compile-to-C++ model does not give
-      continuous per-node taps cheaply; the realistic version is a small
-      image on the node being pin-previewed.
+- [x] Preview thumbnails on nodes - the pin preview's picture on the node
+      previewed, and (sixth pass) a glyph on every node that has a shape
+      to show: the function drawn, not its output, which the compile-to-C++
+      model cannot tap per node cheaply.
 
 ### Against Blender, second pass (September 2026)
 
@@ -543,8 +545,8 @@ order is the order they were done.
       (arrange's height estimate), so the graph's spacing survives
       zooming out; for finding your way round a big graph
       (`GraphPanel.overview`, `_make_standin`, `_standin_rows`).
-- [ ] Numeric expressions in fields ("2*pi") - deferred: the number boxes
-      are Dear PyGui's and parse their own text.
+- [x] Numeric expressions in fields ("2*pi") - done in the seventh pass:
+      a box beside the field (=), since the number boxes are Dear PyGui's.
 - Not applicable: per-node timings (one compiled function, no per-node
   clock - the effect-ms readout is the honest equivalent), the
   spreadsheet (the pin preview and live value), simulation zones and
@@ -633,12 +635,12 @@ them within each group; ticked when done.
       looping (`audio.FileAudio`).
 - [x] **Timeline scrub**: the last 300 net frames are kept while playing;
       paused, a slider above the parameters shows any of them in both
-      views (the cube's face renderer; the point cloud still shows the
-      live pixels).
+      views (the point cloud too, since the seventh pass).
 - [x] **Per-effect cost on the device**: the engine's ms/frame on this PC,
       smoothed, and a device fps from it by a factor (60 by default,
       Settings > Device speed factor) - an estimate, labelled as one, until
-      a device measurement calibrates the factor.
+      a device measurement calibrates the factor (the seventh pass's
+      Calibrate button does).
 
 ### Geometry
 
@@ -782,8 +784,8 @@ scheduling, video). These do, in the order to do them; ticked when done:
       properties pane (click to add, drag, right-click to remove; the
       node's own preview and the numbers follow), and the curve now runs
       as a script too (one select per segment, the same smoothstep as the
-      C++). Sliders are keyframed per sequence step; a continuous
-      slider curve along a step is not done.
+      C++). Sliders are keyframed per sequence step, and ramp along one
+      with a shape (the third and seventh passes).
 - [x] **An effect library** (`native/library_ui.py`, File > Library): every
       graph of the project as a looping thumbnail (24 frames from a second
       engine, the same library copied as A/B does, so the one on screen is
@@ -1313,6 +1315,66 @@ every node it names has the thing, not the first three.
 After this pass: the earlier passes' ticked items read again for the
 same kind of thinness, and each such item fleshed out to the feature it
 names.
+
+### Seventh pass: the thin ones fleshed out (September 2026)
+
+The ticked items of every pass read again for the same thinness the
+sixth pass found in item 8: a feature named in full and shipped in its
+smallest form, or deferred twice with a reason that no longer holds.
+What that reading found, in the order to do them; each is done when it
+is the feature its line names.
+
+- [x] **Numeric expressions in fields** (deferred in two passes: "the
+      number boxes are Dear PyGui's and parse their own text"). They
+      still do - so the expression goes beside the box: `=` while a
+      field is hovered, or the field's menu row "type an expression...",
+      opens a small box at the pointer; `2*pi`, `1/3`, `x*2` (x the value
+      it has), `sqrt(2)`, `sin(0.25)`, `min(a, 4)`... with the usual
+      operators, `pi`, `e`, `tau`, the maths functions and `rand`;
+      Enter sets the value (typed inputs and settings alike, the running
+      effect poked as a drag would), Escape leaves it. A safe evaluator
+      (`native/expr.py`, the AST walked, nothing else called) with tests.
+- [x] **The modulation range on the field** (the fifth pass's item 5
+      promised "the range drawn on the field"; the folded Remap's label
+      carried it instead). An input fed by a modulator's Remap shows its
+      range under the pin's name - a bar from out_lo to out_hi with the
+      live value's position on it, the two numbers at its ends - so the
+      modulated node says what it is being swept over without opening
+      the Remap; Ctrl+wheel over an end nudges it (a drag on the bar would
+      fight the node editor for the click).
+- [x] **The device speed factor measured, not guessed** ("an estimate,
+      labelled as one, until a device measurement calibrates the
+      factor"). The Devices frame gets "Calibrate the speed factor":
+      the current effect's settings pushed to the device, its fps read
+      from /json/info for a few seconds, and the factor set from the
+      device's ms a frame against this PC's - the footer's estimate
+      becomes a measurement, dated, and the label says so.
+- [x] **The API reference inserts** ("a click copies the snippet (the
+      box cannot take an insertion)": the in-app editor can): a click
+      puts the snippet at the cursor, with the indent of the line it
+      lands on; copying stays on the right button.
+- [x] **Find and replace, whole** ("find lists matching lines (click ->
+      line); replace all"): next and previous (Enter / Shift+Enter in the
+      box, F3 / Shift+F3), the count and place ("3 of 12"), replace one
+      (the match under the cursor, then the next found), match case and
+      whole word.
+- [x] **The scrub in every view** ("the point cloud still shows the live
+      pixels"): the last seconds of every LED's colour kept beside the
+      net frames, so a scrubbed frame shows on a strip, a sphere, a
+      shape of parts as it does on the cube.
+- [x] **Value curves with a shape** ("one slider ... straight"): a ramp
+      per slider of a step (any of the five, several at once) with a
+      shape - linear, ease in, ease out, ease in-out, up and back (a
+      sine) and a step half way - drawn on the timeline under the step;
+      the sim's sliders follow the shape, the device's sub-steps sample it
+      (seven for up and back, so the top is played). A ramp saved before
+      shapes reads as linear.
+- [x] **The record set straight**: "Live values on frame-scope pins when
+      hovered - deferred" and "Preview thumbnails on nodes - deferred" in
+      the first Blender list are done (the fifth pass's always-on
+      readouts and hover plot; the sixth pass's glyphs, and the pin
+      preview's picture for a node's output), and the zoom is 10..200%,
+      not 50..200%; the notes say so.
 
 ### Line-in (September 2026)
 

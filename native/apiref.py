@@ -1,8 +1,7 @@
 """
 The API reference beside the code pane: what an effect has to work with,
-one line each, with a snippet to paste. The code widget cannot take an
-insertion from outside, so a click copies the snippet to the clipboard and
-Ctrl+V puts it at the cursor.
+one line each, with a snippet: a click puts it at the cursor of the
+in-app editor (and on the clipboard, for an external one).
 
 Grouped as the effect author thinks of them. Everything here is a stock
 WLED name or a cube_fx_common.h helper - nothing the shim invents.

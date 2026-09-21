@@ -124,6 +124,9 @@ def build(app):
             dpg.add_button(label="Read", small=True, callback=lambda: app.probe_active())
             c.tip("ask the device again what it is and runs")
             dpg.add_button(label="Open in the browser", small=True, callback=lambda: app.open_device_page())
+            dpg.add_button(label="Calibrate the speed factor", small=True, callback=lambda: app.calibrate_factor())
+            c.tip("the current effect's settings sent, the device's fps read for three seconds, and the footer's "
+                  "device fps estimate set from the measurement (Settings > Device speed factor holds the number)")
         dpg.add_separator()
         with dpg.group(horizontal=True):
             dpg.add_button(label="Send the graph as a script", tag="send_script_btn", width=200, callback=lambda: app.send_script())

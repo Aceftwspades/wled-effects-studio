@@ -1855,20 +1855,19 @@ class GraphPanel(Glyphs):
             return
         if dpg.is_item_shown("graph_menu") or dpg.is_item_shown("graph_ctx") or self.overview():
             return
-        probes = getattr(self, "_probes", None) or {}
-        if not probes or not getattr(self, "_probes_for", None):
-            return
-        eng = self.app.eng
-        want = self.app.project.effect_title(self._probes_for)
-        if not eng.names or eng.names[eng.idx] != want:
-            return
         pane = self.app._screen_rect("graph_win")
         if not pane:
             return
         eh = dpg.get_item_rect_size("node_editor")[1]
         x0, y0, x1, y1 = pane[0] + 9, pane[3] - 9 - eh, pane[2] - 9, pane[3] - 9
-        scope = getattr(self, "_probe_scope", {}) or {}
         size = max(9, int(11 * self.zoom))
+        probes = getattr(self, "_probes", None) or {}
+        eng = self.app.eng
+        live = bool(probes) and bool(getattr(self, "_probes_for", None)) and bool(eng.names)             and eng.names[eng.idx] == self.app.project.effect_title(self._probes_for or "")
+        if not live:
+            self._draw_mod_ranges((x0, y0, x1, y1), size)      # the ranges stand without a running build; the dot needs one
+            return
+        scope = getattr(self, "_probe_scope", {}) or {}
         cw = self.char_w
         now = time.time()
         if not dpg.does_item_exist("wire_labels"):
@@ -1919,6 +1918,7 @@ class GraphPanel(Glyphs):
                                                               color=(0, 0, 0, 0), fill=(50, 56, 68, 255)))
                 self._readout_items.append(dpg.draw_rectangle((mx, ry + size + 1), (mx + mw * f, ry + size + 3), parent="wire_labels",
                                                               color=(0, 0, 0, 0), fill=(110, 190, 250, 255)))
+        self._draw_mod_ranges((x0, y0, x1, y1), size)
         self._draw_hover_plot((x0, y0, x1, y1), size)
 
     def _poll_labels(self):
@@ -2229,6 +2229,185 @@ class GraphPanel(Glyphs):
                 except Exception:
                     pass
 
+    def expr_hovered(self):
+        """= over a value box: the expression box for it."""
+        h = self._hovered_field()
+        if not h or not self.graph:
+            return False
+        w, nid, name, kind = h
+        return self.expr_for(nid, name, kind)
+
+    def expr_names(self, nid):
+        """The names an expression may use on this node: its typed inputs
+        and numeric settings, by name."""
+        n = self.graph.nodes[nid]
+        d = self.graph.node_def(n)
+        wired = {i for b, i in ((l[2], l[3]) for l in self.graph.links) if b == nid}
+        names = {}
+        for i in d["inputs"]:
+            if i["type"] == "float" and i["name"] not in wired:
+                try:
+                    names[i["name"].replace(" ", "_")] = float(n.get("inputs", {}).get(i["name"], i.get("default", 0.0)))
+                except (TypeError, ValueError):
+                    pass
+        for p in d["params"]:
+            if p["type"] in ("float", "int"):
+                try:
+                    names[p["name"].replace(" ", "_")] = float(n["params"].get(p["name"], p.get("default", 0.0)))
+                except (TypeError, ValueError):
+                    pass
+        return names
+
+    def expr_for(self, nid, name, kind):
+        """The expression box for a number on a node (a typed input or a
+        numeric setting), at the pointer, holding the value it has."""
+        if not self.graph or nid not in self.graph.nodes or not dpg.does_item_exist("expr_win"):
+            return False
+        n = self.graph.nodes[nid]
+        d = self.graph.node_def(n)
+        if kind == "param":
+            p = next((p for p in d["params"] if p["name"] == name), None)
+            if not p or p["type"] not in ("float", "int"):
+                return False
+            cur = n["params"].get(name, p.get("default", 0))
+        else:
+            i = next((i for i in d["inputs"] if i["name"] == name), None)
+            if not i or i["type"] != "float":
+                return False
+            cur = n.get("inputs", {}).get(name, i.get("default", 0.0))
+        self._expr_target = (nid, name, kind)
+        dpg.set_value("expr_label", f"{n['type']} . {name} =")
+        dpg.set_value("expr_text", f"{float(cur):g}" if isinstance(cur, (int, float)) else str(cur))
+        x, y = dpg.get_mouse_pos(local=False)
+        dpg.configure_item("expr_win", show=True)
+        dpg.set_item_pos("expr_win", [x + 8, y + 8])
+        dpg.focus_item("expr_text")
+        self.status(f"{name}: type an expression and press Enter (Escape leaves it)")
+        return True
+
+    def expr_enter(self, text):
+        """Enter in the box: the expression worked out and set."""
+        t = getattr(self, "_expr_target", None)
+        dpg.configure_item("expr_win", show=False)
+        if not t:
+            return
+        self.apply_expr(*t, text)
+
+    def apply_expr(self, nid, name, kind, text):
+        """`text` evaluated with the node's own numbers as names (and x,
+        the value the field has) and set - a typed input poked live, a
+        setting the way its widget would set it. Returns the value, or
+        None with the reason in the status."""
+        from native import expr
+        if not self.graph or nid not in self.graph.nodes:
+            return None
+        n = self.graph.nodes[nid]
+        d = self.graph.node_def(n)
+        names = self.expr_names(nid)
+        key = name.replace(" ", "_")
+        names["x"] = names.get(key, 0.0)
+        try:
+            v = expr.evaluate(text, names)
+        except expr.ExprError as e:
+            self.status(f"{name}: {e}"); return None
+        if kind == "param":
+            p = next((p for p in d["params"] if p["name"] == name), None)
+            if p is None:
+                return None
+            if p["type"] == "int":
+                v = int(round(v))
+            if p.get("min") is not None:
+                v = max(p["min"], v)
+            if p.get("max") is not None:
+                v = min(p["max"], v)
+            self.snapshot(("expr", nid, name))
+            n["params"][name] = v
+            self._set_param_widget(nid, name, v)
+            self._refresh_summary(nid)
+            self.touch()
+            self.status(f"{name} = {v:g}  ({text})")
+        else:
+            i = next((i for i in d["inputs"] if i["name"] == name), None)
+            if i is None:
+                return None
+            if i.get("min") is not None:
+                v = max(float(i["min"]), v)
+            if i.get("max") is not None:
+                v = min(float(i["max"]), v)
+            self.set_input_live(nid, name, v)
+            self.status(f"{name} = {v:g}  ({text})")
+        return v
+
+    # --- the modulation range on the field --------------------------------------------
+    def mod_ranges(self):
+        """[(remap id, fed node, fed input)] for every input a modulator's
+        Remap feeds - the Remap a "modulate with" made, or any Remap
+        labelled with a ±."""
+        out = []
+        for a, o, b, i in self.graph.links:
+            n = self.graph.nodes.get(a)
+            if n and n["type"] == "Remap" and o == "result" and (n.get("modulator") or "\u00b1" in str(n.get("label") or "")):
+                out.append((a, b, i))
+        return out
+
+    def _draw_mod_ranges(self, pane, size):
+        """Under a modulated input's name: a bar from the Remap's out_lo to
+        out_hi with the live value on it and the two numbers at its ends.
+        Ctrl+wheel over an end nudges it (the Remap's setting changes)."""
+        self._mod_bars = {}
+        if not self.graph:
+            return
+        x0, y0, x1, y1 = pane
+        small = max(8, int(9 * self.zoom))
+        for r, b, inp in self.mod_ranges():
+            if b not in self.graph.nodes or self.graph.nodes[b].get("collapsed"):
+                continue
+            pt = self._pin_point(b, "in", inp)
+            if not pt:
+                continue
+            rn = self.graph.nodes[r]
+            lo, hi = float(rn["params"].get("out_lo", 0.0)), float(rn["params"].get("out_hi", 1.0))
+            mw = max(40.0, 64.0 * self.zoom)
+            bx, by = pt[0] + 12, pt[1] + size * 0.75
+            if bx < x0 or bx + mw > x1 or by < y0 or by + small + 4 > y1:
+                continue
+            k = self._probe_k(r, "out", "result")
+            v = self._probe_now(k)
+            f = None if v is None or hi == lo else max(0.0, min(1.0, (v - min(lo, hi)) / abs(hi - lo)))
+            items = self._readout_items
+            items.append(dpg.draw_rectangle((bx, by), (bx + mw, by + 3), parent="wire_labels", color=(0, 0, 0, 0), fill=(50, 56, 68, 255)))
+            if f is not None:
+                items.append(dpg.draw_rectangle((bx, by), (bx + mw * f, by + 3), parent="wire_labels", color=(0, 0, 0, 0), fill=(190, 150, 250, 255)))
+                items.append(dpg.draw_circle((bx + mw * f, by + 1.5), 2.5, parent="wire_labels", color=(0, 0, 0, 0), fill=(240, 232, 255, 255)))
+            items.append(dpg.draw_text((bx, by + 4), nodeface._fmt(lo), parent="wire_labels", size=small, color=(150, 140, 190, 255)))
+            t = nodeface._fmt(hi)
+            items.append(dpg.draw_text((bx + mw - len(t) * small * 0.6, by + 4), t, parent="wire_labels", size=small, color=(150, 140, 190, 255)))
+            self._mod_bars[(bx, by, bx + mw, by + small + 4)] = r
+
+    def _step_mod_range(self, direction):
+        """Ctrl+wheel over a range bar: the end the pointer is nearer, by
+        a fiftieth of the range (the Remap's out_lo or out_hi)."""
+        bars = getattr(self, "_mod_bars", None)
+        if not bars:
+            return False
+        mx, my = dpg.get_mouse_pos(local=False)
+        for (bx0, by0, bx1, by1), r in bars.items():
+            if bx0 - 4 <= mx <= bx1 + 4 and by0 - 4 <= my <= by1:
+                rn = self.graph.nodes.get(r)
+                if not rn:
+                    return False
+                lo, hi = float(rn["params"].get("out_lo", 0.0)), float(rn["params"].get("out_hi", 1.0))
+                key = "out_lo" if mx < (bx0 + bx1) / 2 else "out_hi"
+                step = (abs(hi - lo) or 1.0) / 50.0 * (1 if direction > 0 else -1)
+                self.snapshot(("modrange", r, key))
+                rn["params"][key] = round(rn["params"].get(key, 0.0) + step, 5)
+                self._set_param_widget(r, key, rn["params"][key])
+                self._refresh_summary(r)
+                self.touch()
+                self.status(f"{rn.get('label') or 'Remap'}: {nodeface._fmt(rn['params']['out_lo'])} .. {nodeface._fmt(rn['params']['out_hi'])}")
+                return True
+        return False
+
     def reset_hovered(self):
         """Backspace over a value box: the default again."""
         h = self._hovered_field()
@@ -2251,7 +2430,10 @@ class GraphPanel(Glyphs):
     def step_hovered(self, direction):
         """Ctrl+wheel over a dropdown: the next or previous choice; over a
         slider or a drag field: a step - one for an integer, a hundredth
-        of the range or of the value for a float."""
+        of the range or of the value for a float; over a modulation range
+        bar, the nearer end by a fiftieth of the range."""
+        if self._step_mod_range(direction):
+            return True
         h = self._hovered_field()
         if not h or not self.graph:
             return False
@@ -3272,6 +3454,8 @@ class GraphPanel(Glyphs):
             if linked:
                 row("disconnect", lambda: self._disconnect_in(nid, name))
             row("reset to default", lambda: self._reset_input(nid, name, i))
+            if i["type"] == "float" and not linked:
+                row("type an expression...", lambda: self.expr_for(nid, name, "input"))
             if linked:
                 from native import chrome
                 lbl = (self.graph.link_meta.get((nid, name)) or {}).get("label", "")
@@ -3350,6 +3534,13 @@ class GraphPanel(Glyphs):
             row("unmute" if n.get("muted") else "mute (pass through)", lambda: self._toggle(nid, "muted"))
             if d.get("params") or d.get("inputs"):
                 row("reset settings to defaults", lambda: self.reset_node(nid))
+            wired_ = {i_ for b_, i_ in ((l[2], l[3]) for l in self.graph.links) if b_ == nid}
+            nums = [(i_["name"], "input") for i_ in d["inputs"] if i_["type"] == "float" and i_["name"] not in wired_] \
+                 + [(p_["name"], "param") for p_ in d["params"] if p_["type"] in ("float", "int")]
+            if nums:
+                with dpg.tree_node(label="type an expression for", parent=P):
+                    for nm, kd in nums:
+                        row(f"  {nm}", lambda nm=nm, kd=kd: self.expr_for(nid, nm, kd))
             if n["type"] == "Image":
                 row("convert to Bitmap + Colour pick", lambda: self.image_to_bitmap(nid))
             selected = bool(self._selected())
@@ -3682,6 +3873,7 @@ class GraphPanel(Glyphs):
         self.graph.nodes[r]["params"].update({"in_lo": 0.0, "in_hi": 1.0, "out_lo": round(v - amount, 4), "out_hi": round(v + amount, 4)})
         self.graph.nodes[r]["collapsed"] = True
         self.graph.nodes[r]["label"] = f"{name} \u00b1{amount:.3g}"
+        self.graph.nodes[r]["modulator"] = True             # the fed pin draws this Remap's range as its own
         self.graph.link(source, sout, r, "x")
         self.graph.link(r, "result", nid, name)
         self.rebuild()
@@ -4457,6 +4649,11 @@ def build_panel(app, panel):
     # The right-click menu: a small window shown at the pointer, categories as
     # collapsing headers, a node per line. A window rather than a popup so it
     # can be positioned exactly and dismissed by the click that adds.
+    # an expression typed into a field: a small box at the pointer (= over a value, or a menu row)
+    with dpg.window(tag="expr_win", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
+        dpg.add_text("", tag="expr_label", color=DIM)
+        dpg.add_input_text(tag="expr_text", width=240, on_enter=True, callback=lambda s, v: app.gp.expr_enter(v))
+        dpg.add_text("2*pi, x*2 (x: the value now), sqrt(2), min(a, 4)...", tag="expr_hint", color=DIM, wrap=240)
     with dpg.window(tag="graph_ctx", show=False, no_title_bar=True, no_resize=True, no_move=True,
                     autosize=True, popup=True):
         pass

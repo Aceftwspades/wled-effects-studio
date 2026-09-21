@@ -81,9 +81,14 @@ def build(app):
                           callback=lambda s, v: _ramp_pick(app, v))
             c.tip("a slider of the first segment that moves over the step, from the step's value to the end value - "
                   "in the sim as it plays; on the device as sub-steps (a second apiece, up to twelve), since a preset cannot move a slider")
-            dpg.add_slider_int(tag="seq_ramp_end", width=160, min_value=0, max_value=255, default_value=128,
+            dpg.add_slider_int(tag="seq_ramp_end", width=140, min_value=0, max_value=255, default_value=128,
                                callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), int(v)))
             dpg.add_text("to", color=c.DIM)
+            dpg.add_combo(list(sequence.RAMP_SHAPES), tag="seq_ramp_shape", width=110, default_value="linear",
+                          callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), None, v))
+            c.tip("the ramp's shape: straight, eased at either end or both, up and back to where it began, or a jump half way")
+            dpg.add_button(label="x", small=True, callback=lambda: remove_ramp(app, dpg.get_value("seq_ramp_key")))
+            c.tip("this slider's ramp off (the others stay)")
             dpg.add_text("", tag="seq_ramp_desc", color=c.DIM)
         with dpg.group(horizontal=True):
             dpg.add_text("PLAY", color=c.ACCENT)
@@ -180,10 +185,11 @@ def refresh(app):
     dpg.set_value("seq_style", S.get("style", "fade"))
     if 0 <= sel < len(steps):
         ramps = steps[sel].get("ramps") or {}
-        first = next(iter(ramps), "none")
+        first = dpg.get_value("seq_ramp_key") if dpg.get_value("seq_ramp_key") in ramps else next(iter(ramps), "none")
         dpg.set_value("seq_ramp_key", first)
         if first != "none":
-            dpg.set_value("seq_ramp_end", int(ramps[first]))
+            dpg.set_value("seq_ramp_end", sequence.ramp_of(steps[sel], first)[0])
+            dpg.set_value("seq_ramp_shape", sequence.ramp_of(steps[sel], first)[1])
         _ramp_desc(app, steps[sel])
         st = steps[sel]
         dpg.set_value("seq_name", st.get("name", "")); dpg.set_value("seq_dur", float(st.get("dur", 10))); dpg.set_value("seq_trans", float(st.get("trans", 0.7)))
@@ -359,21 +365,36 @@ def _ramp_pick(app, key):
     st = S["steps"][sel]
     ramps = st.get("ramps") or {}
     if key == "none":
-        st.pop("ramps", None); app.project.save(); refresh(app); return
+        refresh(app); return                                 # the picker back to none: the ramps stay (x removes one)
     if key not in ramps:
         segs = st.get("segments") or []
-        ramps[key] = int((segs[0].get("params") or {}).get(key, 128)) if segs else 128
+        ramps[key] = {"end": int((segs[0].get("params") or {}).get(key, 128)) if segs else 128, "shape": "linear"}
         st["ramps"] = ramps; app.project.save()
-    dpg.set_value("seq_ramp_end", int(ramps[key])); refresh(app)
+    end, shape = sequence.ramp_of(st, key)
+    dpg.set_value("seq_ramp_end", end); dpg.set_value("seq_ramp_shape", shape); refresh(app)
 
 
-def set_ramp(app, key, end):
+def set_ramp(app, key, end=None, shape=None):
+    """A slider's ramp on the selected step: its end value and / or shape."""
     S = _steps(app); sel = getattr(app, "_seq_sel", 0)
     if key == "none" or not (0 <= sel < len(S["steps"])):
         return
     st = S["steps"][sel]
-    st.setdefault("ramps", {})[key] = int(end)
+    cur = sequence.ramp_of(st, key) or (int(dpg.get_value("seq_ramp_end")), "linear")
+    st.setdefault("ramps", {})[key] = {"end": int(end if end is not None else cur[0]),
+                                       "shape": str(shape if shape is not None else cur[1])}
     app.project.save(); _ramp_desc(app, st); app._tl_dirty = True
+
+
+def remove_ramp(app, key):
+    S = _steps(app); sel = getattr(app, "_seq_sel", 0)
+    if key == "none" or not (0 <= sel < len(S["steps"])):
+        return
+    st = S["steps"][sel]
+    (st.get("ramps") or {}).pop(key, None)
+    if not st.get("ramps"):
+        st.pop("ramps", None)
+    app.project.save(); app._tl_dirty = True; refresh(app)
 
 
 def _ramp_desc(app, st):
@@ -381,7 +402,8 @@ def _ramp_desc(app, st):
     if not ramps:
         dpg.set_value("seq_ramp_desc", ""); return
     n = len(sequence.sub_steps(st))
-    dpg.set_value("seq_ramp_desc", ", ".join(f"{k} {sequence.ramp_value(st, k, 0)} -> {v}" for k, v in ramps.items()) + f"; {n} sub-steps on the device")
+    dpg.set_value("seq_ramp_desc", ", ".join(f"{k} {sequence.ramp_value(st, k, 0)} -> {sequence.ramp_of(st, k)[0]} {sequence.ramp_of(st, k)[1]}"
+                                             for k in ramps) + f"; {n} sub-steps on the device")
 
 
 def load_step(app, i=None):
@@ -653,6 +675,16 @@ def draw_timeline(app):
         name = str(_steps(app)["steps"][i].get("name", ""))
         if b - a > 8 * len(name[:12]) + 8:
             dpg.draw_text((a + 5, 8), name[:12], color=(235, 238, 245, 220), size=13, parent="seq_tl")
+        st = _steps(app)["steps"][i]
+        for j, k in enumerate(st.get("ramps") or {}):
+            # the ramp's curve across the block: the slider's 0..255 over the block's lower half
+            if b - a < 12:
+                break
+            top, bot = 4 + (h - 14) * 0.45, h - 12
+            pts = [(a + 1 + (b - a - 2) * q / 24, bot - (bot - top) * sequence.ramp_value(st, k, q / 24) / 255.0) for q in range(25)]
+            dpg.draw_polyline(pts, color=(255, 255, 255, 200 - 40 * j), thickness=1.5, parent="seq_tl")
+            if b - a > 40:
+                dpg.draw_text((a + 5, top - 12), k, color=(235, 238, 245, 160), size=11, parent="seq_tl")
     # the playhead
     at = _tl_playhead(app, total)
     if at is not None:

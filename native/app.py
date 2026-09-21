@@ -329,6 +329,7 @@ class App(Features):
         self._wiring_items = []
         self.frames = None           # (glow.Frames) - set in build()
         self.history_frames = []     # the last seconds of net frames, for scrubbing while paused
+        self.history_rgb = []        # and every LED's colour for the same frames (the point cloud draws from these)
         self.scrub = None            # an index into history_frames while paused, or None
         self.frame_ms = 0.0          # the engine's cost per frame on this machine, smoothed
         self.loop_ms = 0.0           # the whole app's, frame to frame
@@ -688,6 +689,7 @@ class App(Features):
     def set_device_factor(self, v):
         try:
             self.prefs["device_factor"] = max(1.0, float(v))
+            self.prefs.pop("device_factor_measured", None)     # typed by hand: an estimate again
             save_prefs(self.prefs)
         except ValueError:
             self.gp.status("a number, please: how many times slower than this PC the device is")
@@ -1131,33 +1133,70 @@ class App(Features):
             self.open_external(line)
 
     # --- find and replace ----------------------------------------------------------------
-    def find(self):
-        """Every line holding the find text, as rows that go to the line."""
+    def _find_setup(self):
+        """The find text and its options into the editor; the needle."""
         needle = dpg.get_value("find_text")
-        dpg.delete_item("edit_errors", children_only=True)
         if self.code_ed is not None:
-            self.code_ed.set_needle(needle)
-            if needle:
-                self.code_ed.find_next()
-                self.code_ed.focus = True
-                dpg.focus_item("code_key")
+            self.code_ed.set_needle(needle, case=dpg.get_value("find_case") if dpg.does_item_exist("find_case") else None,
+                                    word=dpg.get_value("find_word") if dpg.does_item_exist("find_word") else None)
+        return needle
+
+    def find(self, backwards=None):
+        """Find: the next match (Shift+Enter, the previous), the place and
+        count in the status, and every matching line as rows that go to
+        the line."""
+        needle = self._find_setup()
+        dpg.delete_item("edit_errors", children_only=True)
+        if backwards is None:
+            backwards = dpg.is_key_down(dpg.mvKey_LShift) or dpg.is_key_down(dpg.mvKey_RShift)
+        if self.code_ed is not None and needle:
+            self.code_ed.find_next(backwards)
+            self.code_ed.focus = True
+            dpg.focus_item("code_key")
         if not needle:
-            return
-        lines = dpg.get_value("code").split("\n")
-        hits = [(i + 1, l) for i, l in enumerate(lines) if needle.lower() in l.lower()]
-        dpg.set_value("edit_status", f"{len(hits)} line(s) match")
-        for ln, l in hits[:40]:
-            dpg.add_selectable(label=f"{ln}: {l.strip()[:100]}", parent="edit_errors", user_data=ln,
+            dpg.set_value("edit_status", ""); return
+        self.find_status()
+        if self.code_ed is not None:
+            hits = sorted({li for li, _ in self.code_ed.matches()})
+            lines = self.code_ed.lines
+        else:
+            lines = dpg.get_value("code").split("\n")
+            hits = [i for i, l in enumerate(lines) if needle.lower() in l.lower()]
+        for li in hits[:40]:
+            dpg.add_selectable(label=f"{li + 1}: {lines[li].strip()[:100]}", parent="edit_errors", user_data=li + 1,
                                callback=lambda s, a, u: self.goto_line(u))
 
+    def find_status(self):
+        if self.code_ed is None:
+            return
+        k, n = self.code_ed.find_place()
+        dpg.set_value("edit_status", (f"{k} of {n}" if k else f"{n} match(es)") if n else "no match")
+
+    def replace_one(self):
+        """The match the cursor is on becomes the replacement, and the next is found."""
+        needle = self._find_setup(); repl = dpg.get_value("replace_text")
+        if not needle or self.code_ed is None:
+            return
+        done = self.code_ed.replace_current(repl)
+        self.edit_dirty = self.edit_dirty or done
+        self.find_status()
+        if done:
+            dpg.set_value("edit_status", "replaced one - " + dpg.get_value("edit_status"))
+
     def replace_all(self):
-        needle = dpg.get_value("find_text"); repl = dpg.get_value("replace_text")
+        needle = self._find_setup(); repl = dpg.get_value("replace_text")
         if not needle:
             return
-        text = dpg.get_value("code")
-        n = text.count(needle)
+        if self.code_ed is not None:
+            self.code_ed._sync_from_store()
+            rx = self.code_ed._needle_re
+            text = "\n".join(self.code_ed.lines)
+            new, n = rx.subn(lambda m: repl, text)
+        else:
+            text = dpg.get_value("code")
+            n = text.count(needle); new = text.replace(needle, repl)
         if n:
-            dpg.set_value("code", text.replace(needle, repl))
+            dpg.set_value("code", new)
             self.edit_dirty = True
         dpg.set_value("edit_status", f"replaced {n} occurrence(s)")
         self.find()
@@ -1192,8 +1231,15 @@ class App(Features):
         dpg.set_value("edit_status", f"metadata: {new[:100]}")
 
     def api_pick(self, snippet, label):
+        """A click on the API reference puts the snippet at the cursor (the
+        in-app editor takes an insertion); the clipboard gets it too, for
+        an external editor."""
         dpg.set_clipboard_text(snippet)
-        dpg.set_value("edit_status", f"copied: {label} - Ctrl+V to paste at the cursor")
+        if self.code_ed is not None and dpg.does_item_exist("code_ed"):
+            self.code_ed.insert(snippet)
+            dpg.set_value("edit_status", f"inserted at the cursor: {label} (and copied)")
+        else:
+            dpg.set_value("edit_status", f"copied: {label} - Ctrl+V to paste at the cursor")
 
     def refresh_import_buttons(self):
         """The File menu says what it will do to the current file, and its
@@ -1934,7 +1980,7 @@ class App(Features):
         """A popup menu that grew past the window's edge - a fold opened
         near the bottom - is moved back inside, so every row can be reached."""
         vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
-        for tag in ("graph_ctx", "graph_menu", "compare_menu", "open_menu", "midi_ctx") + tuple(self.pane_menus.values()):
+        for tag in ("graph_ctx", "graph_menu", "compare_menu", "open_menu", "midi_ctx", "expr_win") + tuple(self.pane_menus.values()):
             if not (dpg.does_item_exist(tag) and dpg.is_item_shown(tag)):
                 continue
             w, h = dpg.get_item_rect_size(tag)
@@ -2587,6 +2633,8 @@ class App(Features):
     def on_key(self, sender, app_data):
         if app_data == dpg.mvKey_Escape:
             self._picker = None
+            if dpg.does_item_exist("expr_win") and dpg.is_item_shown("expr_win"):
+                dpg.configure_item("expr_win", show=False)   # the expression box, left
         # Presentation keys sit under the left hand so the right stays on the
         # mouse for rotating the cube: Q and E either side of W, which is the
         # pair together.
@@ -2682,8 +2730,8 @@ class App(Features):
             "rename":       self.rename_current,
             "import":       self.toggle_import_current,
             "find":         self.focus_find,
-            "find_next":    lambda: self.code_ed and (self.code_ed.set_needle(dpg.get_value("find_text")), self.code_ed.find_next()),
-            "find_prev":    lambda: self.code_ed and (self.code_ed.set_needle(dpg.get_value("find_text")), self.code_ed.find_next(True)),
+            "find_next":    lambda: self.code_ed and (self._find_setup(), self.code_ed.find_next(), self.find_status()),
+            "find_prev":    lambda: self.code_ed and (self._find_setup(), self.code_ed.find_next(True), self.find_status()),
             "external":     self.open_external,
             "screenshot":   lambda: setattr(self, "shot_req", True),
             "record":       lambda: self.start_rec(15.0),
@@ -2745,6 +2793,7 @@ class App(Features):
             "repeat":       self.repeat_last,
             "palette":      lambda: chrome.show_palette(self),
             "snapshots":    lambda: chrome.show_snapshots(self),
+            "expr":         lambda: gp.expr_hovered(),
             "midi":         lambda: midi_ui.show(self),
             "undo_history": lambda: chrome.show_undo_history(self),
             "history":      lambda: chrome.show_history(self),
@@ -2827,7 +2876,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "expr_win",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -3068,11 +3117,20 @@ class App(Features):
         net = self.net_image()
         # the last seconds of frames are kept while playing; paused, the
         # scrub slider picks one of them to show instead of the live one
+        rgb = None
         if self.playing:
             self.history_frames.append(net)
             del self.history_frames[:-self.SCRUB_FRAMES]
+            if self.point_quads is not None and self.cube_on():
+                self.history_rgb.append(self.frame_rgb(self.eng).copy())
+                del self.history_rgb[:-self.SCRUB_FRAMES]
+            elif self.history_rgb:
+                self.history_rgb = []
         elif self.scrub is not None and self.history_frames:
-            net = self.history_frames[max(0, min(len(self.history_frames) - 1, self.scrub))]
+            k = max(0, min(len(self.history_frames) - 1, self.scrub))
+            net = self.history_frames[k]
+            if self.history_rgb and len(self.history_rgb) == len(self.history_frames):
+                rgb = self.history_rgb[k]                  # the scrubbed frame on a strip, a sphere, a shape of parts too
         big = img = None
         self.popouts.publish(net, self.eng, (self.yaw, self.pitch, self.dist))
         if self.net_on():
@@ -3099,7 +3157,7 @@ class App(Features):
                 pq.set_points(pos)                         # a part dragged, a shape changed
             pq.camera(self.yaw, self.pitch, self.dist)
             pq.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
-            pq.colours(self.frame_rgb(self.eng).reshape(-1, 3))
+            pq.colours((rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3))
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on():
@@ -3124,7 +3182,8 @@ class App(Features):
         raw = self.frame_rgb()
         s = stats(raw, self.eng.lit_mask(flat=bool(self.eng.fx.get("o3"))))
         factor = float(self.prefs.get("device_factor", 60.0))
-        est = (f"   effect {self.frame_ms:.2f} ms  ->  device ~{1000.0 / max(0.001, self.frame_ms * factor):.0f} fps (x{factor:.0f})"
+        how = "measured" if self.prefs.get("device_factor_measured") else "est."
+        est = (f"   effect {self.frame_ms:.2f} ms  ->  device ~{1000.0 / max(0.001, self.frame_ms * factor):.0f} fps (x{factor:.0f} {how})"
                f"   app {self.loop_ms:.1f} ms/frame") if self.frame_ms > 0 else ""
         pw = getattr(self, "_power", None)
         power = ""
@@ -3192,8 +3251,15 @@ def build(app):
                 with dpg.group(horizontal=True):
                     dpg.add_input_text(tag="find_text", hint="find", width=130, on_enter=True,
                                        callback=lambda: app.find())
-                    dpg.add_button(label="find", callback=lambda: app.find())
+                    dpg.add_button(label="find", callback=lambda: app.find(False))
+                    chrome.tip("the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many")
+                    dpg.add_checkbox(label="case", tag="find_case", callback=lambda: app.find(False))
+                    chrome.tip("match the case as typed")
+                    dpg.add_checkbox(label="word", tag="find_word", callback=lambda: app.find(False))
+                    chrome.tip("whole words only")
                     dpg.add_input_text(tag="replace_text", hint="replace with", width=130)
+                    dpg.add_button(label="replace", callback=lambda: app.replace_one())
+                    chrome.tip("the match the cursor is on, then the next is found")
                     dpg.add_button(label="replace all", callback=lambda: app.replace_all())
                 with dpg.collapsing_header(label="Metadata - name, labels, palette, flags, defaults", default_open=False):
                     dpg.add_input_text(tag="meta_name", label="name", width=220)
@@ -3204,7 +3270,7 @@ def build(app):
                     with dpg.group(horizontal=True):
                         dpg.add_button(label="read from file", callback=lambda: app.meta_read())
                         dpg.add_button(label="apply to file", callback=lambda: app.meta_write())
-                with dpg.collapsing_header(label="API reference - click copies, Ctrl+V pastes", default_open=False,
+                with dpg.collapsing_header(label="API reference - click inserts at the cursor", default_open=False,
                                            tag="api_header"):
                     for group, items in API:
                         with dpg.tree_node(label=group):
@@ -3565,7 +3631,8 @@ def service_command(app):
                  "timer": lambda: SQ.add_timer(app, op[1]), "timer_del": lambda: SQ.del_timer(app, op[1]),
                  "snap": lambda: SQ.snap_durations(app, op[1], op[2]), "tap": lambda: SQ.tap(app),
                  "wav_beats": lambda: SQ.beats_from_wav(app), "undo": lambda: SQ.undo(app), "redo": lambda: SQ.undo(app, True),
-                 "ramp": lambda: SQ.set_ramp(app, op[1], op[2]),
+                 "ramp": lambda: SQ.set_ramp(app, op[1], op[2], op[3] if len(op) > 3 else None),   # [key, end, shape?]
+                 "ramp_del": lambda: SQ.remove_ramp(app, op[1]),
                  "del": lambda: SQ.del_step(app, op[1]), "play": lambda: SQ.play(app), "stop": lambda: SQ.stop(app),
                  "field": lambda: SQ.set_field(app, op[1], op[2])}[op[0]]()
             if "stream" in c:                           # test hook: a host to stream to over DDP, or false to stop
@@ -3906,6 +3973,11 @@ def service_command(app):
                 app.gp.set_selection([int(x) for x in c["graph_select"]])
             if "graph_selected" in c:                   # test hook: a selection, held until cleared with []
                 app.gp._test_sel = [int(x) for x in c["graph_selected"]] or None
+            if "calibrate" in c:                        # test hook: the speed factor measured against the active device
+                app.calibrate_factor()
+            if "expr" in c:                             # test hook: [nid, name, "input"|"param", text] - an expression into a field
+                nid, name, kind, text = c["expr"]
+                print("expr", app.gp.apply_expr(int(nid), name, kind, text))
             if "midi" in c:                             # test hook: a MIDI message's bytes, as if the port sent them
                 app.midi.inject([int(b) for b in c["midi"]])
             if "midi_learn" in c:                       # test hook: a target to learn next (see midi_ui.targets), or null to cancel
@@ -4495,6 +4567,7 @@ def main():
                 app.poll_glow()
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 midi_ui.poll(app)
+                app.poll_calibration()
                 chrome.poll_update(app); chrome.poll_update_download(app)
                 _t.append(time.perf_counter())
                 app.step_sim()

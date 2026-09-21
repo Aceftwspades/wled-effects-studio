@@ -266,7 +266,9 @@ def build_menus(app):
                                       callback=lambda s, a, u: app.gp.set_overview_zoom(u))
                 dpg.add_text("zoomed out past this, nodes are a title and their wires", color=DIM)
             dpg.add_menu_item(label="Device speed factor...", callback=lambda: ask(
-                app, "Device speed", "how many times slower than this PC the device is (the fps estimate in the footer)",
+                app, "Device speed", "how many times slower than this PC the device is (the fps estimate in the footer)"
+                + ((lambda m: f"; measured {m['date']}: {m['effect']} at {m['fps']} fps on {m['host']}")(app.prefs["device_factor_measured"])
+                   if app.prefs.get("device_factor_measured") else "; Send frame > Calibrate measures it"),
                 str(app.prefs.get("device_factor", 60)), lambda v: app.set_device_factor(v)))
             dpg.add_separator()
             dpg.add_menu_item(label="Open the project folder", callback=lambda: app.reveal(app.project.path))

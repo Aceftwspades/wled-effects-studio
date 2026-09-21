@@ -7,6 +7,7 @@ views. Nothing here is called from outside the app.
 import json
 import os
 import shutil
+import threading
 import time
 import numpy as np
 import dearpygui.dearpygui as dpg
@@ -736,6 +737,51 @@ class Features:
         host = self.active_host()
         if host:
             self.refresh_devices_info(only=host)
+
+    # --- the device speed factor, measured -------------------------------------------
+    def calibrate_factor(self):
+        """The footer's device fps stops being a guess: the current effect's
+        settings go to the device, its fps is read from /json/info a few
+        times over three seconds, and the factor (how many times slower
+        than this PC the device is) is set from the device's ms a frame
+        against this PC's for the same effect - kept with what was
+        measured, and the footer says "measured"."""
+        import statistics
+        host = self.active_host()
+        if not host:
+            device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
+        if self.frame_ms <= 0.0:
+            self.gp.status("no frame time measured here yet - let the effect run a moment"); return
+        self.push_settings()
+        pc_ms = float(self.frame_ms)
+        name = self.eng.names[self.eng.idx]
+        self.gp.status(f"calibrating: reading the device's fps for {name}...")
+
+        def run():
+            fps = []
+            for _ in range(4):
+                time.sleep(0.8)
+                st = devices.state(host, timeout=3.0)
+                if st and st.get("fps"):
+                    fps.append(float(st["fps"]))
+            self._calib_result = (host, name, pc_ms, statistics.median(fps) if fps else None)
+        threading.Thread(target=run, daemon=True).start()
+
+    def poll_calibration(self):
+        r = getattr(self, "_calib_result", None)
+        if r is None:
+            return
+        self._calib_result = None
+        host, name, pc_ms, fps = r
+        if not fps:
+            self.gp.status(f"calibration: {host} reported no fps (is the effect running there?)"); return
+        factor = max(1.0, min(5000.0, (1000.0 / fps) / max(1e-3, pc_ms)))
+        self.prefs["device_factor"] = round(factor, 1)
+        self.prefs["device_factor_measured"] = {"host": host, "effect": name, "fps": round(fps, 1), "pc_ms": round(pc_ms, 3),
+                                                "date": time.strftime("%Y-%m-%d")}
+        save_prefs(self.prefs)
+        self.gp.status(f"speed factor measured: {name} runs at {fps:.0f} fps on {host}, {pc_ms:.2f} ms here - x{factor:.0f}")
+        device_ui.send_log(self, f"speed factor x{factor:.0f} from {name} at {fps:.0f} fps on the device")
 
     def open_device_page(self):
         host = self.active_host()

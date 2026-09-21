@@ -15,6 +15,7 @@ dozen screens for.
     presets, playlist = to_wled(steps, names, pals, base=10, pid=9, name="Show", repeat=0)
 """
 import json
+import math
 import time
 import urllib.request
 
@@ -77,17 +78,46 @@ def segment_json(k, sg, names, pals, is2d, colours):
 
 
 RAMP_KEYS = ("sx", "ix", "c1", "c2", "c3")
+RAMP_SHAPES = ("linear", "ease in", "ease out", "ease in-out", "up and back", "step")
+
+
+def ramp_of(step, key):
+    """(end, shape) of a slider's ramp on the step, or None: a ramp is an
+    end value (a graph saved before shapes) or {"end", "shape"}."""
+    r = (step.get("ramps") or {}).get(key)
+    if r is None:
+        return None
+    if isinstance(r, dict):
+        return int(r.get("end", 128)), str(r.get("shape", "linear"))
+    return int(r), "linear"
+
+
+def shape_t(shape, t):
+    """How far along a ramp of `shape` the value is at t (0..1)."""
+    t = max(0.0, min(1.0, float(t)))
+    if shape == "ease in":
+        return t * t
+    if shape == "ease out":
+        return 1.0 - (1.0 - t) ** 2
+    if shape == "ease in-out":
+        return t * t * (3.0 - 2.0 * t)
+    if shape == "up and back":
+        return 0.5 - 0.5 * math.cos(t * 2 * math.pi)        # there at the middle, back at the end
+    if shape == "step":
+        return 0.0 if t < 0.5 else 1.0
+    return t
 
 
 def ramp_value(step, key, t):
     """The first segment's slider `key` at t (0..1) into the step: from the
-    step's value to the ramp's end, straight."""
+    step's value to the ramp's end, along the ramp's shape."""
     segs = step.get("segments") or []
     start = int((segs[0].get("params") or {}).get(key, 128)) if segs else 128
-    end = (step.get("ramps") or {}).get(key)
-    if end is None:
+    r = ramp_of(step, key)
+    if r is None:
         return start
-    return int(round(start + (int(end) - start) * max(0.0, min(1.0, t))))
+    end, shape = r
+    return int(round(start + (end - start) * shape_t(shape, t)))
 
 
 def sub_steps(step):
@@ -100,6 +130,11 @@ def sub_steps(step):
         return [step]
     dur = float(step.get("dur", 10))
     n = max(2, min(12, int(dur)))
+    shapes = {ramp_of(step, k)[1] for k in ramps}
+    if "up and back" in shapes:
+        n = max(n, 7) if n % 2 == 0 or n < 7 else n          # an odd count lands a sample on the top of the curve
+    elif "ease in-out" in shapes:
+        n = max(n, 6)                                        # a curve needs the samples to read as one
     out = []
     for j in range(n):
         t = j / (n - 1)

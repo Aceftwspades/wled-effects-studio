@@ -107,6 +107,7 @@ ACTIONS = [
     ("snap",          "Snap to grid on / off (Ctrl while dragging: the other way)", "Shift+Tab", "graph"),
     ("dissolve",      "Delete and reconnect (what fed it feeds what it fed)", "Ctrl+Delete", "graph"),
     ("disconnect",    "Disconnect the selected nodes (every wire in and out)", "",       "graph"),
+    ("expr",          "Type an expression into the value under the pointer", "=",      "graph"),
     ("swap_inputs",   "Swap a node's first two inputs",                      "Alt+S",  "graph"),
     ("label_node",    "Label the selected node",                             "Shift+F2", "graph"),
     ("frame_sel",     "Put a Frame round the selection",                     "Ctrl+J", "graph"),

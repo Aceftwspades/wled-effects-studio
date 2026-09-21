@@ -73,6 +73,9 @@ class CodeEditor:
         self.mark = None               # a line to show (goto), until the next edit
         self.needle = ""               # the find text; its matches are highlighted
         self.find_at = None            # the match the cursor was last taken to
+        self.find_case = False         # match case
+        self.find_word = False         # whole words only
+        self._needle_re = None
         self._store = None
         self._dirty = True
         self._items = []
@@ -185,6 +188,18 @@ class CodeEditor:
         self.cur = [l0, c0]
         self.anchor = None
         return True
+
+    def insert(self, text, indent=True):
+        """Text put at the cursor from outside (the API reference): its
+        later lines take the indent of the line it lands on."""
+        self._sync_from_store()
+        if indent and "\n" in text:
+            l = self.cur[0]
+            lead = self.lines[l][:len(self.lines[l]) - len(self.lines[l].lstrip(" "))]
+            text = text.replace("\n", "\n" + lead)
+        self._insert(text)
+        self._dirty = True
+        self.focus = True
 
     def _insert(self, text):
         self._delete_sel()
@@ -336,24 +351,61 @@ class CodeEditor:
         return False
 
     # --- find --------------------------------------------------------------------------
-    def set_needle(self, text):
+    def set_needle(self, text, case=None, word=None):
+        """The find text, and how it matches: case as typed, whole words."""
+        was = (self.needle, self.find_case, self.find_word)
+        if case is not None:
+            self.find_case = bool(case)
+        if word is not None:
+            self.find_word = bool(word)
         self.needle = (text or "")
-        self.find_at = None
+        if (self.needle, self.find_case, self.find_word) != was:
+            self.find_at = None                            # a new search starts from the cursor; the same one goes on
+        pat = re.escape(self.needle)
+        if self.find_word:
+            pat = r"(?<!\w)" + pat + r"(?!\w)"
+        self._needle_re = re.compile(pat, 0 if self.find_case else re.IGNORECASE) if self.needle else None
         self._dirty = True
 
-    def matches(self):
-        """Every (line, col) the needle occurs at, case-insensitive."""
-        n = self.needle.lower()
-        if not n:
+    def _line_matches(self, li):
+        """The columns the needle occurs at on line li."""
+        if self._needle_re is None:
             return []
-        out = []
-        for li, ln in enumerate(self.lines):
-            low = ln.lower()
-            i = low.find(n)
-            while i >= 0:
-                out.append((li, i))
-                i = low.find(n, i + max(1, len(n)))
-        return out
+        return [m.start() for m in self._needle_re.finditer(self.lines[li])]
+
+    def matches(self):
+        """Every (line, col) the needle occurs at, as the options say."""
+        if self._needle_re is None:
+            return []
+        return [(li, c) for li in range(len(self.lines)) for c in self._line_matches(li)]
+
+    def find_place(self):
+        """(k, n): the match the cursor is on (1-based, 0 when on none) and how many there are."""
+        ms = self.matches()
+        if not ms or self.find_at is None:
+            return 0, len(ms)
+        cur = (self.find_at[0], self.find_at[1] - len(self.needle))
+        return (ms.index(cur) + 1 if cur in ms else 0), len(ms)
+
+    def replace_current(self, repl):
+        """The match the cursor is on becomes `repl` and the next is found;
+        on none, the next is found first. True when something was replaced."""
+        self._sync_from_store()
+        ms = self.matches()
+        if not ms:
+            return False
+        cur = None if self.find_at is None else (self.find_at[0], self.find_at[1] - len(self.needle))
+        if cur not in ms:
+            self.find_next(); return False
+        li, c = cur
+        n = len(self.needle)
+        self.lines[li] = self.lines[li][:c] + repl + self.lines[li][c + n:]
+        self.cur = [li, c + len(repl)]
+        self.anchor = None
+        self.find_at = None
+        self._commit()
+        self.find_next()
+        return True
 
     def find_next(self, backwards=False):
         """The cursor to the next match after it (or before, backwards),
@@ -510,16 +562,13 @@ class CodeEditor:
                                            color=(0, 0, 0, 0), fill=COL_SEL))
             if self.needle:
                 n = len(self.needle)
-                low = self.lines[li].lower()
-                i = low.find(self.needle.lower())
-                while i >= 0:
+                for i in self._line_matches(li):
                     xa = x_text + (i - self.left) * self.char_w
                     xb = xa + n * self.char_w
                     if xb > GUTTER and xa < W:
                         current = self.find_at == (li, i + n)
                         add(dpg.draw_rectangle((max(GUTTER, xa), y + 1), (min(W, xb), y + LINE_H - 1), parent=self.dl,
                                                color=(0, 0, 0, 0), fill=COL_FIND_CUR if current else COL_FIND, rounding=2))
-                    i = low.find(self.needle.lower(), i + max(1, n))
             add(dpg.draw_text((4, y + 1), f"{li + 1:>5}", parent=self.dl, color=COL_DIM, size=FONT_PX))
             self._draw_line(li, x_text, y + 1, W)
         if self.focus:
