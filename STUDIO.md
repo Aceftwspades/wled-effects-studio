@@ -1159,14 +1159,25 @@ the order to do them:
       the field pokes the running engine (`simParamSet`); only a change
       of topology, a setting or a colour rebuilds. Settings stay literal:
       several size arrays and loops.
-- [ ] **Signal visible everywhere, always.** Frame-scope values - the
+- [x] **Signal visible everywhere, always.** Frame-scope values - the
       sliders, Audio, the beat, Integrate, Ease, the Sequencer - are one
       number a frame, so probing them all costs nothing: a live readout
       on every frame-scope output pin, all the time, not on hover; a
       history plot on a hovered one.
-- [ ] **Control rate and audio rate told apart on the wire**
+- [x] **Control rate and audio rate told apart on the wire**
       (SuperCollider's kr / ar): frame-scope wires drawn thinner, so the
       graph shows which half runs once a frame and which 1,280 times.
+      Found on the way, and the worst bug of the season: the panel's
+      save() wrote node positions straight off the editor's grid - the
+      graph scaled by the zoom and shifted by the pan - so a graph saved
+      at 50% (and every Live compile saves) halved on every save, until
+      several of the project's graphs were heaps at the origin; the
+      history showed wobble.json's span going 820 → 410 → 205 → ... → 1
+      over two days of test runs. save() converts now, _sync_pos leaves
+      an unmoved node alone (the editor holds whole pixels: reading an
+      unmoved node back at a small zoom crept it), the squashed graphs
+      were restored from the examples and the history, and a test pins
+      the conversions.
 - [ ] **Units and scales on the fields**: a node definition may say a
       value's unit (ms, Hz, s, beats, x, %, LEDs) and its scale
       (logarithmic for times and rates, bipolar about zero); the slider

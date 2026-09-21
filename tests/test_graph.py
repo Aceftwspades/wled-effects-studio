@@ -160,6 +160,27 @@ def test_unfold_a_sub_graph():
     assert strip(after).count("noise") == strip(folded).count("noise") and strip(after).count("noise") == strip(before).count("noise")
 
 
+def test_positions_survive_a_zoomed_save():
+    """The panel's save takes node positions off the editor, whose grid is
+    the graph scaled by the zoom and shifted by the pan: the conversion
+    must invert exactly, or a graph saved at 50% halves every time (it
+    did, until the heaps at the origin were noticed). Checked on the
+    conversions alone: _disp then _graph is the identity, at every zoom
+    and pan, within the editor's whole pixels."""
+    from native.graph_ui import GraphPanel
+    import types
+    gp = types.SimpleNamespace(zoom=0.5, offset=[252.0, 95.5])
+    for z in (0.2, 0.5, 0.85, 1.0, 1.5):
+        for off in ([0.0, 0.0], [252.0, 95.5], [-300.0, 40.0]):
+            gp.zoom, gp.offset = z, off
+            for pos in ([20, 120], [1040, 975], [-40, 3]):
+                disp = GraphPanel._disp(gp, pos)
+                back = GraphPanel._graph(gp, disp)
+                assert abs(back[0] - pos[0]) < 1e-6 and abs(back[1] - pos[1]) < 1e-6, (z, off, pos, back)
+                rounded = GraphPanel._graph(gp, [round(disp[0]), round(disp[1])])    # what the editor hands back
+                assert abs(rounded[0] - pos[0]) <= 0.5 / z + 1e-6 and abs(rounded[1] - pos[1]) <= 0.5 / z + 1e-6
+
+
 def test_wired_input_is_required():
     """Sprites reads the Particles' state through its slots pin: unwired,
     it is a problem on the node and a refusal to compile, not a C++ error."""

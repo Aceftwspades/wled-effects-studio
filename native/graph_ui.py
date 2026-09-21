@@ -137,6 +137,8 @@ class GraphPanel:
         self._focus_sel = None
         self._link_normal = {}   # dpg link id -> the theme it wears when not dimmed
         self._label_items = []   # the wire labels drawn last frame
+        self._readout_items = [] # the live readouts drawn last frame, on the frame-scope output pins
+        self._scope_cache = None # (edits, {nid: scope}) - the plan's scopes for the graph as it is now
         self._mark_themes = {}   # "error"/"warn" -> outline theme
         self.problems = {}       # node id -> message, from the last rebuild
         self.preview = None      # (node, output) routed to Output instead of the graph's own
@@ -260,10 +262,11 @@ class GraphPanel:
     def save(self):
         if not self.graph:
             return
-        for nid, n in self.graph.nodes.items():
-            tag = f"gnode_{nid}"
-            if dpg.does_item_exist(tag):
-                n["pos"] = list(dpg.get_item_pos(tag))
+        # the nodes' places as the editor shows them, back in graph units: the
+        # editor's grid is the graph scaled by the zoom and shifted by the pan,
+        # and writing the grid position raw halved a graph at 50% on every
+        # save (and every Live compile saves) until it was a heap at the origin
+        self._sync_pos()
         path = os.path.join(self.cur_dir or self.dir, self.file)
         if os.path.exists(path):
             from native import history
@@ -944,12 +947,18 @@ class GraphPanel:
         self._mid_last = None
 
     def _sync_pos(self):
+        """The nodes' positions from the editor, in graph units - only where
+        a node was moved: the editor holds whole pixels, so at a small zoom
+        reading an unmoved node back would creep it a unit or two a time."""
         if not self.graph:
             return
         for nid, n in self.graph.nodes.items():
             tag = f"gnode_{nid}"
             if dpg.does_item_exist(tag):
-                n["pos"] = self._graph(dpg.get_item_pos(tag))
+                shown = dpg.get_item_pos(tag)
+                want = self._disp(n.get("pos", [0, 0]))
+                if abs(shown[0] - want[0]) > 1.0 or abs(shown[1] - want[1]) > 1.0:
+                    n["pos"] = self._graph(shown)
 
     def snapshot(self, key=None):
         """Call before changing the graph. `key` names a continuous edit."""
@@ -1362,6 +1371,7 @@ class GraphPanel:
         self._poll_pads()
         self._poll_focus()
         self._poll_labels()
+        self._poll_readouts()
         if not self.auto or not self._dirty or not self.graph:
             return
         if time.time() - self._dirty < self.AUTO_DELAY:
@@ -1719,6 +1729,58 @@ class GraphPanel:
         pad = self.px(8)
         x = nd["rect_max"][0] + pad if kind == "out" else nd["rect_min"][0] - pad
         return (x, y)
+
+    def _poll_readouts(self):
+        """The live value on every frame-scope output pin of the effect on
+        screen - one number a frame each, read from the probes the build
+        planted (as a synth's meters: always on, not on hover)."""
+        for it in self._readout_items:
+            if dpg.does_item_exist(it):
+                dpg.delete_item(it)
+        self._readout_items = []
+        if not self.graph or self.app.layout != "graph" or not self.app.ui or self.zoom < 0.7:
+            return
+        if dpg.is_item_shown("graph_menu") or dpg.is_item_shown("graph_ctx") or self.overview():
+            return
+        probes = getattr(self, "_probes", None) or {}
+        if not probes or not getattr(self, "_probes_for", None):
+            return
+        eng = self.app.eng
+        want = self.app.project.effect_title(self._probes_for)
+        if not eng.names or eng.names[eng.idx] != want:
+            return
+        pane = self.app._screen_rect("graph_win")
+        if not pane:
+            return
+        eh = dpg.get_item_rect_size("node_editor")[1]
+        x0, y0, x1, y1 = pane[0] + 9, pane[3] - 9 - eh, pane[2] - 9, pane[3] - 9
+        scope = getattr(self, "_probe_scope", {}) or {}
+        size = max(9, int(11 * self.zoom))
+        cw = self.char_w
+        if not dpg.does_item_exist("wire_labels"):
+            dpg.add_viewport_drawlist(front=True, tag="wire_labels")
+        for k, (nid, name) in probes.items():
+            if scope.get(nid) != "frame" or nid not in self.graph.nodes or self.graph.nodes[nid].get("collapsed"):
+                continue
+            pt = self._pin_point(nid, "out", name)
+            if not pt:
+                continue
+            ax, ay = pt
+            v = eng.probe(k)
+            try:
+                d = self.graph.node_def(self.graph.nodes[nid])
+                t = next((o["type"] for o in d["outputs"] if o["name"] == name), "float")
+            except G.GraphError:
+                t = "float"
+            text = ("on" if v > 0.5 else "off") if t == "bool" else (f"{v:.3g}" if abs(v) < 1e5 else f"{v:.2e}")
+            # left of the pin's name, inside the node: the name is right-aligned to the pin
+            w = len(text) * size * 0.6
+            rx = ax - 10 - len(name) * cw - 6 - w
+            ry = ay - size * 0.55
+            if rx < x0 or rx + w > x1 or ry < y0 or ry + size > y1:
+                continue
+            col = (110, 190, 250, 255) if t != "bool" else ((170, 230, 120, 255) if v > 0.5 else (90, 96, 108, 255))
+            self._readout_items.append(dpg.draw_text((rx, ry), text, parent="wire_labels", color=col, size=size))
 
     def _poll_labels(self):
         if not dpg.does_item_exist("wire_labels"):
@@ -2449,21 +2511,47 @@ class GraphPanel:
         lid = dpg.add_node_link(ta, tb, parent="node_editor")
         meta = self.graph.link_meta.get((b, inp)) or {}
         col = meta.get("color")
-        dpg.bind_item_theme(lid, self._wire_theme(tuple(col)) if col else self.themes().link[self._ptype.get(ta, "float")])
+        thin = self.scopes().get(a) == "frame"           # control rate: one value a frame, drawn thinner
+        if col or thin:
+            th = self._wire_theme(tuple(col) if col else PIN_COL.get(self._ptype.get(ta, "float"), PIN_COL["float"]), thin=thin)
+        else:
+            th = self.themes().link[self._ptype.get(ta, "float")]
+        dpg.bind_item_theme(lid, th)
         self.links[lid] = (b, inp)
-        self._link_normal[lid] = self._wire_theme(tuple(col)) if col else self.themes().link[self._ptype.get(ta, "float")]
+        self._link_normal[lid] = th
         self._show_input(b, inp, True)
 
-    def _wire_theme(self, col):
-        th = self._wire_themes.get(col)
+    def _wire_theme(self, col, thin=False):
+        """A wire's theme: its colour; thin for a frame-scope source (a
+        value once a frame - control rate - against the per-pixel wires)."""
+        key = (col, thin, self.zoom if thin else None)
+        th = self._wire_themes.get(key)
         if th is None:
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvNodeLink):
                     dpg.add_theme_color(dpg.mvNodeCol_Link, col, category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_color(dpg.mvNodeCol_LinkHovered, (255, 255, 255), category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_color(dpg.mvNodeCol_LinkSelected, (255, 255, 255), category=dpg.mvThemeCat_Nodes)
-            self._wire_themes[col] = th
+                    if thin:
+                        dpg.add_theme_style(dpg.mvNodeStyleVar_LinkThickness, max(1.0, 1.4 * self.zoom), category=dpg.mvThemeCat_Nodes)
+            self._wire_themes[key] = th
         return th
+
+    def scopes(self):
+        """{nid: "frame" | "pixel"} for the graph as it is now, from the
+        plan (no codegen); cached until the next edit; {} when the graph
+        cannot be planned."""
+        if not self.graph:
+            return {}
+        c = self._scope_cache
+        if c and c[0] == self.edits and c[2] is self.graph:
+            return c[1]
+        try:
+            _, _, scope, _, _, _ = self.graph.plan()
+        except Exception:
+            scope = {}
+        self._scope_cache = (self.edits, scope, self.graph)
+        return scope
 
     # --- editing callbacks ------------------------------------------------------------
     def on_link(self, sender, app_data):
