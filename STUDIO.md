@@ -1178,7 +1178,7 @@ the order to do them:
       unmoved node back at a small zoom crept it), the squashed graphs
       were restored from the examples and the history, and a test pins
       the conversions.
-- [ ] **Units and scales on the fields**: a node definition may say a
+- [x] **Units and scales on the fields**: a node definition may say a
       value's unit (ms, Hz, s, beats, x, %, LEDs) and its scale
       (logarithmic for times and rates, bipolar about zero); the slider
       obeys and the field shows the unit.

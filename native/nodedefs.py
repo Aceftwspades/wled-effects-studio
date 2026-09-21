@@ -1116,6 +1116,55 @@ NEEDS = {"Gravity": "imu",
          "Audio": "audio", "FFT bin": "audio", "Beat kick": "audio", "Spectrum": "audio", "Loudest bin": "audio"}
 # an input that must be wired, and from what: the node reads another's state through it
 WIRED = {"Sprites": ("slots", "Particles or Emitters"), "Shells": ("slots", "Emitters or Particles")}
+# Units, ranges and scales for the numbers on the nodes (a synth's knob says
+# Hz or ms, and a frequency knob is logarithmic): (unit, low, high, scale).
+# A unit shows on the field; low and high make the field a slider (an input
+# had no range before); "log" marks a value that moves by ratio - a drag
+# field paces itself by the value's size already, so the mark is for the
+# slider, which spends half its travel below the geometric middle.
+# Pins under the node's inputs, settings under its params; None keeps what is.
+UNITS = {
+    "Envelope":   {"attack": ("ms", 1.0, 2000.0, "log"), "release": ("ms", 1.0, 5000.0, "log")},
+    "Spring":     {"hz": ("Hz", 0.05, 20.0, "log"), "damping": ("", 0.0, 1.0, None)},
+    "Ease":       {"seconds": ("s", 0.02, 20.0, "log")},
+    "Delay":      {"x": None},
+    "Sequencer":  {"t1": ("s", None, None, None), "t2": ("s", None, None, None), "t3": ("s", None, None, None), "t4": ("s", None, None, None)},
+    "Integrate":  {"rate": ("/s", None, None, None), "wrap": ("", None, None, None)},
+    "Beat kick":  {"throw": ("x", 0.0, 4.0, None)},
+    "Particles":  {"rate": ("/s", 0.0, 200.0, None), "life": ("s", 0.05, 20.0, "log"), "spread": ("", 0.0, 2.0, None), "drag": ("", 0.0, 5.0, None)},
+    "Emitters":   {"life": ("s", 0.05, 30.0, "log")},
+    "Wave":       {"cycles": ("x", 0.0, 32.0, None), "phase": ("turns", None, None, None), "distort": ("", 0.0, 2.0, None)},
+    "Stripes":    {"count": ("", 1.0, 64.0, None), "phase": ("turns", None, None, None), "duty": ("", 0.0, 1.0, None)},
+    "Ripple":     {"rings": ("", 0.5, 32.0, None), "phase": ("turns", None, None, None)},
+    "Checker":    {"scale": ("x", 0.1, 64.0, "log")},
+    "Noise":      {"scale": ("x", 0.05, 64.0, "log")},
+    "Voronoi":    {"scale": ("x", 0.1, 32.0, "log")},
+    "Brick":      {"scale": ("x", 0.1, 64.0, "log"), "mortar": ("", 0.0, 0.5, None)},
+    "Transform":  {"turns": ("turns", None, None, None), "zoom": ("x", 0.1, 10.0, "log")},
+    "Rotate":     {"turns": ("turns", None, None, None)},
+    "Blend":      {"amount": ("", 0.0, 1.0, None)},
+    "Palette":    {"brightness": ("", 0.0, 1.0, None)},
+    "Mix":        {"t": ("", 0.0, 1.0, None)},
+    "Scale":      {"by": ("", 0.0, 1.0, None)},
+    "Fade":       {"keep": ("", 0.0, 1.0, None)},
+    "Mask":       {"mask": ("", 0.0, 1.0, None)},
+    "Layers":     {"amount 1": ("", 0.0, 1.0, None), "amount 2": ("", 0.0, 1.0, None), "amount 3": ("", 0.0, 1.0, None), "amount 4": ("", 0.0, 1.0, None)},
+    "Adjust":     {"hue": ("turns", -1.0, 1.0, None), "saturation": ("x", 0.0, 3.0, None), "value": ("x", 0.0, 3.0, None),
+                   "contrast": ("x", 0.0, 3.0, None), "gamma": ("", 0.2, 4.0, "log")},
+    "Levels":     {"brightness": ("x", 0.0, 3.0, None), "contrast": ("x", 0.0, 3.0, None), "gamma": ("", 0.2, 4.0, "log")},
+    "Glow":       {"amount": ("", 0.0, 2.0, None), "radius": ("px", None, None, None)},
+    "Blur":       {"radius": ("px", None, None, None)},
+    "Sparkle":    {"density": ("", 0.0, 1.0, None)},
+    "Sprites":    {"size": ("", 0.01, 1.0, "log")},
+    "Shells":     {"speed": ("/s", 0.0, 10.0, None), "width": ("", 0.01, 1.0, "log")},
+    "Torus knot": {"tube": ("", 0.01, 1.0, None)},
+    "Spectrum":   {"index": ("", 0.0, 1.0, None), "smooth": ("", None, None, None)},
+    "Map range":  {"steps": ("", 0.0, 64.0, None)},
+    "Text":       {"offset": ("", None, None, None), "size": ("x", None, None, None)},
+    "Image":      {"width": ("px", None, None, None), "height": ("px", None, None, None)},
+    "Speed":      {"default": ("", None, None, None)},
+    "Custom 3":   {"default": ("", None, None, None)},
+}
 # two inputs that are one point: an XY pad on the node sets both while neither is wired
 # (name, name, low, high - the pad's range on both axes)
 PADS = {"Transform": [("pivot_u", "pivot_v", 0.0, 1.0), ("move_u", "move_v", -1.0, 1.0)],
@@ -1136,6 +1185,18 @@ def library(extra=()):
             lib[d["name"]]["wired"] = WIRED[d["name"]]
         if d["name"] in PADS:
             lib[d["name"]]["pads"] = PADS[d["name"]]
+        for pin, spec in (UNITS.get(d["name"]) or {}).items():
+            if spec is None:
+                continue
+            unit, lo, hi, scale = spec
+            for q in list(lib[d["name"]]["inputs"]) + list(lib[d["name"]]["params"]):
+                if q["name"] == pin:
+                    if unit:
+                        q["unit"] = unit
+                    if lo is not None and hi is not None and "min" not in q:
+                        q["min"], q["max"] = lo, hi
+                    if scale:
+                        q["scale"] = scale
     for d in extra:
         try:
             lib[d["name"]] = d

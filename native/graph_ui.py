@@ -115,6 +115,7 @@ class GraphPanel:
         self._widgets = set()    # every value widget on a node, so keys know when one is typed in
         self._pads = {}          # image button -> (nid, a, b, lo, hi, texture): the XY pads on the nodes
         self._field_themes = {}  # (frame, accent, light) -> the theme a node's value fields wear
+        self._log_sliders = {}   # slider -> unit: the sliders that hold a logarithm (set_value takes a log)
         self._pad_stroke = None  # the pad being dragged, for one undo step a stroke
         # --- zoom ---------------------------------------------------------------------
         # The node editor cannot zoom, so the panel does: every size it lays
@@ -1389,7 +1390,7 @@ class GraphPanel:
         keep = self._clicked()
         if keep:
             self.ext_sel = [n for n in dict.fromkeys(list(self.ext_sel) + keep)]
-        self._widgets.clear(); self._pads.clear()
+        self._widgets.clear(); self._pads.clear(); self._log_sliders.clear()
         dpg.delete_item("node_editor", children_only=True)
         self.links.clear(); self._pins.clear(); self._ptype.clear(); self._link_normal.clear()
         self._focus_sel = None
@@ -1950,9 +1951,7 @@ class GraphPanel:
         v = n["inputs"].get(i["name"], i.get("default", 0))
         ud = (nid, i["name"])
         if i["type"] == "float":
-            # a drag field: drag to change, ctrl+click to type; the pace from the value's size
-            w = dpg.add_drag_float(label=i["name"], tag=tag, width=self.px(78), default_value=float(v), speed=self._drag_speed(v, i.get("default")),
-                                   format="%.3g", user_data=ud, callback=self._on_input, show=show)
+            w = self._number_widget(i, float(v), tag, ud, self._on_input, show)
         elif i["type"] == "bool":
             w = dpg.add_checkbox(label=i["name"], tag=tag, default_value=bool(v), user_data=ud,
                              callback=self._on_input, show=show)
@@ -2045,6 +2044,9 @@ class GraphPanel:
                 try:
                     if dpg.get_item_type(w).endswith("ColorEdit"):
                         dpg.set_value(w, [c / 255.0 for c in list(val)[:3]] + [1.0])
+                    elif w in self._log_sliders:
+                        import math
+                        dpg.set_value(w, math.log(max(1e-9, float(val)))); self._log_label(w, float(val), self._log_sliders[w])
                     else:
                         dpg.set_value(w, val)
                 except Exception:
@@ -2083,6 +2085,8 @@ class GraphPanel:
             cur = dpg.get_value(w)
             if t.endswith("Int"):
                 step = 1
+            elif w in self._log_sliders:
+                step = (cfg.get("max_value") - cfg.get("min_value")) / 100.0      # a hundredth of the log range: a ratio
             else:
                 lo, hi = cfg.get("min_value"), cfg.get("max_value")
                 step = (hi - lo) / 100.0 if t.endswith("SliderFloat") and hi is not None and hi > lo else max(0.01, abs(cur) * 0.01)
@@ -2093,6 +2097,9 @@ class GraphPanel:
                     val = max(lo, min(hi, val))
             val = int(round(val)) if t.endswith("Int") else round(val, 6)
             dpg.set_value(w, val)
+            if w in self._log_sliders:
+                import math
+                val = math.exp(val); self._log_label(w, val, self._log_sliders[w])
             (self._on_param if kind == "param" else self._on_input)(w, val)
             return True
         if not t.endswith("Combo"):
@@ -2118,14 +2125,7 @@ class GraphPanel:
             self._widgets.add(w)
             return
         if p["type"] == "float":
-            lo, hi = p.get("min"), p.get("max")
-            if lo is not None and hi is not None and float(hi) - float(lo) <= 1000.0:
-                # a range: a slider with the value on it; ctrl+click types one
-                w = dpg.add_slider_float(label=p["name"], width=self.px(96), default_value=float(v), min_value=float(lo), max_value=float(hi),
-                                         clamped=True, format="%.3g", user_data=ud, callback=cb)
-            else:
-                w = dpg.add_drag_float(label=p["name"], width=self.px(78), default_value=float(v), speed=self._drag_speed(v, p.get("default")),
-                                       format="%.3g", user_data=ud, callback=cb)
+            w = self._number_widget(p, float(v), None, ud, cb, True)
         elif p["type"] == "int" and n["type"] == "Effect settings" and p["name"] == "palette":
             # the default palette by name, not by number
             names = [f"{i}  {name}" for name, i in self._palette_names()]
@@ -2189,6 +2189,41 @@ class GraphPanel:
                     dpg.add_theme_style(dpg.mvStyleVar_GrabMinSize, 6, category=dpg.mvThemeCat_Core)
             self._field_themes[key] = th
         return th
+
+    def _number_widget(self, spec, v, tag, ud, cb, show):
+        """A number on a node: a slider when the definition gives a range (a
+        log-scaled one moves by ratio - the widget holds the value's log
+        and the callback maps it back), else a drag field paced by the
+        value's size; the unit, if any, written after the value."""
+        import math
+        unit = spec.get("unit") or ""
+        fmt = "%.3g" + (f" {unit}" if unit else "")
+        lo, hi = spec.get("min"), spec.get("max")
+        kw = {"label": spec["name"], "user_data": ud, "show": show}
+        if tag:
+            kw["tag"] = tag
+        if unit.lower() == spec["name"].lower():
+            unit, fmt = "", "%.3g"                           # "1.2 Hz  hz" says it twice
+        if lo is not None and hi is not None and (float(hi) - float(lo) <= 1000.0 or spec.get("scale") == "log"):
+            lo, hi = float(lo), float(hi)
+            if spec.get("scale") == "log" and lo > 0 and hi > lo:
+                # the slider holds log(value): its travel is by ratio, the value shown by the label's format
+                lv = math.log(max(lo, min(hi, v if v > 0 else lo)))
+                w = dpg.add_slider_float(width=self.px(96), default_value=lv, min_value=math.log(lo), max_value=math.log(hi), clamped=True,
+                                         format="", callback=lambda s_, a_: (self._log_label(s_, math.exp(a_), unit), cb(s_, math.exp(a_))), **kw)
+                self._log_label(w, v, unit)
+                self._log_sliders[w] = unit
+                return w
+            return dpg.add_slider_float(width=self.px(96), default_value=max(lo, min(hi, v)), min_value=lo, max_value=hi, clamped=True,
+                                        format=fmt, callback=cb, **kw)
+        return dpg.add_drag_float(width=self.px(78), default_value=v, speed=self._drag_speed(v, spec.get("default")), format=fmt, callback=cb, **kw)
+
+    def _log_label(self, w, v, unit):
+        """A log slider shows no value of its own (it holds a logarithm): the value goes in its label."""
+        if dpg.does_item_exist(w):
+            ud = dpg.get_item_user_data(w)
+            name = ud[1] if isinstance(ud, tuple) else ""
+            dpg.configure_item(w, label=f"{v:.3g}{(' ' + unit) if unit else ''}  {name}")
 
     @staticmethod
     def _drag_speed(v, default=None):

@@ -76,7 +76,10 @@ pin to wire, or to empty space for a list of what could go there. A
 number on a node is a **drag field**: drag it sideways to change it (a
 big number moves in big steps, a small one finely), ctrl+click to type
 one; a setting with a range is a **slider** with its value written on
-it, ctrl+click types there too; Ctrl+wheel over either steps it. Two
+it, ctrl+click types there too; Ctrl+wheel over either steps it. A
+value with a unit says so (20 ms, 1.2 Hz, 4 x, 2 s), and one that
+moves by ratio - a time, a rate, a scale - has a slider that spends half
+its travel below the geometric middle. Two
 inputs that make one point - Transform's pivot and move, Gravity's
 tilt, Mandelbrot's Julia constant - also get an **XY pad**: drag the dot
 and both fields follow. Effect settings' palette is picked by name. Every
