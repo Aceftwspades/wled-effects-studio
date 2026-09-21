@@ -5,3 +5,5 @@ pillow>=10
 # optional: live audio - a microphone or line-in (sounddevice), what the PC plays (pyaudiowpatch, Windows)
 sounddevice>=0.4
 pyaudiowpatch>=0.2.12; sys_platform == "win32"
+# optional: a MIDI controller's knobs on the sliders (Playback > MIDI controller)
+python-rtmidi>=1.5

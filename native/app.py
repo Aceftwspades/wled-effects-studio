@@ -40,7 +40,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui
+from native import chrome, glow, device_ui, shape_ui, midi_ui
 from native.gpucube import CubeQuads
 from native.textures import registry as tex_registry
 from native.features import Features
@@ -1934,7 +1934,7 @@ class App(Features):
         """A popup menu that grew past the window's edge - a fold opened
         near the bottom - is moved back inside, so every row can be reached."""
         vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
-        for tag in ("graph_ctx", "graph_menu", "compare_menu", "open_menu") + tuple(self.pane_menus.values()):
+        for tag in ("graph_ctx", "graph_menu", "compare_menu", "open_menu", "midi_ctx") + tuple(self.pane_menus.values()):
             if not (dpg.does_item_exist(tag) and dpg.is_item_shown(tag)):
                 continue
             w, h = dpg.get_item_rect_size(tag)
@@ -2454,6 +2454,9 @@ class App(Features):
         if self.layout == "graph" and (dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)):
             if self.gp.knife_start():
                 return                                   # Ctrl+right-drag: the knife, not the menu
+        k = midi_ui.hovered_slider()
+        if k and self.ui:
+            midi_ui.slider_menu(self, k); return         # a parameter slider: MIDI learn, and what is on it
         for pane, tag in getattr(self, "pane_menus", {}).items():
             if pane == "side_win" and not any(dpg.is_item_hovered(f"sec_{k}_hdr") for k in self.SECTIONS
                                               if dpg.does_item_exist(f"sec_{k}_hdr")):
@@ -2742,6 +2745,7 @@ class App(Features):
             "repeat":       self.repeat_last,
             "palette":      lambda: chrome.show_palette(self),
             "snapshots":    lambda: chrome.show_snapshots(self),
+            "midi":         lambda: midi_ui.show(self),
             "undo_history": lambda: chrome.show_undo_history(self),
             "history":      lambda: chrome.show_history(self),
             "compare":      lambda: self.stop_ab() if self.ab else chrome.show_compare(self),
@@ -2823,7 +2827,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -3564,7 +3568,7 @@ def service_command(app):
                 app.wiring_stop() if c["wiring_test"] == "off" else app.wiring_start(c["wiring_test"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
-                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np})))
+                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui})))
                 except Exception:
                     import traceback; traceback.print_exc()
             if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]
@@ -3900,6 +3904,10 @@ def service_command(app):
                 app.gp.set_selection([int(x) for x in c["graph_select"]])
             if "graph_selected" in c:                   # test hook: a selection, held until cleared with []
                 app.gp._test_sel = [int(x) for x in c["graph_selected"]] or None
+            if "midi" in c:                             # test hook: a MIDI message's bytes, as if the port sent them
+                app.midi.inject([int(b) for b in c["midi"]])
+            if "midi_learn" in c:                       # test hook: a target to learn next (see midi_ui.targets), or null to cancel
+                midi_ui.learn(app, c["midi_learn"])
             if "snap" in c:                             # test hook: ["save", name] | ["apply", name] | ["morph", a, b, t] | ["del", name]
                 op = c["snap"]
                 if op[0] == "save": app.gp.snapshot_save(op[1])
@@ -4484,6 +4492,7 @@ def main():
                     app.code_ed.poll()
                 app.poll_glow()
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
+                midi_ui.poll(app)
                 chrome.poll_update(app); chrome.poll_update_download(app)
                 _t.append(time.perf_counter())
                 app.step_sim()

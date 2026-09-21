@@ -143,7 +143,17 @@ scrubbing back through the last seconds while paused, and a **speed** -
 1/4x to 4x (Shift+, and Shift+. step it, Shift+/ is back to 1x) - for
 watching an effect slowly or running it ahead; the footer says the speed
 while it is not 1x. The footer also names the **LED under the pointer**
-in either view: its wiring index, its part, its position. Segments (+ in
+in either view: its wiring index, its part, its position. A **MIDI
+controller** (Playback > MIDI controller...) puts its knobs on the
+sliders: pick the port ("Rescan" after plugging one in), pick what a knob
+should drive - a parameter slider, a check, the palette or the effect by
+index, a typed value on a pin of the open graph - press "Learn" and move
+the knob; a right-click on a parameter slider, or a pin's menu, offers
+the same. A mapping moves the slider, the picture and, with the sim
+streamed, the device; a pin's mapping has a range to edit and belongs to
+that graph. The mappings are the project's. It needs the optional
+python-rtmidi (`pip install python-rtmidi`); without it the window says
+so. Segments (+ in
 the panel) layer several effects with WLED's blend modes and opacity, and
 carry WLED's segment options - reverse, mirror (and Y, and swap XY on a
 matrix), group, space, offset - which the sim lays out the way the device
@@ -574,6 +584,7 @@ on and install what it carries.
 - **Playback** › Sequence...
 - **Playback** › Compare with another effect... `Ctrl+Shift+B`
 - **Playback** › Sweep a slider... `Ctrl+Shift+W`
+- **Playback** › MIDI controller...
 - **Playback** › Compile + reload `F5`
 - **Playback** › Run the graph as a script (no build) `Ctrl+Shift+R`
 - **Playback** › Live: rebuild the graph as it changes `L`
@@ -699,6 +710,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Shift+R` | Repeat the last action | anywhere |
 | `Ctrl+P` | Command palette: every action by name | anywhere |
 | `Ctrl+Shift+K` | Snapshots: the graph's settings as named states | anywhere |
+| `—` | MIDI controller: knobs onto the sliders | anywhere |
 | `Ctrl+Alt+Z` | Undo history | anywhere |
 | `Ctrl+Shift+Y` | History of the current graph or code | anywhere |
 

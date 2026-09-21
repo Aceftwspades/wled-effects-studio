@@ -62,6 +62,18 @@ STEPS = [
     ([{"graph_open": "box_fire.json"}, {"py": "(app.gp.add_node('Send'), app.gp.add_node('Receive'))"},
       {"py": "app.gp.graph.link(6, 't', max(app.gp.graph.nodes) - 1, 'in')"},
       {"py": "'Receive' not in app.gp.graph.compile() and 'Send' not in app.gp.graph.compile()"}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
+    # MIDI learn without a controller: the window, Speed learnt from an injected CC and driven to 255, a typed pin
+    # of the graph learnt and driven to the top of its range, the slider's right-click menu; the mappings cleared
+    ([{"graph_open": "box_fire.json"}, {"action": "midi"}, {"midi_learn": {"kind": "fx", "key": "sx"}}, {"midi": [176, 7, 64]}], 1.0),
+    ([{"expect": ["graph_status", "MIDI: CC 7 ch 1 -> "]}, {"expect": ["graph_status", "(sx)"]}, {"midi": [176, 7, 127]}], 0.6),
+    ([{"expect": ["inp_sx", "255"]},
+      {"midi_learn": {"kind": "pin", "graph": "box_fire.json", "nid": 12, "name": "scale", "lo": 0.0, "hi": 12.0}}], 0.6),
+    ([{"midi": [177, 8, 127]}], 0.6),
+    ([{"expect": ["graph_status", "CC 8 ch 2 -> Noise #12 . scale"]}, {"py": "app.gp.graph.nodes[12]['inputs']['scale']"},
+      {"py": "(dpg.set_value('sld_sx', 0), app.eng.fx.__setitem__('sx', 0))"}, {"midi": [176, 7, 100]}], 0.6),
+    ([{"expect": ["inp_sx", "201"]}, {"py": "midi_ui.slider_menu(app, 'sx') or dpg.is_item_shown('midi_ctx')"}], 0.6),
+    ([{"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
+      {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),
     # a node's type changed with its wires kept; two nodes merged through an Add
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.change_type(3, 'Subtract') if app.gp.graph.nodes[3]['type'] == 'Multiply' else app.gp.change_type(3, 'Multiply')"}], 1.0),
     ([{"expect": ["graph_status", "is now"]}, {"graph_selected": [1, 2]}, {"py": "app.gp.merge_selected('Add')"}, {"graph_selected": []}], 1.0),

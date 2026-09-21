@@ -239,6 +239,7 @@ def build_menus(app):
             dpg.add_menu_item(label="Sequence...", callback=lambda: device_ui.show(app, "sequence"))
             _mi(app, "Compare with another effect...", "compare", callback=lambda: app.run_action("compare"))
             _mi(app, "Sweep a slider...", "sweep", callback=lambda: app.run_action("sweep"))
+            _mi(app, "MIDI controller...", "midi", callback=lambda: app.run_action("midi"))
             dpg.add_separator()
             _mi(app, "Compile + reload", "build", callback=lambda: app.build_current())
             _mi(app, "Run the graph as a script (no build)", "script_preview", callback=lambda: app.preview_script())
@@ -472,6 +473,9 @@ def build_dialogs(app):
                                  callback=lambda s, v: app.gp.snapshot_morph(v))
             dpg.add_combo([], tag="snap_b", width=110)
             tip("drag between the two: numbers blend, the rest switches half way; typed values follow live, a changed setting rebuilds")
+    # MIDI: a controller's knobs onto the sliders (midi_ui.py)
+    from native import midi_ui
+    midi_ui.build(app)
     # REPORT A PROBLEM: where the bundle landed, and the issues page
     with dpg.window(tag="report_win", label="Report a problem", show=False, width=560, height=230, no_collapse=True):
         dpg.add_text("", tag="report_text", wrap=540)

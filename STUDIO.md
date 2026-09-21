@@ -1216,8 +1216,16 @@ the order to do them:
       like any other. A wire that closes a loop gets a Delay when its
       source runs once a frame and carries a number (undo takes both
       out); a colour or per-pixel loop is linked and refused as before.
-- [ ] **MIDI learn**: a controller's knobs onto the panel's sliders (and
-      through them the device), an optional python-rtmidi.
+- [x] **MIDI learn**: a controller's knobs onto the panel's sliders (and
+      through them the device), an optional python-rtmidi. native/midi.py
+      (the port on rtmidi's thread, messages queued for the main one, the
+      maps in the project's options) and native/midi_ui.py (Playback >
+      MIDI controller: port, target, Learn, the mappings with a range
+      each; a parameter slider's right-click and a pin's menu offer Learn
+      too). Targets: the sliders, the checks, the palette and the effect
+      by index, a typed value on a pin (a bool pin on/off). Not tried
+      against a real controller yet: no MIDI input on this PC; the tests
+      inject messages through the port's own callback.
 
 ### Line-in (September 2026)
 

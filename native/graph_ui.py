@@ -2002,6 +2002,41 @@ class GraphPanel:
             return False
         return all(eng.param_set(idx, k, v) for k, v in slots)
 
+    def set_input_live(self, nid, name, val):
+        """A typed value set from outside the node (a MIDI knob): the graph,
+        the field on the node, and the running effect - no rebuild when the
+        poke lands, as with a drag."""
+        n = self.graph.nodes.get(nid) if self.graph else None
+        if n is None:
+            return False
+        d = self.graph.node_def(n)
+        ptype = next((i["type"] for i in d["inputs"] if i["name"] == name), "float")
+        if ptype == "bool":
+            val = bool(val)
+        elif ptype == "float":
+            val = round(float(val), 5)
+        if n.get("inputs", {}).get(name) == val:
+            return True
+        was_dirty = self._dirty
+        self.touch(); self.snapshot(("midi", nid, name))    # a knob's stroke is one undo step
+        n.setdefault("inputs", {})[name] = val
+        w = f"gin_{nid}_{name}_w"
+        if dpg.does_item_exist(w):
+            try:
+                if w in self._log_sliders:
+                    import math
+                    dpg.set_value(w, math.log(max(1e-9, float(val)))); self._log_label(w, float(val), self._log_sliders[w])
+                else:
+                    dpg.set_value(w, val)
+            except Exception:
+                pass
+        for btn, pad in list(self._pads.items()):          # a pad showing this pin follows
+            if pad[0] == nid and name in (pad[1], pad[2]):
+                self._pad_draw(btn)
+        if self.live_poke(nid, name, val) and not was_dirty:
+            self._dirty = 0.0
+        return True
+
     def _on_input(self, sender, val):
         was_dirty = self._dirty
         self.touch()
@@ -3127,6 +3162,13 @@ class GraphPanel:
                 with dpg.tree_node(label="modulate with", parent=P):
                     for label, src in self.MODULATORS:
                         row(f"  {label}", lambda src=src: self.modulate(nid, name, src))
+            if i["type"] in ("float", "bool") and not linked and self.file:
+                # a controller's knob onto this typed value (Playback > MIDI controller lists the rest)
+                from native import midi_ui, midi
+                t = midi_ui.pin_target(self.app, nid, name)
+                row("MIDI learn: move a knob", lambda: midi_ui.learn(self.app, t))
+                for k, ctl in midi_ui.mapped_to(self.app, t):
+                    row(f"forget {midi.ctl_label(ctl)}", lambda k=k: midi_ui.forget(self.app, k))
         elif kind == "out":
             outs = [l for l in self.graph.links if l[0] == nid and l[1] == name]
             dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
