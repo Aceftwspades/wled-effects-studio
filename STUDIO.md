@@ -1206,7 +1206,7 @@ What would say the studio is complete, in the order to do them:
       it runs on; no toolchain bundling - the system compiler), and the
       things that only show on a screen: fonts, the viewport's flags, the
       audio device list.
-- [ ] Housekeeping first: the studio no longer assumes a cube anywhere a
+- [x] Housekeeping first: the studio no longer assumes a cube anywhere a
       user reads - `studio/` (was `cube_sim/`), "WLED Effects Studio"; the
       firmware usermod stays `cube_fx` and its effect names keep the "Ace
       3-D" family prefix the on-cube menu filters on.
