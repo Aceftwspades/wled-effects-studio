@@ -116,6 +116,7 @@ class GraphPanel:
         self._pads = {}          # image button -> (nid, a, b, lo, hi, texture): the XY pads on the nodes
         self._field_themes = {}  # (frame, accent, light) -> the theme a node's value fields wear
         self._log_sliders = {}   # slider -> unit: the sliders that hold a logarithm (set_value takes a log)
+        self._live_glyphs = {}   # nid -> type: the glyphs redrawn each frame (the audio bars)
         self._pad_stroke = None  # the pad being dragged, for one undo step a stroke
         # --- zoom ---------------------------------------------------------------------
         # The node editor cannot zoom, so the panel does: every size it lays
@@ -1373,6 +1374,7 @@ class GraphPanel:
         self._poll_focus()
         self._poll_labels()
         self._poll_readouts()
+        self._poll_glyphs()
         if not self.auto or not self._dirty or not self.graph:
             return
         if time.time() - self._dirty < self.AUTO_DELAY:
@@ -1390,7 +1392,7 @@ class GraphPanel:
         keep = self._clicked()
         if keep:
             self.ext_sel = [n for n in dict.fromkeys(list(self.ext_sel) + keep)]
-        self._widgets.clear(); self._pads.clear(); self._log_sliders.clear()
+        self._widgets.clear(); self._pads.clear(); self._log_sliders.clear(); self._live_glyphs.clear(); self._glyph_pal = None
         dpg.delete_item("node_editor", children_only=True)
         self.links.clear(); self._pins.clear(); self._ptype.clear(); self._link_normal.clear()
         self._focus_sel = None
@@ -1520,6 +1522,9 @@ class GraphPanel:
                         continue                               # wired: the pins say it; the pad is for typed values
                     with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                         self._pad_widget(nid, n, a, b, lo, hi)
+                if n["type"] in self.GLYPHS and self.zoom >= 0.7:
+                    with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+                        self._glyph_widget(nid, n)
             for o in d["outputs"]:
                 if hide and (nid, o["name"]) not in fed_out:
                     continue
@@ -3357,6 +3362,99 @@ class GraphPanel:
         self.snapshot()
         self.graph.nodes[nid].setdefault("inputs", {}).pop(name, None)
         self.rebuild()
+
+    # --- glyphs: a node that shows what it does (a rack module's face) ------------------------
+    GLYPHS = ("Palette", "Audio", "Wave", "Noise", "Spectrum", "FFT bin")
+
+    def _glyph_widget(self, nid, n):
+        """A strip under the node's fields: the palette's colours, the
+        audio's bands (live), a period of the wave, a patch of the noise."""
+        t = n["type"]
+        W = self.px(NODE_W)
+        if t == "Palette":
+            H = self.px(10)
+            with dpg.drawlist(width=W, height=H, tag=f"gglyph_{nid}"):
+                pass
+            self._glyph_palette(nid)
+        elif t in ("Audio", "Spectrum", "FFT bin"):
+            H = self.px(22)
+            with dpg.drawlist(width=W, height=H, tag=f"gglyph_{nid}"):
+                for k in range(16):
+                    x0 = k * W / 16
+                    dpg.draw_rectangle((x0 + 1, H - 1), (x0 + W / 16 - 1, H - 1), color=(0, 0, 0, 0), fill=(110, 190, 250, 200), tag=f"gglyph_{nid}_{k}")
+            self._live_glyphs[nid] = t
+        elif t == "Wave":
+            H = self.px(22)
+            shape = str(n["params"].get("shape", "sine"))
+            import math
+            pts = []
+            for k in range(41):
+                x = k / 40.0
+                y = {"sine": 0.5 + 0.5 * math.sin(x * 2 * math.pi), "triangle": 1.0 - abs(2.0 * x - 1.0),
+                     "square": 1.0 if x < 0.5 else 0.0}.get(shape, x)
+                pts.append((x * (W - 2) + 1, (1.0 - y) * (H - 4) + 2))
+            with dpg.drawlist(width=W, height=H, tag=f"gglyph_{nid}"):
+                dpg.draw_polyline(pts, color=(110, 190, 250, 220), thickness=max(1, self.px(1.5)))
+        elif t == "Noise":
+            self._glyph_noise(nid, n, W)
+
+    def _glyph_palette(self, nid):
+        tag = f"gglyph_{nid}"
+        if not dpg.does_item_exist(tag):
+            return
+        dpg.delete_item(tag, children_only=True)
+        try:
+            sw = self.app.eng.palette_swatch(self.app.eng.pal, 24)
+        except Exception:
+            return
+        W, H = dpg.get_item_configuration(tag)["width"], dpg.get_item_configuration(tag)["height"]
+        for k, (r, g, b) in enumerate(sw):
+            dpg.draw_rectangle((k * W / 24, 0), ((k + 1) * W / 24 + 1, H), color=(0, 0, 0, 0), fill=(r, g, b, 255), parent=tag)
+
+    def _glyph_noise(self, nid, n, W):
+        import numpy as np
+        from native.textures import registry
+        tex = f"gglyph_{nid}_tex"
+        N = 32
+        if not dpg.does_item_exist(tex):
+            rng = np.random.RandomState(7)
+            lat = rng.rand(6, 6)
+            img = np.zeros((N, N, 4), np.float32); img[..., 3] = 1.0
+            ys, xs = np.mgrid[0:N, 0:N] / (N - 1) * 4.0
+            x0, y0 = np.floor(xs).astype(int), np.floor(ys).astype(int)
+            fx, fy = xs - x0, ys - y0
+            fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+            v = (lat[y0, x0] * (1 - fx) + lat[y0, x0 + 1] * fx) * (1 - fy) + (lat[y0 + 1, x0] * (1 - fx) + lat[y0 + 1, x0 + 1] * fx) * fy
+            img[..., 0] = 0.25 + 0.6 * v; img[..., 1] = 0.35 + 0.55 * v; img[..., 2] = 0.55 + 0.45 * v
+            dpg.add_static_texture(N, N, img.ravel().tolist(), tag=tex, parent=registry())
+        dpg.add_image(tex, width=self.px(48), height=self.px(24))
+
+    def _poll_glyphs(self):
+        """The live ones: the audio bars from the engine's bands, the palette strip when the palette changed."""
+        if not self.graph or self.zoom < 0.7:
+            return
+        eng = self.app.eng
+        if getattr(self, "_glyph_pal", None) != eng.pal:
+            self._glyph_pal = eng.pal
+            for nid, n in self.graph.nodes.items():
+                if n["type"] == "Palette":
+                    self._glyph_palette(nid)
+        if not self._live_glyphs:
+            return
+        try:
+            bands = [float(v) / 255.0 for v in eng.fft]
+        except Exception:
+            return
+        for nid in list(self._live_glyphs):
+            tag = f"gglyph_{nid}"
+            if not dpg.does_item_exist(tag):
+                self._live_glyphs.pop(nid, None); continue
+            H = dpg.get_item_configuration(tag)["height"]; W = dpg.get_item_configuration(tag)["width"]
+            for k, v in enumerate(bands[:16]):
+                bt = f"gglyph_{nid}_{k}"
+                if dpg.does_item_exist(bt):
+                    x0 = k * W / 16
+                    dpg.configure_item(bt, pmin=(x0 + 1, H - 1 - v * (H - 2)), pmax=(x0 + W / 16 - 1, H - 1))
 
     # --- snapshots: the whole graph's settings as named states, and a morph between two ----
     def snapshot_save(self, name):

@@ -1203,7 +1203,7 @@ the order to do them:
       recall, update, remove - and a MORPH slider between two: numbers
       blend, the rest switches half way, typed values follow live and a
       changed setting rebuilds.
-- [ ] **Modules that show what they do**: a gradient strip on Palette, the
+- [x] **Modules that show what they do**: a gradient strip on Palette, the
       bands on Audio, a period of the Wave, a thumbnail of the Noise - the
       graph readable like a rack.
 - [ ] **Wireless sends** (a named Send / Receive pair, the Knot's cousin)
