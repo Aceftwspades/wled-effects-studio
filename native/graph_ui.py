@@ -2668,8 +2668,11 @@ class GraphPanel:
                 dpg.add_text(m, parent=P, color=(235, 80, 70) if m.startswith("error") else (240, 190, 70))
             if n["type"].startswith(G.SUB):
                 row("edit sub-graph", lambda: self.enter_sub(nid))
+                row("unfold: its nodes in place of it", lambda: self.unfold_sub(nid))
             row("duplicate", lambda: self._dup(nid))
             row("duplicate with inputs", lambda: self._dup(nid, True))
+            if not n["type"].startswith(G.SUB) and n["type"] not in ("Output", "Effect settings", "Note", "Frame", "Graph input", "Graph output"):
+                row("change type... (the wires stay)", lambda: self.pick_type_for(nid))
             row("label this node...", lambda: (self.set_selection([nid]), self.label_selected()))
             if d["inputs"] or d["params"]:
                 row("expand" if n.get("collapsed") else "collapse", lambda: self._collapse(nid))
@@ -2714,6 +2717,9 @@ class GraphPanel:
                     row("copy selection", self.copy)
                     row("cut selection", self.cut)
                     row("fold selection into a sub-graph", lambda: self.make_sub_from_selection(None))
+                    with dpg.tree_node(label="merge selection through", parent=P):
+                        for op in ("Add", "Subtract", "Multiply", "Min", "Max", "Mix", "Blend"):
+                            row(f"  {op}", lambda op=op: self.merge_selected(op))
                 if not n["type"].startswith(G.SUB) and n["type"] not in ("Frame", "Note", "Knot"):
                     from native import chrome
                     row("save as a preset...", lambda: chrome.ask(self.app, "Node preset", "a name for this node as it is set up",
@@ -2934,6 +2940,62 @@ class GraphPanel:
 
     def _dup(self, nid, with_links=False):
         self.snapshot(); self._sync_pos(); self.graph.duplicate(nid, with_links=with_links); self.rebuild()
+
+    def change_type(self, nid, new_type):
+        """The node as another type, its wires kept where they fit."""
+        if nid not in self.graph.nodes or new_type not in self.lib:
+            return
+        self.snapshot("change type"); self._sync_pos()
+        was = self.graph.nodes[nid]["type"]
+        dropped = self.graph.retype(nid, new_type)
+        self._note_recent(new_type)
+        self.rebuild()
+        self.status(f"#{nid}: {was} is now {new_type}" + (f" - {dropped} wire(s) had no pin to go to" if dropped else ""))
+
+    def pick_type_for(self, nid):
+        """The add menu, but the pick replaces this node."""
+        if nid not in self.graph.nodes:
+            return
+        pos = self.graph.nodes[nid]["pos"]
+        self._menu_pos = pos
+        self._pending = ("replace", nid)
+        try:
+            at = dpg.get_mouse_pos(local=False)
+        except Exception:
+            at = (200, 200)
+        self.show_add_menu(at)
+
+    def merge_selected(self, op="Add"):
+        """The selected nodes' first outputs through Add / Subtract / ...
+        / Blend nodes, left to right; the result selected."""
+        sel = [nid for nid in self._selected() if nid in self.graph.nodes]
+        sel.sort(key=lambda i: self.graph.nodes[i]["pos"][0])
+        if len(sel) < 2:
+            self.status("select two nodes or more to merge"); return
+        self.snapshot("merge"); self._sync_pos()
+        try:
+            made = self.graph.merge(sel, op)
+        except G.GraphError as e:
+            self._undo.pop(); self._undo_desc.pop()
+            self.status(f"merge: {e}"); return
+        self.rebuild()
+        self.set_selection(made[-1:])
+        self.status(f"{len(sel)} nodes merged through {op}" + (f" ({len(made)} of them)" if len(made) > 1 else ""))
+
+    def unfold_sub(self, nid):
+        """The sub-graph node replaced by its contents, in place."""
+        n = self.graph.nodes.get(nid)
+        if not n or not n["type"].startswith(G.SUB):
+            return
+        self.snapshot("unfold"); self._sync_pos()
+        try:
+            new = self.graph.unfold(nid)
+        except G.GraphError as e:
+            self._undo.pop(); self._undo_desc.pop()
+            self.status(f"unfold: {e}"); return
+        self.rebuild()
+        self.set_selection(new)
+        self.status(f"{n['type'][len(G.SUB):]} unfolded: {len(new)} node(s) in its place")
 
     def reset_node(self, nid):
         """Every setting and every typed input value back to the library's
@@ -3242,6 +3304,12 @@ class GraphPanel:
         self.touch()
         dpg.configure_item("graph_menu", show=False)
         if not self.graph:
+            return
+        if self._pending and self._pending[0] == "replace":     # change a node's type: the pick replaces it
+            _, old = self._pending
+            self._pending = None
+            if type_ in self.lib and old in self.graph.nodes:
+                self.change_type(old, type_)
             return
         if type_.startswith("preset:"):
             nid = self.add_preset(type_[7:], self._menu_pos)

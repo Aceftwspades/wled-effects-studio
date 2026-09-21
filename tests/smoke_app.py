@@ -34,11 +34,17 @@ STEPS = [
     ([{"expect": ["edit_status", "loaded cubefx_"]}, {"graph_zoom": 1.0}, {"key": "Home"}, {"speed": 0.5}], 1.5),
     ([{"expect": ["stat_txt", "speed 1/2x"]}, {"action": "speed_up"}, {"action": "speed_up"}, {"action": "speed_up"}], 1.0),
     ([{"expect": ["stat_txt", "speed 4x"]}, {"action": "speed_reset"}], 0.5),
+    # a node's type changed with its wires kept; two nodes merged through an Add
+    ([{"graph_open": "box_fire.json"}, {"py": "app.gp.change_type(3, 'Subtract') if app.gp.graph.nodes[3]['type'] == 'Multiply' else app.gp.change_type(3, 'Multiply')"}], 1.0),
+    ([{"expect": ["graph_status", "is now"]}, {"graph_selected": [1, 2]}, {"py": "app.gp.merge_selected('Add')"}, {"graph_selected": []}], 1.0),
+    ([{"expect": ["graph_status", "merged through Add"]}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     # two nodes folded into a sub-graph, entered, and back by the breadcrumb
     ([{"graph_open": "box_fire.json"}, {"graph_selected": [1, 2]}, {"py": "app.gp.make_sub_from_selection('smoke_sub')"},
       {"py": "app.gp.enter_sub(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'sub:smoke_sub'))"}], 2.0),
     ([{"expect": ["graph_status", "sub-graph smoke_sub"]}, {"py": "dpg.is_item_shown('graph_crumbs')"}, {"py": "app.gp.back(1)"}], 1.0),
-    ([{"expect": ["graph_status", "box_fire.json"]}, {"graph_undo": True}], 0.5),
+    ([{"expect": ["graph_status", "box_fire.json"]},
+      {"py": "app.gp.unfold_sub(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'sub:smoke_sub'))"}], 1.0),
+    ([{"expect": ["graph_status", "unfolded"]}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     ([{"graph_selected": [1, 2]}, {"action": "align_left"}, {"action": "arrange"}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
     ([{"graph_hover": ["out", 1, "value"]}, {"graph_hover": ["node", 9, ""]}], 0.6),
     ([{"gp_call": ["set_focus_mode", [True]]}, {"gp_call": ["set_focus_mode", [False]]}, {"graph_selected": []}], 0.6),

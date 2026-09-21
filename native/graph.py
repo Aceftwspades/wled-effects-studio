@@ -299,6 +299,154 @@ class Graph:
         self.links = [l for l in self.links if not (l[2] == b and l[3] == inp)]
         self.link_meta.pop((b, inp), None)
 
+    def _out_type(self, nid, out):
+        try:
+            return next((o["type"] for o in self.node_def(self.nodes[nid])["outputs"] if o["name"] == out), None)
+        except (GraphError, KeyError):
+            return None
+
+    def _in_type(self, nid, inp):
+        try:
+            return next((i["type"] for i in self.node_def(self.nodes[nid])["inputs"] if i["name"] == inp), None)
+        except (GraphError, KeyError):
+            return None
+
+    def retype(self, nid, new_type):
+        """The node as another type, in its place and under its id: the wires
+        reattached by pin name, else to the first free pin the type fits;
+        settings and typed inputs kept where the names match. Returns how
+        many wires had no pin to go to."""
+        n = self.nodes[nid]
+        if new_type not in self.lib:
+            raise GraphError(f"no node type {new_type!r}")
+        nd = self.lib[new_type]
+        new = {"id": nid, "type": new_type, "pos": list(n["pos"]),
+               "params": {q["name"]: (list(q["default"]) if isinstance(q["default"], (list, tuple)) else q["default"]) for q in nd["params"]},
+               "inputs": {}}
+        for k in ("label", "colour", "collapsed", "muted", "hide_pins"):
+            if k in n:
+                new[k] = n[k]
+        ptypes = {q["name"]: q["type"] for q in nd["params"]}
+        for k, v in (n.get("params") or {}).items():
+            if k in ptypes and ptypes[k] == next((q["type"] for q in self.node_def(n)["params"] if q["name"] == k), None):
+                new["params"][k] = v
+        in_types = {i["name"]: i["type"] for i in nd["inputs"]}
+        out_types = {o["name"]: o["type"] for o in nd["outputs"]}
+        new["inputs"] = {k: v for k, v in (n.get("inputs") or {}).items() if k in in_types}
+        into = [l for l in self.links if l[2] == nid]
+        outof = [l for l in self.links if l[0] == nid]
+        self.links = [l for l in self.links if l[0] != nid and l[2] != nid]
+        self.nodes[nid] = new
+        dropped = 0
+        taken = set()
+        for a, o, b, i in into:
+            st = self._out_type(a, o)
+            pin = i if (i in in_types and i not in taken and compatible(st, in_types[i])) else \
+                next((p for p, t in in_types.items() if p not in taken and compatible(st, t)), None)
+            if pin is None:
+                dropped += 1; continue
+            taken.add(pin); self.links.append((a, o, nid, pin))
+        for a, o, b, i in outof:
+            dt = self._in_type(b, i)
+            pin = o if (o in out_types and compatible(out_types[o], dt)) else \
+                next((p for p, t in out_types.items() if compatible(t, dt)), None)
+            if pin is None:
+                dropped += 1; continue
+            self.links.append((nid, pin, b, i))
+        return dropped
+
+    def merge(self, nids, op="Add"):
+        """The nodes' first outputs combined through `op` nodes - two at a
+        time, a chain for more: Add, Subtract, Multiply, Min, Max, Mix
+        for numbers (the first float or bool output of each), Blend for
+        colours (the first colour output). The new nodes stand right of
+        the rightmost. Returns their ids, the last one the result."""
+        if op not in self.lib:
+            raise GraphError(f"no node type {op!r}")
+        d = self.lib[op]
+        want = "color" if op == "Blend" else "float"
+        ins = [i["name"] for i in d["inputs"]][:2]
+        outs = []
+        for nid in nids:
+            nd = self.node_def(self.nodes[nid])
+            o = next((o["name"] for o in nd["outputs"] if compatible(o["type"], want)), None)
+            if o is None:
+                raise GraphError(f"{nd['name']} #{nid} has no output a {op} can take")
+            outs.append((nid, o))
+        if len(outs) < 2:
+            raise GraphError("two nodes at least")
+        x = max(self.nodes[n]["pos"][0] for n in nids) + 230
+        y = sum(self.nodes[n]["pos"][1] for n in nids) / len(nids)
+        made = []
+        a, ao = outs[0]
+        for k, (b, bo) in enumerate(outs[1:]):
+            m = self.add(op, (x + k * 200, y))
+            self.link(a, ao, m, ins[0]); self.link(b, bo, m, ins[1])
+            made.append(m)
+            a, ao = m, d["outputs"][0]["name"]
+        return made
+
+    def unfold(self, nid):
+        """A sub-graph node replaced by the sub-graph's own nodes, wired in
+        place of its boundary nodes and offset to where it stood - the
+        one level, a sub-graph inside stays a node. Returns the new ids."""
+        n = self.nodes[nid]
+        if not n["type"].startswith(SUB):
+            raise GraphError(f"node {nid} is not a sub-graph")
+        name = n["type"][len(SUB):]
+        sub = self.resolver(name) if self.resolver else None
+        if sub is None:
+            raise GraphError(f"sub-graph {name!r} not found")
+        try:
+            sdef = self.node_def(n)
+        except GraphError:
+            sdef = {"params": []}
+        smap = {}
+        for sid, sn in sub.nodes.items():
+            new = self._next; self._next += 1
+            smap[sid] = new
+            self.nodes[new] = dict(sn, id=new, params=dict(sn.get("params", {})), inputs=dict(sn.get("inputs", {})),
+                                   pos=[sn["pos"][0] + n["pos"][0] - 40, sn["pos"][1] + n["pos"][1] - 40])
+        inner = [(smap[a], o, smap[b], i) for a, o, b, i in sub.links]
+        for p in sdef["params"]:                              # promoted settings: the node's values onto the inner nodes
+            if p.get("promote") and p["promote"][0] in smap:
+                sid, pname = p["promote"]
+                self.nodes[smap[sid]]["params"][pname] = n.get("params", {}).get(p["name"], p["default"])
+        src_in = {i: (a, o) for a, o, b, i in self.links if b == nid}
+        out_src = {}
+        for a, o, b, i in inner:
+            if self.nodes[b]["type"] == "Graph output":
+                out_src[self.nodes[b]["params"].get("name", "out")] = (a, o)
+        rewired = []
+        for a, o, b, i in inner:
+            if self.nodes[a]["type"] == "Graph input":
+                pin = self.nodes[a]["params"].get("name", "in")
+                if pin in src_in:
+                    a, o = src_in[pin]
+            if self.nodes[b]["type"] == "Graph output":
+                continue
+            rewired.append((a, o, b, i))
+        outer = []
+        for a, o, b, i in self.links:
+            if a == nid:
+                if o in out_src:
+                    ia, io = out_src[o]; outer.append((ia, io, b, i))
+            elif b != nid:
+                outer.append((a, o, b, i))
+        self.links = outer + rewired
+        self.nodes.pop(nid, None)
+        self.link_meta = {k: v for k, v in self.link_meta.items() if k[0] != nid}
+        used = {a for a, _, _, _ in self.links}
+        kept = []
+        for sid, new in smap.items():
+            t = self.nodes[new]["type"]
+            if t == "Graph output" or (t == "Graph input" and new not in used):
+                self.nodes.pop(new, None)
+            else:
+                kept.append(new)
+        self.links = [l for l in self.links if l[0] in self.nodes and l[2] in self.nodes]
+        return kept
+
     def unlink_out(self, a, out):
         """Every link leaving this output."""
         for l in [l for l in self.links if l[0] == a and l[1] == out]:

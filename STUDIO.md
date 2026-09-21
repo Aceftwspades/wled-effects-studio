@@ -1100,16 +1100,16 @@ is the order to do them.
 - [x] **Breadcrumbs in sub-graphs** (Blender's context path): the trail
       from the top graph down to the one open, each name a button back
       to it, in place of the one "< back".
-- [ ] **Change a node's type keeping its wires** (Node Wrangler's switch
+- [x] **Change a node's type keeping its wires** (Node Wrangler's switch
       type; xLights' change effect): the node's menu offers the library;
       the new node takes the old one's place, its wires reattached by
       pin name, then by the first free pin of the type; settings kept
       where the names match.
-- [ ] **Merge selected nodes with an operator** (Node Wrangler's
+- [x] **Merge selected nodes with an operator** (Node Wrangler's
       Ctrl+numpad): two or more selected nodes' first outputs into a
       chain of Add, Multiply, Subtract, Min, Max or Mix for numbers, a
       Blend for colours, placed after them.
-- [ ] **Unfold a sub-graph** (Blender's ungroup, Ctrl+Alt+G): the node
+- [x] **Unfold a sub-graph** (Blender's ungroup, Ctrl+Alt+G): the node
       replaced by the sub-graph's own nodes, wired in place of its
       boundary nodes, positioned where it stood.
 - [ ] **Hover an LED for its index and part** (xLights' node numbers):

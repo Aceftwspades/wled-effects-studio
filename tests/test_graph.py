@@ -90,6 +90,76 @@ def test_reset_node_keeps_wires():
     assert g.nodes[n]["label"] == "mine" and any(l[2] == n for l in g.links) and "SEGMENT" in g.compile()
 
 
+def test_retype_keeps_the_wires_that_fit():
+    """Noise to Voronoi: the coordinate wires land by name (x, y) where the
+    pins exist, else on the first free pin the type fits; the value wire
+    out moves to the first float output; settings survive by name."""
+    g = starter()
+    c = g.add("Coords", (0, 0)); n = g.add("Noise", (100, 0), {"scale": 3.0}); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+    g.link(c, "u", n, "x"); g.link(c, "v", n, "y"); g.link(n, "value", p, "index"); g.link(p, "color", o, "color")
+    g.nodes[n]["label"] = "kept"
+    dropped = g.retype(n, "Wave")
+    d = g.node_def(g.nodes[n])
+    assert g.nodes[n]["type"] == "Wave" and g.nodes[n]["label"] == "kept"
+    ins = {(a, out, i) for a, out, b, i in g.links if b == n}
+    assert len(ins) == 2 and all(i in [x["name"] for x in d["inputs"]] for _, _, i in ins)
+    outs = [(out, b, i) for a, out, b, i in g.links if a == n]
+    assert outs == [(d["outputs"][0]["name"], p, "index")] and dropped == 0
+    assert "SEGMENT" in g.compile()
+    # a colour node in a number's place: the wires that cannot go anywhere are dropped and counted
+    dropped = g.retype(n, "Colour 1")
+    assert dropped == 3 and not any(a == n or b == n for a, _, b, _ in g.links)
+
+
+def test_merge_chains_operators():
+    g = starter()
+    a = g.add("Speed", (0, 0)); b = g.add("Intensity", (0, 100)); c = g.add("Custom 1", (0, 200))
+    p = g.add("Palette", (400, 0)); o = g.add("Output", (600, 0)); g.link(p, "color", o, "color")
+    made = g.merge([a, b, c], "Add")
+    assert len(made) == 2 and all(g.nodes[m]["type"] == "Add" for m in made)
+    assert (a, "value", made[0], "a") in g.links and (b, "value", made[0], "b") in g.links
+    assert (made[0], "result", made[1], "a") in g.links and (c, "value", made[1], "b") in g.links
+    g.link(made[-1], "result", p, "index")
+    assert "SEGMENT" in g.compile()
+    c1 = g.add("Colour 1", (0, 300)); c2 = g.add("Colour 2", (0, 400))
+    m = g.merge([c1, c2], "Blend")
+    assert g.nodes[m[0]]["type"] == "Blend" and (c1, "color", m[0], "under") in g.links
+    try:
+        g.merge([a], "Add"); assert False
+    except G.GraphError:
+        pass
+
+
+def test_unfold_a_sub_graph():
+    """A sub-graph made from a selection, then unfolded: the same nodes and
+    wires as before, the sub node gone, the C++ the same."""
+    g = starter()
+    c = g.add("Coords", (0, 0)); n = g.add("Noise", (100, 0)); m = g.add("Multiply", (200, 0)); p = g.add("Palette", (300, 0)); o = g.add("Output", (400, 0))
+    g.link(c, "u", n, "x"); g.link(n, "value", m, "a"); g.link(m, "result", p, "index"); g.link(p, "color", o, "color")
+    g.nodes[m]["inputs"] = {"b": 0.5}
+    before = g.compile()
+    # the sub-graph by hand, the way the panel's fold makes one: Noise and Multiply inside, one input, one output
+    sub = G.Graph({"name": "inner"}, lib=LIB)
+    gi = sub.add("Graph input", (0, 0), {"name": "x", "type": "float"})
+    sn = sub.add("Noise", (100, 0)); sm = sub.add("Multiply", (200, 0)); sub.nodes[sm]["inputs"] = {"b": 0.5}
+    go = sub.add("Graph output", (300, 0), {"name": "result", "type": "float"})
+    sub.link(gi, "value", sn, "x"); sub.link(sn, "value", sm, "a"); sub.link(sm, "result", go, "value")
+    subs = {"inner": sub}
+    g2 = G.Graph({"name": "t"}, lib=LIB, resolver=lambda name: subs.get(name))
+    c2 = g2.add("Coords", (0, 0)); s2 = g2.add(G.SUB + "inner", (100, 0)); p2 = g2.add("Palette", (300, 0)); o2 = g2.add("Output", (400, 0))
+    g2.link(c2, "u", s2, "x"); g2.link(s2, "result", p2, "index"); g2.link(p2, "color", o2, "color")
+    folded = g2.compile()
+    new = g2.unfold(s2)
+    assert s2 not in g2.nodes and sorted(g2.nodes[i]["type"] for i in new) == ["Multiply", "Noise"]
+    assert not any(t.startswith(G.SUB) or t in ("Graph input", "Graph output") for t in (x["type"] for x in g2.nodes.values()))
+    noise = next(i for i in new if g2.nodes[i]["type"] == "Noise"); mul = next(i for i in new if g2.nodes[i]["type"] == "Multiply")
+    assert (c2, "u", noise, "x") in g2.links and (noise, "value", mul, "a") in g2.links and (mul, "result", p2, "index") in g2.links
+    assert g2.nodes[mul]["inputs"] == {"b": 0.5}
+    after = g2.compile()
+    strip = lambda src: "\n".join(l for l in src.splitlines() if not l.strip().startswith("//") and "GC_PROBE" not in l)
+    assert strip(after).count("noise") == strip(folded).count("noise") and strip(after).count("noise") == strip(before).count("noise")
+
+
 def test_wired_input_is_required():
     """Sprites reads the Particles' state through its slots pin: unwired,
     it is a problem on the node and a refusal to compile, not a C++ error."""
