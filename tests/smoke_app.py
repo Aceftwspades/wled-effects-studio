@@ -31,7 +31,14 @@ STEPS = [
     ([{"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
     # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
     ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile()"}], 20.0),
-    ([{"expect": ["edit_status", "loaded cubefx_"]}, {"graph_zoom": 1.0}, {"key": "Home"}], 1.5),
+    ([{"expect": ["edit_status", "loaded cubefx_"]}, {"graph_zoom": 1.0}, {"key": "Home"}, {"speed": 0.5}], 1.5),
+    ([{"expect": ["stat_txt", "speed 1/2x"]}, {"action": "speed_up"}, {"action": "speed_up"}, {"action": "speed_up"}], 1.0),
+    ([{"expect": ["stat_txt", "speed 4x"]}, {"action": "speed_reset"}], 0.5),
+    # two nodes folded into a sub-graph, entered, and back by the breadcrumb
+    ([{"graph_open": "box_fire.json"}, {"graph_selected": [1, 2]}, {"py": "app.gp.make_sub_from_selection('smoke_sub')"},
+      {"py": "app.gp.enter_sub(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'sub:smoke_sub'))"}], 2.0),
+    ([{"expect": ["graph_status", "sub-graph smoke_sub"]}, {"py": "dpg.is_item_shown('graph_crumbs')"}, {"py": "app.gp.back(1)"}], 1.0),
+    ([{"expect": ["graph_status", "box_fire.json"]}, {"graph_undo": True}], 0.5),
     ([{"graph_selected": [1, 2]}, {"action": "align_left"}, {"action": "arrange"}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
     ([{"graph_hover": ["out", 1, "value"]}, {"graph_hover": ["node", 9, ""]}], 0.6),
     ([{"gp_call": ["set_focus_mode", [True]]}, {"gp_call": ["set_focus_mode", [False]]}, {"graph_selected": []}], 0.6),
@@ -151,6 +158,8 @@ def main():
     graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
     saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
     gdir = os.path.join(ROOT, "projects", "default", "graphs")
+    sdir = os.path.join(ROOT, "projects", "default", "subgraphs")
+    subs_before = set(os.listdir(sdir)) if os.path.isdir(sdir) else set()
     caps_before = set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()
     before = set(os.listdir(gdir)) if os.path.isdir(gdir) else set()      # a first run makes the project
     STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs: a saved view would otherwise stay
@@ -200,6 +209,8 @@ def main():
             if want not in names:
                 bad.append(f"the report zip lacks {want}")
         os.remove(rep)
+    for f in (set(os.listdir(sdir)) if os.path.isdir(sdir) else set()) - subs_before:
+        os.remove(os.path.join(sdir, f))                        # the sub-graph the fold made
     for f in (set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()) - caps_before:
         if f.endswith(".zip"):                                  # the project zip the run made
             os.remove(os.path.join(ROOT, "captures", f))

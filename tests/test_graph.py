@@ -77,6 +77,19 @@ def test_bad_and_stray_wires():
     assert len(g2.stray) == 3 and p not in g2.problems() and "SEGMENT" in g2.compile()
 
 
+def test_reset_node_keeps_wires():
+    """reset_node's rule, without the panel: params back to the library's
+    defaults, typed inputs gone, wires and label untouched."""
+    g = starter()
+    c = g.add("Coords", (0, 0)); n = g.add("Noise", (100, 0), {"octaves": 4}); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+    g.link(c, "u", n, "x"); g.link(n, LIB["Noise"]["outputs"][0]["name"], p, "index"); g.link(p, "color", o, "color")
+    g.nodes[n]["inputs"] = {"scale": 9.0}; g.nodes[n]["label"] = "mine"
+    d = g.node_def(g.nodes[n])
+    g.nodes[n]["params"] = {q["name"]: q["default"] for q in d["params"] if "default" in q}; g.nodes[n]["inputs"] = {}
+    assert g.nodes[n]["params"].get("octaves") == next(q["default"] for q in d["params"] if q["name"] == "octaves")
+    assert g.nodes[n]["label"] == "mine" and any(l[2] == n for l in g.links) and "SEGMENT" in g.compile()
+
+
 def test_wired_input_is_required():
     """Sprites reads the Particles' state through its slots pin: unwired,
     it is a problem on the node and a refusal to compile, not a C++ error."""

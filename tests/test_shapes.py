@@ -209,6 +209,22 @@ def test_ramps_become_sub_steps():
     assert sequence.ramp_value(st, "sx", 0.5) == 120
 
 
+def test_positions_export_reads_back():
+    """The positions CSV of a shape of parts: one row an LED in wiring order,
+    the part named; read back, the same points in the same order."""
+    ring = shapes.new_part("ring", n=8); strip = shapes.new_part("strip", n=4); strip["pos"] = [0, 0, 3]
+    g = Geometry("shape", parts=[ring, strip])
+    path = _write("pos.csv", "")
+    n = shape_io.write_points(g, path)
+    assert n == 12
+    lines = [l for l in open(path, encoding="utf-8") if not l.startswith("#")]
+    assert len(lines) == 12 and lines[0].strip().endswith(",0,0,ring") and lines[-1].strip().endswith(",11,1,strip")
+    pts, order = shape_io.read_points(path)
+    assert pts.shape == (12, 3) and order is not None and list(order) == list(range(12))
+    assert np.allclose(pts, np.asarray(g.pos)[np.asarray(g.phys)], atol=1e-3)
+    assert shape_io.write_points(Geometry("cube", B=4), path) == 5 * 16       # a cube's five faces, the corners unlit
+
+
 def test_xmodel_and_points():
     xm = _write("arrow.xmodel", '<custommodel name="Arrow" parm1="5" parm2="3" Depth="1" CustomModel=",,1,,;6,5,4,3,2;,,7,," />')
     m = shape_io.read_xmodel(xm)

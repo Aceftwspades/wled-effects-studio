@@ -492,6 +492,30 @@ def write_xmodel(geom, path, name=None):
 
 
 # --- point lists ------------------------------------------------------------------------------
+def write_points(geom, path):
+    """The geometry's LEDs as CSV rows in wiring order - x, y, z, the
+    wiring index, the part's index and name - for any other tool; the
+    file reads back here as a points part (read_points takes the first
+    four columns, the index as the order). Returns the count."""
+    import numpy as np
+    pos = np.asarray(geom.pos, np.float32).reshape(-1, 3)
+    phys = list(np.asarray(geom.phys, int)) if getattr(geom, "phys", None) is not None else list(range(len(pos)))
+    parts = (geom.params.get("parts") or []) if geom.kind == "shape" else []
+    owner = list(np.asarray(getattr(geom, "owner", []), int)) if geom.kind == "shape" else []
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(f"# {geom.describe()}\n# x, y, z, index (wiring order), part, part name\n")
+        n = 0
+        for k, li in enumerate(phys):
+            x, y, z = pos[li]
+            if not np.isfinite([x, y, z]).all():
+                continue
+            part = int(owner[k]) if k < len(owner) else 0
+            name = parts[part].get("name", "") if part < len(parts) else ""
+            f.write(f"{x:.4f},{y:.4f},{z:.4f},{k},{part},{name}\n")
+            n += 1
+    return n
+
+
 def read_points(path):
     """x y z [index] rows - CSV, whitespace or a JSON list (of rows or of
     {x, y, z[, i]} objects): (pos (n, 3), order or None). With an index

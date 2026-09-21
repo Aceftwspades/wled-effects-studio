@@ -246,6 +246,7 @@ class GraphPanel:
         dpg.configure_item("graph_file", items=self.files())
         dpg.set_value("graph_file", fname if not sub else "")
         dpg.configure_item("graph_back", show=bool(self.stack))
+        self._crumbs()
         stray = getattr(self.graph, "stray", None) or []
         self.status(("sub-graph " if sub else "") + fname
                     + (f" - {len(stray)} wire(s) to nodes or pins that are not there dropped" if stray else ""))
@@ -331,12 +332,33 @@ class GraphPanel:
         self.stack.append((self.cur_dir, self.file))
         self.open(n["type"][len(G.SUB):] + ".json", sub=True)
 
-    def back(self):
+    def back(self, levels=1):
+        """Up one sub-graph (or `levels`), to where the trail came from."""
         if not self.stack:
             return
         self.save()
-        d, f = self.stack.pop()
+        for _ in range(max(1, levels)):
+            if not self.stack:
+                break
+            d, f = self.stack.pop()
         self.open(f, sub=(d == self.sub_dir))
+
+    def _crumbs(self):
+        """The breadcrumbs: every graph on the way down, each a button
+        back to it, then the one open - shown inside a sub-graph only."""
+        if not dpg.does_item_exist("graph_crumbs"):
+            return
+        dpg.delete_item("graph_crumbs", children_only=True)
+        if not self.stack:
+            dpg.configure_item("graph_crumbs", show=False); return
+        depth = len(self.stack)
+        for k, (d, f) in enumerate(self.stack):
+            dpg.add_button(label=os.path.splitext(f)[0], small=True, parent="graph_crumbs", user_data=depth - k,
+                           callback=lambda s, a, u: self.back(u))
+            dpg.add_text("›", parent="graph_crumbs", color=DIM)
+        from native import chrome
+        dpg.add_text(os.path.splitext(self.file or "")[0], parent="graph_crumbs", color=chrome.ACCENT)
+        dpg.configure_item("graph_crumbs", show=True)
 
     def make_sub_from_selection(self, name=None):
         """The selected nodes become one sub-graph node. Wires crossing the
@@ -346,8 +368,7 @@ class GraphPanel:
         rewired through the new node in their place."""
         if not self.graph:
             return
-        sel = [dpg.get_item_user_data(t) for t in dpg.get_selected_nodes("node_editor")]
-        sel = [nid for nid in sel if nid in self.graph.nodes and self.graph.nodes[nid]["type"] not in ("Output",)]
+        sel = [nid for nid in self._selected() if nid in self.graph.nodes and self.graph.nodes[nid]["type"] not in ("Output",)]
         if not sel:
             self.status("select the nodes to fold first")
             return
@@ -2654,6 +2675,8 @@ class GraphPanel:
                 row("expand" if n.get("collapsed") else "collapse", lambda: self._collapse(nid))
                 row("show all pins" if n.get("hide_pins") else "hide unwired pins", lambda: self._toggle(nid, "hide_pins"))
             row("unmute" if n.get("muted") else "mute (pass through)", lambda: self._toggle(nid, "muted"))
+            if d.get("params") or d.get("inputs"):
+                row("reset settings to defaults", lambda: self.reset_node(nid))
             if n["type"] == "Image":
                 row("convert to Bitmap + Colour pick", lambda: self.image_to_bitmap(nid))
             selected = bool(self._selected())
@@ -2911,6 +2934,23 @@ class GraphPanel:
 
     def _dup(self, nid, with_links=False):
         self.snapshot(); self._sync_pos(); self.graph.duplicate(nid, with_links=with_links); self.rebuild()
+
+    def reset_node(self, nid):
+        """Every setting and every typed input value back to the library's
+        defaults; the wires, the label and the exposed pins stay."""
+        n = self.graph.nodes.get(nid)
+        if n is None:
+            return
+        self.snapshot("reset node"); self._sync_pos()
+        try:
+            d = self.graph.node_def(n)
+        except G.GraphError:
+            return
+        n["params"] = {p["name"]: (list(p["default"]) if isinstance(p["default"], (list, tuple)) else p["default"])
+                       for p in d.get("params", []) if "default" in p}
+        n["inputs"] = {}
+        self.rebuild()
+        self.status(f"{d['name']} #{nid}: settings back to their defaults")
 
     def _toggle(self, nid, flag):
         self.snapshot(); self._sync_pos()
@@ -3523,6 +3563,8 @@ def build_panel(app, panel):
     grip("graph_win")
     with dpg.group(horizontal=True):
         dpg.add_button(label="< back", tag="graph_back", show=False, callback=lambda: panel.back())
+        with dpg.group(horizontal=True, tag="graph_crumbs", show=False):     # inside a sub-graph: the trail down to it
+            pass
         dpg.add_combo(panel.files(), tag="graph_file", width=220, default_value=panel.file or "",
                       callback=lambda s, v: panel.open(v))
         dpg.add_text("", tag="graph_status", color=DIM)

@@ -224,6 +224,15 @@ def build_menus(app):
         with dpg.menu(label="Playback"):
             _mi(app, "Play / pause", "play_pause", callback=lambda: app.toggle_play())
             _mi(app, "Step one frame", "step", callback=lambda: app.step_once())
+            with dpg.menu(label="Speed", tag="menu_speed"):
+                for v in app.SPEEDS:
+                    from native.app import speed_label
+                    dpg.add_menu_item(label=speed_label(v), check=True, tag=f"menu_speed_{v:g}", default_value=(v == 1.0),
+                                      user_data=v, callback=lambda s, a, u: app.set_speed(u))
+                dpg.add_separator()
+                _mi(app, "Slower", "speed_down", callback=lambda: app.step_speed(-1))
+                _mi(app, "Faster", "speed_up", callback=lambda: app.step_speed(1))
+                _mi(app, "Back to 1x", "speed_reset", callback=lambda: app.set_speed(1.0))
             _mi(app, "Restart effect", "restart", callback=lambda: app.eng.select(app.eng.idx))
             _mi(app, "Randomise the settings", "randomise", callback=lambda: app.randomise())
             dpg.add_menu_item(label="Sequence...", callback=lambda: device_ui.show(app, "sequence"))
@@ -562,6 +571,14 @@ def show_keys(app):
     refresh_keys(app)
     _centre("keys_win", 640, 600)
     dpg.show_item("keys_win")
+
+
+def refresh_speed(app):
+    """The Speed menu's tick on the one in force."""
+    for v in app.SPEEDS:
+        tag = f"menu_speed_{v:g}"
+        if dpg.does_item_exist(tag):
+            dpg.set_value(tag, v == app.speed)
 
 
 def refresh_keys(app):

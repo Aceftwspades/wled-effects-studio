@@ -355,6 +355,7 @@ class App(Features):
         self.syn = Synth()
         self.live = None
         self.playing = True
+        self.speed = 1.0                # simulated frames per real second, as a factor: 1/4 .. 4 (Playback > Speed)
         self.acc = 0.0
         self.last = time.perf_counter()
         self.yaw, self.pitch, self.dist = -0.6, 0.75, 4.6
@@ -1537,6 +1538,20 @@ class App(Features):
     def step_once(self):
         self.audio_push(); self.eng.frame(STEP)
 
+    SPEEDS = (0.25, 0.5, 1.0, 2.0, 4.0)
+
+    def set_speed(self, v):
+        """The sim's pace: v simulated seconds a real second. The synth's
+        beat clock runs on simulated time, so it keeps step; live audio
+        and a WAV play at their own, real, pace."""
+        self.speed = float(v)
+        chrome.refresh_speed(self)
+        self.gp.status(f"speed {speed_label(self.speed)}")
+
+    def step_speed(self, by):
+        k = min(range(len(self.SPEEDS)), key=lambda i: abs(self.SPEEDS[i] - self.speed))
+        self.set_speed(self.SPEEDS[max(0, min(len(self.SPEEDS) - 1, k + by))])
+
     def duplicate_selected(self):
         sel = self.gp._selected()
         if sel:
@@ -2648,6 +2663,9 @@ class App(Features):
             "props_pane":   self.toggle_props,
             "play_pause":   self.toggle_play,
             "step":         self.step_once,
+            "speed_down":   lambda: self.step_speed(-1),
+            "speed_up":     lambda: self.step_speed(1),
+            "speed_reset":  lambda: self.set_speed(1.0),
             "restart":      lambda: self.eng.select(self.eng.idx),
             "prev_effect":  lambda: self.step_effect(-1),
             "next_effect":  lambda: self.step_effect(1),
@@ -3019,9 +3037,9 @@ class App(Features):
             return
         self.scrub = None
         self._poll_sweep()
-        self.acc += dt * 1000.0
+        self.acc += dt * 1000.0 * self.speed
         n = 0
-        while self.acc >= STEP and n < 6:
+        while self.acc >= STEP and n < 8:
             self.audio_push()
             t0 = time.perf_counter()
             self.eng.frame(STEP)
@@ -3107,9 +3125,10 @@ class App(Features):
         power = ""
         if pw:
             power = f"   power {pw[0] / 1000.0:.2f} A" + (f" (limiter {int(pw[1] * 100)}%)" if pw[2] and pw[1] < 1.0 else "")
+        speed = f"   speed {speed_label(self.speed)}" if self.speed != 1.0 else ""
         dpg.set_value("stat_txt",
                       f"mean {s['mean']:5.1f}   sigma {s['sigma']:5.1f}   "
-                      f"dark {s['dark']:4.1f}%   sat {s['sat']:3d}" + power + est)
+                      f"dark {s['dark']:4.1f}%   sat {s['sat']:3d}" + speed + power + est)
         if dpg.does_item_exist("scrub_row"):
             show = (not self.playing) and len(self.history_frames) > 1
             if dpg.is_item_shown("scrub_row") != show:
@@ -3694,6 +3713,8 @@ def service_command(app):
                 walk_ctx(app, *c["ctx_walk"])
             if "uiref" in c:                            # test hook: the reference section of GUIDE.md written from the live menus, keys and buttons
                 print("uiref", write_uiref(app, c["uiref"] if isinstance(c["uiref"], str) else None))
+            if "speed" in c:                            # test hook: the playback speed, a factor
+                app.set_speed(float(c["speed"]))
             if "stats" in c:                            # test hook: one line of the process - memory, items, frame times (the soak reads it)
                 print("stats", json.dumps(process_stats(app)))
             if "items" in c:                            # test hook: Dear PyGui's items counted by type under their nearest named ancestor
@@ -4362,6 +4383,11 @@ def walk_ctx(app, kind, nid, pin=None):
         if json.dumps(gp.graph.to_json(), sort_keys=True) != before:
             gp.undo()
     gp._hide_menus()
+
+
+def speed_label(v):
+    """1/4x, 1/2x, 1x, 2x, 4x."""
+    return {0.25: "1/4x", 0.5: "1/2x"}.get(v, f"{v:g}x")
 
 
 class _Tail:

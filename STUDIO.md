@@ -1078,6 +1078,58 @@ this repo with a compiler beside it. Done so far:
       wins) and a restart offered; or "I have one" for a checkout that
       exists. Tried from a copy with no tree: the clone, the restart, the
       flash frame listing the checkout's environments.
+### Fourth pass: Blender and xLights (September 2026)
+
+Measured once more against Blender's node editors (with Node Wrangler)
+and xLights, with the three passes above done. What is left that fits
+an effect tool for the firmware, ranked by value over effort; the order
+is the order to do them.
+
+- [x] **Playback speed** (xLights' half speed; a step rate in Blender):
+      1/4, 1/2, 1, 2 and 4 times, from Playback > Speed and two keys
+      (Shift+, slower, Shift+. faster; Shift+/ back to 1x); the engine
+      steps that many simulated frames per real second, the synth's
+      beat clock with it, so an effect can be studied slowly or run
+      ahead. The footer says the speed when it is not 1x.
+- [x] **Reset a node to its defaults** (Blender's Backspace on a node):
+      every setting and every typed input value back to the library's,
+      from the node's menu; Backspace on a value already did one.
+- [x] **Export the shape's positions** (xLights' export model): the LEDs
+      as CSV rows - index, part, x, y, z - from the Shape frame, for any
+      other tool; the same file reads back as a points part.
+- [x] **Breadcrumbs in sub-graphs** (Blender's context path): the trail
+      from the top graph down to the one open, each name a button back
+      to it, in place of the one "< back".
+- [ ] **Change a node's type keeping its wires** (Node Wrangler's switch
+      type; xLights' change effect): the node's menu offers the library;
+      the new node takes the old one's place, its wires reattached by
+      pin name, then by the first free pin of the type; settings kept
+      where the names match.
+- [ ] **Merge selected nodes with an operator** (Node Wrangler's
+      Ctrl+numpad): two or more selected nodes' first outputs into a
+      chain of Add, Multiply, Subtract, Min, Max or Mix for numbers, a
+      Blend for colours, placed after them.
+- [ ] **Unfold a sub-graph** (Blender's ungroup, Ctrl+Alt+G): the node
+      replaced by the sub-graph's own nodes, wired in place of its
+      boundary nodes, positioned where it stood.
+- [ ] **Hover an LED for its index and part** (xLights' node numbers):
+      the pointer over the logical net or the 3-D view names the LED
+      under it - its wiring index, its part, its position - in the
+      footer.
+- [ ] **Align and distribute parts** (xLights' layout tools): the
+      selected parts of a shape aligned on an axis to the first, spread
+      evenly between the first and last, or given the first's scale.
+- [ ] **Paint a bitmap** (xLights' effect assist): the Bitmap node's rows
+      as a grid of cells in the properties pane, clicked and dragged to
+      set and clear; the rows follow.
+
+Looked at and left: Blender's simulation zones and baking (Fields,
+Sequencer and Particles are the studio's), multiple editor areas (the
+panes and pop-outs), numeric expressions in fields (Dear PyGui parses
+its own), node timings (one compiled function); xLights' FPP export,
+video, DMX, shaders, and per-effect fade in / out (WLED's transitions
+cross-fade the presets already).
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

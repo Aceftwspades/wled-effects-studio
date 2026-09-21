@@ -90,6 +90,9 @@ def build(app):
             dpg.add_button(label="Save...", small=True, callback=lambda: dpg.show_item("shape_save_dialog"))
             dpg.add_button(label="Export .xmodel...", small=True, callback=lambda: dpg.show_item("shape_xmodel_dialog"))
             c.tip("the shape as an xLights custom model, the wiring as its node numbers")
+            dpg.add_button(label="Export positions...", small=True, callback=lambda: dpg.show_item("shape_points_dialog"))
+            c.tip("every LED as a CSV row - x, y, z, its wiring index, its part - in wiring order, for any other tool; "
+                  "Import... reads the file back as a points part")
         with dpg.group(horizontal=True):
             dpg.add_text("PARTS", color=c.ACCENT)
             dpg.add_combo(["strip", "grid"], tag="shape_layout", width=70, default_value="strip",
@@ -146,6 +149,9 @@ def build(app):
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_xmodel_dialog", width=640, height=420,
                          default_filename="shape.xmodel", callback=lambda s, a: export_xmodel(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".xmodel", color=(200, 180, 90))
+    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_points_dialog", width=640, height=420,
+                         default_filename="positions.csv", callback=lambda s, a: export_points(app, a.get("file_path_name", ""))):
+        dpg.add_file_extension(".csv", color=(120, 200, 120))
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_save_dialog", width=640, height=420,
                          default_filename="shape.shape.json", callback=lambda s, a: save_shape(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(150, 150, 220))
@@ -655,6 +661,17 @@ def export_xmodel(app, path):
     except Exception as e:
         app.gp.status(f"could not write the model: {e}"); return
     app.gp.status(f"xLights model written: {os.path.basename(path)}, {w} x {h} grid, {n} LEDs")
+
+
+def export_points(app, path):
+    """Every LED's position, its wiring index and its part, as CSV."""
+    if not path:
+        return
+    try:
+        n = shape_io.write_points(app.project.geometry, path)
+    except Exception as e:
+        app.gp.status(f"could not write the positions: {e}"); return
+    app.gp.status(f"positions written: {os.path.basename(path)}, {n} LEDs in wiring order")
 
 
 def save_shape(app, path):

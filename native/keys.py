@@ -28,6 +28,9 @@ ACTIONS = [
     # playback
     ("play_pause",    "Play / pause",                                        "Space",  "global"),
     ("step",          "Step one frame",                                      ".",      "global"),
+    ("speed_down",    "Playback slower (1/4x .. 4x)",                        "Shift+,", "global"),
+    ("speed_up",      "Playback faster",                                     "Shift+.", "global"),
+    ("speed_reset",   "Playback at 1x",                                      "Shift+/", "global"),
     ("restart",       "Restart the effect",                                  "Ctrl+R", "global"),
     ("prev_effect",   "Previous effect in the list",                         "[",      "global"),
     ("next_effect",   "Next effect in the list",                             "]",      "global"),
