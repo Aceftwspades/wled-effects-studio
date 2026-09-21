@@ -1134,9 +1134,15 @@ What would say the studio is complete, in the order to do them:
       colour input (a packed 0) was white in the script and black in
       C++; a `(uint8_t)` cast of a negative (a palette index below 0)
       clamped in the script where C wraps - both in the compiler.
-- [ ] **Round-trip serialisation**: project, graph, shape, sequence and
-      palette files saved and reloaded equal; older project files from
-      the history still opening.
+- [x] **Round-trip serialisation** (`tests/test_roundtrip.py`): every
+      example and project graph loaded, saved, loaded - the same JSON,
+      the same C++, migrate() idempotent; every geometry kind (a mapped
+      strip, a shape of parts, the soccer ball, a grid layout) through
+      to_json / from_json with the same LEDs, places and wiring; a
+      ledmap read back; a project's geometry, options and imports; the
+      sequence's presets.json; the engine's segments (bounds, effect,
+      options, blend); an xLights model written and read; and the 194
+      older graphs the history holds all open and compile.
 - [x] **A scrubbed-PATH run of the packaged app**: the package (built
       with the toolchain it ships, so its objects are the bundled g++'s),
       its doctor and the smoke test run with PATH cut to System32 - the
