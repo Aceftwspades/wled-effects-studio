@@ -92,9 +92,14 @@ static uint32_t gPixels[256 * 256];
 
 // --- audio the page can steer ------------------------------------------------
 static float   gVolume = 0.0f;
+static int16_t gVolumeRaw = 0;                 // u_data[1] is an int16 on the device: the same number, its own type
 static uint8_t gFft[16] = {0};
 static uint8_t gPeak = 0;
 static float   gMajorPeak = 0.0f, gMagnitude = 0.0f;
+// u_data[6] and [7]: audioreactive's maxVol and binNum, which Ripple Peak,
+// Puddlepeak and Waterfall WRITE (from their sliders) - a null here was an
+// access violation the moment one of them ran
+static uint8_t gMaxVol = 31, gBinNum = 8;
 static void   *gU[9];
 static um_data_t gUm = { gU, 9 };
 // the PCM slot, as audioreactive's cube_fx block publishes it (u_data[8])
@@ -102,8 +107,9 @@ struct SimPcm { volatile uint8_t which; int8_t buf[2][256]; };
 static SimPcm gPcm = { 0, {{0}, {0}} };
 
 um_data_t *simAudio() {
-  gU[0] = &gVolume;  gU[1] = &gVolume; gU[2] = gFft;
+  gU[0] = &gVolume;  gU[1] = &gVolumeRaw; gU[2] = gFft;
   gU[3] = &gPeak;    gU[4] = &gMajorPeak; gU[5] = &gMagnitude;
+  gU[6] = &gMaxVol;  gU[7] = &gBinNum;
   gU[8] = &gPcm;
   return &gUm;
 }
@@ -520,6 +526,7 @@ SIM_API float simProbeGet(int i) { return ((unsigned)i < 256u) ? gProbe[i] : 0.0
 
 SIM_API void simAudioSet(float vol, int peak) {
   gVolume = vol; gPeak = (uint8_t)peak;
+  gVolumeRaw = (int16_t)(vol < 0.0f ? 0.0f : (vol > 32767.0f ? 32767.0f : vol));
 }
 
 // One frame. dtMs is passed in rather than read from a wall clock so the page

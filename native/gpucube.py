@@ -32,6 +32,8 @@ LED in Python.
 import numpy as np
 import dearpygui.dearpygui as dpg
 
+from native.textures import registry
+
 from native.render import FACES6 as FACES, _camera
 
 N = 8            # sub-quads across a face
@@ -101,8 +103,7 @@ class CubeQuads:
             else:
                 dpg.delete_item(tex)
         if not dpg.does_item_exist(tex):
-            with dpg.texture_registry():
-                dpg.add_dynamic_texture(w, h, rgba.ravel(), tag=tex)
+            dpg.add_dynamic_texture(w, h, rgba.ravel(), tag=tex, parent=registry())
         ox, oy = (self.w - self.size) * 0.5, (self.h - self.size) * 0.5
         dpg.configure_item(self.bg_item, texture_tag=tex, pmin=(ox, oy), pmax=(ox + self.size, oy + self.size), show=True)
 
@@ -185,8 +186,7 @@ class PointQuads:
             cols = min(max(1, n), self.COLS)
             rows = max(1, (n + cols - 1) // cols)
             self.cols, self.rows = cols, rows
-            with dpg.texture_registry():
-                dpg.add_dynamic_texture(cols, rows, [0.0, 0.0, 0.0, 1.0] * (cols * rows), tag=self.tex)
+            dpg.add_dynamic_texture(cols, rows, [0.0, 0.0, 0.0, 1.0] * (cols * rows), tag=self.tex, parent=registry())
             z = (0, 0)
             if self.bg_item is None:
                 self.bg_item = dpg.draw_image(self.tex, z, z, show=False, parent=self.tag)

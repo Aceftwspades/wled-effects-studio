@@ -17,7 +17,7 @@ included - a new effect builds in seconds. Only flashing firmware needs
 more: a checkout of the WLED fork and PlatformIO. The Flash frame offers
 to get the checkout itself (**Get the WLED fork...**: a clone beside the
 app, or the branch as a zip when git is not installed; then a restart),
-or takes one you have (**I have one**, or `WLED_ROOT`). `WLED Effects Studio (console).exe` is
+or takes one you have (**I have one: choose its folder...**, or `WLED_ROOT`). `WLED Effects Studio (console).exe` is
 the same app with a console, for when something goes wrong.
 
 **Updates**: the app asks the studio's releases on GitHub once a day
@@ -368,3 +368,301 @@ on and install what it carries.
   one texture written once a frame (a 2,000-LED sphere: 6 ms a frame
   against 34 on the CPU). Turn them off if the views misbehave on a
   machine; pictures and recordings always come from the software renderer.
+
+## Reference: every menu, key and button
+
+<!-- uiref start: written by `python tests/make_uiref.py` from the running app - change the app, not this -->
+
+### Menus
+
+- **File** › New graph effect... `Ctrl+N`
+- **File** › New code effect...
+- **File** › Open graph › … the project's graphs
+- **File** › Open code effect › … the project's code effects
+- **File** › Save `Ctrl+S`
+- **File** › Rename... `F2`
+- **File** › Remove from the effects list `Ctrl+I`
+- **File** › History... `Ctrl+Shift+Y`
+- **File** › Library... `Ctrl+Shift+L`
+- **File** › Generate previews of every effect
+- **File** › Open graph as code
+- **File › Project** › New project...
+- **File › Project** › Open › … the projects
+- **File › Project** › Recent › … the projects opened lately
+- **File › Project** › Open folder...
+- **File › Project** › Export usermod (folder + zip)
+- **File** › Import graph bundle...
+- **File** › Export graph bundle
+- **File** › Screenshot of the 3-D view `F12`
+- **File** › Record 15 s GIF `Ctrl+F12`
+- **File** › Record 15 s video `Ctrl+Shift+F12`
+- **File** › Quit
+- **Edit** › Undo `Ctrl+Z`
+- **Edit** › Redo `Ctrl+Y`
+- **Edit** › Undo history... `Ctrl+Alt+Z`
+- **Edit** › Repeat last action `Shift+R`
+- **Edit** › Cut `Ctrl+X`
+- **Edit** › Copy `Ctrl+C`
+- **Edit** › Paste `Ctrl+V`
+- **Edit** › Duplicate with inputs `Shift+D`
+- **Edit › Delete** › Delete `Delete`
+- **Edit › Delete** › Delete and reconnect `Ctrl+Delete`
+- **Edit › Delete** › Disconnect (keep the nodes)
+- **Edit › Select** › All `A`
+- **Edit › Select** › None `Alt+A`
+- **Edit › Select** › Invert `Ctrl+Shift+I`
+- **Edit › Select** › What feeds the selection `Ctrl+[`
+- **Edit › Select** › What the selection feeds `Ctrl+]`
+- **Edit › Select** › Everything wired to it `Shift+L`
+- **Edit** › Command palette... `Ctrl+P`
+- **Edit** › Palettes (gradients)... `Ctrl+Shift+G`
+- **Edit** › Find / replace in code `Ctrl+F`
+- **Edit** › Open code in external editor `Ctrl+E`
+- **Device** › Devices... `Ctrl+Shift+N`
+- **Device** › Flash firmware... `Ctrl+Shift+U`
+- **Device** › Send to device... `Ctrl+Shift+S`
+- **Device** › Sequence: presets and a playlist... `Ctrl+Shift+Q`
+- **Device** › LED outputs and power... `Ctrl+Shift+O`
+- **Device** › Active device › … the devices known
+- **Device** › Scan the network for devices
+- **Device** › Stream the sim to the device (DDP) `Ctrl+Shift+T`
+- **Device** › Send the graph as a script `Ctrl+Shift+D`
+- **Device** › Send the current effect's settings `Ctrl+Shift+P`
+- **Device** › Send the shape (ledmap + positions)
+- **Device** › Send the ledmap only
+- **Device** › Import the device's ledmap
+- **Device** › Import a ledmap file...
+- **Device** › Usermods and features...
+- **Device** › Export usermod (folder + zip)
+- **View** › Logical net `Q`
+- **View** › 3-D view `E`
+- **View** › Net and 3-D `W`
+- **View** › Code `C`
+- **View** › Graph `G`
+- **View** › Presentation (hide controls) `H`
+- **View** › Side panel
+- **View** › Properties pane (graph) `N`
+- **View** › Focus mode (dim all but the selection) `/`
+- **View** › Fullscreen `F11`
+- **View › Zoom** › Zoom in `Ctrl+=`
+- **View › Zoom** › Zoom out `Ctrl+-`
+- **View › Zoom** › Zoom 100% `Ctrl+0`
+- **View › Zoom** › Frame all `Home`
+- **View › Zoom** › Frame the selection `Shift+Home`
+- **View** › Snap to grid `Shift+Tab`
+- **View** › Minimap
+- **View › Camera** › Isometric
+- **View › Camera** › Front
+- **View › Camera** › Back
+- **View › Camera** › Left
+- **View › Camera** › Right
+- **View › Camera** › Top
+- **View › Camera** › Below
+- **View › Camera** › Saved view 1
+- **View › Camera** › Save the view as 1
+- **View › Camera** › Saved view 2
+- **View › Camera** › Save the view as 2
+- **View › Camera** › Saved view 3
+- **View › Camera** › Save the view as 3
+- **View › Camera** › Background picture...
+- **View › Camera** › Clear the background
+- **View** › Shape editor... `Ctrl+Shift+E`
+- **View** › Generate a preview of the shape
+- **View › Layout** › Classic: main pane, 3-D, panel
+- **View › Layout** › Panel on the left
+- **View › Layout** › 3-D on the left
+- **View › Layout** › 3-D under the main pane
+- **View › Layout** › 3-D above the panel
+- **View › Layout** › Panel under the 3-D, main pane on the right
+- **View › Layout** › Reset pane sizes
+- **View › Pop out (a window of its own, for another monitor)** › The logical net
+- **View › Pop out (a window of its own, for another monitor)** › The 3-D view
+- **Node** › Add node...  (or right-click the graph) `Shift+A`
+- **Node** › Add › … every node (see NODES.md)
+- **Node** › Connect selected `F`
+- **Node** › Swap the first two inputs `Alt+S`
+- **Node** › Label the node... `Shift+F2`
+- **Node › Show** › Collapse / expand `K`
+- **Node › Show** › Hide / show unwired pins `Ctrl+H`
+- **Node › Show** › Mute (pass through) `M`
+- **Node › Arrange** › Arrange (the selection, or all) `Ctrl+L`
+- **Node › Arrange** › Frame the selection `Ctrl+J`
+- **Node › Arrange** › Align left edges `Alt+Left`
+- **Node › Arrange** › Align right edges `Alt+Right`
+- **Node › Arrange** › Align tops `Alt+Up`
+- **Node › Arrange** › Align bottoms `Alt+Down`
+- **Node › Arrange** › Align centres, across
+- **Node › Arrange** › Align centres, down
+- **Node › Arrange** › Distribute across `Alt+H`
+- **Node › Arrange** › Distribute down `Alt+V`
+- **Node › Sub-graph** › Fold the selection into one... `Ctrl+G`
+- **Node › Sub-graph** › Enter the selected sub-graph `Tab`
+- **Node › Sub-graph** › Back to the parent graph
+- **Node** › Where is the selected node's type used
+- **Node** › Stop pin preview `Escape`
+- **Playback** › Play / pause `Space`
+- **Playback** › Step one frame `.`
+- **Playback** › Restart effect `Ctrl+R`
+- **Playback** › Randomise the settings `Ctrl+Shift+X`
+- **Playback** › Sequence...
+- **Playback** › Compare with another effect... `Ctrl+Shift+B`
+- **Playback** › Sweep a slider... `Ctrl+Shift+W`
+- **Playback** › Compile + reload `F5`
+- **Playback** › Run the graph as a script (no build) `Ctrl+Shift+R`
+- **Playback** › Live: rebuild the graph as it changes `L`
+- **Playback** › Watch: rebuild when the code is saved outside
+- **Settings** › Keyboard shortcuts...
+- **Settings** › Selection frames...
+- **Settings** › Appearance...
+- **Settings** › External editor command...
+- **Settings** › Draw the 3-D view on the GPU — the shape's faces as textured quads on the GPU, where it has them; loose LEDs are drawn as points either way. Off: the software renderer for everything - the fallback when a machine's GPU misbehaves
+- **Settings** › Scale the logical view on the GPU — softer LED edges and faster; off: the CPU repeats each LED's pixels
+- **Settings › Simplified nodes below** › 70%
+- **Settings › Simplified nodes below** › 50%
+- **Settings › Simplified nodes below** › 40%
+- **Settings › Simplified nodes below** › 30%
+- **Settings › Simplified nodes below** › never
+- **Settings** › Device speed factor...
+- **Settings** › Open the project folder
+- **Settings** › Open the build folder
+- **Help** › Keyboard shortcuts `F1`
+- **Help** › Node reference (NODES.md)
+- **Help** › Studio guide (STUDIO.md)
+- **Help** › Effect API reference
+- **Help** › Check for updates...
+- **Help** › About
+
+### Keys
+
+Every action, its key (Settings › Keyboard shortcuts rebinds them) and where it works.
+
+| Key | Does | Where |
+|---|---|---|
+| `Q` | Logical net, full frame (again: back to the panels) | anywhere |
+| `E` | 3-D view, full frame (again: back) | anywhere |
+| `W` | Net and 3-D, full frame (again: back) | anywhere |
+| `C` | Code pane (again: back) | anywhere |
+| `G` | Graph pane (again: back) | anywhere |
+| `H` | Presentation: hide / show the controls | anywhere |
+| `F11` | Fullscreen window | anywhere |
+| `Ctrl+Shift+H` | Hide / show the side panel | anywhere |
+| `N` | Hide / show the graph's properties pane | in the graph |
+| `Space` | Play / pause | anywhere |
+| `.` | Step one frame | anywhere |
+| `Ctrl+R` | Restart the effect | anywhere |
+| `[` | Previous effect in the list | anywhere |
+| `]` | Next effect in the list | anywhere |
+| `Shift+[` | Previous palette | anywhere |
+| `Shift+]` | Next palette | anywhere |
+| `L` | Live: rebuild the graph as it changes | anywhere |
+| `Ctrl+Shift+B` | Compare with another effect side by side / stop | anywhere |
+| `Ctrl+Shift+W` | Sweep a slider through its range / stop | anywhere |
+| `F5` | Compile + reload | anywhere |
+| `Ctrl+N` | New effect | anywhere |
+| `Ctrl+O` | Open a graph or code effect (the list) | anywhere |
+| `Ctrl+S` | Save | anywhere |
+| `F2` | Rename | anywhere |
+| `Ctrl+I` | Add to / remove from the effects list | anywhere |
+| `Ctrl+F` | Find / replace in the code | anywhere |
+| `F3` | Find the next match | anywhere |
+| `Shift+F3` | Find the previous match | anywhere |
+| `Ctrl+E` | Open the code in the external editor | anywhere |
+| `F12` | Screenshot of the 3-D view | anywhere |
+| `Ctrl+F12` | Record 15 s as a GIF | anywhere |
+| `Ctrl+Shift+F12` | Record 15 s as a video (mp4; needs ffmpeg) | anywhere |
+| `F1` | Keyboard shortcuts | anywhere |
+| `Ctrl+Shift+U` | Build the firmware and flash the device | anywhere |
+| `Ctrl+Shift+P` | Send the current effect's settings to the device | anywhere |
+| `Ctrl+Shift+R` | Run the graph as a script (what the device would run) | anywhere |
+| `Ctrl+Shift+D` | Send the graph to the device as a script | anywhere |
+| `Ctrl+Shift+T` | Stream the sim to the device (DDP), on / off | anywhere |
+| `Ctrl+Shift+N` | Devices on the network | anywhere |
+| `Ctrl+Shift+S` | Send to device: the effects, a script, the shape | anywhere |
+| `Ctrl+Shift+E` | Shape editor | anywhere |
+| `Ctrl+Shift+Q` | Sequence: presets, a playlist and the schedule | anywhere |
+| `Ctrl+Shift+L` | Library: every effect as a looping thumbnail | anywhere |
+| `Ctrl+Shift+G` | Palettes: gradients of the project's own | anywhere |
+| `Ctrl+Shift+O` | LED outputs and power | anywhere |
+| `Ctrl+Shift+X` | Randomise the settings | anywhere |
+| `Ctrl+Z` | Undo (the graph, or the code) | anywhere |
+| `Ctrl+Y` | Redo (the graph, or the code) | anywhere |
+| `Ctrl+X` | Cut | in the graph |
+| `Ctrl+C` | Copy | in the graph |
+| `Ctrl+V` | Paste | in the graph |
+| `Shift+D` | Duplicate with its inputs | in the graph |
+| `Delete` | Delete the selection | in the graph |
+| `Shift+A` | Add a node (search) | in the graph |
+| `F` | Connect two selected nodes | in the graph |
+| `M` | Mute | in the graph |
+| `K` | Collapse / expand | in the graph |
+| `Ctrl+H` | Hide / show unwired pins | in the graph |
+| `Ctrl+G` | Fold the selection into a sub-graph | in the graph |
+| `Tab` | Enter the selected sub-graph / back out | in the graph |
+| `Ctrl+L` | Arrange (the selection, or the whole graph) | in the graph |
+| `Alt+Left` | Align the selected nodes' left edges | in the graph |
+| `Alt+Right` | Align their right edges | in the graph |
+| `Alt+Up` | Align their tops | in the graph |
+| `Alt+Down` | Align their bottoms | in the graph |
+| `Alt+H` | Distribute the selected nodes across | in the graph |
+| `Alt+V` | Distribute them down | in the graph |
+| `Ctrl+=` | Zoom in | in the graph |
+| `Ctrl+-` | Zoom out | in the graph |
+| `Ctrl+0` | Zoom 100% | in the graph |
+| `Home` | Frame the whole graph | in the graph |
+| `Escape` | Stop the pin preview | in the graph |
+| `/` | Focus mode: dim all but the selection | in the graph |
+| `A` | Select every node | in the graph |
+| `Alt+A` | Select nothing | in the graph |
+| `Ctrl+Shift+I` | Invert the selection | in the graph |
+| `Ctrl+[` | Select what feeds the selection too | in the graph |
+| `Ctrl+]` | Select what the selection feeds too | in the graph |
+| `Shift+L` | Select everything wired to the selection | in the graph |
+| `Shift+Home` | Frame the selection | in the graph |
+| `Shift+Tab` | Snap to grid on / off (Ctrl while dragging: the other way) | in the graph |
+| `Ctrl+Delete` | Delete and reconnect (what fed it feeds what it fed) | in the graph |
+| `—` | Disconnect the selected nodes (every wire in and out) | in the graph |
+| `Alt+S` | Swap a node's first two inputs | in the graph |
+| `Shift+F2` | Label the selected node | in the graph |
+| `Ctrl+J` | Put a Frame round the selection | in the graph |
+| `Shift+R` | Repeat the last action | anywhere |
+| `Ctrl+P` | Command palette: every action by name | anywhere |
+| `Ctrl+Alt+Z` | Undo history | anywhere |
+| `Ctrl+Shift+Y` | History of the current graph or code | anywhere |
+
+### Buttons
+
+Every button, with what its tooltip says.
+
+**Devices frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `Scan the network` — asks by mDNS, asks every known device for the nodes it has heard of, and sweeps the subnet; `Stop`; `Add`; `Refresh all` — asks every listed device again what it is and runs; `use`; `remove`
+
+**Flash Firmware frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `flash_env_fit`; `Preview (no compile)` — stages the build and lists what it would carry - the manifest, resolved the way the build resolves it - without compiling; `all`; `none`; `Usermods...`; `Start`; `Cancel`; `Open the build folder`
+
+**Send To Device frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `Read` — ask the device again what it is and runs; `Open in the browser`; `Send the graph as a script` — the graph as bytecode for the Studio Script effect - no firmware build; the device runs it at once; `Send the effect's settings` — the effect the sim shows, with its sliders, checks, palette and colours, onto the device's segment; `Send the shape` — the ledmap (the wiring) and the positions table, so Position and Direction see the real shape; `Send the ledmap only`; `Import the device's` — the device's ledmap becomes the geometry: a matrix with its gaps and wiring, or a strip; `Import a file...`; `<`; `>`
+
+**Shape frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `Undo`; `Clear`; `Open...` — a shape file (.shape.json) saved from here; `Save...`; `Export .xmodel...` — the shape as an xLights custom model, the wiring as its node numbers; `Segment per part` — each part its own WLED segment - effect, palette, sliders - up to eight; `+ strip` — a straight run of n LEDs along X; `+ ring` — n LEDs round a circle in the X-Y plane (radius 0: from the pitch); `+ panel` — w x h LEDs, stood up in the X-Z plane facing the camera; `+ cylinder` — w round, h tall, seamless; `+ sphere` — w round, h latitude rows; `+ cube` — B x B a face, five faces (six with the bottom); `+ polygon` — sides straight sides of per_side LEDs each, in the X-Y plane (radius 0: from the pitch); `+ polyhedron` — the edges of a solid, per_edge LEDs each (mode faces: every face outlined on its own); `+ polyline` — a strip run laid along a path, an LED every pitch; `+ points` — LEDs where they are put, in that order; `Import...` — a mesh or model as LEDs: .obj, .ply, .stl from Blender or CAD; an xLights .xmodel, or a whole xLights layout (xlights_rgbeffects.xml: every model a part, where it stands); an x y z [index] point list (CSV, text, JSON); `Reference...` — a mesh drawn in the 3-D view to place LEDs against, not LEDs: the tree, the house, the enclosure; `up`; `down`; `copy`; `x`; `delete the last`; `renumber: nearest chain from the first`; `turn into a path`; `+X`; `-X`; `+Y`; `-Y`; `+Z`; `-Z`; `aim outward`; `turn only`; `aim at the origin`; `from its place` — the direction and distance the part is at now, into the fields; `X`; `Y`; `Z`; `make`; `Generate a preview` — a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here; `Open the folder`
+
+**Sequence frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `+ Add from the sim` — a new step: what the sim shows now - effect, sliders, palette, colours, segments; `Update from the sim` — the selected step becomes what the sim shows now; `Load into the sim` — the sim shows the selected step; `Play in the sim`; `Stop`; `Render GIF` — plays the sequence once and records it as a GIF, into captures/; `Render video` — plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path; `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `WAV's` — the tempo and the beats found in the WAV playing as live audio (AUDIO > play a WAV file); `Snap durations to bars` — every step's seconds rounded to whole bars, so the sequence changes on the music; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Send and run it`; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`
+
+**Library frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Open the folder`; `no preview`
+
+**Palettes frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `+ New`; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy`; `Remove`; `Use in the sim`; `spread evenly`; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all`; `Remove this one there`
+
+**Led Outputs frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `one output`; `one per part`; `by count:`; `+ output`; `Read the device's`; `Send outputs + power limit` — over /json/cfg; the device re-initialises its outputs (reboot it if it does not)
+
+**Keyboard shortcuts**: `Reset all to defaults`
+
+**Appearance**: `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped
+
+**Selection frames**: `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`
+
+**About**: `The studio on GitHub`; `The WLED fork`; `WLED`
+
+**Usermods and features**: `Add`; `Import a folder...`; `Import a zip...`
+
+**Update**: `Download and install`; `Release page`; `Not now`
+
+**A WLED checkout**: `Clone`; `Restart the studio`; `Close`
+
+**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z; `Redo` — Redo  Ctrl+Y; `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `85%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete; `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G; `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find`; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `sec_effect_arrow`; `sec_segments_arrow`; `+`; `-`; `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play a WAV file...`; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
+
+<!-- uiref end -->

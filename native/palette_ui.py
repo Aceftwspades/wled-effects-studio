@@ -162,8 +162,8 @@ def _swatch(app, i, p):
     if dpg.does_item_exist(tag):
         dpg.set_value(tag, rgba.ravel())
     else:
-        with dpg.texture_registry():
-            dpg.add_dynamic_texture(120, 1, rgba.ravel(), tag=tag)
+        from native.textures import registry
+        dpg.add_dynamic_texture(120, 1, rgba.ravel(), tag=tag, parent=registry())
     return tag
 
 

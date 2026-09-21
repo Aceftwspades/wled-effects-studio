@@ -3392,9 +3392,9 @@ class GraphPanel:
 
     def _thumb_texture(self):
         if not dpg.does_item_exist("preview_thumb_tex"):
-            with dpg.texture_registry():
-                dpg.add_raw_texture(THUMB_PX, THUMB_PX, np.zeros(THUMB_PX * THUMB_PX * 4, np.float32),
-                                    format=dpg.mvFormat_Float_rgba, tag="preview_thumb_tex")
+            from native.textures import registry
+            dpg.add_raw_texture(THUMB_PX, THUMB_PX, np.zeros(THUMB_PX * THUMB_PX * 4, np.float32),
+                                format=dpg.mvFormat_Float_rgba, tag="preview_thumb_tex", parent=registry())
 
     def update_thumb(self, net):
         """The previewed node's picture: the net, resampled to the thumbnail

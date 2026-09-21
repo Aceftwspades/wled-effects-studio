@@ -568,8 +568,8 @@ def _poll_preview(app):
             dpg.delete_item("shape_prev_img", children_only=True)
             if dpg.does_item_exist("shape_prev_tex"):
                 dpg.delete_item("shape_prev_tex")
-            with dpg.texture_registry():
-                dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag="shape_prev_tex")
+            from native.textures import registry
+            dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag="shape_prev_tex", parent=registry())
             dpg.add_image("shape_prev_tex", width=200, height=200, parent="shape_prev_img")
             app._prev_tex_size = (w, h)
         g = app.project.geometry

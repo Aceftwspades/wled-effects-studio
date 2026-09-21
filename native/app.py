@@ -42,6 +42,7 @@ from native.project import (default_project, Project, list_projects, project_pat
 from native.graph_ui import GraphPanel, build_panel
 from native import chrome, glow, device_ui, shape_ui
 from native.gpucube import CubeQuads
+from native.textures import registry as tex_registry
 from native.features import Features
 from native.popout import Popouts
 from native.dropfiles import DropFiles
@@ -2191,9 +2192,8 @@ class App(Features):
             tw, th = img.shape[1] * k, img.shape[0] * k
         else:
             tw, th = w, h
-        with dpg.texture_registry():
-            dpg.add_raw_texture(tw, th, np.zeros(tw * th * 4, np.float32),
-                                format=dpg.mvFormat_Float_rgba, tag="net_tex")
+        dpg.add_raw_texture(tw, th, np.zeros(tw * th * 4, np.float32),
+                            format=dpg.mvFormat_Float_rgba, tag="net_tex", parent=tex_registry())
         dpg.add_image("net_tex", tag="net_img", parent="net_win", width=w, height=h)
         self._bufs.pop("net", None)
 
@@ -2246,8 +2246,7 @@ class App(Features):
             n = 3 * self.eng.B * self.CUBE_SRC_SCALE
             if dpg.does_item_exist("cube_src_tex"):
                 dpg.delete_item("cube_src_tex")
-            with dpg.texture_registry():
-                dpg.add_raw_texture(n, n, np.zeros(n * n * 4, np.float32), format=dpg.mvFormat_Float_rgba, tag="cube_src_tex")
+            dpg.add_raw_texture(n, n, np.zeros(n * n * 4, np.float32), format=dpg.mvFormat_Float_rgba, tag="cube_src_tex", parent=tex_registry())
             self._bufs.pop("cube_src", None)
             self.cube_quads = CubeQuads("cube_win", "cube_img", "cube_src_tex")
             r = self._rects.get("cube")
@@ -2258,9 +2257,8 @@ class App(Features):
             if dpg.does_item_exist("cube_cap"):
                 dpg.set_value("cube_cap", "3-D - drag to rotate, wheel to zoom")
             return
-        with dpg.texture_registry():
-            dpg.add_raw_texture(w, h, np.zeros(w * h * 4, np.float32),
-                                format=dpg.mvFormat_Float_rgba, tag="cube_tex")
+        dpg.add_raw_texture(w, h, np.zeros(w * h * 4, np.float32),
+                            format=dpg.mvFormat_Float_rgba, tag="cube_tex", parent=tex_registry())
         # Drawn at view_side even when rendered smaller, so capping the render
         # cost does not also shrink the picture.
         dpg.add_image("cube_tex", tag="cube_img", parent="cube_win",
@@ -3621,6 +3619,24 @@ def service_command(app):
                 walk_menus(app, c["menu_walk"] if isinstance(c["menu_walk"], list) else [])
             if "ctx_walk" in c:                         # test hook: every row of a context menu ["node"|"in"|"out", nid, pin]
                 walk_ctx(app, *c["ctx_walk"])
+            if "uiref" in c:                            # test hook: the reference section of GUIDE.md written from the live menus, keys and buttons
+                print("uiref", write_uiref(app, c["uiref"] if isinstance(c["uiref"], str) else None))
+            if "stats" in c:                            # test hook: one line of the process - memory, items, frame times (the soak reads it)
+                print("stats", json.dumps(process_stats(app)))
+            if "items" in c:                            # test hook: Dear PyGui's items counted by type under their nearest named ancestor
+                from collections import Counter
+                cnt = Counter()
+                for i in dpg.get_all_items():
+                    p, owner = i, ""
+                    for _ in range(12):
+                        p = dpg.get_item_parent(p)
+                        if not p:
+                            break
+                        owner = dpg.get_item_alias(p) or ""
+                        if owner:
+                            break
+                    cnt[(dpg.get_item_type(i).split("::")[-1], owner)] += 1
+                print("items", json.dumps([[t, o, n] for (t, o), n in cnt.most_common(int(c["items"]) if isinstance(c["items"], int) and c["items"] > 1 else 30)]))
             if "frame_walk" in c:                       # test hook: every button of a frame (or a window, or "root"), clicked
                 walk_frame(app, c["frame_walk"])
             if "action_walk" in c:                      # test hook: every keymap action run (toggles twice), the graph put back
@@ -3972,6 +3988,139 @@ def walk_menus(app, skip=()):
         app.stop_sweep()
     if getattr(app, "rec", None) is not None:
         app.rec = None
+
+
+UIREF_START = "<!-- uiref start"
+UIREF_END = "<!-- uiref end -->"
+
+
+def _tip_after(kids, j):
+    """The tooltip made right after item j of `kids`, as text, or ""."""
+    if j + 1 < len(kids) and dpg.get_item_type(kids[j + 1]).endswith("::mvTooltip"):
+        for t in dpg.get_item_children(kids[j + 1], 1) or []:
+            if dpg.get_item_type(t).endswith("::mvText") and dpg.get_value(t):
+                return str(dpg.get_value(t)).replace("\n", " ").strip()
+    return ""
+
+
+def write_uiref(app, path=None):
+    """GUIDE.md's reference section - every menu item with its key, every
+    key action, every button of every frame, window and pane with its
+    tooltip - written between its markers from the running app, so the
+    guide names what the app has (tests/test_docs.py checks that it does).
+    Returns the path written."""
+    from native.keys import ACTIONS
+    from native import paths as _paths
+    lines = ["## Reference: every menu, key and button", "",
+             "<!-- uiref start: written by `python tests/make_uiref.py` from the running app - change the app, not this -->",
+             "", "### Menus", ""]
+
+    # menus whose rows are the user's files, devices or the node library: named, their rows not listed
+    dynamic = {"menu_open_graph": "the project's graphs", "menu_open_code": "the project's code effects",
+               "menu_open_project": "the projects", "menu_recent_project": "the projects opened lately",
+               "menu_active_device": "the devices known", "menu_add": "every node (see NODES.md)"}
+
+    def menu(item, path):
+        kids = dpg.get_item_children(item, 1) or []
+        for j, k in enumerate(kids):
+            t = dpg.get_item_type(k)
+            cfg = dpg.get_item_configuration(k)
+            lbl = cfg.get("label", "")
+            if t.endswith("::mvMenu"):
+                alias = dpg.get_item_alias(k) or ""
+                if alias in dynamic:
+                    lines.append(f"- **{' › '.join(path)}** › {lbl} › … {dynamic[alias]}"); continue
+                menu(k, path + [lbl])
+            elif t.endswith("::mvMenuItem"):
+                key = cfg.get("shortcut") or ""
+                tip = _tip_after(kids, j)
+                lines.append(f"- **{' › '.join(path)}** › {lbl}" + (f" `{key}`" if key else "") + (f" — {tip}" if tip else ""))
+    for m in dpg.get_item_children("menubar", 1) or []:
+        menu(m, [dpg.get_item_configuration(m).get("label", "")])
+    lines += ["", "### Keys", "", "Every action, its key (Settings › Keyboard shortcuts rebinds them) and where it works.", "",
+              "| Key | Does | Where |", "|---|---|---|"]
+    for action, label, default, ctx in ACTIONS:
+        key = app.keys.label(action) or "—"
+        lines.append(f"| `{key}` | {label} | {'anywhere' if ctx == 'global' else 'in the graph'} |")
+    lines += ["", "### Buttons", "", "Every button, with what its tooltip says.", ""]
+
+    def buttons(item, out):
+        kids = dpg.get_item_children(item, 1) or []
+        for j, k in enumerate(kids):
+            t = dpg.get_item_type(k)
+            if t.endswith(("::mvButton", "::mvImageButton")):
+                lbl = (dpg.get_item_configuration(k).get("label", "") or "").replace("\n", " ").strip()
+                tip = _tip_after(kids, j)
+                if not lbl and tip:                           # an icon button: named by its tooltip's first clause
+                    lbl = re.split(r"[:(]|  ", tip)[0].strip()[:40]
+                elif not lbl:
+                    lbl = dpg.get_item_alias(k) or ""
+                if lbl and lbl not in (":::",):
+                    out.append((lbl, tip if tip != lbl else ""))
+            elif t.endswith(("::mvMenuItem", "::mvSelectable", "::mvTooltip")):
+                pass
+            else:
+                buttons(k, out)
+        return out
+    roots = [(device_ui.FRAMES[w][1].title() + " frame", device_ui.FRAMES[w][0]) for w in device_ui.FRAMES]
+    roots += [("Keyboard shortcuts", "keys_win"), ("Appearance", "appearance_win"), ("Selection frames", "frames_win"),
+              ("History", "history_win"), ("Undo history", "undo_win"), ("About", "about_win"), ("Usermods and features", "usermods_win"),
+              ("Update", "update_win"), ("A WLED checkout", "wled_dialog"), ("The panes and the toolbar", "root")]
+    seen = set()
+    for title, tag in roots:
+        if not dpg.does_item_exist(tag):
+            continue
+        rows = []
+        for lbl, tip in buttons(tag, []):
+            if (title, lbl) in seen:
+                continue
+            seen.add((title, lbl)); rows.append((lbl, tip))
+        if rows:
+            lines.append(f"**{title}**: " + "; ".join(f"`{lbl}`" + (f" — {tip}" if tip else "") for lbl, tip in rows))
+            lines.append("")
+    lines.append(UIREF_END)
+    block = "\n".join(lines) + "\n"
+    path = path or os.path.join(_paths.RES, "GUIDE.md")
+    text = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+    i, j = text.find("## Reference: every menu, key and button"), text.find(UIREF_END)
+    if i >= 0 and j >= 0:
+        text = text[:i] + block + text[j + len(UIREF_END) + 1:]
+    else:
+        text = text.rstrip("\n") + "\n\n" + block
+    open(path, "w", encoding="utf-8", newline="\n").write(text)
+    return path
+
+
+def process_stats(app):
+    """What a soak watches: the resident set in MB, Dear PyGui's item
+    count, the engine's and the app's frame times, threads."""
+    rss = 0.0
+    try:
+        if os.name == "nt":
+            import ctypes, ctypes.wintypes as wt
+
+            class PMC(ctypes.Structure):
+                _fields_ = [("cb", wt.DWORD), ("PageFaultCount", wt.DWORD), ("PeakWorkingSetSize", ctypes.c_size_t),
+                            ("WorkingSetSize", ctypes.c_size_t), ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                            ("QuotaPagedPoolUsage", ctypes.c_size_t), ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                            ("QuotaNonPagedPoolUsage", ctypes.c_size_t), ("PagefileUsage", ctypes.c_size_t),
+                            ("PeakPagefileUsage", ctypes.c_size_t)]
+            pmc = PMC(); pmc.cb = ctypes.sizeof(PMC)
+            k32 = ctypes.windll.kernel32
+            fn = k32.K32GetProcessMemoryInfo
+            fn.argtypes = [wt.HANDLE, ctypes.POINTER(PMC), wt.DWORD]; fn.restype = wt.BOOL
+            k32.GetCurrentProcess.restype = wt.HANDLE            # a pseudo-handle of -1: without this it overflows an int
+            fn(k32.GetCurrentProcess(), ctypes.byref(pmc), pmc.cb)
+            rss = pmc.WorkingSetSize / 1e6
+        else:
+            import resource
+            ru = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            rss = ru / 1e6 if sys.platform == "darwin" else ru / 1e3
+    except Exception:
+        pass
+    return {"rss_mb": round(rss, 1), "items": len(dpg.get_all_items()), "effect_ms": round(app.frame_ms, 2),
+            "app_ms": round(getattr(app, "loop_ms", 0.0), 2), "threads": threading.active_count(),
+            "effect": app.eng.names[app.eng.idx] if app.eng.names else "", "geometry": app.project.geometry.kind}
 
 
 # buttons a walk leaves alone: a flash or a firmware build, a render or a preview that takes minutes,

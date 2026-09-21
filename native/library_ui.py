@@ -287,8 +287,8 @@ def _texture(app, fn, frames):
         return tag
     if dpg.does_item_exist(tag):
         dpg.delete_item(tag)
-    with dpg.texture_registry():
-        dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag=tag)
+    from native.textures import registry
+    dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag=tag, parent=registry())
     app._lib_tex[tag] = (fn, (w, h), frames)
     return tag
 

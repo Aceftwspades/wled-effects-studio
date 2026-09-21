@@ -1150,11 +1150,31 @@ What would say the studio is complete, in the order to do them:
       after a compile), every send reaches the fake device; and with no
       git on the path `wledtree.fetch` brings the fork as GitHub's zip
       (9 s). The release workflow's smoke test runs scrubbed too.
-- [ ] **A soak**: effects and geometries switched for ten minutes, RSS watched.
-- [ ] **A docs cross-check**: every menu label, frame button and key
-      action found in GUIDE.md.
-- [ ] **Audits**: which of WLED's stock effects the sim cannot run and
-      why; GPU against software renderer positions for every geometry.
+- [x] **A soak** (`tests/soak.py`, `--minutes` for a short one): the app
+      driven for ten minutes - an effect every step, geometries, layouts,
+      frames opened and closed, a graph compiled now and then - with the
+      `stats` hook sampling RSS, Dear PyGui's item count and the frame
+      times; the second half judged against the first. Found: three
+      stock audio effects (Ripple Peak, Puddlepeak, Waterfall) wrote to
+      audio slots the sim never provided - an access violation in the
+      engine; and every `with dpg.texture_registry():` left an empty
+      registry item behind (one per geometry change, build, thumbnail)
+      - one registry now (`native/textures.py`). 197 steps: RSS 119 →
+      133 MB (a plateau from minute six), items steady.
+- [x] **A docs cross-check**: GUIDE.md ends with a reference section -
+      every menu item with its key, every key action, every button of
+      every frame, window and pane with its tooltip - written from the
+      running app by `python tests/make_uiref.py` (the `uiref` hook);
+      `tests/test_docs.py` fails when a menu item, action or button in
+      the source is not named there. Run make_uiref after adding one,
+      as nodedocs is run after adding a node.
+- [x] **Audits** (`tests/test_audit.py`): every effect in the roster on
+      every geometry kind for five frames (1,575 runs, none faulting);
+      the stock effects the sim leaves out listed with their reasons (2
+      of the 2-D ones, 16 of the 1-D) and the count held; the GPU view's
+      square for every LED against `render.project`, and the cube's face
+      corners against `render()`, for every geometry kind and twelve
+      cameras - within a hundredth of a pixel.
 - [ ] **Product**: undo for segments, sequence steps and palette edits;
       a project as one zip; "report a problem" bundling version.json,
       crash.txt and the doctor.
