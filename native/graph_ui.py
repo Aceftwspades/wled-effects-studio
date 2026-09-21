@@ -3363,7 +3363,8 @@ class GraphPanel:
                   ("an LFO - a sine of the time", ("lfo", "value", {})),
                   ("the volume", ("Audio", "volume", {})), ("the bass", ("Audio", "bass", {})),
                   ("the mid", ("Audio", "mid", {})), ("the treble", ("Audio", "treble", {})),
-                  ("the beat's hit", ("Audio", "hit", {})), ("a random hold on the beat", ("hold", "value", {}))]
+                  ("the beat's hit", ("Audio", "hit", {})), ("a random hold on the beat", ("hold", "value", {})),
+                  ("the beat's phase (a Tempo)", ("tempo", "phase", {})), ("the bar's phase (a Tempo)", ("tempo", "bar", {}))]
 
     def modulate(self, nid, name, src):
         """Bitwig's gesture: a modulator onto a value. The typed value stays
@@ -3395,6 +3396,12 @@ class GraphPanel:
             h = self.graph.add("Random hold", (px - 440, py))
             self.graph.link(a, "beat", h, "trigger")
             source, sout = h, "value"
+        elif kind == "tempo":                                # musical time: a Tempo fed by the beat
+            a = self._find_or_add("Audio", (px - 660, py))
+            tp = next((m["id"] for m in self.graph.nodes.values() if m["type"] == "Tempo"), None)
+            if tp is None:
+                tp = self.graph.add("Tempo", (px - 440, py)); self.graph.link(a, "beat", tp, "beat")
+            source, sout = tp, out
         else:
             source, sout = self._find_or_add(kind, (px - 440, py)), out
         r = self.graph.add("Remap", (px - 220, py))

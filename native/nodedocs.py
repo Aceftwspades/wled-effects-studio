@@ -83,6 +83,14 @@ DOCS = {
                "on the kick and eases.",
         "in": {"beat": "the beat, from Audio", "throw": "how far each beat throws it"},
         "out": {"phase": "the running offset: add it to a position"}},
+    "Tempo": {
+        "doc": "Musical time. Wire Audio's beat in and it measures the tempo from the gaps between hits (30..300 bpm, "
+               "smoothed) and counts time in beats: a Wave with `beats` / 4 on its x is one cycle a bar at whatever "
+               "speed the song runs. On each hit the count snaps to the nearest whole beat, so the phase stays with "
+               "the music; without beats it runs at the fallback bpm (the synth's, in the sim).",
+        "in": {"beat": "the beat, from Audio", "fallback": "the bpm to run at until beats arrive"},
+        "out": {"bpm": "the tempo measured", "beats": "time in beats, running", "phase": "where in the beat, 0..1",
+                "bar": "where in a four-beat bar, 0..1"}},
     "Integrate": {
         "doc": "A number that keeps growing at a rate you set - the way to make a phase, a scroll or an angle that never "
                "stops. Plug a Speed slider into rate and you have a clock the slider controls. wrap makes it start "

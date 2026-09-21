@@ -381,6 +381,20 @@ The least, the most and the average of a field over every pixel, from last frame
 **Settings**
 - `field` *(int)*: which field to measure
 
+### Tempo
+
+Musical time. Wire Audio's beat in and it measures the tempo from the gaps between hits (30..300 bpm, smoothed) and counts time in beats: a Wave with `beats` / 4 on its x is one cycle a bar at whatever speed the song runs. On each hit the count snaps to the nearest whole beat, so the phase stays with the music; without beats it runs at the fallback bpm (the synth's, in the sim).
+
+**Inputs**
+- `beat` *(bool)*: the beat, from Audio
+- `fallback` *(float)*: the bpm to run at until beats arrive
+
+**Outputs**
+- `bpm` *(float)*: the tempo measured
+- `beats` *(float)*: time in beats, running
+- `phase` *(float)*: where in the beat, 0..1
+- `bar` *(float)*: where in a four-beat bar, 0..1
+
 ### Time
 
 The clock. t counts seconds since the effect started; feed it into a Wave, a Noise's z, or an Add to make something drift. dt is how long this frame took, for things that move a fixed amount per second.

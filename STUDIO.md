@@ -1186,10 +1186,15 @@ the order to do them:
       "modulate with..." - Time, the volume, a band, the beat, an LFO - an
       amount and a range; the Remap it makes stays folded out of sight,
       the range drawn on the field.
-- [ ] **Musical time**: a "beats" unit on the time-based inputs - Wave's
-      cycles, the Sequencer's phases, Integrate's rate - against the sim's
-      bpm and the device's beat clock, so an effect can say one cycle per
-      bar.
+- [x] **Musical time**: a **Tempo** node measures the tempo from the
+      beats as they come (the gaps between Audio's hits, smoothed, 30..300
+      bpm; the fallback until beats arrive) and counts time in beats,
+      snapping to the nearest whole beat on each hit so the phase stays
+      with the music: `beats`, `phase` (in the beat), `bar` (over four).
+      A Wave with beats / 4 on its x is one cycle a bar at any speed;
+      "modulate with" offers the beat's and the bar's phase. Runs as a
+      script too. A test drives it with the synth at 132 bpm and reads
+      132 back.
 - [ ] **A Steps node** (the step sequencer: eight or sixteen values
       advanced by a trigger or the beat) and **snapshots** of the whole
       graph's settings as named states, with a morph between two.

@@ -171,6 +171,32 @@ def test_live_parameters_poke_the_running_effect():
     assert len({tuple(px) for px in after[lit]}) == 1 and len({tuple(px) for px in before[lit]}) > 1
 
 
+def test_tempo_follows_the_synth():
+    """A Tempo fed by Audio's beat measures the synth's bpm within a few
+    percent after ten seconds of beats, and its bar phase runs 0..1 over
+    four beats."""
+    from native.engine import Engine
+    from native.synth import Synth
+    g = G.Graph({"name": "Census tempo probe"}, lib=LIB)
+    a = g.add("Audio", (0, 0)); tp = g.add("Tempo", (200, 0)); p = g.add("Palette", (400, 0)); o = g.add("Output", (600, 0))
+    g.link(a, "beat", tp, "beat"); g.link(tp, "bar", p, "index"); g.link(p, "color", o, "color")
+    g.compile()
+    slot_bpm = next(k for k, v in g.probes.items() if v == (tp, "bpm"))
+    slot_bar = next(k for k, v in g.probes.items() if v == (tp, "bar"))
+    gs, rep = _build({"tempo": g})
+    assert rep.ok, rep.link_output[-600:]
+    e = Engine(); e.load(rep.library)
+    e.select(e.names.index(g.name))
+    syn = Synth(bpm=132)
+    bars = []
+    for _ in range(int(10.0 / 0.023)):
+        syn.push(e); e.frame()
+        bars.append(e.probe(slot_bar))
+    bpm = e.probe(slot_bpm)
+    assert abs(bpm - 132) < 132 * 0.05, bpm
+    assert min(bars[-100:]) < 0.1 and max(bars[-100:]) > 0.9         # the bar phase sweeps 0..1
+
+
 def test_every_node_scripts_or_says_why():
     """The script compiler takes each graph or refuses it as a ScriptError
     (never anything else); what it takes runs in the Script effect."""

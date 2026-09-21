@@ -119,6 +119,24 @@ LIBRARY = [
             "$out.value = $st.y;",
             "smooths a signal: fast up (attack ms), slow down (release ms)"),
          state=["y"]),
+    # Musical time: the tempo from the beats as they come (the gaps between
+    # hits, smoothed), and time counted in beats - a Wave of `beats` / 4 is one
+    # cycle a bar, whatever the song's speed. The count snaps to the nearest
+    # whole beat on each hit, so the phase stays with the music.
+    dict(_n("Tempo", "signals", "frame", [("beat", B, False), ("fallback", F, 120.0)],
+            [("bpm", F), ("beats", F), ("phase", F), ("bar", F)], [],
+            "{ const float now_ = t * 1000.0f;\n"
+            "  if ($first) { $st.last = -1.0f; $st.prev = 0.0f; $st.period = 60000.0f / ($in.fallback > 1.0f ? $in.fallback : 120.0f); $st.beats = 0.0f; $st.n = 0.0f; }\n"
+            "  const bool rise_ = $in.beat && $st.prev < 0.5f; $st.prev = $in.beat ? 1.0f : 0.0f;\n"
+            "  if (rise_) {\n"
+            "    if ($st.last >= 0.0f) { const float gap_ = now_ - $st.last;\n"
+            "      if (gap_ > 200.0f && gap_ < 2000.0f) { $st.period = $st.n < 1.0f ? gap_ : $st.period * 0.8f + gap_ * 0.2f; $st.n += 1.0f; } }\n"
+            "    $st.last = now_; $st.beats = floorf($st.beats + 0.5f); }\n"
+            "  $st.beats += (float)dt / $st.period;\n"
+            "  $out.bpm = 60000.0f / $st.period; $out.beats = $st.beats;\n"
+            "  $out.phase = $st.beats - floorf($st.beats); $out.bar = $st.beats * 0.25f - floorf($st.beats * 0.25f); }",
+            "the tempo from the beats (30..300 bpm, the gaps smoothed), time counted in beats, and where in the beat and the bar we are"),
+         state=["last", "prev", "period", "beats", "n"]),
     dict(_n("Random hold", "signals", "frame", [("trigger", B, False)], [("value", F), ("changed", B)],
             [],
             "if ($first) { $st.val = gc_rnd(); $st.prev = 0.0f; }\n"
@@ -1131,6 +1149,7 @@ UNITS = {
     "Sequencer":  {"t1": ("s", None, None, None), "t2": ("s", None, None, None), "t3": ("s", None, None, None), "t4": ("s", None, None, None)},
     "Integrate":  {"rate": ("/s", None, None, None), "wrap": ("", None, None, None)},
     "Beat kick":  {"throw": ("x", 0.0, 4.0, None)},
+    "Tempo":      {"fallback": ("bpm", 30.0, 300.0, None)},
     "Particles":  {"rate": ("/s", 0.0, 200.0, None), "life": ("s", 0.05, 20.0, "log"), "spread": ("", 0.0, 2.0, None), "drag": ("", 0.0, 5.0, None)},
     "Emitters":   {"life": ("s", 0.05, 30.0, "log")},
     "Wave":       {"cycles": ("x", 0.0, 32.0, None), "phase": ("turns", None, None, None), "distort": ("", 0.0, 2.0, None)},
