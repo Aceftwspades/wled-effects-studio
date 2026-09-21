@@ -55,6 +55,16 @@ STEPS = [
     ([{"layout": "graph"}, {"graph_open": "question_block.json"},
       {"py": "setattr(app.gp, '_test_sel', [next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Bitmap')])"}], 0.8),
     ([{"paint": [0, 0, 7]}, {"py": "app.gp._bitmap_ed is not None"}, {"graph_selected": []}, {"graph_undo": True}], 0.8),
+    # the face of a node: a collapsed node's body is what it computes, the line follows a typed value, a stand-in
+    # carries it too; the zoom scales the nodes themselves (a 50% node is half as tall); category hues on the titles
+    ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "app.gp._collapse(11)"}], 1.0),
+    ([{"expect": ["gsum_11", "a × 2"]}, {"py": "app.gp.set_input_live(11, 'b', 3.0)"}], 0.5),
+    ([{"expect": ["gsum_11", "a × 3"]}, {"check": "dpg.get_item_rect_size('gnode_13')[1] > 90"}, {"graph_zoom": 0.5}], 1.0),
+    ([{"check": "40 < dpg.get_item_rect_size('gnode_13')[1] < 70"}, {"py": "app.gp.set_overview_zoom(0.5)"}, {"graph_zoom": 0.4}], 1.0),
+    ([{"expect": ["gsum_12", "scale"]}, {"check": "app.gp._standin_line.get(12, 0) > 0"},
+      {"py": "app.gp.set_overview_zoom(0.0)"}, {"graph_zoom": 1.0}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
+    ([{"check": "app.gp.summary(12).startswith('scale ')"}, {"py": "app.prefs.__setitem__('cat_colours', False) or app.gp.rebind_themes()"},
+      {"py": "app.prefs.__setitem__('cat_colours', True) or app.gp.rebind_themes()"}], 0.5),
     # a wire that closes a loop (the Multiply of the time back into its own b) gets a Delay; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.on_link(None, (app.gp._pins[(11, 'out', 'result')], app.gp._pins[(11, 'in', 'b')]))"}], 1.0),
     ([{"expect": ["graph_status", "closed a loop"]}, {"py": "[n['type'] for n in app.gp.graph.nodes.values()].count('Delay')"}, {"graph_undo": True}], 0.5),

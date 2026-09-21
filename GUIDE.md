@@ -117,8 +117,18 @@ before, and the message names the fix (Previous, for a colour). A **Bitmap** nod
 are painted in the properties pane: the left button sets the pen's
 digit (a colour slot for Colour pick), the right empties a pixel, and
 the rows follow. Zoomed out past 50% (Settings > Simplified nodes
-below) the nodes become small stand-ins - a title and its wires - for
-getting about a big graph. Settings > Keyboard shortcuts lists the rest.
+below) the nodes become small stand-ins - a title, one line on what the
+node computes, and its wires - for getting about a big graph. Every
+node has that **one line**: `a × 2`, `0..1 -> 3..5`, `sine × 3 cycles`,
+`-> target in 0.2 s`, the palette's name - made from its settings and
+typed values, following a drag. A collapsed node shows it as its body,
+and the box above the graph puts it before the node's description on
+hover. Nodes wear their **category's colour** on the title bar (amber
+sliders, blue signals, teal coordinates, violet patterns, slate maths,
+rust colour, green custom code, magenta output; the add menu's headers
+match), so a graph reads by colour first; Settings > Appearance has the
+legend and the switch, and a colour you give a node still wins.
+Settings > Keyboard shortcuts lists the rest.
 
 **As code.** Ctrl+N in the code pane makes a `.cpp` from the effect
 skeleton; the editor colours it, errors from a build go to their lines,

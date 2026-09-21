@@ -512,6 +512,17 @@ def build_dialogs(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="Back to the preset", small=True, callback=lambda: app.set_appearance(preset=(app.prefs.get("theme") or {}).get("preset") or "dark"))
             tip("the preset's colours again, your changes dropped")
+        dpg.add_separator()
+        from native import nodeface
+        with dpg.group(horizontal=True):
+            dpg.add_checkbox(label="Colour nodes by category", tag="app_cat_colours", default_value=bool(app.prefs.get("cat_colours", True)),
+                             callback=lambda s, v: (app.prefs.__setitem__("cat_colours", bool(v)), save_prefs(app.prefs), app.gp.rebind_themes()))
+            tip("a node's title bar in its category's hue, so a graph reads by colour before it is read by name; "
+                "a colour you give a node still wins")
+        with dpg.group(horizontal=True):
+            for cat in nodeface.CATEGORY_ORDER + ("subgraphs",):
+                r, g, b = nodeface.hue(cat)
+                dpg.add_text(cat, color=(min(255, r + 90), min(255, g + 90), min(255, b + 90), 255))
     with dpg.window(tag="sweep_win", label="Sweep a slider", show=False, width=400, height=190, no_collapse=True):
         dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
                      "record makes that one pass the GIF.", color=DIM, wrap=380)

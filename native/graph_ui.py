@@ -15,6 +15,7 @@ import dearpygui.dearpygui as dpg
 import numpy as np
 
 from native import graph as G
+from native import nodeface
 from native.nodedefs import library
 
 DIM = (139, 147, 163)
@@ -131,6 +132,8 @@ class GraphPanel:
         self.pan = [0.0, 0.0]
         self._mid_last = None
         self._fonts = {}         # px size -> font
+        self._node_font = None   # the font at this zoom, bound to each node as it is made
+        self._standin_line = {}  # nid -> the height a stand-in gives its summary line (0: none)
         self._font_file = _font_file()
         self._zoom_themes = {}   # zoom -> node-editor style theme
         self._node_themes = {}   # (r,g,b) -> a node theme with that title bar
@@ -774,7 +777,9 @@ class GraphPanel:
             if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
                 d = self.graph.node_def(n)
                 note = G.feature_note(d.get("needs"), self.graph.features if hasattr(self.graph, "features") else None)
-                self.help((f"[{note}]  " if note else "") + f"{d.get('label') or n['type']}: {d.get('doc', '')}")
+                text = self.summary(nid)
+                self.help((f"[{note}]  " if note else "") + f"{d.get('label') or n['type']}"
+                          + (f"  [{text}]" if text else "") + f": {d.get('doc', '')}")
                 return
         self.help("")
 
@@ -886,6 +891,21 @@ class GraphPanel:
             self._fonts[size] = f
         return f
 
+    def _zoom_styles(self):
+        """The styles the zoom scales, added to the theme component open
+        now. Dear PyGui 2.3 does not hand an editor's theme (or font) down
+        to its nodes, so every theme a node can wear - its colour, its
+        category, dimmed, marked - carries these too, keyed by the zoom."""
+        z = self.zoom
+        dpg.add_theme_style(dpg.mvNodeStyleVar_NodePadding, 8 * z, 8 * z, category=dpg.mvThemeCat_Nodes)
+        dpg.add_theme_style(dpg.mvNodeStyleVar_PinCircleRadius, 4 * z, category=dpg.mvThemeCat_Nodes)
+        dpg.add_theme_style(dpg.mvNodeStyleVar_PinHoverRadius, 10 * z, category=dpg.mvThemeCat_Nodes)
+        dpg.add_theme_style(dpg.mvNodeStyleVar_LinkThickness, 3 * z, category=dpg.mvThemeCat_Nodes)
+        dpg.add_theme_style(dpg.mvNodeStyleVar_NodeCornerRounding, 4 * z, category=dpg.mvThemeCat_Nodes)
+        dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 4 * z, 3 * z, category=dpg.mvThemeCat_Core)
+        dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8 * z, 4 * z, category=dpg.mvThemeCat_Core)
+        dpg.add_theme_style(dpg.mvStyleVar_ItemInnerSpacing, 4 * z, 4 * z, category=dpg.mvThemeCat_Core)
+
     def _zoom_theme(self):
         z = self.zoom
         th = self._zoom_themes.get(z)
@@ -894,13 +914,7 @@ class GraphPanel:
                 with dpg.theme_component(dpg.mvNodeEditor):
                     dpg.add_theme_style(dpg.mvNodeStyleVar_GridSpacing, 24 * z, category=dpg.mvThemeCat_Nodes)
                 with dpg.theme_component(dpg.mvAll):
-                    dpg.add_theme_style(dpg.mvNodeStyleVar_NodePadding, 8 * z, 8 * z, category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_style(dpg.mvNodeStyleVar_PinCircleRadius, 4 * z, category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_style(dpg.mvNodeStyleVar_PinHoverRadius, 10 * z, category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_style(dpg.mvNodeStyleVar_LinkThickness, 3 * z, category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_style(dpg.mvNodeStyleVar_NodeCornerRounding, 4 * z, category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 4 * z, 3 * z, category=dpg.mvThemeCat_Core)
-                    dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8 * z, 4 * z, category=dpg.mvThemeCat_Core)
+                    self._zoom_styles()
             self._zoom_themes[z] = th
         return th
 
@@ -1393,14 +1407,16 @@ class GraphPanel:
         if keep:
             self.ext_sel = [n for n in dict.fromkeys(list(self.ext_sel) + keep)]
         self._widgets.clear(); self._pads.clear(); self._log_sliders.clear(); self._live_glyphs.clear(); self._glyph_pal = None
+        self._standin_line.clear()
         dpg.delete_item("node_editor", children_only=True)
         self.links.clear(); self._pins.clear(); self._ptype.clear(); self._link_normal.clear()
         self._focus_sel = None
         if not self.graph:
             return
         f = self._font()
+        self._node_font = f
         if f is not None:
-            dpg.bind_item_font("node_editor", f)
+            dpg.bind_item_font("node_editor", f)         # (Dear PyGui 2.3 does not hand an editor's font down: each node binds it too)
         dpg.bind_item_theme("node_editor", self._zoom_theme())
         # frames first: nodes draw in creation order, so a frame made first
         # sits behind the nodes inside it
@@ -1432,14 +1448,16 @@ class GraphPanel:
     # compile, amber for what only looks wrong - and listed in the status
     # line, so a broken graph says where before a build is tried.
     def _mark_theme(self, kind):
-        th = self._mark_themes.get(kind)
+        th = self._mark_themes.get((kind, self.zoom))
         if th is None:
             col = (235, 80, 70) if kind == "error" else (240, 190, 70)
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvNode):
                     dpg.add_theme_color(dpg.mvNodeCol_NodeOutline, col, category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_style(dpg.mvNodeStyleVar_NodeBorderThickness, 2.5, category=dpg.mvThemeCat_Nodes)
-            self._mark_themes[kind] = th
+                with dpg.theme_component(dpg.mvAll):
+                    self._zoom_styles()
+            self._mark_themes[(kind, self.zoom)] = th
         return th
 
     def _mark_problems(self):
@@ -1460,6 +1478,31 @@ class GraphPanel:
                 errs.append(f"{n['type']} #{nid}: {msg[7:]}")
         if errs:
             self.status("; ".join(errs)[:200])
+
+    def summary(self, nid):
+        """One line on what the node computes now (nodeface.summary), with
+        the palette's name where a node reads the palette."""
+        n = self.graph.nodes.get(nid)
+        if n is None:
+            return ""
+        try:
+            d = self.graph.node_def(n)
+        except G.GraphError:
+            return ""
+        wired = {i for b, i in ((l[2], l[3]) for l in self.graph.links) if b == nid}
+        extra = {}
+        if n["type"] in ("Palette", "Palette source", "Effect settings"):
+            try:
+                extra["palette"] = self.app.palette_name_for(self.app.eng.pal)
+            except Exception:
+                pass
+        return nodeface.summary(n, d, wired, extra)
+
+    def _refresh_summary(self, nid):
+        """The line follows a typed value as it is dragged."""
+        tag = f"gsum_{nid}"
+        if dpg.does_item_exist(tag):
+            dpg.set_value(tag, self.summary(nid))
 
     def _make_node(self, nid, n):
         try:
@@ -1484,6 +1527,8 @@ class GraphPanel:
             return
         with dpg.node(label=label, parent="node_editor", pos=self._disp(n.get("pos", [0, 0])), tag=f"gnode_{nid}",
                       user_data=nid):
+            if getattr(self, "_node_font", None):
+                dpg.bind_item_font(f"gnode_{nid}", self._node_font)
             if n["type"] == "Frame":
                 self._frame_body(nid, n)
             with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
@@ -1525,6 +1570,12 @@ class GraphPanel:
                 if n["type"] in self.GLYPHS and self.zoom >= 0.7:
                     with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                         self._glyph_widget(nid, n)
+            if collapsed and n["type"] != "Frame":
+                # folded: the function it computes, in one line, is its body
+                text = self.summary(nid)
+                if text:
+                    with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+                        dpg.add_text(text, tag=f"gsum_{nid}", color=(170, 178, 192), wrap=width)
             for o in d["outputs"]:
                 if hide and (nid, o["name"]) not in fed_out:
                     continue
@@ -1551,6 +1602,7 @@ class GraphPanel:
         fed_out = {(a, o) for a, o, _, _ in self.graph.links}
         pins = [("in", i) for i in d["inputs"] if (nid, i["name"]) in linked] +                [("out", o) for o in d["outputs"] if (nid, o["name"]) in fed_out]
         body = self.px(est) - self._font_px() - 4 * self.px(8) - self.px(4) * (len(pins) + 1)
+        body -= self._standin_line.get(nid, 0)             # the summary's line, when the stand-in shows one
         row_h = max(1, int(body / max(1, len(pins))))
         return pins, row_h, max(1, body - row_h * len(pins))
 
@@ -1559,11 +1611,24 @@ class GraphPanel:
         the wires still have ends), nothing to edit; as tall as the full
         node would be at this zoom. The title's font stops at 8 px."""
         th = self.themes()
+        text = self.summary(nid) if self.zoom >= 0.3 else ""
+        line = self._font_px() + self.px(4)
+        self._standin_line[nid] = line if text else 0
         pins, row_h, rest = self._standin_rows(nid)
+        if text and pins and row_h < self._font_px():
+            # no room under the title: the pins' rows come first
+            text = ""; self._standin_line[nid] = 0
+            pins, row_h, rest = self._standin_rows(nid)
         with dpg.node(label=label, parent="node_editor", pos=self._disp(n.get("pos", [0, 0])), tag=f"gnode_{nid}",
                       user_data=nid):
+            if getattr(self, "_node_font", None):
+                dpg.bind_item_font(f"gnode_{nid}", self._node_font)
             with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
-                dpg.add_spacer(width=width, height=1)
+                if text:
+                    # the function under the title, in a line of its own
+                    dpg.add_text(text[:max(1, int(width / max(1.0, self.char_w)))], tag=f"gsum_{nid}", color=(150, 158, 172))
+                else:
+                    dpg.add_spacer(width=width, height=1)
             for kind, p in pins:
                 tag = f"g{kind}_{nid}_{p['name']}"
                 with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Input if kind == "in" else dpg.mvNode_Attr_Output,
@@ -1587,17 +1652,44 @@ class GraphPanel:
             dpg.bind_item_theme(f"gnode_{nid}", self._node_theme(tuple(col), sel=sel))
         elif n["type"] == "Frame":
             dpg.bind_item_theme(f"gnode_{nid}", self._node_theme(tuple(n["params"].get("colour", [90, 110, 160]))[:3], frame=True, sel=sel))
-        elif sel:
-            dpg.bind_item_theme(f"gnode_{nid}", self._node_theme(None, sel=True))
+        elif self.app.prefs.get("cat_colours", True):
+            # a face per category: the title bar in the category's hue
+            try:
+                cat = self.graph.node_def(n).get("cat", "graph")
+            except G.GraphError:
+                cat = "graph"
+            dpg.bind_item_theme(f"gnode_{nid}", self._node_theme(nodeface.hue(cat), sel=sel))
         else:
-            dpg.bind_item_theme(f"gnode_{nid}", 0)
+            dpg.bind_item_theme(f"gnode_{nid}", self._node_theme(None, sel=sel))
+
+    def rebind_themes(self):
+        """Every node's look again (the category colours switched)."""
+        if not self.graph:
+            return
+        for nid, n in self.graph.nodes.items():
+            if dpg.does_item_exist(f"gnode_{nid}"):
+                self._bind_node_theme(nid, n)
+
+    def _cat_header_theme(self, cat):
+        """The add menu's category header in the category's hue."""
+        key = ("cat", cat)
+        th = self._node_themes.get(key)
+        if th is None:
+            r, g, b = nodeface.hue(cat)
+            with dpg.theme() as th:
+                with dpg.theme_component(dpg.mvCollapsingHeader):
+                    dpg.add_theme_color(dpg.mvThemeCol_Header, (r, g, b, 170))
+                    dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, (min(255, r + 30), min(255, g + 30), min(255, b + 30), 200))
+                    dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, (min(255, r + 50), min(255, g + 50), min(255, b + 50), 220))
+            self._node_themes[key] = th
+        return th
 
     # --- focus mode -------------------------------------------------------------------
     # Everything but the selection and what it is wired to goes dim, so a
     # busy graph can be read one piece at a time. Themes are rebound when
     # the selection changes; nothing is rebuilt.
     def _dim_theme(self):
-        th = self._node_themes.get("dim")
+        th = self._node_themes.get(("dim", self.zoom))
         if th is None:
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvNode):
@@ -1610,7 +1702,8 @@ class GraphPanel:
                 with dpg.theme_component(dpg.mvAll):
                     dpg.add_theme_color(dpg.mvThemeCol_Text, (78, 84, 96), category=dpg.mvThemeCat_Core)
                     dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (26, 29, 36, 80), category=dpg.mvThemeCat_Core)
-            self._node_themes["dim"] = th
+                    self._zoom_styles()
+            self._node_themes[("dim", self.zoom)] = th
         return th
 
     def _dim_wire(self):
@@ -1728,7 +1821,7 @@ class GraphPanel:
             # counted down from the node's title
             pins, row_h, _ = self._standin_rows(nid)
             row = next((r for r, (kd, p) in enumerate(pins) if kd == kind and p["name"] == name), 0)
-            top = nd["rect_min"][1] + self.px(8) * 2 + self._font_px() + self.px(4)
+            top = nd["rect_min"][1] + self.px(8) * 2 + self._font_px() + self.px(4) + self._standin_line.get(nid, 0)
             y = top + row * (row_h + self.px(4)) + row_h / 2
         else:
             y = (st["rect_min"][1] + st["rect_max"][1]) / 2
@@ -1870,10 +1963,12 @@ class GraphPanel:
         """A node theme whose title bar is `col` (None: the default look); a
         frame's body is a wash of the same colour so the nodes inside still
         read through it; `sel` adds the key-selection outline."""
-        key = (col, frame, sel)
+        key = (col, frame, sel, self.zoom)
         th = self._node_themes.get(key)
         if th is None:
             with dpg.theme() as th:
+                with dpg.theme_component(dpg.mvAll):
+                    self._zoom_styles()
                 with dpg.theme_component(dpg.mvNode):
                     if sel:
                         from native import chrome
@@ -2035,6 +2130,7 @@ class GraphPanel:
                 self._pad_draw(btn)
         if self.live_poke(nid, name, val) and not was_dirty:
             self._dirty = 0.0
+        self._refresh_summary(nid)
         return True
 
     def _on_input(self, sender, val):
@@ -2059,6 +2155,7 @@ class GraphPanel:
         if poked and not was_dirty:
             self._dirty = 0.0                            # the running effect has the value: nothing to rebuild
             self.status(f"{name}: {val if not isinstance(val, float) else round(val, 4)} - live")
+        self._refresh_summary(nid)
 
     def _show_input(self, b, inp, linked):
         tag = f"gin_{b}_{inp}"
@@ -2568,9 +2665,11 @@ class GraphPanel:
         if isinstance(val, (list, tuple)) and len(val) >= 3 and all(isinstance(x, float) for x in val):
             val = [int(round(x * 255)) if x <= 1.0 else int(x) for x in val[:3]]
         self.graph.nodes[nid]["params"][name] = val
+        self._refresh_summary(nid)
         for k in self._same_type_selected(nid):
             self.graph.nodes[k]["params"][name] = val
             self._set_param_widget(k, name, val)
+            self._refresh_summary(k)
         if self.graph.nodes[nid]["type"] == "Frame" and name in ("title", "colour"):
             self._sync_pos(); self.rebuild()
         if self.graph.nodes[nid]["type"] in ("Graph input", "Graph output") and name in ("name", "type"):
@@ -3936,7 +4035,9 @@ class GraphPanel:
                                            callback=lambda s, a, u: self.delete_preset(u))
             hidden = 0
             for c, names in cats.items():
-                with dpg.collapsing_header(label=c, default_open=(c in ("generate", "colour", "subgraphs"))):
+                with dpg.collapsing_header(label=c, default_open=(c in ("generate", "colour", "subgraphs"))) as hdr:
+                    if self.app.prefs.get("cat_colours", True):
+                        dpg.bind_item_theme(hdr, self._cat_header_theme(c))
                     for n in names:
                         if self._feature_off(n):
                             hidden += 1

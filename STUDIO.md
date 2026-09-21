@@ -1229,6 +1229,83 @@ the order to do them:
       against a real controller yet: no MIDI input on this PC; the tests
       inject messages through the port's own callback.
 
+### Sixth pass: the face of a module (September 2026)
+
+Item 8 of the fifth pass shipped as its minimum: four glyph kinds on six
+node types. Against a VCV Rack module - recognisable by its faceplate
+before a word is read, lights for events, a scope on anything, the
+function in the name - the graph is still a field of grey boxes with
+numbers on them. This pass is the item in full, and the standard for the
+work is "would a VCV user find it thin": each entry below is done when
+every node it names has the thing, not the first three.
+
+- [x] **Functions that say what they compute.** Every node has a
+      one-line summary derived from its definition and its typed values:
+      a one-statement code template prettied (`$in.a + $in.b` reads
+      `a + 0.5` when b is typed 0.5, `floorf` reads `floor`, `6.2831853f`
+      reads `2π`, casts and `f` suffixes go) and hand-written forms for
+      the nodes whose code is not one line - Remap `0..1 → 3..5`,
+      Map range, Smoothstep `edges 0..1`, Clamp, Threshold `≥ 0.5`, Mix,
+      Select, Math its op, Wave `sine × 3 cycles`, Noise `scale 4, 1
+      octave`, Ease `→ target in 1 s`, Envelope `20 / 250 ms`, Integrate
+      `+1 /s, wrap 1`, Spring `1.2 Hz`, Steps `8 steps`, Sequencer `1 1 1
+      1 s`, Tempo `fallback 120 bpm`, Palette the palette's name, Colour
+      ramp its stop count, Expression its text, Send / Receive their
+      name, Bitmap its size, Text its text, Image its file... Shown on the
+      collapsed node as its body, on the stand-in zoomed out as a second
+      line when the font allows, first in the hover box, and as the
+      tooltip of a full node's title; it follows a typed value as it is
+      dragged. Tests: every library node summarises at its defaults with
+      no `$`, no `f` suffix and no C cast in the text; the hand-written
+      ones are spot-checked. (native/nodeface.py; the line sits in the
+      hover box rather than a title tooltip - a tooltip on a node fires
+      over its fields too.) Found on the way: Dear PyGui 2.3 no longer
+      hands the node editor's font or theme down to its nodes, so the
+      zoom had stopped scaling text and node heights (a 50% graph drew
+      full-size nodes at half spacing, overlapping); every node now
+      binds the zoom's font and carries the zoom's styles in whichever
+      theme it wears, and the smoke test measures a node at 100% and 50%.
+- [x] **A face per category.** The title bar coloured by category by
+      default - signals, coords, generate, maths, colour, controls,
+      graph, output, custom: nine muted hues chosen apart - the node's
+      own colour and muted still winning; the same hue on the Add menu's
+      category headers and in the node library's rows, so the legend is
+      learnt by using it; a legend with the switch to turn it off in
+      Settings > Appearance; stand-ins keep the hue.
+- [ ] **Lights and meters.** A bool output pin gets a light in place of
+      "on / off" - bright when true, dim when not, with a 150 ms
+      afterglow so a one-frame hit is seen (a VCV LED decays) - and a
+      float output whose range is known (Audio's outputs, Wave, Ease,
+      Envelope, Random hold, the phases of Tempo, Sequencer and Beat
+      kick, Steps within its sliders' span, Integrate within its wrap)
+      gets a small bar under its number; the number stays for the rest.
+- [ ] **Glyphs that move.** The Wave carries a dot at its live phase
+      when its x runs once a frame; the Palette strip a marker at the
+      live index; the Noise thumbnail scrolls with its live z; Steps
+      lights its current step; the FFT bin's own bar stands out in its
+      bands; Integrate, Ease, Envelope, Spring, Delay, Random hold, Beat
+      kick and Tempo draw a sparkline of their last three seconds.
+- [ ] **Glyphs for the rest.** The transfer curve of every one-in,
+      one-out maths node computed over its input range - Remap, Map
+      range, Smoothstep, Clamp, Threshold, Fract, Abs, Floor, Power,
+      Modulo, Sine, Cosine, Log, Exp, Band, Float curve; strips for
+      Colour ramp (its stops) and Blackbody (with the typed kelvin
+      marked) and Colour pick (its eight); the Gradient's shape; pattern
+      thumbnails for Checker, Stripes, Ripple, Voronoi, Brick and
+      Mandelbrot from the typed values; a Bitmap's and States' pixels, an
+      Image's picture, a Text's text, a Path's polyline seen from above.
+      Each redrawn when a typed value or setting changes.
+- [ ] **A Scope node**: the rolling plot of anything wired in (three
+      seconds, min and max marked, frame-scope as it is, per-pixel at the
+      centre pixel), compiled to nothing - VCV's Scope, left on a wire.
+- [ ] **The hover plot the fifth pass promised** (item 2: "a history
+      plot on a hovered one"; only the readouts shipped): hovering a
+      frame-scope output pin draws its last three seconds beside the pin.
+
+After this pass: the earlier passes' ticked items read again for the
+same kind of thinness, and each such item fleshed out to the feature it
+names.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

@@ -3503,6 +3503,12 @@ def service_command(app):
                 device_ui.close(app, c["frame_close"])
             if "wled" in c:                             # test hook: ["fetch", dest] | ["use", folder]
                 (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
+            if "check" in c:                            # test hook: an expression that must be true (graded as expect is)
+                try:
+                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui})
+                except Exception as e:
+                    v = f"raised {e!r}"
+                print(("check ok     " if v is True or (v and not isinstance(v, str)) else "EXPECT FAILED check ") + f"{c['check'][:90]}: {v!r}"[:200])
             if "expect" in c:                           # test hook: [tag, substring] - the value of a text/status item must contain it
                 tag, sub = c["expect"]
                 val = str(dpg.get_value(tag)) if dpg.does_item_exist(tag) else "(no such item)"
