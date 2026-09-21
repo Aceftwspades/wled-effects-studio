@@ -3582,6 +3582,10 @@ def service_command(app):
                 elif op[0] == "reference": app._shape_ref = True; shape_ui.import_file(app, op[1])
                 elif op[0] == "layout": shape_ui._apply(app, layout=op[1])
                 elif op[0] == "undo": shape_ui.undo(app)
+                elif op[0] == "mark": shape_ui._marks(app).clear(); shape_ui._marks(app).update(int(i) for i in op[1]); shape_ui.refresh(app)
+                elif op[0] == "align": shape_ui.align_parts(app, int(op[1]))
+                elif op[0] == "spread": shape_ui.distribute_parts(app, int(op[1]))
+                elif op[0] == "match": shape_ui.match_parts(app, op[1])
                 elif op[0] == "select": app._shape_sel = int(op[1]); shape_ui.refresh(app)
                 elif op[0] == "place":
                     app._shape_place = True

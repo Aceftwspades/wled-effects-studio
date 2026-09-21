@@ -209,6 +209,20 @@ def test_ramps_become_sub_steps():
     assert sequence.ramp_value(st, "sx", 0.5) == 120
 
 
+def test_align_spread_match():
+    parts = [shapes.new_part("ring", n=6) for _ in range(4)]
+    for k, p in enumerate(parts):
+        p["pos"] = [k * 3.0 + (1.0 if k == 2 else 0.0), float(k), 0.0]; p["scale"] = 1.0 + k
+    out = shapes.aligned(parts, [1, 2, 3], 0, axis=1)
+    assert [p["pos"][1] for p in out] == [0.0, 0.0, 0.0, 0.0] and [p["pos"][0] for p in out] == [0.0, 3.0, 7.0, 9.0]
+    out = shapes.distributed(parts, [0, 1, 2, 3], axis=0)
+    assert [p["pos"][0] for p in out] == [0.0, 3.0, 6.0, 9.0] and parts[2]["pos"][0] == 7.0     # the input untouched
+    assert shapes.distributed(parts, [0, 1], axis=0) == parts
+    out = shapes.matched(parts, [0, 1, 2, 3], 3, "scale")
+    assert all(p["scale"] == 4.0 for p in out)
+    out = shapes.matched(parts, [1], 0, "rot"); assert out[1]["rot"] == parts[0]["rot"]
+
+
 def test_positions_export_reads_back():
     """The positions CSV of a shape of parts: one row an LED in wiring order,
     the part named; read back, the same points in the same order."""

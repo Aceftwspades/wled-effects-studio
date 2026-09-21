@@ -173,10 +173,13 @@ def refresh(app):
     dpg.set_value("shape_desc", g.describe())
     dpg.set_value("shape_layout", g.params.get("layout", "strip"))
     sel = _sel(app)
+    marks = _marks(app)
     for i, part in enumerate(parts):
         n = shapes.part_count(part)
         with dpg.group(horizontal=True, parent="shape_parts"):
-            dpg.add_selectable(label=f"{i + 1:2d}  {part.get('name', part['kind'])}", width=200, default_value=(i == sel), user_data=i,
+            dpg.add_checkbox(default_value=(i in marks), user_data=i,
+                             callback=lambda s, a, u: (marks.add(u) if a else marks.discard(u), _arrange_hint(app)))
+            dpg.add_selectable(label=f"{i + 1:2d}  {part.get('name', part['kind'])}", width=190, default_value=(i == sel), user_data=i,
                                callback=lambda s, a, u: (setattr(app, "_shape_sel", u), refresh(app)))
             dpg.add_text(f"{part['kind']}, {n} LEDs", color=c.DIM)
             dpg.add_button(label="up", small=True, user_data=i, callback=lambda s, a, u: move_part(app, u, -1), show=i > 0)
@@ -191,6 +194,7 @@ def refresh(app):
     part = parts[sel]
     kind = shapes.KINDS.get(part["kind"], ({}, f"unknown kind {part['kind']!r} - no LEDs"))
     dpg.set_value("shape_part_title", f"PART {sel + 1}: {part.get('name', part['kind'])}")
+    _arrange_hint(app)
     dpg.set_value("shape_part_kind", f"- {part['kind']}, {shapes.part_count(part)} LEDs")
     P = "shape_fields"
     dpg.add_input_text(label="name", parent=P, width=200, default_value=str(part.get("name", "")), on_enter=True,
@@ -285,6 +289,22 @@ def refresh(app):
         dpg.add_button(label="aim at the origin", small=True, callback=lambda: aim_part(app, sel, "origin"))
         dpg.add_button(label="from its place", small=True, callback=lambda: _set_dir(list(d0), dist))
         c.tip("the direction and distance the part is at now, into the fields")
+    with dpg.group(horizontal=True, parent=P):
+        dpg.add_text("ARRANGE", color=c.ACCENT)
+        dpg.add_text("", tag="shape_arrange_hint", color=c.DIM)
+        dpg.add_text("align", color=c.DIM)
+        for ax, lbl in enumerate("XYZ"):
+            dpg.add_button(label=lbl, small=True, user_data=ax, callback=lambda s, a, u: align_parts(app, u))
+        c.tip("the ticked parts given this part's position on that axis")
+        dpg.add_text("  spread", color=c.DIM)
+        for ax, lbl in enumerate("XYZ"):
+            dpg.add_button(label=lbl, small=True, user_data=ax, callback=lambda s, a, u: distribute_parts(app, u))
+        c.tip("the ticked parts (three or more) spaced evenly along that axis between the two farthest apart")
+        dpg.add_button(label="same scale", small=True, callback=lambda: match_parts(app, "scale"))
+        dpg.add_button(label="same turn", small=True, callback=lambda: match_parts(app, "rot"))
+        c.tip("the ticked parts given this part's scale, or its rotation")
+        dpg.add_button(label="tick all", small=True, callback=lambda: (_marks(app).update(range(len(_parts(app) or []))), refresh(app)))
+        dpg.add_button(label="none", small=True, callback=lambda: (_marks(app).clear(), refresh(app)))
     with dpg.group(horizontal=True, parent=P):
         dpg.add_text("mirror", color=c.DIM)
         for ax, lbl in enumerate("XYZ"):
@@ -464,6 +484,49 @@ def set_param(app, i, key, value):
     if 0 <= i < len(parts):
         parts[i]["params"][key] = value
         _apply(app, parts)
+
+
+def _marks(app):
+    """The parts ticked for the arrange tools: a set of indices."""
+    m = getattr(app, "_shape_marks", None)
+    if m is None:
+        m = app._shape_marks = set()
+    return m
+
+
+def _arrange_hint(app):
+    if dpg.does_item_exist("shape_arrange_hint"):
+        n = len(_marks(app))
+        dpg.set_value("shape_arrange_hint", f"{n} ticked" if n else "tick parts in the list")
+
+
+def _marked(app):
+    parts = _parts(app) or []
+    return sorted(i for i in _marks(app) if 0 <= i < len(parts))
+
+
+def align_parts(app, axis):
+    idxs = _marked(app)
+    if not idxs:
+        app.gp.status("tick the parts to align, in the list"); return
+    _apply(app, shapes.aligned(_parts(app), idxs, _sel(app), axis))
+    app.gp.status(f"{len(idxs)} part(s) aligned on {'xyz'[axis]} to part {_sel(app) + 1}")
+
+
+def distribute_parts(app, axis):
+    idxs = _marked(app)
+    if len(idxs) < 3:
+        app.gp.status("tick three parts or more to spread them"); return
+    _apply(app, shapes.distributed(_parts(app), idxs, axis))
+    app.gp.status(f"{len(idxs)} parts spread evenly along {'xyz'[axis]}")
+
+
+def match_parts(app, what):
+    idxs = _marked(app)
+    if not idxs:
+        app.gp.status("tick the parts to match, in the list"); return
+    _apply(app, shapes.matched(_parts(app), idxs, _sel(app), what))
+    app.gp.status(f"{len(idxs)} part(s) given part {_sel(app) + 1}'s {'turn' if what == 'rot' else 'scale'}")
 
 
 def mirror_part(app, i, axis):

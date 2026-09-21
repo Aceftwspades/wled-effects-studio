@@ -77,7 +77,9 @@ STEPS = [
     # the shape editor: parts added, one placed by a click on the 3-D view, the grid layout, undo, and back to the cube
     ([{"layout": "both"}, {"frame": "shape"}, {"shape": ["clear"]}, {"shape": ["add", "ring"]}, {"shape": ["add", "panel"]},
       {"shape": ["add", "cube"]}, {"shape": ["select", 1]}, {"shape": ["place", 120, 120]}, {"shape": ["layout", "grid"]},
-      {"shape": ["layout", "strip"]}, {"shape": ["undo"]}, {"shape": ["segments"]}, {"seg": "remove"}, {"seg": "remove"},
+      {"shape": ["layout", "strip"]}, {"shape": ["undo"]},
+      {"shape": ["mark", [0, 1]]}, {"shape": ["align", 2]}, {"shape": ["match", "scale"]}, {"shape": ["mark", []]}, {"shape": ["undo"]}, {"shape": ["undo"]},
+      {"shape": ["segments"]}, {"seg": "remove"}, {"seg": "remove"},
       {"shape": ["preview", "parts", 1]}, {"shape": ["xmodel", "projects/default/export/_smoke.xmodel"]},
       {"dock": ["shape", True]}, {"dock": ["shape", False]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 4.0),

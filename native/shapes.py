@@ -20,6 +20,7 @@ from the camera, X is to the right - the cube's axes.
 """
 import math
 
+import json
 import numpy as np
 
 # each kind: the parameters it takes, with their defaults, and a line for the editor
@@ -377,6 +378,46 @@ def aimed(part, direction, distance=None, spin_deg=0.0):
     if distance is not None:
         q["pos"] = [round(float(c), 3) for c in d * float(distance)]
     return q
+
+
+# --- arranging several parts (the layout tools) ---------------------------------------------
+def aligned(parts, idxs, ref, axis):
+    """The parts at `idxs` given the reference part's position on one axis (0 x, 1 y, 2 z)."""
+    out = json.loads(json.dumps(parts))
+    if not (0 <= ref < len(out)):
+        return out
+    v = float((out[ref].get("pos") or [0, 0, 0])[axis])
+    for i in idxs:
+        if 0 <= i < len(out) and i != ref:
+            p = list(out[i].get("pos") or [0.0, 0.0, 0.0]); p[axis] = v; out[i]["pos"] = p
+    return out
+
+
+def distributed(parts, idxs, axis):
+    """The parts at `idxs` spread evenly along one axis between the two
+    farthest apart, in the order they sit."""
+    out = json.loads(json.dumps(parts))
+    ids = sorted({i for i in idxs if 0 <= i < len(out)}, key=lambda i: float((out[i].get("pos") or [0, 0, 0])[axis]))
+    if len(ids) < 3:
+        return out
+    lo = float((out[ids[0]].get("pos") or [0, 0, 0])[axis]); hi = float((out[ids[-1]].get("pos") or [0, 0, 0])[axis])
+    for k, i in enumerate(ids):
+        p = list(out[i].get("pos") or [0.0, 0.0, 0.0]); p[axis] = lo + (hi - lo) * k / (len(ids) - 1); out[i]["pos"] = p
+    return out
+
+
+def matched(parts, idxs, ref, what="scale"):
+    """The parts at `idxs` given the reference part's scale ("scale") or turn ("rot")."""
+    out = json.loads(json.dumps(parts))
+    if not (0 <= ref < len(out)):
+        return out
+    for i in idxs:
+        if 0 <= i < len(out) and i != ref:
+            if what == "rot":
+                out[i]["rot"] = list(out[ref].get("rot") or [0.0, 0.0, 0.0])
+            else:
+                out[i]["scale"] = float(out[ref].get("scale", 1.0))
+    return out
 
 
 def split_part(part):

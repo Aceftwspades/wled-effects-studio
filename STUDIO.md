@@ -1116,7 +1116,7 @@ is the order to do them.
       the pointer over the logical net or the 3-D view names the LED
       under it - its wiring index, its part, its position - in the
       footer.
-- [ ] **Align and distribute parts** (xLights' layout tools): the
+- [x] **Align and distribute parts** (xLights' layout tools): the
       selected parts of a shape aligned on an axis to the first, spread
       evenly between the first and last, or given the first's scale.
 - [ ] **Paint a bitmap** (xLights' effect assist): the Bitmap node's rows
