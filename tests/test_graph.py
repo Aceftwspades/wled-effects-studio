@@ -197,6 +197,28 @@ def test_modulate_gesture_shape():
     assert g.last_scope[w] == "frame" and g.last_scope[r] == "frame"           # the LFO and its range run once a frame
 
 
+def test_snapshots_and_morph():
+    """Two snapshots of a graph's settings; the morph blends numbers and
+    switches the rest half way; a value only one side has arrives from
+    the middle; the snapshots ride in the file."""
+    g = starter()
+    c = g.add("Coords", (0, 0)); n = g.add("Noise", (100, 0)); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+    g.link(c, "u", n, "x"); g.link(n, "value", p, "index"); g.link(p, "color", o, "color")
+    g.nodes[n]["params"]["octaves"] = 1; g.nodes[n]["inputs"] = {"scale": 2.0}
+    g.take_snapshot("calm")
+    g.nodes[n]["params"]["octaves"] = 5; g.nodes[n]["inputs"] = {"scale": 8.0}; g.nodes[p]["inputs"] = {"brightness": 0.2}
+    g.take_snapshot("wild")
+    g.apply_snapshot("calm")
+    assert g.nodes[n]["params"]["octaves"] == 1 and g.nodes[n]["inputs"]["scale"] == 2.0
+    g.apply_snapshot("calm", "wild", 0.25)
+    assert g.nodes[n]["params"]["octaves"] == 2 and abs(g.nodes[n]["inputs"]["scale"] - 3.5) < 1e-9
+    assert "brightness" not in g.nodes[p]["inputs"] or g.nodes[p]["inputs"].get("brightness") == 0.2   # only wild has it: not before half way
+    g.apply_snapshot("calm", "wild", 0.75)
+    assert g.nodes[n]["params"]["octaves"] == 4 and g.nodes[p]["inputs"]["brightness"] == 0.2
+    g2 = G.Graph(g.to_json(), lib=LIB)
+    assert sorted(g2.snapshots) == ["calm", "wild"] and "SEGMENT" in g2.compile()
+
+
 def test_wired_input_is_required():
     """Sprites reads the Particles' state through its slots pin: unwired,
     it is a problem on the node and a refusal to compile, not a C++ error."""

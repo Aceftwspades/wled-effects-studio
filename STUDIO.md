@@ -1195,9 +1195,14 @@ the order to do them:
       "modulate with" offers the beat's and the bar's phase. Runs as a
       script too. A test drives it with the synth at 132 bpm and reads
       132 back.
-- [ ] **A Steps node** (the step sequencer: eight or sixteen values
-      advanced by a trigger or the beat) and **snapshots** of the whole
-      graph's settings as named states, with a morph between two.
+- [x] **A Steps node** (the step sequencer: eight values as sliders on
+      the node, one at a time, the next on each trigger, reset to the
+      first; value, step and changed out; scripts too) and **snapshots**
+      (Edit > Snapshots..., Ctrl+Shift+K): the whole graph's settings and
+      typed values as named states kept in the graph file - save,
+      recall, update, remove - and a MORPH slider between two: numbers
+      blend, the rest switches half way, typed values follow live and a
+      changed setting rebuilds.
 - [ ] **Modules that show what they do**: a gradient strip on Palette, the
       bands on Audio, a period of the Wave, a thumbnail of the Noise - the
       graph readable like a rack.

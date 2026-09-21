@@ -3358,6 +3358,77 @@ class GraphPanel:
         self.graph.nodes[nid].setdefault("inputs", {}).pop(name, None)
         self.rebuild()
 
+    # --- snapshots: the whole graph's settings as named states, and a morph between two ----
+    def snapshot_save(self, name):
+        name = (name or "").strip()
+        if not self.graph or not name:
+            self.status("a name is needed for the snapshot"); return
+        self._sync_pos()
+        self.graph.take_snapshot(name)
+        self.save()
+        self.refresh_snapshots()
+        self.status(f"snapshot {name!r}: {len(self.graph.nodes)} node(s) kept")
+
+    def snapshot_apply(self, name, other=None, t=0.0, live=True):
+        """A snapshot (or the morph between two) onto the graph: typed
+        values poked into the running effect where they can be, the fields
+        set, and a rebuild only when a setting changed."""
+        if not self.graph or name not in self.graph.snapshots:
+            return
+        before = {nid: json.dumps(n.get("params") or {}, sort_keys=True) for nid, n in self.graph.nodes.items()}
+        if t == 0.0 or other is None:
+            self.snapshot(("snapshot", name))
+        touched = self.graph.apply_snapshot(name, other, t)
+        params_changed = any(json.dumps(self.graph.nodes[nid].get("params") or {}, sort_keys=True) != before[nid] for nid in touched)
+        all_live = True
+        for nid in touched:
+            n = self.graph.nodes[nid]
+            for k, v in (n.get("inputs") or {}).items():
+                w = f"gin_{nid}_{k}_w"
+                if dpg.does_item_exist(w):
+                    try:
+                        dpg.set_value(w, v if not isinstance(v, (list, tuple)) or len(v) != 3 else list(v) + [0.0])
+                    except Exception:
+                        pass
+                if live and not isinstance(v, (list, tuple)) or (isinstance(v, (list, tuple)) and len(v) == 3):
+                    all_live = self.live_poke(nid, k, v) and all_live
+        for btn in list(self._pads):
+            self._pad_draw(btn)
+        if params_changed or not all_live:
+            self._sync_pos(); self.rebuild()
+        else:
+            self.touch(); self._dirty = 0.0
+        self.status(f"snapshot {name!r}" + (f" -> {other!r} at {t:.2f}" if other else "") + (" (settings changed: rebuilt)" if params_changed else ""))
+
+    def snapshot_delete(self, name):
+        if self.graph and name in self.graph.snapshots:
+            self.graph.snapshots.pop(name); self.save(); self.refresh_snapshots()
+            self.status(f"snapshot {name!r} removed")
+
+    def refresh_snapshots(self):
+        if not dpg.does_item_exist("snap_rows"):
+            return
+        dpg.delete_item("snap_rows", children_only=True)
+        names = sorted(self.graph.snapshots) if self.graph else []
+        for nm in names:
+            with dpg.group(horizontal=True, parent="snap_rows"):
+                dpg.add_button(label=nm, small=True, user_data=nm, callback=lambda s_, a_, u: self.snapshot_apply(u))
+                dpg.add_button(label="update", small=True, user_data=nm, callback=lambda s_, a_, u: self.snapshot_save(u))
+                dpg.add_button(label="x", small=True, user_data=nm, callback=lambda s_, a_, u: self.snapshot_delete(u))
+        if not names:
+            dpg.add_text("none yet: type a name and Save", parent="snap_rows", color=DIM)
+        for tag in ("snap_a", "snap_b"):
+            if dpg.does_item_exist(tag):
+                dpg.configure_item(tag, items=names)
+                if dpg.get_value(tag) not in names:
+                    dpg.set_value(tag, names[0] if names else "")
+
+    def snapshot_morph(self, t):
+        a, b = dpg.get_value("snap_a"), dpg.get_value("snap_b")
+        if not self.graph or a not in self.graph.snapshots or b not in self.graph.snapshots:
+            return
+        self.snapshot_apply(a, b, float(t))
+
     # a source, its output, and its own settings: what "modulate with" offers
     MODULATORS = [("the time (a slow ramp)", ("Time", "t", {})),
                   ("an LFO - a sine of the time", ("lfo", "value", {})),

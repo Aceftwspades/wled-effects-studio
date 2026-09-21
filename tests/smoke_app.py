@@ -46,6 +46,11 @@ STEPS = [
     # modulation as a gesture: an LFO onto a typed value, then the beat's hit; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.modulate(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Noise'), 'scale', ('lfo', 'value', {}))"}], 1.0),
     ([{"expect": ["graph_status", "modulated by Wave"]}, {"graph_undo": True}], 0.5),
+    # snapshots: the look saved twice with a typed value changed between, the morph half way (live), the window shown
+    ([{"graph_open": "box_fire.json"}, {"snap": ["save", "smoke A"]},
+      {"py": "app.gp.graph.nodes[next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Noise')]['inputs'].__setitem__('scale', 9.0)"},
+      {"snap": ["save", "smoke B"]}, {"snap": ["morph", "smoke A", "smoke B", 0.5]}, {"chrome": "snapshots"}], 1.5),
+    ([{"expect": ["graph_status", "smoke A"]}, {"py": "dpg.hide_item('snap_win')"}, {"snap": ["del", "smoke A"]}, {"snap": ["del", "smoke B"]}], 0.5),
     # a Bitmap painted in the properties pane: one cell set, the rows follow, undone
     ([{"layout": "graph"}, {"graph_open": "question_block.json"},
       {"py": "setattr(app.gp, '_test_sel', [next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Bitmap')])"}], 0.8),

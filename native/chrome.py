@@ -108,6 +108,7 @@ def build_menus(app):
                 _mi(app, "Everything wired to it", "select_linked", callback=lambda: app.gp.select_linked("both"))
             dpg.add_separator()
             _mi(app, "Command palette...", "palette", callback=lambda: show_palette(app))
+            _mi(app, "Snapshots...", "snapshots", callback=lambda: show_snapshots(app))
             _mi(app, "Palettes (gradients)...", "palettes", callback=lambda: device_ui.show(app, "palettes"))
             dpg.add_separator()
             _mi(app, "Find / replace in code", "find", callback=lambda: app.focus_find())
@@ -454,6 +455,23 @@ def build_dialogs(app):
             dpg.add_button(label="Not now", callback=lambda: dpg.hide_item("update_win"))
             dpg.add_checkbox(label="check once a day", tag="update_daily", default_value=bool(app.prefs.get("update_check", True)),
                              callback=lambda s, v: (app.prefs.__setitem__("update_check", bool(v)), save_prefs(app.prefs)))
+    # SNAPSHOTS: the whole graph's settings as named states, and a morph between two
+    with dpg.window(tag="snap_win", label="Snapshots", show=False, width=420, height=360, no_collapse=True):
+        dpg.add_text("Every node's settings and typed values, as a named state of this graph. Save the look you have; "
+                     "click a name to bring it back; morph between two.", color=DIM, wrap=400)
+        with dpg.group(horizontal=True):
+            dpg.add_input_text(tag="snap_name", width=200, hint="a name")
+            dpg.add_button(label="Save", callback=lambda: app.gp.snapshot_save(dpg.get_value("snap_name")))
+            tip("the graph as it is now, under this name (the same name updates it)")
+        with dpg.child_window(tag="snap_rows", height=150, border=True):
+            pass
+        with dpg.group(horizontal=True):
+            dpg.add_text("MORPH", color=ACCENT)
+            dpg.add_combo([], tag="snap_a", width=110)
+            dpg.add_slider_float(tag="snap_t", width=120, min_value=0.0, max_value=1.0, default_value=0.0, format="%.2f",
+                                 callback=lambda s, v: app.gp.snapshot_morph(v))
+            dpg.add_combo([], tag="snap_b", width=110)
+            tip("drag between the two: numbers blend, the rest switches half way; typed values follow live, a changed setting rebuilds")
     # REPORT A PROBLEM: where the bundle landed, and the issues page
     with dpg.window(tag="report_win", label="Report a problem", show=False, width=560, height=230, no_collapse=True):
         dpg.add_text("", tag="report_text", wrap=540)
@@ -1024,6 +1042,14 @@ def palette_enter(app):
 def paths_captures():
     from native import paths
     return os.path.join(paths.CAPTURES, "x")
+
+
+def show_snapshots(app):
+    if not app.gp.graph:
+        app.gp.status("open a graph first"); return
+    app.gp.refresh_snapshots()
+    _centre("snap_win", 420, 360)
+    dpg.show_item("snap_win")
 
 
 def report_problem(app):

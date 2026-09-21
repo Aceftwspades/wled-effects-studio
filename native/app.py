@@ -2741,6 +2741,7 @@ class App(Features):
             "frame_sel":    lambda: gp.frame_selection(),
             "repeat":       self.repeat_last,
             "palette":      lambda: chrome.show_palette(self),
+            "snapshots":    lambda: chrome.show_snapshots(self),
             "undo_history": lambda: chrome.show_undo_history(self),
             "history":      lambda: chrome.show_history(self),
             "compare":      lambda: self.stop_ab() if self.ab else chrome.show_compare(self),
@@ -2822,7 +2823,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -3477,7 +3478,7 @@ def service_command(app):
             if "chrome" in c:                           # test hook: a chrome action by name
                 {"new": lambda: app.new_effect(), "rename": app.rename_current, "open": lambda: chrome.show_open(app),
                  "device": lambda: chrome.show_device(app), "editor": lambda: chrome.show_editor(app),
-                 "shortcuts": lambda: chrome.show_keys(app), "about": lambda: dpg.show_item("about_win"),
+                 "shortcuts": lambda: chrome.show_keys(app), "about": lambda: dpg.show_item("about_win"), "snapshots": lambda: chrome.show_snapshots(app),
                  "search": app.search_nodes, "name_ok": lambda: chrome._name_ok(app),
                  "frames": lambda: chrome.show_frames(app), "flash": lambda: chrome.show_flash(app),
                  "usermods": lambda: chrome.show_usermods(app), "devices": lambda: device_ui.show(app, "devices"),
@@ -3899,6 +3900,12 @@ def service_command(app):
                 app.gp.set_selection([int(x) for x in c["graph_select"]])
             if "graph_selected" in c:                   # test hook: a selection, held until cleared with []
                 app.gp._test_sel = [int(x) for x in c["graph_selected"]] or None
+            if "snap" in c:                             # test hook: ["save", name] | ["apply", name] | ["morph", a, b, t] | ["del", name]
+                op = c["snap"]
+                if op[0] == "save": app.gp.snapshot_save(op[1])
+                elif op[0] == "apply": app.gp.snapshot_apply(op[1])
+                elif op[0] == "morph": app.gp.snapshot_apply(op[1], op[2], float(op[3]))
+                elif op[0] == "del": app.gp.snapshot_delete(op[1])
             if "paint" in c:                            # test hook: [row, col, digit] painted into the Bitmap node the properties pane shows
                 ed = getattr(app.gp, "_bitmap_ed", None)
                 if ed:

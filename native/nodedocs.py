@@ -165,6 +165,15 @@ DOCS = {
                "moves there over about `seconds`, so a change on the WLED page fades in rather than snapping.",
         "in": {"target": "where to go", "seconds": "roughly how long the glide takes"},
         "out": {"value": "where it is now", "moving": "true while it is still on its way"}},
+    "Steps": {
+        "doc": "A step sequencer: eight values (sliders on the node), one at a time - each trigger moves to the next, "
+               "the last wraps to the first, reset goes back to the start. Trigger it from Audio's beat, a Tempo's "
+               "phase through a Threshold and Rising edge, or any pulse. The value drives whatever you like: a "
+               "palette index that jumps on the beat, a brightness pattern, which of the States shows.",
+        "in": {"trigger": "a rise here moves to the next step", "reset": "back to the first step while true"},
+        "out": {"value": "the current step's value", "step": "which step, 0..7", "changed": "true on the frame a step changes"},
+        "params": {"length": "how many of the eight play", "s1": "step 1", "s2": "step 2", "s3": "step 3", "s4": "step 4",
+                   "s5": "step 5", "s6": "step 6", "s7": "step 7", "s8": "step 8"}},
     "Sequencer": {
         "doc": "A timed cycle of up to four phases - a bump, a spin, a hold, a rest - each lasting the seconds you "
                "give it, started by the trigger (or straight away). It tells you which phase is on, how far "

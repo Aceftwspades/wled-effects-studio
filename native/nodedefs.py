@@ -220,6 +220,22 @@ LIBRARY = [
             "$out.value = $st.x; $out.moving = fabsf($in.target - $st.x) > 0.0005f;",
             "glides toward whatever target it is given, taking about `seconds` to get there - a value that never jumps when a slider or a switch does"),
          state=["x"]),
+    # A step sequencer: eight values, one at a time, advanced by a trigger
+    # (the beat, a Tempo's phase through a Threshold, a Rising edge of anything).
+    dict(_n("Steps", "signals", "frame", [("trigger", B, False), ("reset", B, False)],
+            [("value", F), ("step", F), ("changed", B)],
+            [_p("length", "int", 8, 1, 8),
+             _p("s1", "float", 1.0, 0.0, 1.0), _p("s2", "float", 0.0, 0.0, 1.0), _p("s3", "float", 0.5, 0.0, 1.0), _p("s4", "float", 0.0, 0.0, 1.0),
+             _p("s5", "float", 1.0, 0.0, 1.0), _p("s6", "float", 0.0, 0.0, 1.0), _p("s7", "float", 0.5, 0.0, 1.0), _p("s8", "float", 0.0, 0.0, 1.0)],
+            "if ($first) { $st.i = 0.0f; $st.prev = 0.0f; }\n"
+            "$out.changed = $in.trigger && $st.prev < 0.5f;\n"
+            "$st.prev = $in.trigger ? 1.0f : 0.0f;\n"
+            "if ($in.reset) { $st.i = 0.0f; } else if ($out.changed) { $st.i += 1.0f; if ($st.i >= (float)$p.length) $st.i = 0.0f; }\n"
+            "{ const int k_ = (int)$st.i;\n"
+            "  $out.value = k_ == 0 ? $p.s1 : k_ == 1 ? $p.s2 : k_ == 2 ? $p.s3 : k_ == 3 ? $p.s4 : k_ == 4 ? $p.s5 : k_ == 5 ? $p.s6 : k_ == 6 ? $p.s7 : $p.s8;\n"
+            "  $out.step = $st.i; }",
+            "a step sequencer: eight values, one at a time, the next on each trigger; reset goes back to the first"),
+         state=["i", "prev"]),
     dict(_n("Sequencer", "signals", "frame", [("trigger", B, False), ("t1", F, 1.0), ("t2", F, 1.0), ("t3", F, 1.0), ("t4", F, 1.0)],
             [("phase", F), ("progress", F), ("since", F), ("running", B)],
             [_p("loop", "bool", False), _p("start_running", "bool", True)],

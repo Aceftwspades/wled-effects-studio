@@ -228,6 +228,7 @@ class Graph:
         # per-link decoration, keyed by the input it lands on: {"color": [r,g,b]}
         self.link_meta = {(int(l[2]), l[3]): dict(l[4]) for l in d.get("links", []) if len(l) > 4 and l[4]}
         self._next = max(self.nodes.keys(), default=0) + 1
+        self.snapshots = dict(d.get("snapshots") or {})    # name -> {nid: {"params": {...}, "inputs": {...}}}: the whole graph's settings, kept
         self.stray = self.prune_links()
 
     def prune_links(self):
@@ -521,9 +522,58 @@ class Graph:
         for l in self.links:
             m = self.link_meta.get((l[2], l[3]))
             links.append(list(l) + ([m] if m else []))
-        return {"name": self.name,
-                "nodes": [dict(n) for n in self.nodes.values()],
-                "links": links}
+        out = {"name": self.name,
+               "nodes": [dict(n) for n in self.nodes.values()],
+               "links": links}
+        if self.snapshots:
+            out["snapshots"] = self.snapshots
+        return out
+
+    # --- snapshots: every node's settings and typed values as one named state -------------
+    def take_snapshot(self, name):
+        self.snapshots[name] = {str(nid): {"params": json.loads(json.dumps(n.get("params") or {})),
+                                           "inputs": json.loads(json.dumps(n.get("inputs") or {}))} for nid, n in self.nodes.items()}
+        return self.snapshots[name]
+
+    @staticmethod
+    def _blend_value(a, b, t):
+        if isinstance(a, bool) or isinstance(b, bool):
+            return b if t >= 0.5 else a
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            v = a + (b - a) * t
+            return int(round(v)) if isinstance(a, int) and isinstance(b, int) else v
+        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)) and len(a) == len(b) and all(isinstance(x, (int, float)) for x in list(a) + list(b)):
+            return [Graph._blend_value(x, y, t) for x, y in zip(a, b)]
+        return b if t >= 0.5 else a
+
+    def apply_snapshot(self, name, other=None, t=0.0):
+        """The settings of snapshot `name` onto the nodes; with `other`, the
+        blend at t (0 = name, 1 = other): numbers interpolated, the rest
+        switching at the middle. Nodes that a snapshot does not know keep
+        their settings. Returns the node ids touched."""
+        a = self.snapshots.get(name)
+        b = self.snapshots.get(other) if other else None
+        if a is None:
+            raise GraphError(f"no snapshot {name!r}")
+        touched = []
+        for nid, n in self.nodes.items():
+            sa = a.get(str(nid))
+            if sa is None:
+                continue
+            sb = b.get(str(nid)) if b else None
+            for key in ("params", "inputs"):
+                cur = n.setdefault(key, {})
+                da, db = sa.get(key, {}), (sb.get(key, {}) if sb else {})
+                for k in set(da) | set(db):
+                    va, vb = da.get(k), db.get(k)
+                    if va is not None and vb is not None:
+                        cur[k] = self._blend_value(va, vb, t)
+                    elif va is not None:
+                        cur[k] = va
+                    elif t >= 0.5:                            # only the other snapshot has it: from half way
+                        cur[k] = vb
+            touched.append(nid)
+        return touched
 
     # --- compile -------------------------------------------------------------
     def _late(self, nid):

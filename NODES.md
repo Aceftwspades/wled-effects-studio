@@ -381,6 +381,30 @@ The least, the most and the average of a field over every pixel, from last frame
 **Settings**
 - `field` *(int)*: which field to measure
 
+### Steps
+
+A step sequencer: eight values (sliders on the node), one at a time - each trigger moves to the next, the last wraps to the first, reset goes back to the start. Trigger it from Audio's beat, a Tempo's phase through a Threshold and Rising edge, or any pulse. The value drives whatever you like: a palette index that jumps on the beat, a brightness pattern, which of the States shows.
+
+**Inputs**
+- `trigger` *(bool)*: a rise here moves to the next step
+- `reset` *(bool)*: back to the first step while true
+
+**Outputs**
+- `value` *(float)*: the current step's value
+- `step` *(float)*: which step, 0..7
+- `changed` *(bool)*: true on the frame a step changes
+
+**Settings**
+- `length` *(int)*: how many of the eight play
+- `s1` *(float)*: step 1
+- `s2` *(float)*: step 2
+- `s3` *(float)*: step 3
+- `s4` *(float)*: step 4
+- `s5` *(float)*: step 5
+- `s6` *(float)*: step 6
+- `s7` *(float)*: step 7
+- `s8` *(float)*: step 8
+
 ### Tempo
 
 Musical time. Wire Audio's beat in and it measures the tempo from the gaps between hits (30..300 bpm, smoothed) and counts time in beats: a Wave with `beats` / 4 on its x is one cycle a bar at whatever speed the song runs. On each hit the count snaps to the nearest whole beat, so the phase stays with the music; without beats it runs at the fallback bpm (the synth's, in the sim).
