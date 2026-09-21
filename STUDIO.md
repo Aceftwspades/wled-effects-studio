@@ -1182,10 +1182,12 @@ the order to do them:
       value's unit (ms, Hz, s, beats, x, %, LEDs) and its scale
       (logarithmic for times and rates, bipolar about zero); the slider
       obeys and the field shows the unit.
-- [ ] **Modulation as a gesture** (Bitwig): a field's menu offers
+- [x] **Modulation as a gesture** (Bitwig): a field's menu offers
       "modulate with..." - Time, the volume, a band, the beat, an LFO - an
       amount and a range; the Remap it makes stays folded out of sight,
-      the range drawn on the field.
+      the range drawn on the field. Done as: the Remap folded to one small
+      node labelled "scale ±1.5" (its out_lo / out_hi are the range); the
+      range is on that label, not drawn on the field itself.
 - [x] **Musical time**: a **Tempo** node measures the tempo from the
       beats as they come (the gaps between Audio's hits, smoothed, 30..300
       bpm; the fallback until beats arrive) and counts time in beats,
