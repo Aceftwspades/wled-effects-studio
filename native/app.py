@@ -3763,6 +3763,12 @@ def service_command(app):
                 if hwnd:
                     u32.SetForegroundWindow(hwnd); u32.ClientToScreen(hwnd, ctypes.byref(pt))
                 u32.SetCursorPos(pt.x + int(c["move"][0]), pt.y + int(c["move"][1]))
+            if "pad" in c:                              # test hook: [k, fx, fy] - the k-th XY pad set to a point (0..1 across, 0..1 up)
+                pads = list(app.gp._pads)
+                k, fx, fy = c["pad"]
+                if 0 <= int(k) < len(pads):
+                    app.gp._pad_apply(pads[int(k)], float(fx), float(fy)); app.gp._pad_stroke = None
+                    print("pad", sorted(app.gp.graph.nodes[app.gp._pads[pads[int(k)]][0]]["inputs"].items()))
             if "drag" in c and os.name == "nt":         # test hook: a real drag [x0, y0, x1, y1, "left"|"middle"]
                 import ctypes, ctypes.wintypes as wt, time as _tm
                 u32 = ctypes.windll.user32

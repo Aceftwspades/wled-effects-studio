@@ -35,6 +35,8 @@ OVERVIEW_CHOICES = ((0.7, "70%"), (0.5, "50%"), (0.4, "40%"), (0.3, "30%"), (0.0
 BASE_FONT = 13          # the size everything above is laid out for
 HELP_H = 46             # the description box, px: two lines
 THUMB = 96              # the preview thumbnail on a node, layout px
+PAD = 56                # an XY pad on a node, layout px (its texture is PAD_PX square)
+PAD_PX = 56
 THUMB_PX = 96           # its texture
 
 
@@ -111,6 +113,9 @@ class GraphPanel:
         self._redo = []
         self._last_snap = None   # (key, time) of the last snapshot, to coalesce slider drags
         self._widgets = set()    # every value widget on a node, so keys know when one is typed in
+        self._pads = {}          # image button -> (nid, a, b, lo, hi, texture): the XY pads on the nodes
+        self._field_themes = {}  # (frame, accent, light) -> the theme a node's value fields wear
+        self._pad_stroke = None  # the pad being dragged, for one undo step a stroke
         # --- zoom ---------------------------------------------------------------------
         # The node editor cannot zoom, so the panel does: every size it lays
         # nodes out with is multiplied by `zoom`, positions included, and the
@@ -1354,6 +1359,7 @@ class GraphPanel:
         self._poll_props()
         self._poll_curve_edit()
         self._poll_bitmap_edit()
+        self._poll_pads()
         self._poll_focus()
         self._poll_labels()
         if not self.auto or not self._dirty or not self.graph:
@@ -1373,7 +1379,7 @@ class GraphPanel:
         keep = self._clicked()
         if keep:
             self.ext_sel = [n for n in dict.fromkeys(list(self.ext_sel) + keep)]
-        self._widgets.clear()
+        self._widgets.clear(); self._pads.clear()
         dpg.delete_item("node_editor", children_only=True)
         self.links.clear(); self._pins.clear(); self._ptype.clear(); self._link_normal.clear()
         self._focus_sel = None
@@ -1498,6 +1504,11 @@ class GraphPanel:
                 for p in d["params"]:
                     with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                         self._param_widget(nid, n, p, multiline=d.get("multiline", False))
+                for a, b, lo, hi in d.get("pads", []):
+                    if (nid, a) in linked or (nid, b) in linked or hide:
+                        continue                               # wired: the pins say it; the pad is for typed values
+                    with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+                        self._pad_widget(nid, n, a, b, lo, hi)
             for o in d["outputs"]:
                 if hide and (nid, o["name"]) not in fed_out:
                     continue
@@ -1877,8 +1888,9 @@ class GraphPanel:
         v = n["inputs"].get(i["name"], i.get("default", 0))
         ud = (nid, i["name"])
         if i["type"] == "float":
-            w = dpg.add_input_float(label=i["name"], tag=tag, width=self.px(78), default_value=float(v), step=0,
-                                format="%.3g", user_data=ud, callback=self._on_input, show=show)
+            # a drag field: drag to change, ctrl+click to type; the pace from the value's size
+            w = dpg.add_drag_float(label=i["name"], tag=tag, width=self.px(78), default_value=float(v), speed=self._drag_speed(v, i.get("default")),
+                                   format="%.3g", user_data=ud, callback=self._on_input, show=show)
         elif i["type"] == "bool":
             w = dpg.add_checkbox(label=i["name"], tag=tag, default_value=bool(v), user_data=ud,
                              callback=self._on_input, show=show)
@@ -1890,6 +1902,7 @@ class GraphPanel:
             rgb = list(v)[:3] if isinstance(v, (list, tuple)) else [0, 0, 0]
             w = dpg.add_color_edit([int(c) for c in rgb] + [255], label=i["name"], tag=tag, width=self.px(90),
                                no_alpha=True, no_inputs=True, user_data=ud, callback=self._on_input, show=show)
+        dpg.bind_item_theme(w, self._field_theme())
         self._widgets.add(w)
 
     def _same_type_selected(self, nid):
@@ -1966,12 +1979,32 @@ class GraphPanel:
         return True
 
     def step_hovered(self, direction):
-        """Ctrl+wheel over a dropdown: the next or previous choice."""
+        """Ctrl+wheel over a dropdown: the next or previous choice; over a
+        slider or a drag field: a step - one for an integer, a hundredth
+        of the range or of the value for a float."""
         h = self._hovered_field()
         if not h or not self.graph:
             return False
         w, nid, name, kind = h
-        if not dpg.get_item_type(w).endswith("Combo"):
+        t = dpg.get_item_type(w)
+        if t.endswith(("SliderFloat", "SliderInt", "DragFloat", "DragInt")):
+            cfg = dpg.get_item_configuration(w)
+            cur = dpg.get_value(w)
+            if t.endswith("Int"):
+                step = 1
+            else:
+                lo, hi = cfg.get("min_value"), cfg.get("max_value")
+                step = (hi - lo) / 100.0 if t.endswith("SliderFloat") and hi is not None and hi > lo else max(0.01, abs(cur) * 0.01)
+            val = cur + (step if direction > 0 else -step)
+            if cfg.get("clamped") or t.endswith("Slider"):
+                lo, hi = cfg.get("min_value"), cfg.get("max_value")
+                if lo is not None and hi is not None and hi > lo:
+                    val = max(lo, min(hi, val))
+            val = int(round(val)) if t.endswith("Int") else round(val, 6)
+            dpg.set_value(w, val)
+            (self._on_param if kind == "param" else self._on_input)(w, val)
+            return True
+        if not t.endswith("Combo"):
             return False
         items = dpg.get_item_configuration(w).get("items") or []
         if not items:
@@ -1994,12 +2027,29 @@ class GraphPanel:
             self._widgets.add(w)
             return
         if p["type"] == "float":
-            w = dpg.add_input_float(label=p["name"], width=self.px(78), default_value=float(v), step=0,
-                                format="%.3f", user_data=ud, callback=cb)
+            lo, hi = p.get("min"), p.get("max")
+            if lo is not None and hi is not None and float(hi) - float(lo) <= 1000.0:
+                # a range: a slider with the value on it; ctrl+click types one
+                w = dpg.add_slider_float(label=p["name"], width=self.px(96), default_value=float(v), min_value=float(lo), max_value=float(hi),
+                                         clamped=True, format="%.3g", user_data=ud, callback=cb)
+            else:
+                w = dpg.add_drag_float(label=p["name"], width=self.px(78), default_value=float(v), speed=self._drag_speed(v, p.get("default")),
+                                       format="%.3g", user_data=ud, callback=cb)
+        elif p["type"] == "int" and n["type"] == "Effect settings" and p["name"] == "palette":
+            # the default palette by name, not by number
+            names = [f"{i}  {name}" for name, i in self._palette_names()]
+            cur = next((s_ for s_ in names if s_.split("  ", 1)[0] == str(int(v))), f"{int(v)}  ?")
+            w = dpg.add_combo(names, label=p["name"], width=self.px(120), default_value=cur, user_data=ud,
+                              callback=lambda s_, a_: cb(s_, int(str(a_).split("  ", 1)[0])))
         elif p["type"] == "int":
-            w = dpg.add_input_int(label=p["name"], width=self.px(78), default_value=int(v), step=0,
-                              min_value=int(p.get("min", -1 << 30)), max_value=int(p.get("max", 1 << 30)),
-                              min_clamped="min" in p, max_clamped="max" in p, user_data=ud, callback=cb)
+            lo, hi = p.get("min"), p.get("max")
+            if lo is not None and hi is not None and int(hi) - int(lo) <= 512:
+                w = dpg.add_slider_int(label=p["name"], width=self.px(96), default_value=int(v), min_value=int(lo), max_value=int(hi),
+                                       clamped=True, user_data=ud, callback=cb)
+            else:
+                w = dpg.add_input_int(label=p["name"], width=self.px(78), default_value=int(v), step=0,
+                                  min_value=int(p.get("min", -1 << 30)), max_value=int(p.get("max", 1 << 30)),
+                                  min_clamped="min" in p, max_clamped="max" in p, user_data=ud, callback=cb)
         elif p["type"] == "bool":
             w = dpg.add_checkbox(label=p["name"], default_value=bool(v), user_data=ud, callback=cb)
         elif p["type"] == "choice":
@@ -2023,7 +2073,140 @@ class GraphPanel:
                                callback=lambda s_, a_, u_: self._pick_file(u_))
         else:
             return
+        dpg.bind_item_theme(w, self._field_theme())
         self._widgets.add(w)
+
+    def _field_theme(self):
+        """The look of a value field on a node: a box a shade lighter than the
+        node's body (a thing to drag or type in), a slider's grab a narrow
+        translucent bar so the value written across it stays readable.
+        One theme per colour scheme; remade when the scheme changes."""
+        from native import chrome
+        from native.app import theme_colors, theme_is_light
+        cols = theme_colors(self.app.prefs); light = theme_is_light(self.app.prefs)
+        key = (cols["frame"], cols["accent"], light)
+        th = self._field_themes.get(key)
+        if th is None:
+            fr = tuple((min(255, c + 12) if not light else max(0, c - 12)) for c in cols["frame"])
+            ac = tuple(chrome.ACCENT[:3])
+            with dpg.theme() as th:
+                with dpg.theme_component(dpg.mvAll):
+                    dpg.add_theme_color(dpg.mvThemeCol_FrameBg, fr + (255,), category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, tuple(min(255, c + 8) for c in fr) + (255,), category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, ac + (90,), category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_SliderGrabActive, ac + (160,), category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_style(dpg.mvStyleVar_GrabMinSize, 6, category=dpg.mvThemeCat_Core)
+            self._field_themes[key] = th
+        return th
+
+    @staticmethod
+    def _drag_speed(v, default=None):
+        """How much a drag field moves per pixel: a hundredth of the value's
+        size, never under 0.005 - a big number moves in big steps, a small
+        one finely."""
+        try:
+            m = max(abs(float(v or 0.0)), abs(float(default or 0.0)))
+        except (TypeError, ValueError):
+            m = 1.0
+        return max(0.005, m * 0.01)
+
+    def _palette_names(self):
+        """[(name, id)] the sim knows, for the Effect settings' palette."""
+        try:
+            return self.app.eng.palette_list()
+        except Exception:
+            return [("Default", 0)]
+
+    # --- the XY pads: two typed inputs as one point on a small square -----------------------
+    def _pad_widget(self, nid, n, a, b, lo, hi):
+        from native.textures import registry
+        tex = f"gpad_{nid}_{a}_tex"
+        if not dpg.does_item_exist(tex):
+            dpg.add_dynamic_texture(PAD_PX, PAD_PX, [0.0, 0.0, 0.0, 1.0] * (PAD_PX * PAD_PX), tag=tex, parent=registry())
+        size = self.px(PAD)
+        with dpg.group(horizontal=True):
+            btn = dpg.add_image_button(tex, width=size, height=size, frame_padding=0, user_data=(nid, a, b, lo, hi))
+            with dpg.tooltip(btn):
+                dpg.add_text(f"{a} and {b} as one point, {lo:g}..{hi:g}: drag to set both (the fields above follow); "
+                             "the fields still take a typed value", wrap=260)
+            stem = a[:-2] if a.endswith(("_u", "_x")) else a.rstrip("xu")
+            dpg.add_text(stem or f"{a} {b}", color=DIM)
+        self._pads[btn] = (nid, a, b, float(lo), float(hi), tex)
+        self._pad_draw(btn)
+
+    def _pad_values(self, nid, a, b):
+        n = self.graph.nodes.get(nid)
+        d = self.graph.node_def(n)
+        da = next((i.get("default", 0.0) for i in d["inputs"] if i["name"] == a), 0.0)
+        db = next((i.get("default", 0.0) for i in d["inputs"] if i["name"] == b), 0.0)
+        return float(n["inputs"].get(a, da)), float(n["inputs"].get(b, db))
+
+    def _pad_draw(self, btn):
+        import numpy as np
+        nid, a, b, lo, hi, tex = self._pads[btn]
+        if nid not in self.graph.nodes or not dpg.does_item_exist(tex):
+            return
+        x, y = self._pad_values(nid, a, b)
+        img = np.empty((PAD_PX, PAD_PX, 4), np.float32)
+        img[:] = (0.11, 0.12, 0.14, 1.0)
+        for k in (PAD_PX // 4, PAD_PX // 2, 3 * PAD_PX // 4):
+            img[k, :, :3] = (0.2, 0.21, 0.24); img[:, k, :3] = (0.2, 0.21, 0.24)
+        if lo < 0.0 < hi:                                     # the zero lines, when the range crosses zero
+            k = int(round((0.0 - lo) / (hi - lo) * (PAD_PX - 1)))
+            img[PAD_PX - 1 - k, :, :3] = (0.3, 0.32, 0.36); img[:, k, :3] = (0.3, 0.32, 0.36)
+        img[0, :, :3] = img[-1, :, :3] = img[:, 0, :3] = img[:, -1, :3] = (0.27, 0.29, 0.32)
+        fx = (max(lo, min(hi, x)) - lo) / (hi - lo); fy = (max(lo, min(hi, y)) - lo) / (hi - lo)
+        cx, cy = int(round(fx * (PAD_PX - 1))), int(round((1.0 - fy) * (PAD_PX - 1)))
+        from native import chrome
+        col = tuple(c / 255.0 for c in chrome.ACCENT[:3])
+        yy, xx = np.ogrid[:PAD_PX, :PAD_PX]
+        dot = (xx - cx) ** 2 + (yy - cy) ** 2 <= 9
+        img[dot, :3] = col
+        img[cy, :, :3] = img[cy, :, :3] * 0.5 + np.array(col) * 0.5
+        img[:, cx, :3] = img[:, cx, :3] * 0.5 + np.array(col) * 0.5
+        dpg.set_value(tex, img.ravel())
+
+    def _poll_pads(self):
+        """A pad held: the point under the pointer into both inputs, the
+        fields and the picture following; one undo step per stroke."""
+        if not self.graph:
+            return
+        active = None
+        for btn, (nid, a, b, lo, hi, tex) in list(self._pads.items()):
+            if dpg.does_item_exist(btn) and dpg.is_item_active(btn) and nid in self.graph.nodes:
+                active = btn; break
+        if active is None:
+            if self._pad_stroke is not None:
+                self._pad_stroke = None
+                self._sync_pos()
+            return
+        st = dpg.get_item_state(active)
+        if "rect_min" not in st:
+            return
+        (x0, y0), (w, h) = st["rect_min"], st["rect_size"]
+        mx, my = dpg.get_mouse_pos(local=False)
+        fx = max(0.0, min(1.0, (mx - x0) / max(1.0, w - 1))); fy = max(0.0, min(1.0, 1.0 - (my - y0) / max(1.0, h - 1)))
+        self._pad_apply(active, fx, fy)
+
+    def _pad_apply(self, btn, fx, fy):
+        """The pad's point (0..1 across, 0..1 up) into its two inputs, the
+        fields and the picture; the first change of a stroke takes the undo step."""
+        nid, a, b, lo, hi, tex = self._pads[btn]
+        x, y = lo + fx * (hi - lo), lo + fy * (hi - lo)
+        cur = self._pad_values(nid, a, b)
+        if abs(cur[0] - x) < 1e-6 and abs(cur[1] - y) < 1e-6:
+            return
+        if self._pad_stroke != btn:
+            self.touch(); self.snapshot(("pad", nid, a))
+            self._pad_stroke = btn
+        n = self.graph.nodes[nid]
+        n.setdefault("inputs", {})[a] = round(x, 4); n["inputs"][b] = round(y, 4)
+        for name, val in ((a, x), (b, y)):
+            w_ = f"gin_{nid}_{name}_w"
+            if dpg.does_item_exist(w_):
+                dpg.set_value(w_, float(val))
+        self.touch()
+        self._pad_draw(btn)
 
     def _pick_file(self, target):
         """The file dialog, for a node's file param; the choice lands in the

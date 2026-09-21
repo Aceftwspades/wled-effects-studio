@@ -72,7 +72,14 @@ them all.
 
 **As a graph.** Ctrl+N, name it, and the graph pane opens with a starter.
 Right-click the grid to add a node (type to search); drag from a pin to a
-pin to wire, or to empty space for a list of what could go there. Every
+pin to wire, or to empty space for a list of what could go there. A
+number on a node is a **drag field**: drag it sideways to change it (a
+big number moves in big steps, a small one finely), ctrl+click to type
+one; a setting with a range is a **slider** with its value written on
+it, ctrl+click types there too; Ctrl+wheel over either steps it. Two
+inputs that make one point - Transform's pivot and move, Gravity's
+tilt, Mandelbrot's Julia constant - also get an **XY pad**: drag the dot
+and both fields follow. Effect settings' palette is picked by name. Every
 node and pin explains itself in the box above the graph when hovered, and
 while the effect is on the cube the box shows the pin's live value. The
 bolt on the toolbar (**L**) rebuilds as you edit; F5 rebuilds on demand.

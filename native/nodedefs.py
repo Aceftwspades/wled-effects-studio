@@ -1116,6 +1116,11 @@ NEEDS = {"Gravity": "imu",
          "Audio": "audio", "FFT bin": "audio", "Beat kick": "audio", "Spectrum": "audio", "Loudest bin": "audio"}
 # an input that must be wired, and from what: the node reads another's state through it
 WIRED = {"Sprites": ("slots", "Particles or Emitters"), "Shells": ("slots", "Emitters or Particles")}
+# two inputs that are one point: an XY pad on the node sets both while neither is wired
+# (name, name, low, high - the pad's range on both axes)
+PADS = {"Transform": [("pivot_u", "pivot_v", 0.0, 1.0), ("move_u", "move_v", -1.0, 1.0)],
+        "Gravity": [("tilt_x", "tilt_y", -1.0, 1.0)],
+        "Mandelbrot": [("jx", "jy", -2.0, 2.0)]}
 
 
 def library(extra=()):
@@ -1129,6 +1134,8 @@ def library(extra=()):
             lib[d["name"]]["needs"] = NEEDS[d["name"]]
         if d["name"] in WIRED:
             lib[d["name"]]["wired"] = WIRED[d["name"]]
+        if d["name"] in PADS:
+            lib[d["name"]]["pads"] = PADS[d["name"]]
     for d in extra:
         try:
             lib[d["name"]] = d

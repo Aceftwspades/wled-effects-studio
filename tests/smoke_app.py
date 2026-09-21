@@ -37,6 +37,10 @@ STEPS = [
     # the LED under a point of the net and of the 3-D view, by wiring index
     ([{"py": "app.led_at(*[a + b * 0.5 for a, b in zip(dpg.get_item_state('net_img')['rect_min'], dpg.get_item_state('net_img')['rect_size'])])"},
       {"py": "app.led_at(*[a + b * 0.5 for a, b in zip(dpg.get_item_state('cube_img')['rect_min'], dpg.get_item_state('cube_img')['rect_size'])])"}], 0.5),
+    # an XY pad on a Transform node: a point on it sets both inputs (pivot 0..1), the fields follow; undone
+    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.graph.add('Transform', (60, 60))"}, {"py": "app.gp.rebuild()"},
+      {"graph_zoom": 1.0}, {"key": "Home"}, {"pad": [0, 0.25, 0.75]}], 1.0),
+    ([{"py": "dpg.get_value(f'gin_{max(app.gp.graph.nodes)}_pivot_u_w')"}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     # a Bitmap painted in the properties pane: one cell set, the rows follow, undone
     ([{"layout": "graph"}, {"graph_open": "question_block.json"},
       {"py": "setattr(app.gp, '_test_sel', [next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Bitmap')])"}], 0.8),

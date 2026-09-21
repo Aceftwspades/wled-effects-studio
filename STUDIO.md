@@ -1123,6 +1123,18 @@ is the order to do them.
       as a grid of cells in the properties pane, clicked and dragged to
       set and clear; the rows follow.
 
+- [x] **The fields on a node** (Blender's fields): a number is a drag
+      field (drag sideways, the pace a hundredth of the value's size;
+      ctrl+click types), a setting with a range is a slider with the value
+      written across it (`_field_theme`: the box a shade lighter than the
+      node, the grab a narrow translucent bar so the value reads),
+      Ctrl+wheel steps either; two inputs that are one point (nodedefs
+      `PADS`: Transform's pivot and move, Gravity's tilt, Mandelbrot's
+      Julia constant) get an XY pad - an image button whose texture is
+      redrawn as the dot is dragged, both fields following, one undo
+      step a stroke - shown while neither input is wired; the Effect
+      settings' palette is a dropdown of the sim's palette names.
+
 Looked at and left: Blender's simulation zones and baking (Fields,
 Sequencer and Particles are the studio's), multiple editor areas (the
 panes and pop-outs), numeric expressions in fields (Dear PyGui parses
