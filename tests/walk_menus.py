@@ -69,6 +69,7 @@ def main():
     saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
     gdir = os.path.join(ROOT, "projects", "default", "graphs")
     before = set(os.listdir(gdir)) if os.path.isdir(gdir) else set()
+    caps_before = set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()
     from fake_wled import FakeWled
     dev = FakeWled(port=8770, ddp_port=4048).start()      # where the frames' sends go
     with open(LOG, "w") as log:
@@ -94,6 +95,10 @@ def main():
             open(prefs, "w", encoding="utf-8").write(saved_prefs)
         for f in (set(os.listdir(gdir)) if os.path.isdir(gdir) else set()) - before:
             os.remove(os.path.join(gdir, f))
+        cap = os.path.join(ROOT, "captures")                # the report and the project zip the menu rows made
+        for f in (set(os.listdir(cap)) if os.path.isdir(cap) else set()) - caps_before:
+            if f.endswith(".zip"):
+                os.remove(os.path.join(cap, f))
     text = open(LOG, encoding="utf-8", errors="replace").read()
     lines = [l for l in text.splitlines() if l.startswith(("menu ", "ctx ", "pane ", "frame ", "act ")) and len(l.split()) > 1
              and l.split()[1] in ("ok", "skip", "gone", "off", "FAIL")]

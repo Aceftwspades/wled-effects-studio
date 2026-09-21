@@ -91,6 +91,8 @@ def build(app):
     with dpg.window(tag=TAG, show=False, width=560, height=460, no_collapse=True, no_title_bar=True):
         device_ui.header(app, "palettes")
         with dpg.group(horizontal=True):
+            dpg.add_button(label="undo", small=True, callback=lambda: undo(app))
+            c.tip("the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes")
             dpg.add_button(label="+ New", small=True, callback=lambda: new_palette(app))
             dpg.add_button(label="From the sim's palette", small=True, callback=lambda: from_current(app))
             c.tip("a new one that starts as the palette the sim shows")
@@ -123,6 +125,17 @@ def build(app):
 
 
 # --- the list, the bar, the fields ----------------------------------------------------------
+def undo(app, redo=False):
+    """The palettes back a step (the project journals every change)."""
+    ok = app.project.redo("palettes") if redo else app.project.undo("palettes")
+    if not ok:
+        app.gp.status("nothing to " + ("redo" if redo else "undo") + " in the palettes"); return
+    pals = _pals(app)
+    app._pal_sel = min(getattr(app, "_pal_sel", 0), max(0, len(pals) - 1)); app._pal_stop = 0
+    refresh(app)
+    app.gp.status(f"palettes: {'redo' if redo else 'undo'}")
+
+
 def refresh(app):
     if not dpg.does_item_exist("pal_rows"):
         return

@@ -1175,9 +1175,21 @@ What would say the studio is complete, in the order to do them:
       square for every LED against `render.project`, and the cube's face
       corners against `render()`, for every geometry kind and twelve
       cameras - within a hundredth of a pixel.
-- [ ] **Product**: undo for segments, sequence steps and palette edits;
-      a project as one zip; "report a problem" bundling version.json,
-      crash.txt and the doctor.
+- [x] **Product**: undo for the segments, the sequence's steps and
+      schedule, and the palettes - the project journals every save that
+      changes one of those options (`Project.undo/redo(key)`, forty
+      deep, per option), Ctrl+Z / Ctrl+Y go to the frame with the focus
+      (floating, or docked and last clicked in) and each frame has an
+      `undo` button, the segments row too. File › Project › Export
+      project as zip (`project.zip_project`: everything but the history
+      and the export folder, into captures/) and Import project from
+      zip... (`unzip_project` into projects/, a taken name numbered, a
+      stray zip refused, nothing written outside the folder). Help ›
+      Report a problem... (`native/report.py`): version, the doctor's
+      findings, the machine, the project's settings with device
+      addresses blanked, the prefs, the last crash tracebacks and the
+      last 300 lines printed, as one zip in captures/, with the issues
+      page a button away - nothing of the user's effects or graphs.
 
 - [ ] A Linux / macOS pass. What is there: `paths.py` puts the home in
       `~/.local/share` or `~/Library/Application Support`, the toolchain

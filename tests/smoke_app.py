@@ -39,7 +39,8 @@ STEPS = [
     ([{"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30}, {"ed_type": "// smoke"}, {"ed_key": ["Return", False, False]},
       {"find": "gc_sat"}, {"action": "find_next"}, {"action": "undo"}, {"action": "undo"}], 1.5),
     ([{"layout": "both"}, {"geometry": {"kind": "matrix", "params": {"w": 32, "h": 16}}}, {"seg": "add"},
-      {"seg": {"k": 1, "x0": 8, "y0": 4, "x1": 24, "y1": 12, "opacity": 160, "blend": 10}}, {"seg": "remove"}], 1.5),
+      {"seg": {"k": 1, "x0": 8, "y0": 4, "x1": 24, "y1": 12, "opacity": 160, "blend": 10}}, {"seg": "remove"},
+      {"seg": "undo"}, {"py": "app.eng.seg_count()"}, {"expect": ["graph_status", "segments: undo"]}, {"seg": "remove"}], 1.5),
     ([{"geometry": {"kind": "cube", "params": {"B": 16}}}, {"compare": "Rainbow"}], 2.0),
     ([{"compare": ""}, {"sweep": ["sx", 3, False, False]}], 3.5),
     ([{"sweep": None}, {"key": "Q"}, {"key": "Q"}, {"key": "E"}, {"key": "E"}, {"key": "W"}, {"key": "W"}], 1.5),
@@ -84,11 +85,15 @@ STEPS = [
     ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).read_timers(app)"}], 3.0),
     ([{"expect": ["seq_tlog", "read from the device"]}, {"seq": ["del", 1]}, {"seq": ["del", 0]}, {"seq": ["timer_del", 1]}, {"seq": ["timer_del", 0]},
       {"seq": ["tap"]}, {"seq": ["snap", 120.0, 4]}, {"camera": "front"}, {"camera": ["save", 1]}, {"camera": "isometric"}], 1.5),
+    # undo in the frames: a deleted step comes back, and goes again on redo
+    ([{"py": "len(app.project.options['sequence']['steps'])"}, {"seq": ["undo"]}, {"py": "len(app.project.options['sequence']['steps'])"},
+      {"seq": ["redo"]}, {"py": "len(app.project.options['sequence']['steps'])"}, {"expect": ["graph_status", "sequence: redo"]}], 1.0),
     # custom palettes: one made, a stop added, used by the sim, one from the sim's palette, both removed
     ([{"frame": "palettes"}, {"cpal": ["new"]}, {"cpal": ["stop", 64, 0, 0, 255]}, {"cpal": ["use"]}, {"cpal": ["current"]},
       {"py": "__import__('native.palette_ui', fromlist=['x']).send(app, True)"}], 3.0),
     ([{"expect": ["pal_log", "palette(s) sent"]}, {"py": "__import__('native.palette_ui', fromlist=['x']).remove_there(app)"},
-      {"cpal": ["del"]}, {"cpal": ["del"]}], 2.0),
+      {"cpal": ["del"]}, {"cpal": ["del"]}, {"cpal": ["undo"]}, {"py": "len(app.project.options.get('palettes') or [])"},
+      {"expect": ["graph_status", "palettes: undo"]}, {"cpal": ["del"]}], 2.0),
     # LED outputs and power: the wiring split three ways, the limiter previewed and off again, the device's read and sent
     ([{"frame": "outputs"}, {"outputs": ["split", "one"]}, {"outputs": ["split", "count"]}, {"outputs": ["limit", 850]},
       {"outputs": ["abl", True]}, {"outputs": ["abl", False]}, {"outputs": ["limit", 0]},
@@ -108,6 +113,8 @@ STEPS = [
     ([{"expect": ["edit_status", "problem"]}, {"action": "undo"}, {"action": "undo"}, {"layout": "graph"}, {"graph_open": "fan.json"},
       {"device": "127.0.0.1:1"}, {"py": "app.send_script()"}], 8.0),
     ([{"expect": ["graph_status", "failed"]}, {"device": "127.0.0.1:8770"}], 1.0),
+    # a problem report bundled, the project zipped (both land in captures/; the test removes them)
+    ([{"report": True}, {"py": "app.export_project_zip()"}, {"expect": ["edit_status", "project zipped"]}], 3.0),
     # the library: thumbnails made for the graphs, the frame docked and floated
     ([{"frame": "library"}, {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
@@ -138,6 +145,7 @@ def main():
     graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
     saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
     gdir = os.path.join(ROOT, "projects", "default", "graphs")
+    caps_before = set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()
     before = set(os.listdir(gdir)) if os.path.isdir(gdir) else set()      # a first run makes the project
     STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs: a saved view would otherwise stay
     saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
@@ -176,6 +184,19 @@ def main():
     if ddp.ddp_frames < 10:
         bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
     bad += [l for l in text.splitlines() if "EXPECT FAILED" in l]
+    rep = next((l.split(None, 1)[1].strip() for l in text.splitlines() if l.startswith("report ")), "")
+    if not rep or not os.path.exists(rep):
+        bad.append("Help > Report a problem made no zip")
+    else:
+        import zipfile
+        names = zipfile.ZipFile(rep).namelist()
+        for want in ("version.json", "doctor.txt", "machine.json", "project.json", "README.txt"):
+            if want not in names:
+                bad.append(f"the report zip lacks {want}")
+        os.remove(rep)
+    for f in (set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()) - caps_before:
+        if f.endswith(".zip"):                                  # the project zip the run made
+            os.remove(os.path.join(ROOT, "captures", f))
     for name in ("/studio.bin", "/ledmap.json", "/geometry.bin"):
         if name not in ddp.files:
             bad.append(f"the fake device never received {name}")

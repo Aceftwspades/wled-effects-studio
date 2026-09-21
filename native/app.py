@@ -1012,6 +1012,33 @@ class App(Features):
             self.switch_project(path); return
         self.switch_project(path, create=True)
 
+    def export_project_zip(self):
+        """The project as one zip in captures/ - to keep, or to hand over."""
+        from native.project import zip_project
+        if self.edit_dirty:
+            self.edit_save()
+        if self.gp.graph:
+            self.gp.save()
+        self.project.save()
+        try:
+            path = zip_project(self.project)
+        except Exception as e:
+            self.gp.status(f"project zip failed: {e}"); return
+        msg = f"project zipped: {path} ({os.path.getsize(path) // 1024} KB)"
+        dpg.set_value("edit_status", msg); self.gp.status(msg)
+
+    def import_project_zip(self, path):
+        """A project zip into projects/, opened."""
+        from native.project import unzip_project
+        if not path:
+            return
+        try:
+            dest = unzip_project(path)
+        except Exception as e:
+            self.gp.status(f"project import failed: {e}"); return
+        self.switch_project(dest)
+        self.gp.status(f"project imported: {os.path.basename(dest)}")
+
     def refresh_project_list(self):
         if dpg.does_item_exist("project_combo"):
             names = list_projects()
@@ -2370,9 +2397,9 @@ class App(Features):
                 return
             self._dragging = True
             self._yaw0, self._pitch0 = self.yaw, self.pitch
-        for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win"):
+        for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win") + tuple(t for t, _, _, _ in device_ui.FRAMES.values()):
             if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_hovered(tag):
-                self.focus = tag
+                self.focus = tag                      # a docked frame counts: Undo then goes to it
                 break
         if self.layout == "graph":
             self.gp.on_press()
@@ -2652,8 +2679,8 @@ class App(Features):
             "palettes":     lambda: device_ui.show(self, "palettes"),
             "outputs":      lambda: device_ui.show(self, "outputs"),
             "randomise":    self.randomise,
-            "undo":         lambda: self.code_undo() if self.layout == "edit" else gp.undo(),
-            "redo":         lambda: self.code_redo() if self.layout == "edit" else gp.redo(),
+            "undo":         lambda: self.undo_where(),
+            "redo":         lambda: self.undo_where(redo=True),
             "cut":          gp.cut,
             "copy":         gp.copy,
             "paste":        gp.paste,
@@ -2708,6 +2735,35 @@ class App(Features):
                 self._last_action = action
             fn()
 
+    def undo_target(self):
+        """What Undo acts on: the frame with the keyboard (floating, or
+        docked and last clicked in) - the shape, the sequence, the
+        palettes - else the code pane, else the graph."""
+        f = device_ui.focused_frame(self)
+        if f is None:
+            for slot, (tag, _, _, _) in device_ui.FRAMES.items():
+                if self.focus == tag and self.docked(slot):
+                    f = slot; break
+        if f in ("shape", "sequence", "palettes"):
+            return f
+        return "code" if self.layout == "edit" else "graph"
+
+    def undo_where(self, redo=False):
+        t = self.undo_target()
+        if t == "shape":
+            from native import shape_ui
+            shape_ui.undo(self) if not redo else self.gp.status("the shape has no redo")
+        elif t == "sequence":
+            from native import sequence_ui
+            sequence_ui.undo(self, redo)
+        elif t == "palettes":
+            from native import palette_ui
+            palette_ui.undo(self, redo)
+        elif t == "code":
+            self.code_redo() if redo else self.code_undo()
+        else:
+            self.gp.redo() if redo else self.gp.undo()
+
     def repeat_last(self):
         a = getattr(self, "_last_action", None)
         if a:
@@ -2747,7 +2803,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -3174,6 +3230,8 @@ def build(app):
                         dpg.add_combo([], tag="seg_combo", width=200, callback=lambda s, v: app.seg_pick(v))
                         dpg.add_button(label="+", small=True, callback=lambda: app.seg_add())
                         dpg.add_button(label="-", small=True, callback=lambda: app.seg_remove())
+                        dpg.add_button(label="undo", small=True, callback=lambda: app.seg_undo())
+                        chrome.tip("the segments as they were before the last change (add, remove, bounds, blend, options)")
                     dpg.add_group(tag="seg_fields")
                 with Section(app, "geometry", "GEOMETRY"):
                     dpg.add_combo(list(KINDS), label="shape", tag="geom_kind", width=120,
@@ -3423,6 +3481,8 @@ def service_command(app):
                 tag, sub = c["expect"]
                 val = str(dpg.get_value(tag)) if dpg.does_item_exist(tag) else "(no such item)"
                 print(("expect ok   " if sub in val else "EXPECT FAILED ") + f"{tag} has {sub!r}: {val[:120]!r}")
+            if "report" in c:                           # test hook: Help > Report a problem, the zip's path printed
+                chrome.report_problem(app); print("report", getattr(app, "_report_path", ""))
             if "update" in c:                           # test hook: "check" (the dialog when newer), "show", "get"
                 {"check": lambda: chrome.check_updates(app, by_hand=True), "show": lambda: chrome.show_update(app),
                  "get": lambda: chrome.get_update(app)}[c["update"]]()
@@ -3448,6 +3508,8 @@ def service_command(app):
                 elif op[0] == "current": PU.from_current(app)
                 elif op[0] == "use": PU.use_palette(app)
                 elif op[0] == "del": PU.del_palette(app)
+                elif op[0] == "undo": PU.undo(app)
+                elif op[0] == "redo": PU.undo(app, True)
                 elif op[0] == "stop":
                     p = PU._pals(app)[PU._sel(app)]; p.setdefault("stops", []).append([int(op[1]), int(op[2]), int(op[3]), int(op[4])])
                     PU._changed(app); PU.refresh(app)
@@ -3462,7 +3524,7 @@ def service_command(app):
                 {"add": lambda: SQ.add_step(app), "update": lambda: SQ.update_step(app), "load": lambda: SQ.load_step(app, op[1]),
                  "timer": lambda: SQ.add_timer(app, op[1]), "timer_del": lambda: SQ.del_timer(app, op[1]),
                  "snap": lambda: SQ.snap_durations(app, op[1], op[2]), "tap": lambda: SQ.tap(app),
-                 "wav_beats": lambda: SQ.beats_from_wav(app),
+                 "wav_beats": lambda: SQ.beats_from_wav(app), "undo": lambda: SQ.undo(app), "redo": lambda: SQ.undo(app, True),
                  "ramp": lambda: SQ.set_ramp(app, op[1], op[2]),
                  "del": lambda: SQ.del_step(app, op[1]), "play": lambda: SQ.play(app), "stop": lambda: SQ.stop(app),
                  "field": lambda: SQ.set_field(app, op[1], op[2])}[op[0]]()
@@ -3504,6 +3566,8 @@ def service_command(app):
                 v = c["seg"]
                 if v == "add": app.seg_add()
                 elif v == "remove": app.seg_remove()
+                elif v == "undo": app.seg_undo()
+                elif v == "redo": app.seg_undo(True)
                 elif isinstance(v, dict):
                     app.eng.seg_config(v["k"], v["x0"], v["y0"], v["x1"], v["y1"], v.get("opacity", 255))
                     if "blend" in v: app.eng.seg_blend(v["k"], v["blend"])
@@ -4065,7 +4129,8 @@ def write_uiref(app, path=None):
     roots = [(device_ui.FRAMES[w][1].title() + " frame", device_ui.FRAMES[w][0]) for w in device_ui.FRAMES]
     roots += [("Keyboard shortcuts", "keys_win"), ("Appearance", "appearance_win"), ("Selection frames", "frames_win"),
               ("History", "history_win"), ("Undo history", "undo_win"), ("About", "about_win"), ("Usermods and features", "usermods_win"),
-              ("Update", "update_win"), ("A WLED checkout", "wled_dialog"), ("The panes and the toolbar", "root")]
+              ("Update", "update_win"), ("A WLED checkout", "wled_dialog"), ("Report a problem", "report_win"),
+              ("The panes and the toolbar", "root")]
     seen = set()
     for title, tag in roots:
         if not dpg.does_item_exist(tag):
@@ -4290,8 +4355,30 @@ def walk_ctx(app, kind, nid, pin=None):
     gp._hide_menus()
 
 
+class _Tail:
+    """stdout with the last lines kept, for Help > Report a problem."""
+    def __init__(self, out, n=300):
+        import collections
+        self.out, self.lines, self._buf = out, collections.deque(maxlen=n), ""
+
+    def write(self, s):
+        self.out.write(s)
+        self._buf += s
+        *done, self._buf = self._buf.split("\n")
+        self.lines.extend(done)
+
+    def flush(self):
+        self.out.flush()
+
+    def __getattr__(self, k):
+        return getattr(self.out, k)
+
+
 def main():
+    if sys.stdout is not None and not isinstance(sys.stdout, _Tail):
+        sys.stdout = _Tail(sys.stdout)
     app = App()
+    app._log_tail = sys.stdout.lines if isinstance(sys.stdout, _Tail) else ()
     build(app)
     dpg.show_viewport()
     app.drops = DropFiles("WLED Effects Studio")

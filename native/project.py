@@ -129,6 +129,11 @@ class Project:
     def file(self):
         return os.path.join(self.path, "project.json")
 
+    # the options with an undo of their own: the sequence's steps, the schedule, the
+    # palettes, the segments - every save() that changes one keeps what it was
+    UNDO_KEYS = ("sequence", "schedule", "palettes", "segments")
+    UNDO_MAX = 40
+
     def load(self):
         if not os.path.exists(self.file):
             self.save()
@@ -144,8 +149,61 @@ class Project:
         self.selected = d.get("selected", "")
         self.options = d.get("options", {})
         self.imported = [f for f in d.get("imported", []) if isinstance(f, str)]
+        self._journal_reset()
+
+    def _journal_reset(self):
+        self._undo = {k: [] for k in self.UNDO_KEYS}
+        self._redo = {k: [] for k in self.UNDO_KEYS}
+        self._last = {k: json.dumps(self.options.get(k), sort_keys=True) for k in self.UNDO_KEYS}
+        self._restoring = False
+
+    def _journal(self):
+        """What changed since the last save, into its undo stack."""
+        if not hasattr(self, "_last"):
+            self._journal_reset(); return
+        for k in self.UNDO_KEYS:
+            cur = json.dumps(self.options.get(k), sort_keys=True)
+            if cur != self._last[k]:
+                if not self._restoring:
+                    self._undo[k].append(self._last[k]); del self._undo[k][:-self.UNDO_MAX]
+                    self._redo[k].clear()
+                self._last[k] = cur
+
+    def can_undo(self, key):
+        return bool(getattr(self, "_undo", {}).get(key))
+
+    def can_redo(self, key):
+        return bool(getattr(self, "_redo", {}).get(key))
+
+    def undo(self, key):
+        """The option back to what it was before its last change; the
+        caller then shows it (the frame's refresh, the engine's segments).
+        True when there was something to undo."""
+        return self._step(key, self._undo, self._redo)
+
+    def redo(self, key):
+        return self._step(key, self._redo, self._undo)
+
+    def _step(self, key, take, give):
+        if not hasattr(self, "_last"):
+            self._journal_reset()
+        if not take.get(key):
+            return False
+        give[key].append(self._last[key])
+        val = json.loads(take[key].pop())
+        if val is None:
+            self.options.pop(key, None)
+        else:
+            self.options[key] = val
+        self._restoring = True
+        try:
+            self.save()
+        finally:
+            self._restoring = False
+        return True
 
     def save(self):
+        self._journal()
         d = {"geometry": self.geometry.to_json(), "selected": self.selected,
              "options": self.options, "imported": self.imported,
              "saved": time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -342,6 +400,55 @@ class Project:
 
 
 STUDIO_FILE = os.path.join(PROJECTS, "studio.json")     # what is not any one project's: the last one opened
+
+
+# what a project zip leaves out: the history's copies, the export's build products
+ZIP_SKIP = ("history", "export", "__pycache__")
+
+
+def zip_project(project, path=None):
+    """The whole project - project.json, effects, graphs, sub-graphs, user
+    nodes, assets, recipes - as one zip (in captures/ by default, named
+    after the project and the day). Returns the zip's path."""
+    import zipfile
+    name = os.path.basename(project.path.rstrip("/\\")) or "project"
+    if path is None:
+        os.makedirs(paths.CAPTURES, exist_ok=True)
+        path = os.path.join(paths.CAPTURES, f"{name}_{time.strftime('%Y%m%d')}.zip")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for d, dirs, files in os.walk(project.path):
+            dirs[:] = [x for x in dirs if x not in ZIP_SKIP]
+            for f in files:
+                full = os.path.join(d, f)
+                z.write(full, os.path.join(name, os.path.relpath(full, project.path)))
+    return path
+
+
+def unzip_project(path, name=None):
+    """A project zip into projects/<name> (the zip's own top folder, or the
+    file's stem; a name already taken gets a number). Returns the project
+    folder, or raises with why not."""
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        names = [n for n in z.namelist() if not n.endswith("/")]
+        tops = {n.split("/")[0] for n in names if "/" in n}
+        top = tops.pop() if len(tops) == 1 and all("/" in n for n in names) else None
+        inside = [n[len(top) + 1:] if top else n for n in names]
+        if "project.json" not in inside and not any(n.startswith("effects/") or n.startswith("graphs/") for n in inside):
+            raise ValueError("not a project zip: no project.json, effects/ or graphs/ in it")
+        base = _ident(name or top or os.path.splitext(os.path.basename(path))[0]) or "project"
+        dest, k = os.path.join(PROJECTS, base), 2
+        while os.path.exists(dest):
+            dest = os.path.join(PROJECTS, f"{base}_{k}"); k += 1
+        os.makedirs(dest)
+        for n, rel in zip(names, inside):
+            if not rel or rel.startswith(("/", "..")) or ".." in rel.split("/"):
+                continue                                          # nothing outside the folder
+            out = os.path.join(dest, *rel.split("/"))
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            with z.open(n) as src, open(out, "wb") as f:
+                shutil.copyfileobj(src, f)
+    return dest
 
 
 def list_projects():

@@ -30,6 +30,20 @@ def _save(app):
     refresh(app)
 
 
+def undo(app, redo=False):
+    """The steps or the schedule back a step - whichever changed last (the
+    project journals both); Ctrl+Z with the frame focused, or its button."""
+    p = app.project
+    keys = [k for k in ("sequence", "schedule") if (p.can_redo(k) if redo else p.can_undo(k))]
+    if not keys:
+        app.gp.status("nothing to " + ("redo" if redo else "undo") + " in the sequence"); return
+    key = keys[0] if len(keys) == 1 else max(keys, key=lambda k: getattr(app, "_seq_touched", {}).get(k, 0))
+    (p.redo if redo else p.undo)(key)
+    app._tl_dirty = True
+    refresh(app); refresh_timers(app)
+    app.gp.status(f"{'schedule' if key == 'schedule' else 'sequence'}: {'redo' if redo else 'undo'}")
+
+
 def build(app):
     c = _c()
     from native import device_ui
@@ -37,6 +51,8 @@ def build(app):
         device_ui.header(app, "sequence")
         with dpg.group(horizontal=True):
             dpg.add_text("STEPS", color=c.ACCENT)
+            dpg.add_button(label="undo", small=True, callback=lambda: undo(app))
+            c.tip("the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes")
             dpg.add_button(label="+ Add from the sim", small=True, callback=lambda: add_step(app))
             c.tip("a new step: what the sim shows now - effect, sliders, palette, colours, segments")
             dpg.add_button(label="Update from the sim", small=True, callback=lambda: update_step(app))

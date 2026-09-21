@@ -215,6 +215,19 @@ class Features:
     def save_segments(self):
         self.project.options["segments"] = self.eng.segments() if self.eng.seg_count() > 1 else []
         self.project.save()
+    def seg_undo(self, redo=False):
+        """The segments back a step (the project keeps what each save changed)."""
+        ok = self.project.redo("segments") if redo else self.project.undo("segments")
+        if not ok:
+            self.gp.status("nothing to undo in the segments"); return
+        segs = self.project.options.get("segments") or []
+        if len(segs) > 1:
+            self.eng.load_segments(segs)
+        else:
+            self.eng.seg_truncate(1); self.eng.seg_select(0)
+        dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
+        self.rebuild_params(); self.sync_palette_combo(); self.rebuild_seg_fields()
+        self.gp.status(f"segments: {'redo' if redo else 'undo'}")
     def restore_segments(self):
         segs = self.project.options.get("segments") or []
         if len(segs) > 1:

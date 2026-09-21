@@ -69,6 +69,12 @@ def build_menus(app):
                     pass
                 dpg.add_menu_item(label="Open folder...", callback=lambda: dpg.show_item("project_dialog"))
                 dpg.add_separator()
+                dpg.add_menu_item(label="Export project as zip", callback=lambda: app.export_project_zip())
+                tip("the whole project - effects, graphs, sub-graphs, user nodes, assets, the settings - as one zip in captures/, "
+                    "to keep or to hand over; the history and the export folder stay behind")
+                dpg.add_menu_item(label="Import project from zip...", callback=lambda: dpg.show_item("project_zip_dialog"))
+                tip("a zip made here (or a project folder zipped by hand) into projects/, and opened")
+                dpg.add_separator()
                 dpg.add_menu_item(label="Export usermod (folder + zip)", callback=lambda: app.export_usermod())
             dpg.add_menu_item(label="Import graph bundle...", callback=lambda: dpg.show_item("graph_import_dialog"))
             dpg.add_menu_item(label="Export graph bundle", callback=lambda: app.gp.export_bundle())
@@ -260,6 +266,9 @@ def build_menus(app):
             dpg.add_menu_item(label="Effect API reference", callback=lambda: app.show_api())
             dpg.add_separator()
             dpg.add_menu_item(label="Check for updates...", tag="menu_update", callback=lambda: check_updates(app, by_hand=True))
+            dpg.add_menu_item(label="Report a problem...", callback=lambda: report_problem(app))
+            tip("bundles what a bug report needs - the version, the doctor's findings, the machine, the project's settings, "
+                "the last crash - into one zip in captures/, and offers the issues page; nothing of your effects or graphs goes in")
             dpg.add_menu_item(label="About", callback=lambda: dpg.show_item("about_win"))
 
 
@@ -393,6 +402,10 @@ def build_dialogs(app):
     with dpg.file_dialog(directory_selector=True, show=False, tag="project_dialog", width=620, height=420,
                          callback=lambda s, a: app.new_project(a.get("file_path_name", ""))):
         pass
+    with dpg.file_dialog(directory_selector=False, show=False, tag="project_zip_dialog", width=620, height=420,
+                         callback=lambda s, a: app.import_project_zip(a.get("file_path_name", ""))):
+        dpg.add_file_extension(".zip", color=(120, 200, 120))
+        dpg.add_file_extension(".*")
     with dpg.file_dialog(directory_selector=False, show=False, tag="ledmap_dialog", width=620, height=420,
                          callback=lambda s, a: app.import_ledmap(path=a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(120, 200, 120))
@@ -431,6 +444,19 @@ def build_dialogs(app):
             dpg.add_button(label="Not now", callback=lambda: dpg.hide_item("update_win"))
             dpg.add_checkbox(label="check once a day", tag="update_daily", default_value=bool(app.prefs.get("update_check", True)),
                              callback=lambda s, v: (app.prefs.__setitem__("update_check", bool(v)), save_prefs(app.prefs)))
+    # REPORT A PROBLEM: where the bundle landed, and the issues page
+    with dpg.window(tag="report_win", label="Report a problem", show=False, width=560, height=230, no_collapse=True):
+        dpg.add_text("", tag="report_text", wrap=540)
+        dpg.add_text("It holds the version, the doctor's findings, the machine, the project's settings (device addresses "
+                     "blanked), the prefs and the last crash tracebacks - nothing of your effects, graphs or captures. "
+                     "Open an issue, say what you did, what you expected and what happened, and attach the zip.",
+                     color=DIM, wrap=540)
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Open the issues page", callback=lambda: app.open_url(f"https://github.com/{version.REPO}/issues/new"))
+            tip("a new issue on the studio's GitHub page, in the browser - attach the zip there")
+            dpg.add_button(label="Show the zip", callback=lambda: app.reveal(os.path.dirname(getattr(app, "_report_path", paths_captures()))))
+            tip("the captures folder, where the report landed")
+            dpg.add_button(label="Close", callback=lambda: dpg.hide_item("report_win"))
     with dpg.window(tag="open_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
@@ -975,6 +1001,26 @@ def palette_enter(app):
             dpg.hide_item("palette_win")
             app.run_action(dpg.get_item_user_data(kids[0]))
             return
+
+
+def paths_captures():
+    from native import paths
+    return os.path.join(paths.CAPTURES, "x")
+
+
+def report_problem(app):
+    """Help > Report a problem: the bundle made, shown where it landed, the
+    issues page a button away."""
+    from native import report
+    try:
+        path = report.bundle(app, getattr(app, "_log_tail", ()))
+    except Exception as e:
+        app.gp.status(f"the report could not be made: {e}"); return
+    app._report_path = path
+    dpg.set_value("report_text", f"The report: {path}")
+    _centre("report_win", 560, 230)
+    dpg.show_item("report_win")
+    app.gp.status(f"report bundled: {os.path.basename(path)}")
 
 
 def show_undo_history(app):

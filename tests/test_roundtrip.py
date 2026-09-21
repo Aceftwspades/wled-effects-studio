@@ -147,6 +147,68 @@ def test_project_round_trip():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_project_option_undo():
+    """Every save that changes the sequence, the schedule, the palettes or
+    the segments keeps what it was: undo and redo walk them, per option,
+    and a change after an undo drops the redo."""
+    from native.project import Project
+    tmp = tempfile.mkdtemp()
+    try:
+        p = Project(os.path.join(tmp, "u"))
+        assert not p.can_undo("palettes")
+        p.options["palettes"] = [{"name": "a", "stops": []}]; p.save()
+        p.options["palettes"] = [{"name": "a", "stops": []}, {"name": "b", "stops": []}]; p.save()
+        p.options["sequence"] = {"steps": [1]}; p.save()
+        assert p.can_undo("palettes") and p.can_undo("sequence") and not p.can_undo("segments")
+        assert p.undo("palettes") and [q["name"] for q in p.options["palettes"]] == ["a"]
+        assert p.options["sequence"] == {"steps": [1]}                  # the other option untouched
+        assert p.redo("palettes") and [q["name"] for q in p.options["palettes"]] == ["a", "b"]
+        assert p.undo("palettes") and p.undo("palettes") and "palettes" not in p.options    # back to none at all
+        assert not p.undo("palettes")
+        p.options["palettes"] = [{"name": "c", "stops": []}]; p.save()
+        assert not p.can_redo("palettes")                                  # a new change after an undo: the redo is gone
+        q = Project(os.path.join(tmp, "u"))                                # what is on disk is the latest
+        assert [x["name"] for x in q.options["palettes"]] == ["c"] and not q.can_undo("palettes")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_project_zip_round_trip():
+    """A project zipped and unzipped: the same files, the history and the
+    export left behind, a taken name numbered, a stray zip refused."""
+    from native.project import Project, zip_project, unzip_project
+    from native import project as P
+    tmp = tempfile.mkdtemp()
+    was = P.PROJECTS
+    try:
+        P.PROJECTS = os.path.join(tmp, "projects")
+        p = Project(os.path.join(P.PROJECTS, "zipme"))
+        p.geometry = Geometry("matrix", w=16, h=8); p.options["palettes"] = [{"name": "x", "stops": []}]; p.save()
+        open(os.path.join(p.path, "effects", "one.cpp"), "w").write("// one")
+        os.makedirs(os.path.join(p.path, "history", "graphs", "g"), exist_ok=True)
+        open(os.path.join(p.path, "history", "graphs", "g", "1.json"), "w").write("{}")
+        open(os.path.join(p.path, "export", "ledmap.json"), "w").write("{}")
+        z = zip_project(p, os.path.join(tmp, "zipme.zip"))
+        dest = unzip_project(z)
+        assert os.path.basename(dest) == "zipme_2"                         # the name was taken
+        q = Project(dest)
+        assert _canon(q.geometry.to_json()) == _canon(p.geometry.to_json()) and q.options["palettes"] == p.options["palettes"]
+        assert open(os.path.join(dest, "effects", "one.cpp")).read() == "// one"
+        assert sorted(os.listdir(os.path.join(dest, "graphs"))) == sorted(os.listdir(os.path.join(p.path, "graphs")))
+        assert not os.path.exists(os.path.join(dest, "history")) and not os.path.exists(os.path.join(dest, "export", "ledmap.json"))
+        import zipfile
+        bad = os.path.join(tmp, "bad.zip")
+        with zipfile.ZipFile(bad, "w") as zz:
+            zz.writestr("readme.txt", "nothing")
+        try:
+            unzip_project(bad); assert False, "took a zip that is no project"
+        except ValueError as e:
+            assert "not a project zip" in str(e)
+    finally:
+        P.PROJECTS = was
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_sequence_presets_file_round_trip():
     """The presets.json the sequence writes is the presets and the playlist it sent."""
     from native import sequence
