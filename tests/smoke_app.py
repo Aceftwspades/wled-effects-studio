@@ -31,7 +31,9 @@ STEPS = [
     ([{"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
     # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
     ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile()"}], 20.0),
-    ([{"expect": ["edit_status", "loaded cubefx_"]}, {"graph_zoom": 1.0}, {"key": "Home"}, {"speed": 0.5}], 1.5),
+    ([{"expect": ["edit_status", "loaded cubefx_"]}, {"graph_zoom": 1.0}, {"key": "Home"}, {"speed": 0.5},
+      # a typed value poked into the running effect's parameter table: no rebuild
+      {"py": "(app.eng.names[app.eng.idx], (lambda k: app.gp.live_poke(k[0], k[1], 0.42))(next(iter(app.gp._live))))"}], 1.5),
     ([{"expect": ["stat_txt", "speed 1/2x"]}, {"action": "speed_up"}, {"action": "speed_up"}, {"action": "speed_up"}], 1.0),
     ([{"expect": ["stat_txt", "speed 4x"]}, {"action": "speed_reset"}, {"layout": "both"}], 0.8),
     # the LED under a point of the net and of the 3-D view, by wiring index

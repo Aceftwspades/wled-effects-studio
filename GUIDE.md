@@ -83,6 +83,11 @@ and both fields follow. Effect settings' palette is picked by name. Every
 node and pin explains itself in the box above the graph when hovered, and
 while the effect is on the cube the box shows the pin's live value. The
 bolt on the toolbar (**L**) rebuilds as you edit; F5 rebuilds on demand.
+A typed value on a pin needs no rebuild at all: the compiled effect
+reads it from a small table, and dragging the field (or the XY pad)
+pokes the running engine, so the picture follows the drag at once -
+as a synth follows a knob. Adding or wiring nodes, a setting on a node
+or a colour still rebuilds.
 Sub-graphs (select nodes, Ctrl+G) fold a cluster into one node you can
 reuse. File > History keeps a copy at every save. The editor has the
 Blender habits: A selects all, Ctrl+[ / Ctrl+] grow the selection up or

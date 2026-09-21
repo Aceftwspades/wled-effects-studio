@@ -461,6 +461,18 @@ class Engine:
         a = np.ascontiguousarray(np.clip(samples, -127, 127).astype(np.int8))
         f(a.ctypes.data_as(C.POINTER(C.c_int8)), int(a.size))
 
+    def param_set(self, idx, k, v):
+        """A typed value into a running graph effect's parameter table
+        (slot k of effect idx): True when it landed, False when the
+        effect has no table bound yet (it has not run since its build)
+        or the engine predates this."""
+        try:
+            f = self.lib.simParamSet
+        except AttributeError:
+            return False
+        f.restype = C.c_int
+        return bool(f(int(idx), int(k), C.c_float(float(v))))
+
     def probe(self, i):
         """A live value the generated effect reported (see graph.py's probes);
         0 if this build has no probes."""

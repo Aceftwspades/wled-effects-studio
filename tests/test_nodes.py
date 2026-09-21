@@ -140,6 +140,37 @@ def test_every_node_builds_and_runs():
     print(f"  dark at the defaults: {', '.join(dark) or 'none'}")
 
 
+def test_live_parameters_poke_the_running_effect():
+    """A typed input compiles as a table read; the studio pokes the table
+    of the running effect and the picture changes with no rebuild; an
+    effect that has not run yet has no table bound and says so."""
+    import numpy as np
+    from native.engine import Engine
+    g = G.Graph({"name": "Census live probe"}, lib=LIB)
+    c = g.add("Coords", (0, 0)); m = g.add("Multiply", (100, 0)); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+    g.link(c, "u", m, "a"); g.link(m, "result", p, "index"); g.link(p, "color", o, "color")
+    g.nodes[m]["inputs"] = {"b": 1.0}
+    src = g.compile()
+    assert "GC_PARAM_TABLE float gc_param[" in src and (m, "b", None) in {v: k for k, v in g.live.items()}
+    slot = next(k for k, v in g.live.items() if v == (m, "b", None))
+    gs, rep = _build({"live": g})
+    assert rep.ok, rep.link_output[-600:]
+    e = Engine(); e.load(rep.library)
+    idx = e.names.index(g.name)
+    assert not e.param_set(idx, slot, 0.5)                   # not run yet: no table bound
+    e.select(idx)
+    for _ in range(3):
+        e.frame()
+    before = np.asarray(e.rgb()).copy()
+    assert e.param_set(idx, slot, 0.0)                       # index = u * 0: one colour everywhere
+    for _ in range(3):
+        e.frame()
+    after = np.asarray(e.rgb())
+    lit = np.asarray(e.lit_mask(), bool)
+    assert not np.array_equal(before, after)
+    assert len({tuple(px) for px in after[lit]}) == 1 and len({tuple(px) for px in before[lit]}) > 1
+
+
 def test_every_node_scripts_or_says_why():
     """The script compiler takes each graph or refuses it as a ScriptError
     (never anything else); what it takes runs in the Script effect."""

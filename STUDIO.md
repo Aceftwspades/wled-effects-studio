@@ -1142,6 +1142,55 @@ its own), node timings (one compiled function); xLights' FPP export,
 video, DMX, shaders, and per-effect fade in / out (WLED's transitions
 cross-fade the presets already).
 
+### Fifth pass: what music software knows (September 2026)
+
+Modular synths, Max / Pd, Reaktor, VCV Rack, Bitwig's Grid and Ableton's
+racks have edited real-time graphs for forty years, and an effect graph is
+a patch: frame scope is control rate, pixel scope is audio rate, WLED's
+sliders are the macro knobs. What they know that the studio did not, in
+the order to do them:
+
+- [x] **No compile between the knob and the sound.** A synth answers a
+      turned knob at once; the studio rebuilt the effect for every typed
+      value. Every unwired number, check and vector input compiles as a
+      read from a parameter table (`gc_param[k]`, `static const` on the
+      device - the typed values baked in, no DRAM; a live `static` in the
+      sim, bound to the effect by `GC_PARAMS` each frame) and a drag on
+      the field pokes the running engine (`simParamSet`); only a change
+      of topology, a setting or a colour rebuilds. Settings stay literal:
+      several size arrays and loops.
+- [ ] **Signal visible everywhere, always.** Frame-scope values - the
+      sliders, Audio, the beat, Integrate, Ease, the Sequencer - are one
+      number a frame, so probing them all costs nothing: a live readout
+      on every frame-scope output pin, all the time, not on hover; a
+      history plot on a hovered one.
+- [ ] **Control rate and audio rate told apart on the wire**
+      (SuperCollider's kr / ar): frame-scope wires drawn thinner, so the
+      graph shows which half runs once a frame and which 1,280 times.
+- [ ] **Units and scales on the fields**: a node definition may say a
+      value's unit (ms, Hz, s, beats, x, %, LEDs) and its scale
+      (logarithmic for times and rates, bipolar about zero); the slider
+      obeys and the field shows the unit.
+- [ ] **Modulation as a gesture** (Bitwig): a field's menu offers
+      "modulate with..." - Time, the volume, a band, the beat, an LFO - an
+      amount and a range; the Remap it makes stays folded out of sight,
+      the range drawn on the field.
+- [ ] **Musical time**: a "beats" unit on the time-based inputs - Wave's
+      cycles, the Sequencer's phases, Integrate's rate - against the sim's
+      bpm and the device's beat clock, so an effect can say one cycle per
+      bar.
+- [ ] **A Steps node** (the step sequencer: eight or sixteen values
+      advanced by a trigger or the beat) and **snapshots** of the whole
+      graph's settings as named states, with a morph between two.
+- [ ] **Modules that show what they do**: a gradient strip on Palette, the
+      bands on Audio, a period of the Wave, a thumbnail of the Noise - the
+      graph readable like a rack.
+- [ ] **Wireless sends** (a named Send / Receive pair, the Knot's cousin)
+      and **loops closed with a delay**: a cycle offered a one-frame Delay
+      at its back edge instead of a refusal.
+- [ ] **MIDI learn**: a controller's knobs onto the panel's sliders (and
+      through them the device), an optional python-rtmidi.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

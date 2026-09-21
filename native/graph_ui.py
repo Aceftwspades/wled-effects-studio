@@ -1913,7 +1913,31 @@ class GraphPanel:
         t = self.graph.nodes[nid]["type"]
         return [k for k in self._selected() if k != nid and self.graph.nodes[k]["type"] == t]
 
+    def live_poke(self, nid, name, val):
+        """The typed value into the running effect's parameter table, so the
+        picture follows the drag with no rebuild. True when it landed: the
+        effect built from this graph is in the engine and has run. A
+        vector pokes three slots; a bool one."""
+        live = getattr(self, "_live", None)
+        if not live or not getattr(self, "_probes_for", None):
+            return False
+        eng = self.app.eng
+        title = self.app.project.effect_title(self._probes_for)
+        if title not in eng.names:
+            return False
+        idx = eng.names.index(title)
+        if eng.idx != idx:
+            return False                                 # something else is on screen (the script preview, another effect): as before
+        if isinstance(val, (list, tuple)):
+            slots = [(live.get((nid, name, j)), float(c)) for j, c in enumerate(list(val)[:3])]
+        else:
+            slots = [(live.get((nid, name, None)), (1.0 if val else 0.0) if isinstance(val, bool) else float(val))]
+        if any(k is None for k, _ in slots):
+            return False
+        return all(eng.param_set(idx, k, v) for k, v in slots)
+
     def _on_input(self, sender, val):
+        was_dirty = self._dirty
         self.touch()
         nid, name = dpg.get_item_user_data(sender)
         self.snapshot(("in", nid, name))
@@ -1924,11 +1948,16 @@ class GraphPanel:
         elif isinstance(val, (list, tuple)) and len(val) >= 3 and all(isinstance(x, float) for x in val):
             val = [int(round(x * 255)) if x <= 1.0 else int(x) for x in val[:3]]
         self.graph.nodes[nid].setdefault("inputs", {})[name] = val
+        poked = ptype != "color" and self.live_poke(nid, name, val)
         for k in self._same_type_selected(nid):
             self.graph.nodes[k].setdefault("inputs", {})[name] = val
+            poked = poked and self.live_poke(k, name, val)
             w = f"gin_{k}_{name}_w"
             if dpg.does_item_exist(w):
                 dpg.set_value(w, val if ptype != "color" else [c / 255.0 for c in val] + [1.0])
+        if poked and not was_dirty:
+            self._dirty = 0.0                            # the running effect has the value: nothing to rebuild
+            self.status(f"{name}: {val if not isinstance(val, float) else round(val, 4)} - live")
 
     def _show_input(self, b, inp, linked):
         tag = f"gin_{b}_{inp}"
@@ -2205,7 +2234,10 @@ class GraphPanel:
             w_ = f"gin_{nid}_{name}_w"
             if dpg.does_item_exist(w_):
                 dpg.set_value(w_, float(val))
+        was_dirty = self._dirty
         self.touch()
+        if self.live_poke(nid, a, x) and self.live_poke(nid, b, y) and not was_dirty:
+            self._dirty = 0.0                            # the running effect follows the dot: no rebuild
         self._pad_draw(btn)
 
     def _pick_file(self, target):
@@ -3873,6 +3905,7 @@ class GraphPanel:
             self._probes = dict(getattr(g or self.graph, "probes", {}) or {})
             self._probe_scope = dict(getattr(g or self.graph, "last_scope", {}) or {})
             self._probes_for = fname
+            self._live = {v: k for k, v in (getattr(g or self.graph, "live", {}) or {}).items()}   # (nid, input, comp) -> slot
         except G.GraphError as e:
             self.status(f"graph: {e}")
             self._mark_problems()

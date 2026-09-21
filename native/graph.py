@@ -817,6 +817,32 @@ class Graph:
             for pn in names:
                 nfields = max(nfields, int(self.nodes[nid]["params"].get(pn, 0)) + 1)
 
+        # Live parameters: a typed value on an unwired number, check or vector
+        # input reads from a table instead of standing in the code as a
+        # literal - `static const` on the device (the values baked in, no DRAM),
+        # a live static in the sim the studio pokes as the field is dragged,
+        # so a turned knob shows at once with no rebuild. Settings stay
+        # literals: several size arrays and loops. live: slot -> (nid, input,
+        # component or None); live_init: the slots' starting values.
+        self.live, self.live_init = {}, []
+
+        def live_slot(nid, name, v, comp=None):
+            k = len(self.live_init)
+            self.live[k] = (nid, name, comp)
+            self.live_init.append(float(v))
+            return k
+
+        def live_expr(nid, i, v):
+            if i["type"] == "float":
+                return f"gc_param[{live_slot(nid, i['name'], v)}]"
+            if i["type"] == "bool":
+                return f"(gc_param[{live_slot(nid, i['name'], 1.0 if v else 0.0)}] > 0.5f)"
+            if i["type"] == "vector":
+                vv = [float(c) for c in (list(v) + [0, 0, 0])[:3]] if isinstance(v, (list, tuple)) else [float(v)] * 3
+                ks = [live_slot(nid, i["name"], c, j) for j, c in enumerate(vv)]
+                return f"gc_v3(gc_param[{ks[0]}], gc_param[{ks[1]}], gc_param[{ks[2]}])"
+            return None
+
         def expand(nid, late=False):
             n = self.nodes[nid]; d = defs[nid]
             code = d["late_code"] if late else d["code"]
@@ -850,9 +876,12 @@ class Graph:
                     except GraphError:
                         raise GraphError(f"{d['name']} #{nid}: {i['name']} cannot take a {at} (from {ad['name']} #{a})")
                 else:
-                    # the value typed on the node stands in for the wire
+                    # the value typed on the node stands in for the wire - through the
+                    # parameter table where the type allows, so a drag needs no rebuild
                     v = n.get("inputs", {}).get(i["name"], i.get("default", 0))
-                    expr = _lit(i["type"], v)
+                    expr = live_expr(nid, i, v) if not late else None
+                    if expr is None:
+                        expr = _lit(i["type"], v)
                 code = _sub(code, "in", i["name"], expr)
             for o in d["outputs"]:
                 code = _sub(code, "out", o["name"], var(nid, o["name"]))
@@ -948,6 +977,10 @@ class Graph:
             else:
                 state += "  if (!gc_st) { SEGMENT.fill(0); FX_DONE; }   // no room for the state\n"
             state += "  (void)gc_first;\n"
+        if self.live_init:
+            vals = ", ".join(f"{v}f" for v in self.live_init)
+            state = (f"  GC_PARAM_TABLE float gc_param[{len(self.live_init)}] = {{{vals}}};   // the typed values (live in the sim)\n"
+                     f"  GC_PARAMS(gc_param, {len(self.live_init)});\n") + state
         return GENERATED.format(title=title, ident=ident, upper=ident.upper(), helpers=HELPERS,
                                 frame=frame, pixel=pixel, meta=meta, state=state)
 
@@ -957,9 +990,14 @@ GENERATED = r'''#include "wled.h"
 #include "cube_fx_bank.h"
 #ifdef CFX_SIM
 extern "C" void simProbeSet(int i, float v);    // the studio reads pin values back (sim only)
+extern "C" void simParamBind(float *t, int n);  // the studio writes typed values in (sim only)
 #define GC_PROBE(i, v) simProbeSet((i), (v))
+#define GC_PARAM_TABLE static
+#define GC_PARAMS(t, n) simParamBind((t), (n))
 #else
 #define GC_PROBE(i, v) ((void)0)
+#define GC_PARAM_TABLE static const                     // the typed values, baked in: flash, not RAM
+#define GC_PARAMS(t, n) ((void)0)
 #endif
 
 // ===========================================================================

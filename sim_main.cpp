@@ -536,6 +536,22 @@ SIM_API void simAudioSet(float vol, int peak) {
 // then the script) starts both from the same millisecond.
 SIM_API void simNowSet(uint32_t ms) { strip.now = ms; }
 
+// --- live parameters: a generated effect's typed values, poked by the studio ---
+// GC_PARAMS(table, n) in the effect binds its table to the effect running
+// (gRunFx, set round each call); simParamSet then writes a slot of any
+// effect's table, bound or not yet: an effect that has not run keeps its
+// baked values until its first frame binds the table, so the studio
+// rebuilds for that one instead.
+static float *gParamTab[CFX_BANK_MAX_FX];
+static int    gParamN[CFX_BANK_MAX_FX];
+static int    gRunFx = -1;
+SIM_API void simParamBind(float *t, int n) { if (gRunFx >= 0 && gRunFx < CFX_BANK_MAX_FX) { gParamTab[gRunFx] = t; gParamN[gRunFx] = n; } }
+SIM_API int  simParamSet(int idx, int k, float v) {
+  if (idx < 0 || idx >= CFX_BANK_MAX_FX || !gParamTab[idx] || k < 0 || k >= gParamN[idx]) return 0;
+  gParamTab[idx][k] = v; return 1;
+}
+SIM_API int  simParamCount(int idx) { return (idx >= 0 && idx < CFX_BANK_MAX_FX && gParamTab[idx]) ? gParamN[idx] : -1; }
+
 SIM_API void simFrame(int idx, int dtMs) {
   if (idx < 0 || idx >= (int)cfxBankCount()) return;
   strip.now += (uint32_t)dtMs;
@@ -556,7 +572,9 @@ SIM_API void simFrame(int idx, int dtMs) {
     S.seg.reverse = S.reverse; S.seg.mirror = S.mirror; S.seg.reverse_y = S.reverseY; S.seg.mirror_y = S.mirrorY;
     S.seg.start = 0; S.seg.stop = (uint16_t)Segment::_vw; S.seg.offset = S.offset;
     _segPtr = &S.seg; strip._currentSegment = &S.seg;
+    gRunFx = S.fx;
     cfxBankRoster()[S.fx].fn();
+    gRunFx = -1;
     S.seg.call++;
   }
   gCurSeg = keep;
