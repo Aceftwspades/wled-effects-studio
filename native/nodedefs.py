@@ -807,6 +807,9 @@ LIBRARY = [
             "", "a colour wire with no line: what feeds this reaches every Receive colour of the same name"), narrow=True),
     dict(_n("Receive colour", "graph", "frame", [], [("out", C)], [_p("name", "text", "a")],
             "$out.out = 0;", "the Send colour of this name, wherever it is"), narrow=True),
+    # a Scope: the plot of whatever is wired in, in the node; not compiled
+    dict(_n("Scope", "graph", "frame", [("x", F, 0.0)], [], [_p("seconds", "float", 3.0, 0.5, 10.0)],
+            "", "a rolling plot of what is wired in - the last seconds, min and max marked; costs the effect nothing"), decor=True),
     dict(_n("Note", "graph", "frame", [], [], [_p("text", "text", "note")],
             "", "a comment on the graph - not compiled"), decor=True, multiline=True),
     dict(_n("Frame", "graph", "frame", [], [],

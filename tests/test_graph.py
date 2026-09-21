@@ -267,6 +267,21 @@ def test_sends_join_without_a_wire():
         assert "cycle" in str(e)
 
 
+def test_scope_costs_nothing():
+    """A Scope on a wire: the source still compiles and is probed; the
+    Scope is in neither back end's output."""
+    from native.script import compile_script
+    g = starter()
+    t = g.add("Time", (0, 0)); w = g.add("Wave", (200, 0)); g.link(t, "t", w, "x")
+    sc = g.add("Scope", (400, 200)); g.link(w, "value", sc, "x")
+    c = g.add("Coords", (0, 300)); n = g.add("Noise", (400, 0)); g.link(c, "u", n, "x"); g.link(w, "value", n, "y")
+    p = g.add("Palette", (600, 0)); o = g.add("Output", (800, 0)); g.link(n, "value", p, "index"); g.link(p, "color", o, "color")
+    src = g.compile()
+    assert "Scope" not in src and (w, "value") in g.probes.values() and g.last_scope[w] == "frame"
+    compile_script(g)
+    assert not [m for m in g.problems().values() if m.startswith("error")]
+
+
 def test_loop_closed_with_a_delay():
     """A wire that closes a loop gets a Delay when its source runs once a
     frame and carries a number; a colour or per-pixel loop is refused as

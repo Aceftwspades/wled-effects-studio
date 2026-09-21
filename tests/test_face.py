@@ -90,6 +90,13 @@ def test_pattern_thumbnails():
         n, d = node(name)
         a = F.pattern(n, d, {"x", "y", "pos"}, 16)
         assert a is not None and a.shape == (16, 16) and float(a.min()) >= 0.0 and float(a.max()) <= 1.0, name
+    for name in list(F.PATTERNS) + ["Noise"]:
+        n, d = node(name)
+        a = F.pattern(n, d, {"x", "y", "pos", "z"}, (48, 24))
+        assert a is not None and a.shape == (24, 48) and float(a.max()) > float(a.min()), name   # a patch, with something in it
+    n, d = node("Noise")
+    a, b = F.pattern(n, d, set(), (48, 24), live={"z": 0.0}), F.pattern(n, d, set(), (48, 24), live={"z": 0.25})
+    assert float(abs(a - b).mean()) > 0.02                                       # it scrolls with z
     n, d = node("Checker", inputs={"scale": 2.0})
     a = F.pattern(n, d, set(), 8)
     assert a[0, 0] != a[0, 4] and a[0, 0] != a[4, 0] and a[0, 0] == a[4, 4]     # two squares across, a checker

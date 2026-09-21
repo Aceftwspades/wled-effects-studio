@@ -127,7 +127,22 @@ hover. Nodes wear their **category's colour** on the title bar (amber
 sliders, blue signals, teal coordinates, violet patterns, slate maths,
 rust colour, green custom code, magenta output; the add menu's headers
 match), so a graph reads by colour first; Settings > Appearance has the
-legend and the switch, and a colour you give a node still wins.
+legend and the switch, and a colour you give a node still wins. Nodes
+also **show what they do**, like a rack module's face: a strip of the
+palette or a colour ramp with a marker at the live index, the audio's
+sixteen bands live (an FFT bin's own bar lit), a period of the Wave with
+a dot riding it, the Noise's texture scrolling with its z, thumbnails of
+Checker, Stripes, Ripple, Voronoi, Brick, Mandelbrot and the Gradient at
+their typed values, the transfer curve of Remap, Smoothstep, Clamp,
+Threshold, Power and the other one-in one-out maths nodes, a Bitmap's
+pixels, a Path from above, an Image's picture, a Text's text, and a
+three-second sparkline on Integrate, Ease, Envelope, Spring, Delay,
+Random hold, Beat kick and Tempo; a Steps node lights its current step.
+On the pins, a switch is a **light** (bright when on, glowing out after
+a one-frame hit) and a number whose range is known has a **meter** under
+it; hovering a frame-scope output draws its last three seconds beside
+the pin, and a **Scope** node left on any wire keeps that plot in the
+graph (its seconds set the window; it costs the effect nothing).
 Settings > Keyboard shortcuts lists the rest.
 
 **As code.** Ctrl+N in the code pane makes a `.cpp` from the effect

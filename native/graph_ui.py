@@ -16,6 +16,7 @@ import numpy as np
 
 from native import graph as G
 from native import nodeface
+from native.glyphs import Glyphs
 from native.nodedefs import library
 
 DIM = (139, 147, 163)
@@ -94,7 +95,7 @@ class PinThemes:
         return th
 
 
-class GraphPanel:
+class GraphPanel(Glyphs):
     def __init__(self, app):
         self.app = app
         self.lib = library(self._user_nodes())
@@ -117,7 +118,7 @@ class GraphPanel:
         self._pads = {}          # image button -> (nid, a, b, lo, hi, texture): the XY pads on the nodes
         self._field_themes = {}  # (frame, accent, light) -> the theme a node's value fields wear
         self._log_sliders = {}   # slider -> unit: the sliders that hold a logarithm (set_value takes a log)
-        self._live_glyphs = {}   # nid -> type: the glyphs redrawn each frame (the audio bars)
+        self._glyph_init()       # the glyphs' live state and the probes' history (glyphs.py)
         self._pad_stroke = None  # the pad being dragged, for one undo step a stroke
         # --- zoom ---------------------------------------------------------------------
         # The node editor cannot zoom, so the panel does: every size it lays
@@ -760,18 +761,11 @@ class GraphPanel:
             return
         for (nid, kind, name), tag in self._pins.items():
             if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
-                n = self.graph.nodes.get(nid)
-                if not n:
-                    return
-                d = self.graph.node_def(n)
-                pins = d["inputs"] if kind == "in" else d["outputs"]
-                p = next((x for x in pins if x["name"] == name), None)
-                live = self.live_value(nid, kind, name)
-                what = (p or {}).get("doc", "")
-                arrow = "<-" if kind == "in" else "->"
-                self.help(f"{d.get('label') or n['type']} {arrow} {name} ({(p or {}).get('type', '')})"
-                          + (f" = {live}" if live is not None else "") + (f": {what}" if what else ""))
+                if nid in self.graph.nodes:
+                    self.hover_pin(kind, nid, name)
                 return
+        if now > getattr(self, "_hover_hold", 0.0):
+            self._hover_out = None
         for nid, n in self.graph.nodes.items():
             tag = f"gnode_{nid}"
             if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
@@ -782,6 +776,22 @@ class GraphPanel:
                           + (f"  [{text}]" if text else "") + f": {d.get('doc', '')}")
                 return
         self.help("")
+
+    def hover_pin(self, kind, nid, name, hold=0.0):
+        """The help for a pin under the pointer, and - for a frame-scope
+        output - its plot beside the pin for as long as it is hovered
+        (`hold` seconds at least: the test hook has no pointer)."""
+        n = self.graph.nodes[nid]
+        d = self.graph.node_def(n)
+        pins = d["inputs"] if kind == "in" else d["outputs"]
+        p = next((x for x in pins if x["name"] == name), None)
+        live = self.live_value(nid, kind, name)
+        what = (p or {}).get("doc", "")
+        arrow = "<-" if kind == "in" else "->"
+        self._hover_out = (nid, name) if kind == "out" and (getattr(self, "_probe_scope", {}) or {}).get(nid) == "frame" else None
+        self._hover_hold = time.time() + hold
+        self.help(f"{d.get('label') or n['type']} {arrow} {name} ({(p or {}).get('type', '')})"
+                  + (f" = {live}" if live is not None else "") + (f": {what}" if what else ""))
 
     # --- build the widgets from the graph -----------------------------------------
     def themes(self):
@@ -1387,6 +1397,7 @@ class GraphPanel:
         self._poll_pads()
         self._poll_focus()
         self._poll_labels()
+        self._record_probes()
         self._poll_readouts()
         self._poll_glyphs()
         if not self.auto or not self._dirty or not self.graph:
@@ -1406,7 +1417,7 @@ class GraphPanel:
         keep = self._clicked()
         if keep:
             self.ext_sel = [n for n in dict.fromkeys(list(self.ext_sel) + keep)]
-        self._widgets.clear(); self._pads.clear(); self._log_sliders.clear(); self._live_glyphs.clear(); self._glyph_pal = None
+        self._widgets.clear(); self._pads.clear(); self._log_sliders.clear(); self._glyph_clear(); self._glyph_pal = None
         self._standin_line.clear()
         dpg.delete_item("node_editor", children_only=True)
         self.links.clear(); self._pins.clear(); self._ptype.clear(); self._link_normal.clear()
@@ -1499,10 +1510,11 @@ class GraphPanel:
         return nodeface.summary(n, d, wired, extra)
 
     def _refresh_summary(self, nid):
-        """The line follows a typed value as it is dragged."""
+        """The line - and the glyph - follow a typed value as it is dragged."""
         tag = f"gsum_{nid}"
         if dpg.does_item_exist(tag):
             dpg.set_value(tag, self.summary(nid))
+        self._refresh_glyph(nid)
 
     def _make_node(self, nid, n):
         try:
@@ -1570,6 +1582,8 @@ class GraphPanel:
                 if n["type"] in self.GLYPHS and self.zoom >= 0.7:
                     with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                         self._glyph_widget(nid, n)
+                elif n["type"] == "Steps":
+                    self._live_glyphs[nid] = "steps"             # its sliders are its face: the current one lights
             if collapsed and n["type"] != "Frame":
                 # folded: the function it computes, in one line, is its body
                 text = self.summary(nid)
@@ -1856,6 +1870,7 @@ class GraphPanel:
         scope = getattr(self, "_probe_scope", {}) or {}
         size = max(9, int(11 * self.zoom))
         cw = self.char_w
+        now = time.time()
         if not dpg.does_item_exist("wire_labels"):
             dpg.add_viewport_drawlist(front=True, tag="wire_labels")
         for k, (nid, name) in probes.items():
@@ -1866,20 +1881,45 @@ class GraphPanel:
                 continue
             ax, ay = pt
             v = eng.probe(k)
+            n = self.graph.nodes[nid]
             try:
-                d = self.graph.node_def(self.graph.nodes[nid])
+                d = self.graph.node_def(n)
                 t = next((o["type"] for o in d["outputs"] if o["name"] == name), "float")
             except G.GraphError:
-                t = "float"
-            text = ("on" if v > 0.5 else "off") if t == "bool" else (f"{v:.3g}" if abs(v) < 1e5 else f"{v:.2e}")
+                d, t = None, "float"
+            if t == "bool":
+                # a light, not a word: on is bright, off is dim, and a one-frame hit glows out over 150 ms
+                lvl = self._light_level(nid, name, v > 0.5, now)
+                r = max(3.0, 4.0 * self.zoom)
+                cx, cy = ax - 10 - len(name) * cw - 6 - r, ay
+                if cx - r < x0 or cx + r > x1 or cy - r < y0 or cy + r > y1:
+                    continue
+                fill = (int(70 + 100 * lvl), int(76 + 154 * lvl), int(88 + 32 * lvl), 255)
+                self._readout_items.append(dpg.draw_circle((cx, cy), r, parent="wire_labels", color=(30, 33, 40, 255), fill=fill))
+                if lvl > 0.02:
+                    self._readout_items.append(dpg.draw_circle((cx, cy), r * (1.0 + 0.8 * lvl), parent="wire_labels",
+                                                               color=(170, 230, 120, int(110 * lvl)), thickness=1.0))
+                continue
+            text = f"{v:.3g}" if abs(v) < 1e5 else f"{v:.2e}"
             # left of the pin's name, inside the node: the name is right-aligned to the pin
             w = len(text) * size * 0.6
             rx = ax - 10 - len(name) * cw - 6 - w
             ry = ay - size * 0.55
             if rx < x0 or rx + w > x1 or ry < y0 or ry + size > y1:
                 continue
-            col = (110, 190, 250, 255) if t != "bool" else ((170, 230, 120, 255) if v > 0.5 else (90, 96, 108, 255))
-            self._readout_items.append(dpg.draw_text((rx, ry), text, parent="wire_labels", color=col, size=size))
+            self._readout_items.append(dpg.draw_text((rx, ry), text, parent="wire_labels", color=(110, 190, 250, 255), size=size))
+            rng = nodeface.out_range(n, d, name) if d else None
+            if rng and ry + size + 3 < y1:
+                # a meter under the number: how far along its range the value is
+                lo, hi = rng
+                f = max(0.0, min(1.0, (v - lo) / (hi - lo))) if hi > lo else 0.0
+                mw = max(w, 24 * self.zoom)
+                mx = rx + w - mw
+                self._readout_items.append(dpg.draw_rectangle((mx, ry + size + 1), (mx + mw, ry + size + 3), parent="wire_labels",
+                                                              color=(0, 0, 0, 0), fill=(50, 56, 68, 255)))
+                self._readout_items.append(dpg.draw_rectangle((mx, ry + size + 1), (mx + mw * f, ry + size + 3), parent="wire_labels",
+                                                              color=(0, 0, 0, 0), fill=(110, 190, 250, 255)))
+        self._draw_hover_plot((x0, y0, x1, y1), size)
 
     def _poll_labels(self):
         if not dpg.does_item_exist("wire_labels"):
@@ -2334,13 +2374,13 @@ class GraphPanel:
         value's size; the unit, if any, written after the value."""
         import math
         unit = spec.get("unit") or ""
-        fmt = "%.3g" + (f" {unit}" if unit else "")
+        fmt = "%.5g" + (f" {unit}" if unit else "")          # five significant digits: 12000 K stays 12000, not 1.2e+04
         lo, hi = spec.get("min"), spec.get("max")
         kw = {"label": spec["name"], "user_data": ud, "show": show}
         if tag:
             kw["tag"] = tag
         if unit.lower() == spec["name"].lower():
-            unit, fmt = "", "%.3g"                           # "1.2 Hz  hz" says it twice
+            unit, fmt = "", "%.5g"                           # "1.2 Hz  hz" says it twice
         if lo is not None and hi is not None and (float(hi) - float(lo) <= 1000.0 or spec.get("scale") == "log"):
             lo, hi = float(lo), float(hi)
             if spec.get("scale") == "log" and lo > 0 and hi > lo:
@@ -2360,7 +2400,7 @@ class GraphPanel:
         if dpg.does_item_exist(w):
             ud = dpg.get_item_user_data(w)
             name = ud[1] if isinstance(ud, tuple) else ""
-            dpg.configure_item(w, label=f"{v:.3g}{(' ' + unit) if unit else ''}  {name}")
+            dpg.configure_item(w, label=f"{v:.5g}{(' ' + unit) if unit else ''}  {name}")
 
     @staticmethod
     def _drag_speed(v, default=None):
@@ -3520,99 +3560,6 @@ class GraphPanel:
         self.snapshot()
         self.graph.nodes[nid].setdefault("inputs", {}).pop(name, None)
         self.rebuild()
-
-    # --- glyphs: a node that shows what it does (a rack module's face) ------------------------
-    GLYPHS = ("Palette", "Audio", "Wave", "Noise", "Spectrum", "FFT bin")
-
-    def _glyph_widget(self, nid, n):
-        """A strip under the node's fields: the palette's colours, the
-        audio's bands (live), a period of the wave, a patch of the noise."""
-        t = n["type"]
-        W = self.px(NODE_W)
-        if t == "Palette":
-            H = self.px(10)
-            with dpg.drawlist(width=W, height=H, tag=f"gglyph_{nid}"):
-                pass
-            self._glyph_palette(nid)
-        elif t in ("Audio", "Spectrum", "FFT bin"):
-            H = self.px(22)
-            with dpg.drawlist(width=W, height=H, tag=f"gglyph_{nid}"):
-                for k in range(16):
-                    x0 = k * W / 16
-                    dpg.draw_rectangle((x0 + 1, H - 1), (x0 + W / 16 - 1, H - 1), color=(0, 0, 0, 0), fill=(110, 190, 250, 200), tag=f"gglyph_{nid}_{k}")
-            self._live_glyphs[nid] = t
-        elif t == "Wave":
-            H = self.px(22)
-            shape = str(n["params"].get("shape", "sine"))
-            import math
-            pts = []
-            for k in range(41):
-                x = k / 40.0
-                y = {"sine": 0.5 + 0.5 * math.sin(x * 2 * math.pi), "triangle": 1.0 - abs(2.0 * x - 1.0),
-                     "square": 1.0 if x < 0.5 else 0.0}.get(shape, x)
-                pts.append((x * (W - 2) + 1, (1.0 - y) * (H - 4) + 2))
-            with dpg.drawlist(width=W, height=H, tag=f"gglyph_{nid}"):
-                dpg.draw_polyline(pts, color=(110, 190, 250, 220), thickness=max(1, self.px(1.5)))
-        elif t == "Noise":
-            self._glyph_noise(nid, n, W)
-
-    def _glyph_palette(self, nid):
-        tag = f"gglyph_{nid}"
-        if not dpg.does_item_exist(tag):
-            return
-        dpg.delete_item(tag, children_only=True)
-        try:
-            sw = self.app.eng.palette_swatch(self.app.eng.pal, 24)
-        except Exception:
-            return
-        W, H = dpg.get_item_configuration(tag)["width"], dpg.get_item_configuration(tag)["height"]
-        for k, (r, g, b) in enumerate(sw):
-            dpg.draw_rectangle((k * W / 24, 0), ((k + 1) * W / 24 + 1, H), color=(0, 0, 0, 0), fill=(r, g, b, 255), parent=tag)
-
-    def _glyph_noise(self, nid, n, W):
-        import numpy as np
-        from native.textures import registry
-        tex = f"gglyph_{nid}_tex"
-        N = 32
-        if not dpg.does_item_exist(tex):
-            rng = np.random.RandomState(7)
-            lat = rng.rand(6, 6)
-            img = np.zeros((N, N, 4), np.float32); img[..., 3] = 1.0
-            ys, xs = np.mgrid[0:N, 0:N] / (N - 1) * 4.0
-            x0, y0 = np.floor(xs).astype(int), np.floor(ys).astype(int)
-            fx, fy = xs - x0, ys - y0
-            fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
-            v = (lat[y0, x0] * (1 - fx) + lat[y0, x0 + 1] * fx) * (1 - fy) + (lat[y0 + 1, x0] * (1 - fx) + lat[y0 + 1, x0 + 1] * fx) * fy
-            img[..., 0] = 0.25 + 0.6 * v; img[..., 1] = 0.35 + 0.55 * v; img[..., 2] = 0.55 + 0.45 * v
-            dpg.add_static_texture(N, N, img.ravel().tolist(), tag=tex, parent=registry())
-        dpg.add_image(tex, width=self.px(48), height=self.px(24))
-
-    def _poll_glyphs(self):
-        """The live ones: the audio bars from the engine's bands, the palette strip when the palette changed."""
-        if not self.graph or self.zoom < 0.7:
-            return
-        eng = self.app.eng
-        if getattr(self, "_glyph_pal", None) != eng.pal:
-            self._glyph_pal = eng.pal
-            for nid, n in self.graph.nodes.items():
-                if n["type"] == "Palette":
-                    self._glyph_palette(nid)
-        if not self._live_glyphs:
-            return
-        try:
-            bands = [float(v) / 255.0 for v in eng.fft]
-        except Exception:
-            return
-        for nid in list(self._live_glyphs):
-            tag = f"gglyph_{nid}"
-            if not dpg.does_item_exist(tag):
-                self._live_glyphs.pop(nid, None); continue
-            H = dpg.get_item_configuration(tag)["height"]; W = dpg.get_item_configuration(tag)["width"]
-            for k, v in enumerate(bands[:16]):
-                bt = f"gglyph_{nid}_{k}"
-                if dpg.does_item_exist(bt):
-                    x0 = k * W / 16
-                    dpg.configure_item(bt, pmin=(x0 + 1, H - 1 - v * (H - 2)), pmax=(x0 + W / 16 - 1, H - 1))
 
     # --- snapshots: the whole graph's settings as named states, and a morph between two ----
     def snapshot_save(self, name):

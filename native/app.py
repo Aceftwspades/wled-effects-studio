@@ -3879,11 +3879,7 @@ def service_command(app):
                 if kind == "node":
                     app.gp.help(f"{d.get('label') or n['type']}: {d.get('doc', '')}")
                 else:
-                    pins = d["inputs"] if kind == "in" else d["outputs"]
-                    p = next(x for x in pins if x["name"] == name)
-                    live = app.gp.live_value(int(nid), kind, name)
-                    app.gp.help(f"{n['type']} {'<-' if kind == 'in' else '->'} {name} ({p['type']})"
-                                + (f" = {live}" if live is not None else "") + f": {p.get('doc', '')}")
+                    app.gp.hover_pin(kind, int(nid), name, hold=3.0)      # a plot beside a frame-scope output, held 3 s
             if "graph_image_convert" in c:
                 app.gp.image_to_bitmap(int(c["graph_image_convert"]))
             if "graph_preview" in c:

@@ -1272,20 +1272,20 @@ every node it names has the thing, not the first three.
       category headers and in the node library's rows, so the legend is
       learnt by using it; a legend with the switch to turn it off in
       Settings > Appearance; stand-ins keep the hue.
-- [ ] **Lights and meters.** A bool output pin gets a light in place of
+- [x] **Lights and meters.** A bool output pin gets a light in place of
       "on / off" - bright when true, dim when not, with a 150 ms
       afterglow so a one-frame hit is seen (a VCV LED decays) - and a
       float output whose range is known (Audio's outputs, Wave, Ease,
       Envelope, Random hold, the phases of Tempo, Sequencer and Beat
       kick, Steps within its sliders' span, Integrate within its wrap)
       gets a small bar under its number; the number stays for the rest.
-- [ ] **Glyphs that move.** The Wave carries a dot at its live phase
+- [x] **Glyphs that move.** The Wave carries a dot at its live phase
       when its x runs once a frame; the Palette strip a marker at the
       live index; the Noise thumbnail scrolls with its live z; Steps
       lights its current step; the FFT bin's own bar stands out in its
       bands; Integrate, Ease, Envelope, Spring, Delay, Random hold, Beat
       kick and Tempo draw a sparkline of their last three seconds.
-- [ ] **Glyphs for the rest.** The transfer curve of every one-in,
+- [x] **Glyphs for the rest.** The transfer curve of every one-in,
       one-out maths node computed over its input range - Remap, Map
       range, Smoothstep, Clamp, Threshold, Fract, Abs, Floor, Power,
       Modulo, Sine, Cosine, Log, Exp, Band, Float curve; strips for
@@ -1295,12 +1295,20 @@ every node it names has the thing, not the first three.
       Mandelbrot from the typed values; a Bitmap's and States' pixels, an
       Image's picture, a Text's text, a Path's polyline seen from above.
       Each redrawn when a typed value or setting changes.
-- [ ] **A Scope node**: the rolling plot of anything wired in (three
+- [x] **A Scope node**: the rolling plot of anything wired in (three
       seconds, min and max marked, frame-scope as it is, per-pixel at the
       centre pixel), compiled to nothing - VCV's Scope, left on a wire.
-- [ ] **The hover plot the fifth pass promised** (item 2: "a history
+- [x] **The hover plot the fifth pass promised** (item 2: "a history
       plot on a hovered one"; only the readouts shipped): hovering a
       frame-scope output pin draws its last three seconds beside the pin.
+      All of the above in native/glyphs.py (a mixin of the panel) over
+      one ring buffer of every probe's last ten seconds, recorded once a
+      frame; the static faces redraw as a value is dragged; the node
+      fields show five significant digits now (5000 K was 5e+03).
+      tests/face_demo.py writes a graph with every face on it, which the
+      smoke test builds and interrogates: the dot moves, the plots have
+      points, the Noise has scrolled, the step is lit, the hovered pin
+      has its plot.
 
 After this pass: the earlier passes' ticked items read again for the
 same kind of thinness, and each such item fleshed out to the feature it

@@ -705,6 +705,11 @@ DOCS = {
     "Receive colour": {
         "doc": "The other end of a Send colour: the colour fed to the Send colour of the same name.",
         "out": {"out": "the colour the Send colour is fed"}, "params": {"name": "the Send colour to listen to"}},
+    "Scope": {
+        "doc": "A plot of whatever is wired in, in the node: the last seconds of it, its min and max written. A "
+               "frame-scope value as it is, a per-pixel one at the centre pixel. Leave one on a wire to watch it; "
+               "the compiler skips it, so it costs the effect nothing.",
+        "in": {"x": "the value to watch"}, "params": {"seconds": "how long a stretch the plot shows"}},
     "Note": {"doc": "A note to yourself on the graph. Not part of the effect.", "params": {"text": "the note"}},
     "Frame": {"doc": "A titled box to group nodes. Drag it and the nodes inside come along. Not part of the effect.",
               "params": {"title": "the box's title", "w": "width", "h": "height", "colour": "its colour"}},

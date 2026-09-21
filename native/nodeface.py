@@ -440,8 +440,42 @@ def out_range(n, d, name):
 
 # --- pattern thumbnails ----------------------------------------------------------------
 def _grid(N):
-    y, x = np.mgrid[0:N, 0:N]
-    return (x + 0.5) / N, (y + 0.5) / N                    # pixel centres, as the effect samples them
+    """Pixel centres over a square of N, or a (W, H) patch: x, y in 0..1
+    (the patch keeps square pixels: y spans H / W of the way)."""
+    W, H = (N, N) if isinstance(N, int) else (int(N[0]), int(N[1]))
+    y, x = np.mgrid[0:H, 0:W]
+    return (x + 0.5) / W, (y + 0.5) / W                    # as the effect samples them
+
+
+def _hash3(ix, iy, iz):
+    """A value in 0..1 for an integer lattice point, the same every time."""
+    h = np.sin(ix * 12.9898 + iy * 78.233 + iz * 37.719) * 43758.5453
+    return h - np.floor(h)
+
+
+def noise_patch(N, scale=4.0, octaves=1, roughness=0.5, z=0.0):
+    """Smooth value noise over the patch at the typed scale, `z` sliding
+    through the third dimension: the Noise node's thumbnail, and how it
+    scrolls with its live z."""
+    x, y = _grid(N)
+    out = np.zeros_like(x)
+    amp, total, sc = 1.0, 0.0, float(scale)
+    for _ in range(max(1, min(4, int(octaves)))):
+        px, py, pz = x * sc, y * sc, np.full_like(x, float(z) * sc)
+        x0, y0, z0 = np.floor(px), np.floor(py), np.floor(pz)
+        fx, fy, fz = px - x0, py - y0, pz - z0
+        fx, fy, fz = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy), fz * fz * (3 - 2 * fz)
+        v = 0.0
+        for dz in (0, 1):
+            vz = 0.0
+            for dy in (0, 1):
+                a = _hash3(x0, y0 + dy, z0 + dz) * (1 - fx) + _hash3(x0 + 1, y0 + dy, z0 + dz) * fx
+                vz = vz + a * (fy if dy else (1 - fy))
+            v = v + vz * (fz if dz else (1 - fz))
+        out += v * amp
+        total += amp
+        amp *= float(roughness); sc *= 2.0
+    return np.clip(out / max(1e-6, total), 0.0, 1.0)
 
 
 def _voronoi(N, scale, seed):
@@ -449,7 +483,7 @@ def _voronoi(N, scale, seed):
     rng = np.random.RandomState(int(seed * 1000) & 0xFFFF)
     k = max(1, int(round(scale)))
     pts = (np.mgrid[0:k, 0:k].reshape(2, -1).T + rng.rand(k * k, 2)) / k
-    d = np.full((N, N), 9.0)
+    d = np.full(x.shape, 9.0)
     for px, py in pts:
         for ox in (-1, 0, 1):
             for oy in (-1, 0, 1):
@@ -466,8 +500,8 @@ def _mandel(N, V):
     else:
         c = (x * 3.0 - 2.2) + 1j * (y * 2.6 - 1.3)
         z = np.zeros_like(c)
-    out = np.zeros((N, N))
-    alive = np.ones((N, N), bool)
+    out = np.zeros(x.shape)
+    alive = np.ones(x.shape, bool)
     for k in range(min(it, 60)):
         z = np.where(alive, z * z + c, z)
         esc = alive & (np.abs(z) > 2.0)
@@ -512,13 +546,18 @@ def _gradient(N, V):
     return x
 
 
-def pattern(n, d, wired=(), N=32):
-    """An N x N array of 0..1 for a pattern node at its typed values (a
-    wired scale or count falls back to the default), or None."""
+def pattern(n, d, wired=(), N=32, live=None):
+    """An N x N (or (W, H)) array of 0..1 for a pattern node at its typed
+    values - a wired pin takes its live value when given, else the
+    default - or None. Noise is a pattern too, sliding with its z."""
     f = PATTERNS.get(n["type"])
+    if n["type"] == "Noise":
+        f = lambda N, V: noise_patch(N, _num(V, "scale", 4.0), V.get("octaves") or 1, _num(V, "roughness", 0.5), _num(V, "z"))
     if not f:
         return None
     V = values(n, d, wired)
+    for k, v in (live or {}).items():
+        V[k] = v
     for i in d["inputs"]:                                   # a wired pin: the default stands in
         if isinstance(V.get(i["name"]), str) and V[i["name"]] == i["name"]:
             V[i["name"]] = i.get("default", 0.0)

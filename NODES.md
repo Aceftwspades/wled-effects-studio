@@ -1747,6 +1747,16 @@ The other end of a Send colour: the colour fed to the Send colour of the same na
 **Settings**
 - `name` *(text)*: the Send colour to listen to
 
+### Scope
+
+A plot of whatever is wired in, in the node: the last seconds of it, its min and max written. A frame-scope value as it is, a per-pixel one at the centre pixel. Leave one on a wire to watch it; the compiler skips it, so it costs the effect nothing.
+
+**Inputs**
+- `x` *(float)*: the value to watch
+
+**Settings**
+- `seconds` *(float)*: how long a stretch the plot shows
+
 ### Send
 
 A wire with no line drawn. Whatever feeds a Send named `bass` reaches every Receive named `bass`, wherever they sit - the compiler joins each pair and both nodes vanish, so they cost nothing. For a value used all over a big graph (the beat, the time, a master speed) without wires crossing everything. Names are local to one graph file; a Send with nothing wired in sends the value typed on it. A loop through a pair is a loop like any other.

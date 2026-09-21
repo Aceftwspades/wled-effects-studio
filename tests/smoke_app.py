@@ -65,6 +65,22 @@ STEPS = [
       {"py": "app.gp.set_overview_zoom(0.0)"}, {"graph_zoom": 1.0}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
     ([{"check": "app.gp.summary(12).startswith('scale ')"}, {"py": "app.prefs.__setitem__('cat_colours', False) or app.gp.rebind_themes()"},
       {"py": "app.prefs.__setitem__('cat_colours', True) or app.gp.rebind_themes()"}], 0.5),
+    # every kind of face, live: the demo graph written into the project, built, and its glyphs asked after -
+    # the Wave's dot moves, the Scope and the sparklines draw, the lights and meters are on the pins, the
+    # Noise scrolls with its z, the Steps node lights its step, a hovered output shows its plot
+    ([{"py": "__import__('runpy').run_path('tests/face_demo.py', run_name='x')['write'](app.project.path)[0]"},
+      {"graph_open": "face_demo.json"}, {"graph_zoom": 1.0}, {"py": "app.gp.compile()"}], 22.0),
+    ([{"check": "app.eng.names[app.eng.idx] == 'face_demo'"}, {"check": "app.gp._hist_n > 30"},
+      {"check": "set(app.gp._live_glyphs.values()) >= {'wave', 'scope', 'spark', 'bars', 'strip', 'noise', 'steps'}"},
+      {"check": "dpg.get_item_configuration('gglyph_3_dot')['center'][0] > 0"},
+      {"check": "len(dpg.get_item_configuration('gglyph_4_line')['points']) > 20"},
+      {"check": "len(dpg.get_item_configuration('gglyph_7_line')['points']) > 20"},
+      {"check": "dpg.does_item_exist('gglyph_8') and dpg.does_item_exist('gglyph_9') and dpg.does_item_exist('gglyph_11') and dpg.does_item_exist('gglyph_15')"},
+      {"check": "getattr(app.gp, '_noise_z', {}).get(20) is not None"},
+      {"check": "app.gp._step_lit.get(5) is not None"},
+      {"py": "len(app.gp._readout_items)"}, {"graph_hover": ["out", 3, "value"]}], 1.0),
+    ([{"check": "app.gp._hover_out == (3, 'value')"}, {"check": "len(app.gp._readout_items) > 12"},
+      {"check": "any(dpg.get_item_type(i).endswith('DrawCircle') for i in app.gp._readout_items)"}], 0.5),
     # a wire that closes a loop (the Multiply of the time back into its own b) gets a Delay; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.on_link(None, (app.gp._pins[(11, 'out', 'result')], app.gp._pins[(11, 'in', 'b')]))"}], 1.0),
     ([{"expect": ["graph_status", "closed a loop"]}, {"py": "[n['type'] for n in app.gp.graph.nodes.values()].count('Delay')"}, {"graph_undo": True}], 0.5),
@@ -269,6 +285,9 @@ def main():
         os.remove(rep)
     for f in (set(os.listdir(sdir)) if os.path.isdir(sdir) else set()) - subs_before:
         os.remove(os.path.join(sdir, f))                        # the sub-graph the fold made
+    for f in ("effects/face_demo.cpp", "graphs/face_demo.json"):    # the face demo's graph and its build
+        if os.path.exists(os.path.join(ROOT, "projects", "default", f)):
+            os.remove(os.path.join(ROOT, "projects", "default", f))
     for f in (set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()) - caps_before:
         if f.endswith(".zip"):                                  # the project zip the run made
             os.remove(os.path.join(ROOT, "captures", f))
