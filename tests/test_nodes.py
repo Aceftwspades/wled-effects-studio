@@ -90,8 +90,9 @@ def test_every_node_compiles_to_cpp():
     assert not bad, "\n".join(bad)
 
 
-def _build():
-    """One engine with every census effect in it. The roster holds 256:
+def _build(gs=None):
+    """One engine with every census effect in it (or the graphs given -
+    the parity test adds the examples). The roster holds 256:
     the census's come first (the stock effects are registered on demand,
     after), so it is the tail of the stock 1-D list that is left off.
     build/latest is left alone: the app, and the other tests, keep the
@@ -100,7 +101,7 @@ def _build():
     from native.toolchain import build_engine
     os.makedirs(OUT, exist_ok=True)
     srcs = []
-    gs = graphs()
+    gs = graphs() if gs is None else gs
     for name, g in gs.items():
         p = os.path.join(OUT, "".join(ch if ch.isalnum() else "_" for ch in name) + ".cpp")
         open(p, "w", encoding="utf-8", newline="\n").write(g.compile())

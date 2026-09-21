@@ -484,6 +484,15 @@ class Engine:
         self.sim_ms += dt
         self.lib.simFrame(self.idx, dt)
 
+    def set_now(self, ms=0):
+        """The engine's clock (strip.now) set: two runs from the same
+        millisecond, for a comparison. Ignored by an engine without it."""
+        self.sim_ms = int(ms)
+        try:
+            self.lib.simNowSet(C.c_uint32(int(ms)))
+        except AttributeError:
+            pass
+
     def pixels(self):
         """(rows, cols) uint32 0x00RRGGBB, a live view of the engine's buffer."""
         n = self.cols * self.rows

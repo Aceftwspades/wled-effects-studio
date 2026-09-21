@@ -1124,8 +1124,16 @@ What would say the studio is complete, in the order to do them:
       and the desktop are skipped), and runs every keymap action
       (`action_walk`: 82, toggles twice, the graph undone after each).
       894 rows, none failing.
-- [ ] **Script / C++ parity**: the same graph through the VM and as its
-      compiled effect, frames compared.
+- [x] **Script / C++ parity** (`tests/test_parity.py`): every census
+      graph and every scriptable example as its compiled effect and as
+      bytecode in the Studio Script effect, in the same engine from the
+      same millisecond (`simNowSet`, a warm-up frame so both dt stores
+      read 23 ms) with the same fake audio, the last ten of forty frames
+      compared: 114 graphs, 111 within a mean of 4/255 (most exactly 0),
+      the three with a Random hold apart by design. Found: an unwired
+      colour input (a packed 0) was white in the script and black in
+      C++; a `(uint8_t)` cast of a negative (a palette index below 0)
+      clamped in the script where C wraps - both in the compiler.
 - [ ] **Round-trip serialisation**: project, graph, shape, sequence and
       palette files saved and reloaded equal; older project files from
       the history still opening.

@@ -525,6 +525,10 @@ SIM_API void simAudioSet(float vol, int peak) {
 // One frame. dtMs is passed in rather than read from a wall clock so the page
 // can step deterministically - which is the whole point of having this: you can
 // hold a frame still and look at it.
+// The clock set: a test that runs the same graph twice (the C++ effect,
+// then the script) starts both from the same millisecond.
+SIM_API void simNowSet(uint32_t ms) { strip.now = ms; }
+
 SIM_API void simFrame(int idx, int dtMs) {
   if (idx < 0 || idx >= (int)cfxBankCount()) return;
   strip.now += (uint32_t)dtMs;

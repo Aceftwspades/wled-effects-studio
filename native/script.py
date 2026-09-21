@@ -415,6 +415,12 @@ class Lower:
             op, b = "MUL", ("k", 1.0 / b[1])           # a divide is software on an ESP32, twice a multiply
         r = self.asm.freg(); self.asm.emit(op, r, self.to_f(a), self.to_f(b)); return ("f", r)
 
+    def wrap(self, t, n):
+        """t modulo n into 0..n, negatives included - what C's narrowing to
+        an unsigned does ((uint8_t)-76 is 180), where fmodf would keep the
+        sign: t - n * floor(t / n)."""
+        return self.f2("SUB", t, self.f2("MUL", ("k", n), self.f1("FLOOR", self.f2("DIV", t, ("k", n)))))
+
     # -- expressions ------------------------------------------------------------------
     def ev(self, e):
         kind = e[0]
@@ -478,11 +484,9 @@ class Lower:
             if a[0] == "c" or a[0] == "s" or a[0] == "v":
                 return a
             if "uint8_t" in types:
-                t = self.f1("TRUNC", a)
-                return self.f2("MOD", t, ("k", 256.0))
+                return self.wrap(self.f1("TRUNC", a), 256.0)
             if "uint16_t" in types:
-                t = self.f1("TRUNC", a)
-                return self.f2("MOD", t, ("k", 65536.0))
+                return self.wrap(self.f1("TRUNC", a), 65536.0)
             if "int" in types or "uint32_t" in types or "int32_t" in types or "unsigned" in types:
                 return self.f1("TRUNC", a)
             if "bool" in types:
@@ -748,7 +752,10 @@ class Lower:
 # --- the graph ------------------------------------------------------------------------
 def _lit(t, v):
     if t == "color":
-        rgb = list(v)[:3] if isinstance(v, (list, tuple)) else [255, 255, 255]
+        if isinstance(v, (list, tuple)):
+            rgb = list(v)[:3]
+        else:                                          # a packed 0xRRGGBB, as the C++ side reads it (0 is black)
+            c = int(v); rgb = [(c >> 16) & 255, (c >> 8) & 255, c & 255]
         return ("k3", [float(c) / 255.0 for c in rgb])
     if t == "vector":
         vv = list(v)[:3] if isinstance(v, (list, tuple)) else [float(v)] * 3
