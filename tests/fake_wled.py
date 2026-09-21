@@ -16,7 +16,8 @@ What it models of WLED 16, faithfully where the studio was bitten:
   /presets.json the presets written so far (and fs.pmt in /json/info moves)
   /upload       any file into the fake's filesystem (studio.bin, ledmap.json,
                 geometry.bin, paletteN.json); GET /<name> serves it back
-  /json/cfg     GET the config (hw.led.ins, timers.ins); POST merges timers
+  /json/cfg     GET the config (hw.led.ins, timers.ins, um.AudioReactive, hw.if.i2c-pin); POST merges timers,
+                the LED block, the audio usermod's block (a type or pin change counts a reboot as needed)
                 (cleared, then the list) and the LED outputs
   DDP           a UDP socket on 4048 counting packets and frames
 
@@ -72,7 +73,13 @@ class FakeWled:
         self.files = {}                                  # name -> bytes
         self.cfg = {"hw": {"led": {"total": w * h, "maxpwr": 0, "ledma": 55, "ins": [{"start": 0, "len": w * h, "pin": [16], "order": 0, "rev": False, "type": 22}],
                                    "matrix": {"mpc": 1, "panels": [{"b": False, "r": False, "v": False, "s": True, "x": 0, "y": 0, "h": h, "w": w}]}}},
-                    "timers": {"ins": []}}
+                    "timers": {"ins": []},
+                    "um": {"AudioReactive": {"enabled": True, "addPalettes": False, "digitalmic": {"type": 1, "pin": [13, 15, 14, -1]},
+                                             "config": {"squelch": 10, "gain": 60, "AGC": 0}, "sync": {"port": 11988, "mode": 0}}}}
+        self.cfg["hw"]["if"] = {"i2c-pin": [-1, -1]}
+        self.audio_level = 0.0                           # what /json/info reports as the input level (a test sets it)
+        self.reboots = 0                                 # /json/state {"rb": true} counted
+        self.reboot_needed = False                       # a new audio type or new pins were written
         self.pmt = int(time.time()) - 100                # presets file modified time: whole seconds by the device's clock
         self.t0 = time.time()
         self.pending = None                              # (id, object, is_api_call)
@@ -133,6 +140,8 @@ class FakeWled:
             self.presets.pop(str(int(d["pdel"])), None); self.pmt = int(time.time())
         if "rmcpal" in d:
             self.files.pop(f"/palette{int(d['rmcpal'])}.json", None)
+        if d.get("rb"):
+            self.reboots += 1; self.reboot_needed = False
         if "psave" in d:
             pid = int(d["psave"])
             if 0 < pid < 251:
@@ -141,7 +150,13 @@ class FakeWled:
 
     def info(self):
         fx = self.state["seg"][self.state["mainseg"]]["fx"]
-        u = {"Studio Script": ["running" if EFFECTS[fx] == "Studio Script" else "idle"]}
+        ar = self.cfg["um"]["AudioReactive"]
+        t = ar["digitalmic"]["type"]
+        u = {"Studio Script": ["running" if EFFECTS[fx] == "Studio Script" else "idle"],
+             "AudioReactive": {"Audio Source": ["I2S digital" if t < 254 else "network only",
+                                                f" - peak {int(self.audio_level / 2.55):3d}%" if self.audio_level > 1 else " - quiet"],
+                               "Input level": [round(self.audio_level), "/255"],
+                               "Sound Processing": ["running" if ar["enabled"] else "suspended"]}}
         return {"ver": "16.0.1", "vid": 2605010, "name": "Fake WLED", "arch": "ESP32-S3", "fxcount": len(EFFECTS),
                 "palcount": len(PALETTES), "cpalcount": sum(1 for f in self.files if f.startswith("/palette")),
                 "mac": "aabbccddeeff", "uptime": int(time.time() - self.t0), "freeheap": 150000,
@@ -202,6 +217,19 @@ class FakeWled:
                             fake.cfg["timers"]["ins"] = list(d["timers"]["ins"])
                         if "hw" in d and "led" in d["hw"]:
                             fake.cfg["hw"]["led"].update(d["hw"]["led"])
+                        if "hw" in d and "if" in d["hw"] and "i2c-pin" in d["hw"]["if"]:
+                            fake.cfg["hw"]["if"]["i2c-pin"] = list(d["hw"]["if"]["i2c-pin"])
+                        ar = (d.get("um") or {}).get("AudioReactive")
+                        if ar:
+                            cur = fake.cfg["um"]["AudioReactive"]
+                            dm = ar.get("digitalmic") or {}
+                            if ("type" in dm and dm["type"] != cur["digitalmic"]["type"]) or ("pin" in dm and list(dm["pin"]) != cur["digitalmic"]["pin"]):
+                                fake.reboot_needed = True
+                            for k, v in ar.items():
+                                if isinstance(v, dict) and isinstance(cur.get(k), dict):
+                                    cur[k].update(v)
+                                else:
+                                    cur[k] = v
                         fake.log.append("cfg written")
                         return self._send(200, {"success": True})
                     if p == "/json":

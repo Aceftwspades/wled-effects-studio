@@ -1646,7 +1646,7 @@ class App(Features):
                ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
                ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
     CORE = ("main", "cube", "side", "props")
-    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes", "outputs")
+    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes", "outputs", "audioin")
     SLOTS = CORE + OPTIONAL
 
     @classmethod
@@ -2340,7 +2340,7 @@ class App(Features):
     def _slot_label(self, slot):
         return {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
                 "side": "Panel", "props": "Properties", "devices": "Devices", "flash": "Flash firmware",
-                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs"}.get(slot, slot)
+                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs", "audioin": "Audio input"}.get(slot, slot)
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
@@ -2678,6 +2678,7 @@ class App(Features):
             "library":      lambda: device_ui.show(self, "library"),
             "palettes":     lambda: device_ui.show(self, "palettes"),
             "outputs":      lambda: device_ui.show(self, "outputs"),
+            "audioin":      lambda: device_ui.show(self, "audioin"),
             "randomise":    self.randomise,
             "undo":         lambda: self.undo_where(),
             "redo":         lambda: self.undo_where(redo=True),
@@ -3495,6 +3496,14 @@ def service_command(app):
                 app.save_view(v[1]) if isinstance(v, list) and v and v[0] == "save" else app.set_camera(v)
             if "background" in c:                       # test hook: a picture's path, or "" to clear
                 app.set_background(c["background"])
+            if "audioin" in c:                          # test hook: ["preset", key] | ["read"] | ["send"] | ["meter", bool] | ["pins", [sd, ws, sck, mclk]]
+                from native import audioin_ui as AI, audioin as A
+                op = c["audioin"]
+                if op[0] == "preset": A.apply_preset(A.state(app.project), op[1]); app.project.save(); AI.refresh(app)
+                elif op[0] == "read": AI.read_device(app)
+                elif op[0] == "send": AI.send(app)
+                elif op[0] == "meter": dpg.set_value("ain_meter", bool(op[1])); AI._meter(app, bool(op[1]))
+                elif op[0] == "pins": A.state(app.project)["pins"] = list(op[1]); app.project.save(); AI.refresh(app)
             if "outputs" in c:                          # test hook: ["split", "one"|"parts"|"count"] | ["abl", true] | ["limit", mA]
                 from native import outputs_ui as OU
                 op = c["outputs"]
@@ -4191,7 +4200,7 @@ def process_stats(app):
 # buttons a walk leaves alone: a flash or a firmware build, a render or a preview that takes minutes,
 # a clone or a download from the network, a restart, a program opened on the desktop, a key capture
 SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "rec_btn")
-SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Open in the browser", "Open the build folder",
+SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
 

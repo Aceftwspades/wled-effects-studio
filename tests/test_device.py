@@ -154,6 +154,44 @@ def test_ddp_stream_counted():
     assert DEV.ddp_frames >= 5
 
 
+def test_audio_input_round_trip():
+    """The device's audio input read, a line-in preset sent, read back the
+    same; a type change counts a reboot as needed and the reboot request
+    lands; the level meter reads the fork's row, or the stock peak."""
+    from native import audioin
+    cfg = devices._get(DEV.host, "/json/cfg", 3)
+    st = audioin.from_wled_cfg(cfg)
+    assert st["type"] == 1 and st["pins"] == [13, 15, 14, -1] and st["preset"] == "inmp441" and st["gain"] == 60
+    st = audioin.apply_preset(dict(st), "pcm1808"); st["pins"] = [13, 15, 14, 4]
+    assert st["type"] == 4 and st["gain"] == 40 and audioin.needs_reboot(audioin.from_wled_cfg(cfg), st)
+    _post("/json/cfg", audioin.wled_cfg(st))
+    back = audioin.from_wled_cfg(devices._get(DEV.host, "/json/cfg", 3))
+    assert back["type"] == 4 and back["pins"] == [13, 15, 14, 4] and back["gain"] == 40 and back["squelch"] == 4 and back["preset"] == "pcm1808"
+    assert DEV.reboot_needed
+    _post("/json/state", {"rb": True})
+    assert DEV.reboots == 1 and not DEV.reboot_needed
+    # an ES8388 board: its I2C pins ride along
+    st = audioin.apply_preset(dict(st), "es8388_audiokit")
+    body = audioin.wled_cfg(st)
+    assert body["hw"]["if"]["i2c-pin"] == [33, 32] and body["um"]["AudioReactive"]["digitalmic"]["pin"] == [35, 25, 27, 0]
+    _post("/json/cfg", body)
+    back = audioin.from_wled_cfg(devices._get(DEV.host, "/json/cfg", 3))
+    assert back["preset"] == "es8388_audiokit" and back["i2c"] == [33, 32]
+    assert "-D SR_DMTYPE=6" in audioin.flags(back) and "-D I2CSDAPIN=33" in audioin.flags(back) and "-D MCLK_PIN=0" in audioin.flags(back)
+    # the meter
+    DEV.audio_level = 120.0
+    lvl, src = audioin.level_of(devices._get(DEV.host, "/json/info", 3))
+    assert lvl == 120.0 and "I2S digital" in src
+    info = devices._get(DEV.host, "/json/info", 3); info["u"]["AudioReactive"].pop("Input level")     # a stock firmware: the peak row
+    lvl, _ = audioin.level_of(info)
+    assert 100 < lvl < 130
+    DEV.audio_level = 0.0
+    assert audioin.level_of({"u": {}}) == (None, "")
+    # off and network-only: no pins to speak of
+    assert audioin.flags(audioin.apply_preset(dict(st), "network"))[0] == "-D SR_DMTYPE=-1"
+    assert audioin.wled_cfg(audioin.apply_preset(dict(st), "off"))["um"]["AudioReactive"]["enabled"] is False
+
+
 def test_a_device_that_is_off():
     """No traceback, a clear refusal, quickly."""
     t0 = time.time()

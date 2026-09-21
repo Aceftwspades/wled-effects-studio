@@ -100,6 +100,12 @@ STEPS = [
       {"py": "__import__('native.outputs_ui', fromlist=['x']).read_device(app)"}], 3.0),
     ([{"expect": ["out_log", "output(s) read"]}, {"py": "__import__('native.outputs_ui', fromlist=['x']).send(app)"}], 3.0),
     ([{"expect": ["out_log", "sent"]}], 0.5),
+    # the audio input: the device's read, a line-in preset sent (the reboot offered), the meter read
+    ([{"frame": "audioin"}, {"audioin": ["read"]}], 2.0),
+    ([{"expect": ["ain_log", "audio input read"]}, {"audioin": ["preset", "pcm1808"]}, {"audioin": ["pins", [13, 15, 14, 4]]},
+      {"audioin": ["send"]}], 3.0),
+    ([{"expect": ["ain_log", "after a reboot"]}, {"py": "dpg.hide_item('confirm_dialog')"}, {"audioin": ["meter", True]}], 2.5),
+    ([{"expect": ["ain_source", "I2S digital"]}, {"audioin": ["meter", False]}, {"audioin": ["preset", "inmp441"]}], 1.0),
     # sad paths: a wire between types that do not convert, a graph with no output, a C++ effect that does not
     # compile, a device that is off - a status line each, never a traceback
     ([{"layout": "graph"}, {"py": "app.gp.new('sad_smoke')"},

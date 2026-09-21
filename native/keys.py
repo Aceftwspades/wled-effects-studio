@@ -64,6 +64,7 @@ ACTIONS = [
     ("library",       "Library: every effect as a looping thumbnail",        "Ctrl+Shift+L", "global"),
     ("palettes",      "Palettes: gradients of the project's own",            "Ctrl+Shift+G", "global"),
     ("outputs",       "LED outputs and power",                               "Ctrl+Shift+O", "global"),
+    ("audioin",       "Audio input: the device's microphone or line-in",    "Ctrl+Shift+M", "global"),
     ("randomise",     "Randomise the settings",                              "Ctrl+Shift+X", "global"),
     # the graph
     ("undo",          "Undo (the graph, or the code)",                       "Ctrl+Z", "global"),

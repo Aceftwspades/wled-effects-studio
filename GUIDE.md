@@ -50,7 +50,8 @@ right half is the device and the frames: devices (Ctrl+Shift+N), flash
 (Ctrl+Shift+U), send to device (Ctrl+Shift+S), the DDP stream on or off
 (Ctrl+Shift+T, lit amber while it runs); then the shape editor
 (Ctrl+Shift+E), the sequence (Ctrl+Shift+Q), the library (Ctrl+Shift+L),
-the palettes (Ctrl+Shift+G) and the LED outputs (Ctrl+Shift+O). Playback
+the palettes (Ctrl+Shift+G), the LED outputs (Ctrl+Shift+O) and the audio
+input (Ctrl+Shift+M). Playback
 > Randomise is Ctrl+Shift+X.
 
 A node's long settings (bitmap rows, expressions, files) are edited in
@@ -321,6 +322,22 @@ stay quiet.
   default) against the supply you enter, and how far WLED's auto
   brightness limiter would dim it; "preview the limiter" dims the sim
   the same way, and the footer shows the amps all the time.
+- **Audio input** (Device menu, Ctrl+Shift+M): what the device listens
+  through - a microphone (INMP441, SPH0645, a PDM mic, an ES7243 module)
+  or a **line-in**: a PCM1808 / WM8782 ADC breakout (the four I2S wires,
+  the master clock included - any free GPIO on an S3), or an ES8388
+  codec board's line-in jack (the AudioKit's and the LyraT's pins are
+  filled in; another board's typed in, with its I2C pins). Pick the
+  MODULE and the type, the pins a board fixes, and the levels a line
+  signal wants (gain 40, squelch 4, no AGC) are set; edit any of them.
+  "Read the device's" shows what it runs now; **Send the audio input**
+  writes it over /json/cfg - the levels take at once, a new type or new
+  pins after a reboot, which is offered. Tick **meter** and the bar
+  shows the level the device hears, twice a second: play something into
+  the jack and watch it move. A fresh flash boots with these settings
+  too (the studio's env carries them as flags). On a line-in the fork's
+  firmware mixes both channels to mono and removes the DC offset, so a
+  line signal drives the audio nodes the way a mic does.
 - **Flash firmware** (Ctrl+Shift+U). WHAT GOES ON THE DEVICE says, before
   anything is built, exactly what the firmware will carry - the tree's
   WLED version and build id, the environment chain with its board and
@@ -425,6 +442,7 @@ on and install what it carries.
 - **Device** › Send to device... `Ctrl+Shift+S`
 - **Device** › Sequence: presets and a playlist... `Ctrl+Shift+Q`
 - **Device** › LED outputs and power... `Ctrl+Shift+O`
+- **Device** › Audio input (mic / line-in)... `Ctrl+Shift+M`
 - **Device** › Active device › … the devices known
 - **Device** › Scan the network for devices
 - **Device** › Stream the sim to the device (DDP) `Ctrl+Shift+T`
@@ -586,6 +604,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Ctrl+Shift+L` | Library: every effect as a looping thumbnail | anywhere |
 | `Ctrl+Shift+G` | Palettes: gradients of the project's own | anywhere |
 | `Ctrl+Shift+O` | LED outputs and power | anywhere |
+| `Ctrl+Shift+M` | Audio input: the device's microphone or line-in | anywhere |
 | `Ctrl+Shift+X` | Randomise the settings | anywhere |
 | `Ctrl+Z` | Undo (the graph, or the code) | anywhere |
 | `Ctrl+Y` | Redo (the graph, or the code) | anywhere |
@@ -651,6 +670,8 @@ Every button, with what its tooltip says.
 **Palettes frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ New`; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy`; `Remove`; `Use in the sim`; `spread evenly`; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all`; `Remove this one there`
 
 **Led Outputs frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `one output`; `one per part`; `by count:`; `+ output`; `Read the device's`; `Send outputs + power limit` — over /json/cfg; the device re-initialises its outputs (reboot it if it does not)
+
+**Audio Input frame**: `dock` — dock: into the pane space, under the main pane (or drag the grip onto a pane); `close` — close (Esc while the frame has the focus); the menu opens it again; `Read the device's` — what the device's audioreactive is set to now (its type, pins and levels), into these fields; `Send the audio input` — over /json/cfg; the levels take at once, a new type or new pins after a reboot (offered when needed); `Reboot the device` — restarts the device so a new type or new pins take effect; the LEDs go dark for a few seconds
 
 **Keyboard shortcuts**: `Reset all to defaults`
 

@@ -1078,6 +1078,29 @@ this repo with a compiler beside it. Done so far:
       wins) and a restart offered; or "I have one" for a checkout that
       exists. Tried from a copy with no tree: the clone, the restart, the
       flash frame listing the checkout's environments.
+### Line-in (September 2026)
+
+- [x] **A line-in module on the device.** The fork's audioreactive reads
+      both channels of a line-in source - type 4, "generic I2S with a
+      master clock" (a PCM1808 or WM8782 ADC breakout), and type 6, an
+      ES8388 codec board's line input - averages them to mono and takes
+      the DC offset out with a first-order high-pass (`I2SSource`'s
+      `stereoMix`; a microphone keeps the one-channel path), and reports
+      the level it hears in /json/info (`u.AudioReactive["Input level"]`).
+      The studio's **Audio input** frame (`native/audioin.py`,
+      `audioin_ui.py`; Device menu, Ctrl+Shift+M): a preset per module
+      that sets the usermod's type, the pins a board fixes (AudioKit,
+      LyraT), the levels a line signal wants; read from the device, sent
+      over /json/cfg with the reboot a type or pin change needs offered;
+      a meter that polls the level; and the same settings as the studio
+      env's build flags (`SR_DMTYPE`, `I2S_*PIN`, `MCLK_PIN`, `SR_GAIN`,
+      `SR_SQUELCH`, `SR_AGC`, `I2CSDAPIN`/`I2CSCLPIN`), so a fresh flash
+      boots with them. The fake WLED models the usermod's config, the
+      reboot and the level; `tests/test_device.py` and the smoke test
+      cover the round trip. Untested on real hardware yet: a PCM1808 or
+      an ES8388 board on the cube - the wiring and the levels need a
+      listen.
+
 ### Completeness (September 2026)
 
 What would say the studio is complete, in the order to do them:

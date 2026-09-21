@@ -119,6 +119,7 @@ def build_menus(app):
             _mi(app, "Send to device...", "send_frame", callback=lambda: device_ui.show(app, "send"))
             _mi(app, "Sequence: presets and a playlist...", "sequence", callback=lambda: device_ui.show(app, "sequence"))
             _mi(app, "LED outputs and power...", "outputs", callback=lambda: device_ui.show(app, "outputs"))
+            _mi(app, "Audio input (mic / line-in)...", "audioin", callback=lambda: device_ui.show(app, "audioin"))
             dpg.add_separator()
             with dpg.menu(label="Active device", tag="menu_active_device"):
                 pass

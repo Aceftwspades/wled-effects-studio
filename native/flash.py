@@ -357,6 +357,9 @@ def feature_flags(project):
     flags = [f"-D {flag}=0" for key, _, _, flag, _ in FEATURES if not f.get(key)]
     if f["audio"] == "stock":
         flags.append("-D CFX_PCM=0")
+    if f["audio"] != "none" and project.options.get("audioin"):
+        from native import audioin
+        flags += audioin.flags(audioin.state(project))     # the input the device boots with: the module, its pins, its levels
     g = project.geometry
     if g.kind == "cube" and g.params.get("six"):
         flags.append("-D CFX_SIX_FACES=1")
@@ -492,6 +495,7 @@ def manifest(project, base_env, only=None):
     return {"wled": ver, "build_id": vid, "env": base_env, "studio_env": "studio_" + base_env, "chain": [e for e, _ in chain],
             "board": board, "partitions": os.path.basename(parts), "usermods": staged_usermods(project, base_env) + [USERMOD],
             "flags": feature_flags(project), "features": feats, "audio": f["audio"],
+            "audio_input": __import__("native.audioin", fromlist=["x"]).describe(project.options["audioin"]) if project.options.get("audioin") and f["audio"] != "none" else "",
             "effects": [(f_, project.effect_title(f_), known.get(f_)) for f_ in ship],
             "not_shipped": [(f_, project.effect_title(f_)) for f_ in files if f_ not in ship],
             "builtin": builtin_effects(), "script": True,
@@ -509,7 +513,8 @@ def manifest_text(m, device=None):
     on = [label for _, label, v in m["features"] if v]
     off = [label for _, label, v in m["features"] if not v]
     L.append("features in: " + (", ".join(on) or "none") + ("; out: " + ", ".join(off) if off else ""))
-    L.append(f"audio: {m['audio']}" + ("; flags " + " ".join(m["flags"]) if m["flags"] else "; no extra flags"))
+    L.append(f"audio: {m['audio']}" + (f"; input {m['audio_input']}" if m.get("audio_input") else "")
+             + ("; flags " + " ".join(m["flags"]) if m["flags"] else "; no extra flags"))
     n = len(m["effects"])
     L.append(f"studio effects shipped: {n}" + (" - " + ", ".join(t for _, t, _ in m["effects"]) if n else " (none ticked)"))
     if m["not_shipped"]:
