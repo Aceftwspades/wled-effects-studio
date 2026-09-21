@@ -43,6 +43,9 @@ STEPS = [
     ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.graph.add('Transform', (60, 60))"}, {"py": "app.gp.rebuild()"},
       {"graph_zoom": 1.0}, {"key": "Home"}, {"pad": [0, 0.25, 0.75]}], 1.0),
     ([{"py": "dpg.get_value(f'gin_{max(app.gp.graph.nodes)}_pivot_u_w')"}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
+    # modulation as a gesture: an LFO onto a typed value, then the beat's hit; undone
+    ([{"graph_open": "box_fire.json"}, {"py": "app.gp.modulate(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Noise'), 'scale', ('lfo', 'value', {}))"}], 1.0),
+    ([{"expect": ["graph_status", "modulated by Wave"]}, {"graph_undo": True}], 0.5),
     # a Bitmap painted in the properties pane: one cell set, the rows follow, undone
     ([{"layout": "graph"}, {"graph_open": "question_block.json"},
       {"py": "setattr(app.gp, '_test_sel', [next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Bitmap')])"}], 0.8),

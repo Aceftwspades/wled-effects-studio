@@ -3100,6 +3100,11 @@ class GraphPanel:
                 with dpg.tree_node(label="drive with a slider", parent=P):
                     for c in ctrls:
                         row(f"  {c}", lambda c=c: self._drive_with(nid, name, c))
+            if i["type"] == "float" and (nid, name) not in {(l[2], l[3]) for l in self.graph.links}:
+                # modulation as a gesture: a source and a folded Remap about the value typed here
+                with dpg.tree_node(label="modulate with", parent=P):
+                    for label, src in self.MODULATORS:
+                        row(f"  {label}", lambda src=src: self.modulate(nid, name, src))
         elif kind == "out":
             outs = [l for l in self.graph.links if l[0] == nid and l[1] == name]
             dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
@@ -3352,6 +3357,58 @@ class GraphPanel:
         self.snapshot()
         self.graph.nodes[nid].setdefault("inputs", {}).pop(name, None)
         self.rebuild()
+
+    # a source, its output, and its own settings: what "modulate with" offers
+    MODULATORS = [("the time (a slow ramp)", ("Time", "t", {})),
+                  ("an LFO - a sine of the time", ("lfo", "value", {})),
+                  ("the volume", ("Audio", "volume", {})), ("the bass", ("Audio", "bass", {})),
+                  ("the mid", ("Audio", "mid", {})), ("the treble", ("Audio", "treble", {})),
+                  ("the beat's hit", ("Audio", "hit", {})), ("a random hold on the beat", ("hold", "value", {}))]
+
+    def modulate(self, nid, name, src):
+        """Bitwig's gesture: a modulator onto a value. The typed value stays
+        the centre - a Remap, folded so it is one small node, takes the
+        source's 0..1 to value - amount .. value + amount (a quarter of the
+        value, or 0.25 about zero) and feeds the pin; the source is one
+        already in the graph, or a new one to the left. An LFO is a Wave
+        of the time; a random hold is one triggered by the beat."""
+        if nid not in self.graph.nodes:
+            return
+        n = self.graph.nodes[nid]
+        d = self.graph.node_def(n)
+        i = next((q for q in d["inputs"] if q["name"] == name), None)
+        if i is None:
+            return
+        self.snapshot("modulate")
+        v = float(n.get("inputs", {}).get(name, i.get("default", 0.0)) or 0.0)
+        amount = abs(v) * 0.25 if abs(v) > 1e-6 else 0.25
+        px, py = n["pos"]
+        kind, out, _ = src
+        if kind == "lfo":                                    # a Wave of the time, in frame scope: the LFO
+            t = self._find_or_add("Time", (px - 660, py))
+            w = self.graph.add("Wave", (px - 440, py)); self.graph.nodes[w]["params"]["shape"] = "sine"
+            self.graph.nodes[w]["inputs"]["cycles"] = 0.25   # a cycle every four seconds
+            self.graph.link(t, "t", w, "x")
+            source, sout = w, "value"
+        elif kind == "hold":
+            a = self._find_or_add("Audio", (px - 660, py))
+            h = self.graph.add("Random hold", (px - 440, py))
+            self.graph.link(a, "beat", h, "trigger")
+            source, sout = h, "value"
+        else:
+            source, sout = self._find_or_add(kind, (px - 440, py)), out
+        r = self.graph.add("Remap", (px - 220, py))
+        self.graph.nodes[r]["params"].update({"in_lo": 0.0, "in_hi": 1.0, "out_lo": round(v - amount, 4), "out_hi": round(v + amount, 4)})
+        self.graph.nodes[r]["collapsed"] = True
+        self.graph.nodes[r]["label"] = f"{name} \u00b1{amount:.3g}"
+        self.graph.link(source, sout, r, "x")
+        self.graph.link(r, "result", nid, name)
+        self.rebuild()
+        self.status(f"{name} modulated by {self.graph.nodes[source]['type']}: {v - amount:.3g} .. {v + amount:.3g} (the Remap's out_lo / out_hi set the range)")
+
+    def _find_or_add(self, type_, pos):
+        existing = next((m["id"] for m in self.graph.nodes.values() if m["type"] == type_), None)
+        return existing if existing is not None else self.graph.add(type_, (max(0, pos[0]), pos[1]))
 
     def _drive_with(self, nid, name, ctrl):
         """A control node feeding this input - reuse one already in the graph,

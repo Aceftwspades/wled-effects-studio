@@ -181,6 +181,22 @@ def test_positions_survive_a_zoomed_save():
                 assert abs(rounded[0] - pos[0]) <= 0.5 / z + 1e-6 and abs(rounded[1] - pos[1]) <= 0.5 / z + 1e-6
 
 
+def test_modulate_gesture_shape():
+    """What the panel's modulate() makes, checked on the graph: a source, a
+    Remap about the typed value, the pin wired - and it compiles. (The
+    panel needs a window; the graph operations it uses are here.)"""
+    g = starter()
+    c = g.add("Coords", (0, 0)); n = g.add("Noise", (400, 0)); p = g.add("Palette", (600, 0)); o = g.add("Output", (800, 0))
+    g.link(c, "u", n, "x"); g.link(n, "value", p, "index"); g.link(p, "color", o, "color")
+    g.nodes[n]["inputs"] = {"scale": 4.0}
+    t = g.add("Time", (0, 100)); w = g.add("Wave", (200, 100)); g.link(t, "t", w, "x"); g.nodes[w]["inputs"]["cycles"] = 0.25
+    r = g.add("Remap", (300, 100)); g.nodes[r]["params"].update({"in_lo": 0.0, "in_hi": 1.0, "out_lo": 3.0, "out_hi": 5.0}); g.nodes[r]["collapsed"] = True
+    g.link(w, "value", r, "x"); g.link(r, "result", n, "scale")
+    src = g.compile()
+    assert "SEGMENT" in src and (r, "result", n, "scale") in g.links
+    assert g.last_scope[w] == "frame" and g.last_scope[r] == "frame"           # the LFO and its range run once a frame
+
+
 def test_wired_input_is_required():
     """Sprites reads the Particles' state through its slots pin: unwired,
     it is a problem on the node and a refusal to compile, not a C++ error."""
