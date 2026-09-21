@@ -484,6 +484,10 @@ class GraphPanel:
         long_ = [p for p in d["params"] if p["type"] in ("text", "file") and not p.get("lines") is False]
         curves = [p for p in d["params"] if p["type"] == "curve"]
         self._curve_ed = None
+        self._bitmap_ed = None
+        if n["type"] == "Bitmap":
+            # the bitmap painted: a grid of cells, the left button sets the pen's digit, the right clears
+            self._build_bitmap_editor(nid, "rows")
         for p in curves:
             # a curve drawn by hand: click to add a point, drag one, right-click to take it out
             dpg.add_text(f"{p['name']} - click to add a point, drag to move, right-click to remove", parent="graph_props", color=DIM, wrap=0)
@@ -503,6 +507,125 @@ class GraphPanel:
             dpg.add_input_text(parent="graph_props", width=-1, multiline=bool(p.get("lines")) or len(v) > 60,
                                height=self.px(120) if p.get("lines") else 0, default_value=shown,
                                user_data=(nid, p["name"]), callback=self._on_prop)
+
+    # --- the bitmap painter in the properties pane ----------------------------------------
+    BITMAP_STATES = "0123456789"
+
+    def _bitmap_rows(self, nid, name):
+        n = self.graph.nodes.get(nid) if self.graph else None
+        if not n:
+            return None, None
+        d = self.graph.node_def(n)
+        p = next((q for q in d["params"] if q["name"] == name), None)
+        text = str(n["params"].get(name, p["default"] if p else "")).replace("\n", "/")
+        rows = [r for r in text.split("/")]
+        if not rows:
+            rows = ["0"]
+        w = max(1, max(len(r) for r in rows))
+        rows = [(r + "." * w)[:w] for r in rows]           # a dot is an empty pixel; a digit a coloured slot
+        return n, rows
+
+    def _build_bitmap_editor(self, nid, name):
+        n, rows = self._bitmap_rows(nid, name)
+        if n is None:
+            return
+        dpg.add_text(f"{name} - paint: the left button sets the pen's digit (a colour slot for Colour pick), the right "
+                     "empties a pixel (a dot); drag to paint a run", parent="graph_props", color=DIM, wrap=0)
+        with dpg.group(horizontal=True, parent="graph_props"):
+            dpg.add_text("pen", color=DIM)
+            dpg.add_combo(list(self.BITMAP_STATES), tag="bitmap_pen", width=44, default_value="1",
+                          callback=lambda s, v: self._bitmap_ed.__setitem__("pen", v))
+            dpg.add_button(label="empty", small=True, callback=lambda: self._bitmap_fill("."))
+            dpg.add_button(label="fill", small=True, callback=lambda: self._bitmap_fill(None))
+        with dpg.group(horizontal=True, parent="graph_props"):
+            dpg.add_text("size", color=DIM)
+            for lbl, dc, dr in (("+col", 1, 0), ("-col", -1, 0), ("+row", 0, 1), ("-row", 0, -1)):
+                dpg.add_button(label=lbl, small=True, user_data=(dc, dr), callback=lambda s, a, u: self._bitmap_resize(*u))
+        W = max(200, int(dpg.get_item_rect_size("graph_props")[0] or 300) - 24)
+        cols, nrows = len(rows[0]), len(rows)
+        cell = max(6, min(28, W // cols, 200 // nrows))
+        tag = dpg.add_drawlist(width=cols * cell + 1, height=nrows * cell + 1, parent="graph_props")
+        self._bitmap_ed = {"nid": nid, "name": name, "tag": tag, "cell": cell, "pen": "1", "was": False, "rwas": False, "stroke": None}
+        self._bitmap_draw()
+
+    def _bitmap_draw(self):
+        ed = self._bitmap_ed
+        if not ed or not dpg.does_item_exist(ed["tag"]):
+            return
+        n, rows = self._bitmap_rows(ed["nid"], ed["name"])
+        if n is None:
+            return
+        cell, tag = ed["cell"], ed["tag"]
+        dpg.delete_item(tag, children_only=True)
+        # ten slots, ten tints (Colour pick gives each its colour; here they are told apart)
+        tints = [(235, 235, 235), (110, 190, 250), (250, 170, 90), (170, 230, 120), (250, 110, 120), (190, 120, 235),
+                 (250, 230, 100), (90, 220, 210), (240, 150, 200), (160, 160, 90)]
+        for r, row in enumerate(rows):
+            for c, ch in enumerate(row):
+                on = ch.isdigit()
+                fill = tints[int(ch)] + (255,) if on else (28, 30, 36, 255)
+                dpg.draw_rectangle((c * cell, r * cell), ((c + 1) * cell, (r + 1) * cell), color=(60, 64, 74, 255), fill=fill, parent=tag)
+                if on and cell >= 12 and ch != "1":
+                    dpg.draw_text((c * cell + cell * 0.3, r * cell + cell * 0.12), ch, size=max(8, cell - 6), color=(20, 22, 26, 255), parent=tag)
+
+    def _bitmap_set(self, rows, text):
+        n = self.graph.nodes[self._bitmap_ed["nid"]]
+        n["params"][self._bitmap_ed["name"]] = text if text is not None else "/".join(rows)
+
+    def _bitmap_resize(self, dc, dr):
+        ed = self._bitmap_ed
+        n, rows = self._bitmap_rows(ed["nid"], ed["name"])
+        if n is None:
+            return
+        w, h = len(rows[0]) + dc, len(rows) + dr
+        if w < 1 or h < 1 or w > 64 or h > 64:
+            return
+        self.touch(); self.snapshot("bitmap size")
+        rows = [(r + "." * w)[:w] for r in rows][:h] + ["." * w] * max(0, h - len(rows))
+        self._bitmap_set(rows, None)
+        self._sync_pos(); self.rebuild()
+
+    def _bitmap_fill(self, ch):
+        ed = self._bitmap_ed
+        n, rows = self._bitmap_rows(ed["nid"], ed["name"])
+        if n is None:
+            return
+        self.touch(); self.snapshot("bitmap fill")
+        if ch is None:                                    # fill: every pixel the pen's digit
+            ch = ed["pen"]
+        rows = [ch * len(r) for r in rows]
+        self._bitmap_set(rows, None)
+        self._sync_pos(); self.rebuild()
+
+    def _poll_bitmap_edit(self):
+        ed = getattr(self, "_bitmap_ed", None)
+        if not ed or not dpg.does_item_exist(ed["tag"]) or not self.graph or ed["nid"] not in self.graph.nodes:
+            return
+        st = dpg.get_item_state(ed["tag"])
+        if "rect_min" not in st:
+            return
+        (x0, y0) = st["rect_min"]
+        n, rows = self._bitmap_rows(ed["nid"], ed["name"])
+        if n is None:
+            return
+        cell = ed["cell"]
+        mx, my = dpg.get_mouse_pos(local=False)
+        c, r = int((mx - x0) // cell), int((my - y0) // cell)
+        inside = 0 <= r < len(rows) and 0 <= c < len(rows[0]) and mx >= x0 and my >= y0
+        down, rdown = dpg.is_mouse_button_down(0), dpg.is_mouse_button_down(1)
+        if (down or rdown) and inside:
+            ch = "." if rdown else ed["pen"]
+            if ed["stroke"] is None:                     # the first cell of a stroke: one undo step for the whole stroke
+                self.touch(); self.snapshot("paint bitmap")
+                ed["stroke"] = set()
+            if (r, c) not in ed["stroke"] and rows[r][c] != ch:
+                rows[r] = rows[r][:c] + ch + rows[r][c + 1:]
+                self._bitmap_set(rows, None)
+                ed["stroke"].add((r, c))
+                self._bitmap_draw()
+        elif not down and not rdown and ed["stroke"] is not None:   # the stroke ends: the node and the code follow
+            ed["stroke"] = None
+            self._sync_pos(); self.rebuild()
 
     # --- the curve editor in the properties pane -------------------------------------------
     def _curve_pts(self):
@@ -1230,6 +1353,7 @@ class GraphPanel:
         self._poll_help()
         self._poll_props()
         self._poll_curve_edit()
+        self._poll_bitmap_edit()
         self._poll_focus()
         self._poll_labels()
         if not self.auto or not self._dirty or not self.graph:

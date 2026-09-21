@@ -83,10 +83,17 @@ down the wires, Shift+Home frames it, Ctrl+Delete deletes a node and
 joins the wires across it, a node dropped on a wire is spliced in, a
 Ctrl+right-drag cuts wires, Alt while editing a value edits every
 selected node of that type, Backspace over a value resets it, Ctrl+P is
-the command palette and Ctrl+Alt+Z the undo history. Zoomed out past
-50% (Settings > Simplified nodes below) the nodes become small stand-ins
-- a title and its wires - for getting about a big graph. Settings > Keyboard
-shortcuts lists the rest.
+the command palette and Ctrl+Alt+Z the undo history. A node's menu can
+**change its type** (the wires stay where they fit), **reset its
+settings**, and **unfold** a sub-graph node back into its nodes; with
+several nodes selected, **merge selection through** an Add, Multiply,
+Mix, Blend... wires their outputs together. Inside a sub-graph the trail
+above the graph (breadcrumbs) leads back up. A **Bitmap** node's pixels
+are painted in the properties pane: the left button sets the pen's
+digit (a colour slot for Colour pick), the right empties a pixel, and
+the rows follow. Zoomed out past 50% (Settings > Simplified nodes
+below) the nodes become small stand-ins - a title and its wires - for
+getting about a big graph. Settings > Keyboard shortcuts lists the rest.
 
 **As code.** Ctrl+N in the code pane makes a `.cpp` from the effect
 skeleton; the editor colours it, errors from a build go to their lines,
@@ -107,7 +114,11 @@ cylinder, sphere, strip, or an XYZ file - and for the cube its wiring - which fa
 first, turns, serpentine - which is what the exported ledmap says. Audio
 comes from the synth (sliders, a beat clock), a live capture, or a WAV
 file. Playback has A/B compare (two effects side by side), a slider sweep,
-and scrubbing back through the last seconds while paused. Segments (+ in
+scrubbing back through the last seconds while paused, and a **speed** -
+1/4x to 4x (Shift+, and Shift+. step it, Shift+/ is back to 1x) - for
+watching an effect slowly or running it ahead; the footer says the speed
+while it is not 1x. The footer also names the **LED under the pointer**
+in either view: its wiring index, its part, its position. Segments (+ in
 the panel) layer several effects with WLED's blend modes and opacity, and
 carry WLED's segment options - reverse, mirror (and Y, and swap XY on a
 matrix), group, space, offset - which the sim lays out the way the device
@@ -134,7 +145,9 @@ high; a path takes a count and sets its pitch - then:
   the part moves in the 3-D view as you drag (the sim takes the new
   shape when you let go; ctrl-click to type a value). "reverse" turns its
   wiring round; mirror and array make copies; up/down reorder parts,
-  which reorders the wiring.
+  which reorders the wiring. **ARRANGE** works on the parts ticked in
+  the list: align them to this part on X, Y or Z, spread three or more
+  evenly along an axis, or give them this part's scale or turn.
 - **AIM**: a direction (x y z, or azimuth and elevation, or one of the
   six axis buttons), a distance and a spin. **aim outward** turns the
   part so its axis - a strip's length, a panel's face, a flat part's

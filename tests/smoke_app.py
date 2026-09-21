@@ -37,6 +37,10 @@ STEPS = [
     # the LED under a point of the net and of the 3-D view, by wiring index
     ([{"py": "app.led_at(*[a + b * 0.5 for a, b in zip(dpg.get_item_state('net_img')['rect_min'], dpg.get_item_state('net_img')['rect_size'])])"},
       {"py": "app.led_at(*[a + b * 0.5 for a, b in zip(dpg.get_item_state('cube_img')['rect_min'], dpg.get_item_state('cube_img')['rect_size'])])"}], 0.5),
+    # a Bitmap painted in the properties pane: one cell set, the rows follow, undone
+    ([{"layout": "graph"}, {"graph_open": "question_block.json"},
+      {"py": "setattr(app.gp, '_test_sel', [next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Bitmap')])"}], 0.8),
+    ([{"paint": [0, 0, 7]}, {"py": "app.gp._bitmap_ed is not None"}, {"graph_selected": []}, {"graph_undo": True}], 0.8),
     # a node's type changed with its wires kept; two nodes merged through an Add
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.change_type(3, 'Subtract') if app.gp.graph.nodes[3]['type'] == 'Multiply' else app.gp.change_type(3, 'Multiply')"}], 1.0),
     ([{"expect": ["graph_status", "is now"]}, {"graph_selected": [1, 2]}, {"py": "app.gp.merge_selected('Add')"}, {"graph_selected": []}], 1.0),

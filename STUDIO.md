@@ -1119,7 +1119,7 @@ is the order to do them.
 - [x] **Align and distribute parts** (xLights' layout tools): the
       selected parts of a shape aligned on an axis to the first, spread
       evenly between the first and last, or given the first's scale.
-- [ ] **Paint a bitmap** (xLights' effect assist): the Bitmap node's rows
+- [x] **Paint a bitmap** (xLights' effect assist): the Bitmap node's rows
       as a grid of cells in the properties pane, clicked and dragged to
       set and clear; the rows follow.
 

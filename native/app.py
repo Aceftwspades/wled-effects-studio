@@ -3893,6 +3893,12 @@ def service_command(app):
                 app.gp.set_selection([int(x) for x in c["graph_select"]])
             if "graph_selected" in c:                   # test hook: a selection, held until cleared with []
                 app.gp._test_sel = [int(x) for x in c["graph_selected"]] or None
+            if "paint" in c:                            # test hook: [row, col, digit] painted into the Bitmap node the properties pane shows
+                ed = getattr(app.gp, "_bitmap_ed", None)
+                if ed:
+                    n, rows = app.gp._bitmap_rows(ed["nid"], ed["name"]); r, col, ch = c["paint"]
+                    rows[r] = rows[r][:col] + str(ch) + rows[r][col + 1:]; app.gp._bitmap_set(rows, None); app.gp._sync_pos(); app.gp.rebuild()
+                    print("paint", app.gp.graph.nodes[ed["nid"]]["params"][ed["name"]])
             if "graph_collapse" in c:
                 app.gp._collapse(int(c["graph_collapse"]))
             if "graph_colour" in c:
