@@ -124,6 +124,91 @@ class Features:
             name = self.eng.names[fx] if 0 <= fx < len(self.eng.names) else "?"
             out.append(f"{k}: {x0},{y0} - {x1},{y1}  {name}")
         return out
+    # --- the LED under the pointer (the footer names it) --------------------------------
+    def led_at(self, mx, my):
+        """The LED under a screen point in the logical net or the 3-D view:
+        (wiring index, logical index, part name or "", (x, y, z)) or None.
+        In the net the picture is the logical grid scaled; in the 3-D view
+        the nearest projected LED within a few pixels (the nearer one of
+        two that overlap)."""
+        import numpy as np
+        from native import render
+        g = self.eng.geom
+        if g is None:
+            return None
+        pos = np.asarray(g.pos, np.float32).reshape(-1, 3)
+        lit = np.asarray(g.lit, bool)
+        phys = np.asarray(g.phys, int)
+        inv = getattr(self, "_phys_inv", None)
+        if inv is None or len(inv) != len(pos) or getattr(self, "_phys_inv_for", None) is not g:
+            inv = np.full(len(pos), -1, int); inv[phys] = np.arange(len(phys))
+            self._phys_inv, self._phys_inv_for = inv, g
+        li = None
+        if dpg.does_item_exist("net_img") and dpg.is_item_shown("net_win"):
+            st = dpg.get_item_state("net_img")
+            if "rect_min" in st:
+                (x0, y0), (w, h) = st["rect_min"], st["rect_size"]
+                if w > 0 and h > 0 and x0 <= mx < x0 + w and y0 <= my < y0 + h:
+                    cols, rows = self.eng.cols, self.eng.rows
+                    px = int((mx - x0) / w * cols); py = int((my - y0) / h * rows) if rows > 1 else 0
+                    cand = py * cols + px
+                    if 0 <= cand < len(pos) and lit[cand]:
+                        li = cand
+        if li is None and dpg.does_item_exist("cube_img") and dpg.is_item_shown("cube_win"):
+            st = dpg.get_item_state("cube_img")
+            if "rect_min" in st:
+                (x0, y0), (w, h) = st["rect_min"], st["rect_size"]
+                q = getattr(self, "point_quads", None) or getattr(self, "cube_quads", None)
+                if q is not None and getattr(q, "size", 0):
+                    x0 += (w - q.size) * 0.5; y0 += (h - q.size) * 0.5; w = h = q.size
+                if w > 0 and x0 <= mx < x0 + w and y0 <= my < y0 + h:
+                    vpos = np.asarray(self.view_positions(), np.float32).reshape(-1, 3)
+                    if len(vpos) == len(pos):
+                        frame = render.frame_of(vpos)
+                        sx, sy, ok = render.project(vpos, float(w), self.yaw, self.pitch, self.dist, frame=frame)
+                        nrm = np.asarray(g.nrm, np.float32).reshape(-1, 3) if getattr(g, "nrm", None) is not None and np.size(g.nrm) == pos.size else None
+                        P = (vpos - frame[0]) / frame[1]
+                        if nrm is None and g.kind == "cube":
+                            # a cube face's normal is the axis its LEDs sit at the end of
+                            ax = np.argmax(np.abs(np.nan_to_num(P)), axis=1)
+                            nrm = np.zeros_like(P); nrm[np.arange(len(P)), ax] = np.sign(np.nan_to_num(P)[np.arange(len(P)), ax])
+                        if nrm is not None:
+                            # a face turned away is hidden: its LEDs are not under the pointer
+                            eye, _ = render._camera(self.yaw, self.pitch, self.dist)
+                            ok = ok & (((eye - P) * nrm).sum(1) > 0)
+                        d = np.hypot(sx + x0 - mx, sy + y0 - my)
+                        d[~ok | ~lit] = np.inf
+                        k = int(np.argmin(d))
+                        if np.isfinite(d[k]):
+                            # within most of the way to the next LED on screen: the pitch as it is drawn here
+                            dd = np.hypot(sx - sx[k], sy - sy[k]); dd[k] = np.inf; dd[~ok | ~lit] = np.inf
+                            pitch = float(dd.min()) if np.isfinite(dd.min()) else 8.0
+                            if d[k] <= max(4.0, 0.75 * pitch):
+                                li = k
+        if li is None:
+            return None
+        part = ""
+        if g.kind == "shape" and getattr(g, "owner", None) is not None and inv[li] >= 0 and inv[li] < len(g.owner):
+            parts = g.params.get("parts") or []
+            pi = int(g.owner[inv[li]])
+            part = parts[pi].get("name", "") if pi < len(parts) else ""
+        x, y, z = (float(v) for v in pos[li])
+        return int(inv[li]), int(li), part, (x, y, z)
+
+    def hover_text(self):
+        """One footer phrase for the LED under the pointer, or ""."""
+        try:
+            mx, my = dpg.get_mouse_pos(local=False)
+            hit = self.led_at(mx, my)
+        except Exception:
+            return ""
+        if hit is None:
+            return ""
+        k, li, part, (x, y, z) = hit
+        g = self.eng.geom
+        where = f"{li % self.eng.cols},{li // self.eng.cols}" if self.eng.rows > 1 else str(li)
+        return f"   LED {k}" + (f" ({part})" if part else "") + f" at {where}" + (f", {x:.2f} {y:.2f} {z:.2f}" if g is not None and g.kind != "matrix" else "")
+
     def rebuild_seg_fields(self):
         if not dpg.does_item_exist("seg_fields"):
             return

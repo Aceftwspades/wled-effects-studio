@@ -3126,9 +3126,10 @@ class App(Features):
         if pw:
             power = f"   power {pw[0] / 1000.0:.2f} A" + (f" (limiter {int(pw[1] * 100)}%)" if pw[2] and pw[1] < 1.0 else "")
         speed = f"   speed {speed_label(self.speed)}" if self.speed != 1.0 else ""
+        hover = self.hover_text()
         dpg.set_value("stat_txt",
                       f"mean {s['mean']:5.1f}   sigma {s['sigma']:5.1f}   "
-                      f"dark {s['dark']:4.1f}%   sat {s['sat']:3d}" + speed + power + est)
+                      f"dark {s['dark']:4.1f}%   sat {s['sat']:3d}" + speed + hover + power + est)
         if dpg.does_item_exist("scrub_row"):
             show = (not self.playing) and len(self.history_frames) > 1
             if dpg.is_item_shown("scrub_row") != show:

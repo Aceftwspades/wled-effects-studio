@@ -1112,7 +1112,7 @@ is the order to do them.
 - [x] **Unfold a sub-graph** (Blender's ungroup, Ctrl+Alt+G): the node
       replaced by the sub-graph's own nodes, wired in place of its
       boundary nodes, positioned where it stood.
-- [ ] **Hover an LED for its index and part** (xLights' node numbers):
+- [x] **Hover an LED for its index and part** (xLights' node numbers):
       the pointer over the logical net or the 3-D view names the LED
       under it - its wiring index, its part, its position - in the
       footer.
