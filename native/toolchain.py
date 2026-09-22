@@ -28,7 +28,7 @@ import glob
 import hashlib
 import json
 import os
-import subprocess
+from native import procs
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
@@ -60,10 +60,10 @@ def _find_vcvarsall():
     pf = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
     vswhere = os.path.join(pf, "Microsoft Visual Studio", "Installer", "vswhere.exe")
     if os.path.exists(vswhere):
-        r = subprocess.run([vswhere, "-latest", "-products", "*",
-                            "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
-                            "-property", "installationPath"],
-                           capture_output=True, text=True)
+        r = procs.run([vswhere, "-latest", "-products", "*",
+                       "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                       "-property", "installationPath"],
+                      capture_output=True, text=True)
         for root in (r.stdout or "").strip().splitlines():
             p = os.path.join(root, "VC", "Auxiliary", "Build", "vcvarsall.bat")
             if os.path.exists(p):
@@ -95,7 +95,7 @@ def _msvc_env():
                 return d["env"]
         except Exception:
             pass
-    r = subprocess.run(f'"{vc}" x64 >nul && set', shell=True, capture_output=True, text=True)
+    r = procs.run(f'"{vc}" x64 >nul && set', shell=True, capture_output=True, text=True)
     if r.returncode != 0:
         raise ToolchainError("vcvarsall failed:\n" + (r.stdout or "") + (r.stderr or ""))
     env = {}
@@ -132,7 +132,7 @@ def find_compiler():
             os.path.expanduser("~"), "emsdk", "upstream", "bin", "clang++.exe")
         if not os.path.exists(clang):
             for cand in ("clang++.exe", "clang++"):
-                r = subprocess.run(["where", cand], capture_output=True, text=True)
+                r = procs.run(["where", cand], capture_output=True, text=True)
                 if r.returncode == 0 and r.stdout.strip():
                     clang = r.stdout.strip().splitlines()[0]
                     break
@@ -145,7 +145,7 @@ def find_compiler():
     for cand in (os.environ.get("SIM_CLANG"), "clang++", "g++"):
         if not cand:
             continue
-        r = subprocess.run(["which", cand], capture_output=True, text=True)
+        r = procs.run(["which", cand], capture_output=True, text=True)
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip().splitlines()[0], dict(os.environ)
     raise ToolchainError("no C++ compiler on PATH - install clang or gcc")
@@ -207,7 +207,7 @@ def _compiler_id(compiler, env):
     made from."""
     if compiler not in _CID:
         try:
-            r = subprocess.run([compiler, "--version"], capture_output=True, text=True, env=env, timeout=30)
+            r = procs.run([compiler, "--version"], capture_output=True, text=True, env=env, timeout=30)
             line = (r.stdout or r.stderr or "").strip().splitlines()[0]
         except Exception:
             line = ""
@@ -248,7 +248,7 @@ def compile_tu(compiler, env, src, obj, include_dirs, extra_flags=(), stamp=None
     for d in include_dirs:
         cmd += ["-I", d]
     cmd += [src, "-o", obj]
-    r = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=HERE)
+    r = procs.run(cmd, capture_output=True, text=True, env=env, cwd=HERE)
     txt = (r.stdout or "") + (r.stderr or "")
     if r.returncode != 0 and os.path.exists(obj):
         try:
@@ -270,7 +270,7 @@ def link_shared(compiler, env, objs, out):
     if IS_WIN and _is_gcc(compiler):
         cmd += ["-static", "-static-libgcc", "-static-libstdc++"]      # a DLL that needs no MinGW runtime beside it
     cmd += objs + ["-o", out]
-    r = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=HERE)
+    r = procs.run(cmd, capture_output=True, text=True, env=env, cwd=HERE)
     txt = (r.stdout or "") + (r.stderr or "")
     return r.returncode == 0, txt
 

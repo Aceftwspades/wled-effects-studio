@@ -16,6 +16,8 @@ import os
 import queue
 import shutil
 import subprocess
+
+from native import procs
 import threading
 import time
 import urllib.request
@@ -109,8 +111,7 @@ def effect_sizes(env):
     if not tool or not objs:
         return {}
     try:
-        flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-        out = subprocess.run([tool] + objs, capture_output=True, text=True, timeout=60, **flags).stdout
+        out = procs.run([tool] + objs, capture_output=True, text=True, timeout=60).stdout
     except Exception:
         return {}
     # Objects of effects staged for an earlier build stay in the build
@@ -831,10 +832,9 @@ class Job:
                     return
                 self.log(f"{os.path.basename(pio)} run -e {env}   (in {ROOT})")
                 t0 = time.time()
-                flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-                self.proc = subprocess.Popen([pio, "run", "-e", env], cwd=ROOT, stdout=subprocess.PIPE,
-                                             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
-                                             bufsize=1, **flags)
+                self.proc = procs.popen([pio, "run", "-e", env], cwd=ROOT, stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                                        bufsize=1)
                 why = None
                 import re
                 part = firm = None

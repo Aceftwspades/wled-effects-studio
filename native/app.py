@@ -40,7 +40,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui
+from native import chrome, glow, device_ui, shape_ui, midi_ui, procs
 from native.gpucube import CubeQuads
 from native.textures import registry as tex_registry
 from native.features import Features
@@ -532,7 +532,7 @@ class App(Features):
     def write_video(self, frames, path, fps=None):
         """The frames as an mp4 through ffmpeg (raw RGB piped in, H.264 out,
         yuv420p so anything plays it). None without ffmpeg on the path."""
-        import shutil, subprocess
+        import shutil
         ff = shutil.which("ffmpeg")
         if not ff or not frames:
             return None
@@ -541,7 +541,7 @@ class App(Features):
         cmd = [ff, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w2}x{h2}",
                "-r", str(fps or self.REC_FPS), "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", path]
         try:
-            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            proc = procs.popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
             for f in frames:
                 proc.stdin.write(np.ascontiguousarray(f[:h2, :w2, :3]).tobytes())
             proc.stdin.close()
@@ -1084,7 +1084,7 @@ class App(Features):
         cmd = self.editor_command()
         try:
             if cmd:
-                subprocess.Popen([c.replace("{file}", path).replace("{line}", str(line)) for c in cmd])
+                procs.popen([c.replace("{file}", path).replace("{line}", str(line)) for c in cmd])
                 dpg.set_value("edit_status", f"opened in {os.path.basename(cmd[0])} - saves there reload here")
             elif hasattr(os, "startfile"):
                 os.startfile(path)
@@ -1092,7 +1092,7 @@ class App(Features):
             else:
                 opener = shutil.which("xdg-open") or shutil.which("open")
                 if opener:
-                    subprocess.Popen([opener, path])
+                    procs.popen([opener, path])
                 dpg.set_value("edit_status", "opened externally - saves there reload here")
         except Exception as e:
             dpg.set_value("edit_status", f"could not open an editor: {e}")
@@ -2083,9 +2083,9 @@ class App(Features):
             if os.name == "nt":
                 os.startfile(path)
             elif sys.platform == "darwin":
-                subprocess.Popen(["open", path])
+                procs.popen(["open", path])
             else:
-                subprocess.Popen(["xdg-open", path])
+                procs.popen(["xdg-open", path])
         except Exception as e:
             self.gp.status(f"could not open {path}: {e}")
 

@@ -107,5 +107,5 @@ def apply(zip_path):
     with open(script, "w", encoding="utf-8", newline="\r\n") as f:
         f.write("\n".join(lines) + "\n")
     flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-    subprocess.Popen(["cmd", "/c", script], cwd=updates, creationflags=flags, close_fds=True)
+    subprocess.Popen(["cmd", "/c", script], cwd=updates, creationflags=flags, close_fds=True)   # console: on purpose - the copy's progress, after the app closes
     return script

@@ -18,7 +18,7 @@ import sys
 import urllib.request
 import zipfile
 
-from native import paths, version
+from native import paths, procs, version
 
 BRANCH = "playground"
 
@@ -41,9 +41,8 @@ def fetch(dest, log=print):
     url = f"https://github.com/{version.WLED_REPO}"
     if has_git():
         log(f"git clone --branch {BRANCH} --depth 1 {url} {dest}")
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        p = subprocess.Popen(["git", "clone", "--branch", BRANCH, "--depth", "1", "--progress", url + ".git", dest],
-                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, creationflags=flags)
+        p = procs.popen(["git", "clone", "--branch", BRANCH, "--depth", "1", "--progress", url + ".git", dest],
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         for line in p.stdout:
             line = line.strip("\r\n")
             if line:
@@ -95,4 +94,4 @@ def restart():
     """The app again, as it was started; the caller then stops this one."""
     args = [sys.executable] if paths.FROZEN else [sys.executable, "-m", "native.app"]
     flags = getattr(subprocess, "DETACHED_PROCESS", 0)
-    subprocess.Popen(args, cwd=paths.RES, creationflags=flags, close_fds=True)
+    subprocess.Popen(args, cwd=paths.RES, creationflags=flags, close_fds=True)   # console: on purpose - it must outlive the studio

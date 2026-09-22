@@ -16,7 +16,7 @@ remembers where it was, which on two monitors is the point.
 """
 import json
 import os
-import subprocess
+from native import procs
 import sys
 import tempfile
 import time
@@ -92,7 +92,7 @@ class Popouts:
             pass
         # frozen, the exe is the app: told to be a popout by its arguments (studio.py)
         args = ([sys.executable, "--popout"] if getattr(sys, "frozen", False) else [sys.executable, "-m", "native.popout"])
-        proc = subprocess.Popen(args + [view, name, str(os.getpid())], cwd=HERE)
+        proc = procs.popen(args + [view, name, str(os.getpid())], cwd=HERE)
         self.jobs[view] = (proc, blk)
 
     def close(self, view):

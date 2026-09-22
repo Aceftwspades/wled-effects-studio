@@ -1376,6 +1376,26 @@ is the feature its line names.
       preview's picture for a node's output), and the zoom is 10..200%,
       not 50..200%; the notes say so.
 
+- [x] **A console window over the graph** (found by the user, not the
+      tests). The studio runs without a console of its own - the packaged
+      windowed exe, or pythonw - and on Windows such a process gives every
+      console child a NEW console window, which on Windows 11 is a
+      Terminal window. The compiler is a console program, so every Live
+      rebuild threw one up over the node graph: opening and compiling one
+      graph popped four (vswhere, and clang++ three times). Every child
+      the app starts now goes through `native/procs.py`
+      (CREATE_NO_WINDOW; `procs.run` / `procs.popen`) - the compiler and
+      the linker, the compiler probes, PlatformIO, the objdump that
+      measures flash cost, git, the popouts, the external editor and the
+      openers. Two keep their own console on purpose, both marked in the
+      source: the restart after fetching a checkout (it must outlive the
+      studio) and the updater's copy (whose progress is the point).
+      `tests/test_audit.py` walks the source and fails on a new
+      `subprocess.run` or `Popen` that is neither; the fix was measured by
+      counting the windows that appear while the studio compiles a graph
+      under pythonw - four before, none after. STUDIO_CONSOLE_CHILDREN=1
+      hands the children their console back, to watch a build go by.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

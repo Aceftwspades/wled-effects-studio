@@ -18,7 +18,7 @@ import sys
 import time
 import zipfile
 
-from native import paths, version
+from native import paths, procs, version
 
 
 def _what_build():
@@ -32,8 +32,7 @@ def _what_build():
             pass
     commit = ""
     try:
-        import subprocess
-        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=paths.RES, timeout=5).stdout.strip()
+        commit = procs.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=paths.RES, timeout=5).stdout.strip()
     except Exception:
         pass
     return json.dumps({"version": version.__version__, "commit": commit, "built": "a checkout"}, indent=1)

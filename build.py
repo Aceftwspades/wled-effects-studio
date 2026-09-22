@@ -25,6 +25,14 @@ wrong rather than obviously broken.
 """
 import os, re, subprocess, sys, glob, json
 
+
+def _procs():
+    """native.procs (child processes with no console window), imported late:
+    build.py is a script as well as a module, and runs from anywhere."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from native import procs
+    return procs
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from native import paths                                   # noqa: E402
@@ -355,7 +363,7 @@ def find_vcvarsall():
     pf = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
     vswhere = os.path.join(pf, "Microsoft Visual Studio", "Installer", "vswhere.exe")
     if os.path.exists(vswhere):
-        r = subprocess.run([vswhere, "-latest", "-products", "*",
+        r = _procs().run([vswhere, "-latest", "-products", "*",
                             "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
                             "-property", "installationPath"],
                            capture_output=True, text=True)

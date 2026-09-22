@@ -1,10 +1,12 @@
 """Audits: every effect in the roster run on every geometry kind without
 the engine faulting; which of WLED's stock effects the sim leaves out and
-why, each with a reason; and the GPU view's placement of every LED and
+why, each with a reason; the GPU view's placement of every LED and
 every cube face corner against the software renderer's projection, for
-every geometry kind and several cameras. Run with
+every geometry kind and several cameras; and every child process the app
+starts, which must not open a console window over it. Run with
 python tests/test_audit.py  (or pytest).
 """
+import ast
 import json
 import os
 import sys
@@ -68,6 +70,44 @@ def _cameras():
     for yaw in (0.3, 1.2, 2.5, 4.0):
         for pitch in (-0.4, 0.2, 0.7):
             yield yaw, pitch, 3.2
+
+
+# a call marked this way keeps its own flags: the two that must outlive the
+# studio (the restart after a checkout, the updater's copy).
+ON_PURPOSE = "console: on purpose"
+
+
+def test_no_child_opens_a_console_window():
+    """Every subprocess the app starts goes through native/procs.py.
+
+    On Windows a process with no console of its own - the packaged
+    windowed exe - gives each console child a NEW console window, so a
+    Live rebuild flashed a black box over the graph, once per translation
+    unit, on every edit. procs.run / procs.popen pass CREATE_NO_WINDOW;
+    this fails when a new call site forgets."""
+    bad = []
+    for d, _, files in os.walk(os.path.join(ROOT, "native")):
+        for f in sorted(files):
+            if not f.endswith(".py"):
+                continue
+            path = os.path.join(d, f)
+            rel = os.path.relpath(path, ROOT).replace("\\", "/")
+            src = open(path, encoding="utf-8").read()
+            if rel == "native/procs.py":
+                continue
+            tree = ast.parse(src, rel)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                    continue
+                if node.func.attr not in ("run", "Popen", "call", "check_call", "check_output"):
+                    continue
+                if not (isinstance(node.func.value, ast.Name) and node.func.value.id == "subprocess"):
+                    continue
+                lines = src.splitlines()[node.lineno - 1:(node.end_lineno or node.lineno)]
+                if any(ON_PURPOSE in l for l in lines):
+                    continue
+                bad.append(f"{rel}:{node.lineno} subprocess.{node.func.attr} - use procs.run / procs.popen")
+    assert not bad, "child processes that would open a console window:\n" + "\n".join(bad)
 
 
 def test_gpu_points_match_the_software_projection():
