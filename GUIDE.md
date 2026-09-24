@@ -2,8 +2,9 @@
 
 Effects for a WLED LED cube (or any matrix or strip), built as node graphs
 or as C++, previewed on a simulated cube with synthetic or live audio, and
-sent to the device three ways. STUDIO.md is the long history and roadmap;
-NODES.md lists every node; TUTORIAL.md builds a first effect node by node.
+sent to the device three ways. [The node reference](NODES.md) lists every
+node; [the tutorial](TUTORIAL.md) builds a first effect node by node;
+[STUDIO.md](STUDIO.md) is the long history and roadmap.
 
 ## First run
 
@@ -30,12 +31,29 @@ starts it again. From a checkout the answer is `git pull`.
 **From the tree**:
 
 ```bash
-cd studio
+cd wled-effects-studio                                 # the clone
 pip install -r requirements.txt                        # dearpygui, numpy, pillow; the audio packages
 python -m native.doctor                                # what is here and what is missing
 python build.py --native-only                          # once; the app rebuilds the engine as it needs
 python -m native.app                                   # or the desktop shortcut
 ```
+
+**Help**: the first time the studio starts, a Welcome panel offers the
+[tutorial](TUTORIAL.md), this guide, the example effects and a search
+for devices (Help > Welcome... brings it back; its checkbox shows it at
+every start). Help > User guide (**F1**), Tutorial and Node reference
+open in a window of the studio's own: the contents down the left mark
+the section on screen, the box at the top searches the page - each
+mention in turn, marked where it is (Enter or F3 for the next, Shift+F3
+the one before, with which of how many) - a link to another document
+opens it there, **< Back** (Alt+Left, or Backspace) returns to where you
+were, and Esc closes it. A picture the page had to shrink opens at full
+size on a click (**Fit the window** and **Full size** switch between
+the two); a block of code has a **copy** button. In the graph, **F1**
+over a node - or with one selected - opens that node's own entry in the
+[node reference](NODES.md); the first row of a node's right-click menu
+does the same, and every row of that menu shows its key. Keyboard
+shortcuts moved to **Shift+F1**.
 
 The window: a menu bar and a toolbar of icons; the two views (the
 **logical net** the effect draws, and the **3-D cube**); a side panel with
@@ -51,8 +69,7 @@ right half is the device and the frames: devices (Ctrl+Shift+N), flash
 (Ctrl+Shift+T, lit amber while it runs); then the shape editor
 (Ctrl+Shift+E), the sequence (Ctrl+Shift+Q), the library (Ctrl+Shift+L),
 the palettes (Ctrl+Shift+G), the LED outputs (Ctrl+Shift+O) and the audio
-input (Ctrl+Shift+M). Playback
-> Randomise is Ctrl+Shift+X.
+input (Ctrl+Shift+M). Playback > Randomise is Ctrl+Shift+X.
 
 A node's long settings (bitmap rows, expressions, files) are edited in
 the Properties pane, which sits under the 3-D view in the graph layout (N
@@ -233,8 +250,8 @@ high; a path takes a count and sets its pitch - then:
   (every edge its own strip in "edges" mode) with the LEDs exactly where
   they were, each then moved, turned and re-counted alone.
 
-Units are LED pitches - a strip with pitch 1 has its LEDs one unit apart
-- so a mesh's own units are the pitch when it is imported.
+Units are LED pitches - a strip with pitch 1 has its LEDs one unit
+apart - so a mesh's own units are the pitch when it is imported.
 
 - **Import...** reads a whole xLights layout (`xlights_rgbeffects.xml`:
   every model a part, placed by its world position and rotation, sized by
@@ -640,10 +657,12 @@ on and install what it carries.
 - **Settings** › Device speed factor...
 - **Settings** › Open the project folder
 - **Settings** › Open the build folder
-- **Help** › Keyboard shortcuts `F1`
-- **Help** › Node reference (NODES.md)
-- **Help** › Studio guide (STUDIO.md)
-- **Help** › Effect API reference
+- **Help** › User guide `F1` — every part of the studio, in a window here: the contents down the side, a search, the keys and menus at the end
+- **Help** › Tutorial — a first effect from nothing, step by step, with pictures
+- **Help** › Node reference — every node, pin and setting; F1 over a node in the graph opens its own entry
+- **Help** › Effect API reference — what a code effect can call, beside the code editor
+- **Help** › Keyboard shortcuts `Shift+F1`
+- **Help** › Welcome...
 - **Help** › Check for updates...
 - **Help** › Report a problem... — bundles what a bug report needs - the version, the doctor's findings, the machine, the project's settings, the last crash - into one zip in captures/, and offers the issues page; nothing of your effects or graphs goes in
 - **Help** › About
@@ -689,7 +708,12 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `F12` | Screenshot of the 3-D view | anywhere |
 | `Ctrl+F12` | Record 15 s as a GIF | anywhere |
 | `Ctrl+Shift+F12` | Record 15 s as a video (mp4; needs ffmpeg) | anywhere |
-| `F1` | Keyboard shortcuts | anywhere |
+| `F1` | User guide: the studio's help, in a window | anywhere |
+| `F1` | The reference for the node under the pointer (else the selected one) | in the graph |
+| `—` | Tutorial: a first effect, step by step | anywhere |
+| `—` | Node reference: every node, pin and setting | anywhere |
+| `—` | Welcome: where to start | anywhere |
+| `Shift+F1` | Keyboard shortcuts | anywhere |
 | `Ctrl+Shift+U` | Build the firmware and flash the device | anywhere |
 | `Ctrl+Shift+P` | Send the current effect's settings to the device | anywhere |
 | `Ctrl+Shift+R` | Run the graph as a script (what the device would run) | anywhere |

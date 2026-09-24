@@ -123,6 +123,27 @@ STEPS = [
     ([{"expect": ["inp_sx", "201"]}, {"py": "midi_ui.slider_menu(app, 'sx') or dpg.is_item_shown('midi_ctx')"}], 0.6),
     ([{"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
       {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),
+    # the help: the guide in its window, a search that marks the words and scrolls to them, F1 with a node
+    # selected landing on that node's entry, Back to where the guide was, the node's menu with its keys and
+    # its reference row, the first-run panel; all put away again
+    ([{"action": "guide"}], 1.0),
+    ([{"check": "dpg.is_item_shown('reader_win') and reader_ui.S.doc == 'GUIDE.md'"}, {"check": "len(reader_ui.S.toc) >= 10"},
+      {"py": "reader_ui.search(app, needle='snapshot')"}], 0.8),
+    ([{"check": "reader_ui.S.hit is not None and dpg.does_item_exist(reader_ui.S.hit)"},
+      {"check": "dpg.get_value('reader_found').startswith('1 of ')"}, {"check": "dpg.get_y_scroll('reader_body') > 100"},
+      {"graph_open": "box_fire.json"}, {"graph_selected": [12]}, {"action": "node_help"}, {"graph_selected": []}], 1.5),
+    ([{"check": "reader_ui.S.doc == 'NODES.md'"},
+      {"check": "reader_ui.S.here == reader_ui.reader.heading_index(reader_ui.S.blocks, 'Noise')"},
+      {"check": "reader_ui.S.history[-1][0] == 'GUIDE.md'"}, {"py": "reader_ui.back(app)"}], 1.0),
+    ([{"check": "reader_ui.S.doc == 'GUIDE.md' and dpg.get_y_scroll('reader_body') > 100"},
+      {"graph_ctx": ["node", 12, None, 400, 300]}], 0.6),
+    ([{"check": "[dpg.get_item_configuration(i)['shortcut'] for i in dpg.get_item_children('graph_ctx', 1) "
+                "if dpg.get_item_label(i) == 'mute (pass through)'] == [app.keys.label('mute')]"},
+      {"check": "any(dpg.get_item_label(i) == 'Noise in the node reference...' for i in dpg.get_item_children('graph_ctx', 1))"},
+      {"py": "dpg.configure_item('graph_ctx', show=False)"}, {"action": "welcome"}], 0.6),
+    ([{"check": "dpg.is_item_shown('welcome_win')"}, {"py": "reader_ui.welcome_closed(app)"},
+      {"check": "app.prefs.get('welcome_done') is True and not dpg.is_item_shown('welcome_win')"},
+      {"py": "dpg.hide_item('reader_win')"}], 0.5),
     # a node's type changed with its wires kept; two nodes merged through an Add
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.change_type(3, 'Subtract') if app.gp.graph.nodes[3]['type'] == 'Multiply' else app.gp.change_type(3, 'Multiply')"}], 1.0),
     ([{"expect": ["graph_status", "is now"]}, {"graph_selected": [1, 2]}, {"py": "app.gp.merge_selected('Add')"}, {"graph_selected": []}], 1.0),
@@ -283,7 +304,7 @@ def main():
     with open(LOG, "w") as log:
         # the console variant of the packaged app keeps its stdout, which is the log the test reads
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
-        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1")
+        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1")
         proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env)
     try:
         time.sleep(9 if not EXE else 30)                 # the packaged app unpacks itself first

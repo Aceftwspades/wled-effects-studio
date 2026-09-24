@@ -44,7 +44,7 @@ def main():
     saved = open(project, encoding="utf-8").read() if os.path.exists(project) else None
     with open(LOG, "w") as log:
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
-        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1")
+        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1")
         proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env)
     t0 = time.time()
     try:

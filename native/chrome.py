@@ -274,10 +274,18 @@ def build_menus(app):
             dpg.add_menu_item(label="Open the project folder", callback=lambda: app.reveal(app.project.path))
             dpg.add_menu_item(label="Open the build folder", callback=lambda: app.reveal(app.build_dir()))
         with dpg.menu(label="Help"):
-            _mi(app, "Keyboard shortcuts", "shortcuts", callback=lambda: show_keys(app))
-            dpg.add_menu_item(label="Node reference (NODES.md)", callback=lambda: app.reveal(app.doc_path("NODES.md")))
-            dpg.add_menu_item(label="Studio guide (STUDIO.md)", callback=lambda: app.reveal(app.doc_path("STUDIO.md")))
+            from native import reader_ui
+            _mi(app, "User guide", "guide", callback=lambda: reader_ui.open_doc(app, "GUIDE.md"))
+            tip("every part of the studio, in a window here: the contents down the side, a search, the keys and menus at the end")
+            _mi(app, "Tutorial", "tutorial", callback=lambda: reader_ui.open_doc(app, "TUTORIAL.md"))
+            tip("a first effect from nothing, step by step, with pictures")
+            _mi(app, "Node reference", "node_ref", callback=lambda: reader_ui.open_doc(app, "NODES.md"))
+            tip("every node, pin and setting; F1 over a node in the graph opens its own entry")
             dpg.add_menu_item(label="Effect API reference", callback=lambda: app.show_api())
+            tip("what a code effect can call, beside the code editor")
+            dpg.add_separator()
+            _mi(app, "Keyboard shortcuts", "shortcuts", callback=lambda: show_keys(app))
+            _mi(app, "Welcome...", "welcome", callback=lambda: reader_ui.show_welcome(app))
             dpg.add_separator()
             dpg.add_menu_item(label="Check for updates...", tag="menu_update", callback=lambda: check_updates(app, by_hand=True))
             dpg.add_menu_item(label="Report a problem...", callback=lambda: report_problem(app))
@@ -480,6 +488,9 @@ def build_dialogs(app):
     # MIDI: a controller's knobs onto the sliders (midi_ui.py)
     from native import midi_ui
     midi_ui.build(app)
+    # HELP: the guide, the tutorial and the node reference in a window, and the first-run panel (reader_ui.py)
+    from native import reader_ui
+    reader_ui.build(app)
     # REPORT A PROBLEM: where the bundle landed, and the issues page
     with dpg.window(tag="report_win", label="Report a problem", show=False, width=560, height=230, no_collapse=True):
         dpg.add_text("", tag="report_text", wrap=540)

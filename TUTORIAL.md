@@ -9,8 +9,11 @@ The pictures come from the studio itself. Yours will look the same.
 
 ## Before you start
 
-Open the studio (`run_studio.cmd`, or `python -m native.app` from
-`studio/`). In the side panel's **GEOMETRY** section set the shape to
+Open the studio (`WLED Effects Studio.exe` from a release, or
+`run_studio.cmd` in a clone). This page is in the studio too - Help >
+Tutorial - so it can sit beside the graph while you work; the Welcome
+panel's **Start the tutorial** opens it the first time. In the side
+panel's **GEOMETRY** section set the shape to
 `matrix`, 32 wide, 16 high. Everything below works on any size; 32 x 16 is
 just what the pictures show. Press **G** for the graph pane.
 
@@ -120,8 +123,8 @@ rainbow - the wrong way round, but the shape is there:
 ## Step 4 - a line, the right way round
 
 **Smoothstep** is a soft switch: 0 below its `e0`, 1 above its `e1`, a
-smooth ramp between. Put the edges *backwards* - `e0` = 0.12, `e1` = 0.02
-- and it becomes: 1 when the distance is under 0.02 (on the curve), 0
+smooth ramp between. Put the edges *backwards* - `e0` = 0.12, `e1` =
+0.02 - and it becomes: 1 when the distance is under 0.02 (on the curve), 0
 when it is over 0.12 (away from it), fading between. That fade is the
 line's soft edge; make `e0` bigger for a thicker line.
 

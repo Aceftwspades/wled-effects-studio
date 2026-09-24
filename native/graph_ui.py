@@ -3511,6 +3511,36 @@ class GraphPanel(Glyphs):
                 self.add_node_at_menu(u)
                 return
 
+    def help_here(self):
+        """F1 in the graph: the node reference at the node under the
+        pointer, else at the selected one; with neither, the guide's
+        chapter on making an effect."""
+        from native import reader_ui
+        nid = None
+        if dpg.does_item_exist("node_editor") and dpg.is_item_hovered("node_editor"):
+            nid = self._node_at(dpg.get_mouse_pos(local=False))
+        if nid is None:
+            sel = self._selected()
+            nid = sel[0] if sel else None
+        if nid is not None and self.graph and nid in self.graph.nodes:
+            return self.open_reference(self.graph.nodes[nid]["type"])
+        reader_ui.open_doc(self.app, "GUIDE.md", "Making an effect")
+        self.status("F1 over a node (or with one selected) opens that node's entry")
+        return False
+
+    def open_reference(self, type_):
+        """The node reference (Help > Node reference) at this type's entry;
+        a sub-graph has none of its own - the guide on them instead."""
+        from native import reader_ui
+        if type_.startswith(G.SUB):
+            reader_ui.open_doc(self.app, "GUIDE.md", "Making an effect")
+            self.status(f"{type_[len(G.SUB):]} is a sub-graph of this project: its own nodes are in the reference")
+            return False
+        if reader_ui.open_doc(self.app, "NODES.md", type_):
+            return True
+        self.status(f"{type_} has no entry in the node reference")
+        return False
+
     def _fill_ctx_menu(self):
         """The context menu's rows, for whatever was right-clicked."""
         dpg.delete_item("graph_ctx", children_only=True)
@@ -3519,19 +3549,36 @@ class GraphPanel(Glyphs):
         d = self.graph.node_def(n)
         P = "graph_ctx"
         close = lambda: dpg.configure_item(P, show=False)
+        keyof = lambda k: (self.app.keys.label(k) if k in self.app.keys.bind else k) if k else ""
 
-        def row(label, fn):
+        def row(label, fn, key=None):
             # Dear PyGui calls a callback with as many of (sender, app_data,
             # user_data) as it has parameters - a third one with a default
             # is overwritten by user_data, a fourth is an error - so what a
             # row does rides in user_data. Inside a fold (tree node) the row
             # goes to the fold: the container stack says where we are.
-            # A set width: a selectable with none takes the width there is,
-            # and in a window that sizes itself to its content the two chase
-            # each other - the menu grew a few pixels every frame until it met
-            # the screen's edge, once a fold was opened.
+            # `key`: an action (its binding shows, as the keymap has it) or
+            # the words for a fixed gesture ("Backspace").
+            # On top, a menu item: the key in a column at the right, the
+            # way the menu bar shows them. In a fold, a selectable of a set
+            # width with the key after its words - one that takes the width
+            # there is chases the window's own sizing, and the menu grew a
+            # few pixels every frame until it met the screen's edge (a menu
+            # item in a fold does the same).
             parent = dpg.top_container_stack() or P
-            dpg.add_selectable(label=label, parent=parent, user_data=fn, width=280, callback=lambda s, a, u: (close(), u()))
+            k = keyof(key)
+            if parent == P:
+                dpg.add_menu_item(label=label, shortcut=k, parent=P, user_data=fn, callback=lambda s, a, u: (close(), u()))
+            else:
+                dpg.add_selectable(label=f"{label}   {k}" if k else label, parent=parent, user_data=fn, width=280,
+                                   callback=lambda s, a, u: (close(), u()))
+
+        def sep():
+            dpg.add_separator(parent=P)
+
+        def reference():
+            if not n["type"].startswith(G.SUB):
+                row(f"{n['type']} in the node reference...", lambda: self.open_reference(n["type"]), "node_help")
 
         if kind == "in":
             linked = any(l[2] == nid and l[3] == name for l in self.graph.links)
@@ -3542,9 +3589,9 @@ class GraphPanel(Glyphs):
             i = next(x for x in d["inputs"] if x["name"] == name)
             if linked:
                 row("disconnect", lambda: self._disconnect_in(nid, name))
-            row("reset to default", lambda: self._reset_input(nid, name, i))
+            row("reset to default", lambda: self._reset_input(nid, name, i), "Backspace")
             if i["type"] == "float" and not linked:
-                row("type an expression...", lambda: self.expr_for(nid, name, "input"))
+                row("type an expression...", lambda: self.expr_for(nid, name, "input"), "expr")
             if linked:
                 from native import chrome
                 lbl = (self.graph.link_meta.get((nid, name)) or {}).get("label", "")
@@ -3581,6 +3628,8 @@ class GraphPanel(Glyphs):
                 row("MIDI learn: move a knob", lambda: midi_ui.learn(self.app, t))
                 for k, ctl in midi_ui.mapped_to(self.app, t):
                     row(f"forget {midi.ctl_label(ctl)}", lambda k=k: midi_ui.forget(self.app, k))
+            sep()
+            reference()
         elif kind == "out":
             outs = [l for l in self.graph.links if l[0] == nid and l[1] == name]
             dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
@@ -3599,28 +3648,35 @@ class GraphPanel(Glyphs):
             with dpg.tree_node(label="connect to a new node", parent=P, default_open=True):
                 for t in self._consumers(o["type"]):
                     row(f"  {t}", lambda t=t: self._connect_new(nid, name, o["type"], t))
+            sep()
+            reference()
         else:
-            # A node's menu: what is done most on top - duplicate, label,
-            # the shape toggles - and the rest in folds (delete, colour,
-            # settings as pins, sub-graph, more), which open in place.
-            dpg.add_text(n.get("label") or d.get("label") or n["type"], parent=P, color=DIM)
+            # A node's menu: what it is (a line, and its entry in the
+            # reference), then what is done most - duplicate, label, the
+            # shape toggles, delete - each with its key, and the rest in
+            # folds (colour, settings as pins, sub-graph, more).
+            title = n.get("label") or d.get("label") or n["type"]
+            dpg.add_text(title if title == n["type"] else f"{title}  ({n['type']})", parent=P, color=DIM)
             if d.get("doc"):
-                dpg.add_text(d["doc"], parent=P, color=self.pal()["soft"], wrap=300)
+                dpg.add_text(nodeface.first_sentence(d["doc"]), parent=P, color=self.pal()["soft"], wrap=300)
             if nid in self.problems:
                 m = self.problems[nid]
-                dpg.add_text(m, parent=P, color=(235, 80, 70) if m.startswith("error") else (240, 190, 70))
+                dpg.add_text(m, parent=P, color=(235, 80, 70) if m.startswith("error") else (240, 190, 70), wrap=300)
+            reference()
+            sep()
             if n["type"].startswith(G.SUB):
-                row("edit sub-graph", lambda: self.enter_sub(nid))
+                row("edit sub-graph", lambda: self.enter_sub(nid), "enter_sub")
                 row("unfold: its nodes in place of it", lambda: self.unfold_sub(nid))
             row("duplicate", lambda: self._dup(nid))
-            row("duplicate with inputs", lambda: self._dup(nid, True))
+            row("duplicate with inputs", lambda: self._dup(nid, True), "duplicate")
             if not n["type"].startswith(G.SUB) and n["type"] not in ("Output", "Effect settings", "Note", "Frame", "Graph input", "Graph output"):
                 row("change type... (the wires stay)", lambda: self.pick_type_for(nid))
-            row("label this node...", lambda: (self.set_selection([nid]), self.label_selected()))
+            row("label this node...", lambda: (self.set_selection([nid]), self.label_selected()), "label_node")
+            sep()
             if d["inputs"] or d["params"]:
-                row("expand" if n.get("collapsed") else "collapse", lambda: self._collapse(nid))
-                row("show all pins" if n.get("hide_pins") else "hide unwired pins", lambda: self._toggle(nid, "hide_pins"))
-            row("unmute" if n.get("muted") else "mute (pass through)", lambda: self._toggle(nid, "muted"))
+                row("expand" if n.get("collapsed") else "collapse", lambda: self._collapse(nid), "collapse")
+                row("show all pins" if n.get("hide_pins") else "hide unwired pins", lambda: self._toggle(nid, "hide_pins"), "hide_pins")
+            row("unmute" if n.get("muted") else "mute (pass through)", lambda: self._toggle(nid, "muted"), "mute")
             if d.get("params") or d.get("inputs"):
                 row("reset settings to defaults", lambda: self.reset_node(nid))
             wired_ = {i_ for b_, i_ in ((l[2], l[3]) for l in self.graph.links) if b_ == nid}
@@ -3633,10 +3689,12 @@ class GraphPanel(Glyphs):
             if n["type"] == "Image":
                 row("convert to Bitmap + Colour pick", lambda: self.image_to_bitmap(nid))
             selected = bool(self._selected())
-            with dpg.tree_node(label="delete", parent=P):
-                row("delete", lambda: self._delete_node(nid))
-                row("delete and reconnect", lambda: (self.set_selection([nid]), self.dissolve_selected()))
-                row("disconnect all (keep the node)", lambda: self._disconnect_node(nid))
+            sep()
+            row("delete", lambda: self._delete_node(nid), "delete")
+            row("delete and reconnect", lambda: (self.set_selection([nid]), self.dissolve_selected()), "dissolve")
+            if any(nid in (l[0], l[2]) for l in self.graph.links):
+                row("disconnect all (keep the node)", lambda: self._disconnect_node(nid), "disconnect")
+            sep()
             with dpg.tree_node(label="colour", parent=P):
                 self._node_colour_rows(dpg.last_container(), nid)
             base = self.lib.get(n["type"])
@@ -3664,9 +3722,9 @@ class GraphPanel(Glyphs):
                             row(f"  keep {p} inside", lambda p=p: self._promote(nid, p, False))
             with dpg.tree_node(label="selection and sub-graph" if selected else "more", parent=P):
                 if selected:
-                    row("copy selection", self.copy)
-                    row("cut selection", self.cut)
-                    row("fold selection into a sub-graph", lambda: self.make_sub_from_selection(None))
+                    row("copy selection", self.copy, "copy")
+                    row("cut selection", self.cut, "cut")
+                    row("fold selection into a sub-graph", lambda: self.make_sub_from_selection(None), "fold")
                     with dpg.tree_node(label="merge selection through", parent=P):
                         for op in ("Add", "Subtract", "Multiply", "Min", "Max", "Mix", "Blend"):
                             row(f"  {op}", lambda op=op: self.merge_selected(op))

@@ -40,7 +40,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui, procs
+from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui
 from native.gpucube import CubeQuads
 from native.textures import registry as tex_registry
 from native.features import Features
@@ -635,6 +635,7 @@ class App(Features):
         chrome.refresh_appearance(self)
         if getattr(self, "gp", None) is not None:
             self.gp.on_theme_change()                        # the graph's own themes and drawing colours, made again
+        reader_ui.on_theme_change(self)                      # the open document's headings in the new accent
         dpg.set_viewport_clear_color(list(cols["bg"]) + [255] if self.ui else [0, 0, 0, 255])
 
     # --- autosave: a version kept while there are unsaved edits -----------------
@@ -2407,6 +2408,7 @@ class App(Features):
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
+        reader_ui.clicked(self)
         if dpg.does_item_exist("help_split") and dpg.is_item_shown("help_split") and dpg.is_item_hovered("help_split"):
             self._split_drag = ("help_split", dpg.get_mouse_pos(local=False)[1], int(self.prefs.get("help_h", 46)))
             return
@@ -2684,6 +2686,8 @@ class App(Features):
             return
         if app_data == dpg.mvKey_Escape and device_ui.focused_frame(self):
             device_ui.close(self, device_ui.focused_frame(self)); return    # Esc closes the floating frame with the focus
+        if reader_ui.key(self, app_data, binding):
+            return                                       # the help window has the keyboard: Esc, find, back
         if self.layout == "graph" and app_data == dpg.mvKey_Back and self.gp.reset_hovered():
             return                                       # Backspace over a value: its default
         if self.layout == "graph" and binding is None:
@@ -2739,6 +2743,11 @@ class App(Features):
             "record":       lambda: self.start_rec(15.0),
             "record_video": lambda: self.start_rec(15.0, "mp4"),
             "shortcuts":    lambda: chrome.show_keys(self),
+            "guide":        lambda: reader_ui.open_doc(self, "GUIDE.md"),
+            "tutorial":     lambda: reader_ui.open_doc(self, "TUTORIAL.md"),
+            "node_ref":     lambda: reader_ui.open_doc(self, "NODES.md"),
+            "node_help":    gp.help_here,
+            "welcome":      lambda: reader_ui.show_welcome(self),
             "flash":        lambda: chrome.show_flash(self),
             "push":         self.push_settings,
             "stream":       lambda: self.stream_stop() if getattr(self, "ddp", None) is not None else self.stream_start(),
@@ -2878,7 +2887,7 @@ class App(Features):
         x, y = st.get("rect_min") or dpg.get_item_pos(tag)
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "expr_win",
+    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "expr_win", "reader_win", "welcome_win", "reader_pic",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -3574,7 +3583,7 @@ def service_command(app):
                 (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
             if "check" in c:                            # test hook: an expression that must be true (graded as expect is)
                 try:
-                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui})
+                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui})
                 except Exception as e:
                     v = f"raised {e!r}"
                 print(("check ok     " if v is True or (v and not isinstance(v, str)) else "EXPECT FAILED check ") + f"{c['check'][:90]}: {v!r}"[:200])
@@ -3644,7 +3653,7 @@ def service_command(app):
                 app.wiring_stop() if c["wiring_test"] == "off" else app.wiring_start(c["wiring_test"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
-                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui})))
+                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui})))
                 except Exception:
                     import traceback; traceback.print_exc()
             if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]
@@ -4128,7 +4137,7 @@ def _call(item, label):
 
 
 SKIP_MENU = ("Quit", "Record 15 s GIF", "Record 15 s video", "Fullscreen", "Check for updates...",     # ends the app, a 15 s recording, flips the window
-             "Open the project folder", "Open the build folder", "Node reference (NODES.md)", "Studio guide (STUDIO.md)",
+             "Open the project folder", "Open the build folder",
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
              "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device (DDP)",
@@ -4540,6 +4549,7 @@ def main():
     from native import update as _update
     if _update.due(app.prefs) and not os.environ.get("STUDIO_NO_UPDATE_CHECK"):
         chrome.check_updates(app)                    # once a day, on a thread; the tests set STUDIO_NO_UPDATE_CHECK
+    reader_ui.maybe_welcome(app)                     # the first run's panel; the tests set STUDIO_NO_WELCOME
     try:
         while dpg.is_dearpygui_running():
             try:
@@ -4570,6 +4580,7 @@ def main():
                 app.poll_glow()
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 midi_ui.poll(app)
+                reader_ui.poll(app)
                 app.poll_calibration()
                 chrome.poll_update(app); chrome.poll_update_download(app)
                 _t.append(time.perf_counter())

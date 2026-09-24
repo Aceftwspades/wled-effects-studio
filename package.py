@@ -240,7 +240,8 @@ def main():
         "the release ships with it (a cut-down MinGW-w64 GCC), else a MinGW-w64 put there, or emsdk's clang with the MSVC Build "
         "Tools. Without one, the effects already built, the examples, the script preview and every send to a device still work."
         "\n\nFlashing firmware needs a WLED checkout and PlatformIO: set WLED_ROOT to the checkout.\n\n"
-        "The guide is _internal\\GUIDE.md; Help > Studio guide opens it.\n")
+        "Help > User guide (F1) opens the guide in the studio; Help > Tutorial makes a first effect step by step. "
+        "The files are in _internal\\ (GUIDE.md, TUTORIAL.md, NODES.md).\n")
     shutil.copyfile(os.path.join(HERE, "Desktop shortcut.cmd"), os.path.join(DIST, "Desktop shortcut.cmd"))   # a .lnk holds a path: made where it lands
     # what this build is: the version, the commit, the day - for the About dialog and a bug report
     import json, time

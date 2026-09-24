@@ -1415,7 +1415,8 @@ reaches furthest; (Cn) is the critique's number.
       its colours from the theme (GraphPanel.pal). Shipped in 1.1.0. (The
       critique first said the fields stayed dark in a light theme; they
       only did until the graph was rebuilt.)
-- [ ] Help > Studio guide opens STUDIO.md, the development log.
+- [x] Help > Studio guide opened STUDIO.md, the development log: Help is
+      the user guide, the tutorial and the node reference now (C4 below).
 - [x] The Flash frame shows `partitions ${esp32.extreme_partitions}`
       unexpanded: PlatformIO's ${section.option} references are resolved
       now (the override first, nested, ${sysenv.X}).
@@ -1440,10 +1441,33 @@ reaches furthest; (Cn) is the critique's number.
       with "...").
 
 **What reaches furthest**
-- [ ] **Help that reaches the user** (C4): Help > Tutorial and Help >
-      User guide, read inside the studio; STUDIO.md out of Help; a
-      first-run panel (the tutorial, an example, a device); shortcut keys
-      in the context menus.
+- [x] **Help that reaches the user** (C4): the guide, the tutorial and
+      the node reference read inside the studio (reader.py parses them,
+      reader_ui.py draws them): set in a reading face (Segoe UI, Helvetica
+      or DejaVu by platform, bold for headings and labels, Consolas for
+      code) where the rest is the 13-px bitmap font; the contents down the
+      left with the section on screen marked and kept in view; a search
+      that stops at each mention, marks the words where they are drawn -
+      the lines Dear ImGui wraps a paragraph into worked out again, so the
+      mark sits on the word in a thirty-line paragraph - and says which of
+      how many (Enter / F3, Shift+F3 back); links between the documents
+      with Back (Alt+Left, Backspace); tables, lists, quotes, bold labels;
+      code scrolled sideways with a copy button; the tutorial's pictures
+      scaled to the page, a click showing them at full size. Help: User
+      guide (F1), Tutorial, Node reference, Effect API reference, Keyboard
+      shortcuts (Shift+F1), Welcome...; STUDIO.md out of it. F1 in the
+      graph opens the node reference at the node under the pointer or the
+      selected one; a node's menu leads with its first sentence and "<type>
+      in the node reference..." (F1), shows every row's key in a column
+      (menu items on top, the key after the words in a fold), and has
+      delete, delete and reconnect and disconnect out of their fold. A
+      first-run panel: the tutorial, the guide, the examples, a device;
+      Help > Welcome... again, a checkbox to show it at every start. Three
+      lines of the guide and the tutorial that began with "- " or "> "
+      after a re-wrap (a list item or a quote on GitHub as well) mended,
+      and a test that none does again; tests/test_reader.py (parsing, the
+      wrap against Dear ImGui's own example, links, every node's entry,
+      the keys), smoke steps for all of it.
 - [ ] **The graph gets the room** (C1): in the graph layout the side
       panel folds to a rail, the 3-D view floats in a corner of the canvas,
       the properties pane shows only when a node needs it, the help band

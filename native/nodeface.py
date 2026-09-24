@@ -308,6 +308,16 @@ def fit_words(text, n):
     return cut.rstrip().rstrip(",;:").rstrip() + "..."
 
 
+def first_sentence(text, n=150):
+    """A doc's first sentence (a "0..1." is not an end, "cube... This" is),
+    cut at a word past n characters - the line a menu shows, the whole
+    of it being in the reference."""
+    import re
+    text = " ".join(str(text or "").split())
+    m = re.search(r"(?<=[^.\s][.!?])\s|(?<=\.\.\.)\s(?=[A-Z])", text)
+    return fit_words(text[:m.start()] if m else text, n)
+
+
 def summary(n, d, wired=(), extra=None):
     """One line on what the node computes now, from its typed values."""
     V = values(n, d, wired)
