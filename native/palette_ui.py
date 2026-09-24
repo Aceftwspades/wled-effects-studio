@@ -16,6 +16,8 @@ straight blend between entries (FastLED's CRGBPalette16 from a gradient).
 """
 import json
 import dearpygui.dearpygui as dpg
+
+from native import weight
 import numpy as np
 
 from native import flash
@@ -38,6 +40,18 @@ def _sel(app):
     pals = _pals(app)
     i = getattr(app, "_pal_sel", 0)
     return min(max(0, i), len(pals) - 1) if pals else -1
+
+
+def _has_sel(app):
+    return _sel(app) >= 0
+
+
+def _dev_sel(app):
+    return bool(app.active_host()) and _sel(app) >= 0
+
+
+def _dev_any(app):
+    return bool(app.active_host()) and bool(_pals(app))
 
 
 def _stops(p):
@@ -97,8 +111,12 @@ def build(app):
             dpg.add_button(label="From the sim's palette", small=True, callback=lambda: from_current(app))
             c.tip("a new one that starts as the palette the sim shows")
             dpg.add_button(label="Copy", small=True, callback=lambda: dup_palette(app))
+            weight.need(dpg.last_item(), _has_sel)
             dpg.add_button(label="Remove", small=True, callback=lambda: del_palette(app))
+            weight.danger(dpg.last_item())
+            weight.need(dpg.last_item(), _has_sel)
             dpg.add_button(label="Use in the sim", small=True, callback=lambda: use_palette(app))
+            weight.need(dpg.last_item(), _has_sel)
             c.info("Gradients of your own: in the sim as palettes (ids 200 down), on the device as its custom palettes - "
                    "sent by position, so the first here replaces the device's palette0.json, the second its palette1.json.")
         with dpg.child_window(tag="pal_rows", height=120, border=True):
@@ -118,9 +136,14 @@ def build(app):
         with dpg.group(horizontal=True):
             dpg.add_text("ON THE DEVICE", color=c.ACCENT)
             dpg.add_button(label="Send this one", small=True, callback=lambda: send(app, False))
+            weight.primary(dpg.last_item())
+            weight.need(dpg.last_item(), _dev_sel)
             c.tip("slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload")
             dpg.add_button(label="Send all", small=True, callback=lambda: send(app, True))
+            weight.need(dpg.last_item(), _dev_any)
             dpg.add_button(label="Remove this one there", small=True, callback=lambda: remove_there(app))
+            weight.danger(dpg.last_item())
+            weight.need(dpg.last_item(), _dev_sel)
         dpg.add_text("", tag="pal_log", color=c.DIM, wrap=0)
 
 
@@ -152,7 +175,8 @@ def refresh(app):
             if tex:
                 dpg.add_image(tex, width=120, height=14)
     if not pals:
-        dpg.add_text("none yet: + New, or From the sim's palette", parent="pal_rows", color=c.DIM)
+        weight.empty("pal_rows", "No palettes of the project's own yet: a new gradient, or the one the sim shows.",
+                     [("New palette", lambda: new_palette(app)), ("From the sim's palette", lambda: from_current(app))])
     if sel < 0:
         dpg.set_value("pal_name", ""); dpg.set_value("pal_id", "")
         dpg.delete_item("pal_bar", children_only=True)

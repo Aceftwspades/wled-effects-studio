@@ -1497,9 +1497,36 @@ reaches furthest; (Cn) is the critique's number.
       longer the graph's (it finds nodes by their rectangles: a click on
       the 3-D view over a node pressed the node). The panes mode is the
       arrangement as it was.
-- [ ] **Button weights and empty states** (C5): primary, secondary and
-      danger buttons; controls with nothing to act on disabled or hidden;
-      each empty state offering its one next step.
+- [x] **Button weights and empty states** (C5): native/weight.py.
+      Primary (filled in the accent: the one thing a dialog or frame is
+      for), danger (red: what changes a device or deletes - the ledmap
+      and shape sends' confirms, a reboot, an import over the shape, the
+      x on every row), quiet (no slab: Cancel, Not now, Close), the rest
+      secondary; themed from the colours in force and rebound on a theme
+      change, made before anything is built (made later, a theme became
+      the "last item" the next tooltip hung on). The confirm weighs its
+      answers (a way out quiet, the first primary, a device change red).
+      Needs: what each action wants (a node selected, two, three, a graph,
+      a copy, something to undo where Undo acts, a device, a sub-graph, a
+      preview) greys it on the menus and the toolbar - the toolbar's icon
+      fades too, Dear PyGui drawing a disabled image button as an enabled
+      one - and its key says why instead of doing nothing; the frames'
+      buttons have theirs (the Send frame's sends and reads a device, the
+      Sequence's a step or steps, the Palettes' a palette, the Outputs'
+      and Audio input's a device), and a disabled control of any kind is
+      drawn greyed at all (a theme component: it was drawn live). Empty
+      states say what the list would hold and offer the next step: the
+      Library (New effect), the Flash effects list (add this effect), the
+      Palettes (new, or the sim's), the Outputs (one output, or the
+      device's), the Sequence's steps (what the sim shows; its timers
+      plainly, one primary to a frame), the open menu; the Send frame with
+      no device offers Find a device; where the frame's own primary is the
+      step (Devices, MIDI), the words point to it. Found on the way: the
+      lines built in the theme's colours kept the dark defaults - on a
+      light theme the confirm's question was near-white, and a light
+      project started so - they are recoloured when the theme changes and
+      once at start; Delete took imnodes' selection alone (A, Ctrl+[ ...
+      selected nothing it would delete).
 - [ ] **A type foundation and an interface size** (C2): a UI face at
       three sizes with monospace kept for code and numbers; Settings >
       Appearance > Interface size, 80-200%, from the monitor's scale.

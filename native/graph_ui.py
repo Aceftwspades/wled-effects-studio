@@ -12,6 +12,8 @@ import os
 import time
 
 import dearpygui.dearpygui as dpg
+
+from native import weight
 import numpy as np
 
 from native import graph as G
@@ -3979,6 +3981,7 @@ class GraphPanel(Glyphs):
                 dpg.add_button(label=nm, small=True, user_data=nm, callback=lambda s_, a_, u: self.snapshot_apply(u))
                 dpg.add_button(label="update", small=True, user_data=nm, callback=lambda s_, a_, u: self.snapshot_save(u))
                 dpg.add_button(label="x", small=True, user_data=nm, callback=lambda s_, a_, u: self.snapshot_delete(u))
+                weight.danger(dpg.last_item())
         if not names:
             dpg.add_text("none yet: type a name and Save", parent="snap_rows", color=DIM)
         for tag in ("snap_a", "snap_b"):
@@ -4342,6 +4345,7 @@ class GraphPanel(Glyphs):
                                                callback=lambda s, a, u: self.add_node_at_menu(u))
                             dpg.add_button(label="x", small=True, user_data=name,
                                            callback=lambda s, a, u: self.delete_preset(u))
+                            weight.danger(dpg.last_item())
             hidden = 0
             for c, names in cats.items():
                 with dpg.collapsing_header(label=c, default_open=(c in ("generate", "colour", "subgraphs"))) as hdr:
@@ -4518,16 +4522,22 @@ class GraphPanel(Glyphs):
         return nid
 
     def delete_selected(self):
-        if not self.graph or not dpg.get_selected_nodes("node_editor"):
-            return
+        """The selection gone: what imnodes has and what the keys added (A,
+        Ctrl+[ ...) - it used to take imnodes' alone, and a selection made
+        by key stayed."""
+        sel = self._selected() if self.graph else []
+        if not sel:
+            self.status("select nodes first"); return
         self.snapshot()
-        for tag in dpg.get_selected_nodes("node_editor"):
-            nid = dpg.get_item_user_data(tag)
+        self.ext_sel = []
+        for nid in sel:
+            tag = f"gnode_{nid}"
             self.graph.remove(nid)
             for lid, (b, inp) in list(self.links.items()):
                 if b == nid or not dpg.does_item_exist(lid):
                     self.links.pop(lid, None)
-            dpg.delete_item(tag)
+            if dpg.does_item_exist(tag):
+                dpg.delete_item(tag)
         # links from the removed node's outputs are gone with the node in DPG;
         # rebuild the link map from the editor's truth
         alive = set(dpg.get_item_children("node_editor", 0) or [])

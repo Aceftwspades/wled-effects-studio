@@ -14,7 +14,7 @@ import sys
 
 import dearpygui.dearpygui as dpg
 
-from native import reader
+from native import reader, weight
 
 TAG = "reader_win"
 WELCOME = "welcome_win"
@@ -163,8 +163,10 @@ def _build_welcome(app):
                 ("Browse the examples", "every graph in the project, running", lambda: _frame(app, "library")),
                 ("Find a device", "the WLED devices on the network", lambda: _frame(app, "devices"))):
             with dpg.group(horizontal=True):
-                dpg.add_button(label=label, width=230, height=36, user_data=fn,
-                               callback=lambda s, a, u: (welcome_closed(app), u()))
+                b = dpg.add_button(label=label, width=230, height=36, user_data=fn,
+                                   callback=lambda s, a, u: (welcome_closed(app), u()))
+                if label == "Start the tutorial":
+                    weight.primary(b)
                 dpg.add_text(why, color=c.DIM)
         dpg.add_spacer(height=8)
         dpg.add_text("Help > User guide (F1) has all of it later; F1 over a node explains that node.", color=c.DIM, wrap=560)
@@ -174,6 +176,7 @@ def _build_welcome(app):
                              default_value=bool(app.prefs.get("welcome_always")))
             dpg.add_spacer(width=40)
             dpg.add_button(label="Close", width=90, callback=lambda: welcome_closed(app))
+            weight.quiet(dpg.last_item())
     _bind(WELCOME, "body")
 
 

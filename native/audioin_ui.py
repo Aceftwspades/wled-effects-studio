@@ -15,7 +15,7 @@ import urllib.request
 
 import dearpygui.dearpygui as dpg
 
-from native import audioin
+from native import audioin, weight
 
 TAG = "audioin_win"
 PIN_TAGS = ("ain_sd", "ain_ws", "ain_sck", "ain_mclk")
@@ -69,10 +69,15 @@ def build(app):
         with dpg.group(horizontal=True):
             dpg.add_text("ON THE DEVICE", color=c.ACCENT)
             dpg.add_button(label="Read the device's", small=True, callback=lambda: read_device(app))
+            weight.need(dpg.last_item(), "device")
             c.tip("what the device's audioreactive is set to now (its type, pins and levels), into these fields")
             dpg.add_button(label="Send the audio input", small=True, callback=lambda: send(app))
+            weight.primary(dpg.last_item())
+            weight.need(dpg.last_item(), "device")
             c.tip("over /json/cfg; the levels take at once, a new type or new pins after a reboot (offered when needed)")
             dpg.add_button(label="Reboot the device", small=True, callback=lambda: reboot(app))
+            weight.danger(dpg.last_item())
+            weight.need(dpg.last_item(), "device")
             c.tip("restarts the device so a new type or new pins take effect; the LEDs go dark for a few seconds")
             dpg.add_checkbox(label="meter", tag="ain_meter", callback=lambda s, v: _meter(app, bool(v)))
             c.tip("reads the level the device hears, twice a second, while ticked: play something into the line-in and watch it move")
@@ -188,7 +193,7 @@ def send(app):
     if before is None or audioin.needs_reboot(before, st):
         msg += " - a new type or new pins take effect after a reboot"
         _c().confirm(app, "Audio input", "The device's audioreactive takes a new type or new pins on its next boot. Reboot it now? "
-                     "(the LEDs go dark for a few seconds)", [("Reboot", lambda: reboot(app)), ("Later", None)])
+                     "(the LEDs go dark for a few seconds)", [("Reboot", lambda: reboot(app), "danger"), ("Later", None)])
     dpg.set_value("ain_log", msg); app.gp.status(msg); device_ui.send_log(app, msg)
 
 

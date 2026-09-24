@@ -15,6 +15,8 @@ dimensions, and whether it runs as a script.
 import os
 import time
 import dearpygui.dearpygui as dpg
+
+from native import weight
 import numpy as np
 
 from native import graph as G, render
@@ -166,7 +168,10 @@ def refresh(app):
                     with dpg.tooltip(dpg.last_item()):
                         dpg.add_text(f"{name}\n{fn}\ntags: {', '.join(tags) or 'none'}", wrap=300)
     if not rows:
-        dpg.add_text("nothing matches" if q else "no graphs in this project", parent="lib_tiles", color=c.DIM)
+        if q:
+            dpg.add_text("nothing matches", parent="lib_tiles", color=c.DIM)
+        else:
+            weight.empty("lib_tiles", "No graphs in this project yet.", [("New effect...", lambda: app.new_effect())])
     left = sum(1 for fn, _, _ in rows if fn not in app._lib_thumbs)
     dpg.set_value("lib_status", f"{len(rows)} graph(s)" + (f", {made} thumbnails made in {time.time() - t0:.1f} s" if made else "") + (f", {left} more next refresh" if left else ""))
     if left:

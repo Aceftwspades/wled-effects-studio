@@ -40,7 +40,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room
+from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight
 from native.gpucube import CubeQuads
 from native.textures import registry as tex_registry
 from native.features import Features
@@ -203,6 +203,23 @@ def apply_theme(prefs=None):
                          (dpg.mvNodesCol_MiniMapCanvas, accent + (28,)),
                          (dpg.mvNodesCol_MiniMapCanvasOutline, accent + (200,))):
                 dpg.add_theme_color(t, c, category=dpg.mvThemeCat_Nodes)
+        # Disabled: Dear PyGui draws a disabled control exactly as an enabled
+        # one unless a component says otherwise - a greyed Send looked live.
+        # The slab and the words fade, and hovering lifts nothing.
+        off_text = dim + (150,)
+        off_slab = lift(panel, 6) + (110,)
+        off_frame = frame + (120,)
+        for comp in (dpg.mvButton, dpg.mvImageButton, dpg.mvSelectable, dpg.mvCheckbox, dpg.mvCombo, dpg.mvRadioButton,
+                     dpg.mvInputText, dpg.mvInputInt, dpg.mvInputFloat, dpg.mvInputDouble, dpg.mvSliderInt, dpg.mvSliderFloat,
+                     dpg.mvDragInt, dpg.mvDragFloat, dpg.mvColorEdit):
+            with dpg.theme_component(comp, enabled_state=False):
+                for t, c in ((dpg.mvThemeCol_Text, off_text), (dpg.mvThemeCol_Button, off_slab),
+                             (dpg.mvThemeCol_ButtonHovered, off_slab), (dpg.mvThemeCol_ButtonActive, off_slab),
+                             (dpg.mvThemeCol_FrameBg, off_frame), (dpg.mvThemeCol_FrameBgHovered, off_frame),
+                             (dpg.mvThemeCol_FrameBgActive, off_frame), (dpg.mvThemeCol_CheckMark, off_text),
+                             (dpg.mvThemeCol_SliderGrab, off_text), (dpg.mvThemeCol_SliderGrabActive, off_text),
+                             (dpg.mvThemeCol_HeaderHovered, (0, 0, 0, 0)), (dpg.mvThemeCol_HeaderActive, (0, 0, 0, 0))):
+                    dpg.add_theme_color(t, c, category=dpg.mvThemeCat_Core)
     dpg.bind_theme(th)
     return th
 
@@ -642,9 +659,11 @@ class App(Features):
         if self.ui:
             dpg.bind_theme(self._themes["normal"])
         cols = theme_colors(self.prefs)
+        was = chrome.colours()
         chrome.ACCENT = tuple(cols["accent"]) + (255,)
         chrome.TEXT = tuple(cols["text"]) + (255,)
         chrome.DIM = tuple(cols["dim"]) + (255,)
+        chrome.recolour_texts(was, chrome.colours())         # the lines made in the old colours
         chrome.refresh(self)
         chrome.refresh_appearance(self)
         if getattr(self, "gp", None) is not None:
@@ -999,7 +1018,7 @@ class App(Features):
                            f"The device at {host} will map its LEDs as this project's geometry does ({g.describe()}): "
                            "its picture changes, and a wiring that is not the device's leaves it dark or scrambled until "
                            "the ledmap is removed. Send it?",
-                           [("Send", lambda: self.send_ledmap(True)), ("Cancel", None)])
+                           [("Send", lambda: self.send_ledmap(True), "danger"), ("Cancel", None)])
             return
         msg = self.project.send_ledmap(host)
         dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
@@ -1016,7 +1035,7 @@ class App(Features):
             chrome.confirm(self, "Send the shape?",
                            f"The device at {host} gets this project's ledmap ({g.describe()}) and, for a shape, the "
                            "positions table the effects read. Its wiring changes with the ledmap. Send both?",
-                           [("Send", lambda: self.send_shape(True)), ("Cancel", None)])
+                           [("Send", lambda: self.send_shape(True), "danger"), ("Cancel", None)])
             return
         msg = self.project.send_ledmap(host)
         ok, msg2 = flash.send_geometry(host, g)
@@ -2860,6 +2879,9 @@ class App(Features):
             "sweep":        lambda: self.stop_sweep() if self.sweep else chrome.show_sweep(self),
         }
         fn = table.get(action)
+        if fn and not weight.enabled(self, action) and action not in ("undo", "redo"):
+            self.gp.status(weight.WHY.get(weight.NEEDS[action], "not now"))     # greyed on the menus: say why
+            return
         if fn:
             if action not in ("repeat", "palette", "undo_history", "undo", "redo"):
                 self._last_action = action
@@ -3289,6 +3311,7 @@ def build(app):
         dpg.add_key_press_handler(callback=app.on_key)
 
     self_app = [app]
+    weight.ensure()                                  # the button weights' themes, before any button is weighed
     with dpg.window(tag="root", no_scroll_with_mouse=True):
         chrome.build_menus(app)
         chrome.build_toolbar(app)
@@ -3484,9 +3507,12 @@ def build(app):
 
     app._themes['normal'] = apply_theme(app.prefs)
     _cols = theme_colors(app.prefs)
+    _was = chrome.colours()                          # what the window was built in: the dark defaults
     chrome.ACCENT = tuple(_cols["accent"]) + (255,)
     chrome.TEXT = tuple(_cols["text"]) + (255,)
     chrome.DIM = tuple(_cols["dim"]) + (255,)
+    chrome.recolour_texts(_was, chrome.colours())    # a light project starts light, not with the dark theme's lines
+    weight.rebind()                                  # the weighed buttons in the project's colours (built in the defaults)
     app._themes['present'] = present_theme()
     app.rebuild_params()
     app.rebuild_geom_fields()
@@ -3633,7 +3659,7 @@ def service_command(app):
                 (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
             if "check" in c:                            # test hook: an expression that must be true (graded as expect is)
                 try:
-                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room})
+                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight})
                 except Exception as e:
                     v = f"raised {e!r}"
                 print(("check ok     " if v is True or (v and not isinstance(v, str)) else "EXPECT FAILED check ") + f"{c['check'][:90]}: {v!r}"[:200])
@@ -3703,7 +3729,7 @@ def service_command(app):
                 app.wiring_stop() if c["wiring_test"] == "off" else app.wiring_start(c["wiring_test"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
-                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room})))
+                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight})))
                 except Exception:
                     import traceback; traceback.print_exc()
             if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]
@@ -4633,6 +4659,7 @@ def main():
                 midi_ui.poll(app)
                 reader_ui.poll(app)
                 room.poll(app)
+                weight.poll(app)                     # what has nothing to act on, greyed
                 app.poll_calibration()
                 chrome.poll_update(app); chrome.poll_update_download(app)
                 _t.append(time.perf_counter())

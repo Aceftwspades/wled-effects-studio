@@ -18,7 +18,7 @@ import dearpygui.dearpygui as dpg
 from native.icons import texture
 from native.project import save_prefs
 from native.keys import ACTIONS, FIXED
-from native import glow, flash, device_ui, room
+from native import glow, flash, device_ui, room, weight
 
 TEXT   = (215, 219, 227, 255)
 DIM    = (139, 147, 163, 255)
@@ -317,6 +317,9 @@ def _btn(app, icon, tip, cb, tag=None, action=None):
     kw = {"tag": tag} if tag else {}
     b = dpg.add_image_button(texture(icon, ICON), width=ICON, height=ICON, tint_color=TEXT,
                              frame_padding=3, callback=cb, **kw)
+    if action:
+        app._tb_btn = getattr(app, "_tb_btn", {})
+        app._tb_btn.setdefault(action, b)                 # weight.poll greys it while it has nothing to act on
     with dpg.tooltip(b):
         tt = f"tbtip_{action}"
         if action and not dpg.does_item_exist(tt):
@@ -393,8 +396,8 @@ def build_dialogs(app):
         dpg.add_text("", tag="name_prompt", color=DIM)
         dpg.add_input_text(tag="name_input", width=-1, on_enter=True, callback=lambda: _name_ok(app))
         with dpg.group(horizontal=True):
-            dpg.add_button(label="OK", width=80, callback=lambda: _name_ok(app))
-            dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("name_dialog"))
+            weight.primary(dpg.add_button(label="OK", width=80, callback=lambda: _name_ok(app)))
+            weight.quiet(dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("name_dialog")))
     with dpg.window(tag="usermods_win", label="Usermods and features", show=False, width=720, height=600, no_collapse=True):
         with dpg.group(horizontal=True):
             dpg.add_text("What the firmware carries for this project; unticked is left out of the build.", color=DIM)
@@ -431,7 +434,9 @@ def build_dialogs(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="Save", width=80, callback=lambda: (app.save_editor_cmd(dpg.get_value("editor_cmd")),
                                                                    dpg.hide_item("editor_dialog")))
+            weight.primary(dpg.last_item())
             dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("editor_dialog"))
+            weight.quiet(dpg.last_item())
     with dpg.file_dialog(directory_selector=True, show=False, tag="project_dialog", width=620, height=420,
                          callback=lambda s, a: app.new_project(a.get("file_path_name", ""))):
         pass
@@ -449,6 +454,7 @@ def build_dialogs(app):
                      "A key taken from another action leaves that one unbound.", color=DIM, wrap=600)
         with dpg.group(horizontal=True):
             dpg.add_button(label="Reset all to defaults", callback=lambda: (app.keys.reset(), refresh_keys(app)))
+            weight.danger(dpg.last_item())
         with dpg.child_window(tag="keys_rows", height=-1, border=False):
             pass
     from native import version
@@ -473,8 +479,10 @@ def build_dialogs(app):
         dpg.add_text("", tag="update_status", color=DIM, wrap=540)
         with dpg.group(horizontal=True):
             dpg.add_button(label="Download and install", tag="update_go", callback=lambda: get_update(app))
+            weight.primary(dpg.last_item())
             dpg.add_button(label="Release page", callback=lambda: app.open_url(getattr(app, "_update", {}).get("url") or f"https://github.com/{version.REPO}/releases"))
             dpg.add_button(label="Not now", callback=lambda: dpg.hide_item("update_win"))
+            weight.quiet(dpg.last_item())
             dpg.add_checkbox(label="check once a day", tag="update_daily", default_value=bool(app.prefs.get("update_check", True)),
                              callback=lambda s, v: (app.prefs.__setitem__("update_check", bool(v)), save_prefs(app.prefs)))
     # SNAPSHOTS: the whole graph's settings as named states, and a morph between two
@@ -484,6 +492,7 @@ def build_dialogs(app):
         with dpg.group(horizontal=True):
             dpg.add_input_text(tag="snap_name", width=200, hint="a name")
             dpg.add_button(label="Save", callback=lambda: app.gp.snapshot_save(dpg.get_value("snap_name")))
+            weight.primary(dpg.last_item())
             tip("the graph as it is now, under this name (the same name updates it)")
         with dpg.child_window(tag="snap_rows", height=150, border=True):
             pass
@@ -508,11 +517,12 @@ def build_dialogs(app):
                      "Open an issue, say what you did, what you expected and what happened, and attach the zip.",
                      color=DIM, wrap=540)
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Open the issues page", callback=lambda: app.open_url(f"https://github.com/{version.REPO}/issues/new"))
+            weight.primary(dpg.add_button(label="Open the issues page", callback=lambda: app.open_url(f"https://github.com/{version.REPO}/issues/new")))
             tip("a new issue on the studio's GitHub page, in the browser - attach the zip there")
             dpg.add_button(label="Show the zip", callback=lambda: app.reveal(os.path.dirname(getattr(app, "_report_path", paths_captures()))))
             tip("the captures folder, where the report landed")
             dpg.add_button(label="Close", callback=lambda: dpg.hide_item("report_win"))
+            weight.quiet(dpg.last_item())
     with dpg.window(tag="open_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
@@ -558,7 +568,9 @@ def build_dialogs(app):
             dpg.add_checkbox(label="record a GIF of one pass", tag="sweep_rec")
         with dpg.group(horizontal=True):
             dpg.add_button(label="Start", callback=lambda: _sweep_start(app))
+            weight.primary(dpg.last_item())
             dpg.add_button(label="Cancel", callback=lambda: dpg.hide_item("sweep_win"))
+            weight.quiet(dpg.last_item())
     build_frames_dialog(app)
     device_ui.build(app)
     with dpg.file_dialog(directory_selector=False, show=False, tag="bg_dialog", width=640, height=420,
@@ -596,13 +608,21 @@ def ask(app, title, prompt, default, cb):
 
 def confirm(app, title, text, buttons):
     """A question with up to three answers: buttons is [(label, callback or
-    None), ...]; the box closes on any of them."""
+    None[, weight]), ...]; the box closes on any of them. An answer with no
+    callback is the way out (quiet); the first with one is the primary
+    unless it says "danger" - an answer that changes a device."""
     dpg.configure_item("confirm_dialog", label=title)
     dpg.set_value("confirm_text", text)
     dpg.delete_item("confirm_buttons", children_only=True)
-    app._confirm = [cb for _, cb in buttons]
-    for k, (label, cb) in enumerate(buttons):
-        dpg.add_button(label=label, parent="confirm_buttons", user_data=k, callback=lambda s, a, u: confirm_pick(app, u))
+    app._confirm = [b[1] for b in buttons]
+    first = True
+    for k, b in enumerate(buttons):
+        label, cb = b[0], b[1]
+        kind = b[2] if len(b) > 2 else ("quiet" if cb is None else ("primary" if first else None))
+        first = first and cb is None
+        btn = dpg.add_button(label=label, parent="confirm_buttons", user_data=k, callback=lambda s, a, u: confirm_pick(app, u))
+        if kind:
+            weight.weigh(btn, kind)
     lines = max(2, len(text) // 58 + 1)
     _centre("confirm_dialog", 460, 78 + 17 * lines)
     dpg.configure_item("confirm_dialog", height=78 + 17 * lines)
@@ -663,6 +683,7 @@ def refresh_keys(app):
                            callback=lambda s, a, u: (setattr(app, "_capture", u), refresh_keys(app)))
             dpg.add_button(label="x", small=True, user_data=action, enabled=bool(b),
                            callback=lambda s, a, u: (app.keys.set(u, ""), refresh_keys(app)))
+            weight.quiet(dpg.last_item())
             dpg.add_text(label, color=TEXT if b else DIM)
             if b != default:
                 dpg.add_text(f"(default {default or '-'})", color=DIM)
@@ -702,7 +723,7 @@ def show_open(app):
                 dpg.add_selectable(label=f[:-5], width=190, user_data=f,
                                    callback=lambda s, a, u: (dpg.hide_item("open_menu"), app.open_graph(u)))
             if not graphs:
-                dpg.add_text("  none yet", color=DIM)
+                weight.empty(dpg.top_container_stack(), "no graphs yet", [("New effect...", lambda: (dpg.hide_item("open_menu"), app.new_effect()))], wrap=190)
         with dpg.child_window(width=230, height=360, border=False):
             dpg.add_text("code effects", color=DIM)
             for f in codes:
@@ -1160,9 +1181,47 @@ def show_appearance(app):
     dpg.show_item("appearance_win")
 
 
+def colours():
+    """The theme's text, dim and accent colours as they are now."""
+    return {"TEXT": TEXT, "DIM": DIM, "ACCENT": ACCENT}
+
+
+def recolour_texts(old, new):
+    """Every line coloured with the theme's text, dim or accent colour as
+    it was, in the one it is now. Those colours are read when a line is
+    made: a theme switched later - or the project's own, which is set once
+    the window is built - left them in the old one (the confirm's question
+    near-white on a light theme). The number recoloured."""
+    pairs = []
+    for k in ("TEXT", "DIM", "ACCENT"):
+        a, b = tuple(old[k][:3]), tuple(new[k][:3])
+        if a != b:
+            pairs.append((a, b))
+    if not pairs:
+        return 0
+    n = 0
+    for it in dpg.get_all_items():
+        try:
+            if dpg.get_item_type(it) != "mvAppItemType::mvText":
+                continue
+            col = dpg.get_item_configuration(it).get("color")
+        except Exception:
+            continue
+        if not col or col[0] < 0:
+            continue                                     # the theme's own: it follows by itself
+        rgb = tuple(int(round(v * 255)) for v in col[:3])
+        for a, b in pairs:
+            if max(abs(x - y) for x, y in zip(rgb, a)) <= 1:
+                dpg.configure_item(it, color=b + (int(round(col[3] * 255)),))
+                n += 1
+                break
+    return n
+
+
 def refresh_appearance(app):
     """The editor's swatches show the colours in force."""
     bind_value_sliders()                             # the accent may have changed
+    weight.rebind()                                  # the primary, danger and quiet buttons in the new colours
     if not dpg.does_item_exist("app_preset"):
         return
     from native.app import theme_colors, THEME_PRESETS
@@ -1461,7 +1520,7 @@ def refresh(app):
     for bar in ("toolbar", "tb_graph_tools"):          # the graph's tools are a group of their own in it
         for child in dpg.get_item_children(bar, 1) or [] if dpg.does_item_exist(bar) else []:
             if "ImageButton" in dpg.get_item_type(child):
-                dpg.configure_item(child, tint_color=TEXT)
+                dpg.configure_item(child, tint_color=weight.tint_of(child))   # faded while it has nothing to act on
     for k, (_, arr) in enumerate(app.PRESETS):
         if dpg.does_item_exist(f"menu_arr_{k}"):
             dpg.set_value(f"menu_arr_{k}", app.arrangement == arr)

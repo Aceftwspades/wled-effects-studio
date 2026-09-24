@@ -9,6 +9,8 @@ import json
 import os
 import time
 import dearpygui.dearpygui as dpg
+
+from native import weight
 import numpy as np
 
 from native import sequence, transition
@@ -23,6 +25,18 @@ def _c():
 
 def _steps(app):
     return app.project.options.setdefault("sequence", {"steps": [], "base": 10, "pid": 9, "name": "Show", "repeat": 0})
+
+
+def _has_steps(app):
+    return bool(_steps(app).get("steps"))
+
+
+def _has_sel(app):
+    return 0 <= getattr(app, "_seq_sel", 0) < len(_steps(app).get("steps") or [])
+
+
+def _dev_steps(app):
+    return bool(app.active_host()) and _has_steps(app)
 
 
 def _save(app):
@@ -56,8 +70,10 @@ def build(app):
             dpg.add_button(label="+ Add from the sim", small=True, callback=lambda: add_step(app))
             c.tip("a new step: what the sim shows now - effect, sliders, palette, colours, segments")
             dpg.add_button(label="Update from the sim", small=True, callback=lambda: update_step(app))
+            weight.need(dpg.last_item(), _has_sel)
             c.tip("the selected step becomes what the sim shows now")
             dpg.add_button(label="Load into the sim", small=True, callback=lambda: load_step(app))
+            weight.need(dpg.last_item(), _has_sel)
             c.tip("the sim shows the selected step")
             c.info("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a playlist. "
                    "The timeline under the list: click a step to select it, drag the line between two to retime the one on the left; "
@@ -88,15 +104,19 @@ def build(app):
                           callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), None, v))
             c.tip("the ramp's shape: straight, eased at either end or both, up and back to where it began, or a jump half way")
             dpg.add_button(label="x", small=True, callback=lambda: remove_ramp(app, dpg.get_value("seq_ramp_key")))
+            weight.danger(dpg.last_item())
             c.tip("this slider's ramp off (the others stay)")
             dpg.add_text("", tag="seq_ramp_desc", color=c.DIM)
         with dpg.group(horizontal=True):
             dpg.add_text("PLAY", color=c.ACCENT)
             dpg.add_button(label="Play in the sim", tag="seq_play", small=True, callback=lambda: play(app))
+            weight.need(dpg.last_item(), _has_steps)
             dpg.add_button(label="Stop", small=True, callback=lambda: stop(app))
             dpg.add_button(label="Render GIF", small=True, callback=lambda: render(app, "gif"))
+            weight.need(dpg.last_item(), _has_steps)
             c.tip("plays the sequence once and records it as a GIF, into captures/")
             dpg.add_button(label="Render video", small=True, callback=lambda: render(app, "mp4"))
+            weight.need(dpg.last_item(), _has_steps)
             c.tip("plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path")
             dpg.add_checkbox(label="repeat", tag="seq_repeat", default_value=False,
                              callback=lambda s, v: (_steps(app).__setitem__("repeat", 0 if v else 1), app.project.save()))
@@ -117,6 +137,7 @@ def build(app):
             dpg.add_input_int(tag="seq_bar", label="a bar", width=40, step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True,
                               callback=lambda: setattr(app, "_tl_dirty", True))
             dpg.add_button(label="Snap durations to bars", small=True, callback=lambda: snap_durations(app))
+            weight.need(dpg.last_item(), _has_steps)
             c.tip("every step's seconds rounded to whole bars, so the sequence changes on the music")
             dpg.add_text("", tag="seq_tap", color=c.DIM)
         dpg.add_separator()
@@ -132,9 +153,13 @@ def build(app):
                                callback=lambda s, v: (_steps(app).__setitem__("name", v), app.project.save()))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Send presets + playlist", tag="seq_send", small=True, callback=lambda: send(app))
+            weight.need(dpg.last_item(), _dev_steps)
             c.tip("about a second a preset: the device writes each one from its main loop, and the next is sent once it has")
             dpg.add_button(label="Send and run it", tag="seq_send_run", small=True, callback=lambda: send(app, run=True))
+            weight.primary(dpg.last_item())
+            weight.need(dpg.last_item(), _dev_steps)
             dpg.add_button(label="Save presets.json...", small=True, callback=lambda: dpg.show_item("seq_save_dialog"))
+            weight.need(dpg.last_item(), _has_steps)
             c.tip("the same presets and playlist as a file, for a device that is not on the network")
         dpg.add_text("", tag="seq_log", color=c.DIM, wrap=0)
         dpg.add_separator()
@@ -145,7 +170,9 @@ def build(app):
             dpg.add_button(label="+ off at", small=True, callback=lambda: add_timer(app, "off"))
             c.tip("a time the lights go off: an Off preset (id 250) is saved on the device and timed")
             dpg.add_button(label="Read the device's", small=True, callback=lambda: read_timers(app))
+            weight.need(dpg.last_item(), "device")
             dpg.add_button(label="Send the schedule", small=True, callback=lambda: send_timers(app))
+            weight.need(dpg.last_item(), "device")
             c.info("The device's timers - eight, plus sunrise and sunset: what preset runs when, on which days. "
                    "The device needs the time (NTP) for them to fire.")
         with dpg.child_window(tag="seq_timers", height=120, border=True):
@@ -154,6 +181,9 @@ def build(app):
     with dpg.file_dialog(directory_selector=False, show=False, tag="seq_save_dialog", width=640, height=420,
                          default_filename="presets.json", callback=lambda s, a: save_file(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(150, 150, 220))
+    # the selected step's own fields and its ramp: nothing to edit with no step
+    for t in ("seq_name", "seq_dur", "seq_trans", "seq_ramp_key", "seq_ramp_end", "seq_ramp_shape"):
+        weight.need(t, _has_sel)
 
 
 def refresh(app):
@@ -177,8 +207,10 @@ def refresh(app):
             dpg.add_button(label="up", small=True, user_data=i, callback=lambda s, a, u: move_step(app, u, -1), show=i > 0)
             dpg.add_button(label="down", small=True, user_data=i, callback=lambda s, a, u: move_step(app, u, 1), show=i < len(steps) - 1)
             dpg.add_button(label="x", small=True, user_data=i, callback=lambda s, a, u: del_step(app, u))
+            weight.danger(dpg.last_item())
     if not steps:
-        dpg.add_text("no steps yet: set the sim up, then + Add from the sim", parent="seq_rows", color=c.DIM)
+        weight.empty("seq_rows", "No steps yet: a step is what the sim shows now - its effect, sliders, palette and colours.",
+                     [("Add what the sim shows", lambda: add_step(app))])
     app._tl_dirty = True
     dpg.set_value("seq_base", int(S.get("base", 10))); dpg.set_value("seq_pid", int(S.get("pid", 9)))
     dpg.set_value("seq_show", S.get("name", "Show")); dpg.set_value("seq_repeat", int(S.get("repeat", 0)) == 0)
@@ -246,8 +278,10 @@ def refresh_timers(app):
             for d in range(7):
                 dpg.add_checkbox(label=DAYS[d], default_value=bool(int(t.get("dow", 127)) >> d & 1), user_data=(k, f"d{d}"), callback=cb)
             dpg.add_button(label="x", small=True, user_data=k, callback=lambda s, a, u: del_timer(app, u))
+            weight.danger(dpg.last_item())
     if not T:
-        dpg.add_text("no timers: + run the playlist at, + off at", parent="seq_timers", color=c.DIM)
+        weight.empty("seq_timers", "No timers: the device runs the playlist, or goes off, at a time of day.",
+                     [("Run the playlist at...", lambda: add_timer(app, "playlist"))], lead=False)
 
 
 def _tfield(app, k, key, v):

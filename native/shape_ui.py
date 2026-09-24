@@ -17,6 +17,8 @@ import os
 import json
 import math
 import dearpygui.dearpygui as dpg
+
+from native import weight
 import numpy as np
 
 from native import shapes, shape_io, render
@@ -85,9 +87,11 @@ def build(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="Undo", small=True, callback=lambda: undo(app))
             dpg.add_button(label="Clear", small=True, callback=lambda: _apply(app, parts=[]))
+            weight.danger(dpg.last_item())
             dpg.add_button(label="Open...", small=True, callback=lambda: dpg.show_item("shape_open_dialog"))
             c.tip("a shape file (.shape.json) saved from here")
             dpg.add_button(label="Save...", small=True, callback=lambda: dpg.show_item("shape_save_dialog"))
+            weight.primary(dpg.last_item())
             dpg.add_button(label="Export .xmodel...", small=True, callback=lambda: dpg.show_item("shape_xmodel_dialog"))
             c.tip("the shape as an xLights custom model, the wiring as its node numbers")
             dpg.add_button(label="Export positions...", small=True, callback=lambda: dpg.show_item("shape_points_dialog"))
@@ -186,6 +190,7 @@ def refresh(app):
             dpg.add_button(label="down", small=True, user_data=i, callback=lambda s, a, u: move_part(app, u, 1), show=i < len(parts) - 1)
             dpg.add_button(label="copy", small=True, user_data=i, callback=lambda s, a, u: dup_part(app, u))
             dpg.add_button(label="x", small=True, user_data=i, callback=lambda s, a, u: del_part(app, u))
+            weight.danger(dpg.last_item())
     if not parts:
         dpg.add_text("no parts yet: + one above, import a file, or place LEDs by hand", parent="shape_parts", color=c.DIM)
     if sel < 0:
@@ -241,6 +246,7 @@ def refresh(app):
                      parent=P, color=c.DIM)
         with dpg.group(horizontal=True, parent=P):
             dpg.add_button(label="delete the last", small=True, callback=lambda: pop_point(app, sel))
+            weight.danger(dpg.last_item())
             dpg.add_button(label="renumber: nearest chain from the first", small=True, callback=lambda: chain_part(app, sel))
             if part["kind"] == "points":
                 dpg.add_button(label="turn into a path", small=True, callback=lambda: set_part(app, sel, kind="polyline"))

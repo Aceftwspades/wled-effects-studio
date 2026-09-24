@@ -173,6 +173,25 @@ STEPS = [
                 "if 'rect_min' in dpg.get_item_state(f'gnode_{n}')) >= app.gp.editor_origin()[0]"},
       {"check": "min(dpg.get_item_state(f'gnode_{n}')['rect_min'][1] for n in app.gp.graph.nodes "
                 "if 'rect_min' in dpg.get_item_state(f'gnode_{n}')) >= app.gp.editor_origin()[1]"}], 0.5),
+    # what has nothing to act on is greyed (the toolbar, the menus, a frame's buttons) and a key for it says why;
+    # the confirm's answers weighed; the Send frame with no device offers one; a theme switch recolours the dialogs' lines
+    ([{"graph_open": "box_fire.json"}, {"graph_selected": []}], 0.6),
+    ([{"check": "not dpg.get_item_configuration(app._tb_btn['delete'])['enabled'] and not dpg.get_item_configuration('mi_delete')['enabled']"},
+      {"check": "dpg.get_item_configuration(app._tb_btn['delete'])['tint_color'][3] < 0.5"},
+      {"action": "delete"}, {"graph_selected": [12, 13]}], 0.6),
+    ([{"expect": ["graph_status", "select a node first"]},
+      {"check": "dpg.get_item_configuration(app._tb_btn['delete'])['enabled'] and dpg.get_item_configuration('mi_fold')['enabled']"},
+      {"graph_selected": []},
+      {"py": "chrome.confirm(app, 'Test', 'a question', [('Send', lambda: None, 'danger'), ('Cancel', None)])"}], 0.5),
+    ([{"check": "[weight.kind_of(b) for b in dpg.get_item_children('confirm_buttons', 1)] == ['danger', 'quiet']"},
+      {"py": "dpg.hide_item('confirm_dialog')"},
+      {"py": "(setattr(app, '_dev_keep', app.project.options.get('device', '')), app.project.options.__setitem__('device', ''))"},
+      {"frame": "send"}, {"py": "device_ui.refresh_send(app)"}], 1.0),
+    ([{"check": "dpg.is_item_shown('send_find') and not dpg.get_item_configuration('send_script_btn')['enabled']"},
+      {"py": "(app.project.options.__setitem__('device', app._dev_keep), device_ui.refresh_send(app))"}, {"frame_close": "send"},
+      {"appearance": {"light": True}}], 1.5),
+    ([{"check": "abs(dpg.get_item_configuration('confirm_text')['color'][0] * 255 - chrome.TEXT[0]) < 2"},
+      {"appearance": {"light": False}}], 1.0),
     # a node's type changed with its wires kept; two nodes merged through an Add
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.change_type(3, 'Subtract') if app.gp.graph.nodes[3]['type'] == 'Multiply' else app.gp.change_type(3, 'Multiply')"}], 1.0),
     ([{"expect": ["graph_status", "is now"]}, {"graph_selected": [1, 2]}, {"py": "app.gp.merge_selected('Add')"}, {"graph_selected": []}], 1.0),

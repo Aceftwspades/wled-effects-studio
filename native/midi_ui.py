@@ -7,7 +7,7 @@ the sim streamed - the device.
 """
 import dearpygui.dearpygui as dpg
 
-from native import midi
+from native import midi, weight
 
 TAG = "midi_win"
 
@@ -38,6 +38,7 @@ def build(app):
             dpg.add_text("LEARN", color=c.ACCENT)
             dpg.add_combo([], tag="midi_target", width=300)
             dpg.add_button(label="Learn", tag="midi_learn_btn", width=80, callback=lambda: learn_from_combo(app))
+            weight.primary(dpg.last_item())
             c.tip("then move the knob (or press the button) that should drive it; Learn again cancels")
             c.info("A target is a parameter slider, a check, the palette or the effect by index, or a typed value "
                    "on a pin of the graph open now (a pin's mapping belongs to that graph). A right-click on a "
@@ -172,6 +173,7 @@ def refresh(app):
         t = m["target"]
         with dpg.group(horizontal=True, parent="midi_rows"):
             dpg.add_button(label="x", small=True, user_data=k, callback=lambda s_, a_, u: forget(app, u))
+            weight.danger(dpg.last_item())
             c.tip("remove this mapping")
             dpg.add_text(f"{midi.ctl_label(tuple(m['ctl']))}  ->  {target_label(app, t)}")
             if t.get("kind") == "pin" and not t.get("bool"):
@@ -180,7 +182,8 @@ def refresh(app):
                                         callback=lambda s_, v, u: _set_range(app, u[0], u[1], v))
                 c.tip("the pin's value at the knob's two ends")
     if not st["maps"]:
-        dpg.add_text("none yet", parent="midi_rows", color=c.DIM)
+        weight.empty("midi_rows", "No knobs on anything yet: pick what above and Learn, then move a knob - or right-click "
+                                  "a slider, or a pin in the graph.")
     _last(app)
 
 

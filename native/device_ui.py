@@ -19,7 +19,7 @@ moved by hand; floating, it can.
 import os
 import dearpygui.dearpygui as dpg
 
-from native import flash, devices, live_out
+from native import flash, devices, live_out, weight
 
 FRAMES = {"devices": ("devices_win", "DEVICES", 640, 420),
           "flash": ("flash_win", "FLASH FIRMWARE", 720, 660),
@@ -102,6 +102,7 @@ def build(app):
         header(app, "devices")
         with dpg.group(horizontal=True):
             dpg.add_button(label="Scan the network", tag="dev_scan", callback=lambda: app.scan_devices("all"))
+            weight.primary(dpg.last_item())
             c.tip("asks by mDNS, asks every known device for the nodes it has heard of, and sweeps the subnet")
             dpg.add_button(label="Stop", tag="dev_scan_stop", enabled=False, callback=lambda: app.stop_scan())
             dpg.add_input_text(tag="dev_add_host", hint="or an address: 192.168.1.50", width=200,
@@ -118,28 +119,41 @@ def build(app):
     # SEND: the active device, what it runs, the four sends
     with dpg.window(tag="send_win", show=False, width=620, height=520, no_collapse=True, no_title_bar=True):
         header(app, "send")
-        dpg.add_text("to: no device chosen - Device > Devices...", tag="send_to", color=c.TEXT, wrap=0)
+        with dpg.group(horizontal=True):
+            dpg.add_text("to: no device chosen - Device > Devices...", tag="send_to", color=c.TEXT, wrap=0)
+            dpg.add_button(label="Find a device", tag="send_find", show=False, callback=lambda: show(app, "devices"))
+            weight.primary(dpg.last_item())
         with dpg.group(horizontal=True):
             dpg.add_text("", tag="send_running", color=c.DIM, wrap=0)
             dpg.add_button(label="Read", small=True, callback=lambda: app.probe_active())
+            weight.need(dpg.last_item(), "device")
             c.tip("ask the device again what it is and runs")
             dpg.add_button(label="Open in the browser", small=True, callback=lambda: app.open_device_page())
+            weight.need(dpg.last_item(), "device")
             dpg.add_button(label="Calibrate the speed factor", small=True, callback=lambda: app.calibrate_factor())
+            weight.need(dpg.last_item(), "device")
             c.tip("the current effect's settings sent, the device's fps read for three seconds, and the footer's "
                   "device fps estimate set from the measurement (Settings > Device speed factor holds the number)")
         dpg.add_separator()
         with dpg.group(horizontal=True):
             dpg.add_button(label="Send the graph as a script", tag="send_script_btn", width=200, callback=lambda: app.send_script())
+            weight.primary(dpg.last_item())
+            weight.need(dpg.last_item(), _script_ok)
             c.tip("the graph as bytecode for the Studio Script effect - no firmware build; the device runs it at once")
             dpg.add_button(label="Send the effect's settings", width=200, callback=lambda: app.push_settings())
+            weight.need(dpg.last_item(), "device")
             c.tip("the effect the sim shows, with its sliders, checks, palette and colours, onto the device's segment")
         with dpg.group(horizontal=True):
             dpg.add_button(label="Send the shape", width=200, callback=lambda: app.send_shape())
+            weight.need(dpg.last_item(), "device")
             c.tip("the ledmap (the wiring) and the positions table, so Position and Direction see the real shape")
             dpg.add_button(label="Send the ledmap only", width=200, callback=lambda: app.send_ledmap())
+            weight.need(dpg.last_item(), "device")
         with dpg.group(horizontal=True):
             dpg.add_text("ledmap", color=c.DIM)
             dpg.add_button(label="Import the device's", small=True, callback=lambda: app.import_ledmap(host=app.active_host()))
+            weight.danger(dpg.last_item())
+            weight.need(dpg.last_item(), "device")
             c.tip("the device's ledmap becomes the geometry: a matrix with its gaps and wiring, or a strip")
             dpg.add_button(label="Import a file...", small=True, callback=lambda: dpg.show_item("ledmap_dialog"))
         dpg.add_separator()
@@ -148,6 +162,7 @@ def build(app):
             dpg.add_text("LIVE", color=c.ACCENT)
             dpg.add_checkbox(label="stream the sim to the device (DDP)", tag="live_on", default_value=False,
                              callback=lambda s, v: (app.stream_start(fps=int(dpg.get_value("live_fps"))) if v else app.stream_stop()))
+            weight.need(dpg.last_item(), "stream")          # a device to stream to (or the stream running, to stop it)
             c.tip("whatever the sim shows - any effect, built or not - on the device as it is drawn; the device goes back to its own effect when this stops")
             dpg.add_combo(["15", "30", "60"], tag="live_fps", width=60, default_value="30",
                           callback=lambda s, v: app.stream_start(fps=int(v)) if getattr(app, "ddp", None) else None)
@@ -225,10 +240,12 @@ def build_flash(app):
             pass
         with dpg.group(horizontal=True):
             dpg.add_button(label="Start", tag="flash_start", callback=lambda: start_flash(app))
+            weight.primary(dpg.last_item())
             dpg.add_checkbox(label="build", tag="flash_build", default_value=True)
             dpg.add_checkbox(label="send to the device", tag="flash_upload", default_value=True)
             dpg.add_button(label="Cancel", tag="flash_cancel", enabled=False,
                            callback=lambda: app.flash_job and app.flash_job.cancel())
+            weight.quiet(dpg.last_item())
             dpg.add_button(label="Open the build folder", callback=lambda: app.reveal(os.path.join(flash.ROOT, ".pio", "build")))
         dpg.add_text("", tag="flash_status", color=c.DIM, wrap=0)
         with dpg.child_window(tag="flash_log", height=-1, border=True):
@@ -244,8 +261,11 @@ def build_wled_dialog(app):
         dpg.add_input_text(tag="wled_dest", width=-1, default_value=wledtree.default_dest())
         with dpg.group(horizontal=True):
             dpg.add_button(label="Clone" if wledtree.has_git() else "Download", tag="wled_go", callback=lambda: fetch_wled(app))
+            weight.primary(dpg.last_item())
             dpg.add_button(label="Restart the studio", tag="wled_restart", show=False, callback=lambda: (wledtree.restart(), dpg.stop_dearpygui()))
+            weight.primary(dpg.last_item())
             dpg.add_button(label="Close", callback=lambda: dpg.hide_item("wled_dialog"))
+            weight.quiet(dpg.last_item())
             dpg.add_text("" if wledtree.has_git() else "no git on the path: the branch comes as a zip (not a repository, which PlatformIO does not mind)",
                          color=c.DIM)
         with dpg.child_window(tag="wled_log", height=-1, border=True):
@@ -392,7 +412,8 @@ def refresh_devices(app):
     active = app.active_host()
     dpg.delete_item("dev_rows", children_only=True)
     if not app.devices:
-        dpg.add_text("none yet - scan the network, or type an address", parent="dev_rows", color=c.DIM)
+        weight.empty("dev_rows", "No devices yet: Scan the network (above) finds the WLEDs on this network; or type "
+                                 "one's address and Add.")
     for d in app.devices:
         host = d["host"]
         on = host == active
@@ -408,6 +429,7 @@ def refresh_devices(app):
                 dpg.add_text("not answering", color=c.RED)
             dpg.add_button(label="use", small=True, user_data=host, callback=lambda s, a, u: app.set_active_device(u), show=not on)
             dpg.add_button(label="remove", small=True, user_data=host, callback=lambda s, a, u: app.remove_device(u))
+            weight.danger(dpg.last_item())
     n = len(app.devices)
     if not getattr(app, "_scan", None):
         dpg.set_value("dev_status", f"{n} device(s); active: {active or 'none'}")
@@ -440,6 +462,16 @@ def dev_log(app, line):
 
 
 # --- the send frame ----------------------------------------------------------------------
+def _script_ok(app):
+    """A device chosen that can run a script (one read without the Studio
+    Script effect cannot)."""
+    host = app.active_host()
+    if not host:
+        return False
+    dv = app.active_device()
+    return not (dv and dv.get("script") is False)
+
+
 def refresh_send(app):
     if not dpg.does_item_exist("send_to"):
         return
@@ -462,8 +494,8 @@ def refresh_send(app):
         dpg.set_value("send_running", f"running: {st['effect']}{fps}{' (off)' if st.get('on') is False else ''}{extra}")
     else:
         dpg.set_value("send_running", "")
-    if dpg.does_item_exist("send_script_btn"):
-        dpg.configure_item("send_script_btn", enabled=not (d and d.get("script") is False))
+    if dpg.does_item_exist("send_find"):
+        dpg.configure_item("send_find", show=not host)             # no device: the way to one, beside the line that says so
 
 
 def refresh_live(app):
@@ -555,7 +587,8 @@ def refresh_flash(app):
             kb = known.get(f)
             dpg.add_text(f"{kb / 1024:.1f} KB" if kb else "not measured yet", color=c.DIM)
     if not files:
-        dpg.add_text("the effects list is empty - File > Add to the effects list", parent="flash_fx", color=c.DIM)
+        weight.empty("flash_fx", "The effects list is empty: the firmware carries the effects on it.",
+                     [("Add this effect to the list", lambda: (app.toggle_import_current(), refresh_flash(app)))])
     if stats.get("partition"):
         base = stats["firmware"] - sum(sizes.values())
         avg = (sum(sizes.values()) / len(sizes)) if sizes else 4096
@@ -594,6 +627,7 @@ def refresh_manifest(app, env=None):
                      parent="flash_manifest", color=c.AMBER, wrap=0)
         with dpg.group(horizontal=True, parent="flash_manifest"):
             dpg.add_button(label="Get the WLED fork...", small=True, callback=lambda: show_wled_dialog(app))
+            weight.primary(dpg.last_item())
             c.tip("clones the fork's branch beside the studio (or downloads it as a zip when git is not installed), "
                   "remembers where, and restarts the studio with it")
             dpg.add_button(label="I have one: choose its folder...", small=True, callback=lambda: dpg.show_item("wled_pick_dialog"))
