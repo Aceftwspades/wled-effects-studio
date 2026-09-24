@@ -72,14 +72,18 @@ class PinThemes:
     """One theme per pin type, lit and greyed, and one per link type. Built
     once; bound to attributes and links so the wires are the colour of what
     flows through them and a pin that cannot take the drag goes grey."""
-    def __init__(self):
+    def __init__(self, light=False):
+        # on a light node body the type colours are too pale to read as text,
+        # and a little pale as wires: the text darkened, the wires a touch
         self.pin, self.grey, self.link = {}, {}, {}
         for t, col in PIN_COL.items():
-            self.pin[t] = self._attr_theme(col, col)
+            text = tuple(int(c * 0.55) for c in col) if light else col
+            wire = tuple(int(c * 0.8) for c in col) if light else col
+            self.pin[t] = self._attr_theme(col, text)
             self.grey[t] = self._attr_theme(GREY, GREY)
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvNodeLink):
-                    dpg.add_theme_color(dpg.mvNodeCol_Link, col, category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_Link, wire, category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_color(dpg.mvNodeCol_LinkHovered, (255, 255, 255), category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_color(dpg.mvNodeCol_LinkSelected, (255, 255, 255), category=dpg.mvThemeCat_Nodes)
             self.link[t] = th
@@ -661,22 +665,23 @@ class GraphPanel(Glyphs):
             return
         W, H, tag = ed["W"], ed["H"], ed["tag"]
         dpg.delete_item(tag, children_only=True)
-        dpg.draw_rectangle((0, 0), (W - 1, H - 1), color=(70, 74, 82, 255), fill=(24, 26, 30, 255), parent=tag)
+        P = self.pal()
+        dpg.draw_rectangle((0, 0), (W - 1, H - 1), color=P["plot_edge"], fill=P["plot_bg"], parent=tag)
         for k in range(1, 4):
-            dpg.draw_line((k * W / 4, 0), (k * W / 4, H - 1), color=(50, 54, 62, 255), parent=tag)
-            dpg.draw_line((0, k * H / 4), (W - 1, k * H / 4), color=(50, 54, 62, 255), parent=tag)
+            dpg.draw_line((k * W / 4, 0), (k * W / 4, H - 1), color=P["grid"], parent=tag)
+            dpg.draw_line((0, k * H / 4), (W - 1, k * H / 4), color=P["grid"], parent=tag)
         prev = None
         for x in range(0, W, 2):
             t = x / max(1, W - 1)
             y = (1.0 - max(0.0, min(1.0, self._curve_at(pts, t)))) * (H - 1)
             if prev is not None:
-                dpg.draw_line(prev, (x, y), color=(110, 190, 250, 255), thickness=2, parent=tag)
+                dpg.draw_line(prev, (x, y), color=P["live"], thickness=2, parent=tag)
             prev = (x, y)
         for k, q in enumerate(pts):
-            c = (255, 210, 90, 255) if k == ed.get("drag") else (255, 255, 255, 255)
+            c = (255, 180, 60, 255) if k == ed.get("drag") else P["point"]
             dpg.draw_circle((q[0] * (W - 1), (1.0 - q[1]) * (H - 1)), 5, color=c, fill=c, parent=tag)
             dpg.draw_text((min(W - 60, q[0] * (W - 1) + 8), max(2, (1.0 - q[1]) * (H - 1) - 16)), f"{q[0]:.2f}, {q[1]:.2f}", size=12,
-                          color=(160, 165, 175, 255), parent=tag)
+                          color=P["dim"], parent=tag)
 
     def _poll_curve_edit(self):
         ed = getattr(self, "_curve_ed", None)
@@ -796,8 +801,74 @@ class GraphPanel(Glyphs):
     # --- build the widgets from the graph -----------------------------------------
     def themes(self):
         if self._themes is None:
-            self._themes = PinThemes()
+            self._themes = PinThemes(self._light())
         return self._themes
+
+    # --- colours for the theme in force ---------------------------------------------------
+    def _light(self):
+        from native.app import theme_is_light
+        return theme_is_light(self.app.prefs)
+
+    @staticmethod
+    def _tint(col, light):
+        """A title bar's hue as it reads on the theme: dark hues under light
+        text on a dark theme; the same hue mixed with white under dark text
+        on a light one."""
+        return tuple(int(c + (255 - c) * 0.55) for c in col[:3]) if light else tuple(col[:3])
+
+    def pal(self):
+        """What the graph draws with, for the theme in force: readouts,
+        glyph lines and labels, plot boxes, the wire labels, the range bars.
+        On a dark theme these are the colours they always were."""
+        from native.app import theme_colors
+        cols = theme_colors(self.app.prefs)
+        light = self._light()
+        key = (tuple(cols["frame"]), tuple(cols["line"]), tuple(cols["text"]), tuple(cols["dim"]), tuple(cols["accent"]), light)
+        if getattr(self, "_pal_key", None) != key:
+            acc = tuple(cols["accent"])
+            live = tuple(int(c * 0.8) for c in acc) if light else (110, 190, 250)
+            self._pal_key = key
+            self._pal = {
+                "light": light,
+                "live": live + (255,), "live_line": live + (220,),
+                "text": tuple(cols["text"]) + (255,), "dim": tuple(cols["dim"]) + (255,),
+                "soft": tuple(cols["dim"]) if light else (170, 178, 192),
+                "plot_bg": tuple(cols["frame"]) + (220,), "plot_edge": tuple(cols["line"]) + (255,),
+                "grid": tuple(cols["line"]) + (255,),
+                "meter_bg": tuple(cols["line"]) + (255,),
+                "mod": (130, 90, 200, 255) if light else (190, 150, 250, 255),
+                "mod_text": (100, 80, 150, 255) if light else (150, 140, 190, 255),
+                "mod_dot": (90, 60, 160, 255) if light else (240, 232, 255, 255),
+                "popup": tuple(cols["panel"]) + (240,), "popup_edge": tuple(cols["line"]) + (255,),
+                "point": tuple(cols["text"]) + (255,) if light else (255, 255, 255, 255),
+            }
+        return self._pal
+
+    def on_theme_change(self):
+        """Settings > Appearance changed the theme: every theme made from its
+        colours is made again, and the graph rebuilt so no widget keeps the
+        old one (the value fields were left near-black on a light theme)."""
+        self._themes = None
+        self._node_themes.clear()
+        self._wire_themes.clear()
+        self._pal_key = None
+        if dpg.does_item_exist("graph_help"):
+            dpg.configure_item("graph_help", color=self.pal()["soft"])
+        self._rebind_cat_headers()
+        if self.graph and dpg.does_item_exist("node_editor"):
+            self._sync_pos()
+            self.rebuild()
+
+    def _rebind_cat_headers(self):
+        """The add menu's category headers in the hues of the theme in force."""
+        if not dpg.does_item_exist("graph_cats"):
+            return
+        on = self.app.prefs.get("cat_colours", True)
+        for k in dpg.get_item_children("graph_cats", 1) or []:
+            if dpg.does_item_exist(k) and dpg.get_item_type(k).endswith("CollapsingHeader"):
+                cat = dpg.get_item_label(k)
+                if cat in nodeface.CATEGORY_HUES:
+                    dpg.bind_item_theme(k, self._cat_header_theme(cat) if on else 0)
 
     # --- undo / redo -----------------------------------------------------------------
     # Every edit first pushes the graph as JSON. Cheap - a graph is a few KB -
@@ -1589,7 +1660,7 @@ class GraphPanel(Glyphs):
                 text = self.summary(nid)
                 if text:
                     with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
-                        dpg.add_text(text, tag=f"gsum_{nid}", color=(170, 178, 192), wrap=width)
+                        dpg.add_text(text, tag=f"gsum_{nid}", color=self.pal()["soft"], wrap=width)
             for o in d["outputs"]:
                 if hide and (nid, o["name"]) not in fed_out:
                     continue
@@ -1640,7 +1711,7 @@ class GraphPanel(Glyphs):
             with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                 if text:
                     # the function under the title, in a line of its own
-                    dpg.add_text(text[:max(1, int(width / max(1.0, self.char_w)))], tag=f"gsum_{nid}", color=(150, 158, 172))
+                    dpg.add_text(text[:max(1, int(width / max(1.0, self.char_w)))], tag=f"gsum_{nid}", color=self.pal()["soft"])
                 else:
                     dpg.add_spacer(width=width, height=1)
             for kind, p in pins:
@@ -1686,10 +1757,11 @@ class GraphPanel(Glyphs):
 
     def _cat_header_theme(self, cat):
         """The add menu's category header in the category's hue."""
-        key = ("cat", cat)
+        light = self._light()
+        key = ("cat", cat, light)
         th = self._node_themes.get(key)
         if th is None:
-            r, g, b = nodeface.hue(cat)
+            r, g, b = self._tint(nodeface.hue(cat), light)
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvCollapsingHeader):
                     dpg.add_theme_color(dpg.mvThemeCol_Header, (r, g, b, 170))
@@ -1703,21 +1775,27 @@ class GraphPanel(Glyphs):
     # busy graph can be read one piece at a time. Themes are rebound when
     # the selection changes; nothing is rebuilt.
     def _dim_theme(self):
-        th = self._node_themes.get(("dim", self.zoom))
+        light = self._light()
+        th = self._node_themes.get(("dim", self.zoom, light))
         if th is None:
+            from native.app import theme_colors
+            cols = theme_colors(self.app.prefs)
+            bg, frame, line, dim = (tuple(cols[k]) for k in ("bg", "frame", "line", "dim"))
+            # faded toward the canvas: what is out of focus sinks into the ground
+            fade = lambda c, f: tuple(int(a + (b - a) * f) for a, b in zip(c, bg))
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvNode):
-                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackground, (24, 27, 34, 110), category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackgroundHovered, (26, 30, 38, 130), category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_color(dpg.mvNodeCol_TitleBar, (30, 34, 42, 110), category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_color(dpg.mvNodeCol_TitleBarHovered, (34, 39, 48, 130), category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_color(dpg.mvNodeCol_NodeOutline, (36, 41, 50, 60), category=dpg.mvThemeCat_Nodes)
-                    dpg.add_theme_color(dpg.mvNodeCol_Pin, (60, 66, 78, 120), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackground, fade(frame, 0.5) + (110,), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackgroundHovered, fade(frame, 0.4) + (130,), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_TitleBar, fade(line, 0.4) + (110,), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_TitleBarHovered, fade(line, 0.3) + (130,), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_NodeOutline, line + (60,), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_Pin, fade(dim, 0.4) + (120,), category=dpg.mvThemeCat_Nodes)
                 with dpg.theme_component(dpg.mvAll):
-                    dpg.add_theme_color(dpg.mvThemeCol_Text, (78, 84, 96), category=dpg.mvThemeCat_Core)
-                    dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (26, 29, 36, 80), category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_Text, fade(dim, 0.45), category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_FrameBg, fade(frame, 0.5) + (80,), category=dpg.mvThemeCat_Core)
                     self._zoom_styles()
-            self._node_themes[("dim", self.zoom)] = th
+            self._node_themes[("dim", self.zoom, light)] = th
         return th
 
     def _dim_wire(self):
@@ -1906,7 +1984,7 @@ class GraphPanel(Glyphs):
             ry = ay - size * 0.55
             if rx < x0 or rx + w > x1 or ry < y0 or ry + size > y1:
                 continue
-            self._readout_items.append(dpg.draw_text((rx, ry), text, parent="wire_labels", color=(110, 190, 250, 255), size=size))
+            self._readout_items.append(dpg.draw_text((rx, ry), text, parent="wire_labels", color=self.pal()["live"], size=size))
             rng = nodeface.out_range(n, d, name) if d else None
             if rng and ry + size + 3 < y1:
                 # a meter under the number: how far along its range the value is
@@ -1915,9 +1993,9 @@ class GraphPanel(Glyphs):
                 mw = max(w, 24 * self.zoom)
                 mx = rx + w - mw
                 self._readout_items.append(dpg.draw_rectangle((mx, ry + size + 1), (mx + mw, ry + size + 3), parent="wire_labels",
-                                                              color=(0, 0, 0, 0), fill=(50, 56, 68, 255)))
+                                                              color=(0, 0, 0, 0), fill=self.pal()["meter_bg"]))
                 self._readout_items.append(dpg.draw_rectangle((mx, ry + size + 1), (mx + mw * f, ry + size + 3), parent="wire_labels",
-                                                              color=(0, 0, 0, 0), fill=(110, 190, 250, 255)))
+                                                              color=(0, 0, 0, 0), fill=self.pal()["live"]))
         self._draw_mod_ranges((x0, y0, x1, y1), size)
         self._draw_hover_plot((x0, y0, x1, y1), size)
 
@@ -1954,9 +2032,9 @@ class GraphPanel(Glyphs):
             if mx - w / 2 < x0 or mx + w / 2 > x1 or my - 9 < y0 or my + 9 > y1:
                 continue
             self._label_items.append(dpg.draw_rectangle((mx - w / 2, my - 9), (mx + w / 2, my + 9), parent="wire_labels",
-                                                        color=(60, 66, 80, 255), fill=(20, 23, 29, 235), rounding=4))
+                                                        color=self.pal()["popup_edge"], fill=self.pal()["popup"], rounding=4))
             self._label_items.append(dpg.draw_text((mx - w / 2 + 5, my - 7), text, parent="wire_labels",
-                                                   color=(200, 206, 216, 255), size=13))
+                                                   color=self.pal()["text"], size=13))
 
     # --- presets --------------------------------------------------------------------------
     # A node as it is set up now, saved by name, to drop in again. Global
@@ -2003,9 +2081,12 @@ class GraphPanel(Glyphs):
         """A node theme whose title bar is `col` (None: the default look); a
         frame's body is a wash of the same colour so the nodes inside still
         read through it; `sel` adds the key-selection outline."""
-        key = (col, frame, sel, self.zoom)
+        light = self._light()
+        key = (col, frame, sel, self.zoom, light)
         th = self._node_themes.get(key)
         if th is None:
+            if col is not None and not frame:
+                col = self._tint(col, light)             # dark title text needs a light bar under it
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvAll):
                     self._zoom_styles()
@@ -2375,13 +2456,14 @@ class GraphPanel(Glyphs):
             v = self._probe_now(k)
             f = None if v is None or hi == lo else max(0.0, min(1.0, (v - min(lo, hi)) / abs(hi - lo)))
             items = self._readout_items
-            items.append(dpg.draw_rectangle((bx, by), (bx + mw, by + 3), parent="wire_labels", color=(0, 0, 0, 0), fill=(50, 56, 68, 255)))
+            P = self.pal()
+            items.append(dpg.draw_rectangle((bx, by), (bx + mw, by + 3), parent="wire_labels", color=(0, 0, 0, 0), fill=P["meter_bg"]))
             if f is not None:
-                items.append(dpg.draw_rectangle((bx, by), (bx + mw * f, by + 3), parent="wire_labels", color=(0, 0, 0, 0), fill=(190, 150, 250, 255)))
-                items.append(dpg.draw_circle((bx + mw * f, by + 1.5), 2.5, parent="wire_labels", color=(0, 0, 0, 0), fill=(240, 232, 255, 255)))
-            items.append(dpg.draw_text((bx, by + 4), nodeface._fmt(lo), parent="wire_labels", size=small, color=(150, 140, 190, 255)))
+                items.append(dpg.draw_rectangle((bx, by), (bx + mw * f, by + 3), parent="wire_labels", color=(0, 0, 0, 0), fill=P["mod"]))
+                items.append(dpg.draw_circle((bx + mw * f, by + 1.5), 2.5, parent="wire_labels", color=(0, 0, 0, 0), fill=P["mod_dot"]))
+            items.append(dpg.draw_text((bx, by + 4), nodeface._fmt(lo), parent="wire_labels", size=small, color=P["mod_text"]))
             t = nodeface._fmt(hi)
-            items.append(dpg.draw_text((bx + mw - len(t) * small * 0.6, by + 4), t, parent="wire_labels", size=small, color=(150, 140, 190, 255)))
+            items.append(dpg.draw_text((bx + mw - len(t) * small * 0.6, by + 4), t, parent="wire_labels", size=small, color=P["mod_text"]))
             self._mod_bars[(bx, by, bx + mw, by + small + 4)] = r
 
     def _step_mod_range(self, direction):
@@ -2793,16 +2875,17 @@ class GraphPanel(Glyphs):
         pts = sorted([list(q) for q in (pts or p["default"])], key=lambda q: q[0])
         W, H = self.px(160), self.px(80)
         with dpg.drawlist(width=W, height=H):
-            dpg.draw_rectangle((0, 0), (W - 1, H - 1), color=(70, 74, 82, 255))
+            P = self.pal()
+            dpg.draw_rectangle((0, 0), (W - 1, H - 1), color=P["plot_edge"])
             prev = None
             for x in range(0, W, 2):
                 t = x / max(1, W - 1)
                 y = (1.0 - max(0.0, min(1.0, self._curve_at(pts, t)))) * (H - 1)
                 if prev is not None:
-                    dpg.draw_line(prev, (x, y), color=(110, 190, 250, 255), thickness=1.5)
+                    dpg.draw_line(prev, (x, y), color=P["live"], thickness=1.5)
                 prev = (x, y)
             for q in pts:
-                dpg.draw_circle((q[0] * (W - 1), (1.0 - q[1]) * (H - 1)), 3, color=(255, 255, 255, 255), fill=(255, 255, 255, 255))
+                dpg.draw_circle((q[0] * (W - 1), (1.0 - q[1]) * (H - 1)), 3, color=P["point"], fill=P["point"])
         for k, q in enumerate(pts):
             with dpg.group(horizontal=True):
                 w1 = dpg.add_input_float(width=self.px(56), default_value=float(q[0]), step=0, format="%.2f",
@@ -2923,12 +3006,14 @@ class GraphPanel(Glyphs):
     def _wire_theme(self, col, thin=False):
         """A wire's theme: its colour; thin for a frame-scope source (a
         value once a frame - control rate - against the per-pixel wires)."""
-        key = (col, thin, self.zoom if thin else None)
+        light = self._light()
+        key = (col, thin, self.zoom if thin else None, light)
         th = self._wire_themes.get(key)
         if th is None:
+            shown = tuple(int(c * 0.8) for c in col[:3]) if light else col   # a touch darker on a light canvas
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvNodeLink):
-                    dpg.add_theme_color(dpg.mvNodeCol_Link, col, category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_Link, shown, category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_color(dpg.mvNodeCol_LinkHovered, (255, 255, 255), category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_color(dpg.mvNodeCol_LinkSelected, (255, 255, 255), category=dpg.mvThemeCat_Nodes)
                     if thin:
@@ -3449,7 +3534,7 @@ class GraphPanel(Glyphs):
             dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
             pd_ = next((x.get("doc") for x in d["inputs"] if x["name"] == name), None)
             if pd_:
-                dpg.add_text(pd_, parent=P, color=(170, 178, 192), wrap=260)
+                dpg.add_text(pd_, parent=P, color=self.pal()["soft"], wrap=260)
             i = next(x for x in d["inputs"] if x["name"] == name)
             if linked:
                 row("disconnect", lambda: self._disconnect_in(nid, name))
@@ -3497,7 +3582,7 @@ class GraphPanel(Glyphs):
             dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
             pd_ = next((x.get("doc") for x in d["outputs"] if x["name"] == name), None)
             if pd_:
-                dpg.add_text(pd_, parent=P, color=(170, 178, 192), wrap=260)
+                dpg.add_text(pd_, parent=P, color=self.pal()["soft"], wrap=260)
             o = next(x for x in d["outputs"] if x["name"] == name)
             if self.preview == (nid, name):
                 row("stop previewing this output", self.stop_preview)
@@ -3516,7 +3601,7 @@ class GraphPanel(Glyphs):
             # settings as pins, sub-graph, more), which open in place.
             dpg.add_text(n.get("label") or d.get("label") or n["type"], parent=P, color=DIM)
             if d.get("doc"):
-                dpg.add_text(d["doc"], parent=P, color=(170, 178, 192), wrap=300)
+                dpg.add_text(d["doc"], parent=P, color=self.pal()["soft"], wrap=300)
             if nid in self.problems:
                 m = self.problems[nid]
                 dpg.add_text(m, parent=P, color=(235, 80, 70) if m.startswith("error") else (240, 190, 70))

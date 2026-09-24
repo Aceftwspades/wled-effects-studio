@@ -523,8 +523,8 @@ def build_dialogs(app):
                 "a colour you give a node still wins")
         with dpg.group(horizontal=True):
             for cat in nodeface.CATEGORY_ORDER + ("subgraphs",):
-                r, g, b = nodeface.hue(cat)
-                dpg.add_text(cat, color=(min(255, r + 90), min(255, g + 90), min(255, b + 90), 255))
+                dpg.add_color_button(list(nodeface.hue(cat)) + [255], width=12, height=12, no_border=True, no_drag_drop=True)
+                dpg.add_text(cat)
     with dpg.window(tag="sweep_win", label="Sweep a slider", show=False, width=400, height=190, no_collapse=True):
         dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
                      "record makes that one pass the GIF.", color=DIM, wrap=380)

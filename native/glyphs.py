@@ -23,9 +23,6 @@ from native.textures import registry
 HIST_N = 600            # samples kept per probe: ten seconds at 60 frames
 HIST_MAX = 256          # probes a build can plant (graph.py)
 PATCH = (48, 24)        # a thumbnail's texture, px
-LIVE_COL = (110, 190, 250, 220)
-DIM_COL = (70, 76, 88, 255)
-LIT = (170, 230, 120, 255)
 GLOW_S = 0.15           # a light's afterglow, seconds
 
 
@@ -133,7 +130,7 @@ class Glyphs:
             with dpg.drawlist(width=W, height=H, tag=tag):
                 for k in range(16):
                     x0 = k * W / 16
-                    dpg.draw_rectangle((x0 + 1, H - 1), (x0 + W / 16 - 1, H - 1), color=(0, 0, 0, 0), fill=LIVE_COL, tag=f"{tag}_{k}")
+                    dpg.draw_rectangle((x0 + 1, H - 1), (x0 + W / 16 - 1, H - 1), color=(0, 0, 0, 0), fill=self.pal()["live_line"], tag=f"{tag}_{k}")
             self._live_glyphs[nid] = "bars"
         elif t == "Wave":
             with dpg.drawlist(width=W, height=self.px(22), tag=tag):
@@ -226,7 +223,7 @@ class Glyphs:
         elif t == "Text":
             dpg.delete_item(tag, children_only=True)
             text = str(n["params"].get("text", ""))
-            dpg.draw_text((2, 1), text[:24], size=self.px(18), color=(220, 224, 232, 255), parent=tag)
+            dpg.draw_text((2, 1), text[:24], size=self.px(18), color=self.pal()["text"], parent=tag)
         elif t == "Path":
             self._draw_path(nid, n, d)
         elif t == "Scope" or t in nodeface.SPARK:
@@ -269,8 +266,8 @@ class Glyphs:
         W, H = dpg.get_item_configuration(tag)["width"], dpg.get_item_configuration(tag)["height"]
         shape = str(n["params"].get("shape", "sine"))
         pts = [(x * (W - 2) + 1, (1.0 - self._wave_y(shape, x)) * (H - 6) + 3) for x in (k / 40.0 for k in range(41))]
-        dpg.draw_polyline(pts, color=LIVE_COL, thickness=max(1, self.px(1.5)), parent=tag)
-        dpg.draw_circle((-10, -10), max(2, self.px(3)), color=(0, 0, 0, 0), fill=(255, 255, 255, 240), parent=tag, tag=f"{tag}_dot")
+        dpg.draw_polyline(pts, color=self.pal()["live_line"], thickness=max(1, self.px(1.5)), parent=tag)
+        dpg.draw_circle((-10, -10), max(2, self.px(3)), color=(0, 0, 0, 0), fill=self.pal()["point"], parent=tag, tag=f"{tag}_dot")
 
     def _draw_transfer(self, nid, n, d, wired):
         tag = f"gglyph_{nid}"
@@ -286,13 +283,13 @@ class Glyphs:
         # the baseline (y = 0) when it is in range, so the curve's sign reads
         if lo < 0.0 < hi:
             by = 2 + (1.0 - (0.0 - lo) / (hi - lo)) * (H - 4)
-            dpg.draw_line((1, by), (W - 1, by), color=(70, 76, 88, 160), parent=tag)
+            dpg.draw_line((1, by), (W - 1, by), color=self.pal()["grid"], parent=tag)
         poly = [(1 + k * (W - 2) / (len(pts) - 1), 2 + (1.0 - (y - lo) / (hi - lo)) * (H - 4)) for k, (_, y) in enumerate(pts)]
-        dpg.draw_polyline(poly, color=LIVE_COL, thickness=max(1, self.px(1.5)), parent=tag)
+        dpg.draw_polyline(poly, color=self.pal()["live_line"], thickness=max(1, self.px(1.5)), parent=tag)
         size = max(7, self.px(9))
         if size >= 8:
-            dpg.draw_text((W - 26 * size / 9, 0), nodeface._fmt(hi), size=size, color=(120, 128, 142, 255), parent=tag)
-            dpg.draw_text((W - 26 * size / 9, H - size - 1), nodeface._fmt(lo), size=size, color=(120, 128, 142, 255), parent=tag)
+            dpg.draw_text((W - 26 * size / 9, 0), nodeface._fmt(hi), size=size, color=self.pal()["dim"], parent=tag)
+            dpg.draw_text((W - 26 * size / 9, H - size - 1), nodeface._fmt(lo), size=size, color=self.pal()["dim"], parent=tag)
 
     TINTS = [(235, 235, 235), (110, 190, 250), (250, 170, 90), (170, 230, 120), (250, 110, 120), (190, 120, 235),
              (250, 230, 100), (90, 220, 210), (240, 150, 200), (160, 160, 90)]
@@ -359,8 +356,8 @@ class Glyphs:
         s = min((W - 6) / sx, (H - 6) / sy)
         ox, oy = (W - sx * s) / 2, (H - sy * s) / 2
         poly = [(ox + (x - x0) * s, H - oy - (y - y0) * s) for x, y in pts]
-        dpg.draw_polyline(poly, color=LIVE_COL, thickness=max(1, self.px(1.5)), parent=tag)
-        dpg.draw_circle(poly[0], max(2, self.px(2.5)), color=(0, 0, 0, 0), fill=(255, 255, 255, 220), parent=tag)
+        dpg.draw_polyline(poly, color=self.pal()["live_line"], thickness=max(1, self.px(1.5)), parent=tag)
+        dpg.draw_circle(poly[0], max(2, self.px(2.5)), color=(0, 0, 0, 0), fill=self.pal()["point"], parent=tag)
 
     def _draw_spark(self, nid, ys, lo, hi, scope=False):
         """A rolling plot in the node: the samples given (oldest first)
@@ -372,11 +369,12 @@ class Glyphs:
         W, H = dpg.get_item_configuration(tag)["width"], dpg.get_item_configuration(tag)["height"]
         if not dpg.does_item_exist(f"{tag}_line"):
             dpg.delete_item(tag, children_only=True)
-            dpg.draw_rectangle((0, 0), (W, H), color=(0, 0, 0, 0), fill=(20, 22, 27, 200), parent=tag)
-            dpg.draw_polyline([(0, H / 2), (W, H / 2)], color=LIVE_COL, thickness=max(1, self.px(1.2)), parent=tag, tag=f"{tag}_line")
+            P = self.pal()
+            dpg.draw_rectangle((0, 0), (W, H), color=(0, 0, 0, 0), fill=P["plot_bg"], parent=tag)
+            dpg.draw_polyline([(0, H / 2), (W, H / 2)], color=P["live_line"], thickness=max(1, self.px(1.2)), parent=tag, tag=f"{tag}_line")
             if scope:
-                dpg.draw_text((2, 0), "", size=max(8, self.px(9)), color=(120, 128, 142, 255), parent=tag, tag=f"{tag}_hi")
-                dpg.draw_text((2, H - max(8, self.px(9)) - 1), "", size=max(8, self.px(9)), color=(120, 128, 142, 255), parent=tag, tag=f"{tag}_lo")
+                dpg.draw_text((2, 0), "", size=max(8, self.px(9)), color=P["dim"], parent=tag, tag=f"{tag}_hi")
+                dpg.draw_text((2, H - max(8, self.px(9)) - 1), "", size=max(8, self.px(9)), color=P["dim"], parent=tag, tag=f"{tag}_lo")
         if len(ys) < 2:
             return
         if lo is None or hi is None:
@@ -436,7 +434,7 @@ class Glyphs:
             if dpg.does_item_exist(bt):
                 x0 = k * W / 16
                 dpg.configure_item(bt, pmin=(x0 + 1, H - 1 - v * (H - 2)), pmax=(x0 + W / 16 - 1, H - 1),
-                                   fill=(255, 220, 120, 240) if k == mine else LIVE_COL)
+                                   fill=(255, 190, 70, 240) if k == mine else self.pal()["live_line"])
 
     def _poll_wave(self, nid, n, tag):
         dot = f"{tag}_dot"
@@ -492,13 +490,17 @@ class Glyphs:
             self._patch_set(nid, a)
 
     def _lit_theme(self):
-        th = self._node_themes.get("lit")
+        light = self.pal()["light"]
+        th = self._node_themes.get(("lit", light))
         if th is None:
+            # the step playing now: an accent field, its grab in the ink that reads on it
+            bg = (150, 190, 230, 255) if light else (70, 110, 150, 255)
+            grab = (30, 60, 100, 255) if light else (240, 244, 250, 255)
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvAll):
-                    dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (70, 110, 150, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, (240, 244, 250, 255))
-            self._node_themes["lit"] = th
+                    dpg.add_theme_color(dpg.mvThemeCol_FrameBg, bg)
+                    dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, grab)
+            self._node_themes[("lit", light)] = th
         return th
 
     def _poll_steps(self, nid, n):
@@ -571,10 +573,11 @@ class Glyphs:
         if hi - lo < 1e-6:
             lo, hi = lo - 0.5, hi + 0.5
         items = self._readout_items
-        items.append(dpg.draw_rectangle((bx, by), (bx + W, by + H), color=(90, 96, 108, 255), fill=(20, 22, 27, 235), parent="wire_labels"))
+        P = self.pal()
+        items.append(dpg.draw_rectangle((bx, by), (bx + W, by + H), color=P["popup_edge"], fill=P["popup"], parent="wire_labels"))
         pts = [(bx + 1 + i * (W - 2) / (len(ys) - 1), by + 2 + (1.0 - (float(y) - lo) / (hi - lo)) * (H - 4)) for i, y in enumerate(ys)]
-        items.append(dpg.draw_polyline(pts, color=LIVE_COL, thickness=1.5, parent="wire_labels"))
-        items.append(dpg.draw_text((bx + 3, by), nodeface._fmt(hi), size=size, color=(150, 158, 172, 255), parent="wire_labels"))
-        items.append(dpg.draw_text((bx + 3, by + H - size - 1), nodeface._fmt(lo), size=size, color=(150, 158, 172, 255), parent="wire_labels"))
-        items.append(dpg.draw_text((bx + W - 3 * size, by + H - size - 1), f"{nodeface.SPARK_SECONDS:g} s", size=size, color=(110, 118, 132, 255), parent="wire_labels"))
+        items.append(dpg.draw_polyline(pts, color=P["live_line"], thickness=1.5, parent="wire_labels"))
+        items.append(dpg.draw_text((bx + 3, by), nodeface._fmt(hi), size=size, color=P["dim"], parent="wire_labels"))
+        items.append(dpg.draw_text((bx + 3, by + H - size - 1), nodeface._fmt(lo), size=size, color=P["dim"], parent="wire_labels"))
+        items.append(dpg.draw_text((bx + W - 3 * size, by + H - size - 1), f"{nodeface.SPARK_SECONDS:g} s", size=size, color=P["dim"], parent="wire_labels"))
 

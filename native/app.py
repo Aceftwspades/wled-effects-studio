@@ -633,6 +633,8 @@ class App(Features):
         chrome.DIM = tuple(cols["dim"]) + (255,)
         chrome.refresh(self)
         chrome.refresh_appearance(self)
+        if getattr(self, "gp", None) is not None:
+            self.gp.on_theme_change()                        # the graph's own themes and drawing colours, made again
         dpg.set_viewport_clear_color(list(cols["bg"]) + [255] if self.ui else [0, 0, 0, 255])
 
     # --- autosave: a version kept while there are unsaved edits -----------------
