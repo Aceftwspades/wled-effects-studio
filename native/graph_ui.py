@@ -1127,20 +1127,39 @@ class GraphPanel(Glyphs):
         self._sync_pos()
 
     def home(self):
-        """Bring the graph back to the origin: the editor cannot be panned
-        from code, so the nodes move instead, their top-left to (20, 20)."""
+        """Frame the whole graph: the zoom the largest step it fits at, its
+        top-left in the editor's corner. Only the view changes - the editor
+        cannot be panned from code, so the panel's own view offset carries
+        it; no node moves and there is nothing to undo."""
         if not self.graph or not self.graph.nodes:
             return
+        self._frame_view(list(self.graph.nodes))
+        self.status(f"the whole graph, at {int(self.zoom * 100)}%")
+
+    def _frame_view(self, nids, most=1.0):
+        """The view fitted to these nodes: the zoom the largest step their box
+        fits at (no more than `most`), and the offset that puts the box's
+        top-left 20 px in from the editor's corner. A node's place on screen
+        is (pos + offset) x zoom + the editor's own pan, so the offset is
+        worked back from the pan measured now."""
         self._sync_pos()
-        self.snapshot()
-        self.offset = [0.0, 0.0]
-        x0 = min(n["pos"][0] for n in self.graph.nodes.values())
-        y0 = min(n["pos"][1] for n in self.graph.nodes.values())
-        for nid, n in self.graph.nodes.items():
-            n["pos"] = [n["pos"][0] - x0 + 20, n["pos"][1] - y0 + 20]
-            if dpg.does_item_exist(f"gnode_{nid}"):
-                dpg.set_item_pos(f"gnode_{nid}", self._disp(n["pos"]))
-        self._frame_last = {nid: tuple(self._disp(n["pos"])) for nid, n in self.graph.nodes.items() if n["type"] == "Frame"}
+        self._measure_pan()
+        boxes = [(self.graph.nodes[n]["pos"], self._node_size(n)) for n in nids if n in self.graph.nodes]
+        if not boxes:
+            return
+        x0 = min(p[0] for p, _ in boxes); y0 = min(p[1] for p, _ in boxes)
+        x1 = max(p[0] + sz[0] for p, sz in boxes); y1 = max(p[1] + sz[1] for p, sz in boxes)
+        w, h = dpg.get_item_rect_size("node_editor") if dpg.does_item_exist("node_editor") else (0, 0)
+        if w <= 0 or h <= 0:                             # not drawn since a rebuild: the pane's size, less its rows
+            w, h = dpg.get_item_rect_size("graph_win") if dpg.does_item_exist("graph_win") else (0, 0)
+            w, h = (w, max(200, h - 160)) if w > 60 and h > 200 else (800, 600)
+        fit = min((w - 40) / max(1.0, x1 - x0), (h - 40) / max(1.0, y1 - y0))
+        z = min(most, max([zz for zz in ZOOMS if zz <= fit] or [ZOOMS[0]]))
+        self.zoom = z
+        pan = getattr(self, "pan", None) or [0.0, 0.0]
+        self.offset = [(20.0 - pan[0]) / z - x0, (20.0 - pan[1]) / z - y0]
+        self.app.prefs["zoom"] = z
+        self.rebuild()
 
     # --- selection by key --------------------------------------------------------------------
     def set_selection(self, nids):
@@ -1217,22 +1236,7 @@ class GraphPanel(Glyphs):
         sel = self._selected()
         if not sel:
             self.home(); return
-        self._sync_pos()
-        self.snapshot()
-        boxes = [(self.graph.nodes[n]["pos"], self._node_size(n)) for n in sel]
-        x0 = min(p[0] for p, _ in boxes); y0 = min(p[1] for p, _ in boxes)
-        x1 = max(p[0] + sz[0] for p, sz in boxes); y1 = max(p[1] + sz[1] for p, sz in boxes)
-        for n in self.graph.nodes.values():
-            n["pos"] = [n["pos"][0] - x0 + 20, n["pos"][1] - y0 + 20]
-        self.offset = [0.0, 0.0]
-        w, h = dpg.get_item_rect_size("node_editor") if dpg.does_item_exist("node_editor") else (0, 0)
-        if w <= 0 or h <= 0:                             # not drawn since a rebuild: the pane's size, less its rows
-            w, h = dpg.get_item_rect_size("graph_win") if dpg.does_item_exist("graph_win") else (0, 0)
-            w, h = (w, max(200, h - 160)) if w > 60 and h > 200 else (800, 600)
-        fit = min((w - 40) / max(1.0, x1 - x0), (h - 40) / max(1.0, y1 - y0))
-        z = max([zz for zz in ZOOMS if zz <= fit] or [ZOOMS[0]])
-        self.zoom = min(1.0, z) if len(sel) > 1 else min(z, 1.5)
-        self.rebuild()
+        self._frame_view(sel, 1.0 if len(sel) > 1 else 1.5)
         self.status(f"framed {len(sel)} node(s) at {int(self.zoom * 100)}%")
 
     GRID = 20                    # graph units; the editor's grid squares
@@ -1711,7 +1715,7 @@ class GraphPanel(Glyphs):
             with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                 if text:
                     # the function under the title, in a line of its own
-                    dpg.add_text(text[:max(1, int(width / max(1.0, self.char_w)))], tag=f"gsum_{nid}", color=self.pal()["soft"])
+                    dpg.add_text(nodeface.fit_words(text, max(1, int(width / max(1.0, self.char_w)))), tag=f"gsum_{nid}", color=self.pal()["soft"])
                 else:
                     dpg.add_spacer(width=width, height=1)
             for kind, p in pins:
@@ -2625,9 +2629,9 @@ class GraphPanel(Glyphs):
                 with dpg.theme_component(dpg.mvAll):
                     dpg.add_theme_color(dpg.mvThemeCol_FrameBg, fr + (255,), category=dpg.mvThemeCat_Core)
                     dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, tuple(min(255, c + 8) for c in fr) + (255,), category=dpg.mvThemeCat_Core)
-                    dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, ac + (90,), category=dpg.mvThemeCat_Core)
-                    dpg.add_theme_color(dpg.mvThemeCol_SliderGrabActive, ac + (160,), category=dpg.mvThemeCat_Core)
-                    dpg.add_theme_style(dpg.mvStyleVar_GrabMinSize, 6, category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, ac + (70,), category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_SliderGrabActive, ac + (140,), category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_style(dpg.mvStyleVar_GrabMinSize, 3, category=dpg.mvThemeCat_Core)   # a thin mark: the digits read through it
             self._field_themes[key] = th
         return th
 

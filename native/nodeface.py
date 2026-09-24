@@ -291,6 +291,23 @@ SUMMARY = {
 }
 
 
+def fit_words(text, n):
+    """`text` in at most n characters, cut at a word with "..." when it
+    does not fit - a stand-in's line is narrow, and a word cut in half
+    reads as another word ("the Speed slider, 0.")."""
+    text = str(text)
+    if len(text) <= n:
+        return text
+    if n <= 3:
+        return text[:n]
+    cut = text[:n - 3]
+    if not (text[n - 3] == " " or cut.endswith(" ")):       # the cut splits a word: back to the last whole one
+        sp = cut.rfind(" ")
+        if sp > n // 3:
+            cut = cut[:sp]
+    return cut.rstrip().rstrip(",;:").rstrip() + "..."
+
+
 def summary(n, d, wired=(), extra=None):
     """One line on what the node computes now, from its typed values."""
     V = values(n, d, wired)

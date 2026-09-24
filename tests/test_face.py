@@ -35,6 +35,16 @@ def test_every_node_summarises_in_plain_words():
     assert not bad, bad
 
 
+def test_fit_words_cuts_at_a_word():
+    assert F.fit_words("the Speed slider, 0..1", 40) == "the Speed slider, 0..1"
+    assert F.fit_words("the Speed slider, 0..1", 20) == "the Speed slider..."       # not "the Speed slider, 0."
+    assert F.fit_words("scale 6, 1 octave", 12) == "scale 6..."
+    assert len(F.fit_words("a" * 50, 10)) == 10 and F.fit_words("a" * 50, 10).endswith("...")   # one long word: cut, marked
+    assert F.fit_words("abc", 2) == "ab"
+    for n in range(4, 40):
+        assert len(F.fit_words("the microphone's volume, bands, beat", n)) <= n
+
+
 def test_hand_written_summaries():
     n, d = node("Add", inputs={"b": 0.5})
     assert F.summary(n, d, {"a"}) == "a + 0.5"

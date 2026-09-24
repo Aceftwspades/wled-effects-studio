@@ -337,18 +337,20 @@ def build_toolbar(app):
             _btn(app, "code" if key == "edit" else key, label, lambda s, a, u: app.show_layout(u), tag=f"tb_view_{key}", action=act)
             dpg.configure_item(f"tb_view_{key}", user_data=key)
         _sep()
-        _btn(app, "zoom_out", "Zoom out", lambda: app.gp.zoom_step(-1), action="zoom_out")
-        z = dpg.add_button(label="100%", tag="tb_zoom", width=46, callback=lambda: app.gp.set_zoom(1.0))
-        with dpg.tooltip(z):
-            dpg.add_text("", tag="tbtip_zoom_reset")
-        _btn(app, "zoom_in", "Zoom in", lambda: app.gp.zoom_step(1), action="zoom_in")
-        _btn(app, "frame_all", "Frame the whole graph", lambda: app.gp.home(), action="frame_all")
-        _sep()
-        _btn(app, "search", "Add a node (or right-click the graph)", lambda: app.search_nodes(), action="add_node")
-        _btn(app, "trash", "Delete the selection", lambda: app.gp.delete_selected(), action="delete")
-        _btn(app, "arrange", "Arrange the graph", lambda: app.gp.arrange(), action="arrange")
-        _btn(app, "fold", "Fold the selection into a sub-graph", lambda: app.run_action("fold"), action="fold")
-        _sep()
+        # the graph's tools, shown only while the graph is (a zoom box reading 120% over a net said nothing)
+        with dpg.group(horizontal=True, tag="tb_graph_tools"):
+            _btn(app, "zoom_out", "Zoom out", lambda: app.gp.zoom_step(-1), action="zoom_out")
+            z = dpg.add_button(label="100%", tag="tb_zoom", width=46, callback=lambda: app.gp.set_zoom(1.0))
+            with dpg.tooltip(z):
+                dpg.add_text("", tag="tbtip_zoom_reset")
+            _btn(app, "zoom_in", "Zoom in", lambda: app.gp.zoom_step(1), action="zoom_in")
+            _btn(app, "frame_all", "Frame the whole graph", lambda: app.gp.home(), action="frame_all")
+            _sep()
+            _btn(app, "search", "Add a node (or right-click the graph)", lambda: app.search_nodes(), action="add_node")
+            _btn(app, "trash", "Delete the selection", lambda: app.gp.delete_selected(), action="delete")
+            _btn(app, "arrange", "Arrange the graph", lambda: app.gp.arrange(), action="arrange")
+            _btn(app, "fold", "Fold the selection into a sub-graph", lambda: app.run_action("fold"), action="fold")
+            _sep()
         _btn(app, "devices", "Devices on the network", lambda: device_ui.show(app, "devices"), action="devices")
         _btn(app, "flash", "Build the firmware and flash the device", lambda: show_flash(app), action="flash")
         _btn(app, "send", "Send to the device: the effects, a script, the shape", lambda: device_ui.show(app, "send"), action="send_frame")
@@ -630,7 +632,7 @@ def refresh_keys(app):
         return
     dpg.delete_item("keys_rows", children_only=True)
     last = None
-    for action, label, default, ctx in ACTIONS:
+    for action, label, default, ctx in sorted(ACTIONS, key=lambda a: a[3] != "global"):   # each context's keys together, once
         if ctx != last:
             dpg.add_text("anywhere" if ctx == "global" else "in the graph", parent="keys_rows", color=ACCENT)
             last = ctx
@@ -1140,6 +1142,7 @@ def show_appearance(app):
 
 def refresh_appearance(app):
     """The editor's swatches show the colours in force."""
+    bind_value_sliders()                             # the accent may have changed
     if not dpg.does_item_exist("app_preset"):
         return
     from native.app import theme_colors, THEME_PRESETS
@@ -1151,6 +1154,31 @@ def refresh_appearance(app):
     for key in cols:
         if dpg.does_item_exist(f"app_col_{key}"):
             dpg.set_value(f"app_col_{key}", list(cols[key]) + [255])
+
+
+# the sliders that write their value on the track: a thin, translucent grab
+# over the digits instead of the theme's solid one, which hid them
+VALUE_SLIDERS = ("ain_gain", "ain_squelch", "seq_ramp_end", "snap_t", "scrub")
+_value_slider_themes = {}
+
+
+def value_slider_theme():
+    th = _value_slider_themes.get(ACCENT)
+    if th is None:
+        ac = tuple(ACCENT[:3])
+        with dpg.theme() as th:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, ac + (80,), category=dpg.mvThemeCat_Core)
+                dpg.add_theme_color(dpg.mvThemeCol_SliderGrabActive, ac + (150,), category=dpg.mvThemeCat_Core)
+                dpg.add_theme_style(dpg.mvStyleVar_GrabMinSize, 3, category=dpg.mvThemeCat_Core)
+        _value_slider_themes[ACCENT] = th
+    return th
+
+
+def bind_value_sliders():
+    for tag in VALUE_SLIDERS:
+        if dpg.does_item_exist(tag):
+            dpg.bind_item_theme(tag, value_slider_theme())
 
 
 def tip(text, item=None, wrap=360):
@@ -1430,6 +1458,8 @@ def refresh(app):
         on = app.layout == key and app.ui
         dpg.set_value(f"menu_view_{key}", on)
         dpg.configure_item(f"tb_view_{key}", tint_color=ACCENT if on else TEXT)
+    if dpg.does_item_exist("tb_graph_tools"):
+        dpg.configure_item("tb_graph_tools", show=app.layout == "graph")
     dpg.set_value("menu_present", not app.ui)
     dpg.set_value("menu_side", app.side)
     if dpg.does_item_exist("menu_props"):

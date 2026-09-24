@@ -84,6 +84,24 @@ def test_back_to_back_psave_is_the_bug_the_wait_avoids():
     assert "31" in DEV.presets and "30" not in DEV.presets
 
 
+def test_pio_references_are_expanded():
+    """The Flash frame names the partition table from platformio.ini, whose
+    envs point at it through ${esp32.extreme_partitions}: resolved, from
+    the override first, nested, ${sysenv.X} from the environment."""
+    import configparser
+    from native.flash import _pio_expand
+    a = configparser.ConfigParser(interpolation=None); b = configparser.ConfigParser(interpolation=None)
+    a.optionxform = b.optionxform = str
+    b.read_string("[esp32]\nextreme_partitions = tools/WLED_ESP32_16MB_9MB_FS.csv\nbig = ${esp32.extreme_partitions}\n")
+    a.read_string("[common]\nflags = -D X=1\n")
+    assert _pio_expand("${esp32.extreme_partitions}", (a, b)) == "tools/WLED_ESP32_16MB_9MB_FS.csv"
+    assert _pio_expand("${esp32.big}", (a, b)) == "tools/WLED_ESP32_16MB_9MB_FS.csv"          # nested
+    assert _pio_expand("${common.flags} -D Y", (a, b)) == "-D X=1 -D Y"
+    assert _pio_expand("${nowhere.x}", (a, b)) == "${nowhere.x}"                            # left as it is
+    os.environ["STUDIO_TEST_VAR"] = "abc"
+    assert _pio_expand("${sysenv.STUDIO_TEST_VAR}", (a, b)) == "abc"
+
+
 def test_ramps_become_sub_presets():
     st = {"name": "fade", "dur": 4.0, "rows": 48, "colors": [0, 0, 0], "ramps": {"ix": 250},
           "segments": [{"effect": "Rainbow", "params": {"ix": 10}, "bounds": [0, 0, 48, 48]}]}
@@ -155,7 +173,7 @@ def test_ledmap_and_geometry_table():
 
 def test_ddp_stream_counted():
     from native import live_out
-    out = live_out.DdpOut(f"127.0.0.1", port=4049) if "port" in live_out.DdpOut.__init__.__code__.co_varnames else None
+    out = live_out.DdpOut("127.0.0.1", port=4049) if "port" in live_out.DdpOut.__init__.__code__.co_varnames else None
     if out is None:
         return                                            # the sender's port is fixed to 4048; the smoke test covers it
     import numpy as np

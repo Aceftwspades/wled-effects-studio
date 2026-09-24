@@ -533,6 +533,9 @@ def poll(app):
     _poll_send(app)
     if dpg.is_item_shown(TAG):
         timeline_mouse(app)
+        fw = dpg.get_item_rect_size(TAG)[0]
+        if fw and fw != getattr(app, "_tl_frame_w", None):
+            app._tl_frame_w = fw; app._tl_dirty = True          # laid out, or resized: the timeline follows
         if getattr(app, "_seq_play", None) is not None or getattr(app, "_tl_dirty", True):
             draw_timeline(app); app._tl_dirty = False
     p = getattr(app, "_seq_play", None)
@@ -582,9 +585,11 @@ def _tl_geometry(app):
     if not dpg.does_item_exist("seq_tl") or not dpg.is_item_shown(TAG):
         return None
     st = dpg.get_item_state("seq_tl")
-    if "rect_min" not in st:
-        return None
-    (x0, y0), (w, h) = st["rect_min"], st["rect_size"]
+    cfg = dpg.get_item_configuration("seq_tl")
+    # the size it was given, not the one last drawn: drawn before its first
+    # layout it measured 0 high, and its text sat above its own top edge
+    (x0, y0) = st.get("rect_min") or (0, 0)
+    w, h = cfg["width"], cfg["height"]
     steps = _steps(app)["steps"]
     spans, t = [], 0.0
     for s in steps:
@@ -629,7 +634,10 @@ def draw_timeline(app):
     c = _c()
     dpg.delete_item("seq_tl", children_only=True)
     if dpg.does_item_exist(TAG):
-        want = max(200, int(dpg.get_item_rect_size(TAG)[0]) - 24)
+        # the frame's width as drawn, or as configured before its first
+        # layout (then it measures 0, and the timeline came out 200 px)
+        fw = dpg.get_item_rect_size(TAG)[0] or dpg.get_item_configuration(TAG)["width"]
+        want = max(200, int(fw) - 24)
         if abs(want - w) > 4:
             dpg.configure_item("seq_tl", width=want); w = want
     dpg.draw_rectangle((0, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 60), parent="seq_tl")

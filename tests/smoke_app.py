@@ -31,7 +31,7 @@ STEPS = [
     ([{"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
     # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
     ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile()"}], 20.0),
-    ([{"expect": ["edit_status", "loaded cubefx_"]}, {"graph_zoom": 1.0}, {"key": "Home"}, {"speed": 0.5},
+    ([{"expect": ["edit_status", "loaded cubefx_"]}, {"key": "Home"}, {"speed": 0.5},
       # a typed value poked into the running effect's parameter table: no rebuild
       {"py": "(app.eng.names[app.eng.idx], (lambda k: app.gp.live_poke(k[0], k[1], 0.42))(next(iter(app.gp._live))))"}], 1.5),
     ([{"expect": ["stat_txt", "speed 1/2x"]}, {"action": "speed_up"}, {"action": "speed_up"}, {"action": "speed_up"}], 1.0),
@@ -41,7 +41,7 @@ STEPS = [
       {"py": "app.led_at(*[a + b * 0.5 for a, b in zip(dpg.get_item_state('cube_img')['rect_min'], dpg.get_item_state('cube_img')['rect_size'])])"}], 0.5),
     # an XY pad on a Transform node: a point on it sets both inputs (pivot 0..1), the fields follow; undone
     ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.graph.add('Transform', (60, 60))"}, {"py": "app.gp.rebuild()"},
-      {"graph_zoom": 1.0}, {"key": "Home"}, {"pad": [0, 0.25, 0.75]}], 1.0),
+      {"graph_zoom": 1.0}, {"pad": [0, 0.25, 0.75]}], 1.0),
     ([{"py": "dpg.get_value(f'gin_{max(app.gp.graph.nodes)}_pivot_u_w')"}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     # modulation as a gesture: an LFO onto a typed value, then the beat's hit; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.modulate(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Noise'), 'scale', ('lfo', 'value', {}))"}], 1.0),
@@ -55,6 +55,11 @@ STEPS = [
     ([{"layout": "graph"}, {"graph_open": "question_block.json"},
       {"py": "setattr(app.gp, '_test_sel', [next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Bitmap')])"}], 0.8),
     ([{"paint": [0, 0, 7]}, {"py": "app.gp._bitmap_ed is not None"}, {"graph_selected": []}, {"graph_undo": True}], 0.8),
+    # Home fits the whole graph by the view alone: the zoom changes, no node's saved place does, no undo step
+    ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "setattr(app, '_home_before', (dict((k, list(n['pos'])) for k, n in app.gp.graph.nodes.items()), len(app.gp._undo)))"},
+      {"key": "Home"}], 1.0),
+    ([{"check": "app.gp.zoom < 1.0"}, {"check": "all(list(n['pos']) == app._home_before[0][k] for k, n in app.gp.graph.nodes.items())"},
+      {"check": "len(app.gp._undo) == app._home_before[1]"}, {"expect": ["graph_status", "the whole graph"]}, {"graph_zoom": 1.0}], 0.5),
     # the face of a node: a collapsed node's body is what it computes, the line follows a typed value, a stand-in
     # carries it too; the zoom scales the nodes themselves (a 50% node is half as tall); category hues on the titles
     ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "app.gp._collapse(11)"}], 1.0),

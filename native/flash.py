@@ -428,6 +428,27 @@ def firmware_bin(env):
 
 
 # --- the manifest: what the firmware will hold, before anything is built ----------------------
+_PIO_VAR = __import__("re").compile(r"\$\{([^}.]+)\.([^}]+)\}")
+
+
+def _pio_expand(value, inis, depth=0):
+    """PlatformIO's ${section.option} references resolved the way it does:
+    from the override first, then platformio.ini; ${sysenv.NAME} from the
+    environment. What cannot be resolved is left as it is."""
+    if depth > 8 or "${" not in value:
+        return value
+
+    def one(m):
+        sec, opt = m.group(1), m.group(2)
+        if sec == "sysenv":
+            return os.environ.get(opt, m.group(0))
+        for cp in inis:
+            if cp.has_option(sec, opt):
+                return _pio_expand(cp.get(sec, opt).split(";")[0].strip(), inis, depth + 1)
+        return m.group(0)
+    return _PIO_VAR.sub(one, value)
+
+
 def _env_chain(env):
     """An env and what it extends, outermost first, with each one's board and flags."""
     base = _ini(os.path.join(ROOT, "platformio.ini"))
@@ -439,7 +460,8 @@ def _env_chain(env):
         cp = next((c for c in (over, base) if c.has_section(sec)), None)
         if cp is None:
             break
-        out.append((env, {k: cp.get(sec, k, fallback="").split(";")[0].strip() for k in ("board", "board_build.partitions", "build_flags", "extends")}))
+        out.append((env, {k: _pio_expand(cp.get(sec, k, fallback="").split(";")[0].strip(), (over, base))
+                          for k in ("board", "board_build.partitions", "build_flags", "extends")}))
         nxt = cp.get(sec, "extends", fallback="")
         env = nxt.strip()[4:] if nxt.strip().startswith("env:") else None
     return out

@@ -79,9 +79,9 @@ def build(app):
     with dpg.window(tag=TAG, show=False, width=560, height=640, no_collapse=True, no_title_bar=True):
         device_ui.header(app, "shape")
         with dpg.group(horizontal=True):
-            dpg.add_text("", tag="shape_desc", color=c.DIM)
             c.info("A shape is a list of parts in wiring order. Units are LED pitches: a strip of pitch 1 has its LEDs one unit apart. "
                    "The selected part's LEDs are ringed in the 3-D view, its wiring drawn through them, its axis an arrow.")
+            dpg.add_text("", tag="shape_desc", color=c.DIM, wrap=520)
         with dpg.group(horizontal=True):
             dpg.add_button(label="Undo", small=True, callback=lambda: undo(app))
             dpg.add_button(label="Clear", small=True, callback=lambda: _apply(app, parts=[]))

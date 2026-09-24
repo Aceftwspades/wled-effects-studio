@@ -3417,6 +3417,7 @@ def build(app):
           dpg.add_text("Q net    E 3-D    W both    C code    G graph    H presentation    space play/pause    "
                        "Help > Keyboard shortcuts has the rest", tag="hint1", color=(130, 140, 155))
     chrome.build_dialogs(app)
+    chrome.bind_value_sliders()
     chrome.build_pane_menus(app)
     device_ui.refresh_devices(app)                   # the known devices into the frame and the menu
     from native import palette_ui

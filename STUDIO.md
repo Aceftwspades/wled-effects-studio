@@ -1396,6 +1396,85 @@ is the feature its line names.
       under pythonw - four before, none after. STUDIO_CONSOLE_CHILDREN=1
       hands the children their console back, to watch a build go by.
 
+### Eighth pass: the interface critique (September 2026)
+
+A critique of the whole interface from captures of every layout, frame
+and dialog at 1280 x 800 and 1920 x 1080 (published as the "Effects
+Studio Critique" page): feature-complete, but nearly everything on
+screen at once, at one weight, in a 13-px debugging font, with the
+graph and the LEDs given less room than the controls around them. Its
+findings, in the order to do them - the plain bugs first, then what
+reaches furthest; (Cn) is the critique's number.
+
+**Plain bugs**
+- [x] **The light themes in the graph** (C3): switching theme left the
+      value fields near-black under dark text until the graph was
+      reopened; title bars kept dark hues under dark title text. A theme
+      change now rebuilds the graph, light themes tint the title bars and
+      darken pin names and wires, and everything the graph draws takes
+      its colours from the theme (GraphPanel.pal). Shipped in 1.1.0. (The
+      critique first said the fields stayed dark in a light theme; they
+      only did until the graph was rebuilt.)
+- [ ] Help > Studio guide opens STUDIO.md, the development log.
+- [x] The Flash frame shows `partitions ${esp32.extreme_partitions}`
+      unexpanded: PlatformIO's ${section.option} references are resolved
+      now (the override first, nested, ${sysenv.X}).
+- [x] The Sequence frame's timeline text is clipped by the steps list: it
+      was drawn before its first layout, when it measured 0 high (the
+      text at y = -7) and the frame 0 wide (the timeline 200 px); it takes
+      its configured size and follows the frame's width.
+- [x] The Shape frame's first line runs off the frame (wrapped, its (?)
+      first).
+- [x] The Library frame's count line is cut off (a line of its own).
+- [x] Home ("Frame the whole graph") moves every node and adds an undo
+      step; so did Frame the selection. Both fit the view now - the zoom
+      the largest step the nodes fit at, the panel's view offset worked
+      back from the editor's measured pan - and no node moves.
+- [x] The shortcuts dialog lists its "anywhere" group twice.
+- [x] Slider grabs cover their own digits: a thin translucent mark on
+      every slider that writes its value (the node fields, and the
+      frames' VALUE_SLIDERS).
+- [x] The zoom box reads 120% in layouts with no graph: the graph's tools
+      are shown only in the graph layout.
+- [x] Stand-in summaries are cut mid-word (nodeface.fit_words: at a word,
+      with "...").
+
+**What reaches furthest**
+- [ ] **Help that reaches the user** (C4): Help > Tutorial and Help >
+      User guide, read inside the studio; STUDIO.md out of Help; a
+      first-run panel (the tutorial, an example, a device); shortcut keys
+      in the context menus.
+- [ ] **The graph gets the room** (C1): in the graph layout the side
+      panel folds to a rail, the 3-D view floats in a corner of the canvas,
+      the properties pane shows only when a node needs it, the help band
+      becomes a tooltip at the pointer - the canvas 75% of the width or
+      more.
+- [ ] **Button weights and empty states** (C5): primary, secondary and
+      danger buttons; controls with nothing to act on disabled or hidden;
+      each empty state offering its one next step.
+- [ ] **A type foundation and an interface size** (C2): a UI face at
+      three sizes with monospace kept for code and numbers; Settings >
+      Appearance > Interface size, 80-200%, from the monitor's scale.
+- [ ] **Forms read left to right** (C6): a label column, the control
+      after it, units inside; colours as a swatch and hex.
+- [ ] **One number control** (C7): the value on the track, drag, click to
+      type, the unit inside, a fill rather than a grab; in the panel too.
+- [ ] **One window style, frames docked** (C8).
+- [ ] **Names people use** (C9): settings, keys, usermod descriptions,
+      the footer's statistics.
+- [ ] **Messages that stay** (C10): short lines, errors held until fixed
+      and linked to their node, a log of the last fifty.
+- [ ] **Finding the way round the graph** (C11): Home fits the graph by
+      the view alone; a node's wires lit on hover and selection, the rest
+      dimmed; the minimap out of the way.
+- [ ] **Nodes spend their height on the work** (C12): control metadata in
+      the properties pane, range pairs on one row, readable glyph labels.
+- [ ] **Polish** (C13-C18): single-letter keys kept to the canvas and a
+      way out of presentation mode shown; a Window menu and a Build menu,
+      no duplicates, node menus with keys; the toolbar following the
+      layout; unlit LEDs as dim dots and the net fitted; a still selection
+      outline by default; a footer of power and fps.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads
