@@ -889,7 +889,7 @@ def _covers(app):
     """What is drawn over the view - floating frames, dialogs, open menus:
     (x0, y0, x1, y1) each - so no mark lands on top of it (the list the
     gradient frames keep off too)."""
-    return app.overlay_holes()
+    return app.overlay_holes("cube")
 
 
 def _clear(covers, x, y, pad=0.0):

@@ -40,7 +40,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui
+from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room
 from native.gpucube import CubeQuads
 from native.textures import registry as tex_registry
 from native.features import Features
@@ -188,6 +188,20 @@ def apply_theme(prefs=None):
                          (dpg.mvNodeCol_TitleBarSelected, lift(frame, 36)),
                          (dpg.mvNodeCol_BoxSelector, accent + (30,)),
                          (dpg.mvNodeCol_BoxSelectorOutline, accent + (180,))):
+                dpg.add_theme_color(t, c, category=dpg.mvThemeCat_Nodes)
+            # the minimap: a slab of the canvas, the nodes as nodes, the view in the accent
+            for t, c in ((dpg.mvNodesCol_MiniMapBackground, lift(bg, 6) + (225,)),
+                         (dpg.mvNodesCol_MiniMapBackgroundHovered, lift(bg, 10) + (240,)),
+                         (dpg.mvNodesCol_MiniMapOutline, line + (255,)),
+                         (dpg.mvNodesCol_MiniMapOutlineHovered, lift(line, 24) + (255,)),
+                         (dpg.mvNodesCol_MiniMapNodeBackground, lift(frame, 14) + (255,)),
+                         (dpg.mvNodesCol_MiniMapNodeBackgroundHovered, lift(frame, 28) + (255,)),
+                         (dpg.mvNodesCol_MiniMapNodeBackgroundSelected, accent + (255,)),
+                         (dpg.mvNodesCol_MiniMapNodeOutline, lift(frame, 30) + (255,)),
+                         (dpg.mvNodesCol_MiniMapLink, dim + (190,)),
+                         (dpg.mvNodesCol_MiniMapLinkSelected, accent + (255,)),
+                         (dpg.mvNodesCol_MiniMapCanvas, accent + (28,)),
+                         (dpg.mvNodesCol_MiniMapCanvasOutline, accent + (200,))):
                 dpg.add_theme_color(t, c, category=dpg.mvThemeCat_Nodes)
     dpg.bind_theme(th)
     return th
@@ -1612,7 +1626,7 @@ class App(Features):
             self.show_layout("graph")
             self.relayout()
         if dpg.does_item_exist("node_editor"):
-            x, y = dpg.get_item_rect_min("node_editor")
+            x, y = self.gp.editor_origin()
             w, h = dpg.get_item_rect_size("node_editor")
             self.gp._menu_pos = self.gp._to_graph((x + w * 0.4, y + h * 0.3))
             self.gp.show_add_menu((x + w * 0.4, y + h * 0.3))
@@ -1809,7 +1823,7 @@ class App(Features):
         if slot == "cube":
             return "cube_win"
         if slot == "side":
-            return "side_win"
+            return "rail_win" if room.folded(self) else "side_win"
         if slot == "props":
             return "props_win"
         if slot in self.OPTIONAL:
@@ -1824,7 +1838,7 @@ class App(Features):
         return self.layout in ("both", "net") and not self.popouts.is_out("net")
 
     def cube_on(self):
-        return self.layout in ("both", "cube", "edit", "graph") and not self.popouts.is_out("cube")
+        return self.layout in ("both", "cube", "edit", "graph") and not self.popouts.is_out("cube") and not room.tucked(self)
 
     def slot_shown(self, slot):
         if not self.ui:
@@ -1832,11 +1846,11 @@ class App(Features):
         if slot in self.OPTIONAL:
             return self.docked(slot)
         if slot == "props":
-            return self.layout == "graph" and self.props
+            return self.layout == "graph" and self.props and not room.active(self)     # canvas first: over the canvas
         if slot == "side":
             return self.side
         if slot == "cube":
-            return self.cube_on()
+            return self.cube_on() and not room.active(self)
         if self.layout == "cube":
             return False
         return self.net_on() if self.layout in ("both", "net") else True
@@ -1892,10 +1906,12 @@ class App(Features):
         G = self.SPLIT
         n = len(cols)
         fr = self._col_fracs(cols)
-        free_w = W - G * (n - 1) - sum(self.side_w for c in cols if c == ["side"])
+        folded = room.folded(self)
+        side_px = room.side_px(self)
+        free_w = W - G * (n - 1) - sum(side_px for c in cols if c == ["side"])
         free_w = max(VIEW_MIN * max(1, len(fr)), free_w)
         self._free_w = free_w
-        widths = [self.side_w if c == ["side"] else max(VIEW_MIN, int(free_w * fr[i])) for i, c in enumerate(cols)]
+        widths = [side_px if c == ["side"] else max(VIEW_MIN, int(free_w * fr[i])) for i, c in enumerate(cols)]
         rects, splits = {}, []
         self._rows_h = []
         x = x0
@@ -1911,7 +1927,7 @@ class App(Features):
                 if j < len(c) - 1:
                     splits.append(("h", i, j, x, y + h, w, G))
                     y += h + G
-            if i < n - 1:
+            if i < n - 1 and not (folded and ["side"] in (c, cols[i + 1])):
                 splits.append(("v", i, 0, x + w, y0, G, H))
             x += w + G
         return rects, splits
@@ -2103,6 +2119,7 @@ class App(Features):
         """
         vw = max(640, dpg.get_viewport_client_width())
         vh = max(420, dpg.get_viewport_client_height())
+        room.prepare(self)                   # the 3-D view and the properties: over the canvas, or among the panes
 
         # What is on screen decides what there is room for. A popped-out view
         # is on another window; hidden here. Presenting shows pictures only:
@@ -2131,6 +2148,10 @@ class App(Features):
             pane_h = max(VIEW_MIN, vh - top - fh - 18)
             rects, splits = self.pane_rects(8, top, vw - 16, pane_h)
             main, cube = rects.get("main"), rects.get("cube")
+            if cube is None and main and room.pip_on(self):
+                cube = room.pip_geometry(self, main)          # the 3-D view in its corner of the graph
+                dpg.configure_item("cube_win", width=cube[2], height=cube[3])   # its size before the picture is centred in it
+            self._cube_rect = cube
             # each view is a square: the largest its pane's inside allows
             side_l = max(VIEW_MIN, min(main[2] - 22, main[3] - CAP_H)) if (main and show_net) else VIEW_MIN
             side = max(VIEW_MIN, min(cube[2] - 22, cube[3] - CAP_H)) if cube else VIEW_MIN
@@ -2139,6 +2160,7 @@ class App(Features):
             # padding, so none of it gets an allowance. The picture takes the
             # whole frame less the gap between two of them.
             pane_h = max(VIEW_MIN, vh)
+            self._cube_rect = None
             avail = vw - (16 if nview == 2 else 0)
             left_w = max(VIEW_MIN, avail // max(1, nview))
             side_l = side = max(VIEW_MIN, min(left_w, pane_h))
@@ -2148,8 +2170,9 @@ class App(Features):
         dpg.configure_item("cube_win", show=show_cube)
         dpg.configure_item("edit_win", show=show_edit)
         dpg.configure_item("graph_win", show=show_graph)
-        dpg.configure_item("side_win", show=self.ui and self.side)
-        dpg.configure_item("props_win", show=self.slot_shown("props"))
+        dpg.configure_item("side_win", show=self.ui and self.side and not room.folded(self))
+        dpg.configure_item("rail_win", show=room.rail(self))
+        dpg.configure_item("props_win", show=self.slot_shown("props") or room.active(self))   # over the canvas: its window decides
         for slot in self.OPTIONAL:
             tag = self.pane_of(slot)
             if dpg.does_item_exist(tag) and self.docked(slot):
@@ -2193,9 +2216,12 @@ class App(Features):
         if self.ui:
             # A pane once placed no longer flows in its row; every one is
             # placed here, from the arrangement.
-            for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win"):
+            for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win", "rail_win"):
                 dpg.reset_pos(tag)
             for slot, (x, y, w, h) in rects.items():
+                if slot == "side" and room.rail(self):
+                    room.place_side(self, (x, y, w, h))        # the rail at the edge, the panel beside it
+                    continue
                 tag = self.pane_of(slot)
                 dpg.configure_item(tag, width=w, height=h)
                 dpg.set_item_pos(tag, [x, y])
@@ -2246,6 +2272,7 @@ class App(Features):
             if "cube" in rects and not self.ab and rects["cube"][2] < 340:
                 dpg.set_value("cube_cap", "3-D view")
         self.centre_views()
+        room.place(self, rects)              # the windows over the canvas, the help band, the rail's buttons
 
     def centre_views(self):
         """A view sits in the middle of its pane, not in its top-left corner:
@@ -2323,7 +2350,7 @@ class App(Features):
         if self.gpu_points_active():
             from native.gpucube import PointQuads
             self.point_quads = PointQuads("cube_win", "cube_img", self.view_positions())
-            r = self._rects.get("cube")
+            r = getattr(self, "_cube_rect", None)
             if r and self.ui:
                 self.point_quads.resize(self.view_side, r[2] - 22, r[3] - CAP_H)
             else:
@@ -2340,7 +2367,7 @@ class App(Features):
             dpg.add_raw_texture(n, n, np.zeros(n * n * 4, np.float32), format=dpg.mvFormat_Float_rgba, tag="cube_src_tex", parent=tex_registry())
             self._bufs.pop("cube_src", None)
             self.cube_quads = CubeQuads("cube_win", "cube_img", "cube_src_tex")
-            r = self._rects.get("cube")
+            r = getattr(self, "_cube_rect", None)
             if r and self.ui:
                 self.cube_quads.resize(self.view_side, r[2] - 22, r[3] - CAP_H)
             else:
@@ -2409,6 +2436,8 @@ class App(Features):
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
         reader_ui.clicked(self)
+        if room.press(self):
+            return                                       # the 3-D view's ::: or size handle, over the graph
         if dpg.does_item_exist("help_split") and dpg.is_item_shown("help_split") and dpg.is_item_hovered("help_split"):
             self._split_drag = ("help_split", dpg.get_mouse_pos(local=False)[1], int(self.prefs.get("help_h", 46)))
             return
@@ -2466,11 +2495,21 @@ class App(Features):
             if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_hovered(tag):
                 self.focus = tag                      # a docked frame counts: Undo then goes to it
                 break
-        if self.layout == "graph":
+        if self.layout == "graph" and not self.over_float():
             self.gp.on_press()
+
+    def over_float(self):
+        """The pointer on something floating over the panes - a frame, a
+        dialog, the 3-D view or the properties over the graph: a press there
+        is not the graph's, though a node lies under it (the graph finds the
+        node under the pointer by its rectangle)."""
+        mx, my = dpg.get_mouse_pos(local=False)
+        return any(x0 <= mx <= x1 and y0 <= my <= y1 for x0, y0, x1, y1 in (getattr(self, "_holes", None) or ()))
 
     def on_mouse_release(self, sender, app_data):
         if shape_ui.release(self):
+            return
+        if room.release(self):
             return
         if self._sec_drag:
             key, target = self._sec_drag, self._sec_target
@@ -2521,6 +2560,8 @@ class App(Features):
 
     def on_drag(self, sender, app_data):
         if shape_ui.drag(self):
+            return
+        if room.drag(self):
             return
         if self._sec_drag:
             self._ghost_move()
@@ -2602,6 +2643,8 @@ class App(Features):
         self.pitch = max(-1.45, min(1.45, self._pitch0 + dy * k))
 
     def on_wheel(self, sender, app_data):
+        if room.wheel(self, app_data):
+            return                                       # Ctrl+wheel over the 3-D view in its corner: its size
         if self.layout == "edit" and self.code_ed is not None and dpg.does_item_exist("code_ed") and dpg.is_item_hovered("code_ed"):
             self.code_ed.wheel(app_data)
             return
@@ -2748,6 +2791,9 @@ class App(Features):
             "node_ref":     lambda: reader_ui.open_doc(self, "NODES.md"),
             "node_help":    gp.help_here,
             "welcome":      lambda: reader_ui.show_welcome(self),
+            "graph_room":   lambda: room.set_on(self, not room.on(self)),
+            "graph_panel":  lambda: room.toggle_panel(self),
+            "pip":          lambda: room.set_tucked(self, not room.pip(self)["tucked"]),
             "flash":        lambda: chrome.show_flash(self),
             "push":         self.push_settings,
             "stream":       lambda: self.stream_stop() if getattr(self, "ddp", None) is not None else self.stream_start(),
@@ -3044,6 +3090,9 @@ class App(Features):
         self.request_layout()
 
     def toggle_props(self):
+        if room.active(self):
+            room.pin_props(self, not getattr(self, "props_pinned", False))    # canvas first: N pins them open
+            return
         self.props = not self.props
         self.prefs["props_pane"] = self.props
         save_prefs(self.prefs)
@@ -3243,7 +3292,7 @@ def build(app):
     with dpg.window(tag="root", no_scroll_with_mouse=True):
         chrome.build_menus(app)
         chrome.build_toolbar(app)
-        with dpg.group(horizontal=True):
+        with dpg.group(horizontal=True, tag="panes_row"):
             with dpg.child_window(tag="net_win", width=420, height=470):
                 chrome.grip("net_win")
                 with dpg.group(horizontal=True):
@@ -3428,6 +3477,7 @@ def build(app):
     chrome.build_dialogs(app)
     chrome.bind_value_sliders()
     chrome.build_pane_menus(app)
+    room.build(app)                                  # the graph's room: the rail, the windows over the canvas
     device_ui.refresh_devices(app)                   # the known devices into the frame and the menu
     from native import palette_ui
     palette_ui.sync(app)                             # the project's custom palettes into the engine and the combos
@@ -3583,7 +3633,7 @@ def service_command(app):
                 (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
             if "check" in c:                            # test hook: an expression that must be true (graded as expect is)
                 try:
-                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui})
+                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room})
                 except Exception as e:
                     v = f"raised {e!r}"
                 print(("check ok     " if v is True or (v and not isinstance(v, str)) else "EXPECT FAILED check ") + f"{c['check'][:90]}: {v!r}"[:200])
@@ -3653,7 +3703,7 @@ def service_command(app):
                 app.wiring_stop() if c["wiring_test"] == "off" else app.wiring_start(c["wiring_test"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
-                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui})))
+                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room})))
                 except Exception:
                     import traceback; traceback.print_exc()
             if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]
@@ -3957,6 +4007,7 @@ def service_command(app):
                 n = app.gp.graph.nodes[int(nid)]; d = app.gp.graph.node_def(n)
                 if kind == "node":
                     app.gp.help(f"{d.get('label') or n['type']}: {d.get('doc', '')}")
+                    app.gp._help_hold = time.time() + 3.0
                 else:
                     app.gp.hover_pin(kind, int(nid), name, hold=3.0)      # a plot beside a frame-scope output, held 3 s
             if "graph_image_convert" in c:
@@ -4581,6 +4632,7 @@ def main():
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 midi_ui.poll(app)
                 reader_ui.poll(app)
+                room.poll(app)
                 app.poll_calibration()
                 chrome.poll_update(app); chrome.poll_update_download(app)
                 _t.append(time.perf_counter())

@@ -1407,6 +1407,9 @@ findings, in the order to do them - the plain bugs first, then what
 reaches furthest; (Cn) is the critique's number.
 
 **Plain bugs**
+- [x] The graph's zoom and tools on the toolbar stayed pale on a light
+      theme: grouped (to hide them outside the graph), they were missed by
+      the re-tint, which walks the group now.
 - [x] **The light themes in the graph** (C3): switching theme left the
       value fields near-black under dark text until the graph was
       reopened; title bars kept dark hues under dark title text. A theme
@@ -1468,11 +1471,32 @@ reaches furthest; (Cn) is the critique's number.
       and a test that none does again; tests/test_reader.py (parsing, the
       wrap against Dear ImGui's own example, links, every node's entry,
       the keys), smoke steps for all of it.
-- [ ] **The graph gets the room** (C1): in the graph layout the side
-      panel folds to a rail, the 3-D view floats in a corner of the canvas,
-      the properties pane shows only when a node needs it, the help band
-      becomes a tooltip at the pointer - the canvas 75% of the width or
-      more.
+- [x] **The graph gets the room** (C1): canvas first (native/room.py,
+      View > Graph: canvas first, on by default) - the graph 96% of the
+      width at 1920 and 95% at 1280, where it had 53%. The side panel
+      folds to a rail of its sections' icons (drawn for it) at the
+      window's edge; a click opens the panel beside the rail at that
+      section, or goes to it when open, the section in view lit on the
+      rail; the rail's top button folds it (a panel opened on the graph's
+      left moves the view back as far, so no node moves on the screen).
+      The 3-D view floats in a corner of the canvas: its ::: drags it to
+      the nearest corner, its handle or Ctrl+wheel sizes it, its tuck
+      button puts it away to a tab (not drawn meanwhile); the minimap
+      keeps to a corner it leaves free. The properties come up over the
+      canvas only for a node that needs them (text over several lines, a
+      file, a curve, a bitmap) or while the add menu describes a node; N
+      pins them, their x closes them until the selection changes, and
+      they size to what they hold, above the 3-D view on its side. The
+      help band became the help at the pointer, after a rest. What floats
+      over the canvas is a top-level window: overlapping child windows of
+      the root take the pointer in the order they were first drawn (the
+      node editor's canvas, made later, would have won); the 3-D view and
+      the properties move into their windows while the graph is up and
+      back among the panes after, and the 3-D view's own overlays still
+      draw on it. A press on anything floating over the graph is no
+      longer the graph's (it finds nodes by their rectangles: a click on
+      the 3-D view over a node pressed the node). The panes mode is the
+      arrangement as it was.
 - [ ] **Button weights and empty states** (C5): primary, secondary and
       danger buttons; controls with nothing to act on disabled or hidden;
       each empty state offering its one next step.
@@ -1490,7 +1514,14 @@ reaches furthest; (Cn) is the critique's number.
       and linked to their node, a log of the last fifty.
 - [ ] **Finding the way round the graph** (C11): Home fits the graph by
       the view alone; a node's wires lit on hover and selection, the rest
-      dimmed; the minimap out of the way.
+      dimmed; the minimap out of the way. (Home: done, and now right - the
+      node editor reports no position of its own, so the pan measured
+      against its 0, 0 took in the editor's place and Home put the graph's
+      corner at the screen's (20, 20), under the rows above the canvas; the
+      editor's origin is worked out from its pane now, and a smoke step
+      checks every node lands inside. The minimap: out of the 3-D view's
+      corner, and in the theme's colours - it kept imnodes' dark ones on a
+      light theme.)
 - [ ] **Nodes spend their height on the work** (C12): control metadata in
       the properties pane, range pairs on one row, readable glyph labels.
 - [ ] **Polish** (C13-C18): single-letter keys kept to the canvas and a

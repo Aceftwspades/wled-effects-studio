@@ -18,7 +18,7 @@ import dearpygui.dearpygui as dpg
 from native.icons import texture
 from native.project import save_prefs
 from native.keys import ACTIONS, FIXED
-from native import glow, flash, device_ui
+from native import glow, flash, device_ui, room
 
 TEXT   = (215, 219, 227, 255)
 DIM    = (139, 147, 163, 255)
@@ -149,6 +149,15 @@ def build_menus(app):
                               callback=lambda: app.toggle_side())
             _mi(app, "Properties pane (graph)", "props_pane", check=True, tag="menu_props",
                 callback=lambda: app.toggle_props())
+            tip("the selected node's longer settings; canvas first they come up over the graph when a node needs them, "
+                "and this (N) keeps them open")
+            _mi(app, "Graph: canvas first", "graph_room", check=True, tag="menu_graph_room",
+                callback=lambda: room.set_on(app, not room.on(app)))
+            tip("the graph takes the window: the 3-D view in a corner of it, the properties over it when a node needs "
+                "them, the panel a rail of its sections, the help at the pointer; off, they sit beside the graph as panes")
+            _mi(app, "3-D view over the graph", "pip", check=True, tag="menu_pip",
+                callback=lambda: room.set_tucked(app, not room.pip(app)["tucked"]))
+            tip("canvas first: the 3-D view in its corner of the graph, or tucked away to a tab")
             _mi(app, "Focus mode (dim all but the selection)", "focus_mode", check=True, tag="menu_focus",
                 callback=lambda s, a: app.gp.set_focus_mode(bool(a)))
             _mi(app, "Fullscreen", "fullscreen", callback=lambda: dpg.toggle_viewport_fullscreen())
@@ -1449,9 +1458,10 @@ def refresh(app):
     app._chrome_sig = _signature(app)
     # every icon in the plain text colour first (the theme may have changed
     # it), then the ones with a state of their own
-    for child in dpg.get_item_children("toolbar", 1) or []:
-        if "ImageButton" in dpg.get_item_type(child):
-            dpg.configure_item(child, tint_color=TEXT)
+    for bar in ("toolbar", "tb_graph_tools"):          # the graph's tools are a group of their own in it
+        for child in dpg.get_item_children(bar, 1) or [] if dpg.does_item_exist(bar) else []:
+            if "ImageButton" in dpg.get_item_type(child):
+                dpg.configure_item(child, tint_color=TEXT)
     for k, (_, arr) in enumerate(app.PRESETS):
         if dpg.does_item_exist(f"menu_arr_{k}"):
             dpg.set_value(f"menu_arr_{k}", app.arrangement == arr)
@@ -1474,7 +1484,11 @@ def refresh(app):
     dpg.set_value("menu_present", not app.ui)
     dpg.set_value("menu_side", app.side)
     if dpg.does_item_exist("menu_props"):
-        dpg.set_value("menu_props", app.props)
+        dpg.set_value("menu_props", getattr(app, "props_pinned", False) if room.active(app) else app.props)
+    if dpg.does_item_exist("menu_graph_room"):
+        dpg.set_value("menu_graph_room", room.on(app))
+    if dpg.does_item_exist("menu_pip"):
+        dpg.set_value("menu_pip", not room.pip(app)["tucked"])
     dpg.set_value("menu_focus", app.gp.focus_mode)
     if dpg.does_item_exist("mi_compare"):
         dpg.configure_item("mi_compare", label="Stop comparing" if app.ab else "Compare with another effect...")

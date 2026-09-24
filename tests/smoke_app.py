@@ -144,6 +144,35 @@ STEPS = [
     ([{"check": "dpg.is_item_shown('welcome_win')"}, {"py": "reader_ui.welcome_closed(app)"},
       {"check": "app.prefs.get('welcome_done') is True and not dpg.is_item_shown('welcome_win')"},
       {"py": "dpg.hide_item('reader_win')"}], 0.5),
+    # the graph gets the room (canvas first): the graph most of the window, the 3-D view in its corner, the rail;
+    # the panel opened at a section beside the rail, and folded; a Bitmap's properties over the canvas, closed;
+    # the help at the pointer; the 3-D view tucked away and back, in another corner; the panes, and back
+    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}], 1.5),
+    ([{"check": "room.active(app) and room.folded(app) and dpg.is_item_shown('rail_win') and dpg.is_item_shown('pip_win')"},
+      {"check": "app._rects['main'][2] > 0.8 * dpg.get_viewport_client_width()"},
+      {"check": "not dpg.is_item_shown('graph_help_box') and not dpg.is_item_shown('props_fly')"},
+      {"check": "room.parent_is('cube_win', 'pip_win')"},
+      {"py": "room.open_panel(app, 'parameters')"}], 1.0),
+    ([{"check": "dpg.is_item_shown('side_win') and dpg.is_item_shown('rail_win') and not room.folded(app)"},
+      {"py": "room.fold_panel(app)"}, {"graph_open": "smiley.json"}, {"graph_selected": [5]}], 1.5),
+    ([{"check": "dpg.is_item_shown('props_fly') and room.parent_is('props_win', 'props_fly')"},
+      {"py": "room.dismiss_props(app)"}], 0.6),
+    ([{"check": "not dpg.is_item_shown('props_fly')"}, {"graph_selected": []}, {"py": "room.S.__setattr__('test_at', (600, 400))"},
+      {"graph_hover": ["node", 5, None]}], 1.0),
+    ([{"check": "dpg.is_item_shown('help_tip') and 'Bitmap' in dpg.get_value('help_tip_text')"},
+      {"py": "room.S.__setattr__('test_at', None)"}, {"py": "room.set_tucked(app, True)"}], 1.0),
+    ([{"check": "dpg.is_item_shown('pip_tab') and not dpg.is_item_shown('pip_win') and not app.cube_on()"},
+      {"py": "(room.set_tucked(app, False), room.pip(app).__setitem__('corner', 'tl'), app.request_layout())"}], 1.0),
+    ([{"check": "room.S.pip_rect[0] < app._rects['main'][0] + 40 and room.S.pip_rect[1] < app._rects['main'][1] + 80"},
+      {"py": "(room.pip(app).__setitem__('corner', 'br'), room.set_on(app, False))"}], 1.5),
+    ([{"check": "not room.active(app) and room.parent_is('cube_win', 'panes_row')"},
+      {"check": "'cube' in app._rects and dpg.is_item_shown('graph_help_box') and not dpg.is_item_shown('rail_win')"},
+      {"py": "room.set_on(app, True)"}, {"graph_open": "box_fire.json"}, {"key": "Home"}], 1.5),
+    # Home puts the whole graph inside the canvas (the editor reports no position of its own: measured from its pane)
+    ([{"check": "min(dpg.get_item_state(f'gnode_{n}')['rect_min'][0] for n in app.gp.graph.nodes "
+                "if 'rect_min' in dpg.get_item_state(f'gnode_{n}')) >= app.gp.editor_origin()[0]"},
+      {"check": "min(dpg.get_item_state(f'gnode_{n}')['rect_min'][1] for n in app.gp.graph.nodes "
+                "if 'rect_min' in dpg.get_item_state(f'gnode_{n}')) >= app.gp.editor_origin()[1]"}], 0.5),
     # a node's type changed with its wires kept; two nodes merged through an Add
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.change_type(3, 'Subtract') if app.gp.graph.nodes[3]['type'] == 'Multiply' else app.gp.change_type(3, 'Multiply')"}], 1.0),
     ([{"expect": ["graph_status", "is now"]}, {"graph_selected": [1, 2]}, {"py": "app.gp.merge_selected('Add')"}, {"graph_selected": []}], 1.0),

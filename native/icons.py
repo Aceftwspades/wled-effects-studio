@@ -325,7 +325,70 @@ def _float(ic):
     ic.rect(0.1, 0.32, 0.66, 0.46)
 
 
+# --- the rail: the side panel's sections, folded beside the graph (room.py) ---------------
+def _fx(ic):
+    # a four-pointed sparkle and a small one: the effect
+    ic.poly([(0.42, 0.08), (0.52, 0.36), (0.8, 0.46), (0.52, 0.56), (0.42, 0.86), (0.32, 0.56), (0.04, 0.46), (0.32, 0.36)])
+    ic.poly([(0.8, 0.06), (0.84, 0.18), (0.96, 0.22), (0.84, 0.26), (0.8, 0.38), (0.76, 0.26), (0.64, 0.22), (0.76, 0.18)])
+
+def _segments(ic):
+    # a strip in three runs: the segments
+    for x0, x1 in ((0.06, 0.34), (0.4, 0.62), (0.68, 0.94)):
+        ic.rect(x0, 0.38, x1, 0.62)
+    ic.seg((0.37, 0.24), (0.37, 0.76), w=0.05); ic.seg((0.65, 0.24), (0.65, 0.76), w=0.05)
+
+def _swatches(ic):
+    # three colours: the segment's colour pickers
+    ic.circle((0.3, 0.36), 0.2); ic.ring((0.7, 0.36), 0.17, w=0.08); ic.ring((0.5, 0.7), 0.17, w=0.08)
+
+def _sliders(ic):
+    # three sliders at three settings: the effect's parameters
+    for y, k in ((0.24, 0.3), (0.5, 0.66), (0.76, 0.46)):
+        ic.seg((0.1, y), (0.9, y), w=0.06)
+        ic.rect(k - 0.07, y - 0.11, k + 0.07, y + 0.11)
+
+def _audio(ic):
+    # a speaker and its sound: the synthetic audio
+    ic.poly([(0.08, 0.38), (0.26, 0.38), (0.48, 0.16), (0.48, 0.84), (0.26, 0.62), (0.08, 0.62)])
+    ic.arc((0.48, 0.5), 0.2, -50, 50, w=0.08); ic.arc((0.48, 0.5), 0.38, -50, 50, w=0.08)
+
+def _mic(ic):
+    # a microphone: live audio in
+    ic.rect(0.38, 0.1, 0.62, 0.54); ic.circle((0.5, 0.12), 0.12); ic.circle((0.5, 0.52), 0.12)
+    ic.arc((0.5, 0.5), 0.24, 0, 180, w=0.07)
+    ic.seg((0.5, 0.74), (0.5, 0.9), w=0.07); ic.seg((0.34, 0.9), (0.66, 0.9), w=0.07)
+
+def _rail_open(ic):
+    # a pane with a chevron out of it: open the panel
+    ic.box(0.1, 0.1, 0.9, 0.9, w=0.08); ic.rect(0.6, 0.1, 0.9, 0.9)
+    ic.path([(0.44, 0.3), (0.26, 0.5), (0.44, 0.7)], w=0.09)
+
+def _rail_fold(ic):
+    # a chevron into a thin bar: fold the panel to its rail
+    ic.rect(0.72, 0.1, 0.88, 0.9)
+    ic.path([(0.3, 0.26), (0.54, 0.5), (0.3, 0.74)], w=0.1)
+
+def _tuck(ic):
+    # a window lowered to a bar: tuck the 3-D view away
+    ic.box(0.1, 0.1, 0.9, 0.62, w=0.08)
+    ic.rect(0.1, 0.76, 0.9, 0.9)
+    ic.arrow((0.5, 0.2), (0.5, 0.56), w=0.08, hw=0.12, hl=0.13)
+
+def _resize(ic):
+    # a diagonal with a head at each end: the view's size
+    ic.seg((0.26, 0.26), (0.74, 0.74), w=0.1)
+    ic.poly([(0.08, 0.08), (0.5, 0.08), (0.08, 0.5)])
+    ic.poly([(0.92, 0.92), (0.5, 0.92), (0.92, 0.5)])
+
+def _pip(ic):
+    # a small window in the corner of a big one: the 3-D view over the graph
+    ic.box(0.06, 0.12, 0.94, 0.88, w=0.08)
+    ic.rect(0.52, 0.5, 0.86, 0.8)
+
+
 ICONS = {
+    "fx": _fx, "segments": _segments, "swatches": _swatches, "sliders": _sliders, "audio": _audio, "mic": _mic,
+    "rail_open": _rail_open, "rail_fold": _rail_fold, "tuck": _tuck, "resize": _resize, "pip": _pip,
     "new": _new, "open": _open, "save": _save, "build": _build, "live": _live,
     "undo": _undo, "redo": _redo, "play": _play, "pause": _pause, "step": _step, "restart": _restart,
     "net": _net, "cube": _cube, "both": _both, "code": _code, "graph": _graph,

@@ -762,8 +762,8 @@ class GraphPanel(Glyphs):
         self._help_at = now
         if not self.graph or not dpg.does_item_exist("node_editor") or not dpg.is_item_shown("node_editor"):
             return
-        if not dpg.is_item_hovered("node_editor"):
-            return
+        if not dpg.is_item_hovered("node_editor") or now < getattr(self, "_help_hold", 0.0):
+            return                                    # (a hold: the tests' hover, which has no pointer)
         for (nid, kind, name), tag in self._pins.items():
             if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
                 if nid in self.graph.nodes:
@@ -894,6 +894,19 @@ class GraphPanel(Glyphs):
     def _graph(self, disp):
         return [disp[0] / self.zoom - self.offset[0], disp[1] / self.zoom - self.offset[1]]
 
+    def editor_origin(self):
+        """The node editor's top-left on the screen. Dear PyGui reports none
+        for it (its rect_min reads 0, 0, so a pan measured against that took
+        in the editor's own place, and Home put the graph's corner at the
+        screen's (20, 20), over the rows above the canvas). It fills its pane
+        to the bottom, less the pane's padding (the theme's 10), and its
+        height is its own."""
+        r = self.app._screen_rect("graph_win") if dpg.does_item_exist("graph_win") else None
+        if not r or not dpg.does_item_exist("node_editor"):
+            return (0.0, 0.0)
+        eh = dpg.get_item_rect_size("node_editor")[1]
+        return (r[0] + 10.0, r[3] - 10.0 - eh)
+
     def _measure_pan(self):
         """The editor's own panning, read off a node: where imnodes drew it
         against where it was placed. Counting middle-drags misses the
@@ -901,7 +914,7 @@ class GraphPanel(Glyphs):
         edge), and a wrong pan puts the zoom off the pointer."""
         if not self.graph or not dpg.does_item_exist("node_editor"):
             return
-        ex, ey = dpg.get_item_rect_min("node_editor")
+        ex, ey = self.editor_origin()
         for nid in self.graph.nodes:
             tag = f"gnode_{nid}"
             if not dpg.does_item_exist(tag):
@@ -917,7 +930,7 @@ class GraphPanel(Glyphs):
         """A screen point -> graph units, allowing for the editor's panning as
         far as it has been watched."""
         self._measure_pan()
-        ex, ey = dpg.get_item_rect_min("node_editor")
+        ex, ey = self.editor_origin()
         return self._graph([screen[0] - ex - self.pan[0], screen[1] - ey - self.pan[1]])
 
     def _font_px(self):
@@ -1008,7 +1021,7 @@ class GraphPanel(Glyphs):
             return
         self._sync_pos()
         self._measure_pan()
-        ex, ey = dpg.get_item_rect_min("node_editor")
+        ex, ey = self.editor_origin()
         if at is None:
             w, h = dpg.get_item_rect_size("node_editor")
             at = (ex + w / 2, ey + h / 2)
@@ -1135,6 +1148,16 @@ class GraphPanel(Glyphs):
             return
         self._frame_view(list(self.graph.nodes))
         self.status(f"the whole graph, at {int(self.zoom * 100)}%")
+
+    def shift_view(self, dx):
+        """The canvas's left edge moved dx to the right on the screen (the
+        panel opened beside it on the left): the view moves back as far, so
+        no node moves on the screen."""
+        if not dx or not self.graph or not self.zoom:
+            return
+        self._sync_pos()
+        self.offset[0] -= dx / self.zoom
+        self.rebuild()
 
     def _frame_view(self, nids, most=1.0):
         """The view fitted to these nodes: the zoom the largest step their box

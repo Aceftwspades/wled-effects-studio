@@ -418,16 +418,23 @@ class Features:
         dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
         self.probe_active()
 
-    def overlay_holes(self):
+    def overlay_holes(self, over=None):
         """The screen rectangles nothing may be drawn over: every window
         floating over the panes, the dialogs, the open menus - the same
-        list the gradient frames keep off (poll_glow)."""
+        list the gradient frames keep off (poll_glow). over="cube": for
+        what is drawn on the 3-D view, whose own window (in its corner of
+        the graph, room.py) is no hole to it."""
         holes = getattr(self, "_holes", None)
         if holes is None:
             try:
                 holes = self.compute_holes()
             except Exception:
                 holes = []
+        if over == "cube":
+            from native import room
+            h = room.cube_hole(self)
+            if h:
+                holes = [q for q in holes if max(abs(a - b) for a, b in zip(q, h)) > 6]
         return list(holes)
 
     # --- the 3-D view's surroundings: camera presets, saved views, a background picture --

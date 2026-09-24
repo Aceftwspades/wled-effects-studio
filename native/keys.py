@@ -25,6 +25,9 @@ ACTIONS = [
     ("fullscreen",    "Fullscreen window",                                   "F11",    "global"),
     ("side_panel",    "Hide / show the side panel",                          "Ctrl+Shift+H", "global"),
     ("props_pane",    "Hide / show the graph's properties pane",             "N",      "graph"),
+    ("graph_room",    "Graph layout: canvas first (3-D in a corner, the panel a rail) or panes", "", "global"),
+    ("graph_panel",   "The side panel beside the graph: open it / fold it to its rail", "", "graph"),
+    ("pip",           "The 3-D view over the graph: tuck it away / bring it back", "", "graph"),
     # playback
     ("play_pause",    "Play / pause",                                        "Space",  "global"),
     ("step",          "Step one frame",                                      ".",      "global"),

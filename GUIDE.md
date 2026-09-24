@@ -71,10 +71,27 @@ right half is the device and the frames: devices (Ctrl+Shift+N), flash
 the palettes (Ctrl+Shift+G), the LED outputs (Ctrl+Shift+O) and the audio
 input (Ctrl+Shift+M). Playback > Randomise is Ctrl+Shift+X.
 
-A node's long settings (bitmap rows, expressions, files) are edited in
-the Properties pane, which sits under the 3-D view in the graph layout (N
-hides it); while the add menu is open, the node under the pointer is
-described there - what it does, every pin and setting - before you add it. The panes go where you want them: drag one by the `:::` at its top right
+**The graph gets the room.** In the graph layout the canvas takes the
+window (View > Graph: canvas first; off, the 3-D view, the properties
+and the panel sit beside the graph as panes, as in the other layouts).
+The side panel folds to a **rail** of its sections' icons at the
+window's edge: a click opens the panel beside the rail at that
+section (or, the panel open, goes to it, the section in view lit on the
+rail), and the rail's top button folds it away again. The **3-D view** sits in
+a corner of the graph: its `:::` drags it to another corner, its size
+handle (or Ctrl+wheel over it) sizes it, and its tuck button puts it
+away to a tab in the corner, where it is not drawn until the tab (or
+View > 3-D view over the graph) brings it back; the minimap keeps to a
+corner the view leaves free. A node's long settings (bitmap rows,
+expressions, files, curves) come up in the **properties** over the graph
+while such a node is selected, and while the add menu is open the node
+under the pointer is described there - what it does, every pin and
+setting - before you add it; N keeps them open, their x closes them
+until another node is selected. As panes, the properties sit under the
+3-D view (N hides them). What a node or pin does comes up **at the
+pointer** when it rests on one (as panes, in the box above the graph).
+
+The panes go where you want them: drag one by the `:::` at its top right
 onto another - near an edge it snaps beside or above that pane, in the
 middle the two swap - or pick a preset under View > Layout; the splitters
 between panes resize them. A view can leave for a second monitor: View >
@@ -105,8 +122,9 @@ its travel below the geometric middle. Two
 inputs that make one point - Transform's pivot and move, Gravity's
 tilt, Mandelbrot's Julia constant - also get an **XY pad**: drag the dot
 and both fields follow. Effect settings' palette is picked by name. Every
-node and pin explains itself in the box above the graph when hovered, and
-while the effect is on the cube the box shows the pin's live value. The
+node and pin explains itself at the pointer when hovered (or in the box
+above the graph, as panes), and while the effect is on the cube that
+shows the pin's live value. The
 bolt on the toolbar (**L**) rebuilds as you edit; F5 rebuilds on demand.
 A typed value on a pin needs no rebuild at all: the compiled effect
 reads it from a small table, and dragging the field (or the XY pad)
@@ -144,8 +162,7 @@ node computes, and its wires - for getting about a big graph. Every
 node has that **one line**: `a × 2`, `0..1 -> 3..5`, `sine × 3 cycles`,
 `-> target in 0.2 s`, the palette's name - made from its settings and
 typed values, following a drag. A collapsed node shows it as its body,
-and the box above the graph puts it before the node's description on
-hover. Nodes wear their **category's colour** on the title bar (amber
+and the help on hover puts it before the node's description. Nodes wear their **category's colour** on the title bar (amber
 sliders, blue signals, teal coordinates, violet patterns, slate maths,
 rust colour, green custom code, magenta output; the add menu's headers
 match), so a graph reads by colour first; Settings > Appearance has the
@@ -564,7 +581,9 @@ on and install what it carries.
 - **View** › Graph `G`
 - **View** › Presentation (hide controls) `H`
 - **View** › Side panel
-- **View** › Properties pane (graph) `N`
+- **View** › Properties pane (graph) `N` — the selected node's longer settings; canvas first they come up over the graph when a node needs them, and this (N) keeps them open
+- **View** › Graph: canvas first — the graph takes the window: the 3-D view in a corner of it, the properties over it when a node needs them, the panel a rail of its sections, the help at the pointer; off, they sit beside the graph as panes
+- **View** › 3-D view over the graph — canvas first: the 3-D view in its corner of the graph, or tucked away to a tab
 - **View** › Focus mode (dim all but the selection) `/`
 - **View** › Fullscreen `F11`
 - **View › Zoom** › Zoom in `Ctrl+=`
@@ -682,6 +701,9 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `F11` | Fullscreen window | anywhere |
 | `Ctrl+Shift+H` | Hide / show the side panel | anywhere |
 | `N` | Hide / show the graph's properties pane | in the graph |
+| `—` | Graph layout: canvas first (3-D in a corner, the panel a rail) or panes | anywhere |
+| `—` | The side panel beside the graph: open it / fold it to its rail | in the graph |
+| `—` | The 3-D view over the graph: tuck it away / bring it back | in the graph |
 | `Space` | Play / pause | anywhere |
 | `.` | Step one frame | anywhere |
 | `Shift+,` | Playback slower (1/4x .. 4x) | anywhere |
@@ -814,6 +836,6 @@ Every button, with what its tooltip says.
 
 **Report a problem**: `Open the issues page` — a new issue on the studio's GitHub page, in the browser - attach the zip there; `Show the zip` — the captures folder, where the report landed; `Close`
 
-**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z; `Redo` — Redo  Ctrl+Y; `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete; `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G; `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `sec_effect_arrow`; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play a WAV file...`; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
+**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z; `Redo` — Redo  Ctrl+Y; `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete; `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G; `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play a WAV file...`; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or a WAV file - goes to it; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
 
 <!-- uiref end -->
