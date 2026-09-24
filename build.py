@@ -43,6 +43,18 @@ GEN = os.path.join(HERE, "gen")
 os.makedirs(GEN, exist_ok=True)
 
 
+def wasm_shell_command(line, emsdk_env, platform=None):
+    """Prepare the Emscripten command for the current host shell.
+
+    Windows needs emsdk_env.bat to populate cmd.exe's environment. On POSIX,
+    setup-emsdk and normal emsdk installations expose em++ directly on PATH.
+    """
+    platform = platform or os.name
+    if platform == "nt":
+        return f'"{emsdk_env}" >nul 2>&1 && {line}'
+    return line
+
+
 def extract_palette_names():
     """Lift JSON_palette_names out of FX_fcn.cpp into gen/palette_names.json.
 
@@ -542,11 +554,10 @@ def main():
     for k in ("MSYSTEM", "MSYS", "MSYSTEM_PREFIX"):
         env.pop(k, None)
 
-    # The bat's own output is kept on failure - suppressing it unconditionally
-    # is what hid this for so long.
-    r = subprocess.run(f'"{EMSDK}" >nul 2>&1 && {line}', shell=True, cwd=HERE,
+    # Windows needs the batch file; on POSIX em++ is already on PATH.
+    r = subprocess.run(wasm_shell_command(line, EMSDK), shell=True, cwd=HERE,
                        capture_output=True, text=True, env=env)
-    if r.returncode != 0 and "is not recognized" in ((r.stdout or "") + (r.stderr or "")):
+    if os.name == "nt" and r.returncode != 0 and "is not recognized" in ((r.stdout or "") + (r.stderr or "")):
         probe = subprocess.run(f'"{EMSDK}" && where emcc', shell=True, cwd=HERE,
                                capture_output=True, text=True, env=env)
         print("  emcc not found; emsdk_env.bat said:")

@@ -5,6 +5,7 @@ effects, previewed on a simulated cube, sphere, matrix, strip or any shape
 you build, with synthetic or live audio - then sent to the device as a
 script, as its settings, or flashed into the firmware.
 
+- **[Live demo](https://Aceftwspades.github.io/wled-toy)** - try the browser-based simulator
 - **[GUIDE.md](GUIDE.md)** - how to use it, from the first run to a show on the device
 - **[TUTORIAL.md](TUTORIAL.md)** - a first effect, node by node
 - **[NODES.md](NODES.md)** - every node
