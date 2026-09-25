@@ -161,7 +161,12 @@ of its range. Press `=` over a number on a node (or use "type an
 expression..." in a pin's menu, "type an expression for" in the node's)
 for a box that takes **arithmetic**: `2*pi`, `1/3`, `x*2` (x is the
 value it has), `sqrt(2)`, `min(a, 4)` with the node's own numbers by
-name, `rand()`; Enter sets it, Escape leaves it. Two
+name, `rand()`; Enter sets it, Escape leaves it. Pins and settings go by
+names in words - Remap's "in low" and "out high", Smoothstep's "edge 0",
+a Steps node's "step 3" - where their keys are code (`in_lo`, `e0`,
+`s3`); an expression takes either (`in_low` or `in_lo`), and the node
+reference gives both. Likewise a slider is its effect's own name
+everywhere (MIDI learn, Sweep, a sequence's ramp), not its key. Two
 inputs that make one point - Transform's pivot and move, Gravity's
 tilt, Mandelbrot's Julia constant - also get an **XY pad**: drag the dot
 and both fields follow. Effect settings' palette is picked by name. Every

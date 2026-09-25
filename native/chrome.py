@@ -995,15 +995,17 @@ def _feature_rows(app, parent="flash_features"):
     from native.nodedefs import NEEDS
     f = flash.features_of(app.project)
     dpg.delete_item(parent, children_only=True)
-    # a row each: the check, its files; what it brings and which nodes lean on it on hover
+    # a row each: the check, what it brings; its whole story, the nodes that lean on it and its files on hover
     for key, label, files, flag, what in flash.FEATURES:
         with dpg.group(horizontal=True, parent=parent):
             dpg.add_checkbox(label=label, default_value=bool(f.get(key)), user_data=key,
                              callback=lambda s, a, u: app.set_feature(u, bool(a)))
             nodes = sorted(n for n, need in NEEDS.items() if need == key)
-            tip(what + (f" Nodes: {', '.join(nodes)}." if nodes else ""))
-            typeface.small(dpg.add_text(files, color=DIM))
+            tip(what + (f" Nodes: {', '.join(nodes)}." if nodes else "") + f" Files: {files}.")
+            typeface.small(dpg.add_text(flash.BRIEF.get(key, ""), color=DIM))
+            tip(what + (f" Nodes: {', '.join(nodes)}." if nodes else "") + f" Files: {files}.")
     with dpg.group(horizontal=True, parent=parent):
+        form.inline("audio")
         labels = [a[1] for a in flash.AUDIO]
         cur = next((a[1] for a in flash.AUDIO if a[0] == f["audio"]), labels[0])
         dpg.add_combo(labels, default_value=cur, width=px(420), tag=f"{parent}_audio",
@@ -1011,7 +1013,6 @@ def _feature_rows(app, parent="flash_features"):
         what = next(a[2] for a in flash.AUDIO if a[0] == f["audio"])
         nodes = sorted(n for n, need in NEEDS.items() if need == "audio")
         tip(what + f" Nodes: {', '.join(nodes)}.")
-        dpg.add_text("audio", color=DIM)
 
 
 def show_usermods(app):
@@ -1438,10 +1439,13 @@ SWEEP_KEYS = ("sx", "ix", "c1", "c2", "c3")
 def show_sweep(app):
     m = app.eng.meta[app.eng.idx]
     generic = {"sx": "Speed", "ix": "Intensity", "c1": "Custom 1", "c2": "Custom 2", "c3": "Custom 3"}
-    labels = []
+    labels, app._sweep_keys = [], {}
     for i, k in enumerate(SWEEP_KEYS):
         lab = (m["labels"][i] if i < len(m["labels"]) else "").strip()
-        labels.append(f"{k}  {lab if lab and lab != '!' else generic[k]}")
+        lab = lab if lab and lab != "!" else generic[k]
+        if lab in app._sweep_keys:
+            lab = f"{lab} ({generic[k]})"                # two the same: told apart by the slider's place
+        labels.append(lab); app._sweep_keys[lab] = k        # the slider's own words, its key kept out of sight (C9)
     dpg.configure_item("sweep_key", items=labels)
     dpg.set_value("sweep_key", labels[0])
     _centre("sweep_win", 400, 190)
@@ -1449,7 +1453,7 @@ def show_sweep(app):
 
 
 def _sweep_start(app):
-    key = (dpg.get_value("sweep_key") or "sx").split()[0]
+    key = (getattr(app, "_sweep_keys", {}) or {}).get(dpg.get_value("sweep_key"), "sx")
     dpg.hide_item("sweep_win")
     app.start_sweep(key, dpg.get_value("sweep_secs"), loop=dpg.get_value("sweep_loop") and not dpg.get_value("sweep_rec"),
                     record=dpg.get_value("sweep_rec"))

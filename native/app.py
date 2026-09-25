@@ -3279,9 +3279,11 @@ class App(Features):
             power = f"   power {pw[0] / 1000.0:.2f} A" + (f" (limiter {int(pw[1] * 100)}%)" if pw[2] and pw[1] < 1.0 else "")
         speed = f"   speed {speed_label(self.speed)}" if self.speed != 1.0 else ""
         hover = self.hover_text()
+        # the picture's measures in words (C9): the average brightness and its spread, 0..255; the share of
+        # LEDs all but off; how saturated the lit ones are, 0..255 - engine.stats keeps the harness's maths
         dpg.set_value("stat_txt",
-                      f"mean {s['mean']:5.1f}   sigma {s['sigma']:5.1f}   "
-                      f"dark {s['dark']:4.1f}%   sat {s['sat']:3d}" + speed + hover + power + est)
+                      f"brightness {s['mean']:5.1f}   contrast {s['sigma']:5.1f}   "
+                      f"unlit {s['dark']:4.1f}%   saturation {s['sat']:3d}" + speed + hover + power + est)
         if dpg.does_item_exist("scrub_row"):
             show = (not self.playing) and len(self.history_frames) > 1
             if dpg.is_item_shown("scrub_row") != show:
@@ -3415,7 +3417,7 @@ def build(app):
                                       callback=app.on_palette)
                     # Only meaningful while a CubeFX audio palette is selected -
                     # it is where those four take their colours from.
-                    with form.row("pal source", tip="where a CubeFX audio palette takes its colours from"):
+                    with form.row("colours from", tip="the palette a CubeFX audio palette takes its colours from"):
                         dpg.add_combo([p[0] for p in PALETTES if p[1] < 201],
                                       width=-1, tag="pal_src",
                                       default_value=app.palette_name_for(app.eng.pal_source),

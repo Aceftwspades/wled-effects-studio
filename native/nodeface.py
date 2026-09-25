@@ -308,6 +308,58 @@ def fit_words(text, n):
     return cut.rstrip().rstrip(",;:").rstrip() + "..."
 
 
+# --- names people use (the critique's C9) ------------------------------------------------------
+# A pin's or a setting's name is its key - in the graph's files, the expressions, MIDI's mappings,
+# the reference's tables - and some keys are code: in_lo, e0, turns_a, gx. These are what the node,
+# its menus and its help show instead. The key still works wherever a name is typed.
+LABELS = {
+    ("Smoothstep", "e0"): "edge 0", ("Smoothstep", "e1"): "edge 1",
+    ("Clamp", "lo"): "low", ("Clamp", "hi"): "high",
+    ("Power", "e"): "exponent", ("Modulo", "m"): "period",
+    ("HSV", "h"): "hue", ("HSV", "s"): "saturation", ("HSV", "v"): "value",
+    ("Frame", "w"): "width", ("Frame", "h"): "height",
+    ("Mandelbrot", "jx"): "julia x", ("Mandelbrot", "jy"): "julia y",
+    ("Gravity", "gx"): "down x", ("Gravity", "gy"): "down y", ("Gravity", "gz"): "down z",
+    ("Spring", "hz"): "swings a second", ("Time", "dt"): "frame ms", ("Voronoi", "id"): "cell",
+    ("Pixel", "i"): "index", ("Text", "i"): "letter",
+    ("Math", "op"): "operation", ("Vector math", "op"): "operation",
+    ("Coords", "cx"): "centred x", ("Coords", "cy"): "centred y",
+    ("Ripple", "cx"): "centre x", ("Ripple", "cy"): "centre y",
+    ("Cube face", "nx"): "normal x", ("Cube face", "ny"): "normal y", ("Cube face", "nz"): "normal z",
+    ("Direction", "nx"): "x", ("Direction", "ny"): "y", ("Direction", "nz"): "z",
+    ("Direction to", "turns_a"): "round", ("Direction to", "turns_b"): "up",
+    ("Sequencer", "start_running"): "run at start",
+    ("Particles", "burst_count"): "burst size", ("Particles", "random_pos"): "born anywhere",
+    ("Particles", "on_surface"): "on the surface",
+    ("Image", "alpha_clear"): "transparent is off",
+    ("Bifurcation", "c_lo"): "c from", ("Bifurcation", "c_hi"): "c to",
+    ("Bifurcation", "x_lo"): "x from", ("Bifurcation", "x_hi"): "x to",
+    ("Drain", "height_field"): "heights", ("Drain", "water_field"): "water",
+    ("Transform", "move_u"): "move across", ("Transform", "move_v"): "move down",
+    ("Transform", "pivot_u"): "pivot across", ("Transform", "pivot_v"): "pivot down",
+    ("Flip", "flip_u"): "left-right", ("Flip", "flip_v"): "top-bottom",
+}
+
+
+def label(type_, name):
+    """What a pin or a setting of a `type_` node is shown by: its own name
+    where there is one (LABELS), else the key in words - "in_lo" as "in
+    low", "s3" (a Steps step) as "step 3", "c5" (a Colour pick's) as
+    "colour 5", "tilt_x" as "tilt x"."""
+    import re
+    got = LABELS.get((type_, name))
+    if got:
+        return got
+    if type_ == "Steps" and re.fullmatch(r"s\d", name):
+        return f"step {name[1:]}"
+    if type_ == "Sequencer" and re.fullmatch(r"t\d", name):
+        return f"phase {name[1:]}"
+    if type_ == "Colour pick" and re.fullmatch(r"c\d", name):
+        return f"colour {name[1:]}"
+    words = re.sub(r"_lo$", " low", re.sub(r"_hi$", " high", name))
+    return words.replace("_", " ")
+
+
 def fit_width(text, width, measure):
     """fit_words by the drawn width: the longest cut at a word, with "...",
     whose `measure` (px, the face's) is within `width` - in a proportional

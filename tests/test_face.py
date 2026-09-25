@@ -45,6 +45,24 @@ def test_fit_words_cuts_at_a_word():
         assert len(F.fit_words("the microphone's volume, bands, beat", n)) <= n
 
 
+def test_pins_and_settings_go_by_names_people_use():
+    """C9: a pin or a setting shows in words - no underscores, no bare
+    codes (in_lo is "in low", Smoothstep's e0 "edge 0", a Steps s3
+    "step 3") - and no node shows two of its inputs and settings, or two
+    of its outputs, by the same name."""
+    lib = library()
+    assert F.label("Remap", "in_lo") == "in low" and F.label("Remap", "out_hi") == "out high"
+    assert F.label("Smoothstep", "e0") == "edge 0" and F.label("Steps", "s3") == "step 3"
+    assert F.label("Colour pick", "c5") == "colour 5" and F.label("Noise", "scale") == "scale"
+    bad = []
+    for t, d in lib.items():
+        for group in (d.get("inputs", []) + d.get("params", []), d.get("outputs", [])):
+            shown = [F.label(t, p["name"]) for p in group]
+            bad += [f"{t}: {s!r} twice" for s in set(shown) if shown.count(s) > 1]
+            bad += [f"{t}: {s!r} has an underscore" for s in shown if "_" in s]
+    assert not bad, bad
+
+
 def test_fit_width_cuts_at_a_word_by_the_drawn_width():
     """A stand-in's line in the interface's face: fitted by the width the
     words are drawn, so narrow letters fit more of them than wide ones."""

@@ -8,6 +8,7 @@ the sim streamed - the device.
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import nodeface
 from native import num
 from native import typeface
 
@@ -78,11 +79,16 @@ def targets(app):
     """[(label, target)]: the sliders and checks of the effect on screen,
     the palette and the effect by index, the typed pins of the graph."""
     labels = _fx_labels(app)
-    out = [(f"{labels[k]}  ({k})", {"kind": "fx", "key": k}) for k in midi.FX_KEYS]
+    out = [(labels[k], {"kind": "fx", "key": k}) for k in midi.FX_KEYS]         # by the effect's own words, no keys (C9)
     m = app.eng.meta[app.eng.idx]
     for i, k in enumerate(midi.CHECK_KEYS):
         if 5 + i < len(m["labels"]) and m["labels"][5 + i].strip():
-            out.append((f"{labels[k]}  ({k})", {"kind": "check", "key": k}))
+            out.append((labels[k], {"kind": "check", "key": k}))
+    seen = {}
+    for j, (lab, t) in enumerate(out):                                            # two the same: told apart by their place
+        if lab in seen:
+            out[j] = (f"{lab} ({'slider' if t['kind'] == 'fx' else 'check'} {midi.FX_KEYS.index(t['key']) + 1 if t['kind'] == 'fx' else midi.CHECK_KEYS.index(t['key']) + 1})", t)
+        seen[lab] = True
     out.append(("the palette, by index", {"kind": "palette"}))
     out.append(("the effect, by index", {"kind": "effect"}))
     g = app.gp.graph
@@ -95,7 +101,7 @@ def targets(app):
                 continue
             for i in d["inputs"]:
                 if i["type"] in ("float", "bool") and (nid, i["name"]) not in wired:
-                    out.append((f"{n['type']} #{nid} . {i['name']}", pin_target(app, nid, i["name"])))
+                    out.append((f"{n['type']} #{nid} . {nodeface.label(n['type'], i['name'])}", pin_target(app, nid, i["name"])))
     return out
 
 
@@ -126,7 +132,7 @@ def pin_target(app, nid, name):
 def target_label(app, t):
     kind = t.get("kind")
     if kind in ("fx", "check"):
-        return f"{_fx_labels(app).get(t.get('key'), t.get('key'))}  ({t.get('key')})"
+        return _fx_labels(app).get(t.get("key"), t.get("key"))
     if kind == "palette":
         return "the palette"
     if kind == "effect":
@@ -135,7 +141,7 @@ def target_label(app, t):
         g = app.gp.graph
         n = g.nodes.get(t.get("nid")) if g and app.gp.file == t.get("graph") else None
         who = f"{n['type']} #{t['nid']}" if n else f"#{t.get('nid')} of {t.get('graph')}"
-        return f"{who} . {t.get('name')}"
+        return f"{who} . {nodeface.label(n['type'], t.get('name')) if n else t.get('name')}"
     return str(t)
 
 

@@ -190,7 +190,7 @@ DOCS = {
         "out": {"min": "the smallest value anywhere", "max": "the largest", "mean": "the average"},
         "params": {"field": "which field to measure"}},
     "Particles": {
-        "doc": "Sparks, rain, fireworks, embers. Points are born at `rate` a second (and `burst_count` at once when "
+        "doc": "Sparks, rain, fireworks, embers. Points are born at `rate` a second (and `burst size` at once when "
                "burst is true), fly with a velocity plus some random spread, fall with gravity, slow with drag, and "
                "die after `life` seconds. They stay on the cube's surface unless you say otherwise. Wire slots to "
                "Sprites to see them.",
@@ -439,17 +439,17 @@ DOCS = {
     "Divide": {"doc": "a / b (0 when b is 0).", "in": {"a": "the number to divide", "b": "what to divide it by"}, "out": {"result": "a / b"}},
     "Mix": {"doc": "Slides between two values: t = 0 gives a, t = 1 gives b, halfway gives the average. Crossfades.",
             "in": {"a": "the value at t = 0", "b": "the value at t = 1", "t": "the slider, 0..1"}, "out": {"result": "the blend"}},
-    "Remap": {"doc": "Changes a value's range: what was in_lo..in_hi becomes out_lo..out_hi. The everyday node for "
+    "Remap": {"doc": "Changes a value's range: what was in low..in high becomes out low..out high. The everyday node for "
                      "turning a 0..1 slider into 'between 2 and 8 stripes'.",
               "in": {"x": "the value to remap"}, "out": {"result": "the remapped value"},
               "params": {"in_lo": "the input's low end", "in_hi": "the input's high end",
-                         "out_lo": "what in_lo becomes", "out_hi": "what in_hi becomes"}},
+                         "out_lo": "what in low becomes", "out_hi": "what in high becomes"}},
     "Map range": {
-        "doc": "Remap with everything on pins: what was in_lo..in_hi becomes out_lo..out_hi, with an easing curve if "
-               "you want it and, with steps above 0, in whole steps. Wire a slider into out_hi and the range itself "
+        "doc": "Remap with everything on pins: what was in low..in high becomes out low..out high, with an easing curve if "
+               "you want it and, with steps above 0, in whole steps. Wire a slider into out high and the range itself "
                "becomes something the user controls.",
         "in": {"x": "the value to remap", "in_lo": "the input's low end", "in_hi": "the input's high end",
-               "out_lo": "what in_lo becomes", "out_hi": "what in_hi becomes", "steps": "0 for smooth, or how many steps"},
+               "out_lo": "what in low becomes", "out_hi": "what in high becomes", "steps": "0 for smooth, or how many steps"},
         "out": {"result": "the remapped value"},
         "params": {"ease": "how it runs between the ends: linear, smooth, ease in, ease out, ease in-out",
                    "clamp": "hold the result inside the output range"}},
@@ -525,9 +525,9 @@ DOCS = {
         "params": {"symmetry": "which mirror set: dihedral n (a pie of n slices), tetrahedral, octahedral (matches the cube), icosahedral (most copies)"}},
     "Sine": {"doc": "A sine wave: -1..1, one full wave per turn of x. (Wave gives 0..1 with more shapes.)",
              "in": {"x": "in turns"}, "out": {"result": "-1 .. 1"}},
-    "Smoothstep": {"doc": "A soft switch: 0 below e0, 1 above e1, an S-curve between. Turns a gradient into a soft "
+    "Smoothstep": {"doc": "A soft switch: 0 below edge 0, 1 above edge 1, an S-curve between. Turns a gradient into a soft "
                           "edge - the usual way to get 'bright near here, dark elsewhere' without a hard line. "
-                          "Swap e0 and e1 to flip it.",
+                          "Swap the edges to flip it.",
                    "in": {"x": "the value to soften"}, "out": {"result": "0..1"},
                    "params": {"e0": "where it starts rising", "e1": "where it reaches 1"}},
     "Threshold": {"doc": "A hard switch: on when x reaches 'at'. Gives both a true/false and a 1/0 number.",
@@ -772,9 +772,12 @@ def markdown():
                 if not pins:
                     continue
                 out.append(f"**{title}**")
+                from native.nodeface import label
                 for p in pins:
-                    t = f" *({p['type']})*" if key != "params" else f" *({p['type']})*"
-                    out.append(f"- `{p['name']}`{t}: {p.get('doc', '')}")
+                    # the name the node shows, and its key where that differs: what an expression may call it by
+                    shown = label(name, p["name"])
+                    key_ = f" `{p['name']}`" if shown != p["name"] else ""
+                    out.append(f"- **{shown}**{key_} *({p['type']})*: {p.get('doc', '')}")
                 out.append("")
     return "\n".join(out)
 

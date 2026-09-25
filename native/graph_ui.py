@@ -521,7 +521,8 @@ class GraphPanel(Glyphs):
             self._build_bitmap_editor(nid, "rows")
         for p in curves:
             # a curve drawn by hand: click to add a point, drag one, right-click to take it out
-            dpg.add_text(f"{p['name']} - click to add a point, drag to move, right-click to remove", parent="graph_props", color=DIM, wrap=0)
+            dpg.add_text(f"{nodeface.label(n['type'], p['name'])} - click to add a point, drag to move, right-click to remove",
+                         parent="graph_props", color=DIM, wrap=0)
             W = max(px(200), int(dpg.get_item_rect_size("graph_props")[0] or px(300)) - px(24))
             H = px(180)
             tag = dpg.add_drawlist(width=W, height=H, parent="graph_props")
@@ -534,7 +535,7 @@ class GraphPanel(Glyphs):
         for p in long_:
             v = str(n["params"].get(p["name"], p["default"]))
             shown = v.replace("/", "\n") if p.get("lines") else v
-            dpg.add_text(p["name"], parent="graph_props", color=DIM)
+            dpg.add_text(nodeface.label(n["type"], p["name"]), parent="graph_props", color=DIM)
             typeface.mono(dpg.add_input_text(parent="graph_props", width=-1, multiline=bool(p.get("lines")) or len(v) > 60,
                                              height=px(120) if p.get("lines") else 0, default_value=shown,
                                              user_data=(nid, p["name"]), callback=self._on_prop))
@@ -808,7 +809,7 @@ class GraphPanel(Glyphs):
         arrow = "<-" if kind == "in" else "->"
         self._hover_out = (nid, name) if kind == "out" and (getattr(self, "_probe_scope", {}) or {}).get(nid) == "frame" else None
         self._hover_hold = time.time() + hold
-        self.help(f"{d.get('label') or n['type']} {arrow} {name} ({(p or {}).get('type', '')})"
+        self.help(f"{d.get('label') or n['type']} {arrow} {nodeface.label(n['type'], name)} ({(p or {}).get('type', '')})"
                   + (f" = {live}" if live is not None else "") + (f": {what}" if what else ""))
 
     # --- build the widgets from the graph -----------------------------------------
@@ -1698,7 +1699,7 @@ class GraphPanel(Glyphs):
                     dpg.add_image("preview_thumb_tex", width=t, height=t, tag=f"gthumb_{nid}")
                     dpg.add_text(f"previewing {self.preview[1]}", color=DIM)
             fed_out = {(a, o) for a, o, _, _ in self.graph.links}
-            col = 0 if collapsed else self._field_column(d, width, multiline=d.get("multiline", False))
+            col = 0 if collapsed else self._field_column(d, width, multiline=d.get("multiline", False), type_=n["type"])
             for i in d["inputs"]:
                 if hide and (nid, i["name"]) not in linked:
                     continue
@@ -1709,13 +1710,14 @@ class GraphPanel(Glyphs):
                     # it takes stands in for the wire. Connected, the field
                     # hides and the name stays. A checkbox wears its name.
                     is_linked = (nid, i["name"]) in linked
+                    shown = nodeface.label(n["type"], i["name"])     # the name people use; the key stays the key
                     if collapsed or i["type"] == "bool":
-                        dpg.add_text(i["name"], tag=tag + "_t", show=is_linked or collapsed)
+                        dpg.add_text(shown, tag=tag + "_t", show=is_linked or collapsed)
                         if not collapsed:
                             self._input_widget(nid, n, i, tag + "_w", show=not is_linked)
                     else:
                         with dpg.group(horizontal=True, horizontal_spacing=self._gap()):
-                            self._lead(i["name"], col, tag + "_t")
+                            self._lead(shown, col, tag + "_t")
                             self._input_widget(nid, n, i, tag + "_w", show=not is_linked, width=width - col)
                 dpg.bind_item_theme(tag, th.pin[i["type"]])
                 self._pins[(nid, "in", i["name"])] = tag
@@ -1746,7 +1748,8 @@ class GraphPanel(Glyphs):
                 tag = f"gout_{nid}_{o['name']}"
                 with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Output, tag=tag,
                                         user_data=(nid, o["name"]), shape=dpg.mvNode_PinShape_CircleFilled):
-                    dpg.add_text(o["name"], indent=_right(self.text_w(o["name"]), width))
+                    shown = nodeface.label(n["type"], o["name"])
+                    dpg.add_text(shown, indent=_right(self.text_w(shown), width))
                 dpg.bind_item_theme(tag, th.pin[o["type"]])
                 self._pins[(nid, "out", o["name"])] = tag
                 self._ptype[tag] = o["type"]
@@ -2255,12 +2258,13 @@ class GraphPanel(Glyphs):
     def _gap(self):
         return max(2, self.px(6))
 
-    def _field_column(self, d, width, multiline=False):
+    def _field_column(self, d, width, multiline=False, type_=None):
         """Where the node's fields start: its widest field name as drawn at
-        this zoom, and a gap - never more than half the node (a longer name
-        is cut there, the whole of it in the pin's help)."""
-        names = [i["name"] for i in d["inputs"] if i["type"] in self.NAMED["input"]]
-        names += [p["name"] for p in d["params"] if p["type"] in self.NAMED["param"]
+        this zoom (the name people use, nodeface.label), and a gap - never
+        more than half the node (a longer name is cut there, the whole of it
+        in the pin's help)."""
+        names = [nodeface.label(type_, i["name"]) for i in d["inputs"] if i["type"] in self.NAMED["input"]]
+        names += [nodeface.label(type_, p["name"]) for p in d["params"] if p["type"] in self.NAMED["param"]
                   and not (p["type"] == "text" and (multiline or p.get("lines")))]
         if not names:
             return 0
@@ -2306,7 +2310,7 @@ class GraphPanel(Glyphs):
         if i["type"] == "float":
             w = self._number_widget(i, float(v), tag, ud, self._on_input, show, fw)
         elif i["type"] == "bool":
-            w = dpg.add_checkbox(label=i["name"], tag=tag, default_value=bool(v), user_data=ud,
+            w = dpg.add_checkbox(label=nodeface.label(n["type"], i["name"]), tag=tag, default_value=bool(v), user_data=ud,
                              callback=self._on_input, show=show)
         elif i["type"] == "vector":
             vv = [float(c) for c in (list(v) + [0, 0, 0])[:3]] if isinstance(v, (list, tuple)) else [float(v)] * 3
@@ -2455,6 +2459,10 @@ class GraphPanel(Glyphs):
                     names[p["name"].replace(" ", "_")] = float(n["params"].get(p["name"], p.get("default", 0.0)))
                 except (TypeError, ValueError):
                     pass
+        # the names as shown work too, in words joined by _ ("in_low" for in_lo); a key wins a clash
+        for key in list(names):
+            shown = nodeface.label(n["type"], key).replace(" ", "_").replace("-", "_")
+            names.setdefault(shown, names[key])
         return names
 
     def expr_for(self, nid, name, kind):
@@ -2475,13 +2483,13 @@ class GraphPanel(Glyphs):
                 return False
             cur = n.get("inputs", {}).get(name, i.get("default", 0.0))
         self._expr_target = (nid, name, kind)
-        dpg.set_value("expr_label", f"{n['type']} . {name} =")
+        dpg.set_value("expr_label", f"{n['type']} . {nodeface.label(n['type'], name)} =")
         dpg.set_value("expr_text", f"{float(cur):g}" if isinstance(cur, (int, float)) else str(cur))
         x, y = dpg.get_mouse_pos(local=False)
         dpg.configure_item("expr_win", show=True)
         dpg.set_item_pos("expr_win", [x + 8, y + 8])
         dpg.focus_item("expr_text")
-        self.status(f"{name}: type an expression and press Enter (Escape leaves it)")
+        self.status(f"{nodeface.label(n['type'], name)}: type an expression and press Enter (Escape leaves it)")
         return True
 
     def expr_enter(self, text):
@@ -2661,7 +2669,7 @@ class GraphPanel(Glyphs):
         if p["type"] in self.NAMED["param"] and not (p["type"] == "text" and (multiline or p.get("lines"))):
             # the setting's name in the node's column, the field after it
             with dpg.group(horizontal=True, horizontal_spacing=self._gap()):
-                self._lead(p["name"], col)
+                self._lead(nodeface.label(n["type"], p["name"]), col)
                 self._param_field(nid, n, p, v, ud, cb, width - col)
             return
         if p["type"] == "text" and (multiline or p.get("lines")):
@@ -2672,7 +2680,7 @@ class GraphPanel(Glyphs):
             self._widgets.add(w)
             return
         if p["type"] == "bool":
-            w = dpg.add_checkbox(label=p["name"], default_value=bool(v), user_data=ud, callback=cb)
+            w = dpg.add_checkbox(label=nodeface.label(n["type"], p["name"]), default_value=bool(v), user_data=ud, callback=cb)
         elif p["type"] == "ramp":
             self._ramp_widget(nid, n, p, v)
             return
@@ -3664,7 +3672,7 @@ class GraphPanel(Glyphs):
 
         if kind == "in":
             linked = any(l[2] == nid and l[3] == name for l in self.graph.links)
-            dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
+            dpg.add_text(f"{n['type']} . {nodeface.label(n['type'], name)}", parent=P, color=DIM)
             pd_ = next((x.get("doc") for x in d["inputs"] if x["name"] == name), None)
             if pd_:
                 dpg.add_text(pd_, parent=P, color=self.pal()["soft"], wrap=px(260))
@@ -3714,7 +3722,7 @@ class GraphPanel(Glyphs):
             reference()
         elif kind == "out":
             outs = [l for l in self.graph.links if l[0] == nid and l[1] == name]
-            dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
+            dpg.add_text(f"{n['type']} . {nodeface.label(n['type'], name)}", parent=P, color=DIM)
             pd_ = next((x.get("doc") for x in d["outputs"] if x["name"] == name), None)
             if pd_:
                 dpg.add_text(pd_, parent=P, color=self.pal()["soft"], wrap=px(260))
@@ -4342,7 +4350,8 @@ class GraphPanel(Glyphs):
             for i in db["inputs"]:
                 if (b, i["name"]) not in wired and compatible(o["type"], i["type"]):
                     self.snapshot(); self.graph.link(a, o["name"], b, i["name"]); self.rebuild()
-                    self.status(f"{da.get('label') or da['name']} . {o['name']} -> {i['name']}"); return
+                    self.status(f"{da.get('label') or da['name']} . {nodeface.label(self.graph.nodes[a]['type'], o['name'])} -> "
+                                f"{nodeface.label(self.graph.nodes[b]['type'], i['name'])}"); return
         self.status("no free input fits")
 
     def disconnect_selected(self):
@@ -4475,7 +4484,8 @@ class GraphPanel(Glyphs):
                 continue
             typeface.label(dpg.add_text(title.upper(), parent="graph_props", color=DIM))
             for p in items:
-                line = f"  {p['name']} ({p.get('type', '')})"
+                shown = nodeface.label(type_, p["name"])
+                line = f"  {shown}" + (f" [{p['name']}]" if shown != p["name"] else "") + f" ({p.get('type', '')})"
                 if p.get("doc"):
                     line += f": {p['doc']}"
                 dpg.add_text(line, parent="graph_props", wrap=0)
@@ -4720,7 +4730,7 @@ class GraphPanel(Glyphs):
 
     def preview_pin(self, nid, name):
         self.preview = (nid, name)
-        self.status(f"previewing {self.graph.nodes[nid]['type']} . {name}")
+        self.status(f"previewing {self.graph.nodes[nid]['type']} . {nodeface.label(self.graph.nodes[nid]['type'], name)}")
         self._sync_pos(); self.rebuild()               # the node grows a thumbnail
         self.compile()
 

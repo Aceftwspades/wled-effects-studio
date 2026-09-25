@@ -1670,8 +1670,29 @@ reaches furthest; (Cn) is the critique's number.
       walk found the float button pressed in the frame between the panel
       coming to the front and the strip being rebuilt (it floated the panel
       and failed): the dock's verbs ignore anything that is not a frame.
-- [ ] **Names people use** (C9): settings, keys, usermod descriptions,
-      the footer's statistics.
+- [x] **Names people use** (C9): nodeface.label. A pin's or a setting's
+      key stays its key (the graph's files, expressions, MIDI's mappings),
+      and what the node shows is its name in words: 78 of 249 keys were
+      code (in_lo, e0, turns_a, gx, s3, c5, alpha_clear...) - Remap's "in
+      low" and "out high", Smoothstep's "edge 0", Direction to's "round" and
+      "up", a Steps "step 3", a Colour pick's "colour 5", the rest by rule
+      (_lo "low", _hi "high", _ words); on the node, its column measured by
+      them, its checkboxes, the properties, the add menu's description (the
+      key after the name where it differs), the hover help, the pin menus,
+      the expression box and the status lines; an expression takes the name
+      too (in_low) and the key wins a clash; the node reference leads each
+      pin with its name, its key after it in code, and its prose uses the
+      names. A test holds no underscore on screen and no node showing two
+      pins alike (Particles had a "burst" and a "burst_count": "burst
+      size"). No slider keys: MIDI learn's targets and status, Sweep's
+      picker and the Sequence's ramp (its picker, its line, its timeline
+      label, the step's summary) name a slider by the effect's own words,
+      two alike told apart by place. The Usermods dialog describes a
+      feature by what it brings ("the cube's tilt, for Gravity and the
+      motion effects"), its source files on hover; its audio row is led by
+      its word. The footer's measures in words: brightness, contrast, unlit,
+      saturation (was mean, sigma, dark, sat; engine.stats keeps the
+      harness's maths). The panel's "pal source" is "colours from".
 - [ ] **Messages that stay** (C10): short lines, errors held until fixed
       and linked to their node, a log of the last fifty.
 - [ ] **Finding the way round the graph** (C11): Home fits the graph by

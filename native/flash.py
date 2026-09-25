@@ -143,6 +143,10 @@ FEATURES = [
     ("param_memory", "Per-effect slider memory", "cube_fx_param_memory.cpp", "CFX_WITH_PARAM_MEMORY",
      "the device remembers each effect's sliders across switches."),
 ]
+# what each feature brings, in a line - shown beside its box (its files are on hover: C9, names people use)
+BRIEF = {"imu": "the cube's tilt, for Gravity and the motion effects",
+         "ui": "a knob and a screen: the menu on the device",
+         "param_memory": "each effect's sliders kept across switches"}
 AUDIO = [
     ("pcm", "audioreactive with the PCM waveform (the studio's patch)",
      "the FFT bands, volume and beat, and the raw waveform: Warp and Scope draw the real signal."),

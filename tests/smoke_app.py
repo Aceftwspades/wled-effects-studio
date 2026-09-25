@@ -114,7 +114,7 @@ STEPS = [
     # MIDI learn without a controller: the window, Speed learnt from an injected CC and driven to 255, a typed pin
     # of the graph learnt and driven to the top of its range, the slider's right-click menu; the mappings cleared
     ([{"graph_open": "box_fire.json"}, {"action": "midi"}, {"midi_learn": {"kind": "fx", "key": "sx"}}, {"midi": [176, 7, 64]}], 1.0),
-    ([{"expect": ["graph_status", "MIDI: CC 7 ch 1 -> "]}, {"expect": ["graph_status", "(sx)"]}, {"midi": [176, 7, 127]}], 0.6),
+    ([{"expect": ["graph_status", "MIDI: CC 7 ch 1 -> "]}, {"expect": ["graph_status", "-> Speed"]}, {"midi": [176, 7, 127]}], 0.6),
     ([{"expect": ["inp_sx", "255"]},
       {"midi_learn": {"kind": "pin", "graph": "box_fire.json", "nid": 12, "name": "scale", "lo": 0.0, "hi": 12.0}}], 0.6),
     ([{"midi": [177, 8, 127]}], 0.6),
