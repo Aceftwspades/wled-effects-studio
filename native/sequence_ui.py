@@ -12,6 +12,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import form
 
 from native import weight
 import numpy as np
@@ -85,13 +86,18 @@ def build(app):
             pass
         # the timeline: the steps as blocks along the time, the playhead, bars, the WAV
         dpg.add_drawlist(tag="seq_tl", width=px(600), height=px(54))       # its drawing reads its size back
-        with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="seq_name", label="name", width=px(180), on_enter=True, callback=lambda s, v: set_field(app, "name", v))
-            dpg.add_input_float(tag="seq_dur", label="seconds", width=px(70), step=0, format="%.1f", on_enter=True,
+        with dpg.group(horizontal=True) as _row:
+            form.inline("name")
+            dpg.add_input_text(tag="seq_name", width=px(180), on_enter=True, callback=lambda s, v: set_field(app, "name", v))
+            form.inline("held")
+            dpg.add_input_float(tag="seq_dur", width=px(80), step=0, format="%.1f s", on_enter=True,
                                 callback=lambda s, v: set_field(app, "dur", max(0.1, float(v))))
-            dpg.add_input_float(tag="seq_trans", label="transition", width=px(70), step=0, format="%.1f", on_enter=True,
+            c.tip("how long the step is shown")
+            form.inline("blend")
+            dpg.add_input_float(tag="seq_trans", width=px(80), step=0, format="%.1f s", on_enter=True,
                                 callback=lambda s, v: set_field(app, "trans", max(0.0, float(v))))
             c.tip("seconds of blend into this step")
+        form.mono_values(_row)
         with dpg.group(horizontal=True):
             dpg.add_text("", tag="seq_step_desc", color=c.DIM)
         with dpg.group(horizontal=True):
@@ -100,9 +106,10 @@ def build(app):
                           callback=lambda s, v: _ramp_pick(app, v))
             c.tip("a slider of the first segment that moves over the step, from the step's value to the end value - "
                   "in the sim as it plays; on the device as sub-steps (a second apiece, up to twelve), since a preset cannot move a slider")
-            dpg.add_slider_int(tag="seq_ramp_end", width=px(140), min_value=0, max_value=255, default_value=128,
-                               callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), int(v)))
-            dpg.add_text("to", color=c.DIM)
+            form.inline("to")
+            typeface.mono(dpg.add_slider_int(tag="seq_ramp_end", width=px(140), min_value=0, max_value=255, default_value=128,
+                                             callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), int(v))))
+            c.tip("the value the slider reaches at the step's end")
             dpg.add_combo(list(sequence.RAMP_SHAPES), tag="seq_ramp_shape", width=px(110), default_value="linear",
                           callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), None, v))
             c.tip("the ramp's shape: straight, eased at either end or both, up and back to where it began, or a jump half way")
@@ -123,22 +130,24 @@ def build(app):
             c.tip("plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path")
             dpg.add_checkbox(label="repeat", tag="seq_repeat", default_value=False,
                              callback=lambda s, v: (_steps(app).__setitem__("repeat", 0 if v else 1), app.project.save()))
+            form.inline("blend as")
             dpg.add_combo(transition.STYLES, tag="seq_style", width=px(110), default_value="fade",
                           callback=lambda s, v: (_steps(app).__setitem__("style", v), app.project.save()))
             c.tip("the transition's style, previewed here; on the device the transitions use its own blend-style setting")
             dpg.add_text("", tag="seq_status", color=c.TEXT)
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("BEATS", color=c.ACCENT))
-            dpg.add_input_float(tag="seq_bpm", label="bpm", width=px(60), step=0, format="%.1f", default_value=120.0,
-                                callback=lambda: setattr(app, "_tl_dirty", True))
+            typeface.mono(dpg.add_input_float(tag="seq_bpm", width=px(96), step=0, format="%.1f bpm", default_value=120.0,
+                                              callback=lambda: setattr(app, "_tl_dirty", True)))
             dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
             c.tip("tap tempo: tap on the beat, the bpm from the gaps")
             dpg.add_button(label="Synth's", small=True, callback=lambda: dpg.set_value("seq_bpm", float(getattr(app.syn, "bpm", 120))))
             c.tip("the bpm of the sim's synthetic beat")
             dpg.add_button(label="WAV's", small=True, callback=lambda: beats_from_wav(app))
             c.tip("the tempo and the beats found in the WAV playing as live audio (AUDIO > play a WAV file)")
-            dpg.add_input_int(tag="seq_bar", label="a bar", width=px(40), step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True,
-                              callback=lambda: setattr(app, "_tl_dirty", True))
+            form.inline("beats a bar")
+            typeface.mono(dpg.add_input_int(tag="seq_bar", width=px(40), step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True,
+                                            callback=lambda: setattr(app, "_tl_dirty", True)))
             dpg.add_button(label="Snap durations to bars", small=True, callback=lambda: snap_durations(app))
             weight.need(dpg.last_item(), _has_steps)
             c.tip("every step's seconds rounded to whole bars, so the sequence changes on the music")
@@ -146,13 +155,16 @@ def build(app):
         dpg.add_separator()
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
-            dpg.add_input_int(tag="seq_base", label="presets from", width=px(50), step=0, default_value=10, min_value=1, max_value=240, min_clamped=True,
-                              callback=lambda s, v: (_steps(app).__setitem__("base", int(v)), app.project.save()))
+            form.inline("presets from")
+            typeface.mono(dpg.add_input_int(tag="seq_base", width=px(50), step=0, default_value=10, min_value=1, max_value=240, min_clamped=True,
+                                            callback=lambda s, v: (_steps(app).__setitem__("base", int(v)), app.project.save())))
             c.tip("each step is saved as a preset, ids from here up; ones already there are overwritten")
-            dpg.add_input_int(tag="seq_pid", label="playlist", width=px(50), step=0, default_value=9, min_value=1, max_value=250, min_clamped=True,
-                              callback=lambda s, v: (_steps(app).__setitem__("pid", int(v)), app.project.save()))
+            form.inline("playlist")
+            typeface.mono(dpg.add_input_int(tag="seq_pid", width=px(50), step=0, default_value=9, min_value=1, max_value=250, min_clamped=True,
+                                            callback=lambda s, v: (_steps(app).__setitem__("pid", int(v)), app.project.save())))
             c.tip("the preset id the playlist is saved as")
-            dpg.add_input_text(tag="seq_show", label="name", width=px(100), default_value="Show", on_enter=True,
+            form.inline("named")
+            dpg.add_input_text(tag="seq_show", width=px(110), default_value="Show", on_enter=True,
                                callback=lambda s, v: (_steps(app).__setitem__("name", v), app.project.save()))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Send presets + playlist", tag="seq_send", small=True, callback=lambda: send(app))
@@ -268,20 +280,31 @@ def refresh_timers(app):
     dpg.delete_item("seq_timers", children_only=True)
     for k, t in enumerate(T):
         cb = lambda s, v, u: _tfield(app, u[0], u[1], v)
-        with dpg.group(horizontal=True, parent="seq_timers"):
+        at_time = t.get("when", "time") == "time"
+        with dpg.group(horizontal=True, parent="seq_timers") as _row:
             dpg.add_checkbox(default_value=bool(t.get("en", True)), user_data=(k, "en"), callback=cb)
             dpg.add_combo(WHEN, width=px(80), default_value=t.get("when", "time"), user_data=(k, "when"), callback=cb)
+            if not at_time:
+                form.inline("offset")                    # sunrise or sunset, give or take minutes
             dpg.add_input_int(width=px(40), step=0, default_value=int(t.get("hour", 0)), min_value=0, max_value=23, user_data=(k, "hour"), on_enter=True, callback=cb,
-                              show=t.get("when", "time") == "time")
-            dpg.add_text(":" if t.get("when", "time") == "time" else "+/- min", color=c.DIM)
+                              show=at_time)
+            if at_time:
+                dpg.add_text(":", color=c.DIM)
             dpg.add_input_int(width=px(45), step=0, default_value=int(t.get("min", 0)), min_value=-120, max_value=120, user_data=(k, "min"), on_enter=True, callback=cb)
-            dpg.add_text("preset", color=c.DIM)
+            if not at_time:
+                dpg.add_text("min", color=c.DIM)
+            form.inline("preset")
             dpg.add_input_int(width=px(45), step=0, default_value=int(t.get("preset", 1)), min_value=0, max_value=250, user_data=(k, "preset"), on_enter=True, callback=cb)
-            dpg.add_text("off" if t.get("what") == "off" else ("playlist" if t.get("what") == "playlist" else ""), color=c.DIM)
-            for d in range(7):
-                dpg.add_checkbox(label=DAYS[d], default_value=bool(int(t.get("dow", 127)) >> d & 1), user_data=(k, f"d{d}"), callback=cb)
+            typeface.small(dpg.add_text("off" if t.get("what") == "off" else ("playlist" if t.get("what") == "playlist" else ""), color=c.DIM))
+            # the days as toggles, lit when on: seven checkboxes with their words ran off the frame
+            with dpg.group(horizontal=True, horizontal_spacing=px(2)):
+                for d in range(7):
+                    dpg.add_selectable(label=DAYS[d], width=px(26), default_value=bool(int(t.get("dow", 127)) >> d & 1),
+                                       user_data=(k, f"d{d}"), callback=cb)
+                    c.tip(("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[d])
             dpg.add_button(label="x", small=True, user_data=k, callback=lambda s, a, u: del_timer(app, u))
             weight.danger(dpg.last_item())
+        form.mono_values(_row)
     if not T:
         weight.empty("seq_timers", "No timers: the device runs the playlist, or goes off, at a time of day.",
                      [("Run the playlist at...", lambda: add_timer(app, "playlist"))], lead=False)
@@ -449,6 +472,7 @@ def load_step(app, i=None):
     if 0 <= i < len(S["steps"]):
         sequence.apply(app.eng, S["steps"][i])
         app.seg_cols = [int(c) for c in S["steps"][i].get("colors") or app.seg_cols]
+        app.refresh_colours()
         dpg.set_value("fx_combo", app.eng.names[app.eng.idx])
         app.rebuild_params(); app.sync_palette_combo(); app.rebuild_seg_fields()
         if getattr(app, "_seq_play", None) is None:

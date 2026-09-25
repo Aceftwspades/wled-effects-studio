@@ -11,6 +11,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import form
 
 from native import outputs, weight
 
@@ -38,7 +39,8 @@ def build(app):
             dpg.add_button(label="one output", small=True, callback=lambda: do_split(app, "one"))
             dpg.add_button(label="one per part", small=True, callback=lambda: do_split(app, "parts"))
             dpg.add_button(label="by count:", small=True, callback=lambda: do_split(app, "count"))
-            dpg.add_input_int(tag="out_per", width=px(60), step=0, default_value=300, min_value=1, min_clamped=True)
+            typeface.mono(dpg.add_input_int(tag="out_per", width=px(60), step=0, default_value=300, min_value=1, min_clamped=True))
+            c.tip("so many LEDs an output")
             dpg.add_button(label="+ output", small=True, callback=lambda: add_output(app))
             dpg.add_button(label="Read the device's", small=True, callback=lambda: read_device(app))
             weight.need(dpg.last_item(), "device")
@@ -48,11 +50,16 @@ def build(app):
             pass
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("POWER", color=c.ACCENT))
-            dpg.add_input_int(tag="out_ledma", label="mA per LED", width=px(60), step=0, min_value=0, max_value=255, min_clamped=True, max_clamped=True,
-                              callback=lambda s, v: _set(app, "ma_per_led", int(v)))
-            dpg.add_input_int(tag="out_maxma", label="supply mA", width=px(70), step=0, min_value=0, max_value=65000, min_clamped=True, max_clamped=True,
-                              callback=lambda s, v: _set(app, "max_ma", int(v)))
-            c.tip("0: no limit")
+            form.inline("per LED")
+            typeface.mono(dpg.add_input_int(tag="out_ledma", width=px(60), step=0, min_value=0, max_value=255, min_clamped=True, max_clamped=True,
+                                            callback=lambda s, v: _set(app, "ma_per_led", int(v))))
+            c.tip("an LED at full white, mA")
+            dpg.add_text("mA", color=c.DIM)
+            form.inline("supply")
+            typeface.mono(dpg.add_input_int(tag="out_maxma", width=px(70), step=0, min_value=0, max_value=65000, min_clamped=True, max_clamped=True,
+                                            callback=lambda s, v: _set(app, "max_ma", int(v))))
+            c.tip("what the supply gives, mA; 0: no limit")
+            dpg.add_text("mA", color=c.DIM)
             dpg.add_checkbox(label="limiter in the sim", tag="out_abl",
                              callback=lambda s, v: _set(app, "abl_preview", bool(v)))
         with dpg.group(horizontal=True):
@@ -84,20 +91,34 @@ def refresh(app):
     dpg.delete_item("out_rows", children_only=True)
     types = [t[1] for t in outputs.TYPES]; orders = [o[1] for o in outputs.ORDERS]
     cb = lambda s, v, u: _field(app, u[0], u[1], v)
-    for k, o in enumerate(outs):
-        with dpg.group(horizontal=True, parent="out_rows"):
-            dpg.add_text(f"{k + 1:2d}", color=c.DIM)
-            dpg.add_input_text(width=px(90), default_value=o.get("name", ""), user_data=(k, "name"), on_enter=True, callback=cb)
-            dpg.add_input_int(label="pin", width=px(50), step=0, default_value=int(o["pin"]), min_value=0, max_value=48, user_data=(k, "pin"), on_enter=True, callback=cb)
-            dpg.add_input_int(label="start", width=px(60), step=0, default_value=int(o["start"]), min_value=0, user_data=(k, "start"), on_enter=True, callback=cb)
-            dpg.add_input_int(label="LEDs", width=px(60), step=0, default_value=int(o["len"]), min_value=1, user_data=(k, "len"), on_enter=True, callback=cb)
-            dpg.add_combo(types, width=px(130), default_value=next((t[1] for t in outputs.TYPES if t[0] == o.get("type", 22)), types[0]),
-                          user_data=(k, "type"), callback=cb)
-            dpg.add_combo(orders, width=px(60), default_value=next((n for i, n in outputs.ORDERS if i == o.get("order", 0)), "GRB"),
-                          user_data=(k, "order"), callback=cb)
-            dpg.add_checkbox(label="rev", default_value=bool(o.get("rev")), user_data=(k, "rev"), callback=cb)
-            dpg.add_button(label="x", small=True, user_data=k, callback=lambda s, a, u: del_output(app, u))
-            weight.danger(dpg.last_item())
+    if outs:
+        # a table under its column names: each row an output, read along (C6); the figures in the monospace
+        with dpg.table(parent="out_rows", header_row=True, policy=dpg.mvTable_SizingStretchProp, borders_innerH=False,
+                       borders_outerH=False, borders_innerV=False, borders_outerV=False, pad_outerX=True) as tbl:
+            # the figures' columns fixed; the name and the type share what is left, so the table fits the frame
+            for name, w, stretch in (("", 22, False), ("name", 1.0, True), ("pin", 48, False), ("start", 62, False),
+                                     ("LEDs", 62, False), ("type", 1.5, True), ("order", 66, False), ("reverse", 60, False),
+                                     ("", 24, False)):
+                if stretch:
+                    dpg.add_table_column(label=name, width_stretch=True, init_width_or_weight=w)
+                else:
+                    dpg.add_table_column(label=name, width_fixed=True, init_width_or_weight=px(w))
+            for k, o in enumerate(outs):
+                with dpg.table_row():
+                    typeface.small(dpg.add_text(f"{k + 1:2d}", color=c.DIM))
+                    dpg.add_input_text(width=-1, default_value=o.get("name", ""), user_data=(k, "name"), on_enter=True, callback=cb)
+                    dpg.add_input_int(width=-1, step=0, default_value=int(o["pin"]), min_value=0, max_value=48, user_data=(k, "pin"), on_enter=True, callback=cb)
+                    dpg.add_input_int(width=-1, step=0, default_value=int(o["start"]), min_value=0, user_data=(k, "start"), on_enter=True, callback=cb)
+                    dpg.add_input_int(width=-1, step=0, default_value=int(o["len"]), min_value=1, user_data=(k, "len"), on_enter=True, callback=cb)
+                    dpg.add_combo(types, width=-1, default_value=next((t[1] for t in outputs.TYPES if t[0] == o.get("type", 22)), types[0]),
+                                  user_data=(k, "type"), callback=cb)
+                    dpg.add_combo(orders, width=-1, default_value=next((n for i, n in outputs.ORDERS if i == o.get("order", 0)), "GRB"),
+                                  user_data=(k, "order"), callback=cb)
+                    dpg.add_checkbox(default_value=bool(o.get("rev")), user_data=(k, "rev"), callback=cb)
+                    dpg.add_button(label="x", small=True, user_data=k, callback=lambda s, a, u: del_output(app, u))
+                    weight.danger(dpg.last_item())
+        for r in dpg.get_item_children(tbl, 1) or []:
+            form.mono_values(r)
     if not outs:
         weight.empty("out_rows", "No outputs yet: the wiring as one output, one per part, so many LEDs each - or the device's own.",
                      [("One output", lambda: do_split(app, "one")), ("Read the device's", lambda: read_device(app))])

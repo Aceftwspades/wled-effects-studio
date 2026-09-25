@@ -161,6 +161,53 @@ def test_every_control_size_is_at_the_interface_size():
     assert not bad, "sizes that would not follow the interface size:\n" + "\n".join(bad)
 
 
+FIELDS = {"add_combo", "add_input_text", "add_input_int", "add_input_float", "add_input_double", "add_input_intx",
+          "add_input_floatx", "add_drag_int", "add_drag_float", "add_drag_intx", "add_drag_floatx", "add_slider_int",
+          "add_slider_float", "add_color_edit", "add_listbox"}
+# the graph's node fields keep their names inside them until the one number control (C7) splits name and value
+LABEL_AFTER_OK = {"native/graph_ui.py"}
+
+
+def test_no_field_is_labelled_after_itself():
+    """Forms read left to right (C6): a field's words come before it - in a
+    form row's label column (native/form.py) or leading it in a row of
+    several - never as Dear PyGui's label, drawn after the control, where
+    labels hugged fields of different widths and never lined up. A text
+    straight after a field in the same row (its label, the old way) fails
+    too; a unit belongs inside the field's format."""
+    bad = []
+    for d, _, files in os.walk(os.path.join(ROOT, "native")):
+        for f in sorted(files):
+            if not f.endswith(".py"):
+                continue
+            path = os.path.join(d, f)
+            rel = os.path.relpath(path, ROOT).replace("\\", "/")
+            if rel in LABEL_AFTER_OK:
+                continue
+            tree = ast.parse(open(path, encoding="utf-8").read(), rel)
+
+            def made(node):
+                """The dpg call an expression makes, through typeface.mono(...) and the like."""
+                c = node.value if isinstance(node, (ast.Expr, ast.Assign)) else None
+                while isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr in ("mono", "small", "label", "heading") and c.args:
+                    c = c.args[0]
+                return c if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) else None
+            for node in ast.walk(tree):
+                c = node if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) else None
+                if c is not None and c.func.attr in FIELDS:
+                    lab = next((k.value for k in c.keywords if k.arg == "label"), None)
+                    if lab is not None and not (isinstance(lab, ast.Constant) and (lab.value in ("", None) or str(lab.value).startswith("##"))):
+                        bad.append(f"{rel}:{c.lineno} dpg.{c.func.attr}(label=...) - its words in form.row / form.inline, before it")
+                body = getattr(node, "body", None)
+                if isinstance(body, list):
+                    for a, b in zip(body, body[1:]):
+                        ca, cb = made(a), made(b)
+                        if ca is not None and cb is not None and ca.func.attr in FIELDS and cb.func.attr == "add_text" \
+                                and cb.args and isinstance(cb.args[0], ast.Constant) and str(cb.args[0].value).strip() not in ("", ":", "="):
+                            bad.append(f"{rel}:{b.lineno} a text after dpg.{ca.func.attr}: {cb.args[0].value!r} - before it, or inside its format")
+    assert not bad, "fields labelled after themselves:\n" + "\n".join(bad)
+
+
 def test_gpu_points_match_the_software_projection():
     """Every LED square the GPU path places sits where render.project puts
     the LED, for every geometry kind and camera - the two are the same

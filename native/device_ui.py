@@ -20,6 +20,7 @@ import os
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import form
 from native import typeface
 
 from native import flash, devices, live_out, weight
@@ -165,12 +166,12 @@ def build(app):
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("LIVE", color=c.ACCENT))
             dpg.add_checkbox(label="stream the sim to the device (DDP)", tag="live_on", default_value=False,
-                             callback=lambda s, v: (app.stream_start(fps=int(dpg.get_value("live_fps"))) if v else app.stream_stop()))
+                             callback=lambda s, v: (app.stream_start(fps=int(dpg.get_value("live_fps").split()[0])) if v else app.stream_stop()))
             weight.need(dpg.last_item(), "stream")          # a device to stream to (or the stream running, to stop it)
             c.tip("whatever the sim shows - any effect, built or not - on the device as it is drawn; the device goes back to its own effect when this stops")
-            dpg.add_combo(["15", "30", "60"], tag="live_fps", width=px(60), default_value="30",
-                          callback=lambda s, v: app.stream_start(fps=int(v)) if getattr(app, "ddp", None) else None)
-            dpg.add_text("fps", color=c.DIM)
+            form.inline("at")
+            typeface.mono(dpg.add_combo(["15 fps", "30 fps", "60 fps"], tag="live_fps", width=px(96), default_value="30 fps",
+                                        callback=lambda s, v: app.stream_start(fps=int(v.split()[0])) if getattr(app, "ddp", None) else None))
             dpg.add_text("", tag="live_status", color=c.DIM)
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("WIRING TEST", color=c.ACCENT))
@@ -179,13 +180,14 @@ def build(app):
             c.tip("in the sim, and on the device while streaming: a chase along the wiring order; one LED by its index; one part of a shape, "
                   "or the parts in turn; one LED output (the LED outputs frame's ranges); all red / green / blue / white for the colour "
                   "order; every other LED; a twinkle")
-            dpg.add_input_float(tag="wt_speed", width=px(70), default_value=20.0, step=0, format="%.0f",
-                                callback=lambda s, v: setattr(app.wiring, "speed", max(0.5, float(v))) if getattr(app, "wiring", None) else None)
-            dpg.add_text("LEDs/s", color=c.DIM)
+            form.inline("at")
+            typeface.mono(dpg.add_input_float(tag="wt_speed", width=px(110), default_value=20.0, step=0, format="%.0f LEDs/s",
+                                              callback=lambda s, v: setattr(app.wiring, "speed", max(0.5, float(v))) if getattr(app, "wiring", None) else None))
+            c.tip("how fast the chase runs")
             dpg.add_button(label="<", small=True, callback=lambda: _wt_step(app, -1))
             dpg.add_button(label=">", small=True, callback=lambda: _wt_step(app, 1))
-            dpg.add_input_int(tag="wt_index", width=px(80), default_value=0, min_value=0, min_clamped=True, on_enter=True,
-                              callback=lambda s, v: _wt_set(app, int(v)))
+            typeface.mono(dpg.add_input_int(tag="wt_index", width=px(80), default_value=0, min_value=0, min_clamped=True, on_enter=True,
+                                            callback=lambda s, v: _wt_set(app, int(v))))
             c.tip("the LED, the part or the output lit in the index, part and output modes; < and > step it")
         dpg.add_text("", tag="wt_status", color=c.TEXT, wrap=0)
         dpg.add_separator()
@@ -218,9 +220,9 @@ def build_flash(app):
                    "that extends the one chosen (its usermods plus ours), and sends the binary to the device's /update. "
                    "The device must have OTA unlocked and be on this subnet.")
         with dpg.group(horizontal=True):
+            form.inline("environment")
             dpg.add_combo(envs, tag="flash_env", width=px(260), default_value=app.project.options.get("flash_env") or default or "",
                           callback=lambda: refresh_flash(app))
-            dpg.add_text("environment", color=c.DIM)
             c.tip("the PlatformIO environment the build extends; the device's chip suggests one")
             dpg.add_button(label="", tag="flash_env_fit", small=True, show=False,
                            callback=lambda: (dpg.set_value("flash_env", dpg.get_item_user_data("flash_env_fit")), refresh_flash(app)))

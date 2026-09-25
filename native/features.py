@@ -14,6 +14,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import form
 
 from native import chrome, device_ui, devices, live_out
 from native.project import save_prefs
@@ -221,20 +222,23 @@ class Features:
         dpg.set_value("seg_combo", labels[self.eng.seg] if self.eng.seg < len(labels) else "")
         dpg.delete_item("seg_fields", children_only=True)
         if self.eng.seg_count() < 2:
-            dpg.add_text("one segment, the whole strip - + adds another", parent="seg_fields", color=(139, 147, 163), wrap=0)
+            form.note("one segment, the whole strip - + adds another", parent="seg_fields")
             return
         x0, y0, x1, y1, op, fx, bm = self.eng.seg_get(self.eng.seg)
-        for row in ((("x0", x0), ("y0", y0)), (("x1", x1), ("y1", y1))):
-            with dpg.group(horizontal=True, parent="seg_fields"):
+        for lab, row in (("from", (("x0", x0), ("y0", y0))), ("to", (("x1", x1), ("y1", y1)))):
+            with form.row(lab, parent="seg_fields", tip="the segment's corner on the net: x along, y down"):
                 for key, val in row:
-                    dpg.add_input_int(label=key, width=px(60), default_value=val, user_data=key, on_enter=True, step=0,
+                    form.inline(key[0])
+                    dpg.add_input_int(width=px(60), default_value=val, user_data=key, on_enter=True, step=0,
                                       callback=self.on_seg_field)
-        dpg.add_slider_int(label="opacity", parent="seg_fields", width=px(200), min_value=0, max_value=255, default_value=op,
-                           callback=lambda s, v: self.on_seg_field(s, v, "opacity"))
+        with form.row("opacity", parent="seg_fields"):
+            dpg.add_slider_int(width=-1, min_value=0, max_value=255, default_value=op,
+                               callback=lambda s, v: self.on_seg_field(s, v, "opacity"))
         # WLED's per-segment blend mode ("bm"): how this segment lands on the ones under it
         modes = self.eng.BLEND_MODES
-        dpg.add_combo(modes, label="blend mode", parent="seg_fields", width=px(200), default_value=modes[bm if bm < len(modes) else 0],
-                      callback=lambda s, v: self.on_seg_blend(modes.index(v)))
+        with form.row("blend mode", parent="seg_fields", tip="how this segment lands on the ones under it"):
+            dpg.add_combo(modes, width=-1, default_value=modes[bm if bm < len(modes) else 0],
+                          callback=lambda s, v: self.on_seg_blend(modes.index(v)))
         self._seg_option_rows(y1 - y0 > 1)
     def _seg_option_rows(self, is2d):
         """WLED's segment options, as its UI has them: reverse and mirror (X, and
@@ -244,13 +248,15 @@ class Features:
         if is2d:
             rows.append((("rY", "reverse Y"), ("mY", "mirror Y")))
         for row in rows:
-            with dpg.group(horizontal=True, parent="seg_fields"):
+            with form.under(parent="seg_fields"):
                 for key, label in row:
                     dpg.add_checkbox(label=label, default_value=bool(o[key]), user_data=key,
                                      callback=lambda s, v, u: self.on_seg_option(u, bool(v)))
-        with dpg.group(horizontal=True, parent="seg_fields"):
-            for key, label, lo, hi in (("grp", "group", 1, 255), ("spc", "space", 0, 255), ("of", "offset", 0, 65535)):
-                dpg.add_input_int(label=label, width=px(50), step=0, default_value=int(o[key]), min_value=lo, max_value=hi, min_clamped=True, max_clamped=True,
+        with form.row("group", parent="seg_fields"):
+            for j, (key, label, lo, hi) in enumerate((("grp", "group", 1, 255), ("spc", "space", 0, 255), ("of", "offset", 0, 65535))):
+                if j:
+                    form.inline(label)
+                dpg.add_input_int(width=px(50), step=0, default_value=int(o[key]), min_value=lo, max_value=hi, min_clamped=True, max_clamped=True,
                                   on_enter=True, user_data=key, callback=lambda s, v, u: self.on_seg_option(u, int(v)))
             chrome.info("WLED's segment options: reverse runs the effect the other way, mirror folds it, transpose swaps the axes; "
                         "group lights that many LEDs as one, space leaves that many dark between, offset rotates along the strip.")

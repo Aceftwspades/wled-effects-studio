@@ -17,6 +17,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import form
 
 from native import audioin, weight
 
@@ -51,22 +52,29 @@ def build(app):
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("PINS", color=c.ACCENT))
             for tag, lbl in zip(PIN_TAGS, ("SD", "WS", "SCK", "MCLK")):
-                dpg.add_input_int(tag=tag, label=lbl, width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
-                                  callback=lambda s, v: _pins_edited(app))
+                form.inline(lbl)
+                typeface.mono(dpg.add_input_int(tag=tag, width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
+                                                callback=lambda s, v: _pins_edited(app)))
             c.tip("the I2S wires: SD the data in (DOUT / ASDOUT on the module), WS the word select (LRCK), SCK the bit clock (BCK); "
                   "MCLK the master clock a line-in ADC or a codec needs (-1: none). -1 = not wired.")
-            dpg.add_input_int(tag="ain_sda", label="SDA", width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
-                              callback=lambda s, v: _pins_edited(app))
-            dpg.add_input_int(tag="ain_scl", label="SCL", width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
-                              callback=lambda s, v: _pins_edited(app))
-            c.tip("WLED's I2C pins - an ES8388 or ES7243 is set up over I2C before it sends audio")
+            with dpg.group(horizontal=True, tag="ain_i2c"):          # shown for a codec set up over I2C
+                form.inline("SDA")
+                typeface.mono(dpg.add_input_int(tag="ain_sda", width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
+                                                callback=lambda s, v: _pins_edited(app)))
+                form.inline("SCL")
+                typeface.mono(dpg.add_input_int(tag="ain_scl", width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
+                                                callback=lambda s, v: _pins_edited(app)))
+                c.tip("WLED's I2C pins - an ES8388 or ES7243 is set up over I2C before it sends audio")
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("LEVELS", color=c.ACCENT))
-            dpg.add_slider_int(tag="ain_gain", label="gain", width=px(130), min_value=0, max_value=255, callback=lambda s, v: _level_edited(app))
+            form.inline("gain")
+            typeface.mono(dpg.add_slider_int(tag="ain_gain", width=px(130), min_value=0, max_value=255, callback=lambda s, v: _level_edited(app)))
             c.tip("audioreactive's gain, 0..255 (60 is WLED's default for a mic; a line signal is louder and steadier: 40)")
-            dpg.add_slider_int(tag="ain_squelch", label="squelch", width=px(110), min_value=0, max_value=255, callback=lambda s, v: _level_edited(app))
+            form.inline("squelch")
+            typeface.mono(dpg.add_slider_int(tag="ain_squelch", width=px(110), min_value=0, max_value=255, callback=lambda s, v: _level_edited(app)))
             c.tip("the noise gate: what counts as silence (10 for a mic; 4 for a line-in, which has no room noise)")
-            dpg.add_combo(audioin.AGC, tag="ain_agc", label="AGC", width=px(80), callback=lambda s, v: _level_edited(app))
+            form.inline("AGC")
+            dpg.add_combo(audioin.AGC, tag="ain_agc", width=px(80), callback=lambda s, v: _level_edited(app))
             c.tip("automatic gain: off, normal, vivid or lazy. A line-in seldom needs it.")
         dpg.add_separator()
         with dpg.group(horizontal=True):
@@ -104,8 +112,7 @@ def refresh(app):
     dpg.configure_item("ain_mclk", enabled=audioin.uses_mclk(st))
     i2c = (list(st.get("i2c") or []) + [-1, -1])[:2]
     dpg.set_value("ain_sda", int(i2c[0])); dpg.set_value("ain_scl", int(i2c[1]))
-    for t in ("ain_sda", "ain_scl"):
-        dpg.configure_item(t, show=audioin.needs_i2c(st))
+    dpg.configure_item("ain_i2c", show=audioin.needs_i2c(st))
     on = int(st.get("type", 1)) < 254
     for t in PIN_TAGS + ("ain_gain", "ain_squelch", "ain_agc"):
         dpg.configure_item(t, enabled=on)

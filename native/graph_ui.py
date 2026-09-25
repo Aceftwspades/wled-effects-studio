@@ -44,7 +44,7 @@ NODE_TEXT = 16          # a node's words - title, pin names, summary - in the in
 # the fields whose text is a value (set in the monospace); a combo, a checkbox, a swatch show words
 VALUE_ITEMS = ("mvAppItemType::mvSliderFloat", "mvAppItemType::mvSliderInt", "mvAppItemType::mvDragFloat",
                "mvAppItemType::mvInputInt", "mvAppItemType::mvInputFloat", "mvAppItemType::mvInputText",
-               "mvAppItemType::mvInputFloatMulti")
+               "mvAppItemType::mvInputFloatMulti", "mvAppItemType::mvDragFloatMulti")
 HELP_H = 46             # the description box, px: two lines
 THUMB = 96              # the preview thumbnail on a node, layout px
 PAD = 56                # an XY pad on a node, layout px (its texture is PAD_PX square)
@@ -2662,8 +2662,9 @@ class GraphPanel(Glyphs):
             w = dpg.add_combo(p["choices"], label=p["name"], width=self.px(90), default_value=str(v), user_data=ud, callback=cb)
         elif p["type"] == "color":
             rgb = list(v)[:3] if isinstance(v, (list, tuple)) else [255, 255, 255]
+            # the swatch alone, as a colour input's is: its picker has the hex and R, G and B
             w = dpg.add_color_edit([int(c) for c in rgb] + [255], label=p["name"], width=self.px(110), no_alpha=True,
-                               user_data=ud, callback=cb)
+                                   no_inputs=True, user_data=ud, callback=cb)
         elif p["type"] == "ramp":
             self._ramp_widget(nid, n, p, v)
             return

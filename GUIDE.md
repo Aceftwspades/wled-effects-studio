@@ -99,6 +99,18 @@ keep their share of the window across a change; the graph keeps a zoom
 of its own (the wheel, or View > Zoom), first the one nearest the
 interface size.
 
+**Forms read left to right.** In the side panel and the frames a row's
+name comes first, right-aligned in a column of its own against its
+control, so the names and the controls each line up (a name too long
+for the column is cut, the whole of it on hover); a checkbox keeps its
+words after it, under the controls; where a row holds several fields,
+each is led by its own words ("presets from [10] playlist [9] named
+[Show]"), and a unit sits inside its field where the field allows
+("10.0 s", "120.0 bpm", "30 fps"). A **colour** is its swatch and its
+hex: a click on the swatch opens the picker (with R, G and B), and the
+hex takes #FFA000, FA0 or 255,160,0 typed and Enter. The LED outputs are
+a table under their column names.
+
 **The graph gets the room.** In the graph layout the canvas takes the
 window (View > Graph: canvas first; off, the 3-D view, the properties
 and the panel sit beside the graph as panes, as in the other layouts).
@@ -380,8 +392,8 @@ curve runs as a script as well as compiled.
 
 Playback > Sequence... (or Device > Sequence). A **step** is what the sim
 shows when you add it - every segment's effect, sliders, palette, bounds,
-opacity and blend, the colours, the brightness - with a name, how many
-seconds it holds and a transition time. "Update from the sim"
+opacity and blend, the colours, the brightness - with a name, how long
+it is **held** and how long it **blends** in from the one before. "Update from the sim"
 recaptures it, "Load into the sim" puts it back to tweak; up /
 down reorder. The **timeline** under the list shows the steps as blocks
 along the time: click one to select it, drag the line between two to

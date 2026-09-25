@@ -19,6 +19,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import form
 
 from native import weight
 import numpy as np
@@ -125,15 +126,18 @@ def build(app):
         with dpg.child_window(tag="pal_rows", height=px(120), border=True):
             pass
         with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="pal_name", label="name", width=px(200), on_enter=True, callback=lambda s, v: rename(app, v))
-            dpg.add_text("", tag="pal_id", color=c.DIM)
+            form.inline("name")
+            dpg.add_input_text(tag="pal_name", width=px(200), on_enter=True, callback=lambda s, v: rename(app, v))
+            typeface.small(dpg.add_text("", tag="pal_id", color=c.DIM))
         dpg.add_text("click: a stop  -  drag: move it  -  right-click: remove it", color=c.DIM, wrap=0)
         dpg.add_drawlist(tag="pal_bar", width=_bar()[0], height=_bar()[1])
         with dpg.group(horizontal=True):
-            dpg.add_color_edit(tag="pal_col", default_value=(255, 255, 255, 255), no_alpha=True, width=px(200),
-                               callback=lambda s, v: set_colour(app, v))
-            dpg.add_input_int(tag="pal_pos", label="position", width=px(80), min_value=0, max_value=255, min_clamped=True, max_clamped=True,
-                              callback=lambda s, v: set_pos(app, int(v)))
+            form.inline("the stop")
+            form.swatch("pal_col", (255, 255, 255), lambda rgb: set_colour(app, rgb))
+            form.inline("at")
+            typeface.mono(dpg.add_input_int(tag="pal_pos", width=px(96), min_value=0, max_value=255, min_clamped=True, max_clamped=True,
+                                            callback=lambda s, v: set_pos(app, int(v))))
+            c.tip("where the stop sits along the palette, 0..255")
             dpg.add_button(label="spread evenly", small=True, callback=lambda: spread(app))
         dpg.add_separator()
         with dpg.group(horizontal=True):
@@ -190,7 +194,7 @@ def refresh(app):
     st = _stops(p)
     k = min(getattr(app, "_pal_stop", 0), len(st) - 1)
     if 0 <= k < len(st):
-        dpg.set_value("pal_col", [st[k][1], st[k][2], st[k][3], 255]); dpg.set_value("pal_pos", st[k][0])
+        form.set_colour("pal_col", (st[k][1], st[k][2], st[k][3])); dpg.set_value("pal_pos", st[k][0])
     draw_bar(app)
 
 

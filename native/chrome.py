@@ -16,6 +16,7 @@ import time
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import form
 from native import typeface
 
 from native.icons import texture
@@ -542,10 +543,9 @@ def build_dialogs(app):
             dpg.add_text("", tag="app_preset", color=DIM)
         dpg.add_separator()
         for key, label, what in THEME_ROLES:
-            with dpg.group(horizontal=True):
-                dpg.add_color_edit([0, 0, 0, 255], tag=f"app_col_{key}", width=px(150), no_alpha=True, no_label=True, user_data=key,
-                                   callback=lambda s, v, u: app.set_appearance(colors={u: [int(round(c * 255)) if c <= 1.0 else int(c) for c in v[:3]]}))
-                dpg.add_text(label, tag=f"app_lbl_{key}")
+            # a colour as its swatch and hex, the role's name first (C6)
+            with form.row(label, width=96):
+                form.swatch(f"app_col_{key}", (0, 0, 0), lambda c, u=key: app.set_appearance(colors={u: list(c)}))
                 typeface.small(dpg.add_text(what, color=DIM))
         dpg.add_separator()
         with dpg.group(horizontal=True):
@@ -580,8 +580,10 @@ def build_dialogs(app):
         dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
                      "record makes that one pass the GIF.", color=DIM, wrap=px(380))
         with dpg.group(horizontal=True):
-            dpg.add_combo([], tag="sweep_key", width=px(200))
-            dpg.add_input_float(tag="sweep_secs", width=px(80), default_value=8.0, step=0, format="%.0f s")
+            form.inline("sweep")
+            dpg.add_combo([], tag="sweep_key", width=px(180))
+            form.inline("over")
+            typeface.mono(dpg.add_input_float(tag="sweep_secs", width=px(80), default_value=8.0, step=0, format="%.0f s"))
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="loop", tag="sweep_loop", default_value=True)
             dpg.add_checkbox(label="record a GIF of one pass", tag="sweep_rec")
@@ -839,8 +841,8 @@ def build_frames_dialog(app):
         dpg.add_separator()
         typeface.label(dpg.add_text("GRADIENT CREATOR", color=ACCENT))
         with dpg.group(horizontal=True):
+            form.inline("start from")
             dpg.add_combo([], tag="gc_from", width=px(220), callback=lambda s, v: _gc_load(app, v))
-            dpg.add_text("start from", color=DIM)
         with dpg.group(horizontal=True):
             dpg.add_input_text(tag="gc_name", hint="a name for this gradient", width=px(220),
                                callback=lambda s, v: app._gc.__setitem__("name", v))
@@ -1289,8 +1291,7 @@ def refresh_appearance(app):
     changed = sorted(k for k in (t.get("colors") or {}) if k in cols and tuple(cols[k]) != tuple(THEME_PRESETS.get(name, {}).get(k, ())))
     dpg.set_value("app_preset", f"{name}" + (f", with {', '.join(changed)} changed" if changed else ""))
     for key in cols:
-        if dpg.does_item_exist(f"app_col_{key}"):
-            dpg.set_value(f"app_col_{key}", list(cols[key]) + [255])
+        form.set_colour(f"app_col_{key}", cols[key])
 
 
 # the sliders that write their value on the track: a thin, translucent grab

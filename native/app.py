@@ -33,6 +33,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import form
 
 import queue
 import threading
@@ -817,7 +818,7 @@ class App(Features):
         self.request_layout()
         try:
             dpg.set_value("geom_desc", geom.describe())
-            dpg.configure_item("map1d2d", show=geom.is2d)
+            dpg.configure_item("map1d2d_row", show=geom.is2d)
         except Exception:
             pass
 
@@ -863,42 +864,47 @@ class App(Features):
         g = self.project.geometry
         for key, label, lo, hi in self.GEOM_FIELDS.get(g.kind, []):
             if lo is None:
-                dpg.add_checkbox(label=label, parent="geom_fields", user_data=key,
-                                 default_value=bool(g.params.get(key, key == "serpentine")),
-                                 callback=self.on_geom_field)
+                form.check(label, parent="geom_fields", user_data=key,
+                           default_value=bool(g.params.get(key, key == "serpentine")),
+                           callback=self.on_geom_field)
             else:
-                dpg.add_input_int(label=label, parent="geom_fields", user_data=key, width=px(90),
-                                  default_value=int(g.params.get(key, {"n": 60, "w": 16, "h": 16, "B": 16}.get(key, 16))),
-                                  min_value=lo, max_value=hi, min_clamped=True, max_clamped=True,
-                                  on_enter=True, callback=self.on_geom_field)
+                with form.row(label, parent="geom_fields"):
+                    dpg.add_input_int(user_data=key, width=px(110),
+                                      default_value=int(g.params.get(key, {"n": 60, "w": 16, "h": 16, "B": 16}.get(key, 16))),
+                                      min_value=lo, max_value=hi, min_clamped=True, max_clamped=True,
+                                      on_enter=True, callback=self.on_geom_field)
         if g.kind == "xyz":
-            dpg.add_text(f"{g.count} points from {g.params.get('source', 'file')}",
-                         parent="geom_fields", color=(139, 147, 163), wrap=0)
+            form.note(f"{g.count} points from {g.params.get('source', 'file')}", parent="geom_fields")
         if g.kind == "shape":                             # the description line below says what it is
-            dpg.add_button(label="Edit the shape...", parent="geom_fields", callback=lambda: device_ui.show(self, "shape"))
+            with form.under(parent="geom_fields"):
+                dpg.add_button(label="Edit the shape...", callback=lambda: device_ui.show(self, "shape"))
         if g.kind == "cube":
             # the wiring: which face first, how each is turned, how each is
             # walked - what the exported ledmap says
-            dpg.add_text("wiring (the ledmap)", parent="geom_fields", color=(139, 147, 163))
-            dpg.add_input_text(label="faces, in wiring order", parent="geom_fields", user_data="faces", width=px(110),
-                               default_value=str(g.params.get("faces", "")), hint="N,W,T,E,S,B" if g.params.get("six") else "N,W,T,E,S", on_enter=True,
-                               callback=self.on_geom_field)
-            dpg.add_input_text(label="quarter turns per face", parent="geom_fields", user_data="rots", width=px(110),
-                               default_value=str(g.params.get("rots", "")), hint="0,0,0,0,0,0" if g.params.get("six") else "0,0,0,0,0", on_enter=True,
-                               callback=self.on_geom_field)
+            form.note("the wiring, as the ledmap has it:", parent="geom_fields")
+            with form.row("face order", parent="geom_fields", tip="the faces in the order the wiring reaches them"):
+                typeface.mono(dpg.add_input_text(user_data="faces", width=-1,
+                                                 default_value=str(g.params.get("faces", "")),
+                                                 hint="N,W,T,E,S,B" if g.params.get("six") else "N,W,T,E,S", on_enter=True,
+                                                 callback=self.on_geom_field))
+            with form.row("quarter turns", parent="geom_fields", tip="how each face is turned, in quarter turns, in the order above"):
+                typeface.mono(dpg.add_input_text(user_data="rots", width=-1,
+                                                 default_value=str(g.params.get("rots", "")),
+                                                 hint="0,0,0,0,0,0" if g.params.get("six") else "0,0,0,0,0", on_enter=True,
+                                                 callback=self.on_geom_field))
             for row in ((("serpentine", "serpentine"), ("vertical", "vertical")),
                         (("start_right", "from right"), ("start_bottom", "from bottom"))):
-                with dpg.group(horizontal=True, parent="geom_fields"):
+                with form.under(parent="geom_fields"):
                     for key, label in row:
                         dpg.add_checkbox(label=label, user_data=key, default_value=bool(g.params.get(key, False)),
                                          callback=self.on_geom_wiring)
             self._inputs.update(("faces_in",))
         if g.params.get("map") is not None:
-            dpg.add_text(f"wiring from {g.params.get('source', 'a ledmap')}: {g.count} LEDs, {int((~g.lit).sum())} gaps",
-                         parent="geom_fields", color=(139, 147, 163), wrap=0)
+            form.note(f"wiring from {g.params.get('source', 'a ledmap')}: {g.count} LEDs, {int((~g.lit).sum())} gaps",
+                      parent="geom_fields")
         if g.kind != "xyz":
-            dpg.add_checkbox(label="show the wiring on the net", parent="geom_fields", default_value=self.show_wiring,
-                             callback=lambda s, v: setattr(self, "show_wiring", bool(v)))
+            form.check("show the wiring on the net", parent="geom_fields", default_value=self.show_wiring,
+                       callback=lambda s, v: setattr(self, "show_wiring", bool(v)))
 
     def on_map1d2d(self, s, val):
         self.eng.set_map1d2d(["strip", "bars", "arcs", "corner"].index(val))
@@ -1457,11 +1463,21 @@ class App(Features):
         self.sync_palette_combo()
         dpg.set_value("edit_status", f"loaded {os.path.basename(rep.library)}  ({self.eng.count} effects)")
 
-    def on_color(self, sender, val):
-        r, g, b = (int(c * 255) if c <= 1.0 else int(c) for c in val[:3])
-        self.seg_cols[int(dpg.get_item_user_data(sender))] = (r << 16) | (g << 8) | b
+    def on_color(self, i, rgb):
+        """A segment colour from its swatch or its hex (0..255 each)."""
+        r, g, b = rgb
+        self.seg_cols[int(i)] = (r << 16) | (g << 8) | b
         self.eng.colors(*self.seg_cols)
         self._ab_sync()
+
+    @staticmethod
+    def rgb_of(c):
+        return ((int(c) >> 16) & 255, (int(c) >> 8) & 255, int(c) & 255)
+
+    def refresh_colours(self):
+        """The COLOURS rows show the colours in force (a sequence step loaded them)."""
+        for i, c in enumerate(self.seg_cols[:3]):
+            form.set_colour(f"seg_col_{i}", self.rgb_of(c))
 
     def _set_param(self, k, v):
         self.eng.fx[k] = int(v)
@@ -1493,21 +1509,20 @@ class App(Features):
             dpg.set_value(st, v)
             setter(v)
 
-        with dpg.group(horizontal=True, parent=parent):
+        with form.row(label, parent=parent):                 # the label first, in the panel's column (C6)
             if is_float:
-                dpg.add_slider_float(tag=st, width=px(142), min_value=lo, max_value=hi,
+                dpg.add_slider_float(tag=st, width=-px(76), min_value=lo, max_value=hi,
                                      default_value=value, format="", callback=from_slider)
                 dpg.add_input_float(tag=it, width=px(68), step=0, format="%.1f",
                                     min_value=lo, max_value=hi, min_clamped=True,
                                     max_clamped=True, default_value=value,
                                     callback=from_box)
             else:
-                dpg.add_slider_int(tag=st, width=px(142), min_value=lo, max_value=hi,
+                dpg.add_slider_int(tag=st, width=-px(76), min_value=lo, max_value=hi,
                                    default_value=value, format="", callback=from_slider)
                 dpg.add_input_int(tag=it, width=px(68), step=0, min_value=lo, max_value=hi,
                                   min_clamped=True, max_clamped=True,
                                   default_value=value, callback=from_box)
-            dpg.add_text(label, color=(139, 147, 163))
 
     def rebuild_params(self):
         """Sliders are labelled from the effect's own metadata, as the web UI is."""
@@ -1530,9 +1545,8 @@ class App(Features):
             lab = (m["labels"][5 + i] if 5 + i < len(m["labels"]) else "").strip()
             if not lab:
                 continue
-            dpg.add_checkbox(label=lab, parent="params",
-                             default_value=bool(self.eng.fx[k]),
-                             user_data=k, callback=self.on_check)
+            form.check(lab, parent="params", default_value=bool(self.eng.fx[k]),
+                       user_data=k, callback=self.on_check)
 
     # --- layout --------------------------------------------------------------
     def request_layout(self):
@@ -3371,12 +3385,20 @@ def build(app):
                     chrome.tip("the match the cursor is on, then the next is found")
                     dpg.add_button(label="replace all", callback=lambda: app.replace_all())
                 with dpg.collapsing_header(label="Metadata - name, labels, palette, flags, defaults", default_open=False):
-                    dpg.add_input_text(tag="meta_name", label="name", width=px(220))
-                    dpg.add_input_text(tag="meta_labels", label="slider labels (8, comma)", width=px(220))
-                    dpg.add_input_text(tag="meta_colours", label="colour labels (3, comma)", width=px(220))
-                    dpg.add_input_text(tag="meta_flags", label="flags: 1 2 12 + v/f", width=px(220))
-                    dpg.add_input_text(tag="meta_defaults", label="defaults sx=,ix=,c1=,pal=", width=px(220))
-                    with dpg.group(horizontal=True):
+                    # the effect's WLED metadata string, a field a part (C6: each led by its name, the format on hover)
+                    with form.row("name", width=128):
+                        dpg.add_input_text(tag="meta_name", width=px(360))
+                    with form.row("slider labels", width=128, tip="eight, separated by commas: Speed, Intensity, "
+                                  "Custom 1 to 3, then the three checkboxes; ! keeps WLED's own name"):
+                        dpg.add_input_text(tag="meta_labels", width=px(360), hint="Speed,Intensity,!,!,!,!,!,!")
+                    with form.row("colour labels", width=128, tip="three, separated by commas: what the colour slots are called"):
+                        dpg.add_input_text(tag="meta_colours", width=px(360), hint="!,!,!")
+                    with form.row("flags", width=128, tip="where it runs - 1 on a strip, 2 on a matrix, 12 on both - "
+                                  "and what it hears: v the volume, f the frequencies"):
+                        typeface.mono(dpg.add_input_text(tag="meta_flags", width=px(360), hint="12v"))
+                    with form.row("defaults", width=128, tip="what the sliders and the palette start at: sx=, ix=, c1=... pal="):
+                        typeface.mono(dpg.add_input_text(tag="meta_defaults", width=px(360), hint="sx=128,ix=128,pal=0"))
+                    with form.under(width=128):
                         dpg.add_button(label="read from file", callback=lambda: app.meta_read())
                         dpg.add_button(label="apply to file", callback=lambda: app.meta_write())
                 with dpg.collapsing_header(label="API reference - click inserts at the cursor", default_open=False,
@@ -3409,40 +3431,45 @@ def build(app):
             with dpg.child_window(tag="side_win", width=app.side_w - 10, height=px(470)):
                 chrome.grip("side_win")
                 with Section(app, "effect", "EFFECT"):
-                    dpg.add_combo(list_projects(), label="project", tag="project_combo", width=px(200),
-                                  default_value=os.path.basename(app.project.path),
-                                  callback=lambda s, v: app.switch_project(v))
-                    dpg.add_combo(app.eng.names, label="effect", tag="fx_combo",
-                                  default_value=app.eng.names[app.eng.idx], width=px(200),
-                                  callback=app.on_effect)
-                    dpg.add_combo([p[0] for p in PALETTES], label="palette",
-                                  default_value=app.palette_name_for(app.eng.pal),
-                                  width=px(200), tag="pal_combo",
-                                  callback=app.on_palette)
+                    with form.row("project"):
+                        dpg.add_combo(list_projects(), tag="project_combo", width=-1,
+                                      default_value=os.path.basename(app.project.path),
+                                      callback=lambda s, v: app.switch_project(v))
+                    with form.row("effect"):
+                        dpg.add_combo(app.eng.names, tag="fx_combo",
+                                      default_value=app.eng.names[app.eng.idx], width=-1,
+                                      callback=app.on_effect)
+                    with form.row("palette"):
+                        dpg.add_combo([p[0] for p in PALETTES],
+                                      default_value=app.palette_name_for(app.eng.pal),
+                                      width=-1, tag="pal_combo",
+                                      callback=app.on_palette)
                     # Only meaningful while a CubeFX audio palette is selected -
                     # it is where those four take their colours from.
-                    dpg.add_combo([p[0] for p in PALETTES if p[1] < 201],
-                                  label="pal source", width=px(200), tag="pal_src",
-                                  default_value=app.palette_name_for(app.eng.pal_source),
-                                  callback=app.on_pal_source)
+                    with form.row("pal source", tip="where a CubeFX audio palette takes its colours from"):
+                        dpg.add_combo([p[0] for p in PALETTES if p[1] < 201],
+                                      width=-1, tag="pal_src",
+                                      default_value=app.palette_name_for(app.eng.pal_source),
+                                      callback=app.on_pal_source)
 
                 with Section(app, "segments", "SEGMENTS"):
-                    with dpg.group(horizontal=True):
-                        dpg.add_combo([], tag="seg_combo", width=px(200), callback=lambda s, v: app.seg_pick(v))
+                    with form.row("segment"):
+                        dpg.add_combo([], tag="seg_combo", width=-px(112), callback=lambda s, v: app.seg_pick(v))
                         dpg.add_button(label="+", small=True, callback=lambda: app.seg_add())
                         dpg.add_button(label="-", small=True, callback=lambda: app.seg_remove())
                         dpg.add_button(label="undo", small=True, callback=lambda: app.seg_undo())
                         chrome.tip("the segments as they were before the last change (add, remove, bounds, blend, options)")
                     dpg.add_group(tag="seg_fields")
                 with Section(app, "geometry", "GEOMETRY"):
-                    dpg.add_combo(list(KINDS), label="shape", tag="geom_kind", width=px(120),
-                                  default_value=app.project.geometry.kind, callback=app.on_geom_kind)
+                    with form.row("shape"):
+                        dpg.add_combo(list(KINDS), tag="geom_kind", width=-1,
+                                      default_value=app.project.geometry.kind, callback=app.on_geom_kind)
                     dpg.add_group(tag="geom_fields")
-                    dpg.add_combo(["strip", "bars", "arcs", "corner"], label="1-D effects as",
-                                  tag="map1d2d", width=px(100), default_value="strip",
-                                  show=app.project.geometry.is2d, callback=app.on_map1d2d)
-                    dpg.add_text(app.project.geometry.describe(), tag="geom_desc",
-                                 color=(139, 147, 163), wrap=0)
+                    with form.row("1-D effects as", tag="map1d2d_row", show=app.project.geometry.is2d,
+                                  tip="how an effect written for a strip is laid over a matrix"):
+                        dpg.add_combo(["strip", "bars", "arcs", "corner"],
+                                      tag="map1d2d", width=-1, default_value="strip", callback=app.on_map1d2d)
+                    form.note(app.project.geometry.describe(), tag="geom_desc")
                     with dpg.file_dialog(directory_selector=False, show=False, tag="xyz_dialog",
                                          width=px(620), height=px(420), callback=app.on_xyz_file,
                                          cancel_callback=lambda s, a: dpg.set_value("geom_kind", app.project.geometry.kind)):
@@ -3459,16 +3486,15 @@ def build(app):
                 # in code. WLED's DEFAULT_COLOR is amber; 2 and 3 start black,
                 # as they do on the device.
                 with Section(app, "colours", "COLOURS"):
-                    for _ci, (_lbl, _rgb) in enumerate((("primary",   (255, 160, 0, 255)),
-                                                        ("secondary", (0, 0, 0, 255)),
-                                                        ("tertiary",  (0, 0, 0, 255)))):
-                        dpg.add_color_edit(_rgb, label=_lbl, width=px(170), no_alpha=True,
-                                           user_data=_ci, callback=app.on_color)
+                    for _ci, _lbl in enumerate(("primary", "secondary", "tertiary")):
+                        form.colour(_lbl, app.rgb_of(app.seg_cols[_ci]), f"seg_col_{_ci}",
+                                    lambda c, i=_ci: app.on_color(i, c))
                 with Section(app, "parameters", "PARAMETERS"):
                     with dpg.group(tag="scrub_row", show=False):
-                        dpg.add_text("paused - scrub the last seconds", color=SECTION)
-                        dpg.add_slider_int(tag="scrub", width=px(280), min_value=0, max_value=1, default_value=0, format="frame %d",
-                                           callback=lambda s, v: setattr(self_app[0], "scrub", int(v)))
+                        form.note("paused - scrub the last seconds", color=SECTION)
+                        with form.row("frame"):
+                            dpg.add_slider_int(tag="scrub", width=-1, min_value=0, max_value=1, default_value=0, format="%d",
+                                               callback=lambda s, v: setattr(self_app[0], "scrub", int(v)))
                     dpg.add_group(tag="params")
                 with Section(app, "audio", "AUDIO"):
                     dpg.add_group(tag="audio_rows")
@@ -3480,20 +3506,19 @@ def build(app):
                             ("bpm",  "bpm",    120, 30, 200, "bpm")):
                         app.pair("audio_rows", key, lab, val, lo, hi,
                                  lambda v, a=attr: setattr(app.syn, a, int(v)))
-                    dpg.add_checkbox(label="auto beat", default_value=True,
-                                     callback=lambda s, v: setattr(app.syn, "auto_beat", v))
+                    form.check("auto beat", default_value=True,
+                               callback=lambda s, v: setattr(app.syn, "auto_beat", v))
                     # Gate a band and it goes silent between beats, jumping to its
                     # slider level on one. Only the bass ever had a transient
                     # otherwise, so mid and treble could not be judged on how an
                     # effect answers a hit.
-                    dpg.add_text("gate to beat", color=(139, 147, 163))
-                    with dpg.group(horizontal=True):
+                    with form.row("gate to beat", tip="a gated band is silent between beats and jumps to its level on one"):
                         for attr, lab in (("gate_bass", "bass"), ("gate_mid", "mid"),
                                           ("gate_treb", "treble")):
                             dpg.add_checkbox(label=lab, tag=f"chk_{attr}", user_data=attr,
                                              callback=lambda s, v, u: setattr(app.syn, u, bool(v)))
-                    dpg.add_checkbox(label="silence (mute all bands)",
-                                     callback=lambda s, v: setattr(app.syn, "muted", v))
+                    form.check("silence (mute all bands)",
+                               callback=lambda s, v: setattr(app.syn, "muted", v))
                     dpg.add_color_button(tag="beat_led", default_value=(42, 47, 58, 255),
                                          width=px(280), height=px(6), no_border=True)
                 with Section(app, "live", "LIVE AUDIO"):
@@ -3502,9 +3527,9 @@ def build(app):
                         _devs = ["system output"] + [n for _, n in list_inputs()]
                     except Exception:
                         _devs = ["system output"]
-                    dpg.add_combo(_devs, label="source", tag="live_dev", width=px(200),
-                                  default_value=_devs[0])
-                    with dpg.group(horizontal=True):
+                    with form.row("source"):
+                        dpg.add_combo(_devs, tag="live_dev", width=-1, default_value=_devs[0])
+                    with form.under():
                         dpg.add_button(label="use live audio", tag="live_btn",
                                        callback=lambda: app.toggle_live())
                         dpg.add_button(label="play a WAV file...", callback=lambda: dpg.show_item("wav_dialog"))
@@ -3516,7 +3541,8 @@ def build(app):
                     app.pair("gain_row", "live_gain", "live gain", 3.0, 0.2, 12.0,
                              lambda v: setattr(app.live, "gain", float(v)) if app.live else None,
                              is_float=True)
-                    dpg.add_progress_bar(tag="lvl_bar", default_value=0.0, width=px(280))
+                    with form.row("level"):
+                        dpg.add_progress_bar(tag="lvl_bar", default_value=0.0, width=-1)
                     dpg.add_text("", tag="live_msg", wrap=0)
                 app.sec_apply_order()
         with dpg.group(tag="footer"):

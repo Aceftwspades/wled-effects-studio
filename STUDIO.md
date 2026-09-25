@@ -1576,9 +1576,36 @@ reaches furthest; (Cn) is the critique's number.
       each control gets a label of its own: the panel's and the frames'
       field values in the monospace (their inline labels would go with
       them), and a node field's name in the interface's face.
-- [ ] **Forms read left to right** (C6): a label column, the control
-      after it, units inside; colours as a swatch and hex. With the label
-      its own text, the control's value takes the monospace (C2).
+- [x] **Forms read left to right** (C6): native/form.py. A form row is
+      its name right-aligned in a column of its own, then its control
+      (form.row; the column is measured to the pixel, so every control
+      starts at the same x, a name too long for it cut at a word with the
+      whole on hover); a checkbox keeps its words after it, under the
+      controls (form.check, form.under); a row of several fields leads
+      each with its words (form.inline: "presets from [10] playlist [9]
+      named [Show]", "SD [-1] WS [-1] SCK [-1] MCLK [-1]"); a note sits
+      under the controls (form.note). A row's value fields take the
+      monospace as it closes (C2's leftover). The side panel throughout -
+      the effect, segments (from x y, to x y, opacity, blend mode, the
+      options, group / space / offset), geometry and the cube's wiring,
+      parameters, audio, live - and the frames: Sequence (a step's name,
+      held, blend; RAMP [sx] to [128] [linear]; blend as; beats a bar; the
+      timers, their days as toggles that fit the frame), LED outputs (a
+      table under its column names, the name and the type stretching to
+      the frame), Audio input, Palettes, the Shape frame's part fields
+      (position, rotation in degrees, scale as 1.00x, aim), the Send
+      frame's stream and wiring test, the Flash environment, the code
+      pane's metadata (each field's format on hover), Sweep. Units inside
+      the field where its format allows ("10.0 s", "120.0 bpm", "30 fps",
+      "20 LEDs/s", "0.0°"); an integer field has no format - C7's control
+      takes those in. A colour is its swatch and its hex (form.swatch:
+      the picker behind the swatch has R, G and B; the hex takes #FFA000,
+      FA0 or 255,160,0): the segment's three colours, the theme's seven,
+      a palette stop; a node's colour setting shows its swatch alone, as
+      a colour input does. test_audit fails on a field labelled after
+      itself - Dear PyGui's label, or a text straight after it - outside
+      the graph's node fields (C7). Found on the way: loading a sequence
+      step changed the colours but not the swatches showing them.
 - [ ] **One number control** (C7): the value on the track, drag, click to
       type, the unit inside, a fill rather than a grab; in the panel too.
       On a node the name leaves the field for the interface's face, the

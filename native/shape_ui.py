@@ -20,6 +20,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import form
 
 from native import weight
 import numpy as np
@@ -119,8 +120,9 @@ def build(app):
                   "(xlights_rgbeffects.xml: every model a part, where it stands); an x y z [index] point list (CSV, text, JSON)")
             dpg.add_combo([m[1] for m in MESH_MODES], tag="shape_mesh_mode", width=px(170), default_value=MESH_MODES[0][1])
             c.tip("how a mesh becomes LEDs: one every pitch along its edges, one at each vertex, or spread over its surface")
-            dpg.add_input_float(tag="shape_mesh_pitch", width=px(60), default_value=1.0, step=0, format="%.2f")
-            dpg.add_text("pitch", color=c.DIM)
+            form.inline("pitch")
+            typeface.mono(dpg.add_input_float(tag="shape_mesh_pitch", width=px(70), default_value=1.0, step=0, format="%.2f"))
+            c.tip("the LED spacing along the edges or over the surface, in the model's units")
             dpg.add_button(label="Reference...", small=True,
                            callback=lambda: (setattr(app, "_shape_ref", True), dpg.show_item("shape_import_dialog")))
             c.tip("a mesh drawn in the 3-D view to place LEDs against, not LEDs: the tree, the house, the enclosure")
@@ -205,8 +207,9 @@ def refresh(app):
     _arrange_hint(app)
     dpg.set_value("shape_part_kind", f"- {part['kind']}, {shapes.part_count(part)} LEDs")
     P = "shape_fields"
-    dpg.add_input_text(label="name", parent=P, width=px(200), default_value=str(part.get("name", "")), on_enter=True,
-                       callback=lambda s, v: set_part(app, sel, name=v))
+    with form.row("name", parent=P):
+        dpg.add_input_text(width=px(200), default_value=str(part.get("name", "")), on_enter=True,
+                           callback=lambda s, v: set_part(app, sel, name=v))
     if part["kind"] == "reference":
         dpg.add_text(f"{part['params'].get('file', '?')}: {len(part['params'].get('vertices') or [])} vertices, "
                      f"{len(part['params'].get('edges') or [])} edges - drawn in the 3-D view, not LEDs", parent=P, color=c.DIM, wrap=0)
@@ -220,25 +223,29 @@ def refresh(app):
             continue
         val = part["params"].get(key, default)
         label = HINT.get(key, key)
+        tip = TIPS.get(key) if not (key == "radius" and part["kind"] == "polyhedron") else None
         if isinstance(default, bool):
-            dpg.add_checkbox(label=key, parent=P, default_value=bool(val), user_data=key,
-                             callback=lambda s, v, u: set_param(app, sel, u, bool(v)))
-        elif isinstance(default, str):
-            dpg.add_combo(shapes.CHOICES.get(key, [str(val)]), label=label, parent=P, width=px(140), default_value=str(val), user_data=key,
-                          callback=lambda s, v, u: set_param(app, sel, u, str(v)))
-        elif isinstance(default, int):
-            dpg.add_input_int(label=label, parent=P, width=px(90), default_value=int(val), min_value=1, max_value=4096, min_clamped=True,
-                              on_enter=True, user_data=key, callback=lambda s, v, u: set_param(app, sel, u, int(v)))
-        else:
-            dpg.add_input_float(label=label, parent=P, width=px(90), default_value=float(val), step=0, format="%.2f",
-                                on_enter=True, user_data=key, callback=lambda s, v, u: set_param(app, sel, u, float(v)))
-        if key in TIPS and not (key == "radius" and part["kind"] == "polyhedron"):
-            c.tip(TIPS[key])
+            form.check(key, parent=P, default_value=bool(val), user_data=key,
+                       callback=lambda s, v, u: set_param(app, sel, u, bool(v)))
+            if tip:
+                c.tip(tip)
+            continue
+        with form.row(label, parent=P, tip=tip):
+            if isinstance(default, str):
+                dpg.add_combo(shapes.CHOICES.get(key, [str(val)]), width=px(140), default_value=str(val), user_data=key,
+                              callback=lambda s, v, u: set_param(app, sel, u, str(v)))
+            elif isinstance(default, int):
+                dpg.add_input_int(width=px(110), default_value=int(val), min_value=1, max_value=4096, min_clamped=True,
+                                  on_enter=True, user_data=key, callback=lambda s, v, u: set_param(app, sel, u, int(v)))
+            else:
+                dpg.add_input_float(width=px(110), default_value=float(val), step=0, format="%.2f",
+                                    on_enter=True, user_data=key, callback=lambda s, v, u: set_param(app, sel, u, float(v)))
     if part["kind"] == "polyline":
         # the count as a field too: the pitch follows (LEDs at both ends)
         n = shapes.part_count(part)
-        dpg.add_input_int(label="LEDs (sets the pitch)", parent=P, width=px(90), default_value=n, min_value=2, max_value=4096, min_clamped=True,
-                          on_enter=True, callback=lambda s, v: set_polyline_count(app, sel, int(v)))
+        with form.row("LEDs", parent=P, tip="the count sets the pitch: LEDs at both ends"):
+            dpg.add_input_int(width=px(110), default_value=n, min_value=2, max_value=4096, min_clamped=True,
+                              on_enter=True, callback=lambda s, v: set_polyline_count(app, sel, int(v)))
     if part["kind"] == "polyhedron":
         with dpg.group(horizontal=True, parent=P):
             dpg.add_button(label="split into parts", small=True, callback=lambda: split_polyhedron(app, sel))
@@ -256,15 +263,18 @@ def refresh(app):
     with dpg.group(horizontal=True, parent=P):
         typeface.label(dpg.add_text("PLACE", color=c.ACCENT))
         c.info("drag a number and the part moves in the 3-D view as you drag; the sim takes the shape when you let go; ctrl-click to type")
-    dpg.add_drag_floatx(label="position x y z", parent=P, width=px(240), size=3, default_value=list(part.get("pos", [0, 0, 0])) + [0.0], format="%.2f",
-                        speed=0.05, callback=lambda s, v: nudge(app, sel, pos=[float(x) for x in v[:3]]))
-    dpg.add_drag_floatx(label="rotation x y z (deg)", parent=P, width=px(240), size=3, default_value=list(part.get("rot", [0, 0, 0])) + [0.0], format="%.1f",
-                        speed=0.5, callback=lambda s, v: nudge(app, sel, rot=[float(x) for x in v[:3]]))
+    with form.row("position", parent=P, tip="x, y and z"):
+        dpg.add_drag_floatx(width=px(240), size=3, default_value=list(part.get("pos", [0, 0, 0])) + [0.0], format="%.2f",
+                            speed=0.05, callback=lambda s, v: nudge(app, sel, pos=[float(x) for x in v[:3]]))
+    with form.row("rotation", parent=P, tip="about x, y and z, in degrees"):
+        dpg.add_drag_floatx(width=px(240), size=3, default_value=list(part.get("rot", [0, 0, 0])) + [0.0], format="%.1f°",
+                            speed=0.5, callback=lambda s, v: nudge(app, sel, rot=[float(x) for x in v[:3]]))
     sc = part.get("scale", 1.0)
-    dpg.add_drag_float(label="scale", parent=P, width=px(90), default_value=float(sc if not isinstance(sc, list) else sc[0]), format="%.2f",
-                       speed=0.01, min_value=0.01, max_value=100.0, clamped=True, callback=lambda s, v: nudge(app, sel, scale=float(v)))
-    dpg.add_checkbox(label="reverse the wiring of this part", parent=P, default_value=bool(part.get("reverse")),
-                     callback=lambda s, v: set_part(app, sel, reverse=bool(v)))
+    with form.row("scale", parent=P):
+        dpg.add_drag_float(width=px(110), default_value=float(sc if not isinstance(sc, list) else sc[0]), format="%.2f×",
+                           speed=0.01, min_value=0.01, max_value=100.0, clamped=True, callback=lambda s, v: nudge(app, sel, scale=float(v)))
+    form.check("reverse the wiring of this part", parent=P, default_value=bool(part.get("reverse")),
+               callback=lambda s, v: set_part(app, sel, reverse=bool(v)))
     # AIM: the part's axis along a direction, at a distance from the origin -
     # the way to build round a ball: a polygon per face, each aimed outward
     ax = shapes.axis_of(part)
@@ -276,20 +286,19 @@ def refresh(app):
         c.info(f"point {axname} along the direction (x y z, or azimuth and elevation, or an axis button). 'aim outward' also puts the part "
                "the distance from the origin along it; 'turn only' keeps its place; 'aim at the origin' points it inward from where it is. "
                "Spin turns it about the direction. The yellow arrow in the 3-D view is the axis.")
-    with dpg.group(horizontal=True, parent=P):
+    with form.row("direction", parent=P, tip="x, y and z - or its azimuth and elevation, in degrees"):
         dpg.add_input_floatx(tag="shape_aim_dir", width=px(200), size=3, default_value=[float(v) for v in d0] + [0.0], format="%.3f",
                              callback=lambda s, v: _dir_to_angles(v))
-        dpg.add_text("direction", color=c.DIM)
         az, el = _angles_of(d0)
-        dpg.add_input_float(tag="shape_aim_az", width=px(60), default_value=az, step=0, format="%.1f", callback=lambda: _angles_to_dir())
-        dpg.add_text("az", color=c.DIM)
-        dpg.add_input_float(tag="shape_aim_el", width=px(60), default_value=el, step=0, format="%.1f", callback=lambda: _angles_to_dir())
-        dpg.add_text("el", color=c.DIM)
-    with dpg.group(horizontal=True, parent=P):
-        dpg.add_input_float(tag="shape_aim_dist", width=px(70), default_value=dist, step=0, format="%.2f")
-        dpg.add_text("distance", color=c.DIM)
-        dpg.add_input_float(tag="shape_aim_spin", width=px(60), default_value=0.0, step=0, format="%.1f")
-        dpg.add_text("spin (deg)", color=c.DIM)
+        form.inline("az")
+        dpg.add_input_float(tag="shape_aim_az", width=px(70), default_value=az, step=0, format="%.1f°", callback=lambda: _angles_to_dir())
+        form.inline("el")
+        dpg.add_input_float(tag="shape_aim_el", width=px(70), default_value=el, step=0, format="%.1f°", callback=lambda: _angles_to_dir())
+    with form.row("distance", parent=P, tip="from the origin, for 'aim outward'"):
+        dpg.add_input_float(tag="shape_aim_dist", width=px(80), default_value=dist, step=0, format="%.2f")
+        form.inline("spin")
+        dpg.add_input_float(tag="shape_aim_spin", width=px(70), default_value=0.0, step=0, format="%.1f°")
+        c.tip("a turn about the direction, in degrees")
         for lbl, v in (("+X", (1, 0, 0)), ("-X", (-1, 0, 0)), ("+Y", (0, 1, 0)), ("-Y", (0, -1, 0)), ("+Z", (0, 0, 1)), ("-Z", (0, 0, -1))):
             dpg.add_button(label=lbl, small=True, user_data=v, callback=lambda s, a, u: _set_dir(u))
     with dpg.group(horizontal=True, parent=P):
@@ -319,8 +328,11 @@ def refresh(app):
         for ax, lbl in enumerate("XYZ"):
             dpg.add_button(label=lbl, small=True, user_data=ax, callback=lambda s, a, u: mirror_part(app, sel, u))
         dpg.add_text("  array", color=c.DIM)
-        dpg.add_input_int(tag="shape_array_n", width=px(60), default_value=3, min_value=2, max_value=64, min_clamped=True)
-        dpg.add_input_floatx(tag="shape_array_off", width=px(180), size=3, default_value=[10.0, 0.0, 0.0, 0.0], format="%.1f")
+        typeface.mono(dpg.add_input_int(tag="shape_array_n", width=px(96), default_value=3, min_value=2, max_value=64, min_clamped=True))
+        c.tip("copies, this one included")
+        form.inline("apart")
+        typeface.mono(dpg.add_input_floatx(tag="shape_array_off", width=px(180), size=3, default_value=[10.0, 0.0, 0.0, 0.0], format="%.1f"))
+        c.tip("each copy moved by this x, y and z from the one before")
         dpg.add_button(label="make", small=True, callback=lambda: array_part(app, sel))
     dpg.add_separator(parent=P)
     with dpg.group(horizontal=True, parent=P):
@@ -332,8 +344,8 @@ def refresh(app):
         dpg.add_combo(["z", "y", "x"], tag="shape_plane_axis", width=px(50), default_value=getattr(app, "_shape_plane", ("z", 0.0))[0],
                       callback=lambda s, v: setattr(app, "_shape_plane", (v, getattr(app, "_shape_plane", ("z", 0.0))[1])))
         dpg.add_text("=", color=c.DIM)
-        dpg.add_input_float(tag="shape_plane_v", width=px(70), default_value=getattr(app, "_shape_plane", ("z", 0.0))[1], step=0, format="%.1f",
-                            callback=lambda s, v: setattr(app, "_shape_plane", (getattr(app, "_shape_plane", ("z", 0.0))[0], float(v))))
+        typeface.mono(dpg.add_input_float(tag="shape_plane_v", width=px(70), default_value=getattr(app, "_shape_plane", ("z", 0.0))[1], step=0, format="%.1f",
+                                          callback=lambda s, v: setattr(app, "_shape_plane", (getattr(app, "_shape_plane", ("z", 0.0))[0], float(v)))))
 
 
 # --- edits -----------------------------------------------------------------------------------
