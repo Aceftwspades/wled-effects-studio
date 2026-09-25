@@ -122,10 +122,13 @@ class Popouts:
             blk.close()
         return gone
 
-    def publish(self, net, eng, cam):
+    def publish(self, net, eng, cam, flags=0):
+        """This frame to every popped-out view; `flags` what the 3-D view
+        adds - 1 unlit LEDs as dim dots, 2 a floor under the shape."""
         for view, (proc, blk) in self.jobs.items():
             try:
                 self._write(view, blk, net, eng, cam)
+                blk.i[9] = int(flags)
             except Exception:
                 pass
 
@@ -286,9 +289,11 @@ def run(view, name, parent=0):
             dpg.set_item_pos("img", [(vw - iw) // 2, (vh - ih) // 2])
         elif kind == "cube":
             k = SRC_SCALE
-            dpg.set_value("tex", rgba("src", px.repeat(k, 0).repeat(k, 1)))
+            dots = bool(int(blk.i[9]) & 1)
+            dpg.set_value("tex", rgba("src", render.dotted(px, k) if dots else px.repeat(k, 0).repeat(k, 1)))
             q = state["quads"]
             q.resize(int(size * 0.86), vw, vh)        # the drawlist is the window; the cube sits centred, a margin round it
+            q.floor = bool(int(blk.i[9]) & 2)
             q.camera(cam[0], cam[1], cam[2], six=bool(blk.i[8]))
             state["size"] = size
         else:
@@ -300,7 +305,8 @@ def run(view, name, parent=0):
             n = min(npts, px.shape[0])
             if n <= 0:
                 return
-            img = render.render_points(pos[:n], px[:n], p, cam[0], cam[1], cam[2])
+            img = render.render_points(pos[:n], px[:n], p, cam[0], cam[1], cam[2],
+                                       unlit=render.UNLIT if int(blk.i[9]) & 1 else None, floor=bool(int(blk.i[9]) & 2))
             dpg.set_value("tex", rgba("pts", img))
             dpg.configure_item("img", width=size, height=size)
             dpg.set_item_pos("img", [(vw - size) // 2, (vh - size) // 2])

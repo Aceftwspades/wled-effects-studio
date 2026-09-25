@@ -351,6 +351,56 @@ def test_gpu_cube_faces_match_the_software_projection():
     assert not bad, "\n".join(bad)
 
 
+def test_the_view_draws_unlit_leds_as_dots_and_a_floor():
+    """C16: where the view asks, an LED that is off is a dim dot - on a
+    cube's face, in a point cloud (smaller than a lit LED), in the GPU
+    cube's texture, behind a GPU point whose own square goes transparent -
+    and the shape stands on a faint floor, left out when seen from below.
+    Asked for neither, the renderers draw what they always did."""
+    import dearpygui.dearpygui as dpg
+    from native import render
+    from native.gpucube import PointQuads
+    B = 8
+    off = np.zeros((3 * B, 3 * B, 3), np.uint8)
+    lit = np.full_like(off, 200)
+    plain = render.render(off, B, 240, 0.6, 0.5, 5.0)
+    assert not plain.any()                                     # all off, asked for nothing: black
+    dots = render.render(off, B, 240, 0.6, 0.5, 5.0, unlit=render.UNLIT)
+    faces = render.render(lit, B, 240, 0.6, 0.5, 5.0).any(axis=2).sum()
+    grey = (dots == render.UNLIT).all(axis=2).sum()
+    assert 0.05 < grey / faces < 0.3, grey / faces            # dots, not tiles: black round each
+    floor = render.render(off, B, 240, 0.6, 0.5, 5.0, floor=True)
+    assert floor.any() and not render.render(off, B, 240, 0.6, -0.5, 5.0, floor=True).any()   # from below: none
+    d = render.dotted(off, 4)
+    assert d.shape == (3 * B * 4, 3 * B * 4, 3) and (d == render.UNLIT).all(axis=2).sum() == (3 * B) ** 2 * 4
+    assert not (render.dotted(lit, 4) == render.UNLIT).all(axis=2).any()
+    pos = np.array([[-2.0, 0.0, 0.0], [2.0, 0.0, 0.0]], np.float32)
+    rgb = np.array([[255, 0, 0], [0, 0, 0]], np.uint8)
+    img = render.render_points(pos, rgb, 240, 0.0, 0.0, 5.0, unlit=render.UNLIT)
+    red, grey = (img == (255, 0, 0)).all(axis=2).sum(), (img == render.UNLIT).all(axis=2).sum()
+    assert 0 < grey < red / 2, (grey, red)
+    dpg.create_context()
+    try:
+        with dpg.window(tag="w"):
+            pass
+        pq = PointQuads("w", "pq_dots", pos)
+        pq.resize(240)
+        pq.dots = True
+        pq.camera(0.0, 0.0, 5.0)
+        dot = [dpg.get_item_configuration(q) for q in pq.dot_items]
+        sq = [dpg.get_item_configuration(q) for q in pq.items]
+        assert all(c["show"] for c in dot + sq)
+        assert all(abs(dc["p3"][0] - dc["p1"][0]) < abs(sc["p3"][0] - sc["p1"][0]) for dc, sc in zip(dot, sq))
+        pq.colours(rgb, unlit=render.UNLIT)
+        tex = np.asarray(dpg.get_value(pq.tex)).reshape(-1, 4)
+        assert tex[0, 3] == 1.0 and tex[1, 3] == 0.0           # the unlit LED's square transparent: its dot shows
+        pq.dots = False
+        pq.camera(0.0, 0.0, 5.0)
+        assert not any(dpg.get_item_configuration(q)["show"] for q in pq.dot_items)
+    finally:
+        dpg.destroy_context()
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0

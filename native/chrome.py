@@ -235,6 +235,13 @@ def build_menus(app):
                 dpg.add_separator()
                 dpg.add_menu_item(label="Background picture...", callback=lambda: dpg.show_item("bg_dialog"))
                 dpg.add_menu_item(label="Clear the background", callback=lambda: app.set_background(""))
+            _mi(app, "Unlit LEDs as dim dots", "unlit_dots", check=True, tag="menu_unlit_dots",
+                default_value=bool(app.prefs.get("unlit_dots", True)), callback=lambda s, a: app.set_view_option("unlit_dots", a))
+            tip("the 3-D view draws an LED that is off as a dim dot, so the shape reads on black; off: black, as the "
+                "LEDs are")
+            _mi(app, "A floor under the shape", "view_floor", check=True, tag="menu_view_floor",
+                default_value=bool(app.prefs.get("view_floor", True)), callback=lambda s, a: app.set_view_option("view_floor", a))
+            tip("a faint grid under the shape in the 3-D view, fading out from the middle - something for it to stand on")
             with dpg.menu(label="Layout"):
                 for k, (label, arr) in enumerate(app.PRESETS):
                     dpg.add_menu_item(label=label, check=True, tag=f"menu_arr_{k}", user_data=arr,

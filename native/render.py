@@ -82,25 +82,89 @@ def _grid(size):
     return g
 
 
-def _fill(out, bg):
-    """The background: a colour, or a (size, size, 3) picture."""
-    if isinstance(bg, np.ndarray) and bg.ndim == 3 and bg.shape[:2] == out.shape[:2]:
-        _fill(out, bg)
-    else:
-        _fill(out, bg)
+# --- what the view adds (the critique's C16) -------------------------------------------------------
+# Unlit LEDs were drawn black on a near-black ground, so a torus running a fire was a black blob with a
+# lit rim: an LED that is off is a dim dot now, where the view asks for one, and the shape stands on a
+# faint floor. Pictures made elsewhere (the library's and the shape's previews) ask for neither.
+UNLIT = (32, 34, 40)        # an LED that is off, as the view draws it: under most lit colours, over black
+UNLIT_BELOW = 10            # a colour whose brightest channel is under this is off
+DOT = 0.21                  # an unlit dot's radius on a face, in LED pitches
+DOT_POINT = 0.4             # a point's unlit dot, against its lit square
+FLOOR = (150, 162, 185)     # the floor's lines, faint (their alpha fades out from the middle)
+FLOOR_SPAN, FLOOR_STEP, FLOOR_ALPHA = 1.8, 0.45, 0.2
 
 
-def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False):
+def dotted(net, k, unlit=UNLIT):
+    """The net at k times its size, each unlit LED a dot of `unlit` in the
+    middle of its k x k block (the rest of it black) - the GPU cube's
+    texture, where the software renderer draws the dots itself."""
+    big = net.repeat(k, 0).repeat(k, 1)
+    off = (net.max(axis=2) < UNLIT_BELOW).repeat(k, 0).repeat(k, 1)
+    c = (np.arange(k) + 0.5) / k - 0.5
+    cell = (c[:, None] ** 2 + c[None, :] ** 2) <= DOT * DOT * 1.6          # a k x k block's dot, round enough at k = 4
+    h, w = net.shape[:2]
+    dot = np.tile(cell, (h, w))
+    big = big.copy() if not big.flags.writeable else big
+    big[off & dot] = unlit
+    return big
+
+
+def floor_segments(z, span=FLOOR_SPAN, step=FLOOR_STEP, pieces=8):
+    """The floor's grid as short segments on the plane z, each with the
+    alpha it fades to by its distance from the middle: [(p0, p1, a)]."""
+    out = []
+    lines = np.arange(-span, span + 1e-6, step)
+    ts = np.linspace(-span, span, pieces + 1)
+    for c in lines:
+        for t0, t1 in zip(ts[:-1], ts[1:]):
+            for p0, p1 in (((c, t0, z), (c, t1, z)), ((t0, c, z), (t1, c, z))):
+                m = np.hypot((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2)
+                a = FLOOR_ALPHA * max(0.0, 1.0 - m / (span * 1.15))
+                if a > 0.004:
+                    out.append((np.array(p0), np.array(p1), a))
+    return out
+
+
+def _floor(out, eye, R, f, z, off=(0.0, 0.0)):
+    """The floor drawn onto a picture: its grid sampled a pixel or so apart
+    and blended in, fading out from the middle; from below it is left out."""
+    if eye[2] <= z + 0.02:
+        return
+    size = out.shape[0]
+    span = FLOOR_SPAN
+    ts = np.linspace(-span, span, max(200, size))
+    pts = []
+    for c in np.arange(-span, span + 1e-6, FLOOR_STEP):
+        pts.append(np.stack([np.full_like(ts, c), ts, np.full_like(ts, z)], 1))
+        pts.append(np.stack([ts, np.full_like(ts, c), np.full_like(ts, z)], 1))
+    P = np.concatenate(pts)
+    cam = (P - eye) @ R.T
+    depth = -cam[:, 2]
+    ok = depth > 0.05
+    d = np.where(ok, depth, 1.0)
+    sx = (off[0] + size * 0.5 + f * cam[:, 0] / d).astype(np.int32)
+    sy = (off[1] + size * 0.5 - f * cam[:, 1] / d).astype(np.int32)
+    ok &= (sx >= 0) & (sx < out.shape[1]) & (sy >= 0) & (sy < out.shape[0])
+    a = (FLOOR_ALPHA * np.clip(1.0 - np.hypot(P[:, 0], P[:, 1]) / (span * 1.15), 0.0, 1.0))[ok][:, None]
+    ys, xs = sy[ok], sx[ok]
+    out[ys, xs] = (out[ys, xs].astype(np.float32) * (1.0 - a) + np.asarray(FLOOR, np.float32) * a).astype(np.uint8)
+
+
+def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False, unlit=None, floor=False):
     """Draw the cube from the unfolded net image.
 
     net_rgb : (3B, 3B, 3) uint8 - the same image the flat view shows
     six     : the bottom face too (seen from below)
+    unlit   : a colour an LED that is off is drawn as, a dot in its cell (None: black)
+    floor   : a faint grid under the cube
     returns : (size, size, 3) uint8
     """
     out = np.zeros((size, size, 3), np.uint8)
     out[:] = bg
     eye, R = _camera(yaw, pitch, dist)
     f = (size * 0.5) / np.tan(np.radians(fov) * 0.5)
+    if floor:
+        _floor(out, eye, R, f, -1.1)
 
     drawn = []
     for fc in (FACES6 if six else FACES):
@@ -159,7 +223,13 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
         np.clip(vi, 0, B - 1, out=vi)
         block = net_rgb[fc["by"] * B:(fc["by"] + 1) * B,
                         fc["bx"] * B:(fc["bx"] + 1) * B]
-        out[y0:y1, x0:x1][inside] = block[vi, ui]
+        px_ = block[vi, ui]
+        if unlit is not None:
+            # an LED that is off: a dim dot in the middle of its cell, black round it
+            fu, fv = u[inside] - ui - 0.5, v[inside] - vi - 0.5
+            px_ = px_.copy()
+            px_[(px_.max(axis=1) < UNLIT_BELOW) & (fu * fu + fv * fv <= DOT * DOT)] = unlit
+        out[y0:y1, x0:x1][inside] = px_
     return out
 
 
@@ -210,8 +280,9 @@ def unproject(sx, sy, size, yaw, pitch, dist, frame, axis=2, value=0.0, fov=38.0
     return (eye + t * d) * ext + c
 
 
-def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=0.42):
-    """Draw any geometry as a cloud of LEDs.
+def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=0.42, unlit=None, floor=False):
+    """Draw any geometry as a cloud of LEDs (an LED that is off a smaller
+    square of `unlit` when given; a faint floor under the shape with `floor`).
 
     pos : (n, 3) float, Z up, in the units Geometry uses (a cube of B pixels a
           face spans +/- B/2); NaN rows are skipped
@@ -238,9 +309,20 @@ def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=
     # LED half-size on screen: the LED pitch in world units (1/ext per pixel),
     # times led (fraction of the pitch the emitter covers), projected
     half = (f * (led / ext)) / np.where(ok, depth, 1.0)
+    if floor:
+        _floor(out, eye, R, f, float(np.nanmin(P[:, 2])) - 0.08 if np.isfinite(P[:, 2]).any() else -1.1)
+    off = (np.asarray(rgb).max(axis=1) < UNLIT_BELOW) if unlit is not None else None
     order = np.argsort(-depth)                  # far first
     for i in order:
         if not ok[i]:
+            continue
+        if off is not None and off[i]:
+            h = max(1, int(round(half[i] * DOT_POINT)))         # off: a dim dot, smaller than a lit LED
+            x0 = int(sx[i]) - h; x1 = int(sx[i]) + h
+            y0 = int(sy[i]) - h; y1 = int(sy[i]) + h
+            if x1 <= 0 or y1 <= 0 or x0 >= size or y0 >= size:
+                continue
+            out[max(0, y0):min(size, y1), max(0, x0):min(size, x1)] = unlit
             continue
         h = max(1, int(round(half[i])))
         x0 = int(sx[i]) - h; x1 = int(sx[i]) + h

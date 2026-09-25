@@ -335,7 +335,17 @@ does and every send and preset carries.
 **The 3-D view** turns by dragging and zooms by the wheel; View > Camera
 has presets (isometric, front, back, left, right, top, below), three
 saved views, and a **background picture** - the room, the house - dimmed
-behind the LEDs, for the point cloud and the GPU cube alike.
+behind the LEDs, for the point cloud and the GPU cube alike. An LED that
+is off is a **dim dot** there (smaller than a lit one, in the middle of
+its cell on a cube's face), so the shape reads when most of it is dark,
+and the shape stands on a faint **floor** that fades out from the middle
+(left out when the view looks up from below it) - View > Unlit LEDs as
+dim dots and View > A floor under the shape turn them off; a popped-out
+view does the same, and a screenshot or a recording takes the view as
+it is shown (the library's and the shape's previews leave both out). The
+**logical view** fits its pane: as many whole pixels an LED as the
+pane's width and height both allow (a wide net in a tall pane was drawn
+as if the pane were square).
 
 ## Any shape: the shape editor
 
@@ -714,6 +724,8 @@ on and install what it carries.
 - **View › Camera** › Save the view as 3
 - **View › Camera** › Background picture...
 - **View › Camera** › Clear the background
+- **View** › Unlit LEDs as dim dots — the 3-D view draws an LED that is off as a dim dot, so the shape reads on black; off: black, as the LEDs are
+- **View** › A floor under the shape — a faint grid under the shape in the 3-D view, fading out from the middle - something for it to stand on
 - **View › Layout** › Classic: main pane, 3-D, panel
 - **View › Layout** › Panel on the left
 - **View › Layout** › 3-D on the left
@@ -892,6 +904,8 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `/` | Focus mode: dim all but the selection | in the graph |
 | `—` | Light a node's wires while it is under the pointer or selected, fade the rest | in the graph |
 | `—` | The graph's minimap: show / hide | in the graph |
+| `—` | The 3-D view: unlit LEDs as dim dots, or black | anywhere |
+| `—` | The 3-D view: a faint floor under the shape | anywhere |
 | `A` | Select every node | in the graph |
 | `Alt+A` | Select nothing | in the graph |
 | `Ctrl+Shift+I` | Invert the selection | in the graph |

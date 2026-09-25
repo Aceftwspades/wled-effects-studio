@@ -284,6 +284,13 @@ STEPS = [
       {"py": "chrome.toggle_window(app, 'library')"}], 1.0),
     ([{"check": "dpg.get_item_theme('tb_frw_library') == chrome._word_theme(chrome.ACCENT)"},
       {"py": "chrome.toggle_window(app, 'library')"}, {"py": "(dpg.set_viewport_width(app._vp0[0]), dpg.set_viewport_height(app._vp0[1]))"}], 1.0),
+    # the views (C16): unlit LEDs as dim dots and a floor under the shape, each off and on again from its action;
+    # the GPU point cloud draws its dots while they are on
+    ([{"layout": "both"}, {"action": "unlit_dots"}, {"action": "view_floor"}], 0.8),
+    ([{"check": "app.view_extras() == (None, False) and not dpg.get_value('menu_unlit_dots') and not dpg.get_value('menu_view_floor')"},
+      {"check": "app.point_quads is None or not app.point_quads.dots"}, {"action": "unlit_dots"}, {"action": "view_floor"}], 0.8),
+    ([{"check": "app.view_extras()[0] is not None and app.view_extras()[1] and dpg.get_value('menu_unlit_dots')"},
+      {"check": "app.point_quads is None or (app.point_quads.dots and app.point_quads.floor)"}], 0.3),
     ([{"chrome": "shortcuts"}, {"chrome": "frames"}, {"chrome": "flash"}, {"feature": ["imu", False]}, {"feature": ["audio", "none"]},
       {"feature": ["imu", True]}, {"feature": ["audio", "pcm"]}, {"chrome": "usermods"}, {"usermod": ["add", "Temperature"]},
       {"usermod": ["off", "Temperature"]}, {"usermod": ["remove", "Temperature"]}, {"chrome": "about"}], 1.0),

@@ -34,10 +34,32 @@ import dearpygui.dearpygui as dpg
 
 from native.textures import registry
 
-from native.render import FACES6 as FACES, _camera
+from native.render import FACES6 as FACES, _camera, floor_segments, FLOOR, UNLIT, UNLIT_BELOW, DOT_POINT
 
 N = 8            # sub-quads across a face
 FOV = 38.0
+
+
+def _floor_items(parent):
+    """The floor's segments, made hidden - after the background, before
+    what stands on it (a drawlist draws in the order it was made)."""
+    return [dpg.draw_line((0, 0), (0, 0), color=FLOOR + (0,), thickness=1, show=False, parent=parent)
+            for _ in floor_segments(0.0)]
+
+
+def _place_floor(items, on, z, eye, R, f, size, ox, oy):
+    """The floor's segments for this camera: faint lines on the plane z,
+    fading from the middle; hidden when it is off or seen from below."""
+    segs = floor_segments(z)
+    show = on and eye[2] > z + 0.02
+    for q, (p0, p1, a) in zip(items, segs):
+        if not show:
+            dpg.configure_item(q, show=False); continue
+        c = (np.stack([p0, p1]) - eye) @ R.T
+        if np.any(c[:, 2] > -0.05):
+            dpg.configure_item(q, show=False); continue
+        s = [(ox + size * 0.5 + f * x / -zz, oy + size * 0.5 - f * y / -zz) for x, y, zz in c]
+        dpg.configure_item(q, p1=s[0], p2=s[1], color=FLOOR + (int(255 * a),), show=True)
 
 
 class CubeQuads:
@@ -48,11 +70,13 @@ class CubeQuads:
         self.w = self.h = 0
         self.items = {}          # face index -> list of quad ids, row-major
         self._last = None
+        self.floor = False       # a faint grid under the cube (the view's toggle)
         with dpg.drawlist(width=10, height=10, tag=tag, parent=parent):
             z = (0, 0)
             # a background picture, drawn first so the faces cover it (see background())
             self.bg_item = dpg.draw_image(texture, z, z, show=False)
             self.bg_key = None
+            self.floor_items = _floor_items(tag)          # then the floor, which the faces stand on
             for fi, fc in enumerate(FACES):
                 quads = []
                 bx, by = fc["bx"], fc["by"]
@@ -111,13 +135,14 @@ class CubeQuads:
         """Project every corner; a face pointing away is hidden, and so is
         the bottom unless the cube has six. Nothing is touched when the
         camera and size are as they were."""
-        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), self.size, self.w, self.h, bool(six))
+        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), self.size, self.w, self.h, bool(six), self.floor)
         if key == self._last or not self.size:
             return
         self._last = key
         size = self.size
         eye, R = _camera(yaw, pitch, dist)
         f = (size * 0.5) / np.tan(np.radians(FOV) * 0.5)
+        _place_floor(self.floor_items, self.floor, -1.1, eye, R, f, size, (self.w - size) * 0.5, (self.h - size) * 0.5)
         a = np.linspace(-1.0, 1.0, N + 1)
         for fi, fc in enumerate(FACES):
             c = fc["corners"]
@@ -152,8 +177,13 @@ class CubeQuads:
 
 
 class PointQuads:
-    """Any geometry on the GPU: an LED a square, its colour a texel."""
+    """Any geometry on the GPU: an LED a square, its colour a texel. With
+    `dots`, an LED that is off is a smaller grey square: each LED has a dot
+    behind its own square (made in pairs, so the far-first order holds for
+    both), and its square's texel is transparent while it is off - as
+    render_points draws it, a dim lit LED full size, an unlit one a dot."""
     LED = 0.42               # the fraction of the LED pitch an emitter covers, as render_points draws it
+    DOT = DOT_POINT          # an unlit LED's dot against a lit one's square, as render_points draws it
     COLS = 4096              # the colour texture's width; more LEDs than that take more rows
 
     def __init__(self, parent, tag, pos):
@@ -168,7 +198,12 @@ class PointQuads:
         with dpg.drawlist(width=10, height=10, tag=tag, parent=parent):
             pass
         self.bg_item = None          # made with the first texture, before the squares, so they cover it
+        self.floor_items = []        # and the floor after it, before the squares
+        self.floor = False
+        self.dots = False            # unlit LEDs as dim dots (the view's toggle)
         self.items = []
+        self.dot_items = []
+        self.dot_tex = f"{tag}_dot"
         self.set_points(pos)
 
     def set_points(self, pos):
@@ -178,10 +213,12 @@ class PointQuads:
         pos = np.asarray(pos, np.float32).reshape(-1, 3)
         n = len(pos)
         if n != self.n:
-            for q in self.items:
+            for q in self.items + self.dot_items:
                 dpg.delete_item(q)
             if dpg.does_item_exist(self.tex):
                 dpg.delete_item(self.tex)
+            if not dpg.does_item_exist(self.dot_tex):
+                dpg.add_static_texture(1, 1, [c / 255.0 for c in UNLIT] + [1.0], tag=self.dot_tex, parent=registry())
             self.n = n
             cols = min(max(1, n), self.COLS)
             rows = max(1, (n + cols - 1) // cols)
@@ -190,7 +227,11 @@ class PointQuads:
             z = (0, 0)
             if self.bg_item is None:
                 self.bg_item = dpg.draw_image(self.tex, z, z, show=False, parent=self.tag)
-            self.items = [dpg.draw_image_quad(self.tex, z, z, z, z, show=False, parent=self.tag) for _ in range(n)]
+                self.floor_items = _floor_items(self.tag)
+            self.items, self.dot_items = [], []
+            for _ in range(n):                            # in pairs: each LED's dot, then its square over it
+                self.dot_items.append(dpg.draw_image_quad(self.dot_tex, z, z, z, z, show=False, parent=self.tag))
+                self.items.append(dpg.draw_image_quad(self.tex, z, z, z, z, show=False, parent=self.tag))
         self.pos = pos
         c, ext = frame_of(pos)
         self.P = (pos - c) * (1.0 / (ext or 1.0))
@@ -209,12 +250,16 @@ class PointQuads:
     def camera(self, yaw, pitch, dist):
         """Every square placed for this camera, far first. Nothing is touched
         when the camera and size are as they were."""
-        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), self.size, self.w, self.h)
+        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), self.size, self.w, self.h, self.floor, self.dots)
         if key == self._last or not self.size or self.n == 0:
             return
         self._last = key
         size = self.size
         eye, R = _camera(yaw, pitch, dist)
+        f0 = (size * 0.5) / np.tan(np.radians(FOV) * 0.5)
+        zs = self.P[:, 2][np.isfinite(self.P[:, 2])]
+        _place_floor(self.floor_items, self.floor, (float(zs.min()) - 0.08) if len(zs) else -1.1, eye, R, f0, size,
+                     (self.w - size) * 0.5, (self.h - size) * 0.5)
         cam = (self.P - eye) @ R.T
         depth = -cam[:, 2]
         ok = np.isfinite(depth) & (depth > 0.05)
@@ -227,18 +272,28 @@ class PointQuads:
         order = np.argsort(np.where(ok, -depth, np.inf))          # far first; the NaN and behind-the-eye last
         cols, rows = self.cols, self.rows
         for k, i in enumerate(order):
-            q = self.items[k]
+            q, dq = self.items[k], self.dot_items[k]
             if not ok[i] or sx[i] + half[i] < 0 or sy[i] + half[i] < 0 or sx[i] - half[i] > self.w or sy[i] - half[i] > self.h:
-                dpg.configure_item(q, show=False); continue
+                dpg.configure_item(q, show=False); dpg.configure_item(dq, show=False); continue
             x0, x1, y0, y1 = sx[i] - half[i], sx[i] + half[i], sy[i] - half[i], sy[i] + half[i]
             uv = ((int(i) % cols + 0.5) / cols, (int(i) // cols + 0.5) / rows)     # one texel's centre: one colour
             dpg.configure_item(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), uv1=uv, uv2=uv, uv3=uv, uv4=uv, show=True)
+            if self.dots:
+                h = max(1.0, half[i] * self.DOT)
+                dpg.configure_item(dq, p1=(sx[i] - h, sy[i] - h), p2=(sx[i] + h, sy[i] - h), p3=(sx[i] + h, sy[i] + h),
+                                   p4=(sx[i] - h, sy[i] + h), show=True)
+            else:
+                dpg.configure_item(dq, show=False)
 
-    def colours(self, rgb):
-        """The LEDs' colours this frame: (n, 3) uint8, in the positions' order."""
+    def colours(self, rgb, unlit=None):
+        """The LEDs' colours this frame: (n, 3) uint8, in the positions' order;
+        with `unlit` (the view's dim dots) an LED that is off is transparent,
+        so its dot behind shows."""
         rgb = np.asarray(rgb).reshape(-1, 3)
         n = self.cols * self.rows
         buf = np.zeros((n, 4), np.float32); buf[:, 3] = 1.0
         m = min(len(rgb), self.n)
         buf[:m, :3] = rgb[:m].astype(np.float32) / 255.0
+        if unlit is not None:
+            buf[:m, 3][rgb[:m].max(axis=1) < UNLIT_BELOW] = 0.0
         dpg.set_value(self.tex, buf.ravel())

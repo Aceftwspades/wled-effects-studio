@@ -488,14 +488,35 @@ class App(Features):
         exact for flat faces), the point cloud for everything else."""
         eng = eng or self.eng
         g = eng.geom
+        unlit, floor = self.view_extras()
         if g is not None and g.kind == "cube" and not eng.fx.get("o3"):
             return render.render(net if net.shape[0] == eng.rows else self.frame_rgb(eng),
-                                 eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px))
+                                 eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px),
+                                 unlit=unlit, floor=floor)
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
         pos = self.view_positions() if eng is self.eng else g.pos
-        return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px))
+        return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
+                                    unlit=unlit, floor=floor)
+
+    def view_extras(self):
+        """What the 3-D view adds (View menu, C16): the colour an unlit LED
+        is drawn in as a dim dot (None: black), and whether the shape stands
+        on a faint floor."""
+        return (render.UNLIT if self.prefs.get("unlit_dots", True) else None), bool(self.prefs.get("view_floor", True))
+
+    def set_view_option(self, name, on=None):
+        """View > Unlit LEDs as dim dots / A floor under the shape: turned
+        over (or set), kept in the prefs, the menu's check following."""
+        v = (not self.prefs.get(name, True)) if on is None else bool(on)
+        self.prefs[name] = v
+        save_prefs(self.prefs)
+        for tag in (f"menu_{name}",):
+            if dpg.does_item_exist(tag):
+                dpg.set_value(tag, v)
+        self.gp.status({"unlit_dots": "unlit LEDs as dim dots" if v else "unlit LEDs black",
+                        "view_floor": "a floor under the shape" if v else "no floor under the shape"}.get(name, name))
 
     # --- audio ---------------------------------------------------------------
     def audio_push(self):
@@ -2246,8 +2267,9 @@ class App(Features):
                 cube = room.pip_geometry(self, main)          # the 3-D view in its corner of the graph
                 dpg.configure_item("cube_win", width=cube[2], height=cube[3])   # its size before the picture is centred in it
             self._cube_rect = cube
-            # each view is a square: the largest its pane's inside allows
-            side_l = max(VIEW_MIN, min(main[2] - px(22), main[3] - CAP_H)) if (main and show_net) else VIEW_MIN
+            # the 3-D view is a square, the largest its pane's inside allows; the logical view has the
+            # pane's inside as it is (a 40 x 12 net drawn in a square was a strip in a tall pane)
+            net_box = (main[2] - px(22), main[3] - CAP_H) if (main and show_net) else (VIEW_MIN, VIEW_MIN)
             side = max(VIEW_MIN, min(cube[2] - px(22), cube[3] - CAP_H)) if cube else VIEW_MIN
         else:
             # Presenting: no control column, no captions, no borders and no
@@ -2257,7 +2279,8 @@ class App(Features):
             self._cube_rect = None
             avail = vw - (16 if nview == 2 else 0)
             left_w = max(VIEW_MIN, avail // max(1, nview))
-            side_l = side = max(VIEW_MIN, min(left_w, pane_h))
+            side = max(VIEW_MIN, min(left_w, pane_h))
+            net_box = (left_w, pane_h)
         self._rects = rects
 
         dpg.configure_item("net_win",  show=show_net)
@@ -2293,7 +2316,8 @@ class App(Features):
         # The net is upscaled by a WHOLE number so the LED grid stays hard;
         # bilinear scaling of a 48-pixel image looks like a photograph of a cube
         # rather than a cube.
-        self.net_scale = max(1, side_l // max(self.eng.cols, self.net_image().shape[0]))
+        self.net_scale = max(1, min(max(VIEW_MIN, net_box[0]) // max(1, self.eng.cols),
+                                    max(VIEW_MIN, net_box[1]) // max(1, self.net_image().shape[0])))
         # The cube render is capped whatever the pane size, and the image is
         # scaled up to fill. Measured, the renderer costs 28 ms a frame at 620
         # and 64 ms at 900 - it is quadratic in the size, and it is already the
@@ -2955,6 +2979,8 @@ class App(Features):
             "stop_preview": gp.stop_preview,
             "focus_mode":   lambda: gp.set_focus_mode(not gp.focus_mode),
             "wire_light":   lambda: gp.set_wire_light(not gp.wire_light()),
+            "unlit_dots":   lambda: self.set_view_option("unlit_dots"),
+            "view_floor":   lambda: self.set_view_option("view_floor"),
             "minimap":      lambda: room.set_minimap(self, show=not self.prefs.get("minimap", True)),
             "select_all":   gp.select_all,
             "select_none":  gp.select_none,
@@ -3328,7 +3354,8 @@ class App(Features):
             if self.history_rgb and len(self.history_rgb) == len(self.history_frames):
                 rgb = self.history_rgb[k]                  # the scrubbed frame on a strip, a sphere, a shape of parts too
         big = img = None
-        self.popouts.publish(net, self.eng, (self.yaw, self.pitch, self.dist))
+        _u, _f = self.view_extras()
+        self.popouts.publish(net, self.eng, (self.yaw, self.pitch, self.dist), (1 if _u is not None else 0) | (2 if _f else 0))
         if self.net_on():
             if self.gpu_net:
                 k = self.NET_SRC_SCALE
@@ -3341,7 +3368,10 @@ class App(Features):
         if self.cube_on() and self.cube_quads is not None:
             k = self.CUBE_SRC_SCALE
             src = net if net.shape[0] == self.eng.rows else self.net_image()
-            dpg.set_value("cube_src_tex", self._rgba("cube_src", src.repeat(k, 0).repeat(k, 1)))
+            unlit, floor = self.view_extras()
+            dpg.set_value("cube_src_tex", self._rgba("cube_src", render.dotted(src, k, unlit) if unlit is not None
+                                                     else src.repeat(k, 0).repeat(k, 1)))
+            self.cube_quads.floor = floor
             self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six)
             self.cube_quads.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
             if self.shot_req or self.rec is not None:
@@ -3351,9 +3381,11 @@ class App(Features):
             pos = self.view_positions()
             if pos is not pq.pos and (len(pos) != pq.n or not np.array_equal(pos, pq.pos)):
                 pq.set_points(pos)                         # a part dragged, a shape changed
+            unlit, floor = self.view_extras()
+            pq.floor, pq.dots = floor, unlit is not None
             pq.camera(self.yaw, self.pitch, self.dist)
             pq.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
-            pq.colours((rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3))
+            pq.colours((rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3), unlit=unlit)
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on():
@@ -4653,7 +4685,7 @@ def walk_frame(app, which):
 SKIP_ACTION = ("fullscreen", "record", "record_video", "external", "flash", "shortcuts", "palette")
 # actions that flip something: run twice, so the app is as it was
 TOGGLE_ACTION = ("view_net", "view_cube", "view_both", "pane_code", "pane_graph", "presentation", "side_panel", "props_pane",
-                 "play_pause", "live", "compare", "sweep", "stream", "focus_mode", "wire_light", "minimap", "snap", "hide_pins",
+                 "play_pause", "live", "compare", "sweep", "stream", "focus_mode", "wire_light", "minimap", "unlit_dots", "view_floor", "snap", "hide_pins",
                  "collapse", "mute",
                  "enter_sub", "stop_preview")
 

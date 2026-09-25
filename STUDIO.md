@@ -1851,8 +1851,31 @@ reaches furthest; (Cn) is the critique's number.
       amber while it runs; the tooltips carry the keys either way. The
       smoke widens the window for the words, narrows it for the icons and
       opens a frame to see it lit.
-- [ ] **Polish** (C16-C18): unlit LEDs as dim dots and the net fitted; a
-      still selection outline by default; a footer of power and fps.
+- [x] **The two views** (C16): unlit LEDs were drawn black on a
+      near-black ground, so a torus running Box Fire was a black blob with
+      a lit rim. An LED that is off is a dim dot now (render.UNLIT, under
+      most lit colours and over the black): in the middle of its cell on a
+      cube's face (the software renderer by the fraction within the cell,
+      the GPU cube in its texture - render.dotted), a smaller square in a
+      point cloud (the GPU cloud has a dot behind every LED, made in pairs
+      so the far-first order holds, and an unlit LED's own square goes
+      transparent). The shape stands on a faint floor, a grid fading out
+      from the middle, under the cube or the cloud's lowest LED, left out
+      when the view looks up from below (drawn by the software renderer,
+      and as segments in the GPU drawlists before what stands on them).
+      Both are View toggles and actions, kept in the prefs; the popout
+      does the same (a flag in its block); screenshots and recordings take
+      the view as shown, the library's and the shape's previews ask for
+      neither. The logical view fits its pane: whole pixels an LED as the
+      pane's width and height both allow (it was fitted to a square of the
+      smaller side). Found on the way: render._fill, added in eff4578, only
+      called itself - dead, and it would have recursed without end - so it
+      went. test_audit draws the dots (dots, not tiles, on a cube; smaller
+      than a lit LED in a cloud; in the GPU texture and behind a GPU point)
+      and the floor (and none from below); the smoke turns both off and
+      on.
+- [ ] **Polish** (C17-C18): a still selection outline by default; a
+      footer of power and fps.
 
 ### Line-in (September 2026)
 

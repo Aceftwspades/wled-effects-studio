@@ -107,6 +107,8 @@ ACTIONS = [
     ("focus_mode",    "Focus mode: dim all but the selection",               "/",      "graph"),
     ("wire_light",    "Light a node's wires while it is under the pointer or selected, fade the rest", "", "graph"),
     ("minimap",       "The graph's minimap: show / hide",                    "",       "graph"),
+    ("unlit_dots",    "The 3-D view: unlit LEDs as dim dots, or black",      "",       "global"),
+    ("view_floor",    "The 3-D view: a faint floor under the shape",         "",       "global"),
     ("select_all",    "Select every node",                                   "A",      "graph"),
     ("select_none",   "Select nothing",                                      "Alt+A",  "graph"),
     ("select_invert", "Invert the selection",                                "Ctrl+Shift+I", "graph"),
