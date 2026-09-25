@@ -1771,8 +1771,34 @@ reaches furthest; (Cn) is the critique's number.
       second copy - the minimap's colour items live in graph_ui. The smoke
       lights a node's wires by selection and checks one faded, all back
       after, and the minimap's corner against the 3-D view's.
-- [ ] **Nodes spend their height on the work** (C12): control metadata in
-      the properties pane, range pairs on one row, readable glyph labels.
+- [x] **Nodes spend their height on the work** (C12): the control nodes
+      - Speed, Intensity, the customs, the checks, the first thing on
+      every graph - spent both their rows on the effect's metadata; their
+      label and default are the properties' now (ON THE WLED PAGE: named,
+      starts at, or ticked at the start; nodeface.META), the node is its
+      title and its pin, the title carries the label ("Speed: Rise",
+      following an edit there, and undo), and its line says both
+      ("“Rise”, 128 at the start") for the folded node, the stand-in and
+      the help; selecting one brings the properties over the graph. The
+      two ends of a range share a row (nodeface.PAIRS): Remap's "in  0 →
+      1" and "out", Clamp's range, Smoothstep's edges, a Loudest bin's bins
+      - two again when one end is exposed as a pin. The critique measured
+      a Remap at 214 px; at 100% it is 185 now, a control node 75. The
+      transfer curve's numbers were 8-px grey on the line: where the
+      node's fields show
+      the output's range (Remap, Clamp) it has none, elsewhere they sit in
+      a column of their own at its right, in the monospace at the
+      captions' size. The pattern previews (Checker, Stripes, Voronoi...,
+      the Noise, an Image) were 48 x 24: the node's width now, 40 tall,
+      from a 120 x 32 texture (the live Noise's costs 0.6 ms every other
+      frame). arrange and the stand-ins count the rows a node spends
+      (nodeface.param_rows). Stand-ins' summaries were fixed with the
+      plain bugs. Found on the way: the properties over the graph were
+      sized 18 px short of their content (an allowance of 52 for a caption
+      row and three paddings of 10), so a note's last line scrolled out of
+      sight. test_face holds the rows, the pairs and the lines; the smoke
+      the title, one row for Remap's in, and an edit of the label in the
+      properties.
 - [ ] **Polish** (C13-C18): single-letter keys kept to the canvas and a
       way out of presentation mode shown; a Window menu and a Build menu,
       no duplicates, node menus with keys; the toolbar following the

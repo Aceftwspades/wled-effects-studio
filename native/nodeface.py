@@ -236,14 +236,14 @@ SUMMARY = {
     "Sparkle":    lambda V, x: f"density {_g(V, 'density')}",
     "Hash":       lambda V, x: f"seed {_g(V, 'seed')}",
     "Mirror fold": lambda V, x: str(V.get("symmetry")),
-    "Speed":      lambda V, x: "the Speed slider, 0..1",
-    "Intensity":  lambda V, x: "the Intensity slider, 0..1",
-    "Custom 1":   lambda V, x: "the Custom 1 slider, 0..1",
-    "Custom 2":   lambda V, x: "the Custom 2 slider, 0..1",
-    "Custom 3":   lambda V, x: "the Custom 3 slider, 0..1",
-    "Check 1":    lambda V, x: "the Check 1 box",
-    "Check 2":    lambda V, x: "the Check 2 box",
-    "Check 3":    lambda V, x: "the Check 3 box",
+    "Speed":      lambda V, x: _control(V, "Speed", "slider"),
+    "Intensity":  lambda V, x: _control(V, "Intensity", "slider"),
+    "Custom 1":   lambda V, x: _control(V, "Custom 1", "slider"),
+    "Custom 2":   lambda V, x: _control(V, "Custom 2", "slider"),
+    "Custom 3":   lambda V, x: _control(V, "Custom 3", "slider"),
+    "Check 1":    lambda V, x: _control(V, "Check 1", "box"),
+    "Check 2":    lambda V, x: _control(V, "Check 2", "box"),
+    "Check 3":    lambda V, x: _control(V, "Check 3", "box"),
     "Colour 1":   lambda V, x: "the segment's first colour",
     "Colour 2":   lambda V, x: "the segment's second colour",
     "Colour 3":   lambda V, x: "the segment's third colour",
@@ -339,6 +339,56 @@ LABELS = {
     ("Transform", "pivot_u"): "pivot across", ("Transform", "pivot_v"): "pivot down",
     ("Flip", "flip_u"): "left-right", ("Flip", "flip_v"): "top-bottom",
 }
+
+
+# --- the rows a node spends (the critique's C12) --------------------------------------------
+# A control node's label and default are the effect's settings, not the graph's: what WLED's page
+# names the slider or the box, and where it starts. The properties pane has them; the node's title
+# carries the label ("Speed: Rise") and its height goes to the work.
+META = {t: ("label", "default") for t in ("Speed", "Intensity", "Custom 1", "Custom 2", "Custom 3",
+                                          "Check 1", "Check 2", "Check 3")}
+
+
+def is_meta(type_, name):
+    return name in META.get(type_, ())
+
+
+# Two settings that are one range share a row on the node: its words, then the two fields with an
+# arrow between ("in  [0] -> [1]"). (the first key, the second, the row's words)
+PAIRS = {
+    "Remap": (("in_lo", "in_hi", "in"), ("out_lo", "out_hi", "out")),
+    "Clamp": (("lo", "hi", "range"),),
+    "Smoothstep": (("e0", "e1", "edges"),),
+    "Loudest bin": (("from", "to", "bins"),),
+}
+
+
+def pairs(type_):
+    return PAIRS.get(type_, ())
+
+
+def param_rows(n, d):
+    """How many rows a node's settings take on it: none while it is folded;
+    the effect's own (META) none - they are in the properties; a pair one."""
+    if n.get("collapsed"):
+        return 0
+    names = [p["name"] for p in d["params"] if not is_meta(n["type"], p["name"])]
+    return len(names) - sum(1 for a, b, _ in pairs(n["type"]) if a in names and b in names)
+
+
+def range_on_node(n, d):
+    """True when the node's own fields show its output's range - Remap's out,
+    Clamp's range: its curve then needs no numbers of its own."""
+    names = {p["name"] for p in d["params"]}
+    return (n["type"] == "Remap" and {"out_lo", "out_hi"} <= names) or (n["type"] == "Clamp" and {"lo", "hi"} <= names)
+
+
+def _control(V, name, what):
+    """A control node's line: its label on the WLED page (or which slider it
+    is) and where it starts."""
+    lbl = str(V.get("label") or name).strip()
+    start = ("on" if V.get("default") else "off") if what == "box" else _fmt(V.get("default"))
+    return (f"\u201c{lbl}\u201d" if lbl != name else f"the {name} {what}") + f", {start} at the start"
 
 
 def label(type_, name):

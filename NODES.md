@@ -111,8 +111,8 @@ The Speed slider on the WLED page, as a number from 0 (left) to 1 (right). Multi
 - **value** *(float)*: the slider's position, 0..1
 
 **Settings**
-- **label** *(text)*: the name the slider shows on the WLED page
-- **default** *(int)*: where the slider starts, 0..255
+- **label** *(text)*: the name the slider shows on the WLED page (set in the properties; the node's title carries it)
+- **default** *(int)*: where the slider starts, 0..255 (set in the properties)
 
 ## signals
 

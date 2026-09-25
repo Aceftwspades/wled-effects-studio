@@ -171,7 +171,14 @@ it.
 **As a graph.** Ctrl+N, name it, and the graph pane opens with a starter.
 Right-click the grid to add a node (type to search); drag from a pin to a
 pin to wire, or to empty space for a list of what could go there. A
-node's fields line up after their names. Every **number** - on a node,
+node's fields line up after their names, and a node spends its height
+on what it computes: the two ends of a range share a row - Remap's
+"in  0 → 1" and "out  0 → 1", Clamp's range, Smoothstep's edges, a
+Loudest bin's bins. A control node - Speed, Intensity, the customs, the
+checks - is a title and its pin: what the WLED page calls the slider (or
+the box) is in its title ("Speed: Rise"), and that name and where it
+starts are set in the properties (select the node; ON THE WLED PAGE).
+Every **number** - on a node,
 in the side panel, in the frames - is the same control: its value on
 the track, with its unit ("20 ms", "1.2 Hz", "120 bpm"); **drag** it
 sideways to change it (Shift: ten times as far, Alt: a hundredth); **click**
@@ -248,10 +255,12 @@ legend and the switch, and a colour you give a node still wins. Nodes
 also **show what they do**, like a rack module's face: a strip of the
 palette or a colour ramp with a marker at the live index, the audio's
 sixteen bands live (an FFT bin's own bar lit), a period of the Wave with
-a dot riding it, the Noise's texture scrolling with its z, thumbnails of
-Checker, Stripes, Ripple, Voronoi, Brick, Mandelbrot and the Gradient at
-their typed values, the transfer curve of Remap, Smoothstep, Clamp,
-Threshold, Power and the other one-in one-out maths nodes, a Bitmap's
+a dot riding it, the Noise's texture scrolling with its z, previews the
+node's width of Checker, Stripes, Ripple, Voronoi, Brick, Mandelbrot and
+the Gradient at their typed values, the transfer curve of Remap,
+Smoothstep, Clamp, Threshold, Power and the other one-in one-out maths
+nodes (its output's range written beside it, clear of the line, where
+the node's fields do not show it already), a Bitmap's
 pixels, a Path from above, an Image's picture, a Text's text, and a
 three-second sparkline on Integrate, Ease, Envelope, Spring, Delay,
 Random hold, Beat kick and Tempo; a Steps node lights its current step.

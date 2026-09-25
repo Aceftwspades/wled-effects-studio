@@ -516,8 +516,9 @@ class Graph:
                 n = self.nodes[nid]
                 n["pos"] = [ox + c * col_w, y]
                 try:
+                    from native import nodeface          # the rows the node spends: a pair is one, the effect's own none
                     d = self.node_def(n)
-                    rows = len(d["inputs"]) + len(d["outputs"]) + (0 if n.get("collapsed") else len(d["params"]))
+                    rows = len(d["inputs"]) + len(d["outputs"]) + nodeface.param_rows(n, d)
                 except GraphError:
                     rows = 3
                 y += 56 + 27 * max(1, rows) + row_gap

@@ -171,6 +171,37 @@ def test_strips_and_ranges():
     assert set(F.CATEGORY_HUES) >= {d["cat"] for d in LIB.values() if d.get("cat")}
 
 
+def test_nodes_spend_their_rows_on_the_work():
+    """C12: a control node's label and default are the properties' - none
+    of its rows - and its line says them; a range's two settings take one
+    row, two again when one end is a pin; the transfer curve carries its own
+    numbers only where the node's fields do not show the range."""
+    from native import graph as G
+    n, d = node("Speed", params={"label": "Rise", "default": 128})
+    assert F.param_rows(n, d) == 0 and F.is_meta("Speed", "label") and F.is_meta("Check 2", "default")
+    assert not F.is_meta("Remap", "in_lo") and not F.is_meta("Colour 1", "label")
+    assert F.summary(n, d) == "“Rise”, 128 at the start"
+    assert F.summary(*node("Custom 3")) == "the Custom 3 slider, 16 at the start"
+    assert F.summary(*node("Check 1", params={"default": True})) == "the Check 1 box, on at the start"
+    n, d = node("Remap")
+    assert F.param_rows(n, d) == 2 and F.range_on_node(n, d)
+    assert [w for _, _, w in F.pairs("Remap")] == ["in", "out"]
+    n["expose"] = ["out_hi"]                                   # out high a pin: out low a row of its own
+    assert F.param_rows(n, G.exposed_def(d, n)) == 2 and not F.range_on_node(n, G.exposed_def(d, n))
+    assert F.param_rows(*node("Smoothstep")) == 1 and F.param_rows(*node("Loudest bin")) == 1
+    assert F.range_on_node(*node("Clamp")) and not F.range_on_node(*node("Sine"))
+    n, d = node("Remap")
+    n["collapsed"] = True
+    assert F.param_rows(n, d) == 0
+    # every pair is two settings of the node, of one kind, the first before the second
+    for t, prs in F.PAIRS.items():
+        names = [p["name"] for p in LIB[t]["params"]]
+        for a, b, words in prs:
+            assert a in names and b in names and names.index(a) < names.index(b) and words, (t, a, b)
+            ta, tb = (next(p["type"] for p in LIB[t]["params"] if p["name"] == k) for k in (a, b))
+            assert ta == tb and ta in ("int", "float"), (t, a, ta, tb)
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

@@ -595,8 +595,12 @@ class GraphPanel(Glyphs):
         typeface.heading(dpg.add_text(title, parent="graph_props"))
         if len(sel) > 1:
             typeface.small(dpg.add_text(f"and {len(sel) - 1} more selected", parent="graph_props", color=DIM))
-        long_ = [p for p in d["params"] if p["type"] in ("text", "file") and not p.get("lines") is False]
+        long_ = [p for p in d["params"] if p["type"] in ("text", "file") and not p.get("lines") is False
+                 and not nodeface.is_meta(n["type"], p["name"])]
         curves = [p for p in d["params"] if p["type"] == "curve"]
+        meta = [p for p in d["params"] if nodeface.is_meta(n["type"], p["name"])]
+        if meta:
+            self._meta_rows(nid, n, meta)
         self._curve_ed = None
         self._bitmap_ed = None
         if n["type"] == "Bitmap":
@@ -612,8 +616,9 @@ class GraphPanel(Glyphs):
             self._curve_ed = {"nid": nid, "name": p["name"], "tag": tag, "W": W, "H": H, "drag": None, "was": False, "rwas": False}
             self._curve_draw()
         if not long_ and not curves:
-            dpg.add_text("all of this node's settings are on the node", parent="graph_props",
-                         color=DIM, wrap=0)
+            if not meta:
+                dpg.add_text("all of this node's settings are on the node", parent="graph_props",
+                             color=DIM, wrap=0)
             return
         for p in long_:
             v = str(n["params"].get(p["name"], p["default"]))
@@ -622,6 +627,29 @@ class GraphPanel(Glyphs):
             typeface.mono(dpg.add_input_text(parent="graph_props", width=-1, multiline=bool(p.get("lines")) or len(v) > 60,
                                              height=px(120) if p.get("lines") else 0, default_value=shown,
                                              user_data=(nid, p["name"]), callback=self._on_prop))
+
+    def _meta_rows(self, nid, n, meta):
+        """A control node's settings that are the effect's, not the graph's
+        (nodeface.META): what WLED's page names the slider or the box, and
+        where it starts. Edited here; the node's title carries the name."""
+        from native import form
+        box = n["type"].startswith("Check")
+        typeface.label(dpg.add_text("ON THE WLED PAGE", parent="graph_props", color=self.pal()["dim"]))
+        for p in meta:
+            v = n["params"].get(p["name"], p["default"])
+            ud = (nid, p["name"])
+            if p["type"] == "bool":
+                form.check("ticked at the start", parent="graph_props", default_value=bool(v), user_data=ud,
+                           callback=self._on_param)
+                continue
+            with form.row("named" if p["name"] == "label" else "starts at", parent="graph_props"):
+                if p["type"] == "text":
+                    dpg.add_input_text(default_value=str(v), width=-1, user_data=ud, callback=self._on_param)
+                else:
+                    num.add(None, int(v), p.get("min"), p.get("max"), integer=True, width=-1, callback=self._on_param,
+                            user_data=ud)
+        form.note(f"the {'box' if box else 'slider'} the effect shows on the WLED page: its name, and where it "
+                  "starts when the effect is picked", parent="graph_props")
 
     # --- the bitmap painter in the properties pane ----------------------------------------
     BITMAP_STATES = "0123456789"
@@ -1756,15 +1784,9 @@ class GraphPanel(Glyphs):
         th = self.themes()
         linked = {(b, inp) for _, _, b, inp in self.graph.links}
         n.setdefault("inputs", {})
-        label = n.get("label") or d.get("label") or n["type"]
-        if n["type"] in ("Graph input", "Graph output") or n["type"] in G.SENDS or n["type"] in G.RECEIVES:
-            label = f"{n['type']}: {n['params'].get('name', '')}"
-        if n["type"] == "Frame":
-            label = str(n["params"].get("title", "group"))
+        label = self.node_title(n, d)
         collapsed = bool(n.get("collapsed"))
         hide = bool(n.get("hide_pins"))
-        if n.get("muted"):
-            label = f"{label} (muted)"
         width = self.px(NARROW_W if d.get("narrow") else NODE_W)
         if self.overview() and n["type"] != "Frame":
             self._make_standin(nid, n, d, label, width)
@@ -1810,7 +1832,19 @@ class GraphPanel(Glyphs):
                 self._pins[(nid, "in", i["name"])] = tag
                 self._ptype[tag] = i["type"]
             if not collapsed and n["type"] != "Frame":
+                paired = {a: (a, b, words) for a, b, words in nodeface.pairs(n["type"])}
+                pdefs = {p["name"]: p for p in d["params"]}
+                done = set()
                 for p in d["params"]:
+                    if p["name"] in done or nodeface.is_meta(n["type"], p["name"]):
+                        continue                          # the effect's own (a slider's label, where it starts): the properties
+                    pr = paired.get(p["name"])
+                    q = pdefs.get(pr[1]) if pr else None
+                    if q is not None and p["type"] in ("float", "int") and q["type"] == p["type"]:
+                        done.add(q["name"])               # one range, one row: "in  [0] -> [1]"
+                        with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+                            self._pair_widget(nid, n, p, q, pr[2], col, width)
+                        continue
                     with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                         self._param_widget(nid, n, p, multiline=d.get("multiline", False), col=col, width=width)
                 for a, b, lo, hi in d.get("pads", []):
@@ -1842,6 +1876,24 @@ class GraphPanel(Glyphs):
                 self._ptype[tag] = o["type"]
         self._bind_node_theme(nid, n)
 
+    def node_title(self, n, d):
+        """A node's title: the name it was given, else its definition's; a
+        send, a receive or a graph's pin with its name, a frame its title, a
+        control node with its label on the WLED page ("Speed: Rise" - the
+        label is edited in the properties, C12); "(muted)" while muted."""
+        label = n.get("label") or d.get("label") or n["type"]
+        if n["type"] in ("Graph input", "Graph output") or n["type"] in G.SENDS or n["type"] in G.RECEIVES:
+            label = f"{n['type']}: {n['params'].get('name', '')}"
+        elif n["type"] == "Frame":
+            label = str(n["params"].get("title", "group"))
+        elif not n.get("label") and n["type"] in nodeface.META:
+            lbl = str(n["params"].get("label", "") or "").strip()
+            if lbl and lbl != n["type"]:
+                label = f"{n['type']}: {lbl}"
+        if n.get("muted"):
+            label = f"{label} (muted)"
+        return label
+
     def _standin_rows(self, nid):
         """A stand-in's pin rows and their height: the node keeps the
         footprint its full self would have at this zoom (the height
@@ -1850,7 +1902,7 @@ class GraphPanel(Glyphs):
         its corner."""
         n = self.graph.nodes[nid]
         d = self.graph.node_def(n)
-        rows = len(d["inputs"]) + len(d["outputs"]) + (0 if n.get("collapsed") else len(d["params"]))
+        rows = len(d["inputs"]) + len(d["outputs"]) + nodeface.param_rows(n, d)
         est = 56 + 27 * max(1, rows)
         linked = {(b, inp) for _, _, b, inp in self.graph.links}
         fed_out = {(a, o) for a, o, _, _ in self.graph.links}
@@ -2501,8 +2553,17 @@ class GraphPanel(Glyphs):
         more than half the node (a longer name is cut there, the whole of it
         in the pin's help)."""
         names = [nodeface.label(type_, i["name"]) for i in d["inputs"] if i["type"] in self.NAMED["input"]]
-        names += [nodeface.label(type_, p["name"]) for p in d["params"] if p["type"] in self.NAMED["param"]
-                  and not (p["type"] == "text" and (multiline or p.get("lines")))]
+        pnames = {p["name"] for p in d["params"]}
+        pair_words = {}                                  # a pair's first key -> its row's words; its second -> None
+        for a, b, words in nodeface.pairs(type_):
+            if a in pnames and b in pnames:
+                pair_words[a], pair_words[b] = words, None
+        for p in d["params"]:
+            if p["type"] not in self.NAMED["param"] or (p["type"] == "text" and (multiline or p.get("lines"))):
+                continue
+            if nodeface.is_meta(type_, p["name"]) or pair_words.get(p["name"], "") is None:
+                continue
+            names.append(pair_words.get(p["name"]) or nodeface.label(type_, p["name"]))
         if not names:
             return 0
         return min(int(width * 0.5), int(max(self.text_w(nm) for nm in names) + 0.999) + 2 * self._gap() + 1)
@@ -2932,6 +2993,21 @@ class GraphPanel(Glyphs):
         self._value_face(w)
         self._widgets.add(w)
 
+    def _pair_widget(self, nid, n, p, q, words, col, width):
+        """Two settings that are one range on one row (nodeface.PAIRS): the
+        row's words in the node's column, then the two fields with an arrow
+        between - "in  [0] -> [1]" - each the one number control."""
+        g = self._gap()
+        arrow = "\u2192"
+        aw = int(self.text_w(arrow) + 0.999)
+        fw = max(self.px(24), int((width - col - aw - 2 * g) / 2))
+        with dpg.group(horizontal=True, horizontal_spacing=g):
+            self._lead(words, col)
+            for k, r in enumerate((p, q)):
+                if k:
+                    dpg.add_text(arrow, color=self.pal()["dim"])
+                self._param_field(nid, n, r, n["params"].get(r["name"], r["default"]), (nid, r["name"]), self._on_param, fw)
+
     def _param_field(self, nid, n, p, v, ud, cb, fw):
         """A setting's field, `fw` wide, after its name: a number the one
         control; a choice, a colour, a text, a file as their own."""
@@ -3318,6 +3394,9 @@ class GraphPanel(Glyphs):
         elif name == "name" and (self.graph.nodes[nid]["type"] in G.SENDS or self.graph.nodes[nid]["type"] in G.RECEIVES):
             t = self.graph.nodes[nid]["type"]
             dpg.configure_item(f"gnode_{nid}", label=f"{t}: {val}")   # the title names the pair
+        elif name == "label" and nodeface.is_meta(self.graph.nodes[nid]["type"], name) and dpg.does_item_exist(f"gnode_{nid}"):
+            n = self.graph.nodes[nid]
+            dpg.configure_item(f"gnode_{nid}", label=self.node_title(n, self.graph.node_def(n)))   # "Speed: Rise"
 
     def _make_link(self, a, out, b, inp):
         ta, tb = self._pins.get((a, "out", out)), self._pins.get((b, "in", inp))

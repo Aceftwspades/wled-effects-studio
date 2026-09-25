@@ -495,6 +495,9 @@ def _props_need(app):
         return False, None
     if n["type"] == "Bitmap":
         return True, key
+    from native import nodeface
+    if n["type"] in nodeface.META:
+        return True, key                                   # its label and where it starts are edited there (C12)
     d = gp.graph.node_def(n)
     for q in d["params"]:
         v = str(n["params"].get(q["name"], q.get("default", "")))
@@ -533,7 +536,11 @@ def _poll_props(app):
     room = eh - 2 * MARGIN
     if c and S.pip_rect and c[0] == "b" and (c[1] == "r") == right:
         room -= S.pip_rect[3] + MARGIN                  # above the 3-D view on the same side
-    h = int(max(px(120), min(room, _props_content_h() + px(52))))
+    # the content, where its pane starts in the window (under the caption), the pane's padding above and
+    # below it and the window's below that (the theme's 10 each): an allowance of 52 in all left the last
+    # line of a control node's note scrolled out of sight
+    top = (dpg.get_item_state("graph_props").get("pos") or [0, px(40)])[1]
+    h = int(max(px(120), min(room, _props_content_h() + top + px(30))))
     w = int(min(PROPS_W, ew - 2 * MARGIN))
     if not dpg.is_item_shown("props_fly"):
         dpg.configure_item("props_win", show=True)

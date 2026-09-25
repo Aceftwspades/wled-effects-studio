@@ -71,6 +71,18 @@ STEPS = [
       {"py": "room.set_minimap(app, corner=room.pip(app)['corner'])"},
       {"check": "app.gp._mini_corner != room.pip(app)['corner'] or not room.pip_on(app)"},
       {"py": "room.set_minimap(app, corner='auto')"}], 0.5),
+    # nodes spend their height on the work (C12): a control node's label in its title, its label and where it starts
+    # in the properties (the title follows an edit there, and undo); a range's two settings on one row
+    ([{"graph_selected": [1]}], 1.0),
+    ([{"check": "dpg.get_item_configuration('gnode_1')['label'] == 'Speed: Rise'"},
+      {"check": "(lambda ws: len(ws) == 2 and len({dpg.get_item_info(dpg.get_item_info(w)['parent'])['parent'] for w in ws}) == 1)"
+                "([w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) in ((9, 'in_lo'), (9, 'in_hi'))])"},
+      {"py": "setattr(app, '_meta_w', next(w for g in dpg.get_item_children('graph_props', 1) for w in (dpg.get_item_children(g, 1) or []) "
+             "if dpg.get_item_user_data(w) == (1, 'label')))"},
+      {"check": "dpg.get_value(app._meta_w) == 'Rise'"}, {"py": "app.gp._on_param(app._meta_w, 'Rising')"},
+      {"check": "dpg.get_item_configuration('gnode_1')['label'] == 'Speed: Rising'"}, {"graph_undo": True}], 0.8),
+    ([{"check": "dpg.get_item_configuration('gnode_1')['label'] == 'Speed: Rise' and app.gp.graph.nodes[1]['params']['label'] == 'Rise'"},
+      {"graph_selected": []}], 0.5),
     # the face of a node: a collapsed node's body is what it computes, the line follows a typed value, a stand-in
     # carries it too; the zoom scales the nodes themselves (a 50% node is half as tall); category hues on the titles
     ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "app.gp._collapse(11)"}], 1.0),

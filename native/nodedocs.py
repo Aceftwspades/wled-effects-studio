@@ -24,7 +24,8 @@ DOCS = {
         "doc": "The Speed slider on the WLED page, as a number from 0 (left) to 1 (right). Multiply it into a rate "
                "(Integrate's rate, a Multiply before Time) so the slider sets how fast things move.",
         "out": {"value": "the slider's position, 0..1"},
-        "params": {"label": "the name the slider shows on the WLED page", "default": "where the slider starts, 0..255"}},
+        "params": {"label": "the name the slider shows on the WLED page (set in the properties; the node's title carries it)",
+                   "default": "where the slider starts, 0..255 (set in the properties)"}},
     "Intensity": {
         "doc": "The Intensity slider on the WLED page, 0..1. Use it for how much - brightness, size, how many. "
                "The label you give it is what the page shows.",

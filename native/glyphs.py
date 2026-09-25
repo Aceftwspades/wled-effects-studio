@@ -18,11 +18,12 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native import nodeface
+from native import typeface
 from native.textures import registry
 
 HIST_N = 600            # samples kept per probe: ten seconds at 60 frames
 HIST_MAX = 256          # probes a build can plant (graph.py)
-PATCH = (48, 24)        # a thumbnail's texture, px
+PATCH = (120, 32)       # a pattern's preview texture, px: shown the node's width, 32 of 120 as tall
 GLOW_S = 0.15           # a light's afterglow, seconds
 
 
@@ -138,7 +139,7 @@ class Glyphs:
             self._live_glyphs[nid] = "wave"
         elif t == "Noise" or t in nodeface.PATTERNS or t == "Image":
             self._patch_texture(nid)
-            dpg.add_image(f"{tag}_tex", width=self.px(PATCH[0]), height=self.px(PATCH[1]), tag=tag)
+            dpg.add_image(f"{tag}_tex", width=W, height=int(W * PATCH[1] / PATCH[0]), tag=tag)   # the node's width
             if t == "Noise":
                 self._live_glyphs[nid] = "noise"
         elif t in nodeface.TRANSFER:
@@ -280,16 +281,23 @@ class Glyphs:
         lo, hi = min(ys), max(ys)
         if hi - lo < 1e-9:
             lo, hi = lo - 0.5, hi + 0.5
+        # the output's range: on the node already as its fields (Remap's out, Clamp's range), or
+        # written in a column of its own at the right - clear of the line, at a size that reads
+        cw = W
+        if not nodeface.range_on_node(n, d):
+            size = max(self.px(10), int(self._font_px() * 0.85))
+            top, bottom = nodeface._fmt(hi), nodeface._fmt(lo)
+            gutter = int(max(typeface.measure(top, "mono", size), typeface.measure(bottom, "mono", size)) + 0.999) + self.px(6)
+            if gutter < W * 0.45 and H >= 2 * size:
+                cw = W - gutter
+                self._draw_text((cw + self.px(6), 0), top, size=size, color=self.pal()["dim"], parent=tag, face="mono")
+                self._draw_text((cw + self.px(6), H - size), bottom, size=size, color=self.pal()["dim"], parent=tag, face="mono")
         # the baseline (y = 0) when it is in range, so the curve's sign reads
         if lo < 0.0 < hi:
             by = 2 + (1.0 - (0.0 - lo) / (hi - lo)) * (H - 4)
-            dpg.draw_line((1, by), (W - 1, by), color=self.pal()["grid"], parent=tag)
-        poly = [(1 + k * (W - 2) / (len(pts) - 1), 2 + (1.0 - (y - lo) / (hi - lo)) * (H - 4)) for k, (_, y) in enumerate(pts)]
+            dpg.draw_line((1, by), (cw - 1, by), color=self.pal()["grid"], parent=tag)
+        poly = [(1 + k * (cw - 2) / (len(pts) - 1), 2 + (1.0 - (y - lo) / (hi - lo)) * (H - 4)) for k, (_, y) in enumerate(pts)]
         dpg.draw_polyline(poly, color=self.pal()["live_line"], thickness=max(1, self.px(1.5)), parent=tag)
-        size = max(7, self.px(9))
-        if size >= 8:
-            self._draw_text((W - 26 * size / 9, 0), nodeface._fmt(hi), size=size, color=self.pal()["dim"], parent=tag)
-            self._draw_text((W - 26 * size / 9, H - size - 1), nodeface._fmt(lo), size=size, color=self.pal()["dim"], parent=tag)
 
     TINTS = [(235, 235, 235), (110, 190, 250), (250, 170, 90), (170, 230, 120), (250, 110, 120), (190, 120, 235),
              (250, 230, 100), (90, 220, 210), (240, 150, 200), (160, 160, 90)]
