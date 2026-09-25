@@ -16,6 +16,7 @@ import urllib.request
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import num
 from native import typeface
 from native import form
 
@@ -68,10 +69,10 @@ def build(app):
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("LEVELS", color=c.ACCENT))
             form.inline("gain")
-            typeface.mono(dpg.add_slider_int(tag="ain_gain", width=px(130), min_value=0, max_value=255, callback=lambda s, v: _level_edited(app)))
+            num.add("ain_gain", 60, 0, 255, integer=True, width=px(130), callback=lambda s, v: _level_edited(app))
             c.tip("audioreactive's gain, 0..255 (60 is WLED's default for a mic; a line signal is louder and steadier: 40)")
             form.inline("squelch")
-            typeface.mono(dpg.add_slider_int(tag="ain_squelch", width=px(110), min_value=0, max_value=255, callback=lambda s, v: _level_edited(app)))
+            num.add("ain_squelch", 10, 0, 255, integer=True, width=px(110), callback=lambda s, v: _level_edited(app))
             c.tip("the noise gate: what counts as silence (10 for a mic; 4 for a line-in, which has no room noise)")
             form.inline("AGC")
             dpg.add_combo(audioin.AGC, tag="ain_agc", width=px(80), callback=lambda s, v: _level_edited(app))
@@ -116,8 +117,8 @@ def refresh(app):
     on = int(st.get("type", 1)) < 254
     for t in PIN_TAGS + ("ain_gain", "ain_squelch", "ain_agc"):
         dpg.configure_item(t, enabled=on)
-    dpg.set_value("ain_gain", int(st.get("gain", 60)))
-    dpg.set_value("ain_squelch", int(st.get("squelch", 10)))
+    num.set("ain_gain", int(st.get("gain", 60)))
+    num.set("ain_squelch", int(st.get("squelch", 10)))
     dpg.set_value("ain_agc", audioin.AGC[int(st.get("agc", 0)) % 4])
     dpg.set_value("ain_desc", audioin.describe(st))
     fl = audioin.flags(st)

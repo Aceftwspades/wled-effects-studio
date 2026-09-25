@@ -16,6 +16,7 @@ import time
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import num
 from native import form
 from native import typeface
 
@@ -504,8 +505,7 @@ def build_dialogs(app):
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("MORPH", color=ACCENT))
             dpg.add_combo([], tag="snap_a", width=px(110))
-            dpg.add_slider_float(tag="snap_t", width=px(120), min_value=0.0, max_value=1.0, default_value=0.0, format="%.2f",
-                                 callback=lambda s, v: app.gp.snapshot_morph(v))
+            num.add("snap_t", 0.0, 0.0, 1.0, digits=2, width=px(120), callback=lambda s, v: app.gp.snapshot_morph(v))
             dpg.add_combo([], tag="snap_b", width=px(110))
             tip("drag between the two: numbers blend, the rest switches half way; typed values follow live, a changed setting rebuilds")
     # MIDI: a controller's knobs onto the sliders (midi_ui.py)
@@ -567,8 +567,8 @@ def build_dialogs(app):
         dpg.add_separator()
         typeface.label(dpg.add_text("INTERFACE SIZE", color=ACCENT))
         with dpg.group(horizontal=True):
-            dpg.add_slider_int(tag="app_ui_scale", min_value=80, max_value=200, width=px(200), format="%d%%",
-                               default_value=int(round(typeface.scale() * 100)), callback=lambda s, v: _ui_scale_pick(app, v))
+            num.add("app_ui_scale", int(round(typeface.scale() * 100)), 80, 200, integer=True, unit="%", width=px(200),
+                    callback=lambda s, v: _ui_scale_pick(app, v))
             tip("the type and every control at this size, 80 to 200%; first the monitor's own scale. Takes a restart.")
             dpg.add_button(label="The monitor's", small=True, callback=lambda: _ui_scale_pick(app, typeface.monitor_scale() * 100))
             tip("the size the monitor is set to in the system's display settings")
@@ -1269,8 +1269,7 @@ def _ui_scale_pick(app, pct):
     """An interface size for the next start: kept, and the restart offered."""
     new = typeface.set_scale(app.prefs, pct)
     save_prefs(app.prefs)
-    if dpg.does_item_exist("app_ui_scale"):
-        dpg.set_value("app_ui_scale", new)
+    num.set("app_ui_scale", new)
     now = int(round(typeface.scale() * 100))
     same = new == now
     dpg.configure_item("app_ui_restart_row", show=not same)
@@ -1280,7 +1279,7 @@ def _ui_scale_pick(app, pct):
 
 def refresh_appearance(app):
     """The editor's swatches show the colours in force."""
-    bind_value_sliders()                             # the accent may have changed
+    num.rebind()                                     # the number fields' fills in the new accent
     weight.rebind()                                  # the primary, danger and quiet buttons in the new colours
     if not dpg.does_item_exist("app_preset"):
         return
@@ -1292,31 +1291,6 @@ def refresh_appearance(app):
     dpg.set_value("app_preset", f"{name}" + (f", with {', '.join(changed)} changed" if changed else ""))
     for key in cols:
         form.set_colour(f"app_col_{key}", cols[key])
-
-
-# the sliders that write their value on the track: a thin, translucent grab
-# over the digits instead of the theme's solid one, which hid them
-VALUE_SLIDERS = ("ain_gain", "ain_squelch", "seq_ramp_end", "snap_t", "scrub")
-_value_slider_themes = {}
-
-
-def value_slider_theme():
-    th = _value_slider_themes.get(ACCENT)
-    if th is None:
-        ac = tuple(ACCENT[:3])
-        with dpg.theme() as th:
-            with dpg.theme_component(dpg.mvAll):
-                dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, ac + (80,), category=dpg.mvThemeCat_Core)
-                dpg.add_theme_color(dpg.mvThemeCol_SliderGrabActive, ac + (150,), category=dpg.mvThemeCat_Core)
-                dpg.add_theme_style(dpg.mvStyleVar_GrabMinSize, 3, category=dpg.mvThemeCat_Core)
-        _value_slider_themes[ACCENT] = th
-    return th
-
-
-def bind_value_sliders():
-    for tag in VALUE_SLIDERS:
-        if dpg.does_item_exist(tag):
-            dpg.bind_item_theme(tag, value_slider_theme())
 
 
 def tip(text, item=None, wrap=None):

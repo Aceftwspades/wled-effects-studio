@@ -15,6 +15,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import num
 
 from native import weight
 import numpy as np
@@ -132,7 +133,6 @@ class GraphPanel(Glyphs):
         self._widgets = set()    # every value widget on a node, so keys know when one is typed in
         self._pads = {}          # image button -> (nid, a, b, lo, hi, texture): the XY pads on the nodes
         self._field_themes = {}  # (frame, accent, light) -> the theme a node's value fields wear
-        self._log_sliders = {}   # slider -> unit: the sliders that hold a logarithm (set_value takes a log)
         self._glyph_init()       # the glyphs' live state and the probes' history (glyphs.py)
         self._pad_stroke = None  # the pad being dragged, for one undo step a stroke
         # --- zoom ---------------------------------------------------------------------
@@ -1559,9 +1559,10 @@ class GraphPanel(Glyphs):
         keep = self._clicked()
         if keep:
             self.ext_sel = [n for n in dict.fromkeys(list(self.ext_sel) + keep)]
-        self._widgets.clear(); self._pads.clear(); self._log_sliders.clear(); self._glyph_clear(); self._glyph_pal = None
+        self._widgets.clear(); self._pads.clear(); self._glyph_clear(); self._glyph_pal = None
         self._standin_line.clear()
         dpg.delete_item("node_editor", children_only=True)
+        num.prune()                                      # the old nodes' number fields are gone
         self.links.clear(); self._pins.clear(); self._ptype.clear(); self._link_normal.clear()
         self._focus_sel = None
         if not self.graph:
@@ -1697,6 +1698,7 @@ class GraphPanel(Glyphs):
                     dpg.add_image("preview_thumb_tex", width=t, height=t, tag=f"gthumb_{nid}")
                     dpg.add_text(f"previewing {self.preview[1]}", color=DIM)
             fed_out = {(a, o) for a, o, _, _ in self.graph.links}
+            col = 0 if collapsed else self._field_column(d, width, multiline=d.get("multiline", False))
             for i in d["inputs"]:
                 if hide and (nid, i["name"]) not in linked:
                     continue
@@ -1704,19 +1706,24 @@ class GraphPanel(Glyphs):
                 with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Input, tag=tag,
                                         user_data=(nid, i["name"]), shape=dpg.mvNode_PinShape_CircleFilled):
                     # An unconnected input is EDITABLE on the node: the value
-                    # it takes stands in for the wire. Connected, the widget
-                    # hides and the name stays.
+                    # it takes stands in for the wire. Connected, the field
+                    # hides and the name stays. A checkbox wears its name.
                     is_linked = (nid, i["name"]) in linked
-                    dpg.add_text(i["name"], tag=tag + "_t", show=is_linked or collapsed)
-                    if not collapsed:
-                        self._input_widget(nid, n, i, tag + "_w", show=not is_linked)
+                    if collapsed or i["type"] == "bool":
+                        dpg.add_text(i["name"], tag=tag + "_t", show=is_linked or collapsed)
+                        if not collapsed:
+                            self._input_widget(nid, n, i, tag + "_w", show=not is_linked)
+                    else:
+                        with dpg.group(horizontal=True, horizontal_spacing=self._gap()):
+                            self._lead(i["name"], col, tag + "_t")
+                            self._input_widget(nid, n, i, tag + "_w", show=not is_linked, width=width - col)
                 dpg.bind_item_theme(tag, th.pin[i["type"]])
                 self._pins[(nid, "in", i["name"])] = tag
                 self._ptype[tag] = i["type"]
             if not collapsed and n["type"] != "Frame":
                 for p in d["params"]:
                     with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
-                        self._param_widget(nid, n, p, multiline=d.get("multiline", False))
+                        self._param_widget(nid, n, p, multiline=d.get("multiline", False), col=col, width=width)
                 for a, b, lo, hi in d.get("pads", []):
                     if (nid, a) in linked or (nid, b) in linked or hide:
                         continue                               # wired: the pins say it; the pad is for typed values
@@ -2195,10 +2202,12 @@ class GraphPanel(Glyphs):
         w = int(n["params"].get("w", 400)); h = int(n["params"].get("h", 300))
         with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
             dpg.add_spacer(width=self.px(w), height=max(1, self.px(h - 40)))
-            with dpg.group(horizontal=True):
-                w_ = dpg.add_input_int(label="w", width=self.px(70), default_value=w, step=0, user_data=(nid, "w"),
+            with dpg.group(horizontal=True, horizontal_spacing=self._gap()):
+                dpg.add_text("size", color=DIM)             # the frame's size, wide by high
+                w_ = dpg.add_input_int(width=self.px(70), default_value=w, step=0, user_data=(nid, "w"),
                                        callback=self._on_param)
-                h_ = dpg.add_input_int(label="h", width=self.px(70), default_value=h, step=0, user_data=(nid, "h"),
+                dpg.add_text("×", color=DIM)
+                h_ = dpg.add_input_int(width=self.px(70), default_value=h, step=0, user_data=(nid, "h"),
                                        callback=self._on_param)
                 self._value_face(w_); self._value_face(h_)
                 self._widgets.update((w_, h_))
@@ -2240,22 +2249,72 @@ class GraphPanel(Glyphs):
                     dpg.set_item_pos(t, [px + dx, py + dy])
             self._frame_last[fid] = cur
 
-    def _input_widget(self, nid, n, i, tag, show):
-        """The editable stand-in for an unconnected input pin."""
+    # a field's name before it, in the interface's face; the node's fields start together (C7)
+    NAMED = {"input": ("float", "vector", "color"), "param": ("float", "int", "choice", "color", "text", "file")}
+
+    def _gap(self):
+        return max(2, self.px(6))
+
+    def _field_column(self, d, width, multiline=False):
+        """Where the node's fields start: its widest field name as drawn at
+        this zoom, and a gap - never more than half the node (a longer name
+        is cut there, the whole of it in the pin's help)."""
+        names = [i["name"] for i in d["inputs"] if i["type"] in self.NAMED["input"]]
+        names += [p["name"] for p in d["params"] if p["type"] in self.NAMED["param"]
+                  and not (p["type"] == "text" and (multiline or p.get("lines")))]
+        if not names:
+            return 0
+        return min(int(width * 0.5), int(max(self.text_w(nm) for nm in names) + 0.999) + 2 * self._gap() + 1)
+
+    def _lead(self, name, col, tag=None):
+        """A field's name in the row open now, and the space that brings
+        the field to the node's column."""
+        import math
+        g = self._gap()
+        shown = name if self.text_w(name) <= col - 2 * g - 1 else nodeface.fit_width(name, max(1, col - 2 * g - 1), self.text_w)
+        kw = {"tag": tag} if tag else {}
+        t = dpg.add_text(shown, **kw)
+        pad = col - 2 * g - math.ceil(self.text_w(shown))
+        if pad >= 1:
+            dpg.add_spacer(width=pad)
+        return t
+
+    def _show_value(self, w, val):
+        """A field shows a value set from outside - a knob, a pad, a morph,
+        a typed expression: a number's fill with it, a colour as the swatch
+        takes it."""
+        if not dpg.does_item_exist(w):
+            return
+        try:
+            if num.is_num(w):
+                num.set(w, val)
+            elif dpg.get_item_type(w).endswith("ColorEdit"):
+                dpg.set_value(w, [c / 255.0 for c in list(val)[:3]] + [1.0])
+            elif dpg.get_item_type(w).endswith("InputFloatMulti") and isinstance(val, (list, tuple)) and len(val) == 3:
+                dpg.set_value(w, list(val) + [0.0])
+            else:
+                dpg.set_value(w, val)
+        except Exception:
+            pass
+
+    def _input_widget(self, nid, n, i, tag, show, width=None):
+        """The editable stand-in for an unconnected input pin: after its
+        name, as wide as the node leaves it."""
         v = n["inputs"].get(i["name"], i.get("default", 0))
         ud = (nid, i["name"])
+        fw = width or self.px(96)
         if i["type"] == "float":
-            w = self._number_widget(i, float(v), tag, ud, self._on_input, show)
+            w = self._number_widget(i, float(v), tag, ud, self._on_input, show, fw)
         elif i["type"] == "bool":
             w = dpg.add_checkbox(label=i["name"], tag=tag, default_value=bool(v), user_data=ud,
                              callback=self._on_input, show=show)
         elif i["type"] == "vector":
             vv = [float(c) for c in (list(v) + [0, 0, 0])[:3]] if isinstance(v, (list, tuple)) else [float(v)] * 3
-            w = dpg.add_input_floatx(label=i["name"], tag=tag, width=self.px(120), size=3, default_value=vv + [0.0],
+            w = dpg.add_input_floatx(tag=tag, width=fw, size=3, default_value=vv + [0.0],
                                      format="%.2f", user_data=ud, callback=self._on_input, show=show)
         else:
             rgb = list(v)[:3] if isinstance(v, (list, tuple)) else [0, 0, 0]
-            w = dpg.add_color_edit([int(c) for c in rgb] + [255], label=i["name"], tag=tag, width=self.px(90),
+            w = dpg.add_color_edit([int(c) for c in rgb] + [255], tag=tag, no_label=True,
                                no_alpha=True, no_inputs=True, user_data=ud, callback=self._on_input, show=show)
         dpg.bind_item_theme(w, self._field_theme())
         self._value_face(w)
@@ -2310,16 +2369,7 @@ class GraphPanel(Glyphs):
         was_dirty = self._dirty
         self.touch(); self.snapshot(("midi", nid, name))    # a knob's stroke is one undo step
         n.setdefault("inputs", {})[name] = val
-        w = f"gin_{nid}_{name}_w"
-        if dpg.does_item_exist(w):
-            try:
-                if w in self._log_sliders:
-                    import math
-                    dpg.set_value(w, math.log(max(1e-9, float(val)))); self._log_label(w, float(val), self._log_sliders[w])
-                else:
-                    dpg.set_value(w, val)
-            except Exception:
-                pass
+        self._show_value(f"gin_{nid}_{name}_w", val)
         for btn, pad in list(self._pads.items()):          # a pad showing this pin follows
             if pad[0] == nid and name in (pad[1], pad[2]):
                 self._pad_draw(btn)
@@ -2344,20 +2394,23 @@ class GraphPanel(Glyphs):
         for k in self._same_type_selected(nid):
             self.graph.nodes[k].setdefault("inputs", {})[name] = val
             poked = poked and self.live_poke(k, name, val)
-            w = f"gin_{k}_{name}_w"
-            if dpg.does_item_exist(w):
-                dpg.set_value(w, val if ptype != "color" else [c / 255.0 for c in val] + [1.0])
+            self._show_value(f"gin_{k}_{name}_w", val)
         if poked and not was_dirty:
             self._dirty = 0.0                            # the running effect has the value: nothing to rebuild
             self.status(f"{name}: {val if not isinstance(val, float) else round(val, 4)} - live")
         self._refresh_summary(nid)
 
     def _show_input(self, b, inp, linked):
-        tag = f"gin_{b}_{inp}"
-        if dpg.does_item_exist(tag + "_t"):
+        """A wire in or out: the pin's field hides or comes back. Its name
+        stays either way - a checkbox's is on it, so it shows alone while wired."""
+        tag, w = f"gin_{b}_{inp}", f"gin_{b}_{inp}_w"
+        if not dpg.does_item_exist(w):                      # a stand-in has no value box (nor a folded node)
+            if dpg.does_item_exist(tag + "_t"):
+                dpg.configure_item(tag + "_t", show=linked)
+            return
+        dpg.configure_item(f"{w}__num" if dpg.does_item_exist(f"{w}__num") else w, show=not linked)
+        if dpg.get_item_type(w).endswith("Checkbox") and dpg.does_item_exist(tag + "_t"):
             dpg.configure_item(tag + "_t", show=linked)
-        if dpg.does_item_exist(tag + "_w"):                 # a stand-in has no value box
-            dpg.configure_item(tag + "_w", show=not linked)
 
     def _hovered_field(self):
         """(widget, nid, name, kind) for the value box under the pointer."""
@@ -2373,16 +2426,7 @@ class GraphPanel(Glyphs):
     def _set_param_widget(self, nid, name, val):
         for w in self._widgets:
             if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (nid, name):
-                try:
-                    if dpg.get_item_type(w).endswith("ColorEdit"):
-                        dpg.set_value(w, [c / 255.0 for c in list(val)[:3]] + [1.0])
-                    elif w in self._log_sliders:
-                        import math
-                        dpg.set_value(w, math.log(max(1e-9, float(val)))); self._log_label(w, float(val), self._log_sliders[w])
-                    else:
-                        dpg.set_value(w, val)
-                except Exception:
-                    pass
+                self._show_value(w, val)
 
     def expr_hovered(self):
         """= over a value box: the expression box for it."""
@@ -2595,27 +2639,8 @@ class GraphPanel(Glyphs):
             return False
         w, nid, name, kind = h
         t = dpg.get_item_type(w)
-        if t.endswith(("SliderFloat", "SliderInt", "DragFloat", "DragInt")):
-            cfg = dpg.get_item_configuration(w)
-            cur = dpg.get_value(w)
-            if t.endswith("Int"):
-                step = 1
-            elif w in self._log_sliders:
-                step = (cfg.get("max_value") - cfg.get("min_value")) / 100.0      # a hundredth of the log range: a ratio
-            else:
-                lo, hi = cfg.get("min_value"), cfg.get("max_value")
-                step = (hi - lo) / 100.0 if t.endswith("SliderFloat") and hi is not None and hi > lo else max(0.01, abs(cur) * 0.01)
-            val = cur + (step if direction > 0 else -step)
-            if cfg.get("clamped") or t.endswith("Slider"):
-                lo, hi = cfg.get("min_value"), cfg.get("max_value")
-                if lo is not None and hi is not None and hi > lo:
-                    val = max(lo, min(hi, val))
-            val = int(round(val)) if t.endswith("Int") else round(val, 6)
-            dpg.set_value(w, val)
-            if w in self._log_sliders:
-                import math
-                val = math.exp(val); self._log_label(w, val, self._log_sliders[w])
-            (self._on_param if kind == "param" else self._on_input)(w, val)
+        if num.is_num(w):
+            num.step(w, 1 if direction > 0 else -1)        # the field's own callback takes it (num.step fires it)
             return True
         if not t.endswith("Combo"):
             return False
@@ -2628,10 +2653,17 @@ class GraphPanel(Glyphs):
         self._on_param(w, items[k])
         return True
 
-    def _param_widget(self, nid, n, p, multiline=False):
+    def _param_widget(self, nid, n, p, multiline=False, col=0, width=None):
         v = n["params"].get(p["name"], p["default"])
         ud = (nid, p["name"])
         cb = self._on_param
+        width = width or self.px(NODE_W)
+        if p["type"] in self.NAMED["param"] and not (p["type"] == "text" and (multiline or p.get("lines"))):
+            # the setting's name in the node's column, the field after it
+            with dpg.group(horizontal=True, horizontal_spacing=self._gap()):
+                self._lead(p["name"], col)
+                self._param_field(nid, n, p, v, ud, cb, width - col)
+            return
         if p["type"] == "text" and (multiline or p.get("lines")):
             # rows of a bitmap are '/'-separated in the param and shown as lines
             shown = str(v).replace("/", "\n") if p.get("lines") else str(v)
@@ -2639,45 +2671,46 @@ class GraphPanel(Glyphs):
                                    default_value=shown, user_data=ud, callback=cb)
             self._widgets.add(w)
             return
-        if p["type"] == "float":
-            w = self._number_widget(p, float(v), None, ud, cb, True)
-        elif p["type"] == "int" and n["type"] == "Effect settings" and p["name"] == "palette":
-            # the default palette by name, not by number
-            names = [f"{i}  {name}" for name, i in self._palette_names()]
-            cur = next((s_ for s_ in names if s_.split("  ", 1)[0] == str(int(v))), f"{int(v)}  ?")
-            w = dpg.add_combo(names, label=p["name"], width=self.px(120), default_value=cur, user_data=ud,
-                              callback=lambda s_, a_: cb(s_, int(str(a_).split("  ", 1)[0])))
-        elif p["type"] == "int":
-            lo, hi = p.get("min"), p.get("max")
-            if lo is not None and hi is not None and int(hi) - int(lo) <= 512:
-                w = dpg.add_slider_int(label=p["name"], width=self.px(96), default_value=int(v), min_value=int(lo), max_value=int(hi),
-                                       clamped=True, user_data=ud, callback=cb)
-            else:
-                w = dpg.add_input_int(label=p["name"], width=self.px(78), default_value=int(v), step=0,
-                                  min_value=int(p.get("min", -1 << 30)), max_value=int(p.get("max", 1 << 30)),
-                                  min_clamped="min" in p, max_clamped="max" in p, user_data=ud, callback=cb)
-        elif p["type"] == "bool":
+        if p["type"] == "bool":
             w = dpg.add_checkbox(label=p["name"], default_value=bool(v), user_data=ud, callback=cb)
-        elif p["type"] == "choice":
-            w = dpg.add_combo(p["choices"], label=p["name"], width=self.px(90), default_value=str(v), user_data=ud, callback=cb)
-        elif p["type"] == "color":
-            rgb = list(v)[:3] if isinstance(v, (list, tuple)) else [255, 255, 255]
-            # the swatch alone, as a colour input's is: its picker has the hex and R, G and B
-            w = dpg.add_color_edit([int(c) for c in rgb] + [255], label=p["name"], width=self.px(110), no_alpha=True,
-                                   no_inputs=True, user_data=ud, callback=cb)
         elif p["type"] == "ramp":
             self._ramp_widget(nid, n, p, v)
             return
         elif p["type"] == "curve":
             self._curve_widget(nid, n, p, v)
             return
+        else:
+            return
+        dpg.bind_item_theme(w, self._field_theme())
+        self._value_face(w)
+        self._widgets.add(w)
+
+    def _param_field(self, nid, n, p, v, ud, cb, fw):
+        """A setting's field, `fw` wide, after its name: a number the one
+        control; a choice, a colour, a text, a file as their own."""
+        if p["type"] == "float":
+            w = self._number_widget(p, float(v), None, ud, cb, True, fw)
+        elif p["type"] == "int" and n["type"] == "Effect settings" and p["name"] == "palette":
+            # the default palette by name, not by number
+            names = [f"{i}  {name}" for name, i in self._palette_names()]
+            cur = next((s_ for s_ in names if s_.split("  ", 1)[0] == str(int(v))), f"{int(v)}  ?")
+            w = dpg.add_combo(names, width=fw, default_value=cur, user_data=ud,
+                              callback=lambda s_, a_: cb(s_, int(str(a_).split("  ", 1)[0])))
+        elif p["type"] == "int":
+            w = self._number_widget(p, int(v), None, ud, cb, True, fw, integer=True)
+        elif p["type"] == "choice":
+            w = dpg.add_combo(p["choices"], width=fw, default_value=str(v), user_data=ud, callback=cb)
+        elif p["type"] == "color":
+            rgb = list(v)[:3] if isinstance(v, (list, tuple)) else [255, 255, 255]
+            # the swatch alone, as a colour input's is: its picker has the hex and R, G and B
+            w = dpg.add_color_edit([int(c) for c in rgb] + [255], no_label=True, no_alpha=True,
+                                   no_inputs=True, user_data=ud, callback=cb)
         elif p["type"] == "text":
-            w = dpg.add_input_text(label=p["name"], width=self.px(100), default_value=str(v), user_data=ud, callback=cb)
+            w = dpg.add_input_text(width=fw, default_value=str(v), user_data=ud, callback=cb)
         elif p["type"] == "file":
-            with dpg.group(horizontal=True):
-                w = dpg.add_input_text(label=p["name"], width=self.px(120), default_value=str(v), user_data=ud, callback=cb)
-                dpg.add_button(label="...", small=True, user_data=(nid, p["name"]),
-                               callback=lambda s_, a_, u_: self._pick_file(u_))
+            w = dpg.add_input_text(width=max(self.px(20), fw - self.px(30)), default_value=str(v), user_data=ud, callback=cb)
+            dpg.add_button(label="...", small=True, user_data=(nid, p["name"]),
+                           callback=lambda s_, a_, u_: self._pick_file(u_))
         else:
             return
         dpg.bind_item_theme(w, self._field_theme())
@@ -2707,51 +2740,28 @@ class GraphPanel(Glyphs):
             self._field_themes[key] = th
         return th
 
-    def _number_widget(self, spec, v, tag, ud, cb, show):
-        """A number on a node: a slider when the definition gives a range (a
-        log-scaled one moves by ratio - the widget holds the value's log
-        and the callback maps it back), else a drag field paced by the
-        value's size; the unit, if any, written after the value."""
-        import math
+    def _number_widget(self, spec, v, tag, ud, cb, show, width=None, integer=False):
+        """A number on a node: the one control (num.py) - the value and its
+        unit on the track in the monospace, drag it, click it to type, a
+        thin fill for where it sits in the definition's range (along the
+        log of it for a log one, which moves by ratio). A range too wide to
+        slide across still clamps, and paces by the value's size, as an
+        open field does from its default."""
         unit = spec.get("unit") or ""
-        fmt = "%.5g" + (f" {unit}" if unit else "")          # five significant digits: 12000 K stays 12000, not 1.2e+04
-        lo, hi = spec.get("min"), spec.get("max")
-        kw = {"label": spec["name"], "user_data": ud, "show": show}
-        if tag:
-            kw["tag"] = tag
         if unit.lower() == spec["name"].lower():
-            unit, fmt = "", "%.5g"                           # "1.2 Hz  hz" says it twice
-        if lo is not None and hi is not None and (float(hi) - float(lo) <= 1000.0 or spec.get("scale") == "log"):
-            lo, hi = float(lo), float(hi)
-            if spec.get("scale") == "log" and lo > 0 and hi > lo:
-                # the slider holds log(value): its travel is by ratio, the value shown by the label's format
-                lv = math.log(max(lo, min(hi, v if v > 0 else lo)))
-                w = dpg.add_slider_float(width=self.px(96), default_value=lv, min_value=math.log(lo), max_value=math.log(hi), clamped=True,
-                                         format="", callback=lambda s_, a_: (self._log_label(s_, math.exp(a_), unit), cb(s_, math.exp(a_))), **kw)
-                self._log_label(w, v, unit)
-                self._log_sliders[w] = unit
-                return w
-            return dpg.add_slider_float(width=self.px(96), default_value=max(lo, min(hi, v)), min_value=lo, max_value=hi, clamped=True,
-                                        format=fmt, callback=cb, **kw)
-        return dpg.add_drag_float(width=self.px(78), default_value=v, speed=self._drag_speed(v, spec.get("default")), format=fmt, callback=cb, **kw)
-
-    def _log_label(self, w, v, unit):
-        """A log slider shows no value of its own (it holds a logarithm): the value goes in its label."""
-        if dpg.does_item_exist(w):
-            ud = dpg.get_item_user_data(w)
-            name = ud[1] if isinstance(ud, tuple) else ""
-            dpg.configure_item(w, label=f"{v:.5g}{(' ' + unit) if unit else ''}  {name}")
-
-    @staticmethod
-    def _drag_speed(v, default=None):
-        """How much a drag field moves per pixel: a hundredth of the value's
-        size, never under 0.005 - a big number moves in big steps, a small
-        one finely."""
+            unit = ""                                        # "1.2 Hz  hz" says it twice
+        lo, hi = spec.get("min"), spec.get("max")
+        lo = None if lo is None else (int(lo) if integer else float(lo))
+        hi = None if hi is None else (int(hi) if integer else float(hi))
+        log = spec.get("scale") == "log"
+        wide = lo is not None and hi is not None and (hi - lo) > (512 if integer else 1000.0) and not log
         try:
-            m = max(abs(float(v or 0.0)), abs(float(default or 0.0)))
+            pace = abs(float(spec.get("default") or 0.0))
         except (TypeError, ValueError):
-            m = 1.0
-        return max(0.005, m * 0.01)
+            pace = None
+        w = num.add(tag, int(v) if integer else float(v), lo, hi, integer=integer, log=log, unit=unit, width=width or self.px(96),
+                    callback=cb, user_data=ud, show=show, fill_h=max(1, self.px(2)), wide=wide, pace=pace)
+        return w
 
     def _palette_names(self):
         """[(name, id)] the sim knows, for the Effect settings' palette."""
@@ -2845,9 +2855,7 @@ class GraphPanel(Glyphs):
         n = self.graph.nodes[nid]
         n.setdefault("inputs", {})[a] = round(x, 4); n["inputs"][b] = round(y, 4)
         for name, val in ((a, x), (b, y)):
-            w_ = f"gin_{nid}_{name}_w"
-            if dpg.does_item_exist(w_):
-                dpg.set_value(w_, float(val))
+            self._show_value(f"gin_{nid}_{name}_w", float(val))
         was_dirty = self._dirty
         self.touch()
         if self.live_poke(nid, a, x) and self.live_poke(nid, b, y) and not was_dirty:
@@ -2938,8 +2946,8 @@ class GraphPanel(Glyphs):
                 dpg.draw_rectangle((x, 0), (x + 2, H), color=(r, g, b, 255), fill=(r, g, b, 255))
         for k, st in enumerate(stops):
             with dpg.group(horizontal=True):
-                w1 = dpg.add_input_float(width=self.px(56), default_value=float(st[0]), step=0, format="%.2f",
-                                         user_data=(nid, p["name"], k, "pos"), callback=self._on_ramp)
+                w1 = num.add(None, float(st[0]), 0.0, 1.0, digits=2, width=self.px(56), user_data=(nid, p["name"], k, "pos"),
+                             callback=self._on_ramp, fill_h=max(1, self.px(2)))
                 w2 = dpg.add_color_edit([int(st[1]), int(st[2]), int(st[3]), 255], width=self.px(60), no_alpha=True, no_inputs=True,
                                         user_data=(nid, p["name"], k, "col"), callback=self._on_ramp)
                 self._value_face(w1)
@@ -2965,10 +2973,10 @@ class GraphPanel(Glyphs):
                 dpg.draw_circle((q[0] * (W - 1), (1.0 - q[1]) * (H - 1)), 3, color=P["point"], fill=P["point"])
         for k, q in enumerate(pts):
             with dpg.group(horizontal=True):
-                w1 = dpg.add_input_float(width=self.px(56), default_value=float(q[0]), step=0, format="%.2f",
-                                         user_data=(nid, p["name"], k, "x"), callback=self._on_curve)
-                w2 = dpg.add_input_float(width=self.px(56), default_value=float(q[1]), step=0, format="%.2f",
-                                         user_data=(nid, p["name"], k, "y"), callback=self._on_curve)
+                w1 = num.add(None, float(q[0]), 0.0, 1.0, digits=2, width=self.px(56), user_data=(nid, p["name"], k, "x"),
+                             callback=self._on_curve, fill_h=max(1, self.px(2)))
+                w2 = num.add(None, float(q[1]), 0.0, 1.0, digits=2, width=self.px(56), user_data=(nid, p["name"], k, "y"),
+                             callback=self._on_curve, fill_h=max(1, self.px(2)))
                 self._value_face(w1); self._value_face(w2)
                 self._widgets.update((w1, w2))
                 if len(pts) > 2:
@@ -3999,12 +4007,7 @@ class GraphPanel(Glyphs):
         for nid in touched:
             n = self.graph.nodes[nid]
             for k, v in (n.get("inputs") or {}).items():
-                w = f"gin_{nid}_{k}_w"
-                if dpg.does_item_exist(w):
-                    try:
-                        dpg.set_value(w, v if not isinstance(v, (list, tuple)) or len(v) != 3 else list(v) + [0.0])
-                    except Exception:
-                        pass
+                self._show_value(f"gin_{nid}_{k}_w", v)
                 if live and not isinstance(v, (list, tuple)) or (isinstance(v, (list, tuple)) and len(v) == 3):
                     all_live = self.live_poke(nid, k, v) and all_live
         for btn in list(self._pads):

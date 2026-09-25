@@ -19,6 +19,7 @@ import math
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import num
 from native import typeface
 from native import form
 
@@ -271,8 +272,8 @@ def refresh(app):
                             speed=0.5, callback=lambda s, v: nudge(app, sel, rot=[float(x) for x in v[:3]]))
     sc = part.get("scale", 1.0)
     with form.row("scale", parent=P):
-        dpg.add_drag_float(width=px(110), default_value=float(sc if not isinstance(sc, list) else sc[0]), format="%.2f×",
-                           speed=0.01, min_value=0.01, max_value=100.0, clamped=True, callback=lambda s, v: nudge(app, sel, scale=float(v)))
+        num.add(None, float(sc if not isinstance(sc, list) else sc[0]), 0.01, 100.0, log=True, digits=2, unit="×", width=px(110),
+                callback=lambda s, v: nudge(app, sel, scale=float(v)))
     form.check("reverse the wiring of this part", parent=P, default_value=bool(part.get("reverse")),
                callback=lambda s, v: set_part(app, sel, reverse=bool(v)))
     # AIM: the part's axis along a direction, at a distance from the origin -

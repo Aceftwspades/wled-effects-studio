@@ -164,8 +164,8 @@ def test_every_control_size_is_at_the_interface_size():
 FIELDS = {"add_combo", "add_input_text", "add_input_int", "add_input_float", "add_input_double", "add_input_intx",
           "add_input_floatx", "add_drag_int", "add_drag_float", "add_drag_intx", "add_drag_floatx", "add_slider_int",
           "add_slider_float", "add_color_edit", "add_listbox"}
-# the graph's node fields keep their names inside them until the one number control (C7) splits name and value
-LABEL_AFTER_OK = {"native/graph_ui.py"}
+# every field's words come before it now, the graph's node fields too (C7); nothing is excused
+LABEL_AFTER_OK = set()
 
 
 def test_no_field_is_labelled_after_itself():
@@ -173,9 +173,56 @@ def test_no_field_is_labelled_after_itself():
     form row's label column (native/form.py) or leading it in a row of
     several - never as Dear PyGui's label, drawn after the control, where
     labels hugged fields of different widths and never lined up. A text
-    straight after a field in the same row (its label, the old way) fails
-    too; a unit belongs inside the field's format."""
+    straight after a field in a row (a horizontal group, form.row,
+    form.under) - its label, the old way - fails too; a unit belongs inside
+    the field's format. A line under a field (a hint, a caption) is not a
+    label, nor is a separator between two fields (:, =, x)."""
     bad = []
+
+    def made(node):
+        """The dpg call an expression makes, through typeface.mono(...) and the like."""
+        c = node.value if isinstance(node, (ast.Expr, ast.Assign)) else None
+        while isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr in ("mono", "small", "label", "heading") and c.args:
+            c = c.args[0]
+        return c if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) else None
+
+    def opens_row(item):
+        """A `with` that opens a row: dpg.group(horizontal=True), form.row, form.under."""
+        c = item.context_expr
+        if not (isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)):
+            return None
+        if c.func.attr in ("row", "under") and isinstance(c.func.value, ast.Name) and c.func.value.id == "form":
+            return True
+        if c.func.attr == "group":
+            return any(k.arg == "horizontal" and isinstance(k.value, ast.Constant) and k.value.value for k in c.keywords)
+        if c.func.attr in ("child_window", "window", "tooltip", "table_row", "table", "collapsing_header", "tree_node"):
+            return False
+        return None
+
+    def scan(body, rel, in_row):
+        for a, b in zip(body, body[1:]):
+            ca, cb = made(a), made(b)
+            if in_row and ca is not None and cb is not None and ca.func.attr in FIELDS and cb.func.attr == "add_text" \
+                    and cb.args and isinstance(cb.args[0], ast.Constant) and str(cb.args[0].value).strip() not in ("", ":", "=", "×"):
+                bad.append(f"{rel}:{b.lineno} a text after dpg.{ca.func.attr} in a row: {cb.args[0].value!r} - before it, or inside its format")
+        for st in body:
+            if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                scan(st.body, rel, False)
+            elif isinstance(st, ast.With):
+                row = in_row
+                for item in st.items:
+                    r = opens_row(item)
+                    if r is not None:
+                        row = r
+                scan(st.body, rel, row)
+            else:
+                for field in ("body", "orelse", "finalbody"):
+                    sub = getattr(st, field, None)
+                    if isinstance(sub, list) and sub and isinstance(sub[0], ast.stmt):
+                        scan(sub, rel, in_row)
+                for h in getattr(st, "handlers", []) or []:
+                    scan(h.body, rel, in_row)
+
     for d, _, files in os.walk(os.path.join(ROOT, "native")):
         for f in sorted(files):
             if not f.endswith(".py"):
@@ -185,27 +232,37 @@ def test_no_field_is_labelled_after_itself():
             if rel in LABEL_AFTER_OK:
                 continue
             tree = ast.parse(open(path, encoding="utf-8").read(), rel)
-
-            def made(node):
-                """The dpg call an expression makes, through typeface.mono(...) and the like."""
-                c = node.value if isinstance(node, (ast.Expr, ast.Assign)) else None
-                while isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr in ("mono", "small", "label", "heading") and c.args:
-                    c = c.args[0]
-                return c if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) else None
             for node in ast.walk(tree):
                 c = node if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) else None
                 if c is not None and c.func.attr in FIELDS:
                     lab = next((k.value for k in c.keywords if k.arg == "label"), None)
                     if lab is not None and not (isinstance(lab, ast.Constant) and (lab.value in ("", None) or str(lab.value).startswith("##"))):
                         bad.append(f"{rel}:{c.lineno} dpg.{c.func.attr}(label=...) - its words in form.row / form.inline, before it")
-                body = getattr(node, "body", None)
-                if isinstance(body, list):
-                    for a, b in zip(body, body[1:]):
-                        ca, cb = made(a), made(b)
-                        if ca is not None and cb is not None and ca.func.attr in FIELDS and cb.func.attr == "add_text" \
-                                and cb.args and isinstance(cb.args[0], ast.Constant) and str(cb.args[0].value).strip() not in ("", ":", "="):
-                            bad.append(f"{rel}:{b.lineno} a text after dpg.{ca.func.attr}: {cb.args[0].value!r} - before it, or inside its format")
+            scan(tree.body, rel, False)
     assert not bad, "fields labelled after themselves:\n" + "\n".join(bad)
+
+
+def test_every_number_is_the_one_control():
+    """One number control (C7, native/num.py): the value on the track,
+    drag, click to type, a fill for where it sits. A slider (a grab over
+    the digits, or no digits at all) or a bare drag field made elsewhere
+    would be a sixth kind again. Typed fields (input_int, input_float) stay
+    for numbers that are typed - pins, ids, counts - and a drag of three
+    (a position) for a vector."""
+    bad = []
+    for d, _, files in os.walk(os.path.join(ROOT, "native")):
+        for f in sorted(files):
+            if not f.endswith(".py"):
+                continue
+            rel = os.path.relpath(os.path.join(d, f), ROOT).replace("\\", "/")
+            if rel == "native/num.py":
+                continue
+            for node in ast.walk(ast.parse(open(os.path.join(d, f), encoding="utf-8").read(), rel)):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) \
+                        and node.func.value.id == "dpg" and node.func.attr in ("add_slider_int", "add_slider_float", "add_slider_double",
+                                                                               "add_drag_int", "add_drag_float", "add_drag_double"):
+                    bad.append(f"{rel}:{node.lineno} dpg.{node.func.attr} - num.add")
+    assert not bad, "number controls not the one control:\n" + "\n".join(bad)
 
 
 def test_gpu_points_match_the_software_projection():

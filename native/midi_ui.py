@@ -8,6 +8,7 @@ the sim streamed - the device.
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import num
 from native import typeface
 
 from native import midi, weight
@@ -266,9 +267,9 @@ def slider_menu(app, key):
 def hovered_slider():
     """The parameter slider under the pointer, by key, or None."""
     for k in midi.FX_KEYS:
-        for tag in (f"sld_{k}", f"inp_{k}"):
-            if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
-                return k
+        tag = f"inp_{k}"
+        if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
+            return k
     return None
 
 
@@ -322,9 +323,7 @@ def apply_target(app, t, v):
             return
         app.eng.fx[key] = val
         app.eng.push()
-        for tag in (f"sld_{key}", f"inp_{key}"):
-            if dpg.does_item_exist(tag):
-                dpg.set_value(tag, val)
+        num.set(f"inp_{key}", val)
     elif kind == "check":
         key = t["key"]
         if bool(app.eng.fx.get(key)) == val:

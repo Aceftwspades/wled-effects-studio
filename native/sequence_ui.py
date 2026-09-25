@@ -11,6 +11,7 @@ import time
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import num
 from native import typeface
 from native import form
 
@@ -107,8 +108,8 @@ def build(app):
             c.tip("a slider of the first segment that moves over the step, from the step's value to the end value - "
                   "in the sim as it plays; on the device as sub-steps (a second apiece, up to twelve), since a preset cannot move a slider")
             form.inline("to")
-            typeface.mono(dpg.add_slider_int(tag="seq_ramp_end", width=px(140), min_value=0, max_value=255, default_value=128,
-                                             callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), int(v))))
+            num.add("seq_ramp_end", 128, 0, 255, integer=True, width=px(140),
+                    callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), int(v)))
             c.tip("the value the slider reaches at the step's end")
             dpg.add_combo(list(sequence.RAMP_SHAPES), tag="seq_ramp_shape", width=px(110), default_value="linear",
                           callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), None, v))
@@ -235,7 +236,7 @@ def refresh(app):
         first = dpg.get_value("seq_ramp_key") if dpg.get_value("seq_ramp_key") in ramps else next(iter(ramps), "none")
         dpg.set_value("seq_ramp_key", first)
         if first != "none":
-            dpg.set_value("seq_ramp_end", sequence.ramp_of(steps[sel], first)[0])
+            num.set("seq_ramp_end", sequence.ramp_of(steps[sel], first)[0])
             dpg.set_value("seq_ramp_shape", sequence.ramp_of(steps[sel], first)[1])
         _ramp_desc(app, steps[sel])
         st = steps[sel]
@@ -431,7 +432,7 @@ def _ramp_pick(app, key):
         ramps[key] = {"end": int((segs[0].get("params") or {}).get(key, 128)) if segs else 128, "shape": "linear"}
         st["ramps"] = ramps; app.project.save()
     end, shape = sequence.ramp_of(st, key)
-    dpg.set_value("seq_ramp_end", end); dpg.set_value("seq_ramp_shape", shape); refresh(app)
+    num.set("seq_ramp_end", end); dpg.set_value("seq_ramp_shape", shape); refresh(app)
 
 
 def set_ramp(app, key, end=None, shape=None):
@@ -633,9 +634,7 @@ def poll(app):
             v = sequence.ramp_value(steps[i], k, t)
             if app.eng.seg == 0 and app.eng.fx.get(k) != v:
                 app.eng.fx[k] = v; changed = True
-                for tag in (f"sld_{k}", f"inp_{k}"):
-                    if dpg.does_item_exist(tag):
-                        dpg.set_value(tag, v)
+                num.set(f"inp_{k}", v)
         if changed:
             app.eng.push()
 

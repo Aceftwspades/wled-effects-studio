@@ -32,6 +32,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import num
 from native import typeface
 from native import form
 
@@ -494,7 +495,7 @@ class App(Features):
     def start_live(self):
         try:
             from native.audio import open_live
-            # pair() names its widgets sld_/inp_, so read the box.
+            # pair() names its field inp_<key>
             dev = dpg.get_value("live_dev") if dpg.does_item_exist("live_dev") else "system output"
             index = None
             if dev and dev != "system output":
@@ -1488,41 +1489,16 @@ class App(Features):
         self.eng.push()
 
     # --- the one slider shape used everywhere ---------------------------------
-    def pair(self, parent, key, label, value, lo, hi, setter, is_float=False):
-        """A slider carrying no number, and the typed box that shows it.
-
-        The slider used to print its own value as well, so the same number
-        appeared twice a few pixels apart and disagreed with itself for a frame
-        whenever one was dragged. The box is the readout; the slider is the
-        handle. format="" is what stops Dear PyGui drawing the value on the
-        track.
-        """
-        st, it = f"sld_{key}", f"inp_{key}"
+    def pair(self, parent, key, label, value, lo, hi, setter, is_float=False, unit=""):
+        """A row of the panel: its label, then the one number control
+        (num.py) - the value on the track, drag it, click it to type, a thin
+        fill for where it sits. It was a slider showing no number beside a
+        box that did (C7). The field is inp_<key>."""
+        it = f"inp_{key}"
         self._inputs.add(it)
-
-        def from_slider(s, v):
-            dpg.set_value(it, v)
-            setter(v)
-
-        def from_box(s, v):
-            v = max(lo, min(hi, v))
-            dpg.set_value(st, v)
-            setter(v)
-
         with form.row(label, parent=parent):                 # the label first, in the panel's column (C6)
-            if is_float:
-                dpg.add_slider_float(tag=st, width=-px(76), min_value=lo, max_value=hi,
-                                     default_value=value, format="", callback=from_slider)
-                dpg.add_input_float(tag=it, width=px(68), step=0, format="%.1f",
-                                    min_value=lo, max_value=hi, min_clamped=True,
-                                    max_clamped=True, default_value=value,
-                                    callback=from_box)
-            else:
-                dpg.add_slider_int(tag=st, width=-px(76), min_value=lo, max_value=hi,
-                                   default_value=value, format="", callback=from_slider)
-                dpg.add_input_int(tag=it, width=px(68), step=0, min_value=lo, max_value=hi,
-                                  min_clamped=True, max_clamped=True,
-                                  default_value=value, callback=from_box)
+            num.add(it, value, lo, hi, integer=not is_float, digits=1 if is_float else None, unit=unit, width=-1,
+                    callback=lambda s, v: setter(max(lo, min(hi, v))))
 
     def rebuild_params(self):
         """Sliders are labelled from the effect's own metadata, as the web UI is."""
@@ -2701,6 +2677,11 @@ class App(Features):
     def on_wheel(self, sender, app_data):
         if room.wheel(self, app_data):
             return                                       # Ctrl+wheel over the 3-D view in its corner: its size
+        if dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl):
+            h = num.hovered()
+            if h is not None:
+                num.step(h, 1 if app_data > 0 else -1)   # Ctrl+wheel over a number field, anywhere: a step (num.py)
+                return
         if self.layout == "edit" and self.code_ed is not None and dpg.does_item_exist("code_ed") and dpg.is_item_hovered("code_ed"):
             self.code_ed.wheel(app_data)
             return
@@ -2716,7 +2697,8 @@ class App(Features):
         # Multiplicative, so a notch moves the same proportion at every range.
         self.dist = max(1.9, min(14.0, self.dist * np.exp(-app_data * 0.06)))
 
-    TYPING = ("mvAppItemType::mvInputText", "mvAppItemType::mvInputInt", "mvAppItemType::mvInputFloat",
+    TYPING = ("mvAppItemType::mvDragFloat", "mvAppItemType::mvDragInt",       # a number field typed into (num.py)
+              "mvAppItemType::mvInputText", "mvAppItemType::mvInputInt", "mvAppItemType::mvInputFloat",
               "mvAppItemType::mvInputDouble", "mvAppItemType::mvInputIntMulti", "mvAppItemType::mvInputFloatMulti",
               "mvAppItemType::mvInputDoubleMulti", "mvAppItemType::mvSliderFloat", "mvAppItemType::mvSliderInt",
               "mvAppItemType::mvDragFloat", "mvAppItemType::mvDragInt")
@@ -3318,8 +3300,8 @@ class App(Features):
             if dpg.is_item_shown("scrub_row") != show:
                 dpg.configure_item("scrub_row", show=show)
                 if show:
-                    dpg.configure_item("scrub", max_value=len(self.history_frames) - 1)
-                    dpg.set_value("scrub", len(self.history_frames) - 1)
+                    num.configure("scrub", hi=len(self.history_frames) - 1)
+                    num.set("scrub", len(self.history_frames) - 1)
         lvl = self.live.level if self.live else 0.0
         dpg.set_value("lvl_bar", min(1.0, lvl / 220.0))
         if self.beat_flash:
@@ -3493,8 +3475,8 @@ def build(app):
                     with dpg.group(tag="scrub_row", show=False):
                         form.note("paused - scrub the last seconds", color=SECTION)
                         with form.row("frame"):
-                            dpg.add_slider_int(tag="scrub", width=-1, min_value=0, max_value=1, default_value=0, format="%d",
-                                               callback=lambda s, v: setattr(self_app[0], "scrub", int(v)))
+                            num.add("scrub", 0, 0, 1, integer=True, width=-1,
+                                    callback=lambda s, v: setattr(self_app[0], "scrub", int(v)))
                     dpg.add_group(tag="params")
                 with Section(app, "audio", "AUDIO"):
                     dpg.add_group(tag="audio_rows")
@@ -3503,9 +3485,9 @@ def build(app):
                             ("bass", "bass",   45,  0,  255, "bass"),
                             ("mid",  "mid",    50,  0,  255, "mid"),
                             ("treb", "treble", 35,  0,  255, "treb"),
-                            ("bpm",  "bpm",    120, 30, 200, "bpm")):
+                            ("bpm",  "tempo",  120, 30, 200, "bpm")):
                         app.pair("audio_rows", key, lab, val, lo, hi,
-                                 lambda v, a=attr: setattr(app.syn, a, int(v)))
+                                 lambda v, a=attr: setattr(app.syn, a, int(v)), unit="bpm" if key == "bpm" else "")
                     form.check("auto beat", default_value=True,
                                callback=lambda s, v: setattr(app.syn, "auto_beat", v))
                     # Gate a band and it goes silent between beats, jumping to its
@@ -3540,7 +3522,7 @@ def build(app):
                     dpg.add_group(tag="gain_row")
                     app.pair("gain_row", "live_gain", "live gain", 3.0, 0.2, 12.0,
                              lambda v: setattr(app.live, "gain", float(v)) if app.live else None,
-                             is_float=True)
+                             is_float=True, unit="×")
                     with form.row("level"):
                         dpg.add_progress_bar(tag="lvl_bar", default_value=0.0, width=-1)
                     dpg.add_text("", tag="live_msg", wrap=0)
@@ -3550,7 +3532,6 @@ def build(app):
           dpg.add_text("Q net    E 3-D    W both    C code    G graph    H presentation    space play/pause    "
                        "Help > Keyboard shortcuts has the rest", tag="hint1", color=(130, 140, 155))
     chrome.build_dialogs(app)
-    chrome.bind_value_sliders()
     chrome.build_pane_menus(app)
     room.build(app)                                  # the graph's room: the rail, the windows over the canvas
     device_ui.refresh_devices(app)                   # the known devices into the frame and the menu
@@ -3711,7 +3692,7 @@ def service_command(app):
                 (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
             if "check" in c:                            # test hook: an expression that must be true (graded as expect is)
                 try:
-                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight})
+                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface})
                 except Exception as e:
                     v = f"raised {e!r}"
                 print(("check ok     " if v is True or (v and not isinstance(v, str)) else "EXPECT FAILED check ") + f"{c['check'][:90]}: {v!r}"[:200])
@@ -3781,7 +3762,7 @@ def service_command(app):
                 app.wiring_stop() if c["wiring_test"] == "off" else app.wiring_start(c["wiring_test"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
-                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight})))
+                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface})))
                 except Exception:
                     import traceback; traceback.print_exc()
             if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]

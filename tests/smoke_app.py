@@ -119,7 +119,7 @@ STEPS = [
       {"midi_learn": {"kind": "pin", "graph": "box_fire.json", "nid": 12, "name": "scale", "lo": 0.0, "hi": 12.0}}], 0.6),
     ([{"midi": [177, 8, 127]}], 0.6),
     ([{"expect": ["graph_status", "CC 8 ch 2 -> Noise #12 . scale"]}, {"py": "app.gp.graph.nodes[12]['inputs']['scale']"},
-      {"py": "(dpg.set_value('sld_sx', 0), app.eng.fx.__setitem__('sx', 0))"}, {"midi": [176, 7, 100]}], 0.6),
+      {"py": "(num.set('inp_sx', 0), app.eng.fx.__setitem__('sx', 0))"}, {"midi": [176, 7, 100]}], 0.6),
     ([{"expect": ["inp_sx", "201"]}, {"py": "midi_ui.slider_menu(app, 'sx') or dpg.is_item_shown('midi_ctx')"}], 0.6),
     ([{"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
       {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),

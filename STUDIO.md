@@ -1606,10 +1606,41 @@ reaches furthest; (Cn) is the critique's number.
       itself - Dear PyGui's label, or a text straight after it - outside
       the graph's node fields (C7). Found on the way: loading a sequence
       step changed the colours but not the swatches showing them.
-- [ ] **One number control** (C7): the value on the track, drag, click to
-      type, the unit inside, a fill rather than a grab; in the panel too.
-      On a node the name leaves the field for the interface's face, the
-      value keeps the monospace (C2).
+- [x] **One number control** (C7): native/num.py. Five kinds became one
+      - the panel's slider showing no value beside a box that did, the
+      nodes' drag fields, sliders whose grab sat on their digits, log
+      sliders with the value outside the track, integer sliders whose
+      grab at the minimum read as a checkbox. The value and its unit on
+      the track in the monospace ("120 bpm", "1.00×", "150%"); drag it
+      (Dear ImGui's Shift and Alt pace it); a click - pressed and let go
+      without moving - types into it, the number selected (Dear PyGui's
+      drag fields do nothing on a click; its focus_item puts one into its
+      text mode, found by a probe and held by a test); Ctrl+wheel steps it,
+      anywhere; a thin fill under it for where it sits in its range, along
+      the log of it for a log field, which moves by ratio (its pace follows
+      its size as it moves: Dear PyGui has no log flag); an open field
+      paces by its size, or its default's while near 0; a range too wide to
+      slide across clamps and paces as an open one; a field clamped at one
+      end only is. num.set moves a value and its fill from outside (MIDI,
+      a sweep, a sequence's ramps, the XY pads, a snapshot's morph, a typed
+      expression), num.configure a range (the scrub's grows with the
+      history). Everywhere: the side panel's parameters, audio and live
+      gain (one field a row, filling the row), the segment's opacity, the
+      scrub, the Sequence's ramp end, the Audio input's gain and squelch,
+      the snapshots' morph, Settings > Appearance > Interface size, the
+      Shape frame's scale; on the nodes every number input and setting,
+      a ramp's stops and a curve's points. On a node the fields line up
+      after their names - a column per node from its widest field name at
+      the zoom, no more than half the node, a longer name cut - the name
+      in the interface's face (C2's leftover), and a name stays while its
+      field hides under a wire; a colour, a choice, a text and a vector
+      follow their names too. Typed fields stay for numbers that are typed
+      (pins, ids, counts, durations). test_audit fails on a slider or a
+      single drag made anywhere but num.py, and on a field labelled after
+      itself anywhere, the nodes now included; tests/test_num.py (formats,
+      the fill, the pace, set / configure / step, a click against a drag
+      with the mouse stubbed, and focus_item's typing on a real frame).
+      The sliders' own theme (a thin grab over the digits) went with them.
 - [ ] **One window style, frames docked** (C8).
 - [ ] **Names people use** (C9): settings, keys, usermod descriptions,
       the footer's statistics.

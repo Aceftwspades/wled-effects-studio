@@ -147,18 +147,21 @@ them all.
 **As a graph.** Ctrl+N, name it, and the graph pane opens with a starter.
 Right-click the grid to add a node (type to search); drag from a pin to a
 pin to wire, or to empty space for a list of what could go there. A
-number on a node is a **drag field**: drag it sideways to change it (a
-big number moves in big steps, a small one finely), ctrl+click to type
-one; a setting with a range is a **slider** with its value written on
-it, ctrl+click types there too; Ctrl+wheel over either steps it. Press
-`=` over either (or use "type an expression..." in a pin's menu, "type
-an expression for" in the node's) for a box that takes **arithmetic**:
-`2*pi`, `1/3`, `x*2` (x is the value it has), `sqrt(2)`, `min(a, 4)`
-with the node's own numbers by name, `rand()`; Enter sets it, Escape
-leaves it. A
-value with a unit says so (20 ms, 1.2 Hz, 4 x, 2 s), and one that
-moves by ratio - a time, a rate, a scale - has a slider that spends half
-its travel below the geometric middle. Two
+node's fields line up after their names. Every **number** - on a node,
+in the side panel, in the frames - is the same control: its value on
+the track, with its unit ("20 ms", "1.2 Hz", "120 bpm"); **drag** it
+sideways to change it (Shift: ten times as far, Alt: a hundredth); **click**
+it - press and let go without moving - to type a value (Enter takes it,
+Escape leaves it; a double click or Ctrl+click does the same);
+**Ctrl+wheel** over it steps it. One with a range has a thin **fill**
+under it for where it sits; one without paces itself by its size (a big
+number moves in big steps, a small one finely), and one that moves by
+ratio - a time, a rate, a scale - moves by ratio, its fill along the log
+of its range. Press `=` over a number on a node (or use "type an
+expression..." in a pin's menu, "type an expression for" in the node's)
+for a box that takes **arithmetic**: `2*pi`, `1/3`, `x*2` (x is the
+value it has), `sqrt(2)`, `min(a, 4)` with the node's own numbers by
+name, `rand()`; Enter sets it, Escape leaves it. Two
 inputs that make one point - Transform's pivot and move, Gravity's
 tilt, Mandelbrot's Julia constant - also get an **XY pad**: drag the dot
 and both fields follow. Effect settings' palette is picked by name. Every

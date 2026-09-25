@@ -13,6 +13,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import num
 from native import typeface
 from native import form
 
@@ -232,8 +233,7 @@ class Features:
                     dpg.add_input_int(width=px(60), default_value=val, user_data=key, on_enter=True, step=0,
                                       callback=self.on_seg_field)
         with form.row("opacity", parent="seg_fields"):
-            dpg.add_slider_int(width=-1, min_value=0, max_value=255, default_value=op,
-                               callback=lambda s, v: self.on_seg_field(s, v, "opacity"))
+            num.add(None, op, 0, 255, integer=True, width=-1, callback=lambda s, v: self.on_seg_field(s, v, "opacity"))
         # WLED's per-segment blend mode ("bm"): how this segment lands on the ones under it
         modes = self.eng.BLEND_MODES
         with form.row("blend mode", parent="seg_fields", tip="how this segment lands on the ones under it"):
@@ -953,9 +953,7 @@ class Features:
         if v != self.eng.fx.get(sw["key"]):
             self.eng.fx[sw["key"]] = v
             self.eng.push()
-            for tag in (f"sld_{sw['key']}", f"inp_{sw['key']}"):
-                if dpg.does_item_exist(tag):
-                    dpg.set_value(tag, v)
+            num.set(f"inp_{sw['key']}", v)
     def _draw_wiring(self):
         """The wiring order as a line through the net's pixels, first LED
         marked, when asked for and the net is on screen."""
