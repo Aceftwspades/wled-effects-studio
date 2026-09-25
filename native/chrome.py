@@ -435,16 +435,29 @@ def build_toolbar(app):
             _btn(app, "arrange", "Arrange the graph", lambda: app.gp.arrange(), action="arrange")
             _btn(app, "fold", "Fold the selection into a sub-graph", lambda: app.run_action("fold"), action="fold")
             _sep()
-        _btn(app, "devices", "Devices on the network", lambda: device_ui.show(app, "devices"), action="devices")
-        _btn(app, "flash", "Build the firmware and flash the device", lambda: show_flash(app), action="flash")
-        _btn(app, "send", "Send to the device: the effects, a script, the shape", lambda: device_ui.show(app, "send"), action="send_frame")
-        _btn(app, "stream", "Stream the sim to the device (DDP)", lambda: app.run_action("stream"), tag="tb_stream", action="stream")
-        _sep()
-        _btn(app, "shape", "Shape editor", lambda: device_ui.show(app, "shape"), action="shape")
-        _btn(app, "sequence", "Sequence: presets, a playlist and the schedule", lambda: device_ui.show(app, "sequence"), action="sequence")
-        _btn(app, "library", "Library: every effect as a looping thumbnail", lambda: device_ui.show(app, "library"), action="library")
-        _btn(app, "palette", "Palettes: gradients of the project's own", lambda: device_ui.show(app, "palettes"), action="palettes")
-        _btn(app, "outputs", "LED outputs and power", lambda: device_ui.show(app, "outputs"), action="outputs")
+        # The frames (C15: nine look-alike glyphs): in words while the toolbar has room for them, their icons
+        # when it has not (fit_toolbar); each lit while its frame is open, a click opening or closing it, as
+        # the Window menu does. The stream is a switch among them, lit while it runs.
+        with dpg.group(horizontal=True, tag="tb_frames_icons"):
+            for slot, icon, word, tip_, act in TOOLBAR_FRAMES:
+                if slot == "|":
+                    _sep()
+                elif slot is None:
+                    _btn(app, icon, tip_, lambda: app.run_action("stream"), tag="tb_stream", action=act)
+                else:
+                    _btn(app, icon, tip_, lambda s, a, u: toggle_window(app, u), tag=f"tb_fr_{slot}", action=act)
+                    dpg.configure_item(f"tb_fr_{slot}", user_data=slot)
+        with dpg.group(horizontal=True, tag="tb_frames_words", show=False):
+            for slot, icon, word, tip_, act in TOOLBAR_FRAMES:
+                if slot == "|":
+                    _sep()
+                    continue
+                b = dpg.add_button(label=word, small=True, tag=f"tb_frw_{slot or 'stream'}", user_data=slot,
+                                   callback=(lambda: app.run_action("stream")) if slot is None
+                                   else (lambda s, a, u: toggle_window(app, u)))
+                dpg.bind_item_theme(b, _word_theme(TEXT))
+                with dpg.tooltip(b):
+                    dpg.add_text("", tag=f"tbtipw_{act}")
         _sep()
         _btn(app, "external", "Open the code in an external editor", lambda: app.open_external(), action="external")
         _btn(app, "camera", "Screenshot of the 3-D view", lambda: setattr(app, "shot_req", True), tag="shot_btn", action="screenshot")
@@ -452,6 +465,83 @@ def build_toolbar(app):
         dpg.add_text("", tag="rec_msg", color=DIM)
     dpg.bind_item_theme("toolbar", "toolbar_theme")
     refresh_keys(app)
+
+
+# The toolbar's frames: (slot - None for the stream, "|" a separator - icon, word, what it is, keymap action)
+TOOLBAR_FRAMES = (("devices", "devices", "Devices", "Devices on the network", "devices"),
+                  ("flash", "flash", "Flash", "Build the firmware and flash the device", "flash"),
+                  ("send", "send", "Send", "Send to the device: the effects, a script, the shape", "send_frame"),
+                  (None, "stream", "Stream", "Stream the sim to the device (DDP)", "stream"),
+                  ("|", "", "", "", ""),
+                  ("shape", "shape", "Shape", "Shape editor", "shape"),
+                  ("sequence", "sequence", "Sequence", "Sequence: presets, a playlist and the schedule", "sequence"),
+                  ("library", "library", "Library", "Library: every effect as a looping thumbnail", "library"),
+                  ("palettes", "palette", "Palettes", "Palettes: gradients of the project's own", "palettes"),
+                  ("outputs", "outputs", "Outputs", "LED outputs and power", "outputs"),
+                  ("audioin", "mic", "Audio in", "Audio input: the device's microphone or line-in", "audioin"))
+_WORD_THEMES = {}
+
+
+def _word_theme(col):
+    """A frame's word on the toolbar: no slab, a lift on hover, the words in
+    `col` - the text's, the accent while its frame is open, amber while the
+    stream runs."""
+    key = (tuple(col), tuple(TEXT))
+    t = _WORD_THEMES.get(key)
+    if t is None or not dpg.does_item_exist(t):
+        tx = tuple(TEXT[:3])
+        with dpg.theme() as t:
+            with dpg.theme_component(dpg.mvButton):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (0, 0, 0, 0), category=dpg.mvThemeCat_Core)
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, tx + (26,), category=dpg.mvThemeCat_Core)
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, tx + (46,), category=dpg.mvThemeCat_Core)
+                dpg.add_theme_color(dpg.mvThemeCol_Text, tuple(col[:3]) + (255,), category=dpg.mvThemeCat_Core)
+        _WORD_THEMES[key] = t
+    return t
+
+
+def _words_width():
+    """How wide the frames are in words: each word and its padding, the
+    spacing between, the separator - once measured, as drawn."""
+    got = dpg.get_item_rect_size("tb_frames_words")[0] if dpg.is_item_shown("tb_frames_words") else 0
+    if got > 0:
+        _WORD_THEMES["_w"] = got
+    if _WORD_THEMES.get("_w"):
+        return _WORD_THEMES["_w"]
+    words = [w for s, _, w, _, _ in TOOLBAR_FRAMES if s != "|"]
+    return sum(typeface.measure(w) + 2 * px(7) for w in words) + px(4) * len(words) + px(12)
+
+
+def fit_toolbar(app):
+    """The frames in words while the toolbar has room for them - the rest of
+    the row and the words within the window - their icons when it has not
+    (a narrow window; the graph's tools shown)."""
+    if not (dpg.does_item_exist("tb_frames_icons") and dpg.does_item_exist("toolbar")):
+        return
+    words_on = dpg.is_item_shown("tb_frames_words")
+    tw = dpg.get_item_rect_size("toolbar")[0]
+    gw = dpg.get_item_rect_size("tb_frames_words" if words_on else "tb_frames_icons")[0]
+    if tw <= 0 or gw <= 0:
+        return
+    want = (tw - gw) + _words_width() <= dpg.get_viewport_client_width() - px(24)
+    if want != words_on:
+        dpg.configure_item("tb_frames_words", show=want)
+        dpg.configure_item("tb_frames_icons", show=not want)
+
+
+def light_frames(app):
+    """The toolbar's frames lit while open (their icons in the accent, their
+    words too), the stream amber while it runs."""
+    for slot, _, _, _, _ in TOOLBAR_FRAMES:
+        if slot in (None, "|"):
+            continue
+        on = window_open(app, slot)
+        if dpg.does_item_exist(f"tb_fr_{slot}"):
+            dpg.configure_item(f"tb_fr_{slot}", tint_color=ACCENT if on else TEXT)
+        if dpg.does_item_exist(f"tb_frw_{slot}"):
+            dpg.bind_item_theme(f"tb_frw_{slot}", _word_theme(ACCENT if on else TEXT))
+    if dpg.does_item_exist("tb_frw_stream"):
+        dpg.bind_item_theme("tb_frw_stream", _word_theme(AMBER if getattr(app, "ddp", None) is not None else TEXT))
 
 
 # --- dialogs ------------------------------------------------------------------------
@@ -763,10 +853,10 @@ def refresh_keys(app):
         tag = f"mi_{action}"
         if dpg.does_item_exist(tag):
             dpg.configure_item(tag, shortcut=app.keys.label(action))
-        tt = f"tbtip_{action}"
-        if dpg.does_item_exist(tt):
-            b = app.keys.label(action)
-            dpg.set_value(tt, app._tips.get(action, "") + (f"  {b}" if b else ""))
+        for tt in (f"tbtip_{action}", f"tbtipw_{action}"):
+            if dpg.does_item_exist(tt):
+                b = app.keys.label(action)
+                dpg.set_value(tt, app._tips.get(action, "") + (f"  {b}" if b else ""))
     if not dpg.does_item_exist("keys_rows"):
         return
     dpg.delete_item("keys_rows", children_only=True)
@@ -1410,6 +1500,8 @@ def poll_windows(app, every=0.3):
     if now - getattr(app, "_win_checks_at", 0.0) >= every:
         app._win_checks_at = now
         refresh_windows(app)
+        light_frames(app)
+        fit_toolbar(app)
 
 
 def refresh_appearance(app):
@@ -1775,6 +1867,7 @@ def refresh(app):
         dpg.set_value("menu_pip", not room.pip(app)["tucked"])
     dpg.set_value("menu_focus", app.gp.focus_mode)
     refresh_windows(app)
+    light_frames(app)
     if dpg.does_item_exist("menu_wire_light"):
         dpg.set_value("menu_wire_light", app.gp.wire_light())
     room.refresh_minimap_menu(app)

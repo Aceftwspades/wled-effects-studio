@@ -1838,9 +1838,21 @@ reaches furthest; (Cn) is the critique's number.
       from "File > Project" (it was Device's). The smoke opens and closes a
       frame from Window, runs a menu command from the palette and reads the
       node menu's order and the add menu's first row.
-- [ ] **Polish** (C15-C18): the toolbar following the layout; unlit LEDs
-      as dim dots and the net fitted; a still selection outline by
-      default; a footer of power and fps.
+- [x] **The toolbar** (C15): its graph tools show while the graph does
+      (a zoom box read 120% over a net and a 3-D view - fixed with the plain
+      bugs). The device and frame buttons were nine look-alike glyphs: they
+      are words now while the toolbar has room for them - Devices, Flash,
+      Send, Stream, then Shape, Sequence, Library, Palettes, Outputs and
+      Audio in (new to the row) - and their icons when it has not (a narrow
+      window, or the graph's tools shown: the row measured each third of a
+      second against the window, the words' width as drawn once seen); a
+      frame's word or icon is lit in the accent while the frame is open and
+      a click opens or closes it, as the Window menu does; Stream is lit
+      amber while it runs; the tooltips carry the keys either way. The
+      smoke widens the window for the words, narrows it for the icons and
+      opens a frame to see it lit.
+- [ ] **Polish** (C16-C18): unlit LEDs as dim dots and the net fitted; a
+      still selection outline by default; a footer of power and fps.
 
 ### Line-in (September 2026)
 
