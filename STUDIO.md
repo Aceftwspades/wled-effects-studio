@@ -1641,7 +1641,35 @@ reaches furthest; (Cn) is the critique's number.
       the fill, the pace, set / configure / step, a click against a drag
       with the mouse stubbed, and focus_item's typing on a real frame).
       The sliders' own theme (a thin grab over the digits) went with them.
-- [ ] **One window style, frames docked** (C8).
+- [x] **One window style, frames docked** (C8): native/dock.py. The
+      frames opened floating, over the logical and 3-D views they change;
+      they open in the dock now - the side panel's column, tabbed: a Panel
+      tab and one per docked frame, one in front at a time, the column as
+      wide as the tab in front wants (the panel its width, a frame the width
+      it was drawn for, or the one its edge was dragged to, kept at 100%),
+      so the views move over and are never covered. The strip is buttons
+      (Dear PyGui's tab bar gave its first item all the width the others
+      left, whatever it was): the one in front on the panel's ground in the
+      accent, each frame's close beside it, names as icons when they do not
+      fit, and at its right float, which takes the frame in front out into
+      a window over the panes; a floated frame opens floating until docked
+      again - by dock at its top right, or its grip dropped on the panes (a
+      frame is no pane any more: an older arrangement holding one is
+      migrated into the dock). While the graph has the room the dock is the
+      drawer beside the rail, and the rail carries the docked frames' icons
+      (a click brings one to the front, the drawer opened). A docked frame
+      drops its own header - its tab names it. One window style: the
+      nineteen dialogs (Appearance, Keyboard shortcuts, Usermods, History,
+      Undo history, Snapshots, MIDI, Sweep, About, Update, Report, Selection
+      frames, a WLED checkout, the Help reader and its picture, Welcome, and
+      the three modal questions) lost Dear PyGui's title bar for the frames'
+      header - the title in the heading face, a close at the top right that
+      follows the window's width - and titles are in sentence case, frames'
+      too ("LED outputs", not "LED OUTPUTS"; the capitals are for labels);
+      Esc closes the dialog with the focus, as it does a floating frame. The
+      walk found the float button pressed in the frame between the panel
+      coming to the front and the strip being rebuilt (it floated the panel
+      and failed): the dock's verbs ignore anything that is not a frame.
 - [ ] **Names people use** (C9): settings, keys, usermod descriptions,
       the footer's statistics.
 - [ ] **Messages that stay** (C10): short lines, errors held until fixed

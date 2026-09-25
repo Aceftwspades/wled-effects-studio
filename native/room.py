@@ -104,10 +104,12 @@ def folded(app):
 
 def side_px(app):
     """The panel's column's width: the rail's while folded, the rail and
-    the panel side by side while open, the panel's without the rail."""
+    the dock side by side while open, the dock's without the rail - the
+    panel's width, or the frame's whose tab is in front (dock.py)."""
+    from native import dock
     if not rail(app):
-        return app.side_w
-    return RAIL_W if folded(app) else app.side_w + RAIL_GAP + RAIL_W
+        return dock.width(app)
+    return RAIL_W if folded(app) else dock.width(app) + RAIL_GAP + RAIL_W
 
 
 def _outer_right(app):
@@ -160,8 +162,12 @@ def set_tucked(app, v):
 
 
 def open_panel(app, key=None):
-    """The panel beside the graph, at a section (opened if it was folded)."""
+    """The panel beside the graph, at a section (opened if it was folded) -
+    in front of the dock's frames."""
+    from native import dock
     app.prefs["graph_panel_open"] = True
+    if key and dock.active(app) != "side":
+        dock.state(app)["active"] = "side"
     _save(app)
     if key:
         if key in app.sec_closed:
@@ -238,8 +244,8 @@ def build(app):
 
 
 def _rail_sig(app):
-    from native import chrome
-    return (tuple(app.sec_order), tuple(chrome.TEXT), folded(app))
+    from native import chrome, dock
+    return (tuple(app.sec_order), tuple(chrome.TEXT), folded(app), tuple(dock.tabs(app)))
 
 
 def fill_rail(app):
@@ -263,6 +269,15 @@ def fill_rail(app):
                                  height=px(20), tint_color=chrome.TEXT, user_data=key,
                                  callback=lambda s, a, u: open_panel(app, u))
         chrome.tip(TIP.get(key, key.upper()) + (" - opens the panel there" if shut else " - goes to it"), item=b)
+    # the frames in the dock: a click brings the one to the front of the drawer (C8)
+    from native import dock
+    if dock.tabs(app):
+        dpg.add_separator(parent="rail_win")
+        for slot in dock.tabs(app):
+            b = dpg.add_image_button(texture(dock.ICONS.get(slot, "gear"), px(20)), tag=f"rail_frame_{slot}", parent="rail_win",
+                                     width=px(20), height=px(20), tint_color=chrome.TEXT, user_data=slot,
+                                     callback=lambda s, a, u: dock.activate(app, u))
+            chrome.tip(f"{dock.NAMES.get(slot, slot)} - in the dock: opens it beside the rail", item=b)
 
 
 # --- where things go ------------------------------------------------------------------------------
@@ -335,6 +350,7 @@ def pip_geometry(app, main):
 def place_side(app, rect):
     """The panel's column at (x, y, w, h): the rail at its outer edge (the
     window's), the panel, open, between it and the graph."""
+    from native import dock
     x, y, w, h = rect
     right = _outer_right(app)
     rx = x
@@ -342,10 +358,9 @@ def place_side(app, rect):
         pw = max(1, w - RAIL_W - RAIL_GAP)
         panel_x = x if right else x + RAIL_W + RAIL_GAP
         rx = x + pw + RAIL_GAP if right else x
-        dpg.configure_item("side_win", width=pw, height=h)
-        dpg.set_item_pos("side_win", [panel_x, y])
-        if dpg.does_item_exist("grip_side_win"):
-            dpg.set_item_pos("grip_side_win", [pw - px(40 + 14), px(8)])
+        dock.place(app, (panel_x, y, pw, h))             # the panel, or the frame whose tab is in front
+    else:
+        dock.hide(app)
     dpg.configure_item("rail_win", width=RAIL_W, height=h)
     dpg.set_item_pos("rail_win", [rx, y])
 

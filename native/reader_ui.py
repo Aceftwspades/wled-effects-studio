@@ -91,8 +91,9 @@ S = _State()
 
 def build(app):
     c = _c()
-    with dpg.window(tag=TAG, label="Help", show=False, width=px(980), height=px(720), no_collapse=True,
+    with dpg.window(tag=TAG, label="Help", no_title_bar=True, show=False, width=px(980), height=px(720), no_collapse=True,
                     on_close=lambda: setattr(S, "keys", False)):
+        _c().dialog_header(TAG, "Help")                 # one window style (C8): the frames' header
         with dpg.group(horizontal=True):
             dpg.add_button(label="< Back", tag="reader_back", enabled=False, callback=lambda: back(app))
             c.tip("where you were before the last link (Alt+Left, or Backspace)")
@@ -120,7 +121,8 @@ def build(app):
     with dpg.item_handler_registry(tag="reader_pic_click"):
         dpg.add_item_clicked_handler(callback=lambda s, a: _pic_clicked(app, a))
     # a picture at its full size, to read what the page had to shrink
-    with dpg.window(tag="reader_pic", label="Picture", show=False, width=px(900), height=px(600), no_collapse=True):
+    with dpg.window(tag="reader_pic", label="Picture", no_title_bar=True, show=False, width=px(900), height=px(600), no_collapse=True):
+        _c().dialog_header("reader_pic", "Picture")                 # one window style (C8): the frames' header
         with dpg.group(horizontal=True):
             dpg.add_button(label="Fit the window", callback=lambda: _pic_zoom("fit"))
             dpg.add_button(label="Full size", callback=lambda: _pic_zoom(1.0))
@@ -133,8 +135,9 @@ def build(app):
 
 def _build_welcome(app):
     c = _c()
-    with dpg.window(tag=WELCOME, label="Welcome", show=False, width=px(600), height=px(400), no_collapse=True, no_resize=True,
+    with dpg.window(tag=WELCOME, label="Welcome", no_title_bar=True, show=False, width=px(600), height=px(400), no_collapse=True, no_resize=True,
                     on_close=lambda: welcome_closed(app)):
+        _c().dialog_header(WELCOME, "Welcome")                 # one window style (C8): the frames' header
         t = dpg.add_text("WLED Effects Studio")
         _bind(t, "h1")
         dpg.add_text("Make LED effects from nodes or from code, watch them run on any shape in 3-D, and send them "
@@ -279,7 +282,7 @@ def render(app, name):
         if dpg.does_item_exist(f"reader_doc_{f}"):
             dpg.configure_item(f"reader_doc_{f}", enabled=(f != name))
     title = next((lab for lab, f in reader.DOCS if f == name), name)
-    dpg.configure_item(TAG, label=f"Help - {title}")
+    _c().set_dialog_title(TAG, title)
     dpg.delete_item("reader_body", children_only=True)
     dpg.delete_item("reader_toc", children_only=True)
     accent, dim = c.ACCENT, c.DIM
@@ -444,7 +447,8 @@ def show_picture(path, caption=""):
     _pic.update(tex=tex, w=w, h=h)
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
     ww, wh = min(w + 40, vw - 60), min(h + 110, vh - 60)
-    dpg.configure_item("reader_pic", label=caption or os.path.basename(path), width=ww, height=wh)
+    _c().set_dialog_title("reader_pic", caption or os.path.basename(path))
+    dpg.configure_item("reader_pic", width=ww, height=wh)
     dpg.set_item_pos("reader_pic", [max(0, (vw - ww) // 2), max(20, (vh - wh) // 2)])
     _pic_zoom(1.0)
     dpg.show_item("reader_pic")

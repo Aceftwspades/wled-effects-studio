@@ -35,6 +35,7 @@ from native.typeface import px
 from native import num
 from native import typeface
 from native import form
+from native import dock
 
 import queue
 import threading
@@ -332,6 +333,7 @@ class App(Features):
         # where the panes sit: columns of rows of slots (see PRESETS), the
         # columns' shares of the width per layout mode, the rows' of a column
         self.arrangement = self._valid_arrangement(self.prefs.get("arrangement")) or [list(c) for c in self.PRESETS[0][1]]
+        self.arrangement = dock.migrate(self, self.arrangement)     # frames an older layout placed among the panes: in the dock
         self.colw = {k: dict(v) for k, v in (self.prefs.get("colw") or {}).items()}
         self.rowh = dict(self.prefs.get("rowh") or {})
         self._rects = {}             # slot -> (x, y, w, h) as last laid out
@@ -1782,41 +1784,25 @@ class App(Features):
         return cols
 
     def docked(self, slot):
-        """Whether a Device frame sits in the pane space."""
-        return any(slot in c for c in self.arrangement)
+        """Whether a Device frame sits in the dock (native/dock.py) - a tab
+        beside the side panel's - rather than floating."""
+        return dock.in_dock(self, slot)
 
     def dock_slot(self, slot):
-        """A floating frame into the pane space: under the main pane."""
-        if slot not in self.OPTIONAL or self.docked(slot):
+        """A frame into the dock, its tab in front."""
+        if slot not in self.OPTIONAL:
             return
-        arr = [list(c) for c in self.arrangement]
-        ci = next(i for i, c in enumerate(arr) if "main" in c)
-        arr[ci].insert(arr[ci].index("main") + 1, slot)
-        self.set_arrangement(arr)
-        try:
-            dpg.set_y_scroll(self.pane_of(slot), 0)
-        except Exception:
-            pass
-        self.gp.status(f"{slot} docked under the main pane; its grip moves it, float takes it out")
+        dock.dock_frame(self, slot)
+        self.gp.status(f"{dock.NAMES.get(slot, slot)} in the dock; float takes it out over the panes")
 
     def undock_slot(self, slot):
-        """A docked frame out of the pane space: a window again, over the panes."""
-        if not self.docked(slot):
+        """A docked frame out into a window of its own, over the panes."""
+        if slot not in self.OPTIONAL:
             return
-        arr = [[s for s in c if s != slot] for c in self.arrangement]
-        arr = [c for c in arr if c]
-        tag = self.pane_of(slot)
-        self.set_arrangement(arr)
-        _, _, w, h = device_ui.FRAMES[slot]
-        dpg.configure_item(tag, no_move=False, no_resize=False, width=w, height=h, show=True)
-        chrome._centre(tag, w, h)
-        device_ui.place_header(tag, w, False)
-        try:
-            dpg.set_y_scroll(tag, 0)        # scrolled while docked short, the title would come back hidden
-        except Exception:
-            pass
+        dock.float_frame(self, slot)
 
     def set_arrangement(self, arr):
+        arr = dock.migrate(self, [list(c) for c in arr])     # a frame dropped among the panes goes into the dock
         cols = self._valid_arrangement(arr)
         if cols is None:
             raise ValueError(f"not an arrangement: {arr!r}")
@@ -1828,11 +1814,12 @@ class App(Features):
     def move_slot(self, slot, target, zone):
         """`slot` dropped on `target`: beside it (left, right), above or below
         it (top, bottom), or in its place (centre - the two swap)."""
+        if slot in self.OPTIONAL:
+            dock.dock_frame(self, slot)              # a frame's grip dropped on the panes: into the dock, its tab in front
+            return
         if slot == target or slot not in self.SLOTS or target not in self.SLOTS or zone is None:
             return
         arr = [list(c) for c in self.arrangement]
-        if zone == "centre" and not self.docked(slot):
-            zone = "bottom"                          # a floating frame cannot take a pane's place
         if zone == "centre":
             arr = [[target if s == slot else slot if s == target else s for s in c] for c in arr]
         else:
@@ -1876,7 +1863,7 @@ class App(Features):
         if not self.ui:
             return False
         if slot in self.OPTIONAL:
-            return self.docked(slot)
+            return False                             # frames are the dock's (or float), never panes
         if slot == "props":
             return self.layout == "graph" and self.props and not room.active(self)     # canvas first: over the canvas
         if slot == "side":
@@ -2205,11 +2192,8 @@ class App(Features):
         dpg.configure_item("side_win", show=self.ui and self.side and not room.folded(self))
         dpg.configure_item("rail_win", show=room.rail(self))
         dpg.configure_item("props_win", show=self.slot_shown("props") or room.active(self))   # over the canvas: its window decides
-        for slot in self.OPTIONAL:
-            tag = self.pane_of(slot)
-            if dpg.does_item_exist(tag) and self.docked(slot):
-                # docked: placed below like the panes, and not movable by hand
-                dpg.configure_item(tag, show=self.ui, no_move=True, no_resize=True)
+        if not (self.ui and self.side and not room.folded(self)) or "side" not in rects:
+            dock.hide(self)                          # the dock's column is away: its strip and frames with it
         # The menu bar is the window's: a hidden mvMenuBar still draws its
         # strip, the window flag takes it away.
         dpg.configure_item("root", menubar=self.ui)
@@ -2252,16 +2236,17 @@ class App(Features):
                 dpg.reset_pos(tag)
             for slot, (x, y, w, h) in rects.items():
                 if slot == "side" and room.rail(self):
-                    room.place_side(self, (x, y, w, h))        # the rail at the edge, the panel beside it
+                    room.place_side(self, (x, y, w, h))        # the rail at the edge, the dock beside it
+                    continue
+                if slot == "side":
+                    dock.place(self, (x, y, w, h))             # the panel, or the frame whose tab is in front
                     continue
                 tag = self.pane_of(slot)
                 dpg.configure_item(tag, width=w, height=h)
                 dpg.set_item_pos(tag, [x, y])
                 # the grip at the pane's top right, clear of the scrollbar
-                if slot in self.OPTIONAL:
-                    device_ui.place_header(tag, w, True)
-                elif dpg.does_item_exist(f"grip_{tag}"):
-                    dpg.set_item_pos(f"grip_{tag}", [w - px(40) - (px(14) if slot == "side" else 0), px(8)])
+                if dpg.does_item_exist(f"grip_{tag}"):
+                    dpg.set_item_pos(f"grip_{tag}", [w - px(40), px(8)])
             app_ed = getattr(self, "code_ed", None)
             if app_ed and show_edit and "main" in rects:
                 x, y, w, h = rects["main"]
@@ -2509,8 +2494,8 @@ class App(Features):
             cols = self._cols
             if kind == "v":
                 if cols[i] == ["side"] or cols[i + 1] == ["side"]:
-                    # the panel keeps a pixel width: the splitter moves that
-                    self._split_drag = (tag, mp[0], ("side", 1 if cols[i] == ["side"] else -1, self.side_w))
+                    # the dock keeps a pixel width - the panel's, or the frame's in front: the splitter moves that
+                    self._split_drag = (tag, mp[0], ("side", 1 if cols[i] == ["side"] else -1, dock.width(self)))
                 else:
                     fr = self._col_fracs(cols)
                     self._split_drag = (tag, mp[0], ("col", i, fr[i], fr[i + 1]))
@@ -2638,9 +2623,9 @@ class App(Features):
                 return
             if v0[0] == "side":
                 _, sign, w0 = v0
-                new = int(max(px(240), min(vw // 2, w0 + sign * (mx - x0))))
-                if abs(new - self.side_w) >= 6:
-                    self.side_w = new; self.request_layout()
+                new = int(max(px(240), min(int(vw * 0.6), w0 + sign * (mx - x0))))
+                if abs(new - dock.width(self)) >= 6:
+                    dock.set_width(self, new); self.request_layout()
             elif v0[0] == "col":
                 _, i, a, b = v0
                 fw = max(1, self._free_w)
@@ -2767,6 +2752,8 @@ class App(Features):
             return
         if app_data == dpg.mvKey_Escape and device_ui.focused_frame(self):
             device_ui.close(self, device_ui.focused_frame(self)); return    # Esc closes the floating frame with the focus
+        if app_data == dpg.mvKey_Escape and chrome.focused_dialog() and chrome.focused_dialog() not in (reader_ui.TAG, "palette_win"):
+            chrome.close_dialog(chrome.focused_dialog()); return          # ... and the dialog with the focus, as a frame
         if reader_ui.key(self, app_data, binding):
             return                                       # the help window has the keyboard: Esc, find, back
         if self.layout == "graph" and app_data == dpg.mvKey_Back and self.gp.reset_hovered():
@@ -3534,6 +3521,7 @@ def build(app):
     chrome.build_dialogs(app)
     chrome.build_pane_menus(app)
     room.build(app)                                  # the graph's room: the rail, the windows over the canvas
+    dock.build(app)                                  # the tab strip over the side panel's column (C8)
     device_ui.refresh_devices(app)                   # the known devices into the frame and the menu
     from native import palette_ui
     palette_ui.sync(app)                             # the project's custom palettes into the engine and the combos
@@ -4384,7 +4372,7 @@ def write_uiref(app, path=None):
             else:
                 buttons(k, out)
         return out
-    roots = [(device_ui.FRAMES[w][1].title() + " frame", device_ui.FRAMES[w][0]) for w in device_ui.FRAMES]
+    roots = [(device_ui.FRAMES[w][1] + " frame", device_ui.FRAMES[w][0]) for w in device_ui.FRAMES]
     roots += [("Keyboard shortcuts", "keys_win"), ("Appearance", "appearance_win"), ("Selection frames", "frames_win"),
               ("History", "history_win"), ("Undo history", "undo_win"), ("About", "about_win"), ("Usermods and features", "usermods_win"),
               ("Update", "update_win"), ("A WLED checkout", "wled_dialog"), ("Report a problem", "report_win"),
@@ -4689,6 +4677,8 @@ def main():
                     app.code_ed.poll()
                 app.poll_glow()
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
+                dock.poll(app)                       # a frame's tab closed by its x
+                chrome.poll_dialogs()                # the dialogs' closes at their top right
                 midi_ui.poll(app)
                 reader_ui.poll(app)
                 room.poll(app)

@@ -25,15 +25,16 @@ from native import typeface
 
 from native import flash, devices, live_out, weight
 
-FRAMES = {"devices": ("devices_win", "DEVICES", 640, 420),
-          "flash": ("flash_win", "FLASH FIRMWARE", 720, 660),
-          "send": ("send_win", "SEND TO DEVICE", 620, 440),
-          "shape": ("shape_win", "SHAPE", 600, 700),          # the shape editor (shape_ui.py), the same kind of frame
-          "sequence": ("sequence_win", "SEQUENCE", 640, 660),  # steps into presets and a playlist, and the schedule (sequence_ui.py)
-          "library": ("library_win", "LIBRARY", 640, 520),     # the graphs as looping thumbnails (library_ui.py)
-          "palettes": ("palettes_win", "PALETTES", 560, 460),  # gradients of the project's own (palette_ui.py)
-          "outputs": ("outputs_win", "LED OUTPUTS", 680, 400),  # the wiring as the device's busses, and the power (outputs_ui.py)
-          "audioin": ("audioin_win", "AUDIO INPUT", 640, 340)}  # the device's microphone or line-in module (audioin_ui.py)
+# a frame's title is in sentence case, as a dialog's is (one window style, C8); the capitals are for its labels
+FRAMES = {"devices": ("devices_win", "Devices", 640, 420),
+          "flash": ("flash_win", "Flash firmware", 720, 660),
+          "send": ("send_win", "Send to device", 620, 440),
+          "shape": ("shape_win", "Shape", 600, 700),          # the shape editor (shape_ui.py), the same kind of frame
+          "sequence": ("sequence_win", "Sequence", 640, 660),  # steps into presets and a playlist, and the schedule (sequence_ui.py)
+          "library": ("library_win", "Library", 640, 520),     # the graphs as looping thumbnails (library_ui.py)
+          "palettes": ("palettes_win", "Palettes", 560, 460),  # gradients of the project's own (palette_ui.py)
+          "outputs": ("outputs_win", "LED outputs", 680, 400),  # the wiring as the device's busses, and the power (outputs_ui.py)
+          "audioin": ("audioin_win", "Audio input", 640, 340)}  # the device's microphone or line-in module (audioin_ui.py)
 HEADER_H = 30
 
 
@@ -56,7 +57,7 @@ def header(app, slot):
                          callback=lambda s, a, u: app.undock_slot(u) if app.docked(u) else app.dock_slot(u))
     with dpg.tooltip(f"dock_{tag}"):
         dpg.add_text("", tag=f"dock_{tag}_tip")
-    _dock_tip(tag, False)
+    _dock_tip(tag)
     dpg.add_image_button(texture("close", px(14)), tag=f"close_{tag}", width=px(14), height=px(14), frame_padding=2, tint_color=c.TEXT,
                          pos=(340, 8), user_data=slot, callback=lambda s, a, u: close(app, u))
     with dpg.tooltip(f"close_{tag}"):
@@ -64,11 +65,19 @@ def header(app, slot):
 
 
 def close(app, which):
-    """The frame away: hidden, and out of the pane space first if docked."""
-    tag = FRAMES[which][0]
-    if app.docked(which):
-        app.undock_slot(which)
-    dpg.hide_item(tag)
+    """The frame away: its tab in the dock, or its window."""
+    from native import dock
+    dock.close_frame(app, which)
+
+
+def chrome_for(app, slot, docked):
+    """A frame's own header - its title, float or dock, its grip, close - is
+    for a floating frame; docked, its tab names it and the tab strip closes
+    and floats it, and the frame's content starts at the top."""
+    tag = FRAMES[slot][0]
+    for t in (f"{tag}_title", f"dock_{tag}", f"grip_{tag}", f"close_{tag}"):
+        if dpg.does_item_exist(t):
+            dpg.configure_item(t, show=not docked)
 
 
 def focused_frame(app):
@@ -79,23 +88,21 @@ def focused_frame(app):
     return None
 
 
-def _dock_tip(tag, docked):
-    dpg.set_value(f"dock_{tag}_tip", "float: out again, over the panes" if docked
-                  else "dock: into the pane space, under the main pane (or drag the grip onto a pane)")
+def _dock_tip(tag):
+    dpg.set_value(f"dock_{tag}_tip", "dock: a tab beside the side panel's (or drag the grip onto the panes)")
 
 
 def place_header(tag, w, docked):
     """The dock button, the grip and the close button at the frame's top
-    right for its width: [dock] [:::] [x]."""
+    right for its width: [dock] [:::] [x]. They show while the frame
+    floats - docked, its tab names it and the dock's strip closes and
+    floats it (chrome_for) - so the button is always the dock."""
     if dpg.does_item_exist(f"close_{tag}"):
         dpg.set_item_pos(f"close_{tag}", [w - px(30), px(8)])
     if dpg.does_item_exist(f"grip_{tag}"):
         dpg.set_item_pos(f"grip_{tag}", [w - px(30 + 36), px(8)])
     if dpg.does_item_exist(f"dock_{tag}"):
-        from native.icons import texture
         dpg.set_item_pos(f"dock_{tag}", [w - px(30 + 36 + 26), px(8)])
-        dpg.configure_item(f"dock_{tag}", texture_tag=texture("float" if docked else "dock", px(14)))
-        _dock_tip(tag, docked)
 
 
 # --- build --------------------------------------------------------------------------------
@@ -264,7 +271,8 @@ def build_flash(app):
 def build_wled_dialog(app):
     from native import wledtree
     c = _c()
-    with dpg.window(tag="wled_dialog", label="A WLED checkout", show=False, width=px(560), height=px(300), no_collapse=True):
+    with dpg.window(tag="wled_dialog", label="A WLED checkout", no_title_bar=True, show=False, width=px(560), height=px(300), no_collapse=True):
+        _c().dialog_header("wled_dialog", "A WLED checkout")                 # one window style (C8): the frames' header
         dpg.add_text(f"The fork's {wledtree.BRANCH} branch - the firmware side the studio flashes - into:", color=c.DIM, wrap=px(540))
         dpg.add_input_text(tag="wled_dest", width=-1, default_value=wledtree.default_dest())
         with dpg.group(horizontal=True):
@@ -383,19 +391,9 @@ def show(app, which):
     elif which == "audioin":
         from native import audioin_ui
         audioin_ui.refresh(app)
-    if not app.docked(which):
-        if not dpg.is_item_shown(tag):
-            _c()._centre(tag, w, h)
-            # frames opened one after another cascade rather than stack - three steps,
-            # then round again - and stay inside the window whatever its size
-            k = list(FRAMES).index(which) % 3
-            x, y = dpg.get_item_pos(tag)
-            vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
-            dpg.set_item_pos(tag, [max(0, min(x + k * 60, vw - w - 4)), max(0, min(y + k * 40, vh - h - 4))])
-        dpg.show_item(tag)
-        dpg.focus_item(tag)
-    else:
-        dpg.focus_item(tag)
+    # in the dock, its tab in front - over the panes only if it was floated (C8)
+    from native import dock
+    dock.open_frame(app, which)
     if which == "send":
         app.probe_active()
 

@@ -30,7 +30,8 @@ def build(app):
     app.midi = midi.MidiIn()
     app._midi_learn = None
     app._midi_opened = False
-    with dpg.window(tag=TAG, label="MIDI controller", show=False, width=px(600), height=px(440), no_collapse=True):
+    with dpg.window(tag=TAG, label="MIDI controller", no_title_bar=True, show=False, width=px(600), height=px(440), no_collapse=True):
+        c.dialog_header(TAG, "MIDI controller")                 # one window style (C8): the frames' header
         dpg.add_text("", tag="midi_note", color=c.DIM, wrap=px(580))
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("PORT", color=c.ACCENT))

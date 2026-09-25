@@ -397,13 +397,15 @@ def build_toolbar(app):
 
 # --- dialogs ------------------------------------------------------------------------
 def build_dialogs(app):
-    with dpg.window(tag="name_dialog", label="Name", modal=True, show=False, no_resize=True, width=px(360), height=px(118), no_collapse=True):
+    with dpg.window(tag="name_dialog", label="Name", no_title_bar=True, modal=True, show=False, no_resize=True, width=px(360), height=px(118), no_collapse=True):
+        dialog_header("name_dialog", "Name")                 # one window style (C8): the frames' header
         dpg.add_text("", tag="name_prompt", color=DIM)
         dpg.add_input_text(tag="name_input", width=-1, on_enter=True, callback=lambda: _name_ok(app))
         with dpg.group(horizontal=True):
             weight.primary(dpg.add_button(label="OK", width=px(80), callback=lambda: _name_ok(app)))
             weight.quiet(dpg.add_button(label="Cancel", width=px(80), callback=lambda: dpg.hide_item("name_dialog")))
-    with dpg.window(tag="usermods_win", label="Usermods and features", show=False, width=px(720), height=px(600), no_collapse=True):
+    with dpg.window(tag="usermods_win", label="Usermods and features", no_title_bar=True, show=False, width=px(720), height=px(600), no_collapse=True):
+        dialog_header("usermods_win", "Usermods and features")                 # one window style (C8): the frames' header
         with dpg.group(horizontal=True):
             dpg.add_text("What the firmware carries for this project; unticked is left out of the build.", color=DIM)
             info("The features are the studio's own optional parts. The usermods are WLED's, from this tree's "
@@ -428,11 +430,13 @@ def build_dialogs(app):
     with dpg.file_dialog(directory_selector=False, show=False, tag="um_zip_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: app.import_usermod(a.get("file_path_name", ""))):
         dpg.add_file_extension(".zip", color=(120, 200, 120))
-    with dpg.window(tag="confirm_dialog", label="Question", modal=True, show=False, no_resize=True, width=px(460), height=px(170), no_collapse=True):
+    with dpg.window(tag="confirm_dialog", label="Question", no_title_bar=True, modal=True, show=False, no_resize=True, width=px(460), height=px(170), no_collapse=True):
+        dialog_header("confirm_dialog", "Question")                 # one window style (C8): the frames' header
         dpg.add_text("", tag="confirm_text", color=TEXT, wrap=px(440))
         with dpg.group(horizontal=True, tag="confirm_buttons"):
             pass
-    with dpg.window(tag="editor_dialog", label="External editor", modal=True, show=False, no_resize=True, width=px(460), height=px(170), no_collapse=True):
+    with dpg.window(tag="editor_dialog", label="External editor", no_title_bar=True, modal=True, show=False, no_resize=True, width=px(460), height=px(170), no_collapse=True):
+        dialog_header("editor_dialog", "External editor")                 # one window style (C8): the frames' header
         dpg.add_text("the command that opens a file at a line; {file} and {line} are filled in. "
                      "Empty uses VS Code if it is on the path.", color=DIM, wrap=px(440))
         typeface.mono(dpg.add_input_text(tag="editor_cmd", hint="code -g {file}:{line}", width=-1))
@@ -453,8 +457,9 @@ def build_dialogs(app):
                          callback=lambda s, a: app.import_ledmap(path=a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(120, 200, 120))
         dpg.add_file_extension(".*")
-    with dpg.window(tag="keys_win", label="Keyboard shortcuts", show=False, width=px(640), height=px(600), no_collapse=True,
+    with dpg.window(tag="keys_win", label="Keyboard shortcuts", no_title_bar=True, show=False, width=px(640), height=px(600), no_collapse=True,
                     on_close=lambda: setattr(app, "_capture", None)):
+        dialog_header("keys_win", "Keyboard shortcuts")                 # one window style (C8): the frames' header
         dpg.add_text("Click a key to change it, then press the new one (Escape keeps the old). "
                      "A key taken from another action leaves that one unbound.", color=DIM, wrap=px(600))
         with dpg.group(horizontal=True):
@@ -463,7 +468,8 @@ def build_dialogs(app):
         with dpg.child_window(tag="keys_rows", height=-1, border=False):
             pass
     from native import version
-    with dpg.window(tag="about_win", label="About", show=False, width=px(600), height=px(270), no_collapse=True):
+    with dpg.window(tag="about_win", label="About", no_title_bar=True, show=False, width=px(600), height=px(270), no_collapse=True):
+        dialog_header("about_win", "About")                 # one window style (C8): the frames' header
         typeface.heading(dpg.add_text(f"WLED Effects Studio {version.__version__}"))
         dpg.add_text("Node graphs and C++ compiled into WLED effects, previewed on a simulated cube, sphere, matrix "
                      "or strip with synthetic or live audio.", color=DIM, wrap=px(570))
@@ -478,7 +484,8 @@ def build_dialogs(app):
         dpg.add_spacer(height=px(6))
         typeface.mono(dpg.add_text("", tag="about_paths", color=DIM))
     # UPDATE: what the check found, and the way to get it in
-    with dpg.window(tag="update_win", label="Update", show=False, width=px(560), height=px(360), no_collapse=True):
+    with dpg.window(tag="update_win", label="Update", no_title_bar=True, show=False, width=px(560), height=px(360), no_collapse=True):
+        dialog_header("update_win", "Update")                 # one window style (C8): the frames' header
         dpg.add_text("", tag="update_head", wrap=px(540))
         with dpg.child_window(tag="update_notes", height=px(180), border=True):
             pass
@@ -492,7 +499,8 @@ def build_dialogs(app):
             dpg.add_checkbox(label="check once a day", tag="update_daily", default_value=bool(app.prefs.get("update_check", True)),
                              callback=lambda s, v: (app.prefs.__setitem__("update_check", bool(v)), save_prefs(app.prefs)))
     # SNAPSHOTS: the whole graph's settings as named states, and a morph between two
-    with dpg.window(tag="snap_win", label="Snapshots", show=False, width=px(420), height=px(360), no_collapse=True):
+    with dpg.window(tag="snap_win", label="Snapshots", no_title_bar=True, show=False, width=px(420), height=px(360), no_collapse=True):
+        dialog_header("snap_win", "Snapshots")                 # one window style (C8): the frames' header
         dpg.add_text("Every node's settings and typed values, as a named state of this graph. Save the look you have; "
                      "click a name to bring it back; morph between two.", color=DIM, wrap=px(400))
         with dpg.group(horizontal=True):
@@ -515,7 +523,8 @@ def build_dialogs(app):
     from native import reader_ui
     reader_ui.build(app)
     # REPORT A PROBLEM: where the bundle landed, and the issues page
-    with dpg.window(tag="report_win", label="Report a problem", show=False, width=px(560), height=px(230), no_collapse=True):
+    with dpg.window(tag="report_win", label="Report a problem", no_title_bar=True, show=False, width=px(560), height=px(230), no_collapse=True):
+        dialog_header("report_win", "Report a problem")                 # one window style (C8): the frames' header
         dpg.add_text("", tag="report_text", wrap=px(540))
         dpg.add_text("It holds the version, the doctor's findings, the machine, the project's settings (device addresses "
                      "blanked), the prefs and the last crash tracebacks - nothing of your effects, graphs or captures. "
@@ -532,7 +541,8 @@ def build_dialogs(app):
         pass
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
-    with dpg.window(tag="appearance_win", label="Appearance", show=False, width=px(560), height=px(470), no_collapse=True):
+    with dpg.window(tag="appearance_win", label="Appearance", no_title_bar=True, show=False, width=px(560), height=px(470), no_collapse=True):
+        dialog_header("appearance_win", "Appearance")                 # one window style (C8): the frames' header
         from native.app import THEME_PRESETS, THEME_ROLES
         dpg.add_text("The look. A preset to start from, then any of its seven colours - the change shows as you make it "
                      "and is kept.", color=DIM, wrap=px(540))
@@ -576,7 +586,8 @@ def build_dialogs(app):
             dpg.add_text("", tag="app_ui_note", color=DIM)
             weight.primary(dpg.add_button(label="Restart now", tag="app_ui_restart", callback=lambda: app.restart_studio()))
             tip("the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first")
-    with dpg.window(tag="sweep_win", label="Sweep a slider", show=False, width=px(400), height=px(190), no_collapse=True):
+    with dpg.window(tag="sweep_win", label="Sweep a slider", no_title_bar=True, show=False, width=px(400), height=px(190), no_collapse=True):
+        dialog_header("sweep_win", "Sweep a slider")                 # one window style (C8): the frames' header
         dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
                      "record makes that one pass the GIF.", color=DIM, wrap=px(380))
         with dpg.group(horizontal=True):
@@ -598,7 +609,8 @@ def build_dialogs(app):
                          callback=lambda s, a: app.set_background(a.get("file_path_name", ""))):
         for ext in (".png", ".jpg", ".jpeg", ".bmp"):
             dpg.add_file_extension(ext, color=(120, 200, 120))
-    with dpg.window(tag="history_win", label="History", show=False, width=px(520), height=px(420), no_collapse=True):
+    with dpg.window(tag="history_win", label="History", no_title_bar=True, show=False, width=px(520), height=px(420), no_collapse=True):
+        dialog_header("history_win", "History")                 # one window style (C8): the frames' header
         dpg.add_text("", tag="history_what", color=DIM, wrap=px(500))
         with dpg.child_window(tag="history_rows", height=-1, border=False):
             pass
@@ -609,7 +621,8 @@ def build_dialogs(app):
                            callback=lambda s, v: _palette_fill(app, v))
         with dpg.child_window(tag="palette_rows", height=-1, border=False):
             pass
-    with dpg.window(tag="undo_win", label="Undo history", show=False, width=px(420), height=px(380), no_collapse=True):
+    with dpg.window(tag="undo_win", label="Undo history", no_title_bar=True, show=False, width=px(420), height=px(380), no_collapse=True):
+        dialog_header("undo_win", "Undo history")                 # one window style (C8): the frames' header
         dpg.add_text("the graph's edits, newest first; click one to go back to before it", color=DIM, wrap=px(400))
         with dpg.child_window(tag="undo_rows", height=-1, border=False):
             pass
@@ -618,7 +631,7 @@ def build_dialogs(app):
 def ask(app, title, prompt, default, cb):
     """A one-line name box; cb(value) on OK or Enter."""
     app._ask_cb = cb
-    dpg.configure_item("name_dialog", label=title)
+    set_dialog_title("name_dialog", title)
     dpg.set_value("name_prompt", prompt)
     dpg.set_value("name_input", default or "")
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
@@ -632,7 +645,7 @@ def confirm(app, title, text, buttons):
     None[, weight]), ...]; the box closes on any of them. An answer with no
     callback is the way out (quiet); the first with one is the primary
     unless it says "danger" - an answer that changes a device."""
-    dpg.configure_item("confirm_dialog", label=title)
+    set_dialog_title("confirm_dialog", title)
     dpg.set_value("confirm_text", text)
     dpg.delete_item("confirm_buttons", children_only=True)
     app._confirm = [b[1] for b in buttons]
@@ -834,7 +847,8 @@ def _strip(stops, mirror, width=None, height=None, parent=None):
 
 def build_frames_dialog(app):
     app._gc = {"name": "", "stops": [list(st) for st in glow.DEFAULT_STOPS], "mirror": False}
-    with dpg.window(tag="frames_win", label="Selection frames", show=False, width=px(560), height=px(620), no_collapse=True):
+    with dpg.window(tag="frames_win", label="Selection frames", no_title_bar=True, show=False, width=px(560), height=px(620), no_collapse=True):
+        dialog_header("frames_win", "Selection frames")                 # one window style (C8): the frames' header
         dpg.add_text("The turning gradient frame around the selected nodes, and the one around the pane "
                      "last clicked in. Pick a WLED palette, the studio's own, or one you made below.", color=DIM, wrap=px(530))
         dpg.add_group(tag="frames_choice")
@@ -1281,6 +1295,9 @@ def refresh_appearance(app):
     """The editor's swatches show the colours in force."""
     num.rebind()                                     # the number fields' fills in the new accent
     weight.rebind()                                  # the primary, danger and quiet buttons in the new colours
+    from native import dock
+    if dpg.does_item_exist("dock_tabs"):
+        dock.theme(app)                              # the dock's tabs in the new colours
     if not dpg.does_item_exist("app_preset"):
         return
     from native.app import theme_colors, THEME_PRESETS
@@ -1291,6 +1308,54 @@ def refresh_appearance(app):
     dpg.set_value("app_preset", f"{name}" + (f", with {', '.join(changed)} changed" if changed else ""))
     for key in cols:
         form.set_colour(f"app_col_{key}", cols[key])
+
+
+# --- one window style (C8): a dialog wears a frame's header --------------------------------------
+DIALOGS = {}              # tag -> what its close does (None: hide it)
+
+
+def dialog_header(tag, title, on_close=None):
+    """A dialog's first row, as a floating frame's: its title in the heading
+    face, and a close at its top right (placed by poll_dialogs as it is
+    resized). Dear PyGui's title bar is off; the window still moves by any
+    empty part of it."""
+    from native.icons import texture
+    typeface.heading(dpg.add_text(title, tag=f"{tag}_head", color=ACCENT))
+    dpg.add_image_button(texture("close", px(14)), tag=f"{tag}_x", width=px(14), height=px(14), frame_padding=2,
+                         tint_color=TEXT, pos=(px(200), px(8)), callback=lambda: close_dialog(tag))
+    tip("close (Esc while it has the focus)")
+    DIALOGS[tag] = on_close
+
+
+def set_dialog_title(tag, title):
+    """A dialog's title as it changes (a question's, a document's)."""
+    if dpg.does_item_exist(f"{tag}_head"):
+        dpg.set_value(f"{tag}_head", title)
+
+
+def close_dialog(tag):
+    cb = DIALOGS.get(tag)
+    if cb:
+        cb()
+    elif dpg.does_item_exist(tag):
+        dpg.hide_item(tag)
+
+
+def focused_dialog():
+    """The dialog that has the keyboard, if any."""
+    for tag in DIALOGS:
+        if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_focused(tag):
+            return tag
+    return None
+
+
+def poll_dialogs():
+    """Each dialog's close at its top right for its width."""
+    for tag in DIALOGS:
+        if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.does_item_exist(f"{tag}_x"):
+            w = dpg.get_item_rect_size(tag)[0] or dpg.get_item_configuration(tag).get("width") or 0
+            if w:
+                dpg.set_item_pos(f"{tag}_x", [w - px(30), px(8)])
 
 
 def tip(text, item=None, wrap=None):
