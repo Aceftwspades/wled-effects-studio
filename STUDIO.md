@@ -1902,7 +1902,7 @@ reaches furthest; (Cn) is the critique's number.
       open. The smoke reads the footer, opens the stats, checks they sit
       above the button and closes them with Esc.
 
-The eighth pass is done: C1-C18 and the plain bugs.
+The eighth pass is done: C1-C18 and the plain bugs, released as 1.2.0.
 
 ### Line-in (September 2026)
 
