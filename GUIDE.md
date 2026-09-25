@@ -931,7 +931,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Shift+F2` | Label the selected node | in the graph |
 | `Ctrl+J` | Put a Frame round the selection | in the graph |
 | `Shift+R` | Repeat the last action | anywhere |
-| `Ctrl+P` | Command palette: every action by name | anywhere |
+| `Ctrl+P` | Command palette: every action and menu command by name | anywhere |
 | `Ctrl+Shift+K` | Snapshots: the graph's settings as named states | anywhere |
 | `—` | MIDI controller: knobs onto the sliders | anywhere |
 | `Ctrl+Alt+Z` | Undo history | anywhere |

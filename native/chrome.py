@@ -772,7 +772,7 @@ def build_dialogs(app):
         dpg.add_text("", tag="history_what", color=DIM, wrap=px(500))
         with dpg.child_window(tag="history_rows", height=-1, border=False):
             pass
-    # the command palette: every action by name, Enter runs the first hit
+    # the command palette: every action and menu command by name, Enter runs the first hit
     with dpg.window(tag="palette_win", show=False, no_title_bar=True, no_resize=True, no_move=True, width=px(460), height=px(380),
                     no_collapse=True):
         dpg.add_input_text(tag="palette_text", hint="type an action (Esc closes)", width=px(440),

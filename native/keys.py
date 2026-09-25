@@ -124,7 +124,7 @@ ACTIONS = [
     ("label_node",    "Label the selected node",                             "Shift+F2", "graph"),
     ("frame_sel",     "Put a Frame round the selection",                     "Ctrl+J", "graph"),
     ("repeat",        "Repeat the last action",                              "Shift+R", "global"),
-    ("palette",       "Command palette: every action by name",               "Ctrl+P", "global"),
+    ("palette",       "Command palette: every action and menu command by name", "Ctrl+P", "global"),
     ("snapshots",     "Snapshots: the graph's settings as named states",     "Ctrl+Shift+K", "global"),
     ("midi",          "MIDI controller: knobs onto the sliders",            "",             "global"),
     ("undo_history",  "Undo history",                                        "Ctrl+Alt+Z", "global"),
