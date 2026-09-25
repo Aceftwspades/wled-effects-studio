@@ -16,6 +16,7 @@ import dearpygui.dearpygui as dpg
 from native.typeface import px
 from native import typeface
 from native import num
+from native import messages
 
 from native import weight
 import numpy as np
@@ -327,6 +328,7 @@ class GraphPanel(Glyphs):
             new_stem = f"{G._ident(name)}_{n}"; n += 1
         self.graph.name = name
         if new_stem != old_stem:
+            messages.clear(self.app, f"problem:{self._key()}:"); messages.clear(self.app, f"graph:{self._key()}")
             os.remove(os.path.join(d, self.file))
             self.file = new_stem + ".json"
         G.save(self.graph, os.path.join(d, self.file))
@@ -354,6 +356,14 @@ class GraphPanel(Glyphs):
         self.compile()
 
     # --- sub-graphs: in and out --------------------------------------------------------
+    def open_top(self, fname):
+        """A graph picked from the pane's list: the sub-graph trail left
+        behind (it led to the graph that was open, not to this one)."""
+        if self.graph is not None:
+            self.save()
+        self.stack.clear()
+        self.open(fname)
+
     def enter_sub(self, nid):
         """Open the sub-graph a node stands for; back returns to here."""
         n = self.graph.nodes.get(nid)
@@ -470,9 +480,50 @@ class GraphPanel(Glyphs):
         self.save()
         self.status(f"folded {len(sel)} nodes into sub-graph '{name}'")
 
-    def status(self, msg):
-        if dpg.does_item_exist("graph_status"):
-            dpg.set_value("graph_status", msg)
+    def status(self, msg, kind="info", node=None, key=None, merge=None):
+        """A message - the studio's, whichever pane it comes from: to the
+        log and the footer's line (messages.py), where a problem with a key
+        stays until it is fixed. `node` is where it is about (self.where)."""
+        messages.post(self.app, msg, kind, node=node, key=key, merge=merge)
+
+    def where(self, nid):
+        """A node as a message points at it: its graph, its id, and whether
+        the graph is a sub-graph (they live in a folder of their own)."""
+        return (self.file, nid, self.cur_dir == self.sub_dir)
+
+    def pin_words(self, nid, name):
+        """A pin or a setting as a message names it: its node and its name in
+        words ("Remap #7 out low"), never its key."""
+        n = self.graph.nodes.get(nid) if self.graph else None
+        return f"{n['type']} #{nid} {nodeface.label(n['type'], name)}" if n else str(name)
+
+    def _key(self):
+        """This graph in a message's key: a sub-graph's name apart from a graph's."""
+        return ("sub/" if self.cur_dir == self.sub_dir else "") + (self.file or "")
+
+    def goto_node(self, fname, nid, sub=False):
+        """A message's node: its graph open in the graph pane, the node
+        selected and framed. A sub-graph opens as if entered from the graph
+        open now, so back returns there."""
+        here = self.graph is not None and fname == self.file and (self.cur_dir == self.sub_dir) == bool(sub)
+        if not here:
+            d = self.sub_dir if sub else self.dir
+            if not os.path.exists(os.path.join(d, fname)):
+                self.status(f"{fname} is not in this project any more"); return
+            if sub:
+                if self.graph is not None:
+                    self.save()
+                    self.stack.append((self.cur_dir, self.file))
+            else:
+                if self.graph is not None:
+                    self.save()
+                self.stack.clear()
+            self.open(fname, sub=bool(sub))
+        self.app.show_pane("graph")
+        if not self.graph or nid not in self.graph.nodes:
+            self.status(f"#{nid} is not in {fname} any more"); return
+        self.set_selection([nid])
+        self._frame_view([nid], most=1.0)
 
     # --- help: what is under the pointer ---------------------------------------------
     # A tooltip inside a node crashes the node editor, so the help is a
@@ -1620,7 +1671,11 @@ class GraphPanel(Glyphs):
         if not self.graph:
             return
         self.problems = self.graph.problems()
-        errs = []
+        # the errors held in the log while they last: judged again on every
+        # change (a rebuild, a hover's dimming), each logged once
+        messages.hold(self.app, f"problem:{self._key()}:",
+                      {f"problem:{self._key()}:{nid}": (f"{self.graph.nodes[nid]['type']} #{nid}: {msg[7:]}", self.where(nid))
+                       for nid, msg in self.problems.items() if msg.startswith("error") and nid in self.graph.nodes})
         for nid, msg in self.problems.items():
             tag = f"gnode_{nid}"
             if not dpg.does_item_exist(tag):
@@ -1630,10 +1685,6 @@ class GraphPanel(Glyphs):
             # a coloured or framed node keeps its colour theme; the outline wins on top of it
             if kind == "error" or not (n.get("color") or n["type"] == "Frame"):
                 dpg.bind_item_theme(tag, self._mark_theme(kind))
-            if kind == "error":
-                errs.append(f"{n['type']} #{nid}: {msg[7:]}")
-        if errs:
-            self.status("; ".join(errs)[:200])
 
     def summary(self, nid):
         """One line on what the node computes now (nodeface.summary), with
@@ -2401,7 +2452,9 @@ class GraphPanel(Glyphs):
             self._show_value(f"gin_{k}_{name}_w", val)
         if poked and not was_dirty:
             self._dirty = 0.0                            # the running effect has the value: nothing to rebuild
-            self.status(f"{name}: {val if not isinstance(val, float) else round(val, 4)} - live")
+            self.status(f"{self.graph.nodes[nid]['type']} #{nid} {nodeface.label(self.graph.nodes[nid]['type'], name)}: "
+                        f"{val if not isinstance(val, float) else round(val, 4)} - live",
+                        node=self.where(nid), merge=f"live:{nid}:{name}")
         self._refresh_summary(nid)
 
     def _show_input(self, b, inp, linked):
@@ -2516,7 +2569,7 @@ class GraphPanel(Glyphs):
         try:
             v = expr.evaluate(text, names)
         except expr.ExprError as e:
-            self.status(f"{name}: {e}"); return None
+            self.status(f"{self.pin_words(nid, name)}: {e}", node=self.where(nid)); return None
         if kind == "param":
             p = next((p for p in d["params"] if p["name"] == name), None)
             if p is None:
@@ -2532,7 +2585,7 @@ class GraphPanel(Glyphs):
             self._set_param_widget(nid, name, v)
             self._refresh_summary(nid)
             self.touch()
-            self.status(f"{name} = {v:g}  ({text})")
+            self.status(f"{self.pin_words(nid, name)} = {v:g}  ({text})", node=self.where(nid))
         else:
             i = next((i for i in d["inputs"] if i["name"] == name), None)
             if i is None:
@@ -2542,7 +2595,7 @@ class GraphPanel(Glyphs):
             if i.get("max") is not None:
                 v = min(float(i["max"]), v)
             self.set_input_live(nid, name, v)
-            self.status(f"{name} = {v:g}  ({text})")
+            self.status(f"{self.pin_words(nid, name)} = {v:g}  ({text})", node=self.where(nid))
         return v
 
     # --- the modulation range on the field --------------------------------------------
@@ -2632,7 +2685,7 @@ class GraphPanel(Glyphs):
             n.setdefault("inputs", {}).pop(name, None)
         self.touch()
         self._sync_pos(); self.rebuild()
-        self.status(f"{name}: back to its default")
+        self.status(f"{self.pin_words(nid, name)}: back to its default", node=self.where(nid))
         return True
 
     def step_hovered(self, direction):
@@ -3440,7 +3493,7 @@ class GraphPanel(Glyphs):
             self._splice_clear()
             self._splice = want
             dpg.bind_item_theme(lid, self._dim_wire())         # the wire that would go fades; the new wiring is drawn
-            self.status(f"drop to splice into {a} . {out} -> {b} . {inp}")
+            self.status(f"drop to splice into {self.pin_words(a, out)} -> {self.pin_words(b, inp)}")
         # the wiring it would become, drawn over everything, following the node
         p_src = self._pin_point(a, "out", out)
         p_in = self._pin_point(nid, "in", my_in) or self._node_edge(nid, "in")
@@ -3484,7 +3537,7 @@ class GraphPanel(Glyphs):
         if pb[0] < pn[0] + sn[0] + 20 and pb[0] + sb[0] > pn[0] and abs(pb[1] - pn[1]) < max(sn[1], sb[1]):
             self.graph.nodes[b]["pos"][0] = pn[0] + sn[0] + 40
         self.rebuild()
-        self.status(f"spliced into the wire ({a} . {out} -> {b} . {inp})")
+        self.status(f"spliced into the wire {self.pin_words(a, out)} -> {self.pin_words(b, inp)}", node=self.where(nid))
 
     def knife_start(self):
         """Ctrl+right-drag: the line drawn cuts every wire it crosses."""
@@ -3876,7 +3929,7 @@ class GraphPanel(Glyphs):
         self.save()                                  # the sub node outside reads it from the file
         self.refresh_lib()
         self.rebuild()
-        self.status(f"{name}: {'a setting of the sub-graph node now' if on else 'kept inside'}")
+        self.status(f"{self.pin_words(nid, name)}: {'a setting of the sub-graph node now' if on else 'kept inside'}")
 
     def _expose(self, nid, name, on):
         """A param becomes an input pin (its value the pin's default), or
@@ -3893,7 +3946,7 @@ class GraphPanel(Glyphs):
         else:
             n.pop("expose", None)
         self.rebuild()
-        self.status(f"{name}: {'a pin now' if on else 'a setting again'}")
+        self.status(f"{self.pin_words(nid, name)}: {'a pin now' if on else 'a setting again'}", node=self.where(nid))
 
     def _node_colour_rows(self, P, nid):
         dpg.add_text("node colour", parent=P, color=DIM)
@@ -4105,12 +4158,13 @@ class GraphPanel(Glyphs):
         r = self.graph.add("Remap", (px - 220, py))
         self.graph.nodes[r]["params"].update({"in_lo": 0.0, "in_hi": 1.0, "out_lo": round(v - amount, 4), "out_hi": round(v + amount, 4)})
         self.graph.nodes[r]["collapsed"] = True
-        self.graph.nodes[r]["label"] = f"{name} \u00b1{amount:.3g}"
+        self.graph.nodes[r]["label"] = f"{nodeface.label(n['type'], name)} \u00b1{amount:.3g}"
         self.graph.nodes[r]["modulator"] = True             # the fed pin draws this Remap's range as its own
         self.graph.link(source, sout, r, "x")
         self.graph.link(r, "result", nid, name)
         self.rebuild()
-        self.status(f"{name} modulated by {self.graph.nodes[source]['type']}: {v - amount:.3g} .. {v + amount:.3g} (the Remap's out_lo / out_hi set the range)")
+        self.status(f"{self.pin_words(nid, name)} modulated by {self.graph.nodes[source]['type']}: {v - amount:.3g} .. {v + amount:.3g} "
+                    f"(the Remap's out low and out high set the range)", node=self.where(nid))
 
     def _find_or_add(self, type_, pos):
         existing = next((m["id"] for m in self.graph.nodes.values() if m["type"] == type_), None)
@@ -4804,9 +4858,15 @@ class GraphPanel(Glyphs):
             self._probes_for = fname
             self._live = {v: k for k, v in (getattr(g or self.graph, "live", {}) or {}).items()}   # (nid, input, comp) -> slot
         except G.GraphError as e:
-            self.status(f"graph: {e}")
             self._mark_problems()
+            if messages.held(f"problem:{self._key()}:"):
+                # the nodes' problems are held already and say where: this is their consequence
+                self.status(f"{self.file} does not compile: {e}", "error")
+            else:
+                self.status(f"{self.file} does not compile: {e}", "error", key=f"graph:{self._key()}")   # held until it does
             return None
+        messages.clear(self.app, f"graph:{self._key()}")
+        self._mark_problems()
         self.app.project.write_effect(fname, src)
         self.status(f"wrote {fname}" + (f" (previewing {self.preview[1]} of #{self.preview[0]})" if self.preview else ""))
         if and_build:
@@ -4862,8 +4922,9 @@ class GraphPanel(Glyphs):
 
 def build_panel(app, panel):
     """The graph pane's widgets. Called once from build()."""
-    # One row: which graph, and the status line. Everything else is on the
-    # menus and the toolbar (chrome.py) or the right-click menu.
+    # One row: which graph (the messages are the footer's, in every layout -
+    # messages.py). Everything else is on the menus and the toolbar
+    # (chrome.py) or the right-click menu.
     from native.chrome import grip
     grip("graph_win")
     with dpg.group(horizontal=True):
@@ -4871,8 +4932,7 @@ def build_panel(app, panel):
         with dpg.group(horizontal=True, tag="graph_crumbs", show=False):     # inside a sub-graph: the trail down to it
             pass
         dpg.add_combo(panel.files(), tag="graph_file", width=px(220), default_value=panel.file or "",
-                      callback=lambda s, v: panel.open(v))
-        dpg.add_text("", tag="graph_status", color=DIM)
+                      callback=lambda s, v: panel.open_top(v))
     with dpg.file_dialog(directory_selector=False, show=False, tag="graph_import_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: panel.import_bundle(a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(120, 200, 120))

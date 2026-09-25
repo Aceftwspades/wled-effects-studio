@@ -45,12 +45,12 @@ STEPS = [
     ([{"py": "dpg.get_value(f'gin_{max(app.gp.graph.nodes)}_pivot_u_w')"}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     # modulation as a gesture: an LFO onto a typed value, then the beat's hit; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.modulate(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Noise'), 'scale', ('lfo', 'value', {}))"}], 1.0),
-    ([{"expect": ["graph_status", "modulated by Wave"]}, {"graph_undo": True}], 0.5),
+    ([{"expect": ["messages", "modulated by Wave"]}, {"graph_undo": True}], 0.5),
     # snapshots: the look saved twice with a typed value changed between, the morph half way (live), the window shown
     ([{"graph_open": "box_fire.json"}, {"snap": ["save", "smoke A"]},
       {"py": "app.gp.graph.nodes[next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Noise')]['inputs'].__setitem__('scale', 9.0)"},
       {"snap": ["save", "smoke B"]}, {"snap": ["morph", "smoke A", "smoke B", 0.5]}, {"chrome": "snapshots"}], 1.5),
-    ([{"expect": ["graph_status", "smoke A"]}, {"py": "dpg.hide_item('snap_win')"}, {"snap": ["del", "smoke A"]}, {"snap": ["del", "smoke B"]}], 0.5),
+    ([{"expect": ["messages", "smoke A"]}, {"py": "dpg.hide_item('snap_win')"}, {"snap": ["del", "smoke A"]}, {"snap": ["del", "smoke B"]}], 0.5),
     # a Bitmap painted in the properties pane: one cell set, the rows follow, undone
     ([{"layout": "graph"}, {"graph_open": "question_block.json"},
       {"py": "setattr(app.gp, '_test_sel', [next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Bitmap')])"}], 0.8),
@@ -59,7 +59,7 @@ STEPS = [
     ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "setattr(app, '_home_before', (dict((k, list(n['pos'])) for k, n in app.gp.graph.nodes.items()), len(app.gp._undo)))"},
       {"key": "Home"}], 1.0),
     ([{"check": "app.gp.zoom < 1.0"}, {"check": "all(list(n['pos']) == app._home_before[0][k] for k, n in app.gp.graph.nodes.items())"},
-      {"check": "len(app.gp._undo) == app._home_before[1]"}, {"expect": ["graph_status", "the whole graph"]}, {"graph_zoom": 1.0}], 0.5),
+      {"check": "len(app.gp._undo) == app._home_before[1]"}, {"expect": ["messages", "the whole graph"]}, {"graph_zoom": 1.0}], 0.5),
     # the face of a node: a collapsed node's body is what it computes, the line follows a typed value, a stand-in
     # carries it too; the zoom scales the nodes themselves (a 50% node is half as tall); category hues on the titles
     ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "app.gp._collapse(11)"}], 1.0),
@@ -78,7 +78,7 @@ STEPS = [
       {"expr": [9, "out_lo", "param", "nope(1)"]}], 0.8),
     ([{"check": "abs(app.gp.graph.nodes[13]['inputs']['b'] - 3.0) < 1e-6"},
       {"check": "abs(app.gp.graph.nodes[9]['params']['out_hi'] - (app.gp.graph.nodes[9]['params']['out_lo'] + 0.3141592653589793)) < 1e-6"},
-      {"expect": ["graph_status", "the functions here"]}, {"py": "app.gp.expr_for(13, 'b', 'input')"}], 0.6),
+      {"expect": ["messages", "the functions here"]}, {"py": "app.gp.expr_for(13, 'b', 'input')"}], 0.6),
     ([{"check": "dpg.is_item_shown('expr_win')"}, {"key": "Escape"}, {"py": "app.gp.modulate(13, 'b', ('lfo', 'value', {}))"},
       {"py": "app.gp.set_selection([13])"}, {"action": "frame_selected"}, {"graph_zoom": 1.0}], 1.0),
     ([{"check": "[r for r in app.gp.mod_ranges() if r[1] == 13 and app.gp.graph.nodes[r[0]].get('modulator')]"},
@@ -106,7 +106,7 @@ STEPS = [
       {"check": "any(dpg.get_item_type(i).endswith('DrawCircle') for i in app.gp._readout_items)"}], 0.5),
     # a wire that closes a loop (the Multiply of the time back into its own b) gets a Delay; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.on_link(None, (app.gp._pins[(11, 'out', 'result')], app.gp._pins[(11, 'in', 'b')]))"}], 1.0),
-    ([{"expect": ["graph_status", "closed a loop"]}, {"py": "[n['type'] for n in app.gp.graph.nodes.values()].count('Delay')"}, {"graph_undo": True}], 0.5),
+    ([{"expect": ["messages", "closed a loop"]}, {"py": "[n['type'] for n in app.gp.graph.nodes.values()].count('Delay')"}, {"graph_undo": True}], 0.5),
     # a Send / Receive pair added, named, and joined by the compiler (the pair is not in the C++)
     ([{"graph_open": "box_fire.json"}, {"py": "(app.gp.add_node('Send'), app.gp.add_node('Receive'))"},
       {"py": "app.gp.graph.link(6, 't', max(app.gp.graph.nodes) - 1, 'in')"},
@@ -114,11 +114,11 @@ STEPS = [
     # MIDI learn without a controller: the window, Speed learnt from an injected CC and driven to 255, a typed pin
     # of the graph learnt and driven to the top of its range, the slider's right-click menu; the mappings cleared
     ([{"graph_open": "box_fire.json"}, {"action": "midi"}, {"midi_learn": {"kind": "fx", "key": "sx"}}, {"midi": [176, 7, 64]}], 1.0),
-    ([{"expect": ["graph_status", "MIDI: CC 7 ch 1 -> "]}, {"expect": ["graph_status", "-> Speed"]}, {"midi": [176, 7, 127]}], 0.6),
+    ([{"expect": ["messages", "MIDI: CC 7 ch 1 -> "]}, {"expect": ["messages", "-> Speed"]}, {"midi": [176, 7, 127]}], 0.6),
     ([{"expect": ["inp_sx", "255"]},
       {"midi_learn": {"kind": "pin", "graph": "box_fire.json", "nid": 12, "name": "scale", "lo": 0.0, "hi": 12.0}}], 0.6),
     ([{"midi": [177, 8, 127]}], 0.6),
-    ([{"expect": ["graph_status", "CC 8 ch 2 -> Noise #12 . scale"]}, {"py": "app.gp.graph.nodes[12]['inputs']['scale']"},
+    ([{"expect": ["messages", "CC 8 ch 2 -> Noise #12 . scale"]}, {"py": "app.gp.graph.nodes[12]['inputs']['scale']"},
       {"py": "(num.set('inp_sx', 0), app.eng.fx.__setitem__('sx', 0))"}, {"midi": [176, 7, 100]}], 0.6),
     ([{"expect": ["inp_sx", "201"]}, {"py": "midi_ui.slider_menu(app, 'sx') or dpg.is_item_shown('midi_ctx')"}], 0.6),
     ([{"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
@@ -179,7 +179,7 @@ STEPS = [
     ([{"check": "not dpg.get_item_configuration(app._tb_btn['delete'])['enabled'] and not dpg.get_item_configuration('mi_delete')['enabled']"},
       {"check": "dpg.get_item_configuration(app._tb_btn['delete'])['tint_color'][3] < 0.5"},
       {"action": "delete"}, {"graph_selected": [12, 13]}], 0.6),
-    ([{"expect": ["graph_status", "select a node first"]},
+    ([{"expect": ["messages", "select a node first"]},
       {"check": "dpg.get_item_configuration(app._tb_btn['delete'])['enabled'] and dpg.get_item_configuration('mi_fold')['enabled']"},
       {"graph_selected": []},
       {"py": "chrome.confirm(app, 'Test', 'a question', [('Send', lambda: None, 'danger'), ('Cancel', None)])"}], 0.5),
@@ -194,15 +194,15 @@ STEPS = [
       {"appearance": {"light": False}}], 1.0),
     # a node's type changed with its wires kept; two nodes merged through an Add
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.change_type(3, 'Subtract') if app.gp.graph.nodes[3]['type'] == 'Multiply' else app.gp.change_type(3, 'Multiply')"}], 1.0),
-    ([{"expect": ["graph_status", "is now"]}, {"graph_selected": [1, 2]}, {"py": "app.gp.merge_selected('Add')"}, {"graph_selected": []}], 1.0),
-    ([{"expect": ["graph_status", "merged through Add"]}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
+    ([{"expect": ["messages", "is now"]}, {"graph_selected": [1, 2]}, {"py": "app.gp.merge_selected('Add')"}, {"graph_selected": []}], 1.0),
+    ([{"expect": ["messages", "merged through Add"]}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     # two nodes folded into a sub-graph, entered, and back by the breadcrumb
     ([{"graph_open": "box_fire.json"}, {"graph_selected": [1, 2]}, {"py": "app.gp.make_sub_from_selection('smoke_sub')"},
       {"py": "app.gp.enter_sub(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'sub:smoke_sub'))"}], 2.0),
-    ([{"expect": ["graph_status", "sub-graph smoke_sub"]}, {"py": "dpg.is_item_shown('graph_crumbs')"}, {"py": "app.gp.back(1)"}], 1.0),
-    ([{"expect": ["graph_status", "box_fire.json"]},
+    ([{"expect": ["messages", "sub-graph smoke_sub"]}, {"py": "dpg.is_item_shown('graph_crumbs')"}, {"py": "app.gp.back(1)"}], 1.0),
+    ([{"expect": ["messages", "box_fire.json"]},
       {"py": "app.gp.unfold_sub(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'sub:smoke_sub'))"}], 1.0),
-    ([{"expect": ["graph_status", "unfolded"]}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
+    ([{"expect": ["messages", "unfolded"]}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     ([{"graph_selected": [1, 2]}, {"action": "align_left"}, {"action": "arrange"}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
     ([{"graph_hover": ["out", 1, "value"]}, {"graph_hover": ["node", 9, ""]}], 0.6),
     ([{"gp_call": ["set_focus_mode", [True]]}, {"gp_call": ["set_focus_mode", [False]]}, {"graph_selected": []}], 0.6),
@@ -224,7 +224,7 @@ STEPS = [
       {"action": "undo"}, {"action": "undo"}, {"action": "undo"}], 1.5),
     ([{"layout": "both"}, {"geometry": {"kind": "matrix", "params": {"w": 32, "h": 16}}}, {"seg": "add"},
       {"seg": {"k": 1, "x0": 8, "y0": 4, "x1": 24, "y1": 12, "opacity": 160, "blend": 10}}, {"seg": "remove"},
-      {"seg": "undo"}, {"py": "app.eng.seg_count()"}, {"expect": ["graph_status", "segments: undo"]}, {"seg": "remove"}], 1.5),
+      {"seg": "undo"}, {"py": "app.eng.seg_count()"}, {"expect": ["messages", "segments: undo"]}, {"seg": "remove"}], 1.5),
     ([{"geometry": {"kind": "cube", "params": {"B": 16}}}, {"compare": "Rainbow"}], 2.0),
     ([{"compare": ""}, {"sweep": ["sx", 3, False, False]}], 3.5),
     ([{"sweep": None}, {"key": "Q"}, {"key": "Q"}, {"key": "E"}, {"key": "E"}, {"key": "W"}, {"key": "W"}], 1.5),
@@ -277,13 +277,13 @@ STEPS = [
       {"seq": ["tap"]}, {"seq": ["snap", 120.0, 4]}, {"camera": "front"}, {"camera": ["save", 1]}, {"camera": "isometric"}], 1.5),
     # undo in the frames: a deleted step comes back, and goes again on redo
     ([{"py": "len(app.project.options['sequence']['steps'])"}, {"seq": ["undo"]}, {"py": "len(app.project.options['sequence']['steps'])"},
-      {"seq": ["redo"]}, {"py": "len(app.project.options['sequence']['steps'])"}, {"expect": ["graph_status", "sequence: redo"]}], 1.0),
+      {"seq": ["redo"]}, {"py": "len(app.project.options['sequence']['steps'])"}, {"expect": ["messages", "sequence: redo"]}], 1.0),
     # custom palettes: one made, a stop added, used by the sim, one from the sim's palette, both removed
     ([{"frame": "palettes"}, {"cpal": ["new"]}, {"cpal": ["stop", 64, 0, 0, 255]}, {"cpal": ["use"]}, {"cpal": ["current"]},
       {"py": "__import__('native.palette_ui', fromlist=['x']).send(app, True)"}], 3.0),
     ([{"expect": ["pal_log", "palette(s) sent"]}, {"py": "__import__('native.palette_ui', fromlist=['x']).remove_there(app)"},
       {"cpal": ["del"]}, {"cpal": ["del"]}, {"cpal": ["undo"]}, {"py": "len(app.project.options.get('palettes') or [])"},
-      {"expect": ["graph_status", "palettes: undo"]}, {"cpal": ["del"]}], 2.0),
+      {"expect": ["messages", "palettes: undo"]}, {"cpal": ["del"]}], 2.0),
     # LED outputs and power: the wiring split three ways, the limiter previewed and off again, the device's read and sent
     ([{"frame": "outputs"}, {"outputs": ["split", "one"]}, {"outputs": ["split", "count"]}, {"outputs": ["limit", 850]},
       {"outputs": ["abl", True]}, {"outputs": ["abl", False]}, {"outputs": ["limit", 0]},
@@ -301,14 +301,23 @@ STEPS = [
     ([{"layout": "graph"}, {"py": "app.gp.new('sad_smoke')"},
       {"py": "app.gp.graph.links.append((next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Speed'), 'value', "
              "next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Output'), 'color'))"}, {"py": "app.gp.compile()"}], 3.0),
-    ([{"expect": ["graph_status", "cannot take a float"]},
+    ([{"expect": ["messages", "cannot take a float"]},
       {"py": "[app.gp._delete_node(i) for i, n in list(app.gp.graph.nodes.items()) if n['type'] == 'Output']"}, {"py": "app.gp.compile()"}], 3.0),
-    ([{"expect": ["graph_status", "exactly one Output"]}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile(False)"},
+    ([{"expect": ["messages", "exactly one Output"]}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile(False)"},
       {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
       {"ed_type": "this is not C++ ;"}, {"ed_key": ["Return", False, False]}, {"py": "app.edit_build()"}], 12.0),
     ([{"expect": ["edit_status", "problem"]}, {"action": "undo"}, {"action": "undo"}, {"layout": "graph"}, {"graph_open": "fan.json"},
       {"device": "127.0.0.1:1"}, {"py": "app.send_script()"}], 8.0),
-    ([{"expect": ["graph_status", "failed"]}, {"device": "127.0.0.1:8770"}], 1.0),
+    ([{"expect": ["messages", "failed"]}, {"device": "127.0.0.1:8770"}], 1.0),
+    # the messages (C10): the graph that did not compile held as a problem, counted in the footer; the log lists it;
+    # go to from another layout opens the graph pane with the interface (it went to a full frame once)
+    ([{"check": "'graph:sad_smoke.json' in messages.HELD and dpg.is_item_shown('msg_problems')"},
+      {"py": "messages.show_log(app)"}, {"check": "dpg.is_item_shown('log_win')"}, {"py": "dpg.hide_item('log_win')"},
+      {"graph_open": "box_fire.json"}, {"py": "setattr(app, '_goto_nid', next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Output'))"},
+      {"graph_open": "fan.json"}, {"layout": "both"},
+      {"py": "messages.goto(app, {'node': ('box_fire.json', app._goto_nid, False)})"}], 1.0),
+    ([{"check": "app.ui and app.layout == 'graph' and app.gp.file == 'box_fire.json' and app.gp.ext_sel == [app._goto_nid]"},
+      {"py": "messages.clear(app, 'graph:sad_smoke.json')"}], 0.5),
     # a problem report bundled, the project zipped (both land in captures/; the test removes them)
     ([{"report": True}, {"py": "app.export_project_zip()"}, {"expect": ["edit_status", "project zipped"]}], 3.0),
     # the library: thumbnails made for the graphs, the frame docked and floated
@@ -388,7 +397,7 @@ def main():
     else:
         import zipfile
         names = zipfile.ZipFile(rep).namelist()
-        for want in ("version.json", "doctor.txt", "machine.json", "project.json", "README.txt"):
+        for want in ("version.json", "doctor.txt", "machine.json", "project.json", "README.txt", "messages.txt"):
             if want not in names:
                 bad.append(f"the report zip lacks {want}")
         os.remove(rep)

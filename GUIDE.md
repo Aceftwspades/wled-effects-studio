@@ -82,7 +82,7 @@ input (Ctrl+Shift+M). Playback > Randomise is Ctrl+Shift+X.
 UI on Windows) at the system's own size: a frame's title larger and
 heavier, the capitals over a group of controls (STEPS, ON THE DEVICE)
 smaller and heavier, a caption beside what it belongs to - a count, a
-size, a key - small. Code, the logs, the status line's figures, the
+size, a key - small. Code, the logs, the footer's figures, the
 values in a node's fields and the numbers drawn on the graph and the
 timeline are in its monospace (Consolas), so their columns line up and a
 changing figure does not shift the words after it; a node's title and
@@ -141,6 +141,26 @@ pane comes back. The side panel's sections fold on their arrow or title
 and move by their own `:::` (drop one on another section to put it above
 or below); right-click a section header to expand, collapse or restore
 them all.
+
+**Messages.** What the studio has to say - a build's result, a graph
+that will not compile, a value set live, MIDI learn, an expression's
+answer, a send to a device - comes up in the **footer**, under the
+figures, in every layout: the latest message, short (its whole on hover,
+and a click opens the log), red for a problem, amber for a warning. A
+note leaves the line after a while and a warning later; an error stays
+until the next message. A **problem stays until it is fixed**: a node
+the graph cannot use (a wire between types that do not convert, a
+Receive with no Send), a graph that does not compile, a build that
+failed - the footer counts them (**2 problems**, in red) and a click
+opens the log at them; they go by themselves once fixed. The **message
+log** (the footer's **log**, or Help > Message log) holds the last fifty,
+newest first under the problems; one about a node or a line of code has
+a **go to** that opens its graph with the node selected and framed, or
+its effect at the line. A value dragged on the running effect is one
+line that changes, not fifty; the same message again is counted (x3).
+**copy all** puts the log on the clipboard, **clear** empties it (the
+problems stay), and a problem report (Help > Report a problem) carries
+it.
 
 ## Making an effect
 
@@ -322,7 +342,7 @@ apart - so a mesh's own units are the pitch when it is imported.
   every model a part, placed by its world position and rotation, sized by
   its scale - custom models, matrices, lines and poly lines exactly,
   circles, spheres, cubes, window frames, arches, trees and stars near
-  enough and named in the status; anything else as a strip of its LEDs),
+  enough and named in the footer's line; anything else as a strip of its LEDs),
   or `.obj`, `.ply` and `.stl` from
   Blender or any CAD program - LEDs **along the edges** at a pitch (a
   strip run round the outline, chained into as few runs as it can), or
@@ -551,7 +571,7 @@ on and install what it carries.
   calls every menu item and context-menu row.
 - A frame that throws is written once to `%TEMP%\cubefx\crash.txt` (this
   run's; the last run's is `crash.prev.txt`) and to the console, and the
-  status line says so; the sim pauses.
+  footer's line says so (the message log keeps it); the sim pauses.
 - Settings > Appearance: dark, light, soft light or slate, and every one
   of the theme's seven colours editable.
 - Settings > "Draw the 3-D view on the GPU" / "Scale the logical view on
@@ -740,6 +760,7 @@ on and install what it carries.
 - **Help** › Welcome...
 - **Help** › Check for updates...
 - **Help** › Report a problem... — bundles what a bug report needs - the version, the doctor's findings, the machine, the project's settings, the last crash - into one zip in captures/, and offers the issues page; nothing of your effects or graphs goes in
+- **Help** › Message log...
 - **Help** › About
 
 ### Keys
@@ -896,6 +917,8 @@ Every button, with what its tooltip says.
 
 **Report a problem**: `close` — close (Esc while it has the focus); `Open the issues page` — a new issue on the studio's GitHub page, in the browser - attach the zip there; `Show the zip` — the captures folder, where the report landed; `Close`
 
-**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play a WAV file...`; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or a WAV file - goes to it; `Panel` — Panel - brings it to the front; `Devices - brings it to the front`; `x` — close Devices (the menus open it again); `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
+**Message log**: `close` — close (Esc while it has the focus); `copy all` — the log as text, to paste into an issue or a note; `clear` — empties the recent messages; the problems stay until they are fixed
+
+**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play a WAV file...`; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or a WAV file - goes to it; `Panel` — Panel - brings it to the front; `Devices - brings it to the front`; `x` — close Devices (the menus open it again); `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
 
 <!-- uiref end -->

@@ -305,6 +305,7 @@ def build_menus(app):
             dpg.add_menu_item(label="Report a problem...", callback=lambda: report_problem(app))
             tip("bundles what a bug report needs - the version, the doctor's findings, the machine, the project's settings, "
                 "the last crash - into one zip in captures/, and offers the issues page; nothing of your effects or graphs goes in")
+            dpg.add_menu_item(label="Message log...", callback=lambda: __import__("native.messages", fromlist=["x"]).show_log(app))
             dpg.add_menu_item(label="About", callback=lambda: show_about(app))
 
 
@@ -1296,6 +1297,8 @@ def refresh_appearance(app):
     """The editor's swatches show the colours in force."""
     num.rebind()                                     # the number fields' fills in the new accent
     weight.rebind()                                  # the primary, danger and quiet buttons in the new colours
+    from native import messages
+    messages.rebind(app)                             # the footer's message line in the new colours
     from native import dock
     if dpg.does_item_exist("dock_tabs"):
         dock.theme(app)                              # the dock's tabs in the new colours

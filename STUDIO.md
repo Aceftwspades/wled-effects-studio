@@ -1693,8 +1693,52 @@ reaches furthest; (Cn) is the critique's number.
       its word. The footer's measures in words: brightness, contrast, unlit,
       saturation (was mean, sigma, dark, sat; engine.stats keeps the
       harness's maths). The panel's "pal source" is "colours from".
-- [ ] **Messages that stay** (C10): short lines, errors held until fixed
-      and linked to their node, a log of the last fifty.
+- [x] **Messages that stay** (C10): native/messages.py. A message went
+      to one line beside the graph's file name - the whole sentence, cut
+      by the pane, replaced by the next, with no history - and in the
+      other layouts nothing showed it. Every message (some 270 calls post
+      one) goes to the footer now, under its figures, in every layout;
+      the graph pane's own line went. The latest shows short (its first
+      clause, cut at a word), its whole on hover, red for a problem and
+      amber for a warning (a note that reads like a failure - could not,
+      failed, dropped - is one), and a click opens the log; a note leaves
+      the line after 12 s, a warning after 30, an error stays until the
+      next. A problem stays until it is fixed: a node the graph cannot use
+      (judged again on every change - a rebuild, a hover's dimming - and
+      logged once while it lasts, gone when fixed), a graph that does not
+      compile (held unless its nodes' problems already say why), a build
+      that failed (linked to its first error's line); the footer counts
+      them in red and a click opens the log at them; a project switched
+      drops the last one's, a graph renamed takes its own along. The log
+      (Help > Message log, or the footer's log) holds the last fifty under
+      the problems, newest first, with the time; one about a node or a
+      line has go to - its graph opened (a sub-graph as if entered from
+      the graph open, so back returns), the node selected and framed, or
+      its effect at the line; one from another project says so. copy all,
+      clear (the problems stay); a problem report carries the log. A
+      value dragged on the running effect is one line that changes
+      ("Noise #12 scale: 0.61 - live"), the same message again is counted
+      (x3), and a frame that throws is posted as an error. The messages
+      name a pin by its node and its words ("Remap #7 out low"): C9's
+      leftovers in the expression box's answers and errors, back to the
+      default, a splice, a setting promoted or exposed, and modulate with
+      (its Remap's label too). The footer's line of layout keys went (Help
+      and Settings > Keyboard shortcuts carry them). Found on the way: go
+      to called the Q/E/W switch, which is the presentation mode - the
+      graph pane came up with no interface; app.show_pane brings a pane up
+      with it. Dear PyGui keeps a tooltip as the next item of a row, and a
+      row whose first item drawn is a tooltip goes on the line above: the
+      log button sat at the end of the stats line and the footer measured
+      a row short, so the panes hid the row - the problems button hides
+      with its tooltip now; a text after a small button sits its padding
+      lower, so the line is a button with no slab. Picking a graph from
+      the pane's list inside a sub-graph kept the trail down to the old
+      one; it is left behind now. tests/test_messages.py (a problem logged
+      once while it lasts, a readout merged and a repeat counted, the
+      kinds, the short line and the text of the log, clear, the row on a
+      real frame, a note leaving the line); the smoke's expectations read
+      the messages posted since the last batch, and it goes to a node from
+      another layout.
 - [ ] **Finding the way round the graph** (C11): Home fits the graph by
       the view alone; a node's wires lit on hover and selection, the rest
       dimmed; the minimap out of the way. (Home: done, and now right - the

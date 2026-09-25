@@ -102,9 +102,11 @@ def bundle(app=None, log_lines=()):
             z.write(latest, "build_latest.txt")
         if log_lines:
             z.writestr("log.txt", "\n".join(log_lines))
+        from native import messages
+        z.writestr("messages.txt", messages.dump() or "(none)")        # the studio's message log, the problems first
         z.writestr("README.txt", f"A problem report from WLED Effects Studio {version.__version__}.\n"
                                  f"Attach this zip to an issue at https://github.com/{version.REPO}/issues and say what you did, "
                                  "what you expected and what happened.\nIt holds: what this build is, the doctor's findings, "
                                  "the machine, the project's settings (device addresses blanked), the prefs, the last crash "
-                                 "tracebacks - nothing of your effects, graphs or captures.\n")
+                                 "tracebacks, the studio's last fifty messages - nothing of your effects, graphs or captures.\n")
     return path

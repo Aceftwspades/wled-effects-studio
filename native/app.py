@@ -36,6 +36,7 @@ from native import num
 from native import typeface
 from native import form
 from native import dock
+from native import messages
 
 import queue
 import threading
@@ -994,6 +995,7 @@ class App(Features):
         if self.gp.graph:
             self.gp.save()
         self.project = Project(path)
+        messages.clear(self, "")                         # the last project's problems are not this one's
         if create:
             from native import flash
             self.project.options["features"] = dict(flash.NEW_DEFAULTS)     # no hardware assumed until ticked
@@ -1167,6 +1169,15 @@ class App(Features):
         dpg.set_value("edit_status", f"{self.edit_file} reloaded from disk")
         if dpg.does_item_exist("edit_watch") and dpg.get_value("edit_watch") and not self.building:
             self.edit_build()
+
+    def goto_code(self, fname, line):
+        """A message's line of code: the file open in the code pane, at the line."""
+        if fname and fname not in self.project.effect_files():
+            self.gp.status(f"{fname} is not one of this project's effects"); return
+        if fname and fname != self.edit_file:
+            self.edit_open(fname)
+        self.show_pane("edit")
+        self.goto_line(line)
 
     def goto_line(self, line):
         """An error or find row was clicked: the editor goes to that line;
@@ -1426,6 +1437,7 @@ class App(Features):
         self.building = False
         if kind == "exception":
             dpg.set_value("edit_status", f"build failed: {payload}")
+            messages.post(self, f"build failed: {payload}", "error", key="build:")
             return
         rep = payload
         if not rep.ok:
@@ -1436,6 +1448,9 @@ class App(Features):
                     if e[2].startswith("error") or os.path.basename(e[0]) in mine]
             errs.sort(key=lambda e: 0 if e[2].startswith("error") else 1)
             dpg.set_value("edit_status", f"{len(errs)} problem(s)")
+            first = errs[0] if errs else None
+            messages.post(self, f"{self.edit_file}: {len(errs)} problem(s) in the build" + (f" - {os.path.basename(first[0])}:{first[1]} {first[2]}" if first else ""),
+                          "error", key="build:", code=(os.path.basename(first[0]), int(first[1])) if first else None)
             if self.code_ed is not None:
                 self.code_ed.err_lines = {int(line) - 1 for path, line, msg in errs
                                           if os.path.basename(path) == self.edit_file and msg.startswith("error")}
@@ -1465,6 +1480,8 @@ class App(Features):
         self.rebuild_params()
         self.sync_palette_combo()
         dpg.set_value("edit_status", f"loaded {os.path.basename(rep.library)}  ({self.eng.count} effects)")
+        messages.clear(self, "build:")                       # it builds: the build's problem is gone
+        messages.post(self, f"built: {self.eng.count} effects")
 
     def on_color(self, i, rgb):
         """A segment colour from its swatch or its hex (0..255 each)."""
@@ -2210,7 +2227,7 @@ class App(Features):
             dpg.configure_item(tag, border=self.ui)
         # The captions, the grips, the readout and the key hints are UI too -
         # a clean picture means nothing left over the top of it.
-        for tag in ("net_cap", "cube_cap", "stat_txt", "hint1", "grip_net_win", "grip_cube_win"):
+        for tag in ("net_cap", "cube_cap", "stat_txt", "msg_row", "grip_net_win", "grip_cube_win"):
             if dpg.does_item_exist(tag):
                 dpg.configure_item(tag, show=self.ui)
         chrome.refresh(self)
@@ -3113,6 +3130,14 @@ class App(Features):
         self.ui = True
         self.request_layout()
 
+    def show_pane(self, which):
+        """A pane brought up to show something in it - a message's node or
+        line: up, with the interface, whatever was up before; never toggled
+        away (C and G) or turned into a full frame (Q, E, W)."""
+        if self.layout != which or not self.ui:
+            self.layout, self.ui = which, True
+            self.request_layout()
+
     def toggle_side(self):
         self.side = not self.side
         self.request_layout()
@@ -3518,9 +3543,9 @@ def build(app):
                 app.sec_apply_order()
         with dpg.group(tag="footer"):
           typeface.mono(dpg.add_text("", tag="stat_txt"))
-          dpg.add_text("Q net    E 3-D    W both    C code    G graph    H presentation    space play/pause    "
-                       "Help > Keyboard shortcuts has the rest", tag="hint1", color=(130, 140, 155))
+          messages.build(app, "footer")               # the latest message, the problems that stay, the log (C10)
     chrome.build_dialogs(app)
+    messages.build_log(app)                          # the log's window: Help > Messages, the footer's log (C10)
     chrome.build_pane_menus(app)
     room.build(app)                                  # the graph's room: the rail, the windows over the canvas
     dock.build(app)                                  # the tab strip over the side panel's column (C8)
@@ -3619,6 +3644,9 @@ def service_command(app):
             return                                    # still being written: next frame
         cmds = json.loads(text)
         os.remove(CMD_FILE)
+        # the messages a test may expect: those posted since the last batch began
+        # (what it did, the wait after it, and this batch so far)
+        app._msg_since, app._msg_batch = getattr(app, "_msg_batch", 0), messages.seq()
     except Exception as e:
         print(f"command file: {e}")
         try:
@@ -3682,13 +3710,16 @@ def service_command(app):
                 (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
             if "check" in c:                            # test hook: an expression that must be true (graded as expect is)
                 try:
-                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface})
+                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages})
                 except Exception as e:
                     v = f"raised {e!r}"
                 print(("check ok     " if v is True or (v and not isinstance(v, str)) else "EXPECT FAILED check ") + f"{c['check'][:90]}: {v!r}"[:200])
             if "expect" in c:                           # test hook: [tag, substring] - the value of a text/status item must contain it
-                tag, sub = c["expect"]
-                val = str(dpg.get_value(tag)) if dpg.does_item_exist(tag) else "(no such item)"
+                tag, sub = c["expect"]                  # "messages": one posted since the last batch began must
+                if tag == "messages":
+                    val = " | ".join(e["text"] for e in messages.LOG if e.get("seq", 0) > app._msg_since) or "(no message)"
+                else:
+                    val = str(dpg.get_value(tag)) if dpg.does_item_exist(tag) else "(no such item)"
                 print(("expect ok   " if sub in val else "EXPECT FAILED ") + f"{tag} has {sub!r}: {val[:120]!r}")
             if "report" in c:                           # test hook: Help > Report a problem, the zip's path printed
                 chrome.report_problem(app); print("report", getattr(app, "_report_path", ""))
@@ -3752,7 +3783,7 @@ def service_command(app):
                 app.wiring_stop() if c["wiring_test"] == "off" else app.wiring_start(c["wiring_test"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
-                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface})))
+                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages})))
                 except Exception:
                     import traceback; traceback.print_exc()
             if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]
@@ -4304,6 +4335,9 @@ def walk_menus(app, skip=()):
 
 UIREF_START = "<!-- uiref start"
 UIREF_END = "<!-- uiref end -->"
+# buttons whose label is what they show now: named in the reference for what they are
+UIREF_NAMED = {"msg_problems": ("N problems", "the problems that stay until they are fixed - a click opens the log at them"),
+               "msg_line": ("the latest message", "short, the whole of it on hover; a click opens the log")}
 
 
 def _tip_after(kids, j):
@@ -4363,7 +4397,9 @@ def write_uiref(app, path=None):
             if t.endswith(("::mvButton", "::mvImageButton")):
                 lbl = (dpg.get_item_configuration(k).get("label", "") or "").replace("\n", " ").strip()
                 tip = _tip_after(kids, j)
-                if not lbl and tip:                           # an icon button: named by its tooltip's first clause
+                if (dpg.get_item_alias(k) or "") in UIREF_NAMED:
+                    lbl, tip = UIREF_NAMED[dpg.get_item_alias(k)]
+                elif not lbl and tip:                           # an icon button: named by its tooltip's first clause
                     lbl = re.split(r"[:(]|  ", tip)[0].strip()[:40]
                 elif not lbl:
                     lbl = dpg.get_item_alias(k) or ""
@@ -4378,7 +4414,7 @@ def write_uiref(app, path=None):
     roots += [("Keyboard shortcuts", "keys_win"), ("Appearance", "appearance_win"), ("Selection frames", "frames_win"),
               ("History", "history_win"), ("Undo history", "undo_win"), ("About", "about_win"), ("Usermods and features", "usermods_win"),
               ("Update", "update_win"), ("A WLED checkout", "wled_dialog"), ("Report a problem", "report_win"),
-              ("The panes and the toolbar", "root")]
+              ("Message log", "log_win"), ("The panes and the toolbar", "root")]
     seen = set()
     for title, tag in roots:
         if not dpg.does_item_exist(tag):
@@ -4437,8 +4473,9 @@ def process_stats(app):
 
 
 # buttons a walk leaves alone: a flash or a firmware build, a render or a preview that takes minutes,
-# a clone or a download from the network, a restart, a program opened on the desktop, a key capture
-SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn")
+# a clone or a download from the network, a restart, a program opened on the desktop, a key capture,
+# the clipboard (the log's copy: what the user had copied stays)
+SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy")
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
@@ -4681,6 +4718,7 @@ def main():
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 dock.poll(app)                       # a frame's tab closed by its x
                 chrome.poll_dialogs()                # the dialogs' closes at their top right
+                messages.poll(app)                   # a note's time on the footer's line; the open log follows
                 midi_ui.poll(app)
                 reader_ui.poll(app)
                 room.poll(app)
@@ -4708,7 +4746,7 @@ def main():
                             fh.write(tb + "\n")
                     except Exception:
                         pass
-                    app.gp.status(f"a frame failed: {tb.strip().splitlines()[-1][:90]} - see crash.txt")
+                    app.gp.status(f"a frame failed: {tb.strip().splitlines()[-1][:90]} - see crash.txt", "error")
                 app.playing = False
             _r0 = time.perf_counter()
             dpg.render_dearpygui_frame()
