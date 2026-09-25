@@ -1799,11 +1799,48 @@ reaches furthest; (Cn) is the critique's number.
       sight. test_face holds the rows, the pairs and the lines; the smoke
       the title, one row for Remap's in, and an edit of the label in the
       properties.
-- [ ] **Polish** (C13-C18): single-letter keys kept to the canvas and a
-      way out of presentation mode shown; a Window menu and a Build menu,
-      no duplicates, node menus with keys; the toolbar following the
-      layout; unlit LEDs as dim dots and the net fitted; a still selection
-      outline by default; a footer of power and fps.
+- [x] **Keys kept to the canvas, a way out shown** (C13): Q, E, W, C, G,
+      H acted anywhere outside a text box, so a stray H from the panel hid
+      every control. A key on its own - a letter, a digit, a sign - acts
+      with the pointer over the views (the 3-D view in its corner of the
+      graph too) or the graph, or anywhere while presenting; from the
+      panel, a frame, a dialog or the code it changes nothing and the
+      footer says where it works (one line that changes, however many are
+      pressed). Keys with Ctrl or Alt, Space, the F keys and Esc are as
+      they were. Entering presentation puts a pill at the bottom of the
+      picture for a few seconds, fading, with the keys as bound: "H or Esc:
+      the controls back", or after Q / E / W "E again or Esc: back to the
+      panels · H: the controls over the picture"; Esc leaves it (after a
+      dialog or a frame with the focus has had it). The Keyboard shortcuts
+      dialog and the guide say so. The smoke presses Q with the pointer on
+      the panel, and enters and leaves presentation.
+- [x] **Menus: a Window menu, a Build menu, no duplicates** (C14): the
+      frames were spread over five menus, the builds in Playback, the
+      project folder in Settings, Export usermod and Sequence twice each.
+      Now File, Edit, View, Node, **Build** (Compile + reload, Live, Watch,
+      Run as a script, Flash firmware, the build folder), Playback, Device
+      (what is done to a device), **Window** (every frame - Devices, Send,
+      Shape editor, Sequence, Library, Palettes, LED outputs, Audio input -
+      checked while open, a click opening or closing it, with its key; then
+      Snapshots, MIDI controller, the Message log, and Close every frame),
+      Settings (Keyboard shortcuts with its Shift+F1) and Help; each command
+      in one place (the shape's and the library's preview generators are
+      their frames' buttons; the project folder is File > Project's).
+      Edit's Delete, Delete and reconnect and Disconnect at the top. The
+      **command palette** finds every menu command by its path as well as
+      the actions - the graphs to open, the recent projects, the devices -
+      and runs one as a click would (a check item turned over). A node's
+      menu opens on what can be done - its title, a problem if it has one,
+      then its actions with their keys and Delete at the top level - its
+      documentation on the title's hover and its reference last; the add
+      menu is its search and its nodes (undo, redo, paste and arrange have
+      their keys and menus). Found on the way: the tutorial sent a script
+      from "File > Project" (it was Device's). The smoke opens and closes a
+      frame from Window, runs a menu command from the palette and reads the
+      node menu's order and the add menu's first row.
+- [ ] **Polish** (C15-C18): the toolbar following the layout; unlit LEDs
+      as dim dots and the net fitted; a still selection outline by
+      default; a footer of power and fps.
 
 ### Line-in (September 2026)
 

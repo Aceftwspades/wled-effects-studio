@@ -251,6 +251,31 @@ STEPS = [
     ([{"geometry": {"kind": "cube", "params": {"B": 16}}}, {"compare": "Rainbow"}], 2.0),
     ([{"compare": ""}, {"sweep": ["sx", 3, False, False]}], 3.5),
     ([{"sweep": None}, {"key": "Q"}, {"key": "Q"}, {"key": "E"}, {"key": "E"}, {"key": "W"}, {"key": "W"}], 1.5),
+    # a plain key from the panel changes nothing and says where it works (C13); presentation shows how to leave
+    # it, and Esc does
+    ([{"py": "setattr(app, '_lay_before', (app.layout, app.ui))"}, {"key": "Q", "over": "panel"},
+      {"check": "(app.layout, app.ui) == app._lay_before"}, {"expect": ["messages", "works with the pointer over"]},
+      {"action": "presentation"}], 0.6),
+    ([{"check": "not app.ui and app._present_hint is not None and dpg.does_item_exist('present_hint')"},
+      {"check": "len(dpg.get_item_children('present_hint', 2) or []) >= 2"}, {"key": "Escape"}], 0.5),
+    ([{"check": "app.ui and app._present_hint is None"}], 0.3),
+    # the menus (C14): Window opens a frame and closes it, its check following; the palette runs a menu command
+    # that is no action; a node's menu leads with what can be done and ends with its reference; the add menu
+    # starts at its search
+    ([{"py": "chrome.toggle_window(app, 'library')"}], 1.0),
+    ([{"check": "chrome.window_open(app, 'library') and dpg.get_value('menu_win_library')"},
+      {"py": "chrome.toggle_window(app, 'library')"}], 0.8),
+    ([{"check": "not chrome.window_open(app, 'library') and not dpg.get_value('menu_win_library')"},
+      {"check": "any(p.endswith('Message log...') for p, _ in chrome.menu_commands(app))"},
+      {"check": "not any('mi_' in (dpg.get_item_alias(k) or '') for _, k in chrome.menu_commands(app))"},
+      {"palette_run": "message log"}], 0.6),
+    ([{"check": "dpg.is_item_shown('log_win')"}, {"py": "dpg.hide_item('log_win')"}, {"layout": "graph"},
+      {"graph_open": "box_fire.json"}, {"py": "setattr(app.gp, '_ctx', ('node', 12, None))"}, {"py": "app.gp._fill_ctx_menu()"}], 0.8),
+    ([{"check": "(lambda ks: [dpg.get_item_type(k).split('::')[-1] for k in ks].index('mvMenuItem') <= 4)(dpg.get_item_children('graph_ctx', 1))"},
+      {"check": "'node reference' in dpg.get_item_configuration([k for k in dpg.get_item_children('graph_ctx', 1) "
+                "if dpg.get_item_type(k).endswith('mvMenuItem')][-1])['label']"},
+      {"check": "dpg.get_item_alias(dpg.get_item_children('graph_menu', 1)[0]) == 'graph_search'"},
+      {"py": "dpg.configure_item('graph_ctx', show=False)"}], 0.5),
     ([{"chrome": "shortcuts"}, {"chrome": "frames"}, {"chrome": "flash"}, {"feature": ["imu", False]}, {"feature": ["audio", "none"]},
       {"feature": ["imu", True]}, {"feature": ["audio", "pcm"]}, {"chrome": "usermods"}, {"usermod": ["add", "Temperature"]},
       {"usermod": ["off", "Temperature"]}, {"usermod": ["remove", "Temperature"]}, {"chrome": "about"}], 1.0),

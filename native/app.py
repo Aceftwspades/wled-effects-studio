@@ -1661,7 +1661,48 @@ class App(Features):
 
     def toggle_ui(self):
         self.ui = not self.ui
+        if not self.ui:
+            self.hint_presentation(f"{self.keys.label('presentation') or 'H'} or Esc: the controls back")
         self.request_layout()
+
+    def leave_presentation(self):
+        """Esc while presenting: the controls back - and from a full-frame
+        view (Q, E, W) the panels, as its own key again does."""
+        if self.layout in ("net", "cube"):
+            self.layout = "both"
+        self.ui = True
+        self._present_hint = None
+        self.request_layout()
+
+    HINT_S = 3.5          # the presentation hint's seconds on the picture, the last one fading
+
+    def hint_presentation(self, text):
+        self._present_hint = (text, time.time())
+
+    def poll_present_hint(self):
+        """Presentation entered: how to leave it, a pill at the bottom of the
+        picture for a few seconds, fading (the critique's C13 - nothing on
+        the screen said how to come back)."""
+        h = getattr(self, "_present_hint", None)
+        alive = h is not None and not self.ui and time.time() - h[1] < self.HINT_S
+        if not dpg.does_item_exist("present_hint"):
+            if not alive:
+                return
+            dpg.add_viewport_drawlist(front=True, tag="present_hint")
+        dpg.delete_item("present_hint", children_only=True)
+        if not alive:
+            self._present_hint = None
+            return
+        text, t0 = h
+        age = time.time() - t0
+        k = 1.0 if age < self.HINT_S - 1.0 else max(0.0, self.HINT_S - age)
+        size = typeface.size_of("body")
+        w, hh = typeface.measure(text, "body", size) + px(32), size + px(18)
+        vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+        x0, y0 = (vw - w) / 2, vh - hh - px(32)
+        dpg.draw_rectangle((x0, y0), (x0 + w, y0 + hh), fill=(18, 20, 26, int(220 * k)), color=(255, 255, 255, int(70 * k)),
+                           rounding=hh / 2, parent="present_hint")
+        typeface.draw_text((x0 + px(16), y0 + px(9)), text, size, color=(236, 239, 245, int(255 * k)), parent="present_hint")
 
     def toggle_play(self):
         self.playing = not self.playing
@@ -1780,7 +1821,7 @@ class App(Features):
     # settings too long for the node. It shows in the graph layout only,
     # and it is a pane of its own so selecting a node never moves the
     # editor - the panel it used to grow above the editor did.
-    # Then the Device menu's frames - "devices", "flash", "send" - which
+    # Then the device frames - "devices", "flash", "send" - which
     # are windows of their own floating over the panes until docked: in
     # the arrangement they are placed like any pane (dock_slot puts one
     # under the main pane; the grip dragged onto a pane, beside it) and
@@ -2788,6 +2829,8 @@ class App(Features):
             device_ui.close(self, device_ui.focused_frame(self)); return    # Esc closes the floating frame with the focus
         if app_data == dpg.mvKey_Escape and chrome.focused_dialog() and chrome.focused_dialog() not in (reader_ui.TAG, "palette_win"):
             chrome.close_dialog(chrome.focused_dialog()); return          # ... and the dialog with the focus, as a frame
+        if app_data == dpg.mvKey_Escape and not self.ui:
+            self.leave_presentation(); return                             # the way out the hint names
         if reader_ui.key(self, app_data, binding):
             return                                       # the help window has the keyboard: Esc, find, back
         if self.layout == "graph" and app_data == dpg.mvKey_Back and self.gp.reset_hovered():
@@ -2804,8 +2847,26 @@ class App(Features):
             if app_data in arrows and not alt:
                 self.gp.nudge(*arrows[app_data]); return
         action = self.keys.lookup(binding, "graph" if self.layout == "graph" else "global") if binding else None
+        if action and len(binding) == 1 and not self.over_canvas():
+            # A plain key - a letter, a digit, a sign - acts where the work is: over the views, over the graph,
+            # or anywhere while presenting. From the panel, a frame or the code pane a stray one did whatever
+            # it was bound to (H hid every control), so it says so instead (the critique's C13).
+            messages.post(self, f"{binding} works with the pointer over the views or the graph", merge="stray-key")
+            return
         if action:
             self.run_action(action)
+
+    def over_canvas(self):
+        """The pointer over what a plain key is for: the logical view, the
+        3-D view (in its corner of the graph too) or the graph - not a
+        window over them - or anywhere while presenting. (The test hooks
+        hold it true for a moment: they have no pointer.)"""
+        if not self.ui or time.time() < getattr(self, "_canvas_hold", 0.0):
+            return True
+        for tag in ("node_editor", "net_win", "cube_win"):
+            if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_hovered(tag):
+                return True
+        return False
 
     def run_action(self, action):
         """Every keyboard action by name; the menus and toolbar call the same."""
@@ -3209,6 +3270,9 @@ class App(Features):
         else:
             self.layout = which
             self.ui = False
+            key = self.keys.label({"net": "view_net", "cube": "view_cube", "both": "view_both"}.get(which, "")) or ""
+            self.hint_presentation((f"{key} again or Esc: back to the panels" if key else "Esc: back to the panels")
+                                   + f"  ·  {self.keys.label('presentation') or 'H'}: the controls over the picture")
         self.request_layout()
 
 
@@ -3564,7 +3628,7 @@ def build(app):
           typeface.mono(dpg.add_text("", tag="stat_txt"))
           messages.build(app, "footer")               # the latest message, the problems that stay, the log (C10)
     chrome.build_dialogs(app)
-    messages.build_log(app)                          # the log's window: Help > Messages, the footer's log (C10)
+    messages.build_log(app)                          # the log's window: Window > Message log, the footer's log (C10)
     chrome.build_pane_menus(app)
     room.build(app)                                  # the graph's room: the rail, the windows over the canvas
     dock.build(app)                                  # the tab strip over the side panel's column (C8)
@@ -3683,6 +3747,9 @@ def service_command(app):
             if "effect" in c:
                 app.on_effect(None, c["effect"])
                 dpg.set_value("fx_combo", c["effect"])
+            if "palette_run" in c:                      # test hook: the command palette's first row for this text, run
+                chrome.show_palette(app); dpg.set_value("palette_text", c["palette_run"])
+                chrome._palette_fill(app, c["palette_run"]); chrome.palette_enter(app)
             if c.get("measure"):                        # test hook: print pane and content sizes
                 for t in ("root", "toolbar", "net_win", "cube_win", "edit_win", "graph_win", "side_win", "footer", "node_editor"):
                     if dpg.does_item_exist(t):
@@ -3694,7 +3761,10 @@ def service_command(app):
                 print("measure viewport", dpg.get_viewport_client_width(), dpg.get_viewport_client_height(),
                       "footer rect", dpg.get_item_rect_min("footer"), dpg.get_item_rect_max("footer"))
             if "key" in c:                              # test hook: a key press, by mvKey_ name
+                if c.get("over") != "panel":            # ... as if over the canvas (the hooks have no pointer)
+                    app._canvas_hold = time.time() + 0.5
                 app.on_key(None, getattr(dpg, "mvKey_" + c["key"]))
+                app._canvas_hold = 0.0
             if "action" in c:                           # test hook: a keymap action by name
                 app.run_action(c["action"])
             if "bind" in c:                             # test hook: [action, binding]
@@ -4738,7 +4808,9 @@ def main():
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 dock.poll(app)                       # a frame's tab closed by its x
                 chrome.poll_dialogs()                # the dialogs' closes at their top right
+                chrome.poll_windows(app)             # the Window menu's checks: which frames are open
                 messages.poll(app)                   # a note's time on the footer's line; the open log follows
+                app.poll_present_hint()              # how to leave presentation, for a few seconds after entering it
                 midi_ui.poll(app)
                 reader_ui.poll(app)
                 room.poll(app)

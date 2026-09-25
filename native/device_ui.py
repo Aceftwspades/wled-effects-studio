@@ -1,6 +1,7 @@
-"""The Device menu's three frames: Devices (finding them and choosing the
-active one), Flash (build the firmware and send it) and Send (a graph as
-a script, an effect's settings, the ledmap - to the active device).
+"""The device frames (the Window menu has them, Flash the Build menu):
+Devices (finding them and choosing the active one), Flash (build the
+firmware and send it) and Send (a graph as a script, an effect's
+settings, the ledmap - to the active device).
 
 Each is a Dear PyGui window of its own with the app's header - a title,
 the ::: grip, a dock button - so it floats over the panes by default and
@@ -132,7 +133,7 @@ def build(app):
     with dpg.window(tag="send_win", show=False, width=px(620), height=px(520), no_collapse=True, no_title_bar=True):
         header(app, "send")
         with dpg.group(horizontal=True):
-            dpg.add_text("to: no device chosen - Device > Devices...", tag="send_to", color=c.TEXT, wrap=0)
+            dpg.add_text("to: no device chosen - Window > Devices...", tag="send_to", color=c.TEXT, wrap=0)
             dpg.add_button(label="Find a device", tag="send_find", show=False, callback=lambda: show(app, "devices"))
             weight.primary(dpg.last_item())
         with dpg.group(horizontal=True):
@@ -222,7 +223,7 @@ def build_flash(app):
     with dpg.window(tag="flash_win", show=False, width=px(720), height=px(660), no_collapse=True, no_title_bar=True):
         header(app, "flash")
         with dpg.group(horizontal=True):
-            dpg.add_text("to: no device chosen - Device > Devices...", tag="flash_to", color=c.TEXT, wrap=0)
+            dpg.add_text("to: no device chosen - Window > Devices...", tag="flash_to", color=c.TEXT, wrap=0)
             c.info("Stages the project's effects into the WLED tree as a usermod, builds the firmware on an environment "
                    "that extends the one chosen (its usermods plus ours), and sends the binary to the device's /update. "
                    "The device must have OTA unlocked and be on this subnet.")
@@ -486,7 +487,7 @@ def refresh_send(app):
     d = app.active_device()
     host = app.active_host()
     if not host:
-        line, col = "to: no device chosen - Device > Devices...", c.DIM
+        line, col = "to: no device chosen - Window > Devices...", c.DIM
     elif d:
         line, col = f"to: {d.get('name') or host}  ({host}) - {_device_line(d)}", c.TEXT
     else:
@@ -709,7 +710,7 @@ def start_flash(app):
     if not env:
         dpg.set_value("flash_status", "choose an environment"); return
     if dpg.get_value("flash_upload") and not host:
-        dpg.set_value("flash_status", "no device chosen to send to (Device > Devices...), or untick sending"); return
+        dpg.set_value("flash_status", "no device chosen to send to (Window > Devices...), or untick sending"); return
     app.project.options["flash_env"] = env
     app.project.save()
     dpg.delete_item("flash_log", children_only=True)

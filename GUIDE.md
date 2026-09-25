@@ -60,8 +60,19 @@ The window: a menu bar and a toolbar of icons; the two views (the
 the project, the effect, its sliders, the segments, the geometry, colours
 and audio. **G** opens the graph pane, **C** the code pane; **Q / E / W**
 show one view or both full-frame (press again to come back); **H** hides
-every control; **space** pauses. Every key is on the menus and under
-Settings > Keyboard shortcuts, where any can be changed. Every control
+every control - a pill at the bottom says how to come back, and **Esc**
+does too; **space** pauses. A key on its own - a letter, a digit, a sign -
+acts with the pointer over the views or the graph (or while presenting):
+a stray one from the side panel, a frame or the code changes nothing, and
+the footer says where it works. Every key is on the menus and under
+Settings > Keyboard shortcuts (Shift+F1), where any can be changed. The
+menus are File, Edit, View, Node, **Build** (compile, Live, Watch, run as
+a script, flash the firmware), Playback, Device (what is done to a
+device), **Window** (every frame and window - checked while it is open, a
+click opens or closes it, and Close every frame), Settings and Help; each
+command is in one place. The **command palette** (Ctrl+P) finds any of
+them by name - every action and every menu command, the graphs to open
+and the recent projects too; Enter runs the first. Every control
 explains itself on hover; a dim **(?)** at the end of a row holds what
 the row as a whole is for. Buttons say what they weigh: the one a dialog
 or a frame is for is filled in the accent, one that changes a device or
@@ -157,7 +168,7 @@ the graph cannot use (a wire between types that do not convert, a
 Receive with no Send), a graph that does not compile, a build that
 failed - the footer counts them (**2 problems**, in red) and a click
 opens the log at them; they go by themselves once fixed. The **message
-log** (the footer's **log**, or Help > Message log) holds the last fifty,
+log** (the footer's **log**, or Window > Message log) holds the last fifty,
 newest first under the problems; one about a node or a line of code has
 a **go to** that opens its graph with the node selected and framed, or
 its effect at the line. A value dragged on the running effect is one
@@ -302,7 +313,7 @@ the point cloud too), and a **speed** -
 watching an effect slowly or running it ahead; the footer says the speed
 while it is not 1x. The footer also names the **LED under the pointer**
 in either view: its wiring index, its part, its position. A **MIDI
-controller** (Playback > MIDI controller...) puts its knobs on the
+controller** (Window > MIDI controller...) puts its knobs on the
 sliders: pick the port ("Rescan" after plugging one in), pick what a knob
 should drive - a parameter slider, a check, the palette or the effect by
 index, a typed value on a pin of the open graph - press "Learn" and move
@@ -324,7 +335,7 @@ behind the LEDs, for the point cloud and the GPU cube alike.
 
 ## Any shape: the shape editor
 
-GEOMETRY > shape (or View > Shape editor...) opens the **Shape** frame - in
+GEOMETRY > shape (or Window > Shape editor) opens the **Shape** frame - in
 the dock like the Device ones, and floats the same way. A shape is a list of
 **parts** in wiring order: strips, rings, panels, cylinders, spheres, cubes,
 polygons (sides of so many LEDs each), polyhedra (the edges of a solid -
@@ -380,8 +391,8 @@ apart - so a mesh's own units are the pitch when it is imported.
   polyline of the points and fills it with LEDs at the pitch.
 - **Export .xmodel** writes the shape (any geometry, on its grid) as an
   xLights custom model, the wiring as the node numbers.
-- **Generate a preview** (the frame's PREVIEW fold, or View > Generate a
-  preview of the shape) renders a turn of the shape off screen - lit by
+- **Generate a preview** (the frame's PREVIEW fold) renders a turn of
+  the shape off screen - lit by
   the effect the sim runs, or each part in a colour of its own, or a chase
   along the wiring - loops it in the frame and writes `shape_preview.gif`
   and `.png` into the project's export folder, for a README or a forum
@@ -403,14 +414,14 @@ projected onto from the front - or the grid an xLights model came with.
 On a grid, two LEDs in one cell are reported: the cell keeps the first.
 
 **On the device**: the shape's positions go along with it. Device > Send
-the shape uploads the ledmap (the wiring) and `/geometry.bin`, a table of
+the shape (or the Send frame's button) uploads the ledmap (the wiring) and `/geometry.bin`, a table of
 every LED's position and outward direction, which the cube effects read
 instead of their cube-net rule - so Position, Direction, Cube face and
 every effect that asks where a pixel is see the real shape, on the device
 exactly as in the sim. Cylinders, spheres and tori send the table too; a
 cube net and a flat matrix have a rule of their own and send none.
 
-**Palettes of your own** (Edit > Palettes...): a gradient drawn by hand -
+**Palettes of your own** (Window > Palettes): a gradient drawn by hand -
 click the bar to add a stop, drag it, right-click to remove it, a colour
 and a position each, up to 18 - kept with the project, in the sim as a
 palette of its own (ids 200 down, in the palette combo like any other,
@@ -419,7 +430,7 @@ palettes (`/palette{n}.json`, the same ids there - by position, so the
 first here replaces whatever the device had as palette 0). "From the
 sim's palette" starts from whatever the sim shows.
 
-**The library** (File > Library...) shows every graph of the project as a
+**The library** (Window > Library) shows every graph of the project as a
 looping thumbnail with its tags (what nodes it uses, audio, 3-D, script);
 type to search; click a tile to run its effect in the sim (built first if
 it never was) - the layout stays as it is, and its graph is waiting in
@@ -437,7 +448,7 @@ curve runs as a script as well as compiled.
 
 ## A show: the Sequence frame
 
-Playback > Sequence... (or Device > Sequence). A **step** is what the sim
+Window > Sequence (Ctrl+Shift+Q). A **step** is what the sim
 shows when you add it - every segment's effect, sliders, palette, bounds,
 opacity and blend, the colours, the brightness - with a name, how long
 it is **held** and how long it **blends** in from the one before. "Update from the sim"
@@ -527,7 +538,7 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
   twinkle - in the sim and on the device when streaming - the way to
   check a new ledmap, shape or wiring before trusting it; play resumes
   the effect.
-- **LED outputs and power** (Device menu): the wiring split into the
+- **LED outputs and power** (Window menu): the wiring split into the
   device's outputs - one, one per part of a shape, or every N LEDs - each
   a pin, a start, a count, an LED type, a colour order and reversed or
   not; "Read the device's" shows what it has now; **Send outputs + power
@@ -536,7 +547,7 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
   default) against the supply you enter, and how far WLED's auto
   brightness limiter would dim it; "preview the limiter" dims the sim
   the same way, and the footer shows the amps all the time.
-- **Audio input** (Device menu, Ctrl+Shift+M): what the device listens
+- **Audio input** (Window menu, Ctrl+Shift+M): what the device listens
   through - a microphone (INMP441, SPH0645, a PDM mic, an ES7243 module)
   or a **line-in**: a PCM1808 / WM8782 ADC breakout (the four I2S wires,
   the master clock included - any free GPIO on an S3), or an ES8388
@@ -574,7 +585,7 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
   features manages WLED's own usermods for the project as well: tick,
   untick, add one from the tree, import a folder or zip.
 
-**Export usermod** (Device menu, or File > Project) writes the usermod
+**Export usermod** (File > Export usermod) writes the usermod
 folder and zip for a build elsewhere. If the effects (or a graph bundle)
 need firmware not every WLED tree has - the IMU driver - the studio asks
 whether to include it; importing such a bundle offers to turn the feature
@@ -614,8 +625,6 @@ on and install what it carries.
 - **File** › Rename... `F2`
 - **File** › Remove from the effects list `Ctrl+I`
 - **File** › History... `Ctrl+Shift+Y`
-- **File** › Library... `Ctrl+Shift+L`
-- **File** › Generate previews of every effect
 - **File** › Open graph as code
 - **File › Project** › New project...
 - **File › Project** › Open › … the projects
@@ -623,9 +632,10 @@ on and install what it carries.
 - **File › Project** › Open folder...
 - **File › Project** › Export project as zip — the whole project - effects, graphs, sub-graphs, user nodes, assets, the settings - as one zip in captures/, to keep or to hand over; the history and the export folder stay behind
 - **File › Project** › Import project from zip... — a zip made here (or a project folder zipped by hand) into projects/, and opened
-- **File › Project** › Export usermod (folder + zip)
+- **File › Project** › Open the project folder
 - **File** › Import graph bundle...
 - **File** › Export graph bundle
+- **File** › Export usermod (folder + zip) — the project's effects as a WLED usermod - a folder and a zip - to build into firmware outside the studio
 - **File** › Screenshot of the 3-D view `F12`
 - **File** › Record 15 s GIF `Ctrl+F12`
 - **File** › Record 15 s video `Ctrl+Shift+F12`
@@ -638,26 +648,18 @@ on and install what it carries.
 - **Edit** › Copy `Ctrl+C`
 - **Edit** › Paste `Ctrl+V`
 - **Edit** › Duplicate with inputs `Shift+D`
-- **Edit › Delete** › Delete `Delete`
-- **Edit › Delete** › Delete and reconnect `Ctrl+Delete`
-- **Edit › Delete** › Disconnect (keep the nodes)
+- **Edit** › Delete `Delete`
+- **Edit** › Delete and reconnect `Ctrl+Delete`
+- **Edit** › Disconnect (keep the nodes)
 - **Edit › Select** › All `A`
 - **Edit › Select** › None `Alt+A`
 - **Edit › Select** › Invert `Ctrl+Shift+I`
 - **Edit › Select** › What feeds the selection `Ctrl+[`
 - **Edit › Select** › What the selection feeds `Ctrl+]`
 - **Edit › Select** › Everything wired to it `Shift+L`
-- **Edit** › Command palette... `Ctrl+P`
-- **Edit** › Snapshots... `Ctrl+Shift+K`
-- **Edit** › Palettes (gradients)... `Ctrl+Shift+G`
+- **Edit** › Command palette... `Ctrl+P` — every action and menu command by name: type a few letters, Enter runs the first
 - **Edit** › Find / replace in code `Ctrl+F`
 - **Edit** › Open code in external editor `Ctrl+E`
-- **Device** › Devices... `Ctrl+Shift+N`
-- **Device** › Flash firmware... `Ctrl+Shift+U`
-- **Device** › Send to device... `Ctrl+Shift+S`
-- **Device** › Sequence: presets and a playlist... `Ctrl+Shift+Q`
-- **Device** › LED outputs and power... `Ctrl+Shift+O`
-- **Device** › Audio input (mic / line-in)... `Ctrl+Shift+M`
 - **Device** › Active device › … the devices known
 - **Device** › Scan the network for devices
 - **Device** › Stream the sim to the device (DDP) `Ctrl+Shift+T`
@@ -668,7 +670,6 @@ on and install what it carries.
 - **Device** › Import the device's ledmap
 - **Device** › Import a ledmap file...
 - **Device** › Usermods and features...
-- **Device** › Export usermod (folder + zip)
 - **View** › Logical net `Q`
 - **View** › 3-D view `E`
 - **View** › Net and 3-D `W`
@@ -709,8 +710,6 @@ on and install what it carries.
 - **View › Camera** › Save the view as 3
 - **View › Camera** › Background picture...
 - **View › Camera** › Clear the background
-- **View** › Shape editor... `Ctrl+Shift+E`
-- **View** › Generate a preview of the shape
 - **View › Layout** › Classic: main pane, 3-D, panel
 - **View › Layout** › Panel on the left
 - **View › Layout** › 3-D on the left
@@ -755,15 +754,27 @@ on and install what it carries.
 - **Playback › Speed** › Back to 1x `Shift+/`
 - **Playback** › Restart effect `Ctrl+R`
 - **Playback** › Randomise the settings `Ctrl+Shift+X`
-- **Playback** › Sequence...
 - **Playback** › Compare with another effect... `Ctrl+Shift+B`
 - **Playback** › Sweep a slider... `Ctrl+Shift+W`
-- **Playback** › MIDI controller...
-- **Playback** › Compile + reload `F5`
-- **Playback** › Run the graph as a script (no build) `Ctrl+Shift+R`
-- **Playback** › Live: rebuild the graph as it changes `L`
-- **Playback** › Watch: rebuild when the code is saved outside
-- **Settings** › Keyboard shortcuts...
+- **Build** › Compile + reload `F5`
+- **Build** › Live: rebuild the graph as it changes `L`
+- **Build** › Watch: rebuild when the code is saved outside — a code effect edited in another editor (Edit > Open code in external editor) rebuilt when it saves
+- **Build** › Run the graph as a script (no build) `Ctrl+Shift+R` — the graph compiled to bytecode and run by the Studio Script effect in the sim - no C++ build
+- **Build** › Flash firmware... `Ctrl+Shift+U` — the firmware built with the project's effects and written to a device (the Flash frame)
+- **Build** › Open the build folder
+- **Window** › Devices `Ctrl+Shift+N`
+- **Window** › Send to device `Ctrl+Shift+S`
+- **Window** › Shape editor `Ctrl+Shift+E`
+- **Window** › Sequence: presets and a playlist `Ctrl+Shift+Q`
+- **Window** › Library `Ctrl+Shift+L`
+- **Window** › Palettes (gradients) `Ctrl+Shift+G`
+- **Window** › LED outputs and power `Ctrl+Shift+O`
+- **Window** › Audio input (mic / line-in) `Ctrl+Shift+M`
+- **Window** › Snapshots... `Ctrl+Shift+K`
+- **Window** › MIDI controller...
+- **Window** › Message log...
+- **Window** › Close every frame
+- **Settings** › Keyboard shortcuts... `Shift+F1`
 - **Settings** › Selection frames...
 - **Settings** › Appearance...
 - **Settings** › External editor command...
@@ -775,17 +786,13 @@ on and install what it carries.
 - **Settings › Simplified nodes below** › 30%
 - **Settings › Simplified nodes below** › never
 - **Settings** › Device speed factor...
-- **Settings** › Open the project folder
-- **Settings** › Open the build folder
 - **Help** › User guide `F1` — every part of the studio, in a window here: the contents down the side, a search, the keys and menus at the end
 - **Help** › Tutorial — a first effect from nothing, step by step, with pictures
 - **Help** › Node reference — every node, pin and setting; F1 over a node in the graph opens its own entry
 - **Help** › Effect API reference — what a code effect can call, beside the code editor
-- **Help** › Keyboard shortcuts `Shift+F1`
 - **Help** › Welcome...
 - **Help** › Check for updates...
 - **Help** › Report a problem... — bundles what a bug report needs - the version, the doctor's findings, the machine, the project's settings, the last crash - into one zip in captures/, and offers the issues page; nothing of your effects or graphs goes in
-- **Help** › Message log...
 - **Help** › About
 
 ### Keys

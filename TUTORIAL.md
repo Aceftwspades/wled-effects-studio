@@ -156,9 +156,9 @@ Change the palette in the EFFECT section and the line recolours.
   History keeps every save).
 - **Ctrl+I** adds it to the project's effects list, so it is built and
   exported with the project rather than only while you edit it.
-- To put it on a device: File > Project > *Send the graph as a script*
+- To put it on a device: Device > *Send the graph as a script*
   (no firmware build, it runs in the Studio Script effect within a couple
-  of seconds), or *Build firmware + flash* to compile it in as a real
+  of seconds), or Build > *Flash firmware...* to compile it in as a real
   effect. GUIDE.md has the details.
 
 The finished graph is in `docs/tutorial/sine_wave.graph.json`: File >

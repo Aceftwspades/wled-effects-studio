@@ -5,7 +5,7 @@ all went to one line beside the graph's file name - whole sentences the
 pane cut off, replaced by the next, with no history; and in the other
 layouts nothing showed them at all. Now:
 
-- every message is logged, the last fifty (Help > Message log, or the
+- every message is logged, the last fifty (Window > Message log, or the
   footer's log button, opens the log; it goes into a problem report too);
 - the footer's line, in every layout, shows the latest one short - its
   first part, cut at a word - and the whole of it on hover, coloured by

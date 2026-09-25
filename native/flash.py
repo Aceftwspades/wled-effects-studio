@@ -249,7 +249,7 @@ def features_of(project):
 
 # --- usermods: WLED's own, managed per project ---------------------------------------
 # Every folder under usermods/ is one; the environment names the ones it
-# builds (custom_usermods). The manager (Settings > Usermods) lets a project
+# builds (custom_usermods). The manager (Device > Usermods and features) lets a project
 # add any from the tree, import one from a folder or a zip, turn one off
 # that the env would build, and drop one from its list. The staged env's
 # custom_usermods is the base env's list with the project's changes on it.
@@ -547,7 +547,7 @@ def manifest_text(m, device=None):
     if m["not_shipped"]:
         L.append(f"on the list but NOT shipped: {', '.join(t for _, t in m['not_shipped'])}")
     L.append(f"built in: the cube_fx effects ({len(m['builtin'])} source files, Studio Script among them; the bank places them, all register when no slots are chosen)")
-    L.append(f"the flash sends firmware only - not the ledmap, the shape or a script (Device > Send...); geometry here: {m['geometry']}")
+    L.append(f"the flash sends firmware only - not the ledmap, the shape or a script (Window > Send to device...); geometry here: {m['geometry']}")
     if device:
         L.append(f"device now: {device.get('name', '?')} at {device.get('host', '?')}, WLED {device.get('ver', '?')} build {device.get('vid', '?')}, "
                  f"{device.get('arch', '?')}, {device.get('fx', '?')} effects" + (", Studio Script" if device.get("script") else ""))

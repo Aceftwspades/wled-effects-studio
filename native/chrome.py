@@ -43,7 +43,53 @@ def _mi(app, label, action=None, **kw):
     if action:
         kw.setdefault("tag", f"mi_{action}")
         kw["shortcut"] = app.keys.label(action)
-    return dpg.add_menu_item(label=label, **kw)
+    item = dpg.add_menu_item(label=label, **kw)
+    if action:
+        app.__dict__.setdefault("_mi_actions", {})[item] = action
+        app._mi_actions[dpg.get_item_alias(item) or item] = action
+    return item
+
+
+# The Window menu: every frame, in the order a project meets them - (slot, label, keymap action)
+WINDOW_FRAMES = (("devices", "Devices", "devices"), ("send", "Send to device", "send_frame"),
+                 ("shape", "Shape editor", "shape"), ("sequence", "Sequence: presets and a playlist", "sequence"),
+                 ("library", "Library", "library"), ("palettes", "Palettes (gradients)", "palettes"),
+                 ("outputs", "LED outputs and power", "outputs"), ("audioin", "Audio input (mic / line-in)", "audioin"))
+
+
+def window_open(app, slot):
+    """A frame open: its tab in the dock, or its window shown while it floats."""
+    from native import dock
+    if dock.in_dock(app, slot):
+        return True
+    tag = device_ui.FRAMES.get(slot, (None,))[0]
+    return bool(tag and dpg.does_item_exist(tag) and dpg.is_item_shown(tag))
+
+
+def toggle_window(app, slot):
+    """Window > a frame: opened (to the front), or closed when it is open."""
+    if window_open(app, slot):
+        device_ui.close(app, slot)
+    else:
+        device_ui.show(app, slot)
+    refresh_windows(app)
+
+
+def close_all_frames(app):
+    """Window > Close every frame: every frame away, docked or floating."""
+    shut = [s for s in device_ui.FRAMES if window_open(app, s)]
+    for s in shut:
+        device_ui.close(app, s)
+    refresh_windows(app)
+    app.gp.status(f"{len(shut)} frame{'s' if len(shut) != 1 else ''} closed" if shut else "no frame was open")
+
+
+def refresh_windows(app):
+    """The Window menu's checks: which frames are open now."""
+    for slot, _, _ in WINDOW_FRAMES:
+        t = f"menu_win_{slot}"
+        if dpg.does_item_exist(t):
+            dpg.set_value(t, window_open(app, slot))
 
 
 def build_menus(app):
@@ -60,9 +106,6 @@ def build_menus(app):
             dpg.add_separator()
             _mi(app, "Add to the effects list", "import", tag="menu_import", callback=lambda: app.toggle_import_current())
             _mi(app, "History...", "history", callback=lambda: show_history(app))
-            _mi(app, "Library...", "library", callback=lambda: device_ui.show(app, "library"))
-            dpg.add_menu_item(label="Generate previews of every effect", callback=lambda: (device_ui.show(app, "library"),
-                              __import__("native.library_ui", fromlist=["x"]).generate_previews(app)))
             dpg.add_menu_item(label="Open graph as code", callback=lambda: app.open_graph_code())
             dpg.add_separator()
             with dpg.menu(label="Project"):
@@ -80,9 +123,11 @@ def build_menus(app):
                 dpg.add_menu_item(label="Import project from zip...", callback=lambda: dpg.show_item("project_zip_dialog"))
                 tip("a zip made here (or a project folder zipped by hand) into projects/, and opened")
                 dpg.add_separator()
-                dpg.add_menu_item(label="Export usermod (folder + zip)", callback=lambda: app.export_usermod())
+                dpg.add_menu_item(label="Open the project folder", callback=lambda: app.reveal(app.project.path))
             dpg.add_menu_item(label="Import graph bundle...", callback=lambda: dpg.show_item("graph_import_dialog"))
             dpg.add_menu_item(label="Export graph bundle", callback=lambda: app.gp.export_bundle())
+            dpg.add_menu_item(label="Export usermod (folder + zip)", callback=lambda: app.export_usermod())
+            tip("the project's effects as a WLED usermod - a folder and a zip - to build into firmware outside the studio")
             dpg.add_separator()
             _mi(app, "Screenshot of the 3-D view", "screenshot", callback=lambda: setattr(app, "shot_req", True))
             _mi(app, "Record 15 s GIF", "record", callback=lambda: app.start_rec(15.0))
@@ -99,10 +144,9 @@ def build_menus(app):
             _mi(app, "Copy", "copy", callback=lambda: app.gp.copy())
             _mi(app, "Paste", "paste", callback=lambda: app.gp.paste())
             _mi(app, "Duplicate with inputs", "duplicate", callback=lambda: app.duplicate_selected())
-            with dpg.menu(label="Delete"):
-                _mi(app, "Delete", "delete", callback=lambda: app.gp.delete_selected())
-                _mi(app, "Delete and reconnect", "dissolve", callback=lambda: app.gp.dissolve_selected())
-                _mi(app, "Disconnect (keep the nodes)", "disconnect", callback=lambda: app.gp.disconnect_selected())
+            _mi(app, "Delete", "delete", callback=lambda: app.gp.delete_selected())
+            _mi(app, "Delete and reconnect", "dissolve", callback=lambda: app.gp.dissolve_selected())
+            _mi(app, "Disconnect (keep the nodes)", "disconnect", callback=lambda: app.gp.disconnect_selected())
             with dpg.menu(label="Select"):
                 _mi(app, "All", "select_all", callback=lambda: app.gp.select_all())
                 _mi(app, "None", "select_none", callback=lambda: app.gp.select_none())
@@ -113,20 +157,12 @@ def build_menus(app):
                 _mi(app, "Everything wired to it", "select_linked", callback=lambda: app.gp.select_linked("both"))
             dpg.add_separator()
             _mi(app, "Command palette...", "palette", callback=lambda: show_palette(app))
-            _mi(app, "Snapshots...", "snapshots", callback=lambda: show_snapshots(app))
-            _mi(app, "Palettes (gradients)...", "palettes", callback=lambda: device_ui.show(app, "palettes"))
+            tip("every action and menu command by name: type a few letters, Enter runs the first")
             dpg.add_separator()
             _mi(app, "Find / replace in code", "find", callback=lambda: app.focus_find())
             _mi(app, "Open code in external editor", "external", callback=lambda: app.open_external())
         with dpg.menu(label="Device"):
-            # the three frames: each a window that floats or docks into the pane space
-            _mi(app, "Devices...", "devices", callback=lambda: device_ui.show(app, "devices"))
-            _mi(app, "Flash firmware...", "flash", callback=lambda: device_ui.show(app, "flash"))
-            _mi(app, "Send to device...", "send_frame", callback=lambda: device_ui.show(app, "send"))
-            _mi(app, "Sequence: presets and a playlist...", "sequence", callback=lambda: device_ui.show(app, "sequence"))
-            _mi(app, "LED outputs and power...", "outputs", callback=lambda: device_ui.show(app, "outputs"))
-            _mi(app, "Audio input (mic / line-in)...", "audioin", callback=lambda: device_ui.show(app, "audioin"))
-            dpg.add_separator()
+            # what is done to a device; its frames are on the Window menu, the firmware on Build
             with dpg.menu(label="Active device", tag="menu_active_device"):
                 pass
             dpg.add_menu_item(label="Scan the network for devices", callback=lambda: (device_ui.show(app, "devices"), app.scan_devices("all")))
@@ -142,7 +178,6 @@ def build_menus(app):
             dpg.add_menu_item(label="Import a ledmap file...", callback=lambda: dpg.show_item("ledmap_dialog"))
             dpg.add_separator()
             dpg.add_menu_item(label="Usermods and features...", callback=lambda: show_usermods(app))
-            dpg.add_menu_item(label="Export usermod (folder + zip)", callback=lambda: app.export_usermod())
         with dpg.menu(label="View"):
             for key, label, act in LAYOUTS:
                 _mi(app, label, act, check=True, tag=f"menu_view_{key}",
@@ -200,8 +235,6 @@ def build_menus(app):
                 dpg.add_separator()
                 dpg.add_menu_item(label="Background picture...", callback=lambda: dpg.show_item("bg_dialog"))
                 dpg.add_menu_item(label="Clear the background", callback=lambda: app.set_background(""))
-            _mi(app, "Shape editor...", "shape", callback=lambda: device_ui.show(app, "shape"))
-            dpg.add_menu_item(label="Generate a preview of the shape", callback=lambda: (device_ui.show(app, "shape"), shape_ui_preview(app)))
             with dpg.menu(label="Layout"):
                 for k, (label, arr) in enumerate(app.PRESETS):
                     dpg.add_menu_item(label=label, check=True, tag=f"menu_arr_{k}", user_data=arr,
@@ -262,19 +295,36 @@ def build_menus(app):
                 _mi(app, "Back to 1x", "speed_reset", callback=lambda: app.set_speed(1.0))
             _mi(app, "Restart effect", "restart", callback=lambda: app.eng.select(app.eng.idx))
             _mi(app, "Randomise the settings", "randomise", callback=lambda: app.randomise())
-            dpg.add_menu_item(label="Sequence...", callback=lambda: device_ui.show(app, "sequence"))
+            dpg.add_separator()
             _mi(app, "Compare with another effect...", "compare", callback=lambda: app.run_action("compare"))
             _mi(app, "Sweep a slider...", "sweep", callback=lambda: app.run_action("sweep"))
-            _mi(app, "MIDI controller...", "midi", callback=lambda: app.run_action("midi"))
-            dpg.add_separator()
+        with dpg.menu(label="Build"):
+            # the effect built and run - in the sim, as a script, onto a device's firmware
             _mi(app, "Compile + reload", "build", callback=lambda: app.build_current())
-            _mi(app, "Run the graph as a script (no build)", "script_preview", callback=lambda: app.preview_script())
             _mi(app, "Live: rebuild the graph as it changes", "live", check=True, tag="menu_live",
                               default_value=app.gp.auto, callback=lambda s, a: app.gp.set_auto(bool(a)))
             dpg.add_menu_item(label="Watch: rebuild when the code is saved outside", check=True, tag="edit_watch",
                               default_value=False)
+            tip("a code effect edited in another editor (Edit > Open code in external editor) rebuilt when it saves")
+            _mi(app, "Run the graph as a script (no build)", "script_preview", callback=lambda: app.preview_script())
+            tip("the graph compiled to bytecode and run by the Studio Script effect in the sim - no C++ build")
+            dpg.add_separator()
+            _mi(app, "Flash firmware...", "flash", callback=lambda: device_ui.show(app, "flash"))
+            tip("the firmware built with the project's effects and written to a device (the Flash frame)")
+            dpg.add_menu_item(label="Open the build folder", callback=lambda: app.reveal(app.build_dir()))
+        with dpg.menu(label="Window"):
+            # every frame and window: checked while it is open, a click opens or closes it
+            for _slot, _label, _act in WINDOW_FRAMES:
+                _mi(app, _label, _act, check=True, tag=f"menu_win_{_slot}", user_data=_slot,
+                    callback=lambda s, a, u: toggle_window(app, u))
+            dpg.add_separator()
+            _mi(app, "Snapshots...", "snapshots", callback=lambda: show_snapshots(app))
+            _mi(app, "MIDI controller...", "midi", callback=lambda: app.run_action("midi"))
+            dpg.add_menu_item(label="Message log...", callback=lambda: __import__("native.messages", fromlist=["x"]).show_log(app))
+            dpg.add_separator()
+            dpg.add_menu_item(label="Close every frame", callback=lambda: close_all_frames(app))
         with dpg.menu(label="Settings"):
-            dpg.add_menu_item(label="Keyboard shortcuts...", callback=lambda: show_keys(app))
+            _mi(app, "Keyboard shortcuts...", "shortcuts", callback=lambda: show_keys(app))
             dpg.add_menu_item(label="Selection frames...", callback=lambda: show_frames(app))
             dpg.add_menu_item(label="Appearance...", callback=lambda: show_appearance(app))
             dpg.add_menu_item(label="External editor command...", callback=lambda: show_editor(app))
@@ -296,9 +346,6 @@ def build_menus(app):
                 + ((lambda m: f"; measured {m['date']}: {m['effect']} at {m['fps']} fps on {m['host']}")(app.prefs["device_factor_measured"])
                    if app.prefs.get("device_factor_measured") else "; Send frame > Calibrate measures it"),
                 str(app.prefs.get("device_factor", 60)), lambda v: app.set_device_factor(v)))
-            dpg.add_separator()
-            dpg.add_menu_item(label="Open the project folder", callback=lambda: app.reveal(app.project.path))
-            dpg.add_menu_item(label="Open the build folder", callback=lambda: app.reveal(app.build_dir()))
         with dpg.menu(label="Help"):
             from native import reader_ui
             _mi(app, "User guide", "guide", callback=lambda: reader_ui.open_doc(app, "GUIDE.md"))
@@ -310,14 +357,13 @@ def build_menus(app):
             dpg.add_menu_item(label="Effect API reference", callback=lambda: app.show_api())
             tip("what a code effect can call, beside the code editor")
             dpg.add_separator()
-            _mi(app, "Keyboard shortcuts", "shortcuts", callback=lambda: show_keys(app))
             _mi(app, "Welcome...", "welcome", callback=lambda: reader_ui.show_welcome(app))
             dpg.add_separator()
             dpg.add_menu_item(label="Check for updates...", tag="menu_update", callback=lambda: check_updates(app, by_hand=True))
             dpg.add_menu_item(label="Report a problem...", callback=lambda: report_problem(app))
             tip("bundles what a bug report needs - the version, the doctor's findings, the machine, the project's settings, "
                 "the last crash - into one zip in captures/, and offers the issues page; nothing of your effects or graphs goes in")
-            dpg.add_menu_item(label="Message log...", callback=lambda: __import__("native.messages", fromlist=["x"]).show_log(app))
+            dpg.add_separator()
             dpg.add_menu_item(label="About", callback=lambda: show_about(app))
 
 
@@ -474,7 +520,9 @@ def build_dialogs(app):
                     on_close=lambda: setattr(app, "_capture", None)):
         dialog_header("keys_win", "Keyboard shortcuts")                 # one window style (C8): the frames' header
         dpg.add_text("Click a key to change it, then press the new one (Escape keeps the old). "
-                     "A key taken from another action leaves that one unbound.", color=DIM, wrap=px(600))
+                     "A key taken from another action leaves that one unbound. A key on its own - a letter, a "
+                     "digit, a sign - acts with the pointer over the views or the graph (or while presenting), so "
+                     "a stray one from the panel or a frame changes nothing.", color=DIM, wrap=px(600))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Reset all to defaults", callback=lambda: (app.keys.reset(), refresh_keys(app)))
             weight.danger(dpg.last_item())
@@ -1076,11 +1124,6 @@ def refresh_usermods(app):
     refresh_flash(app)
 
 
-def shape_ui_preview(app):
-    from native import shape_ui
-    shape_ui.generate_preview(app)
-
-
 def show_flash(app):
     device_ui.show(app, "flash")
 
@@ -1140,9 +1183,49 @@ def show_palette(app):
     dpg.focus_item("palette_text")
 
 
+def menu_commands(app):
+    """Every menu bar item that is not a keymap action - those are listed as
+    actions - by its path ("File \u203a Project \u203a Export project as zip"),
+    the ones filled as the studio goes too (a graph to open, a recent
+    project, a device): [(path, item)]."""
+    acts = getattr(app, "_mi_actions", {})
+    out = []
+
+    def walk(item, path):
+        for k in dpg.get_item_children(item, 1) or []:
+            t = dpg.get_item_type(k)
+            conf = dpg.get_item_configuration(k)
+            if t.endswith("::mvMenu"):
+                walk(k, path + [conf.get("label", "")])
+            elif t.endswith("::mvMenuItem") and conf.get("callback") and conf.get("show", True) and k not in acts \
+                    and (dpg.get_item_alias(k) or "") not in acts:
+                out.append((" \u203a ".join(path + [conf.get("label", "")]), k))
+    if dpg.does_item_exist("menubar"):
+        walk("menubar", [])
+    return out
+
+
+def run_menu_item(item):
+    """A menu item run as a click runs it: a check item turned over first."""
+    import inspect
+    conf = dpg.get_item_configuration(item)
+    cb, ud = conf.get("callback"), conf.get("user_data")
+    if cb is None:
+        return
+    val = None
+    if conf.get("check"):
+        val = not dpg.get_value(item)
+        dpg.set_value(item, val)
+    try:
+        n = len(inspect.signature(cb).parameters)
+    except (TypeError, ValueError):
+        n = 3
+    cb(*[item, val, ud][:n])
+
+
 def _palette_fill(app, text):
     """The rows: actions whose label or name has the text, the key beside
-    each; menu-only things are on the menus already."""
+    each, then the menu commands that are not actions (by their path)."""
     from native.keys import ACTIONS
     text = (text or "").strip().lower()
     dpg.delete_item("palette_rows", children_only=True)
@@ -1153,24 +1236,40 @@ def _palette_fill(app, text):
             continue
         if text and text not in label.lower() and text not in action.replace("_", " "):
             continue
-        rows.append((0 if text and label.lower().startswith(text) else 1, label, action))
-    rows.sort(key=lambda r: (r[0], r[1].lower()) if text else 0)
-    for _, label, action in rows[:40]:
+        rows.append((0 if text and label.lower().startswith(text) else 1, label, ("action", action)))
+    for path, item in menu_commands(app):
+        last = path.rsplit(" \u203a ", 1)[-1].lower()
+        if text and text not in path.lower():
+            continue
+        rows.append((0 if text and last.startswith(text) else 2, path, ("menu", item)))
+    rows.sort(key=lambda r: (r[0], r[1].lower()) if text else (r[2][0] == "menu",))
+
+    def go(u):
+        dpg.hide_item("palette_win")
+        if u[0] == "action":
+            app.run_action(u[1])
+        elif dpg.does_item_exist(u[1]):
+            run_menu_item(u[1])
+    for _, label, what in rows[:60]:
         with dpg.group(horizontal=True, parent="palette_rows"):
-            dpg.add_selectable(label=label, width=px(330), user_data=action,
-                               callback=lambda s, a, u: (dpg.hide_item("palette_win"), app.run_action(u)))
-            typeface.small(dpg.add_text(app.keys.label(action), color=DIM))
+            dpg.add_selectable(label=label, width=px(330), user_data=what, callback=lambda s, a, u: go(u))
+            if what[0] == "action":
+                typeface.small(dpg.add_text(app.keys.label(what[1]), color=DIM))
     if not rows:
-        dpg.add_text("no action matches", parent="palette_rows", color=DIM)
+        dpg.add_text("no action or menu command matches", parent="palette_rows", color=DIM)
 
 
 def palette_enter(app):
     """Enter in the palette runs the first row."""
     for k in dpg.get_item_children("palette_rows", 1) or []:
         kids = dpg.get_item_children(k, 1) or []
-        if kids and dpg.get_item_user_data(kids[0]):
+        u = dpg.get_item_user_data(kids[0]) if kids else None
+        if u:
             dpg.hide_item("palette_win")
-            app.run_action(dpg.get_item_user_data(kids[0]))
+            if u[0] == "action":
+                app.run_action(u[1])
+            elif dpg.does_item_exist(u[1]):
+                run_menu_item(u[1])
             return
 
 
@@ -1303,6 +1402,14 @@ def _ui_scale_pick(app, pct):
     dpg.configure_item("app_ui_restart_row", show=not same)
     dpg.set_value("app_ui_note", f"now {now}%; {new}% from the next start")
     app.gp.status("the interface size as it is" if same else f"the interface at {new}% from the next start - Restart now in Appearance")
+
+
+def poll_windows(app, every=0.3):
+    import time as _t
+    now = _t.time()
+    if now - getattr(app, "_win_checks_at", 0.0) >= every:
+        app._win_checks_at = now
+        refresh_windows(app)
 
 
 def refresh_appearance(app):
@@ -1667,6 +1774,7 @@ def refresh(app):
     if dpg.does_item_exist("menu_pip"):
         dpg.set_value("menu_pip", not room.pip(app)["tucked"])
     dpg.set_value("menu_focus", app.gp.focus_mode)
+    refresh_windows(app)
     if dpg.does_item_exist("menu_wire_light"):
         dpg.set_value("menu_wire_light", app.gp.wire_light())
     room.refresh_minimap_menu(app)

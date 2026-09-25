@@ -4039,7 +4039,7 @@ class GraphPanel(Glyphs):
                     for label, src in self.MODULATORS:
                         row(f"  {label}", lambda src=src: self.modulate(nid, name, src))
             if i["type"] in ("float", "bool") and not linked and self.file:
-                # a controller's knob onto this typed value (Playback > MIDI controller lists the rest)
+                # a controller's knob onto this typed value (Window > MIDI controller lists the rest)
                 from native import midi_ui, midi
                 t = midi_ui.pin_target(self.app, nid, name)
                 row("MIDI learn: move a knob", lambda: midi_ui.learn(self.app, t))
@@ -4072,14 +4072,15 @@ class GraphPanel(Glyphs):
             # reference), then what is done most - duplicate, label, the
             # shape toggles, delete - each with its key, and the rest in
             # folds (colour, settings as pins, sub-graph, more).
-            title = n.get("label") or d.get("label") or n["type"]
-            dpg.add_text(title if title == n["type"] else f"{title}  ({n['type']})", parent=P, color=DIM)
+            title = self.node_title(n, d)
+            head = dpg.add_text(title if title == n["type"] else f"{title}  ({n['type']})", parent=P, color=DIM)
             if d.get("doc"):
-                dpg.add_text(nodeface.first_sentence(d["doc"]), parent=P, color=self.pal()["soft"], wrap=px(300))
+                # what it is on the title's hover: the menu opens on what can be done (the critique's C14)
+                with dpg.tooltip(head):
+                    dpg.add_text(nodeface.first_sentence(d["doc"], 400), wrap=px(360))
             if nid in self.problems:
                 m = self.problems[nid]
                 dpg.add_text(m, parent=P, color=(235, 80, 70) if m.startswith("error") else (240, 190, 70), wrap=px(300))
-            reference()
             sep()
             if n["type"].startswith(G.SUB):
                 row("edit sub-graph", lambda: self.enter_sub(nid), "enter_sub")
@@ -4152,6 +4153,8 @@ class GraphPanel(Glyphs):
                 row("where is this type used", lambda: self.show_where_used(n["type"]))
                 row("remove from favourites" if n["type"] in self.app.prefs.get("fav_nodes", []) else "add to favourites",
                     lambda: self.toggle_favourite(n["type"]))
+            sep()
+            reference()
 
     def where_used(self, type_):
         """Every graph and sub-graph in the project with a node of this type,
@@ -4707,12 +4710,6 @@ class GraphPanel(Glyphs):
         for name in self.type_names():
             c, n = name.split(" / ", 1)
             cats.setdefault(c, []).append(n)
-        with dpg.group(horizontal=True, parent="graph_menu"):
-            dpg.add_button(label="undo", small=True, callback=lambda: (self._hide_menus(), self.undo()))
-            dpg.add_button(label="redo", small=True, callback=lambda: (self._hide_menus(), self.redo()))
-            dpg.add_button(label="paste here", small=True,
-                           callback=lambda: (self._hide_menus(), self.paste(self._menu_pos)))
-            dpg.add_button(label="arrange", small=True, callback=lambda: (self._hide_menus(), self.arrange()))
         dpg.add_input_text(tag="graph_search", parent="graph_menu", hint="search nodes", width=px(200),
                            callback=self._search, on_enter=False)
         # on_enter would stop the per-keystroke callback; Enter is read separately

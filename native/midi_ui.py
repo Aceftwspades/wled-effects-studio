@@ -1,5 +1,5 @@
 """The MIDI window and the learn gesture (midi.py holds the port, the
-messages and the maps). Playback > MIDI controller...: the port, a
+messages and the maps). Window > MIDI controller...: the port, a
 target and Learn, the mappings with a range each and a remove. A
 right-click on a parameter slider offers Learn there, and so does a
 node pin's menu; a learnt knob moves the slider, the picture and - with
@@ -250,7 +250,7 @@ def learn(app, target):
     if target is None:
         app.gp.status("MIDI learn cancelled")
     elif not app.midi.port:
-        app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)} - no port is open yet (Playback > MIDI controller)")
+        app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)} - no port is open yet (Window > MIDI controller)")
     else:
         app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)}")
 

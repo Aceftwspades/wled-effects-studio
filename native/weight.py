@@ -166,8 +166,8 @@ NEEDS = {
 }
 WHY = {"graph": "no graph is open", "sel": "select a node first", "sel2": "select two nodes or more",
        "sel3": "select three nodes or more", "clip": "nothing copied yet", "undo": "nothing to undo",
-       "redo": "nothing to redo", "device": "no device: Device > Devices... to choose one",
-       "stream": "no device: Device > Devices... to choose one", "sub": "select a sub-graph node (or enter one)",
+       "redo": "nothing to redo", "device": "no device: Window > Devices... to choose one",
+       "stream": "no device: Window > Devices... to choose one", "sub": "select a sub-graph node (or enter one)",
        "preview": "no pin is being previewed", "repeat": "nothing to repeat yet"}
 
 
