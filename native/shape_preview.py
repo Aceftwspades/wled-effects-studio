@@ -14,15 +14,15 @@ Three ways to light it:
     path = save(app, frames)                # export/shape_preview.gif (+ .png of the first frame)
 """
 import os
-import colorsys
 import numpy as np
 
 from native import render, gif, live_out
 
 
 def _colour_of_part(k, n):
-    r, g, b = colorsys.hsv_to_rgb((k * 0.61803) % 1.0, 0.75, 1.0)
-    return np.array([r * 255, g * 255, b * 255], np.uint8)
+    """Part k's colour - the shape editor's (shape_view.part_colour), so the preview matches the view."""
+    from native.shape_view import part_colour
+    return part_colour(k)
 
 
 def frame_colours(app, eng, mode, wt, dt):

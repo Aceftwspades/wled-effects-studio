@@ -34,7 +34,7 @@ import dearpygui.dearpygui as dpg
 
 from native.textures import registry
 
-from native.render import FACES6 as FACES, _camera, floor_segments, FLOOR, UNLIT, UNLIT_BELOW, DOT_POINT
+from native.render import FACES6 as FACES, Cam, floor_segments, FLOOR, FLOOR_POOL, FLOOR_STEP, UNLIT, UNLIT_BELOW, DOT_POINT
 
 N = 8            # sub-quads across a face
 FOV = 38.0
@@ -42,24 +42,27 @@ FOV = 38.0
 
 def _floor_items(parent):
     """The floor's segments, made hidden - after the background, before
-    what stands on it (a drawlist draws in the order it was made)."""
+    what stands on it (a drawlist draws in the order it was made); a pool
+    of them, as a floor's step (a shape's round distances) sets how many
+    it takes."""
     return [dpg.draw_line((0, 0), (0, 0), color=FLOOR + (0,), thickness=1, show=False, parent=parent)
-            for _ in floor_segments(0.0)]
+            for _ in range(FLOOR_POOL)]
 
 
-def _place_floor(items, on, z, eye, R, f, size, ox, oy):
+def _place_floor(items, on, z, cam, ox, oy, step=None):
     """The floor's segments for this camera: faint lines on the plane z,
-    fading from the middle; hidden when it is off or seen from below."""
-    segs = floor_segments(z)
-    show = on and eye[2] > z + 0.02
-    for q, (p0, p1, a) in zip(items, segs):
-        if not show:
+    fading from the middle; hidden when it is off or seen from below.
+    `step`: (step, origin) of its lines in the fitted space."""
+    st, org = step or (FLOOR_STEP, (0.0, 0.0))
+    segs = floor_segments(z, step=st, origin=org) if on and cam.eye[2] > z + 0.02 else []
+    for k, q in enumerate(items):
+        if k >= len(segs):
             dpg.configure_item(q, show=False); continue
-        c = (np.stack([p0, p1]) - eye) @ R.T
-        if np.any(c[:, 2] > -0.05):
+        p0, p1, a = segs[k]
+        sx, sy, ok, _ = cam.screen(np.stack([p0, p1]))
+        if not ok.all():
             dpg.configure_item(q, show=False); continue
-        s = [(ox + size * 0.5 + f * x / -zz, oy + size * 0.5 - f * y / -zz) for x, y, zz in c]
-        dpg.configure_item(q, p1=s[0], p2=s[1], color=FLOOR + (int(255 * a),), show=True)
+        dpg.configure_item(q, p1=(ox + sx[0], oy + sy[0]), p2=(ox + sx[1], oy + sy[1]), color=FLOOR + (int(255 * a),), show=True)
 
 
 class CubeQuads:
@@ -131,18 +134,20 @@ class CubeQuads:
         ox, oy = (self.w - self.size) * 0.5, (self.h - self.size) * 0.5
         dpg.configure_item(self.bg_item, texture_tag=tex, pmin=(ox, oy), pmax=(ox + self.size, oy + self.size), show=True)
 
-    def camera(self, yaw, pitch, dist, six=False):
+    def camera(self, yaw, pitch, dist, six=False, look=None, ortho=False):
         """Project every corner; a face pointing away is hidden, and so is
         the bottom unless the cube has six. Nothing is touched when the
         camera and size are as they were."""
-        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), self.size, self.w, self.h, bool(six), self.floor)
+        lk = tuple(np.round(np.asarray(look if look is not None else (0, 0, 0), np.float64), 4))
+        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), lk, bool(ortho), self.size, self.w, self.h, bool(six), self.floor)
         if key == self._last or not self.size:
             return
         self._last = key
         size = self.size
-        eye, R = _camera(yaw, pitch, dist)
-        f = (size * 0.5) / np.tan(np.radians(FOV) * 0.5)
-        _place_floor(self.floor_items, self.floor, -1.1, eye, R, f, size, (self.w - size) * 0.5, (self.h - size) * 0.5)
+        cam = Cam(yaw, pitch, dist, size, look, ortho, FOV)
+        eye = cam.eye
+        ox, oy = (self.w - size) * 0.5, (self.h - size) * 0.5
+        _place_floor(self.floor_items, self.floor, -1.1, cam, ox, oy)
         a = np.linspace(-1.0, 1.0, N + 1)
         for fi, fc in enumerate(FACES):
             c = fc["corners"]
@@ -156,14 +161,12 @@ class CubeQuads:
             o, ea, eb = c[0], c[1] - c[0], c[3] - c[0]
             aa, bb = np.meshgrid(a, a)                            # (N+1, N+1): bb rows, aa cols
             pts = o + ((aa + 1) / 2)[..., None] * ea + ((bb + 1) / 2)[..., None] * eb
-            cam = (pts.reshape(-1, 3) - eye) @ R.T
-            if np.any(cam[:, 2] > -0.05):
+            sx, sy, ok, _ = cam.screen(pts.reshape(-1, 3))
+            if not ok.all():
                 for q in quads:
                     dpg.configure_item(q, show=False)
                 continue
-            sx = (self.w - size) * 0.5 + size * 0.5 + f * cam[:, 0] / -cam[:, 2]
-            sy = (self.h - size) * 0.5 + size * 0.5 - f * cam[:, 1] / -cam[:, 2]
-            scr = np.stack([sx, sy], 1).reshape(N + 1, N + 1, 2)
+            scr = np.stack([ox + sx, oy + sy], 1).reshape(N + 1, N + 1, 2)
             k = 0
             for j in range(N):
                 for i in range(N):
@@ -206,9 +209,10 @@ class PointQuads:
         self.dot_tex = f"{tag}_dot"
         self.set_points(pos)
 
-    def set_points(self, pos):
-        """The LEDs' positions: (n, 3), Z up, any units - fitted to the frame
-        the way render_points fits them. A new count remakes the squares."""
+    def set_points(self, pos, frame=None):
+        """The LEDs' positions: (n, 3), Z up, any units - fitted to `frame`
+        ((centre, extent); their own, the way render_points fits them, when
+        None). A new count remakes the squares."""
         from native.render import frame_of
         pos = np.asarray(pos, np.float32).reshape(-1, 3)
         n = len(pos)
@@ -233,10 +237,19 @@ class PointQuads:
                 self.dot_items.append(dpg.draw_image_quad(self.dot_tex, z, z, z, z, show=False, parent=self.tag))
                 self.items.append(dpg.draw_image_quad(self.tex, z, z, z, z, show=False, parent=self.tag))
         self.pos = pos
-        c, ext = frame_of(pos)
+        self.frame = frame
+        c, ext = frame or frame_of(pos)
         self.P = (pos - c) * (1.0 / (ext or 1.0))
         self.ext = ext or 1.0
         self._last = None
+
+    def set_frame(self, frame):
+        """The same LEDs fitted by another frame (the view's, held while a
+        shape is built, or eased to a new one)."""
+        if frame is self.frame or (frame is not None and self.frame is not None and np.array_equal(frame[0], self.frame[0])
+                                   and frame[1] == self.frame[1]):
+            return
+        self.set_points(self.pos, frame)
 
     def resize(self, size, w=None, h=None):
         w, h = max(size, w or size), max(size, h or size)
@@ -247,28 +260,25 @@ class PointQuads:
 
     background = CubeQuads.background
 
-    def camera(self, yaw, pitch, dist):
+    def camera(self, yaw, pitch, dist, look=None, ortho=False, floor_step=None):
         """Every square placed for this camera, far first. Nothing is touched
-        when the camera and size are as they were."""
-        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), self.size, self.w, self.h, self.floor, self.dots)
+        when the camera and size are as they were. `floor_step`: (step,
+        origin) of the floor's lines, a shape's round distances."""
+        lk = tuple(np.round(np.asarray(look if look is not None else (0, 0, 0), np.float64), 4))
+        fs = None if floor_step is None else (round(float(floor_step[0]), 5), tuple(np.round(floor_step[1], 4)))
+        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), lk, bool(ortho), fs, self.size, self.w, self.h, self.floor, self.dots)
         if key == self._last or not self.size or self.n == 0:
             return
         self._last = key
         size = self.size
-        eye, R = _camera(yaw, pitch, dist)
-        f0 = (size * 0.5) / np.tan(np.radians(FOV) * 0.5)
-        zs = self.P[:, 2][np.isfinite(self.P[:, 2])]
-        _place_floor(self.floor_items, self.floor, (float(zs.min()) - 0.08) if len(zs) else -1.1, eye, R, f0, size,
-                     (self.w - size) * 0.5, (self.h - size) * 0.5)
-        cam = (self.P - eye) @ R.T
-        depth = -cam[:, 2]
-        ok = np.isfinite(depth) & (depth > 0.05)
-        f = (size * 0.5) / np.tan(np.radians(FOV) * 0.5)
-        d = np.where(ok, depth, 1.0)
+        cam = Cam(yaw, pitch, dist, size, look, ortho, FOV)
         ox, oy = (self.w - size) * 0.5, (self.h - size) * 0.5
-        sx = ox + size * 0.5 + f * cam[:, 0] / d
-        sy = oy + size * 0.5 - f * cam[:, 1] / d
-        half = np.maximum(1.0, (f * (self.LED / self.ext)) / d)
+        zs = self.P[:, 2][np.isfinite(self.P[:, 2])]
+        _place_floor(self.floor_items, self.floor, (float(zs.min()) - 0.08) if len(zs) else -1.1, cam, ox, oy, floor_step)
+        sx, sy, ok, depth = cam.screen(self.P)
+        sx = ox + sx
+        sy = oy + sy
+        half = np.maximum(1.0, cam.scale(depth) * (self.LED / self.ext))
         order = np.argsort(np.where(ok, -depth, np.inf))          # far first; the NaN and behind-the-eye last
         cols, rows = self.cols, self.rows
         for k, i in enumerate(order):

@@ -38,15 +38,22 @@ def _c():
     return chrome
 
 
+def _shape_view():
+    from native import shape_view
+    return shape_view
+
+
 def _parts(app):
     g = app.project.geometry
     return g.params.get("parts") if g.kind == "shape" else None
 
 
-def _apply(app, parts=None, undo_from=None, **more):
+def _apply(app, parts=None, undo_from=None, refit=None, **more):
     """The parts (and any other shape option) into a new geometry, with an
     undo step kept (`undo_from`: the params to go back to, when the
-    geometry already moved on - a drag)."""
+    geometry already moved on - a drag). `refit`: "grow" when parts came
+    in (the view's held frame grows to take them), "all" when the shape
+    was replaced (fitted afresh); a move never refits."""
     g = app.project.geometry
     p = dict(g.params) if g.kind == "shape" else {}
     if parts is not None:
@@ -62,6 +69,9 @@ def _apply(app, parts=None, undo_from=None, **more):
     if was != "shape" and dpg.does_item_exist("geom_kind"):
         dpg.set_value("geom_kind", "shape"); app.rebuild_geom_fields()
     refresh(app)
+    if refit:
+        from native import view3d
+        view3d.refit(app, grow=(refit == "grow"))
 
 
 def undo(app):
@@ -91,7 +101,7 @@ def build(app):
             dpg.add_text("", tag="shape_desc", color=c.DIM, wrap=px(520))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Undo", small=True, callback=lambda: undo(app))
-            dpg.add_button(label="Clear", small=True, callback=lambda: _apply(app, parts=[]))
+            dpg.add_button(label="Clear", small=True, callback=lambda: _apply(app, parts=[], refit="all"))
             weight.danger(dpg.last_item())
             dpg.add_button(label="Open...", small=True, callback=lambda: dpg.show_item("shape_open_dialog"))
             c.tip("a shape file (.shape.json) saved from here")
@@ -109,6 +119,12 @@ def build(app):
             c.tip("the logical layout the effects see: one strip in wiring order, or a grid seen from the front")
             dpg.add_button(label="Segment per part", small=True, callback=lambda: segments_per_part(app))
             c.tip("each part its own WLED segment - effect, palette, sliders - up to eight")
+            form.inline("colours")
+            dpg.add_combo(["the parts", "the effect"], tag="shape_colours", width=px(100),
+                          default_value="the effect" if app.prefs.get("shape_colours") == "effect" else "the parts",
+                          callback=lambda s, v: _shape_view().set_mode(app, "effect" if v == "the effect" else "parts"))
+            c.tip("what the 3-D view shows while you build: each part in a colour of its own (the selected one bright, "
+                  "the rest dimmed, the wiring drawn on them), or the effect the sim runs")
         kinds = [k for k in shapes.KINDS if k != "reference"]
         for row in (kinds[:5], kinds[5:]):
             with dpg.group(horizontal=True):
@@ -365,7 +381,7 @@ def add_part(app, kind):
                        float(last.get("pos", [0, 0, 0])[1]), float(last.get("pos", [0, 0, 0])[2])]
     parts.append(part)
     app._shape_sel = len(parts) - 1
-    _apply(app, parts)
+    _apply(app, parts, refit="grow")
 
 
 def del_part(app, i):
@@ -383,7 +399,7 @@ def dup_part(app, i):
         q["name"] = q.get("name", q["kind"]) + " copy"
         parts.insert(i + 1, q)
         app._shape_sel = i + 1
-        _apply(app, parts)
+        _apply(app, parts, refit="grow")
 
 
 def move_part(app, i, d):
@@ -453,7 +469,7 @@ def split_polyhedron(app, i):
         pieces = shapes.split_part(parts[i])
         parts[i:i + 1] = pieces
         app._shape_sel = i
-        _apply(app, parts)
+        _apply(app, parts, refit="grow")
         app.gp.status(f"split into {len(pieces)} parts, the LEDs where they were")
 
 
@@ -556,7 +572,7 @@ def mirror_part(app, i, axis):
     if 0 <= i < len(parts):
         parts.insert(i + 1, shapes.mirrored(parts[i], axis))
         app._shape_sel = i + 1
-        _apply(app, parts)
+        _apply(app, parts, refit="grow")
 
 
 def array_part(app, i):
@@ -564,7 +580,7 @@ def array_part(app, i):
     if 0 <= i < len(parts):
         n = int(dpg.get_value("shape_array_n")); off = list(dpg.get_value("shape_array_off"))[:3]
         parts[i + 1:i + 1] = shapes.arrayed(parts[i], n, off)
-        _apply(app, parts)
+        _apply(app, parts, refit="grow")
 
 
 def pop_point(app, i):
@@ -712,7 +728,7 @@ def import_file(app, path):
             new, notes = shape_io.read_layout(path)
             parts += new
             app._shape_sel = len(parts) - 1
-            _apply(app, parts)
+            _apply(app, parts, refit="grow")
             app.gp.status(f"{len(new)} model(s) from the layout" + (f"; approximated: {'; '.join(notes[:4])}" + (" ..." if len(notes) > 4 else "") if notes else ""))
             return
         elif ext == ".xmodel":
@@ -733,7 +749,7 @@ def import_file(app, path):
         return
     parts.append(part)
     app._shape_sel = len(parts) - 1
-    _apply(app, parts, **more)
+    _apply(app, parts, refit="grow", **more)
     app.gp.status(note)
 
 
@@ -779,25 +795,45 @@ def open_shape(app, path):
     except Exception as e:
         app.gp.status(f"could not open {os.path.basename(path)}: {e}"); return
     app._shape_sel = 0
-    _apply(app, **g.params)
+    _apply(app, refit="all", **g.params)
 
 
-# --- the 3-D view: placing and dragging LEDs, the rings round the selected part ------------
-def _view(app):
-    """(rect_min, size, ext) of the 3-D image, or None when it is not the point cloud."""
-    g = app.project.geometry
-    if g.kind != "shape" or not dpg.does_item_exist("cube_img") or not dpg.is_item_shown("cube_win"):
-        return None
-    st = dpg.get_item_state("cube_img")
-    if "rect_min" not in st:
-        return None
-    (x0, y0), (w, h) = st["rect_min"], st["rect_size"]
-    if w <= 0:
-        return None
-    pq = getattr(app, "point_quads", None)
-    if pq is not None and pq.size:                        # the GPU cloud: a square of the view's side, centred in its drawlist
-        x0 += (w - pq.size) * 0.5; y0 += (h - pq.size) * 0.5; w = pq.size
-    return (x0, y0), float(w), render.frame_of(g.pos)
+# --- the 3-D view: the selection, placing and dragging LEDs by hand -------------------------
+# (what the view draws while a shape is built - the parts' colours, the wiring, the part under
+# the pointer - is shape_view's; the camera is view3d's)
+def selection(app):
+    """The selected parts: a set of indices."""
+    parts = _parts(app) or []
+    i = _sel(app)
+    return {i} if 0 <= i < len(parts) else set()
+
+
+def view_colours(app, rgb):
+    """The 3-D view's colours this frame (shape_view.colours)."""
+    from native import shape_view
+    return shape_view.colours(app, rgb)
+
+
+def view_key_ok(app, action):
+    """Whether one of the 3-D view's keys applies now: the camera's always."""
+    return True
+
+
+def frame_selection(app):
+    """F over the view: the camera on the selected parts while a shape is
+    built, else everything."""
+    from native import view3d, shape_view
+    parts = _parts(app)
+    sel = selection(app)
+    if view3d.editing(app) and parts and sel:
+        g = shape_view.drawn(app)
+        if g is not None and g.kind == "shape":
+            W, owner = shape_view.wiring(g)
+            pts = W[np.isin(owner, sorted(sel))]
+            if len(pts):
+                view3d.frame_points(app, pts)
+                return
+    view3d.home(app)
 
 
 def _plane(app):
@@ -807,27 +843,32 @@ def _plane(app):
 
 def _hit(app, mx, my):
     """The LED under the pointer: (part index, point index within a points part) or None."""
-    v = _view(app)
+    from native import shape_view
+    v = shape_view.view(app)
     if v is None:
         return None
-    (x0, y0), size, ext = v
+    g = shape_view.drawn(app)
+    got = shape_view.pick(app, v, mx, my, g)
+    if got is None:
+        return None
+    k, pi = got
     parts = _parts(app) or []
-    pos, _, owner = shapes.resolve(parts)
-    if len(pos) == 0:
+    if not (0 <= pi < len(parts)):
         return None
-    sx, sy, ok = render.project(pos, size, app.yaw, app.pitch, app.dist, frame=ext)
-    d = np.hypot(sx + x0 - mx, sy + y0 - my)
-    d[~ok] = np.inf
-    k = int(np.argmin(d))
-    if d[k] > 9:
-        return None
-    pi = int(owner[k])
     if parts[pi]["kind"] != "points":
         return (pi, None)
     # which of the part's points: its index in the part's order (reverse and the transform kept)
+    _, owner = shape_view.wiring(g)
     n_before = int((owner[:k] == pi).sum())
     n = shapes.part_count(parts[pi])
     return (pi, (n - 1 - n_before) if parts[pi].get("reverse") else n_before)
+
+
+def _local(part, p):
+    """A point of the shape into a part's own frame: its move, rotation and scale undone."""
+    R = shapes.rotation(*part.get("rot", [0, 0, 0]))
+    s = part.get("scale", 1.0); s = np.asarray(s if isinstance(s, list) else [s, s, s], np.float32)
+    return ((np.asarray(p, np.float32) - np.asarray(part.get("pos", [0, 0, 0]), np.float32)) @ R) / np.where(s != 0, s, 1)
 
 
 def click(app, at=None):
@@ -835,7 +876,8 @@ def click(app, at=None):
     picked up, else a new one is put on the plane. True when handled."""
     if not getattr(app, "_shape_place", False) or _parts(app) is None:
         return False
-    v = _view(app)
+    from native import shape_view
+    v = shape_view.view(app)
     if v is None:
         return False
     mx, my = at or dpg.get_mouse_pos(local=False)
@@ -844,9 +886,8 @@ def click(app, at=None):
         app._shape_drag = hit
         app._shape_sel = hit[0]
         return True
-    (x0, y0), size, ext = v
     axis, value = _plane(app)
-    p = render.unproject(mx - x0, my - y0, size, app.yaw, app.pitch, app.dist, ext, axis, value)
+    p = shape_view.unproject(v, mx, my, axis, value)
     if p is None:
         app.gp.status("the plane is edge-on here: turn the view, or choose another plane"); return True
     parts = json.loads(json.dumps(_parts(app) or []))
@@ -855,10 +896,7 @@ def click(app, at=None):
         parts.append(shapes.new_part("points", points=[])); parts[-1]["name"] = f"placed {sum(1 for q in parts if q['kind'] == 'points')}"
         sel = len(parts) - 1
     part = parts[sel]
-    # into the part's own frame: undo its move, rotation and scale
-    R = shapes.rotation(*part.get("rot", [0, 0, 0]))
-    s = part.get("scale", 1.0); s = np.asarray(s if isinstance(s, list) else [s, s, s], np.float32)
-    local = ((np.asarray(p, np.float32) - np.asarray(part.get("pos", [0, 0, 0]), np.float32)) @ R) / np.where(s != 0, s, 1)
+    local = _local(part, p)
     if part.get("reverse"):
         part["params"].setdefault("points", []).insert(0, [round(float(c), 3) for c in local])
     else:
@@ -873,13 +911,13 @@ def drag(app):
     hit = getattr(app, "_shape_drag", None)
     if not hit:
         return False
-    v = _view(app)
+    from native import shape_view
+    v = shape_view.view(app)
     if v is None:
         return True
-    (x0, y0), size, ext = v
     mx, my = dpg.get_mouse_pos(local=False)
     axis, value = _plane(app)
-    p = render.unproject(mx - x0, my - y0, size, app.yaw, app.pitch, app.dist, ext, axis, value)
+    p = shape_view.unproject(v, mx, my, axis, value)
     if p is not None:
         app._shape_drag_to = [float(c) for c in p]
     return True
@@ -897,9 +935,7 @@ def release(app):
     parts = json.loads(json.dumps(_parts(app) or []))
     pi, k = hit
     part = parts[pi]
-    R = shapes.rotation(*part.get("rot", [0, 0, 0]))
-    s = part.get("scale", 1.0); s = np.asarray(s if isinstance(s, list) else [s, s, s], np.float32)
-    local = ((np.asarray(to, np.float32) - np.asarray(part.get("pos", [0, 0, 0]), np.float32)) @ R) / np.where(s != 0, s, 1)
+    local = _local(part, to)
     pts = part["params"].get("points") or []
     if 0 <= k < len(pts):
         pts[k] = [round(float(c), 3) for c in local]
@@ -907,91 +943,11 @@ def release(app):
     return True
 
 
-def _covers(app):
-    """What is drawn over the view - floating frames, dialogs, open menus:
-    (x0, y0, x1, y1) each - so no mark lands on top of it (the list the
-    gradient frames keep off too)."""
-    return app.overlay_holes("cube")
-
-
-def _clear(covers, x, y, pad=0.0):
-    """Nothing covers (x, y) - with `pad`, nothing within pad of it either (a ring's radius)."""
-    return not any(a - pad <= x <= c + pad and b - pad <= y <= d + pad for a, b, c, d in covers)
-
-
-def _poll_reference(app):
-    """The reference meshes as wireframes over the 3-D view, redrawn when
-    the camera or the shape moves."""
-    if not dpg.does_item_exist("ref_dl"):
-        return
-    v = _view(app)
-    parts = _parts(app)
-    segs = shapes.reference_segments(parts) if (v is not None and parts) else None
-    covers = _covers(app)
-    key = None if segs is None or len(segs) == 0 else (round(app.yaw, 4), round(app.pitch, 4), round(app.dist, 3), v[0], v[1], len(segs), id(parts), tuple(covers))
-    if key == getattr(app, "_ref_key", "unset"):
-        return
-    app._ref_key = key
-    dpg.delete_item("ref_dl", children_only=True)
-    if key is None:
-        return
-    (x0, y0), size, ext = v
-    ax, ay, aok = render.project(segs[:, 0], size, app.yaw, app.pitch, app.dist, frame=ext)
-    bx, by, bok = render.project(segs[:, 1], size, app.yaw, app.pitch, app.dist, frame=ext)
-    col = (150, 160, 180, 110)
-    inside = lambda x, y: 0 <= x <= size and 0 <= y <= size          # the view's square only: no lines into the panels
-    for i in range(len(segs)):
-        if aok[i] and bok[i] and inside(ax[i], ay[i]) and inside(bx[i], by[i]) and _clear(covers, x0 + ax[i], y0 + ay[i]) and _clear(covers, x0 + bx[i], y0 + by[i]):
-            dpg.draw_line((x0 + ax[i], y0 + ay[i]), (x0 + bx[i], y0 + by[i]), color=col, thickness=1, parent="ref_dl")
-
-
 def poll(app):
-    """Rings round the selected part's LEDs while the frame shows; the
-    dragged LED's new place as a cross; the reference wireframes always."""
-    _poll_reference(app)
+    """Per frame: the preview's frames, a drag's commit, and the view's
+    overlay (shape_view: the wiring, the part under the pointer, the
+    reference wireframes)."""
     _poll_preview(app)
     _poll_pending(app)
-    if not dpg.does_item_exist("shape_dl"):
-        return
-    dpg.delete_item("shape_dl", children_only=True)
-    if not dpg.is_item_shown(TAG):
-        return
-    v = _view(app)
-    parts = _parts(app)
-    if v is None or not parts:
-        return
-    (x0, y0), size, ext = v
-    sel = _sel(app)
-    pos, _, owner = shapes.resolve(parts)
-    mine = np.nonzero(owner == sel)[0][:600]
-    if len(mine) == 0:
-        return
-    c = _c()
-    covers = _covers(app)
-    sx, sy, ok = render.project(pos[mine], size, app.yaw, app.pitch, app.dist, frame=ext)
-    r = max(3.0, 0.42 * (size * 0.5) / np.tan(np.radians(19.0)) / (app.dist * ext[1]) * 0.9)
-    col = tuple(c.ACCENT[:3]) + (200,)
-    for i in range(len(mine)):
-        if ok[i] and 0 <= sx[i] <= size and 0 <= sy[i] <= size and _clear(covers, x0 + sx[i], y0 + sy[i], min(r, 14)):
-            dpg.draw_circle((x0 + sx[i], y0 + sy[i]), min(r, 14), color=col, thickness=1.5, parent="shape_dl")
-    # the part's axis: a line from its centre the way "aim" points it, a dot at the tip
-    part = parts[sel]
-    ppos = np.asarray(part.get("pos", [0, 0, 0]), np.float32)
-    span = float(np.linalg.norm(pos[mine] - ppos, axis=1).max()) if len(mine) else 1.0
-    tip = ppos + (shapes.rotation(*part.get("rot", [0, 0, 0])) @ shapes.axis_of(part)).astype(np.float32) * max(1.5, span * 0.8)
-    ex, ey, eok = render.project(np.stack([ppos, tip]), size, app.yaw, app.pitch, app.dist, frame=ext)
-    if eok[0] and eok[1] and _clear(covers, x0 + ex[0], y0 + ey[0]) and _clear(covers, x0 + ex[1], y0 + ey[1]):
-        dpg.draw_line((x0 + ex[0], y0 + ey[0]), (x0 + ex[1], y0 + ey[1]), color=(255, 200, 80, 220), thickness=2, parent="shape_dl")
-        dpg.draw_circle((x0 + ex[1], y0 + ey[1]), 4, color=(255, 200, 80, 240), fill=(255, 200, 80, 200), parent="shape_dl")
-    # the wiring: a faint line from LED to LED of the selected part
-    if len(mine) > 1 and len(mine) <= 400:
-        pts = [(x0 + sx[i], y0 + sy[i]) for i in range(len(mine)) if ok[i] and _clear(covers, x0 + sx[i], y0 + sy[i])]
-        if len(pts) > 1:
-            dpg.draw_polyline(pts, color=tuple(c.ACCENT[:3]) + (90,), thickness=1, parent="shape_dl")
-    to = getattr(app, "_shape_drag_to", None)
-    if to is not None:
-        tx, ty, tok = render.project(np.asarray([to], np.float32), size, app.yaw, app.pitch, app.dist, frame=ext)
-        if tok[0]:
-            X, Y = x0 + tx[0], y0 + ty[0]
-            dpg.draw_line((X - 8, Y), (X + 8, Y), color=(255, 255, 255, 220), thickness=2, parent="shape_dl")
-            dpg.draw_line((X, Y - 8), (X, Y + 8), color=(255, 255, 255, 220), thickness=2, parent="shape_dl")
+    from native import shape_view
+    shape_view.poll(app)

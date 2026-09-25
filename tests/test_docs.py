@@ -56,7 +56,7 @@ def test_every_frame_button_is_in_the_guide():
     guide = _guide()
     missing = []
     for f in sorted(os.listdir(os.path.join(ROOT, "native"))):
-        if f.endswith("_ui.py") or f in ("chrome.py", "app.py", "messages.py"):
+        if f.endswith("_ui.py") or f in ("chrome.py", "app.py", "messages.py", "view3d.py", "shape_view.py"):
             for b in re.findall(r'add_button\(label="([^"]+)"', _source(f)):
                 if len(b) >= 4 and b not in GENERIC and not _has(guide, b.replace("\\n", " ")):
                     missing.append(f"{f}: {b}")

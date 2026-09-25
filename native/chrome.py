@@ -31,6 +31,9 @@ ACCENT = (90, 169, 230, 255)
 AMBER  = (255, 184, 70, 255)
 RED    = (255, 96, 96, 255)
 GREEN  = (110, 220, 150, 255)
+BG     = (14, 16, 20, 255)          # the theme's ground, panels and lines (for what is drawn, not styled: overlays)
+PANEL  = (21, 24, 30, 255)
+LINE   = (36, 41, 50, 255)
 ICON   = 16
 
 LAYOUTS = (("net", "Logical net", "view_net"), ("cube", "3-D view", "view_cube"), ("both", "Net and 3-D", "view_both"),
@@ -226,8 +229,15 @@ def build_menus(app):
                                       callback=lambda s, a, u: room.set_minimap(app, corner=u))
             dpg.add_separator()
             with dpg.menu(label="Camera"):
-                for name in ("isometric", "front", "back", "left", "right", "top", "below"):
-                    dpg.add_menu_item(label=name.capitalize(), user_data=name, callback=lambda s, a, u: app.set_camera(u))
+                for name, action in (("isometric", "view_iso"), ("front", "view_front"), ("back", "view_back"), ("left", "view_left"),
+                                     ("right", "view_side"), ("top", "view_top"), ("below", "view_below")):
+                    _mi(app, name.capitalize(), action, callback=lambda s, a, u: app.run_action(u), user_data=action)
+                dpg.add_separator()
+                _mi(app, "Orthographic", "view_ortho", check=True, tag="menu_view_ortho", callback=lambda: app.run_action("view_ortho"))
+                tip("no perspective: a size is the same across the view - for lining parts up (the views from the front, "
+                    "the side and above turn it on; turning the view by hand turns it off again)")
+                _mi(app, "Frame the selection", "view_frame", callback=lambda: app.run_action("view_frame"))
+                _mi(app, "Everything in view", "view_home", callback=lambda: app.run_action("view_home"))
                 dpg.add_separator()
                 for k in (1, 2, 3):
                     dpg.add_menu_item(label=f"Saved view {k}", user_data=str(k), callback=lambda s, a, u: app.set_camera(u))
@@ -868,9 +878,10 @@ def refresh_keys(app):
         return
     dpg.delete_item("keys_rows", children_only=True)
     last = None
-    for action, label, default, ctx in sorted(ACTIONS, key=lambda a: a[3] != "global"):   # each context's keys together, once
-        if ctx != last:
-            typeface.label(dpg.add_text("ANYWHERE" if ctx == "global" else "IN THE GRAPH", parent="keys_rows", color=ACCENT))
+    heads = {"global": "ANYWHERE", "graph": "IN THE GRAPH", "view": "OVER THE 3-D VIEW"}
+    for action, label, default, ctx in sorted(ACTIONS, key=lambda a: list(heads).index(a[3]) if a[3] in heads else 9):
+        if ctx != last:                                  # each context's keys together, once
+            typeface.label(dpg.add_text(heads.get(ctx, ctx.upper()), parent="keys_rows", color=ACCENT))
             last = ctx
         with dpg.group(horizontal=True, parent="keys_rows"):
             b = app.keys.label(action)
@@ -1410,6 +1421,8 @@ def _palette_fill(app, text):
     for action, label, _, where in ACTIONS:
         if where == "graph" and ctx != "graph":
             continue
+        if where == "view":
+            label = f"3-D view: {label[0].lower()}{label[1:]}"         # its own words say what it does, not where
         if text and text not in label.lower() and text not in action.replace("_", " "):
             continue
         rows.append((0 if text and label.lower().startswith(text) else 1, label, ("action", action)))
@@ -1712,7 +1725,7 @@ def build_pane_menus(app):
         ("Screenshot", lambda: setattr(app, "shot_req", True)),
         ("Record 15 s GIF", lambda: app.start_rec(15.0)),
         ("Record 15 s video", lambda: app.start_rec(15.0, "mp4")),
-        ("Reset the camera", lambda: (setattr(app, "yaw", -0.6), setattr(app, "pitch", 0.75), setattr(app, "dist", 4.6))),
+        ("Reset the camera", lambda: (app.run_action("view_iso"), app.run_action("view_home"))),
         ("Compare with another effect...", lambda: app.run_action("compare")),
         ("Full frame (E)", lambda: app.set_layout("cube")),
         ("Pop out to its own window", lambda: app.set_popout("cube", True))])

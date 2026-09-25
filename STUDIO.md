@@ -1904,6 +1904,150 @@ reaches furthest; (Cn) is the critique's number.
 
 The eighth pass is done: C1-C18 and the plain bugs, released as 1.2.0.
 
+### Ninth pass: building a shape in 3-D (September 2026)
+
+Building a shape was a form: parts typed into place in LED pitches and
+turned by three Euler angles, the 3-D view only to look at (orbit and
+zoom; no pan, no pick, no handles), every part in the effect's colour,
+the wiring order only the list's order, a path's corners not editable
+once made, no redo; a frame of ten "+ kind" buttons, import settings
+always showing, fifteen AIM controls, arrange tools behind unlabelled
+tick boxes and one-shot mirrors and arrays; and choosing "shape" added a
+ring nobody asked for. The pass moves the building into the 3-D view
+and makes the frame the inspector for exact values. (Sn) is the
+proposal's number; in the order to do them.
+
+**See what you're building**
+- [x] **Parts in their own colours** (S1) while the Shape frame is open,
+      the selected part bright and the rest dimmed, the effect's colours a
+      toggle away; the part under the pointer named with its LED range
+      and length. `native/shape_view.py` is the 3-D view's half of the
+      editor: `colours()` recolours the view's LEDs (the GPU cloud's
+      texture and the software renderer's alike) from the part each
+      logical LED belongs to - golden-ratio hues, the preview's "parts"
+      mode now reading the same `part_colour` - with the selection at full
+      brightness, the rest at 0.38 and the part under the pointer at 0.72;
+      the frame's "colours" switch (the parts / the effect) is kept in the
+      prefs. The per-LED rings round the selected part went: the colour
+      says it, at any count. The pointer's part is `pick()`: of the LEDs
+      whose square is under the point, the one drawn on top - the nearest
+      the eye (the nearest in screen distance let a neighbour nearer the
+      camera win in a small view) - named in a label with its LED range,
+      its size (a run's length for strips, rings, polygons and paths, else
+      its box) and the LED's number and place in the part.
+- [x] **The wiring on the shape** (S2): IN at LED 0, arrows along each
+      part the way it runs, END at the last LED, each lead between two
+      parts dashed and labelled with its length; any LED's number under
+      the pointer. Each part's line runs through its LEDs in wiring order
+      in its colour, faint - the selected part's in the text colour, as
+      its own would vanish into its LEDs - with chevrons spaced along its
+      path on the screen; a lead is the gap from one part's last LED to
+      the next's first less the LEDs' spacing (so a part butted on at one
+      spacing is a join and draws nothing), its label beside the dashes
+      and kept off IN and END. The whole overlay keeps off what floats
+      over the view (`visible()`, vectorised) and is redrawn each frame.
+- [x] **A camera for building** (S3): pan (middle-drag, Ctrl+drag),
+      Front / Side / Top / Perspective on the view and on keys, frame the
+      selection (F) and everything (Home), an orthographic view, the grid
+      marked in real units; the view's frame held while editing so a moved
+      part does not rescale everything. `render.Cam` is the one camera the
+      software renderer, the GPU cube and cloud, the overlays, picking and
+      the hover readout share: yaw, pitch and dist as before, plus `look`
+      (the point it circles, in the fitted space) and `ortho` (every depth
+      at the scale the look point has in perspective, so switching keeps
+      the size; the eye stood well back so the depth order holds), with
+      `screen()`, `scale()` and `ray()`. `native/view3d.py` drives it:
+      presets eased over 0.22 s (and an ease given more while one is under
+      way keeps the first's targets - a view key then Home both arrive),
+      orthographic for the six along the axes and back to perspective when
+      the view is turned by hand (Blender's auto-perspective), the pan at
+      the look point's depth, F framing the selected parts' LEDs, Home the
+      lot; the buttons at the view's top right; keys in a new "view"
+      context - 1, 3, 7 (Ctrl: the other side), 0, 5, F, Home - that apply
+      with the pointer on the view and shadow a global binding there
+      (`Keymap.set` no longer unbinds one for the other). While the frame
+      is open the view's frame is held from when it opened; a part added
+      or imported outside it grows it (eased), a move never refits.
+      **View > Camera's "front" had been the back**: the presets follow
+      the shapes' axes now (the front from -Y, X to the right, Z up - what
+      a panel faces and the grid layout projects onto), so a cube's front
+      is its S face. `native/units.py` gives a shape a density (60 LEDs a
+      metre unless set) and a unit (cm) - display only - and ruler steps
+      (1-2-5, and inches' eighths to feet) for the floor, whose lines now
+      fall on round distances through the world's origin (a pool of line
+      items on the GPU, as a step sets how many) and are named at the
+      view's foot with the camera's keys. Tests: `tests/test_view3d.py`
+      (units, the projections and rays, a pan, the floor's lines, the
+      parts' colours and runs) and the smoke's S1-S3 steps; a test hook
+      `led_at` finds an LED on the screen and stands in for the pointer
+      over it (a test's process cannot bring the window to the front).
+
+**Move things directly**
+- [ ] **Pick in the view** (S4): click a part to select it, Shift-click
+      to add or take away, Shift-drag a box; the list's tick boxes go.
+- [ ] **Handles** (S5): arrows to move along an axis, squares to move in
+      a plane, rings to turn, snapping to the grid step and 15 degrees
+      (Ctrl frees it); Blender's keys over the view - G, R, S, then X / Y /
+      Z to lock, a typed number, Enter, Esc to cancel.
+- [ ] **Snap to join** (S6): a part dragged near another's end lands one
+      LED spacing beyond its last LED, and goes after it in the wiring.
+- [ ] **A part's menu in the view** (S7): duplicate and move, mirror,
+      repeat, reverse, move in the wiring, frame, rename, hide, lock,
+      light it on the device (the wiring test), delete.
+
+**Real sizes, real objects**
+- [ ] **Real units** (S8): the shape's LED density (30, 60, 96, 144 a
+      metre or a spacing) and a unit (mm, cm, in); strips by length or
+      count, rings by diameter, leads in centimetres. The display only:
+      the device's table is fitted to its box as before; old shapes open
+      at 60 a metre.
+- [ ] **Add from a gallery** (S9): a thumbnail per kind, grouped (lines,
+      flat, solid, free, from a file), each asking its natural sizes; the
+      new part joined to the end of the selected one.
+- [ ] **The shapes people light** (S10), xLights' model types the
+      checklist: tree (strands down a cone, or a spiral), star, helix or
+      spiral, arch, concentric rings, frame (window, door, screen, room
+      edge), spokes; and a formula part - x, y and z as expressions of the
+      place along it, Pixelblaze's mapper's way. The xLights layout import
+      maps its trees, stars, arches, spinners and window frames onto them.
+- [ ] **Draw a run** (S11): click corners on the working plane (the grid
+      and 15-degree snapping, the length in centimetres and LEDs as it
+      grows); the corners handles afterwards, and a table in the frame.
+- [ ] **Live copies** (S12): repeat (a count, a step, a turn a copy, round
+      a centre, every other one reversed) and mirror as settings of a part,
+      exact mirrors; "make separate" when one copy needs its own change.
+
+**The frame as an inspector**
+- [ ] **What the selection needs** (S13): nothing selected, the shape
+      (density, units, layout, segments, a File menu); one part, its size,
+      its place (flat / upright / outward and 90-degree turns, the exact
+      angles folded), its copies and its wiring; several, align, spread
+      and match. The import settings move into the import dialog.
+- [ ] **The list is the wiring** (S14): rows dragged to reorder, a swatch
+      in the part's colour, the LED range, reverse as an arrow, hide and
+      lock, groups.
+- [ ] **Undo and redo** (S15) as the rest of the studio has them: Ctrl+Z
+      and Ctrl+Y over the view or the frame, a drag one step, the steps
+      named in the undo history.
+- [ ] **Checks as you build** (S16): two LEDs on one spot, a long lead, a
+      total that is not the outputs' count, the power - each with a "show
+      me" that frames it.
+- [ ] **A starting point** (S17): an empty editor offers objects (matrix,
+      cube, sphere, tree, star, ring disc, room outline), drawing a run,
+      importing a model or an xLights layout; choosing "shape" changes
+      nothing until one is picked.
+
+**From the real object**
+- [ ] **Map by camera** (S18): for lights that follow no pattern, the
+      device lights one LED at a time, a webcam finds each, photos from
+      two or more sides give 3-D, a missed LED is filled from its
+      neighbours in the wiring. The method of Matt Parker's 2020 tree ("I
+      wired my tree with 500 LED lights and calculated their 3D
+      coordinates"; standupmaths/xmastree2020). Tested against a
+      synthetic camera; never the cube.
+- [ ] **The guide and the tutorial** (S19) rewritten round the new flow:
+      GUIDE's shape section, a tutorial chapter building a tree.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

@@ -323,8 +323,32 @@ STEPS = [
       {"shape": ["mark", [0, 1]]}, {"shape": ["align", 2]}, {"shape": ["match", "scale"]}, {"shape": ["mark", []]}, {"shape": ["undo"]}, {"shape": ["undo"]},
       {"shape": ["segments"]}, {"seg": "remove"}, {"seg": "remove"},
       {"shape": ["preview", "parts", 1]}, {"shape": ["xmodel", "projects/default/export/_smoke.xmodel"]},
-      {"dock": ["shape", True]}, {"dock": ["shape", False]},
-      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 4.0),
+      {"dock": ["shape", True]}, {"dock": ["shape", False]}], 4.0),
+    # building in 3-D (the ninth pass, S1-S3): each part its colour, the selected one bright; the part under the
+    # pointer (the hooks' stand-in for it); the view's own keys - a view along an axis is orthographic, 5 turns it
+    # over, F frames the selected part, Home everything; a pan; the view's frame held while a part moves, grown when
+    # one is added out of it
+    ([{"layout": "cube", "with_ui": True}, {"frame": "shape"}, {"dock": ["shape", True]}, {"shape": ["clear"]},
+      {"shape": ["add", "ring"]}, {"shape": ["add", "strip"]}, {"shape": ["select", 1]}], 1.5),
+    ([{"check": "view3d.editing(app)"},
+      {"check": "(lambda out: tuple(out[30]) == tuple(shape_view.part_colour(1)) and "
+                "np.abs(out[0].astype(int) - shape_view.part_colour(0) * shape_view.DIM_OTHERS).max() <= 1)"
+                "(shape_view.colours(app, app.frame_rgb(app.eng).reshape(-1, 3)))"},
+      {"led_at": [30, "hover"]}], 0.6),
+    ([{"check": "app._shape_hover == (30, 1)"}, {"led_at": [0, "leave"]}, {"key": "1", "over": "view"}], 0.6),
+    ([{"check": "app.ortho and abs(abs(app.yaw) - np.pi) < 1e-3 and abs(app.pitch) < 1e-3"}, {"key": "5", "over": "view"}], 0.3),
+    ([{"check": "not app.ortho"}, {"key": "7", "over": "view"}, {"py": "setattr(app, '_d0', app.dist)"}, {"key": "F", "over": "view"}], 0.6),
+    ([{"check": "app.ortho and app.pitch > 1.5 and app.dist < app._d0 and np.linalg.norm(app.look) > 0.1"},
+      {"py": "view3d.pan(app, 80, 30)"}, {"key": "Home", "over": "view"}], 0.6),
+    ([{"check": "np.linalg.norm(app.look) < 1e-6 and abs(app.dist - view3d.HOME[2]) < 1e-6"},
+      {"py": "setattr(app, '_f0', view3d.frame(app))"}, {"shape": ["nudge", {"pos": [60.0, 0.0, 0.0]}]}], 0.6),
+    ([{"check": "np.allclose(view3d.frame(app)[0], app._f0[0]) and view3d.frame(app)[1] == app._f0[1]"},
+      {"shape": ["add", "panel"]}], 0.6),
+    ([{"check": "view3d.frame(app)[1] > app._f0[1]"}, {"expect": ["shape_colours", "the parts"]},
+      {"py": "shape_view.set_mode(app, 'effect')"}], 0.3),
+    ([{"check": "shape_view.colours(app, app.frame_rgb(app.eng).reshape(-1, 3)) is not None and app.prefs.get('shape_colours') == 'effect'"},
+      {"py": "shape_view.set_mode(app, 'parts')"}, {"key": "0", "over": "view"}, {"dock": ["shape", False]},
+      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
     # live output to the fake device on this machine, and the wiring test
     ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
       {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),

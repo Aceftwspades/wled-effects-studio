@@ -48,6 +48,9 @@ CHOICES = {"solid": ["tetrahedron", "cube", "octahedron", "dodecahedron", "icosa
 # the axis "aim" points: a strip's length, a panel's face, a flat part's normal
 AXIS = {"strip": (1.0, 0.0, 0.0), "panel": (0.0, -1.0, 0.0), "polyline": (1.0, 0.0, 0.0)}
 
+# the kinds that are one run of strip (a length says their size; the rest a box)
+LINEAR = ("strip", "ring", "polygon", "polyline")
+
 
 def new_part(kind, **params):
     p = dict(KINDS[kind][0])

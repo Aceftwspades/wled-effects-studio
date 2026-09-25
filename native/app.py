@@ -47,7 +47,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight
+from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight, view3d
 from native.gpucube import CubeQuads
 from native.textures import registry as tex_registry
 from native.features import Features
@@ -492,13 +492,18 @@ class App(Features):
         if g is not None and g.kind == "cube" and not eng.fx.get("o3"):
             return render.render(net if net.shape[0] == eng.rows else self.frame_rgb(eng),
                                  eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px),
-                                 unlit=unlit, floor=floor)
+                                 unlit=unlit, floor=floor, **view3d.kw(self))
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
-        pos = self.view_positions() if eng is self.eng else g.pos
-        return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
-                                    unlit=unlit, floor=floor)
+        if eng is self.eng:
+            pos = self.view_positions()
+            rgb = shape_ui.view_colours(self, rgb)             # a shape being built: each part its colour
+            return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
+                                        unlit=unlit, floor=floor, frame=view3d.frame(self), floor_step=view3d.floor_step(self),
+                                        **view3d.kw(self))
+        return render.render_points(g.pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
+                                    unlit=unlit, floor=floor, **view3d.kw(self))
 
     def fill_stats(self, pw, factor, dev_fps):
         """The stats popover's figures, this frame (while it is open): the
@@ -731,6 +736,7 @@ class App(Features):
         chrome.ACCENT = tuple(cols["accent"]) + (255,)
         chrome.TEXT = tuple(cols["text"]) + (255,)
         chrome.DIM = tuple(cols["dim"]) + (255,)
+        chrome.BG, chrome.PANEL, chrome.LINE = (tuple(cols[k]) + (255,) for k in ("bg", "panel", "line"))
         chrome.recolour_texts(was, chrome.colours())         # the lines made in the old colours
         chrome.refresh(self)
         chrome.refresh_appearance(self)
@@ -2329,7 +2335,7 @@ class App(Features):
             dpg.configure_item(tag, border=self.ui)
         # The captions, the grips, the readout and the key hints are UI too -
         # a clean picture means nothing left over the top of it.
-        for tag in ("net_cap", "cube_cap", "stat_row", "msg_row", "grip_net_win", "grip_cube_win"):
+        for tag in ("net_cap", "cube_cap", "cube_cap_tip", "stat_row", "msg_row", "grip_net_win", "grip_cube_win"):
             if dpg.does_item_exist(tag):
                 dpg.configure_item(tag, show=self.ui)
         if not self.ui and dpg.does_item_exist("stats_pop"):
@@ -2489,6 +2495,7 @@ class App(Features):
         if self.gpu_points_active():
             from native.gpucube import PointQuads
             self.point_quads = PointQuads("cube_win", "cube_img", self.view_positions())
+            self.point_quads.set_frame(view3d.frame(self))
             r = getattr(self, "_cube_rect", None)
             if r and self.ui:
                 self.point_quads.resize(self.view_side, r[2] - px(22), r[3] - CAP_H)
@@ -2628,8 +2635,11 @@ class App(Features):
         if dpg.is_item_hovered("cube_img"):
             if shape_ui.click(self):                 # placing an LED, or picking one up
                 return
-            self._dragging = True
-            self._yaw0, self._pitch0 = self.yaw, self.pitch
+            if dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl):
+                self._pan_drag = [0.0, 0.0]          # Ctrl+drag pans (a touchpad has no middle button)
+            else:
+                self._dragging = True
+                self._yaw0, self._pitch0 = self.yaw, self.pitch
         for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win") + tuple(t for t, _, _, _ in device_ui.FRAMES.values()):
             if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_hovered(tag):
                 self.focus = tag                      # a docked frame counts: Undo then goes to it
@@ -2675,6 +2685,7 @@ class App(Features):
             self.prefs["rowh"] = self.rowh
             save_prefs(self.prefs)
         self._dragging = False
+        self._pan_drag = None
         if self.layout == "graph":
             self.gp.on_release()
 
@@ -2769,6 +2780,9 @@ class App(Features):
                     self.rowh["+".join(self._cols[i])] = rf
                     self.request_layout()
             return
+        if getattr(self, "_pan_drag", None) is not None:
+            self.pan_by(app_data)
+            return
         # Keyed to whether the drag STARTED on the cube, not to what is under
         # the pointer now, so running off the edge mid-turn does not drop it.
         if not self._dragging:
@@ -2778,8 +2792,28 @@ class App(Features):
         # size the window is. A fixed radians-per-pixel means the same hand
         # movement does something different after you resize.
         k = 3.14159265 / max(120, self.view_side)
-        self.yaw = self._yaw0 + dx * k
-        self.pitch = max(-1.45, min(1.45, self._pitch0 + dy * k))
+        view3d.orbit(self, self._yaw0 + dx * k, self._pitch0 + dy * k)
+
+    def pan_by(self, app_data):
+        """A drag with the pan held (middle, or Ctrl+left): the step since the last."""
+        _, dx, dy = app_data
+        last = self._pan_drag
+        view3d.pan(self, dx - last[0], dy - last[1])
+        self._pan_drag = [dx, dy]
+
+    def on_mid_click(self, sender, app_data):
+        if dpg.does_item_exist("cube_img") and dpg.is_item_hovered("cube_img"):
+            self._pan_drag = [0.0, 0.0]              # middle-drag on the 3-D view pans it
+
+    def on_mid_drag(self, sender, app_data):
+        if getattr(self, "_pan_drag", None) is not None:
+            self.pan_by(app_data)
+            return
+        self.gp.on_mid_drag((app_data[1], app_data[2]))
+
+    def on_mid_release(self, sender, app_data):
+        self._pan_drag = None
+        self.gp.on_mid_release()
 
     def on_wheel(self, sender, app_data):
         if room.wheel(self, app_data):
@@ -2802,7 +2836,7 @@ class App(Features):
         if not dpg.is_item_hovered("cube_img"):
             return
         # Multiplicative, so a notch moves the same proportion at every range.
-        self.dist = max(1.9, min(14.0, self.dist * np.exp(-app_data * 0.06)))
+        view3d.zoom(self, app_data)
 
     TYPING = ("mvAppItemType::mvDragFloat", "mvAppItemType::mvDragInt",       # a number field typed into (num.py)
               "mvAppItemType::mvInputText", "mvAppItemType::mvInputInt", "mvAppItemType::mvInputFloat",
@@ -2895,6 +2929,11 @@ class App(Features):
             alt = dpg.is_key_down(dpg.mvKey_LAlt) or dpg.is_key_down(dpg.mvKey_RAlt)
             if app_data in arrows and not alt:
                 self.gp.nudge(*arrows[app_data]); return
+        if binding and self.over_view():
+            va = self.keys.lookup(binding, "view")               # the 3-D view's own keys, with the pointer on it
+            if va and self.keys.context.get(va) == "view" and shape_ui.view_key_ok(self, va):
+                self.run_action(va)
+                return
         action = self.keys.lookup(binding, "graph" if self.layout == "graph" else "global") if binding else None
         if action and len(binding) == 1 and not self.over_canvas():
             # A plain key - a letter, a digit, a sign - acts where the work is: over the views, over the graph,
@@ -2904,6 +2943,14 @@ class App(Features):
             return
         if action:
             self.run_action(action)
+
+    def over_view(self):
+        """The pointer on the 3-D view - in its pane, in its corner of the
+        graph, or full frame: its own keys (the camera's; the shape
+        editor's) apply there. (The test hooks hold it true for a moment.)"""
+        if time.time() < getattr(self, "_view_hold", 0.0):
+            return True
+        return dpg.does_item_exist("cube_win") and dpg.is_item_shown("cube_win") and dpg.is_item_hovered("cube_win")
 
     def over_canvas(self):
         """The pointer over what a plain key is for: the logical view, the
@@ -3006,6 +3053,16 @@ class App(Features):
             "wire_light":   lambda: gp.set_wire_light(not gp.wire_light()),
             "unlit_dots":   lambda: self.set_view_option("unlit_dots"),
             "view_floor":   lambda: self.set_view_option("view_floor"),
+            "view_front":   lambda: view3d.preset(self, "front"),
+            "view_back":    lambda: view3d.preset(self, "back"),
+            "view_side":    lambda: view3d.preset(self, "right"),
+            "view_left":    lambda: view3d.preset(self, "left"),
+            "view_top":     lambda: view3d.preset(self, "top"),
+            "view_below":   lambda: view3d.preset(self, "below"),
+            "view_iso":     lambda: view3d.preset(self, "isometric"),
+            "view_ortho":   lambda: view3d.toggle_ortho(self),
+            "view_frame":   lambda: shape_ui.frame_selection(self),
+            "view_home":    lambda: view3d.home(self),
             "minimap":      lambda: room.set_minimap(self, show=not self.prefs.get("minimap", True)),
             "select_all":   gp.select_all,
             "select_none":  gp.select_none,
@@ -3398,20 +3455,23 @@ class App(Features):
             dpg.set_value("cube_src_tex", self._rgba("cube_src", render.dotted(src, k, unlit) if unlit is not None
                                                      else src.repeat(k, 0).repeat(k, 1)))
             self.cube_quads.floor = floor
-            self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six)
+            self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six, **view3d.kw(self))
             self.cube_quads.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on() and self.point_quads is not None:
             pq = self.point_quads
             pos = self.view_positions()
+            fr = view3d.frame(self)
             if pos is not pq.pos and (len(pos) != pq.n or not np.array_equal(pos, pq.pos)):
-                pq.set_points(pos)                         # a part dragged, a shape changed
+                pq.set_points(pos, fr)                     # a part dragged, a shape changed
+            else:
+                pq.set_frame(fr)                           # held while a shape is built, eased when it is refitted
             unlit, floor = self.view_extras()
             pq.floor, pq.dots = floor, unlit is not None
-            pq.camera(self.yaw, self.pitch, self.dist)
+            pq.camera(self.yaw, self.pitch, self.dist, floor_step=view3d.floor_step(self), **view3d.kw(self))
             pq.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
-            pq.colours((rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3), unlit=unlit)
+            pq.colours(shape_ui.view_colours(self, (rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3)), unlit=unlit)
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on():
@@ -3480,9 +3540,9 @@ def build(app):
         dpg.add_mouse_wheel_handler(callback=app.on_wheel)
         dpg.add_mouse_drag_handler(button=dpg.mvMouseButton_Right, callback=lambda s, a: app.gp.knife_drag())
         dpg.add_mouse_release_handler(button=dpg.mvMouseButton_Right, callback=lambda s, a: app.gp.knife_end())
-        dpg.add_mouse_drag_handler(button=dpg.mvMouseButton_Middle,
-                                   callback=lambda s, a: app.gp.on_mid_drag((a[1], a[2])))
-        dpg.add_mouse_release_handler(button=dpg.mvMouseButton_Middle, callback=lambda s, a: app.gp.on_mid_release())
+        dpg.add_mouse_click_handler(button=dpg.mvMouseButton_Middle, callback=app.on_mid_click)
+        dpg.add_mouse_drag_handler(button=dpg.mvMouseButton_Middle, callback=app.on_mid_drag)
+        dpg.add_mouse_release_handler(button=dpg.mvMouseButton_Middle, callback=app.on_mid_release)
         dpg.add_key_press_handler(callback=app.on_key)
 
     self_app = [app]
@@ -3556,6 +3616,10 @@ def build(app):
                 with dpg.group(horizontal=True):
                     dpg.add_text("3-D - drag to rotate, wheel to zoom",
                                  tag="cube_cap", color=(139, 147, 163))
+                    with dpg.tooltip("cube_cap", tag="cube_cap_tip"):
+                        dpg.add_text("drag: turn it  ·  middle-drag or Ctrl+drag: pan  ·  wheel: zoom\n"
+                                     "1 front, 3 side, 7 top (Ctrl: the other side), 5 orthographic, F frame, Home everything")
+                view3d.build_buttons(app, "cube_win")
             # the graph's properties pane: what a node's settings need that
             # a node cannot hold (text, files); filled by GraphPanel._poll_props
             with dpg.child_window(tag="props_win", width=px(300), height=px(300), show=False):
@@ -3703,6 +3767,7 @@ def build(app):
     chrome.ACCENT = tuple(_cols["accent"]) + (255,)
     chrome.TEXT = tuple(_cols["text"]) + (255,)
     chrome.DIM = tuple(_cols["dim"]) + (255,)
+    chrome.BG, chrome.PANEL, chrome.LINE = (tuple(_cols[k]) + (255,) for k in ("bg", "panel", "line"))
     chrome.recolour_texts(_was, chrome.colours())    # a light project starts light, not with the dark theme's lines
     weight.rebind()                                  # the weighed buttons in the project's colours (built in the defaults)
     app._themes['present'] = present_theme()
@@ -3768,6 +3833,14 @@ SHOT_PNG = os.path.join(SHOT_DIR, "capture.png")
 CMD_FILE = os.path.join(SHOT_DIR, "command.json")
 
 
+def _hook_names(app):
+    """What a test hook's line of Python ("py", "check") has in scope."""
+    from native import shape_view, shapes, units
+    return {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
+            "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
+            "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shapes": shapes, "units": units}
+
+
 def service_command(app):
     """Drive the running app from outside, the same way a capture is asked
     for: a JSON file of commands, applied on the next tick and removed.
@@ -3824,8 +3897,11 @@ def service_command(app):
             if "key" in c:                              # test hook: a key press, by mvKey_ name
                 if c.get("over") != "panel":            # ... as if over the canvas (the hooks have no pointer)
                     app._canvas_hold = time.time() + 0.5
+                if c.get("over") == "view":             # ... or on the 3-D view, where its own keys apply
+                    app._view_hold = time.time() + 0.5
                 app.on_key(None, getattr(dpg, "mvKey_" + c["key"]))
                 app._canvas_hold = 0.0
+                app._view_hold = 0.0
             if "action" in c:                           # test hook: a keymap action by name
                 app.run_action(c["action"])
             if "bind" in c:                             # test hook: [action, binding]
@@ -3860,7 +3936,7 @@ def service_command(app):
                 (lambda op: (dpg.set_value("wled_dest", op[1]), device_ui.fetch_wled(app)) if op[0] == "fetch" else device_ui.use_wled(app, op[1]))(c["wled"])
             if "check" in c:                            # test hook: an expression that must be true (graded as expect is)
                 try:
-                    v = eval(c["check"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages})
+                    v = eval(c["check"], _hook_names(app))
                 except Exception as e:
                     v = f"raised {e!r}"
                 print(("check ok     " if v is True or (v and not isinstance(v, str)) else "EXPECT FAILED check ") + f"{c['check'][:90]}: {v!r}"[:200])
@@ -3933,7 +4009,7 @@ def service_command(app):
                 app.wiring_stop() if c["wiring_test"] == "off" else app.wiring_start(c["wiring_test"])
             if "py" in c:                               # test hook: a line of Python with `app` and `dpg` in scope, printed
                 try:
-                    print("py", repr(eval(c["py"], {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome, "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages})))
+                    print("py", repr(eval(c["py"], _hook_names(app))))
                 except Exception:
                     import traceback; traceback.print_exc()
             if "shape" in c:                            # test hook: ["add", kind] | ["import", path] | ["place", vx, vy] | ["layout", "grid"] | ["undo"]
@@ -4127,6 +4203,43 @@ def service_command(app):
                     st = dpg.get_item_state(m)
                     kids = dpg.get_item_children(m, 1) or []
                     print("menu", dpg.get_item_configuration(m).get("label"), st, "first child", dpg.get_item_state(kids[0]) if kids else None)
+            if "led_at" in c:                           # test hook: [k, "hover"|"leave"|"move"|"click"|"right"|"shift"|"ctrl"|None] - LED k (wiring order) on the 3-D view
+                from native import shape_view
+                k = int(c["led_at"][0]); how = c["led_at"][1] if len(c["led_at"]) > 1 else None
+                v = shape_view.view(app); g = shape_view.drawn(app)
+                if v is None or g is None:
+                    print("led_at none")
+                else:
+                    W, owner = shape_view.wiring(g)
+                    sx, sy, ok, _ = shape_view.project(v, W[[k]])
+                    x, y = int(round(float(sx[0]))), int(round(float(sy[0])))
+                    print("led_at", k, x, y, "part", int(owner[k]), "ok", bool(ok[0]))
+                    if how in ("hover", "leave"):
+                        app._test_pointer = (x, y) if how == "hover" else None   # the pointer's stand-in (shape_view.pointer)
+                    elif how and os.name == "nt":
+                        import ctypes, ctypes.wintypes as wt, time as _tm
+                        u32 = ctypes.windll.user32
+                        hwnd = u32.FindWindowW(None, "WLED Effects Studio")
+                        pt = wt.POINT(0, 0)
+                        if hwnd:
+                            u32.SetForegroundWindow(hwnd); u32.ClientToScreen(hwnd, ctypes.byref(pt))
+                        u32.SetCursorPos(pt.x + x, pt.y + y)
+                        u32.mouse_event(1, 0, 0, 0, 0)              # a real (zero) move: the window hears the pointer arrive
+                        print("led_at foreground", u32.GetForegroundWindow() == hwnd)
+                        if how != "move":
+                            vk = {"shift": 0x10, "ctrl": 0x11}.get(how)
+
+                            def _press(vk=vk, how=how):         # on a thread: a frame of hovering first, the loop drawing
+                                _tm.sleep(0.12)
+                                if vk:
+                                    u32.keybd_event(vk, 0, 0, 0); _tm.sleep(0.05)
+                                if how == "right":
+                                    u32.mouse_event(8, 0, 0, 0, 0); _tm.sleep(0.05); u32.mouse_event(16, 0, 0, 0, 0)
+                                else:
+                                    u32.mouse_event(2, 0, 0, 0, 0); _tm.sleep(0.05); u32.mouse_event(4, 0, 0, 0, 0)
+                                if vk:
+                                    _tm.sleep(0.05); u32.keybd_event(vk, 0, 2, 0)
+                            threading.Thread(target=_press, daemon=True).start()
             if "move" in c and os.name == "nt":         # test hook: the real pointer to viewport [x, y], no click
                 import ctypes, ctypes.wintypes as wt
                 u32 = ctypes.windll.user32
@@ -4539,7 +4652,7 @@ def write_uiref(app, path=None):
               "| Key | Does | Where |", "|---|---|---|"]
     for action, label, default, ctx in ACTIONS:
         key = app.keys.label(action) or "—"
-        lines.append(f"| `{key}` | {label} | {'anywhere' if ctx == 'global' else 'in the graph'} |")
+        lines.append(f"| `{key}` | {label} | {({'global': 'anywhere', 'view': 'over the 3-D view'}).get(ctx, 'in the graph')} |")
     lines += ["", "### Buttons", "", "Every button, with what its tooltip says.", ""]
 
     def buttons(item, out):
@@ -4862,6 +4975,7 @@ def main():
                 app.poll_stream()
                 app.poll_autosave()
                 app.poll_view_mode()
+                view3d.poll(app)                     # the camera's easing, before anything draws with it
                 app.poll_drops()
                 app.poll_popouts()
                 app.poll_menus_fit()

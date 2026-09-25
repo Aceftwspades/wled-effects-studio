@@ -170,18 +170,17 @@ class Features:
                 if w > 0 and x0 <= mx < x0 + w and y0 <= my < y0 + h:
                     vpos = np.asarray(self.view_positions(), np.float32).reshape(-1, 3)
                     if len(vpos) == len(pos):
-                        frame = render.frame_of(vpos)
-                        sx, sy, ok = render.project(vpos, float(w), self.yaw, self.pitch, self.dist, frame=frame)
-                        nrm = np.asarray(g.nrm, np.float32).reshape(-1, 3) if getattr(g, "nrm", None) is not None and np.size(g.nrm) == pos.size else None
+                        from native import view3d
+                        frame = view3d.frame(self) if g.kind != "cube" else render.frame_of(vpos)
+                        cam = view3d.cam(self, float(w))
                         P = (vpos - frame[0]) / frame[1]
-                        if nrm is None and g.kind == "cube":
-                            # a cube face's normal is the axis its LEDs sit at the end of
+                        sx, sy, ok, depth = cam.screen(P)
+                        if g.kind == "cube":
+                            # a face turned away is hidden: its LEDs are not under the pointer (a cube face's
+                            # normal is the axis its LEDs sit at the end of)
                             ax = np.argmax(np.abs(np.nan_to_num(P)), axis=1)
                             nrm = np.zeros_like(P); nrm[np.arange(len(P)), ax] = np.sign(np.nan_to_num(P)[np.arange(len(P)), ax])
-                        if nrm is not None:
-                            # a face turned away is hidden: its LEDs are not under the pointer
-                            eye, _ = render._camera(self.yaw, self.pitch, self.dist)
-                            ok = ok & (((eye - P) * nrm).sum(1) > 0)
+                            ok = ok & (((cam.eye - P) * nrm).sum(1) > 0)
                         d = np.hypot(sx + x0 - mx, sy + y0 - my)
                         d[~ok | ~lit] = np.inf
                         k = int(np.argmin(d))
@@ -189,8 +188,12 @@ class Features:
                             # within most of the way to the next LED on screen: the pitch as it is drawn here
                             dd = np.hypot(sx - sx[k], sy - sy[k]); dd[k] = np.inf; dd[~ok | ~lit] = np.inf
                             pitch = float(dd.min()) if np.isfinite(dd.min()) else 8.0
-                            if d[k] <= max(4.0, 0.75 * pitch):
-                                li = k
+                            reach = max(4.0, 0.75 * pitch)
+                            if d[k] <= reach:
+                                # the point cloud hides nothing behind a face: of those under the pointer, the one
+                                # drawn on top - the nearest the eye
+                                near = np.nonzero(d <= reach)[0]
+                                li = int(near[np.argmin(depth[near])]) if len(near) > 1 else k
         if li is None:
             return None
         part = ""
@@ -447,22 +450,24 @@ class Features:
         return list(holes)
 
     # --- the 3-D view's surroundings: camera presets, saved views, a background picture --
-    CAMERAS = {"isometric": (-0.6, 0.75, 4.6), "front": (0.0, 0.12, 4.6), "back": (3.14159, 0.12, 4.6),
-               "left": (-1.5708, 0.12, 4.6), "right": (1.5708, 0.12, 4.6), "top": (-0.6, 1.45, 4.6), "below": (-0.6, -1.3, 4.6)}
-
     def set_camera(self, name_or_view):
-        """A named camera (isometric, front, back, left, right, top, below) or (yaw, pitch, dist)."""
-        v = self.CAMERAS.get(name_or_view) if isinstance(name_or_view, str) else name_or_view
-        if not v:
-            v = (self.prefs.get("views") or {}).get(name_or_view)
+        """A named camera (isometric, front, back, left, right, top, below:
+        view3d.PRESETS), a saved view by its slot, or (yaw, pitch, dist[,
+        look x y z, ortho])."""
+        from native import view3d
+        if isinstance(name_or_view, str) and name_or_view in view3d.PRESETS:
+            view3d.preset(self, name_or_view)
+            return
+        v = name_or_view if not isinstance(name_or_view, str) else (self.prefs.get("views") or {}).get(name_or_view)
         if not v:
             return
-        self.yaw, self.pitch, self.dist = float(v[0]), float(v[1]), float(v[2])
+        view3d.restore(self, v)
         self.gp.status(f"camera: {name_or_view if isinstance(name_or_view, str) else 'set'}")
 
     def save_view(self, slot):
+        from native import view3d
         views = self.prefs.setdefault("views", {})
-        views[str(slot)] = [self.yaw, self.pitch, self.dist]
+        views[str(slot)] = view3d.saved(self)
         save_prefs(self.prefs)
         self.gp.status(f"view {slot} saved")
 

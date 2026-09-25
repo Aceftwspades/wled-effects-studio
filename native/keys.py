@@ -109,6 +109,17 @@ ACTIONS = [
     ("minimap",       "The graph's minimap: show / hide",                    "",       "graph"),
     ("unlit_dots",    "The 3-D view: unlit LEDs as dim dots, or black",      "",       "global"),
     ("view_floor",    "The 3-D view: a faint floor under the shape",         "",       "global"),
+    # over the 3-D view (the pointer on it): its camera - Blender's keypad, on the number row too
+    ("view_front",    "From the front (orthographic)",                       "1",      "view"),
+    ("view_back",     "From the back",                                       "Ctrl+1", "view"),
+    ("view_side",     "From the right side",                                 "3",      "view"),
+    ("view_left",     "From the left side",                                  "Ctrl+3", "view"),
+    ("view_top",      "From above",                                          "7",      "view"),
+    ("view_below",    "From below",                                          "Ctrl+7", "view"),
+    ("view_iso",      "The isometric view (perspective)",                    "0",      "view"),
+    ("view_ortho",    "Orthographic / perspective",                          "5",      "view"),
+    ("view_frame",    "Frame the selected parts (the shape editor), else everything", "F", "view"),
+    ("view_home",     "Everything in view: the pan and the zoom back",       "Home",   "view"),
     ("select_all",    "Select every node",                                   "A",      "graph"),
     ("select_none",   "Select nothing",                                      "Alt+A",  "graph"),
     ("select_invert", "Invert the selection",                                "Ctrl+Shift+I", "graph"),
@@ -145,7 +156,9 @@ FIXED = [("arrows / Shift+arrows", "nudge the selected nodes 10 / 1"),
          ("Backspace over a value", "back to its default; Ctrl+wheel over a dropdown steps it"),
          ("double-click a sub-graph", "enter it"),
          ("click a pin", "preview that pin's value on the cube"),
-         ("drag the bars between panes", "resize them")]
+         ("drag the bars between panes", "resize them"),
+         ("drag the 3-D view", "turn it (by hand, a view from the front, side or top goes back to perspective)"),
+         ("middle-drag or Ctrl+drag the 3-D view", "pan it; the wheel zooms")]
 
 # key name <-> Dear PyGui codes. A name may have two codes (the number row
 # and the keypad); the first is the one shown.
@@ -215,7 +228,8 @@ class Keymap:
 
     def lookup(self, binding, ctx):
         """The action bound to `binding` that applies in context `ctx`; a
-        graph binding wins over a global one while the graph is up."""
+        graph binding wins over a global one while the graph is up, a view
+        binding while the pointer is on the 3-D view."""
         found = None
         for a, b in self.bind.items():
             if b != binding:
@@ -229,11 +243,12 @@ class Keymap:
 
     def set(self, action, binding):
         """Bind; whatever else had this key in a context that would clash
-        loses it (a global key clashes with everything)."""
+        loses it (a global key clashes with everything but the 3-D view's,
+        which shadow it while the pointer is on the view)."""
         if binding:
             for a, b in list(self.bind.items()):
-                if a != action and b == binding and ("global" in (self.context[a], self.context[action])
-                                                      or self.context[a] == self.context[action]):
+                ca, cb = self.context[a], self.context[action]
+                if a != action and b == binding and (ca == cb or ("global" in (ca, cb) and "view" not in (ca, cb))):
                     self.bind[a] = ""
         self.bind[action] = binding
         self._save()
