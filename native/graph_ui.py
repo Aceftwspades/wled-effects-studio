@@ -35,6 +35,25 @@ WIRE_COLOURS = [("type colour", None), ("white", (235, 235, 235)), ("red", (235,
                 ("cyan", (90, 220, 230)), ("blue", (100, 150, 250)), ("magenta", (230, 100, 220)),
                 ("grey", (130, 135, 145))]
 CHAR_W = 7.2            # Consolas at 13 px: a fallback measure when no face is found
+WIRE_FADE = 0.22        # while a node's wires are lit, every other wire keeps this much of its colour
+WIRE_LIT = 1.6          # and a lit wire is this much thicker
+_STALE = object()       # the wires' lit set not applied (a rebuild, focus mode off): the next poll applies it
+# The app theme's minimap colour items, by Dear PyGui colour (app.apply_theme
+# fills it): set in place for a faint or a full minimap. Kept here, not in
+# app.py - the app runs as __main__, and native.app imported from another
+# module is a second copy whose state the running app never filled.
+MINIMAP_ITEMS = {}
+
+
+def minimap_faint(prefs, faint):
+    """The minimap drawn faint or full: the app theme's colours for it set
+    in place (a theme bound to the node editor does not reach imnodes'
+    minimap; set_value on the app theme's items does, the next frame)."""
+    from native.app import minimap_colours
+    for t, c in minimap_colours(prefs, faint):
+        it = MINIMAP_ITEMS.get(t)
+        if it is not None and dpg.does_item_exist(it):
+            dpg.set_value(it, c)
 
 
 NARROW_W = 46           # a knot: just wide enough for its two pin names
@@ -158,6 +177,14 @@ class GraphPanel(Glyphs):
         self.edits = 0           # bumped by touch(); what the autosave watches
         self._focus_sel = None
         self._link_normal = {}   # dpg link id -> the theme it wears when not dimmed
+        self._link_style = {}    # dpg link id -> (its colour, thin): what its lit and faded themes are made from
+        self._wires_lit = _STALE # the wires (b, inp) lit now - a node's under the pointer and the selection's - or None
+        self._wires_at = 0.0
+        self._hover_cache = (0.0, None)
+        self._mini_faint = True  # the minimap drawn faint: the pointer is not at its corner
+        self._mini_applied = None  # (faint, the theme's colour item) last set: set again when either changes
+        self._mini_corner = "br"
+        self._mini_at = 0.0
         self._label_items = []   # the wire labels drawn last frame
         self._readout_items = [] # the live readouts drawn last frame, on the frame-scope output pins
         self._scope_cache = None # (edits, {nid: scope}) - the plan's scopes for the graph as it is now
@@ -921,6 +948,7 @@ class GraphPanel(Glyphs):
         self._themes = None
         self._node_themes.clear()
         self._wire_themes.clear()
+        self._mini_applied = None                    # the minimap's colours are the new theme's: faint or full again
         self._pal_key = None
         if dpg.does_item_exist("graph_help"):
             dpg.configure_item("graph_help", color=self.pal()["soft"])
@@ -1595,6 +1623,8 @@ class GraphPanel(Glyphs):
         self._poll_bitmap_edit()
         self._poll_pads()
         self._poll_focus()
+        self._poll_wires()
+        self._poll_minimap()
         self._poll_labels()
         self._record_probes()
         self._poll_readouts()
@@ -1621,6 +1651,7 @@ class GraphPanel(Glyphs):
         dpg.delete_item("node_editor", children_only=True)
         num.prune()                                      # the old nodes' number fields are gone
         self.links.clear(); self._pins.clear(); self._ptype.clear(); self._link_normal.clear()
+        self._link_style.clear(); self._wires_lit = _STALE
         self._focus_sel = None
         if not self.graph:
             return
@@ -1942,6 +1973,7 @@ class GraphPanel(Glyphs):
     def set_focus_mode(self, on):
         self.focus_mode = bool(on)
         self._focus_sel = None
+        self._wires_lit = _STALE                 # focus mode rules the wires while it is on; off, they are lit afresh
         if not self.focus_mode and self.graph:
             self._apply_focus(None)
         self.status("focus mode: the selection and its neighbours lit" if on else "focus mode off")
@@ -1985,6 +2017,152 @@ class GraphPanel(Glyphs):
             dpg.bind_item_theme(lid, self._link_normal.get(lid, 0) if lit else self._dim_wire())
         if keep is not None:
             self._mark_problems()
+
+    # --- a node's wires lit -----------------------------------------------------------------
+    # While the pointer rests on a node (or a pin) and while nodes are
+    # selected, their wires are drawn brighter and thicker and every other
+    # wire fades to a trace of its colour, so one node's connections read
+    # in a busy graph (the critique's C11) - the nodes stay as they are
+    # (focus mode, which dims them too, rules the wires while it is on).
+    # Nothing is rebuilt: the wires' themes change when what is lit does.
+    def wire_light(self):
+        return bool(self.app.prefs.get("wire_light", True))
+
+    def set_wire_light(self, on):
+        """View > Light a node's wires, kept in the prefs."""
+        from native.app import save_prefs
+        self.app.prefs["wire_light"] = bool(on)
+        save_prefs(self.app.prefs)
+        self._wires_lit = _STALE
+        if dpg.does_item_exist("menu_wire_light"):
+            dpg.set_value("menu_wire_light", bool(on))
+        self.status("a node's wires lit while it is under the pointer or selected, the rest faded" if on
+                    else "every wire drawn as it is, whatever is selected")
+
+    def _hover_target(self):
+        """What the pointer rests on in the editor: ("pin", node, "in"/"out",
+        name), ("node", node) - a frame only where no node is - or None;
+        looked up at most every twentieth of a second."""
+        now = time.time()
+        at, what = self._hover_cache
+        if now - at < 0.05:
+            return what
+        what = None
+        if self.graph and dpg.does_item_exist("node_editor") and dpg.is_item_shown("node_editor") \
+                and dpg.is_item_hovered("node_editor"):
+            for (nid, kind, name), tag in self._pins.items():
+                if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
+                    what = ("pin", nid, kind, name)
+                    break
+            else:
+                # a frame holds nodes: the node over it wins
+                for nid, n in sorted(self.graph.nodes.items(), key=lambda kv: kv[1]["type"] == "Frame"):
+                    tag = f"gnode_{nid}"
+                    if dpg.does_item_exist(tag) and dpg.is_item_hovered(tag):
+                        what = ("node", nid)
+                        break
+        self._hover_cache = (now, what)
+        return what
+
+    def _lit_wires(self, sel, hov):
+        """The wires (b, inp) to light: the selected nodes', and the hovered
+        pin's or node's (a frame's own - none - lights nothing)."""
+        out = set()
+        for a, o, b, i in self.graph.links:
+            if a in sel or b in sel:
+                out.add((b, i))
+        if hov and hov[0] == "pin":
+            _, nid, kind, name = hov
+            out |= {(b, i) for a, o, b, i in self.graph.links
+                    if (kind == "out" and a == nid and o == name) or (kind == "in" and b == nid and i == name)}
+        elif hov:
+            nid = hov[1]
+            out |= {(b, i) for a, o, b, i in self.graph.links if a == nid or b == nid}
+        return out
+
+    def _poll_wires(self):
+        now = time.time()
+        if now - self._wires_at < 0.05:
+            return
+        self._wires_at = now
+        if not self.graph or self.focus_mode or self._drag_type is not None or not self.links:
+            return                                   # (a wire being dragged: its pins say what fits)
+        if not dpg.does_item_exist("node_editor") or not dpg.is_item_shown("node_editor"):
+            return
+        lit = None
+        if self.wire_light():
+            keys = self._lit_wires(set(self._selected()), self._hover_target())
+            lit = frozenset(keys) if keys else None
+        if lit == self._wires_lit:
+            return
+        self._wires_lit = lit
+        for lid in list(self.links):
+            self._restyle_wire(lid)
+
+    def _restyle_wire(self, lid):
+        """A wire in the theme it wears now: dimmed as the one a dragged node
+        would splice into; lit or faded while a node's wires are lit; else
+        its own."""
+        if not dpg.does_item_exist(lid):
+            return
+        if self._splice and self._splice[1] == lid:
+            dpg.bind_item_theme(lid, self._dim_wire())
+            return
+        lit = self._wires_lit if self._wires_lit is not _STALE else None
+        style = self._link_style.get(lid)
+        if lit is None or style is None or self.focus_mode:
+            dpg.bind_item_theme(lid, self._link_normal.get(lid, 0))
+            return
+        dpg.bind_item_theme(lid, self._wire_theme(style[0], style[1], "lit" if self.links.get(lid) in lit else "faded"))
+
+    def wire_state(self, b, inp):
+        """"lit", "faded" or "normal" - how the wire into (b, inp) is drawn now."""
+        lit = self._wires_lit if self._wires_lit is not _STALE else None
+        if lit is None:
+            return "normal"
+        return "lit" if (b, inp) in lit else "faded"
+
+    # --- the minimap ---------------------------------------------------------------------
+    # imnodes' own (a click on it pans the view): faint over the graph until
+    # the pointer comes to its corner, drawn full while it is there. Its
+    # corner is View > Minimap's (room.minimap_corner). Only the app's theme
+    # colours it - a theme bound to the node editor never reaches it (a
+    # probe: its background stayed the app theme's under an editor theme of
+    # another colour) - so the app theme's own colour items are set in place.
+    def minimap_rect(self):
+        """Where the minimap can be on the screen, (x0, y0, x1, y1): imnodes
+        gives it a fifth of the editor each way at its corner, in from the
+        edges by its offset (it fits the graph's shape inside that). None
+        while it is off."""
+        if not self.graph or not self.app.prefs.get("minimap", True) or not dpg.does_item_exist("node_editor"):
+            return None
+        w, h = dpg.get_item_rect_size("node_editor")
+        if w <= 0 or h <= 0:
+            return None
+        ex, ey = self.editor_origin()
+        mw, mh, off = w * 0.2, h * 0.2, 4.0
+        c = self._mini_corner
+        x0 = ex + w - off - mw if c[1] == "r" else ex + off
+        y0 = ey + h - off - mh if c[0] == "b" else ey + off
+        return (x0, y0, x0 + mw, y0 + mh)
+
+    def _poll_minimap(self):
+        now = time.time()
+        if now - self._mini_at < 0.05:
+            return
+        self._mini_at = now
+        if not dpg.does_item_exist("node_editor") or not dpg.is_item_shown("node_editor"):
+            return
+        r = self.minimap_rect()
+        faint = True
+        if r is not None:
+            mx, my = dpg.get_mouse_pos(local=False)
+            faint = not (r[0] <= mx <= r[2] and r[1] <= my <= r[3])
+        now_applied = (faint, MINIMAP_ITEMS.get(dpg.mvNodesCol_MiniMapBackground))
+        if now_applied != self._mini_applied:
+            self._mini_faint = faint
+            self._mini_applied = now_applied
+            minimap_faint(self.app.prefs, faint)
 
     # --- wire labels ---------------------------------------------------------------------
     # A label on a wire is text drawn over the editor at the wire's middle,
@@ -2169,10 +2347,13 @@ class GraphPanel(Glyphs):
             w, hh = typeface.measure(text, "body", size) + px(10), size / 2 + px(2)
             if mx - w / 2 < x0 or mx + w / 2 > x1 or my - hh < y0 or my + hh > y1:
                 continue
+            edge, fill, ink = self.pal()["popup_edge"], self.pal()["popup"], self.pal()["text"]
+            if self.wire_state(b, inp) == "faded":         # its wire faded while another node's are lit: it fades too
+                edge, fill, ink = edge[:3] + (60,), fill[:3] + (80,), ink[:3] + (90,)
             self._label_items.append(dpg.draw_rectangle((mx - w / 2, my - hh), (mx + w / 2, my + hh), parent="wire_labels",
-                                                        color=self.pal()["popup_edge"], fill=self.pal()["popup"], rounding=4))
+                                                        color=edge, fill=fill, rounding=4))
             self._label_items.append(self._draw_text((mx - w / 2 + px(5), my - size / 2), text, parent="wire_labels",
-                                                   color=self.pal()["text"], size=size, face="body"))
+                                                   color=ink, size=size, face="body"))
 
     # --- presets --------------------------------------------------------------------------
     # A node as it is set up now, saved by name, to drop in again. Global
@@ -3153,23 +3334,33 @@ class GraphPanel(Glyphs):
         dpg.bind_item_theme(lid, th)
         self.links[lid] = (b, inp)
         self._link_normal[lid] = th
+        base = tuple(col) if col else PIN_COL.get(self._ptype.get(ta, "float"), PIN_COL["float"])
+        self._link_style[lid] = (tuple(base[:3]), thin)
         self._show_input(b, inp, True)
 
-    def _wire_theme(self, col, thin=False):
+    def _wire_theme(self, col, thin=False, mode="normal"):
         """A wire's theme: its colour; thin for a frame-scope source (a
-        value once a frame - control rate - against the per-pixel wires)."""
+        value once a frame - control rate - against the per-pixel wires).
+        `mode` "lit" - a node's own wires while it is under the pointer or
+        selected: brighter and thicker - or "faded": every other wire
+        meanwhile, a trace of its colour."""
         light = self._light()
-        key = (col, thin, self.zoom if thin else None, light)
+        key = (tuple(col[:3]), thin, self.zoom if (thin or mode == "lit") else None, light, mode)
         th = self._wire_themes.get(key)
         if th is None:
-            shown = tuple(int(c * 0.8) for c in col[:3]) if light else col   # a touch darker on a light canvas
+            shown = tuple(int(c * 0.8) for c in col[:3]) if light else tuple(col[:3])   # a touch darker on a light canvas
+            if mode == "lit":                        # toward white on a dark canvas, deeper on a light one
+                shown = tuple(int(c * 0.72) for c in shown) if light else tuple(int(c + (255 - c) * 0.35) for c in shown)
+            alpha = int(255 * WIRE_FADE) if mode == "faded" else 255
             with dpg.theme() as th:
                 with dpg.theme_component(dpg.mvNodeLink):
-                    dpg.add_theme_color(dpg.mvNodeCol_Link, shown, category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(dpg.mvNodeCol_Link, shown + (alpha,), category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_color(dpg.mvNodeCol_LinkHovered, (255, 255, 255), category=dpg.mvThemeCat_Nodes)
                     dpg.add_theme_color(dpg.mvNodeCol_LinkSelected, (255, 255, 255), category=dpg.mvThemeCat_Nodes)
-                    if thin:
-                        dpg.add_theme_style(dpg.mvNodeStyleVar_LinkThickness, max(1.0, 1.4 * self.zoom), category=dpg.mvThemeCat_Nodes)
+                    if thin or mode == "lit":
+                        dpg.add_theme_style(dpg.mvNodeStyleVar_LinkThickness,
+                                            max(1.0, (1.4 if thin else 3.0) * self.zoom * (WIRE_LIT if mode == "lit" else 1.0)),
+                                            category=dpg.mvThemeCat_Nodes)
             self._wire_themes[key] = th
         return th
 
@@ -3520,9 +3711,8 @@ class GraphPanel(Glyphs):
     def _splice_clear(self):
         if self._splice:
             lid = self._splice[1]
-            if dpg.does_item_exist(lid):
-                dpg.bind_item_theme(lid, self._link_normal.get(lid, 0))
             self._splice = None
+            self._restyle_wire(lid)                  # its own theme, or lit or faded as the others
         for tag in ("splice_a", "splice_b"):
             if dpg.does_item_exist(tag):
                 dpg.configure_item(tag, show=False)
@@ -4952,7 +5142,7 @@ def build_panel(app, panel):
         dpg.add_text("", tag="graph_help", color=(170, 178, 192), wrap=0)
     dpg.add_button(label="", tag="help_split", width=-1, height=px(5))
     with dpg.node_editor(tag="node_editor", callback=panel.on_link, delink_callback=panel.on_delink,
-                         minimap=True, minimap_location=dpg.mvNodeMiniMap_Location_BottomRight,
+                         minimap=bool(app.prefs.get("minimap", True)), minimap_location=dpg.mvNodeMiniMap_Location_BottomRight,
                          width=-1, height=-1):
         pass
     # The right-click menu: a small window shown at the pointer, categories as

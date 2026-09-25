@@ -365,7 +365,53 @@ def place_side(app, rect):
     dpg.set_item_pos("rail_win", [rx, y])
 
 
-MINIMAP = {"br": "BottomLeft", "bl": "BottomRight", "tr": "BottomRight", "tl": "BottomRight"}
+# View > Minimap's corners; "auto" is one the 3-D view leaves free
+MINIMAP_CORNERS = (("auto", "In a corner the 3-D view leaves free"), ("tl", "Top left"), ("tr", "Top right"),
+                   ("bl", "Bottom left"), ("br", "Bottom right"))
+_MINIMAP_LOC = {"tl": "TopLeft", "tr": "TopRight", "bl": "BottomLeft", "br": "BottomRight"}
+
+
+def minimap_corner(app):
+    """The minimap's corner: the one picked in View > Minimap - unless the
+    3-D view (or its tab, tucked) has it, when the minimap takes the other
+    corner of that edge; left to the studio, the bottom right, or the
+    bottom left while the view is there."""
+    want = app.prefs.get("minimap_corner", "auto")
+    taken = pip(app)["corner"] if active(app) and not app.popouts.is_out("cube") else None
+    if want in _MINIMAP_LOC:
+        return want if want != taken else {"br": "bl", "bl": "br", "tr": "tl", "tl": "tr"}[want]
+    return {"br": "bl"}.get(taken, "br")
+
+
+def apply_minimap(app):
+    """The minimap shown or not, in its corner."""
+    if not dpg.does_item_exist("node_editor"):
+        return
+    c = minimap_corner(app)
+    app.gp._mini_corner = c
+    dpg.configure_item("node_editor", minimap=bool(app.prefs.get("minimap", True)),
+                       minimap_location=getattr(dpg, "mvNodeMiniMap_Location_" + _MINIMAP_LOC[c]))
+
+
+def set_minimap(app, show=None, corner=None):
+    """View > Minimap: shown or not, and its corner - kept in the prefs."""
+    from native.app import save_prefs
+    if show is not None:
+        app.prefs["minimap"] = bool(show)
+    if corner is not None:
+        app.prefs["minimap_corner"] = corner
+    save_prefs(app.prefs)
+    apply_minimap(app)
+    refresh_minimap_menu(app)
+
+
+def refresh_minimap_menu(app):
+    if dpg.does_item_exist("menu_minimap"):
+        dpg.set_value("menu_minimap", bool(app.prefs.get("minimap", True)))
+    want = app.prefs.get("minimap_corner", "auto")
+    for k, _ in MINIMAP_CORNERS:
+        if dpg.does_item_exist(f"menu_minimap_{k}"):
+            dpg.set_value(f"menu_minimap_{k}", k == want)
 
 
 def place(app, rects):
@@ -380,8 +426,7 @@ def place(app, rects):
         for t in ("graph_help_box", "help_split"):
             if dpg.does_item_exist(t):
                 dpg.show_item(t)
-        if dpg.does_item_exist("node_editor"):
-            dpg.configure_item("node_editor", minimap_location=dpg.mvNodeMiniMap_Location_BottomRight)
+        apply_minimap(app)                                  # its corner, the 3-D view beside the graph
         S.editor = S.pip_rect = None
         S.tip_shown = False
         S.was_folded, S.main_x = None, None
@@ -419,9 +464,7 @@ def place(app, rects):
             dpg.set_item_pos("pip_tab", [int(tx), int(ty)])
         else:
             dpg.hide_item("pip_tab")
-    if dpg.does_item_exist("node_editor"):
-        loc = MINIMAP[p["corner"]] if pip_on(app) else "BottomRight"
-        dpg.configure_item("node_editor", minimap_location=getattr(dpg, "mvNodeMiniMap_Location_" + loc))
+    apply_minimap(app)                                      # out of the 3-D view's corner
     if S.rail_sig != _rail_sig(app):
         fill_rail(app)
     # the props: shown by poll() as the selection wants; here, their controls

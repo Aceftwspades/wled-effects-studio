@@ -105,6 +105,8 @@ ACTIONS = [
     ("frame_all",     "Frame the whole graph",                               "Home",   "graph"),
     ("stop_preview",  "Stop the pin preview",                                "Escape", "graph"),
     ("focus_mode",    "Focus mode: dim all but the selection",               "/",      "graph"),
+    ("wire_light",    "Light a node's wires while it is under the pointer or selected, fade the rest", "", "graph"),
+    ("minimap",       "The graph's minimap: show / hide",                    "",       "graph"),
     ("select_all",    "Select every node",                                   "A",      "graph"),
     ("select_none",   "Select nothing",                                      "Alt+A",  "graph"),
     ("select_invert", "Invert the selection",                                "Ctrl+Shift+I", "graph"),

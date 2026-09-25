@@ -1741,16 +1741,36 @@ reaches furthest; (Cn) is the critique's number.
       real frame, a note leaving the line); the smoke's expectations read
       the messages posted since the last batch, and it goes to a node from
       another layout.
-- [ ] **Finding the way round the graph** (C11): Home fits the graph by
-      the view alone; a node's wires lit on hover and selection, the rest
-      dimmed; the minimap out of the way. (Home: done, and now right - the
-      node editor reports no position of its own, so the pan measured
-      against its 0, 0 took in the editor's place and Home put the graph's
-      corner at the screen's (20, 20), under the rows above the canvas; the
-      editor's origin is worked out from its pane now, and a smoke step
-      checks every node lands inside. The minimap: out of the 3-D view's
-      corner, and in the theme's colours - it kept imnodes' dark ones on a
-      light theme.)
+- [x] **Finding the way round the graph** (C11): Home fits the graph by
+      the view alone - the node editor reports no position of its own, so
+      the pan measured against its 0, 0 took in the editor's place and
+      Home put the graph's corner at the screen's (20, 20), under the rows
+      above the canvas; the editor's origin is worked out from its pane,
+      and a smoke step checks every node lands inside. **A node's wires
+      lit**: with the pointer on a node its wires are drawn brighter and
+      thicker (x1.6) and every other wire fades to a trace of its colour
+      (22%); on a pin, that pin's wires alone; the selection's wires stay
+      lit while it lasts. The nodes stay as they are (focus mode, which
+      dims them too, rules the wires while it is on); a frame lights
+      nothing and a node over one wins; a wire's label fades with its
+      wire; the wire a dragged node would splice into keeps its own dim.
+      Nothing is rebuilt - the wires' themes change when what is lit does,
+      looked at twenty times a second. View > Light a node's wires (an
+      action a key can be bound to; kept in the prefs). **The minimap**
+      (imnodes' own: a click on it moves the view) sits faint over its
+      corner - the nodes under it read through - and comes up full while
+      the pointer is at it; View > Minimap shows or hides it and picks its
+      corner, or leaves it to one the 3-D view leaves free (a picked
+      corner the view has goes to the other corner of that edge), both
+      kept; in the theme's colours (it kept imnodes' dark ones on a light
+      theme). Found on the way: a theme bound to the node editor never
+      reaches imnodes' minimap (a probe: it kept the app theme's colour
+      under an editor theme of another), so the app theme's own minimap
+      colours are set in place, which a frame later shows; and the app
+      runs as __main__, so native.app imported by another module is a
+      second copy - the minimap's colour items live in graph_ui. The smoke
+      lights a node's wires by selection and checks one faded, all back
+      after, and the minimap's corner against the 3-D view's.
 - [ ] **Nodes spend their height on the work** (C12): control metadata in
       the properties pane, range pairs on one row, readable glyph labels.
 - [ ] **Polish** (C13-C18): single-letter keys kept to the canvas and a

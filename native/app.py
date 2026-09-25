@@ -115,6 +115,31 @@ def theme_is_light(prefs=None):
     return (bg[0] + bg[1] + bg[2]) / 3 > 128
 
 
+def minimap_colours(prefs=None, faint=False):
+    """The graph's minimap: a slab of the canvas, the nodes as nodes, the
+    view in the accent - or, faint, the same as a trace over the graph, as
+    it is drawn until the pointer comes to its corner (graph_ui). Pairs of
+    (Dear PyGui colour, RGBA)."""
+    cols = theme_colors(prefs)
+    light = theme_is_light(prefs)
+    bg, frame, line, dim, accent = (tuple(cols[k]) for k in ("bg", "frame", "line", "dim", "accent"))
+    lift = (lambda c, k: tuple(min(255, v + k) for v in c)) if not light else (lambda c, k: tuple(max(0, v - k) for v in c))
+    # (colour, the alpha drawn full, the alpha drawn faint)
+    rows = ((dpg.mvNodesCol_MiniMapBackground, lift(bg, 6), 225, 40),
+            (dpg.mvNodesCol_MiniMapBackgroundHovered, lift(bg, 10), 240, 240),
+            (dpg.mvNodesCol_MiniMapOutline, line, 255, 60),
+            (dpg.mvNodesCol_MiniMapOutlineHovered, lift(line, 24), 255, 255),
+            (dpg.mvNodesCol_MiniMapNodeBackground, lift(frame, 14), 255, 80),
+            (dpg.mvNodesCol_MiniMapNodeBackgroundHovered, lift(frame, 28), 255, 255),
+            (dpg.mvNodesCol_MiniMapNodeBackgroundSelected, accent, 255, 140),
+            (dpg.mvNodesCol_MiniMapNodeOutline, lift(frame, 30), 255, 70),
+            (dpg.mvNodesCol_MiniMapLink, dim, 190, 50),
+            (dpg.mvNodesCol_MiniMapLinkSelected, accent, 255, 110),
+            (dpg.mvNodesCol_MiniMapCanvas, accent, 28, 8),
+            (dpg.mvNodesCol_MiniMapCanvasOutline, accent, 200, 90))
+    return [(t, tuple(c[:3]) + ((af if faint else a),)) for t, c, a, af in rows]
+
+
 def apply_theme(prefs=None):
     """A dark theme close to the browser build's, so switching between the two
     is not jarring. Default Dear PyGui is grey-blue and tightly packed; the
@@ -197,20 +222,12 @@ def apply_theme(prefs=None):
                          (dpg.mvNodeCol_BoxSelector, accent + (30,)),
                          (dpg.mvNodeCol_BoxSelectorOutline, accent + (180,))):
                 dpg.add_theme_color(t, c, category=dpg.mvThemeCat_Nodes)
-            # the minimap: a slab of the canvas, the nodes as nodes, the view in the accent
-            for t, c in ((dpg.mvNodesCol_MiniMapBackground, lift(bg, 6) + (225,)),
-                         (dpg.mvNodesCol_MiniMapBackgroundHovered, lift(bg, 10) + (240,)),
-                         (dpg.mvNodesCol_MiniMapOutline, line + (255,)),
-                         (dpg.mvNodesCol_MiniMapOutlineHovered, lift(line, 24) + (255,)),
-                         (dpg.mvNodesCol_MiniMapNodeBackground, lift(frame, 14) + (255,)),
-                         (dpg.mvNodesCol_MiniMapNodeBackgroundHovered, lift(frame, 28) + (255,)),
-                         (dpg.mvNodesCol_MiniMapNodeBackgroundSelected, accent + (255,)),
-                         (dpg.mvNodesCol_MiniMapNodeOutline, lift(frame, 30) + (255,)),
-                         (dpg.mvNodesCol_MiniMapLink, dim + (190,)),
-                         (dpg.mvNodesCol_MiniMapLinkSelected, accent + (255,)),
-                         (dpg.mvNodesCol_MiniMapCanvas, accent + (28,)),
-                         (dpg.mvNodesCol_MiniMapCanvasOutline, accent + (200,))):
-                dpg.add_theme_color(t, c, category=dpg.mvThemeCat_Nodes)
+            # kept by graph_ui (one copy of it: this module runs as __main__ too), which sets them in place -
+            # faint until the pointer comes to the minimap
+            from native import graph_ui as _gu
+            _gu.MINIMAP_ITEMS.clear()
+            for t, c in minimap_colours(prefs):
+                _gu.MINIMAP_ITEMS[t] = dpg.add_theme_color(t, c, category=dpg.mvThemeCat_Nodes)
         # Disabled: Dear PyGui draws a disabled control exactly as an enabled
         # one unless a component says otherwise - a greyed Send looked live.
         # The slab and the words fade, and hovering lifts nothing.
@@ -2876,6 +2893,8 @@ class App(Features):
             "frame_all":    gp.home,
             "stop_preview": gp.stop_preview,
             "focus_mode":   lambda: gp.set_focus_mode(not gp.focus_mode),
+            "wire_light":   lambda: gp.set_wire_light(not gp.wire_light()),
+            "minimap":      lambda: room.set_minimap(self, show=not self.prefs.get("minimap", True)),
             "select_all":   gp.select_all,
             "select_none":  gp.select_none,
             "select_invert": gp.select_invert,
@@ -4564,7 +4583,8 @@ def walk_frame(app, which):
 SKIP_ACTION = ("fullscreen", "record", "record_video", "external", "flash", "shortcuts", "palette")
 # actions that flip something: run twice, so the app is as it was
 TOGGLE_ACTION = ("view_net", "view_cube", "view_both", "pane_code", "pane_graph", "presentation", "side_panel", "props_pane",
-                 "play_pause", "live", "compare", "sweep", "stream", "focus_mode", "snap", "hide_pins", "collapse", "mute",
+                 "play_pause", "live", "compare", "sweep", "stream", "focus_mode", "wire_light", "minimap", "snap", "hide_pins",
+                 "collapse", "mute",
                  "enter_sub", "stop_preview")
 
 

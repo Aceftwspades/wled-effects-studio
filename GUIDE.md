@@ -121,8 +121,12 @@ rail), and the rail's top button folds it away again. The **3-D view** sits in
 a corner of the graph: its `:::` drags it to another corner, its size
 handle (or Ctrl+wheel over it) sizes it, and its tuck button puts it
 away to a tab in the corner, where it is not drawn until the tab (or
-View > 3-D view over the graph) brings it back; the minimap keeps to a
-corner the view leaves free. A node's long settings (bitmap rows,
+View > 3-D view over the graph) brings it back. The **minimap** sits
+faint over its corner of the graph - the nodes under it read through -
+and comes up full when the pointer reaches it; a click on it moves the
+view there. View > Minimap shows or hides it and picks its corner (or
+leaves it to one the 3-D view leaves free; a corner the view has, it
+cedes to the other corner of that edge). A node's long settings (bitmap rows,
 expressions, files, curves) come up in the **properties** over the graph
 while such a node is selected, and while the add menu is open the node
 under the pointer is described there - what it does, every pin and
@@ -206,7 +210,13 @@ down the wires, Shift+Home frames it, Ctrl+Delete deletes a node and
 joins the wires across it, a node dropped on a wire is spliced in, a
 Ctrl+right-drag cuts wires, Alt while editing a value edits every
 selected node of that type, Backspace over a value resets it, Ctrl+P is
-the command palette and Ctrl+Alt+Z the undo history. **Snapshots**
+the command palette and Ctrl+Alt+Z the undo history. **A node's wires
+light up**: with the pointer on a node its wires are drawn brighter and
+thicker and every other wire fades to a trace of its colour - on a pin,
+that pin's wires alone - and the selection's wires stay lit, so one
+node's connections can be followed across a busy graph (View > Light a
+node's wires turns it off; focus mode, `/`, dims the other nodes too).
+**Snapshots**
 (Ctrl+Shift+K) keep the whole graph's settings as named states - save
 the look you have, bring one back, morph between two with a slider. A
 node's menu can
@@ -661,6 +671,7 @@ on and install what it carries.
 - **View** › Graph: canvas first — the graph takes the window: the 3-D view in a corner of it, the properties over it when a node needs them, the panel a rail of its sections, the help at the pointer; off, they sit beside the graph as panes
 - **View** › 3-D view over the graph — canvas first: the 3-D view in its corner of the graph, or tucked away to a tab
 - **View** › Focus mode (dim all but the selection) `/`
+- **View** › Light a node's wires — the wires of the node under the pointer (or of the pin) and of the selection drawn bright, every other wire faded to a trace of its colour
 - **View** › Fullscreen `F11`
 - **View › Zoom** › Zoom in `Ctrl+=`
 - **View › Zoom** › Zoom out `Ctrl+-`
@@ -668,7 +679,12 @@ on and install what it carries.
 - **View › Zoom** › Frame all `Home`
 - **View › Zoom** › Frame the selection `Shift+Home`
 - **View** › Snap to grid `Shift+Tab`
-- **View** › Minimap
+- **View › Minimap** › Show the minimap — the whole graph in small, the view in the accent - a click on it moves the view there; faint until the pointer comes to it
+- **View › Minimap** › In a corner the 3-D view leaves free
+- **View › Minimap** › Top left
+- **View › Minimap** › Top right
+- **View › Minimap** › Bottom left
+- **View › Minimap** › Bottom right
 - **View › Camera** › Isometric
 - **View › Camera** › Front
 - **View › Camera** › Back
@@ -854,6 +870,8 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Home` | Frame the whole graph | in the graph |
 | `Escape` | Stop the pin preview | in the graph |
 | `/` | Focus mode: dim all but the selection | in the graph |
+| `—` | Light a node's wires while it is under the pointer or selected, fade the rest | in the graph |
+| `—` | The graph's minimap: show / hide | in the graph |
 | `A` | Select every node | in the graph |
 | `Alt+A` | Select nothing | in the graph |
 | `Ctrl+Shift+I` | Invert the selection | in the graph |

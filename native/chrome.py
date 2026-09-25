@@ -165,6 +165,10 @@ def build_menus(app):
             tip("canvas first: the 3-D view in its corner of the graph, or tucked away to a tab")
             _mi(app, "Focus mode (dim all but the selection)", "focus_mode", check=True, tag="menu_focus",
                 callback=lambda s, a: app.gp.set_focus_mode(bool(a)))
+            _mi(app, "Light a node's wires", "wire_light", check=True, tag="menu_wire_light",
+                default_value=bool(app.prefs.get("wire_light", True)), callback=lambda s, a: app.gp.set_wire_light(bool(a)))
+            tip("the wires of the node under the pointer (or of the pin) and of the selection drawn bright, every other "
+                "wire faded to a trace of its colour")
             _mi(app, "Fullscreen", "fullscreen", callback=lambda: dpg.toggle_viewport_fullscreen())
             dpg.add_separator()
             with dpg.menu(label="Zoom"):
@@ -175,8 +179,16 @@ def build_menus(app):
                 _mi(app, "Frame all", "frame_all", callback=lambda: app.gp.home())
                 _mi(app, "Frame the selection", "frame_selected", callback=lambda: app.gp.frame_selected())
             _mi(app, "Snap to grid", "snap", check=True, tag="menu_snap", callback=lambda: app.gp.toggle_snap())
-            dpg.add_menu_item(label="Minimap", check=True, default_value=True, tag="menu_minimap",
-                              callback=lambda s, a: dpg.configure_item("node_editor", minimap=bool(a)))
+            with dpg.menu(label="Minimap"):
+                _mi(app, "Show the minimap", "minimap", check=True, tag="menu_minimap",
+                    default_value=bool(app.prefs.get("minimap", True)), callback=lambda s, a: room.set_minimap(app, show=bool(a)))
+                tip("the whole graph in small, the view in the accent - a click on it moves the view there; faint "
+                    "until the pointer comes to it")
+                dpg.add_separator()
+                for _k, _l in room.MINIMAP_CORNERS:
+                    dpg.add_menu_item(label=_l, check=True, tag=f"menu_minimap_{_k}", user_data=_k,
+                                      default_value=app.prefs.get("minimap_corner", "auto") == _k,
+                                      callback=lambda s, a, u: room.set_minimap(app, corner=u))
             dpg.add_separator()
             with dpg.menu(label="Camera"):
                 for name in ("isometric", "front", "back", "left", "right", "top", "below"):
@@ -1655,6 +1667,9 @@ def refresh(app):
     if dpg.does_item_exist("menu_pip"):
         dpg.set_value("menu_pip", not room.pip(app)["tucked"])
     dpg.set_value("menu_focus", app.gp.focus_mode)
+    if dpg.does_item_exist("menu_wire_light"):
+        dpg.set_value("menu_wire_light", app.gp.wire_light())
+    room.refresh_minimap_menu(app)
     if dpg.does_item_exist("mi_compare"):
         dpg.configure_item("mi_compare", label="Stop comparing" if app.ab else "Compare with another effect...")
     if dpg.does_item_exist("mi_sweep"):

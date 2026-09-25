@@ -60,6 +60,17 @@ STEPS = [
       {"key": "Home"}], 1.0),
     ([{"check": "app.gp.zoom < 1.0"}, {"check": "all(list(n['pos']) == app._home_before[0][k] for k, n in app.gp.graph.nodes.items())"},
       {"check": "len(app.gp._undo) == app._home_before[1]"}, {"expect": ["messages", "the whole graph"]}, {"graph_zoom": 1.0}], 0.5),
+    # a node's wires lit (C11): the selected Noise's wires bright, a wire elsewhere faded; nothing selected, all as
+    # they were; the minimap in the corner View > Minimap picks, and off the 3-D view's corner when that is its pick
+    ([{"py": "setattr(app.gp, '_hover_cache', (__import__('time').time() + 5, None))"},   # the real pointer left out of it
+      {"graph_selected": [12]}], 0.5),
+    ([{"check": "app.gp.wire_state(12, 'x') == 'lit' and app.gp.wire_state(13, 'a') == 'lit'"},
+      {"check": "any(app.gp.wire_state(b, i) == 'faded' for b, i in app.gp.links.values())"}, {"graph_selected": []}], 0.5),
+    ([{"check": "all(app.gp.wire_state(b, i) == 'normal' for b, i in app.gp.links.values())"},
+      {"py": "room.set_minimap(app, corner='tl')"}, {"check": "app.gp._mini_corner == 'tl' and dpg.get_value('menu_minimap_tl')"},
+      {"py": "room.set_minimap(app, corner=room.pip(app)['corner'])"},
+      {"check": "app.gp._mini_corner != room.pip(app)['corner'] or not room.pip_on(app)"},
+      {"py": "room.set_minimap(app, corner='auto')"}], 0.5),
     # the face of a node: a collapsed node's body is what it computes, the line follows a typed value, a stand-in
     # carries it too; the zoom scales the nodes themselves (a 50% node is half as tall); category hues on the titles
     ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "app.gp._collapse(11)"}], 1.0),
