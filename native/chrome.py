@@ -982,14 +982,84 @@ def resolve_gradient(app, key):
     return [list(st) for st in glow.DEFAULT_STOPS], False
 
 
+# --- the footer's figures (the critique's C18) -----------------------------------------------------
+# The footer was nine statistics; it keeps power and the device's fps, and its stats button opens these,
+# live while open: (section, [(key, words, what it is)])
+STATS_ROWS = (
+    ("THE PICTURE", (("mean", "brightness", "the LEDs' average, 0..255"),
+                     ("sigma", "contrast", "how far they spread about it, 0..255"),
+                     ("dark", "unlit", "the share of LEDs all but off"),
+                     ("sat", "saturation", "how saturated the lit ones are, 0..255"))),
+    ("TIME", (("effect", "the effect", "a frame of the effect, here, in the engine"),
+              ("device", "on the device", "the frames a second the device manages: the effect's time here times the "
+                                          "device's speed factor (Settings > Device speed factor; the Send frame's "
+                                          "Calibrate measures it)"),
+              ("app", "the studio", "a frame of the whole studio, and where it goes"))),
+    ("POWER", (("current", "current", "what the frame draws, at the LED outputs' figures (Window > LED outputs)"),
+               ("limiter", "limiter", "the brightness the device's current limiter allows the frame"))),
+)
+
+
+def build_stats_popover(app):
+    """The footer's stats: every figure, in words, the value in the
+    monospace; filled by the app's frame while it is open."""
+    with dpg.window(tag="stats_pop", show=False, no_title_bar=True, autosize=True, no_move=True, no_resize=True,
+                    no_collapse=True):
+        for head, rows in STATS_ROWS:
+            typeface.label(dpg.add_text(head, color=ACCENT))
+            for key, words, why in rows:
+                with form.row(words, tip=why):
+                    dpg.add_text("-", tag=f"stat_{key}")
+
+
+def toggle_stats(app):
+    """The footer's stats button: the figures above it, or away."""
+    if dpg.is_item_shown("stats_pop"):
+        dpg.hide_item("stats_pop")
+        return
+    dpg.show_item("stats_pop")
+    place_stats()
+    dpg.focus_item("stats_pop")
+
+
+def place_stats():
+    """The popover above its button: its height is known once it has been
+    drawn, so it is placed again each frame while open."""
+    x, y = dpg.get_item_rect_min("stat_more") if dpg.does_item_exist("stat_more") else (px(20), px(600))
+    h = dpg.get_item_rect_size("stats_pop")[1] or px(360)
+    dpg.set_item_pos("stats_pop", [int(max(0, x - px(8))), int(max(0, y - h - px(6)))])
+
+
+def frame_style(app):
+    """How the frames look (glow.STYLES): a still outline in the accent
+    unless Settings > Selection frames picks a gradient."""
+    s = app.prefs.get("frame_style", "outline")
+    return s if s in dict(glow.STYLES) else "outline"
+
+
 def apply_frames(app):
-    """The frames take their gradients from the prefs."""
+    """The frames as the prefs have them: an outline in the accent, or each
+    kind's gradient, still or turning."""
     if not app.frames:
         return
+    style = frame_style(app)
+    app.frames.style = style
     choice = app.prefs.get("frames") or {}
     for kind, _ in FRAME_KINDS:
-        stops, mirror = resolve_gradient(app, choice.get(kind, "studio"))
-        app.frames.set_gradient(kind, stops, mirror)
+        if style == "outline":
+            app.frames.set_gradient(kind, [[0.0] + [int(v) for v in ACCENT[:3]]], False)
+        else:
+            stops, mirror = resolve_gradient(app, choice.get(kind, "studio"))
+            app.frames.set_gradient(kind, stops, mirror)
+
+
+def set_frame_style(app, style):
+    """Settings > Selection frames: the look, kept."""
+    app.prefs["frame_style"] = style if style in dict(glow.STYLES) else "outline"
+    from native.project import save_prefs
+    save_prefs(app.prefs)
+    apply_frames(app)
+    refresh_frames(app)
 
 
 def _strip(stops, mirror, width=None, height=None, parent=None):
@@ -1007,8 +1077,12 @@ def build_frames_dialog(app):
     app._gc = {"name": "", "stops": [list(st) for st in glow.DEFAULT_STOPS], "mirror": False}
     with dpg.window(tag="frames_win", label="Selection frames", no_title_bar=True, show=False, width=px(560), height=px(620), no_collapse=True):
         dialog_header("frames_win", "Selection frames")                 # one window style (C8): the frames' header
-        dpg.add_text("The turning gradient frame around the selected nodes, and the one around the pane "
-                     "last clicked in. Pick a WLED palette, the studio's own, or one you made below.", color=DIM, wrap=px(530))
+        dpg.add_text("The frame around the selected nodes, and the one around the pane last clicked in: an "
+                     "outline in the accent, or a gradient - a WLED palette, the studio's own, or one you make "
+                     "below - still or turning.", color=DIM, wrap=px(530))
+        with form.row("look"):
+            dpg.add_radio_button([w for _, w in glow.STYLES], tag="frames_style", default_value=glow.STYLES[0][1],
+                                 callback=lambda s, v: set_frame_style(app, next(k for k, w in glow.STYLES if w == v)))
         dpg.add_group(tag="frames_choice")
         dpg.add_separator()
         typeface.label(dpg.add_text("GRADIENT CREATOR", color=ACCENT))
@@ -1041,7 +1115,12 @@ def refresh_frames(app):
     keys = gradient_keys(app)
     labels = [gradient_label(k) for k in keys]
     choice = app.prefs.get("frames") or {}
+    style = frame_style(app)
+    if dpg.does_item_exist("frames_style"):
+        dpg.set_value("frames_style", dict(glow.STYLES)[style])
     dpg.delete_item("frames_choice", children_only=True)
+    if style == "outline":
+        dpg.add_text("the gradients below are for the gradient looks", parent="frames_choice", color=DIM)
     for kind, label in FRAME_KINDS:
         cur = choice.get(kind, "studio")
         if cur not in keys:
@@ -1517,6 +1596,7 @@ def refresh_appearance(app):
     weight.rebind()                                  # the primary, danger and quiet buttons in the new colours
     from native import messages
     messages.rebind(app)                             # the footer's message line in the new colours
+    apply_frames(app)                                # an outline in the new accent
     from native import dock
     if dpg.does_item_exist("dock_tabs"):
         dock.theme(app)                              # the dock's tabs in the new colours

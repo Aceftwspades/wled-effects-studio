@@ -291,6 +291,17 @@ STEPS = [
       {"check": "app.point_quads is None or not app.point_quads.dots"}, {"action": "unlit_dots"}, {"action": "view_floor"}], 0.8),
     ([{"check": "app.view_extras()[0] is not None and app.view_extras()[1] and dpg.get_value('menu_unlit_dots')"},
       {"check": "app.point_quads is None or (app.point_quads.dots and app.point_quads.floor)"}], 0.3),
+    # the frames (C17): a still outline in the accent unless a gradient is picked; the look is kept
+    ([{"check": "chrome.frame_style(app) == app.frames.style"}, {"frame_style": "turning"}], 0.4),
+    ([{"check": "app.frames.style == 'turning' and app.prefs.get('frame_style') == 'turning'"}, {"frame_style": "outline"}], 0.4),
+    ([{"check": "app.frames.style == 'outline' and dpg.get_value('frames_style') == 'An outline in the accent, still'"}], 0.3),
+    # the footer (C18): power and the device's fps; the stats popover live while open, above its button; Esc closes it
+    ([{"check": "'device ~' in dpg.get_value('stat_txt') and 'brightness' not in dpg.get_value('stat_txt')"},
+      {"py": "chrome.toggle_stats(app)"}], 0.8),
+    ([{"check": "dpg.is_item_shown('stats_pop') and dpg.get_value('stat_mean') != '-' and 'ms a frame' in dpg.get_value('stat_app')"},
+      {"check": "dpg.get_item_pos('stats_pop')[1] + dpg.get_item_rect_size('stats_pop')[1] <= dpg.get_item_rect_min('stat_more')[1]"},
+      {"key": "Escape"}], 0.4),
+    ([{"check": "not dpg.is_item_shown('stats_pop')"}], 0.2),
     ([{"chrome": "shortcuts"}, {"chrome": "frames"}, {"chrome": "flash"}, {"feature": ["imu", False]}, {"feature": ["audio", "none"]},
       {"feature": ["imu", True]}, {"feature": ["audio", "pcm"]}, {"chrome": "usermods"}, {"usermod": ["add", "Temperature"]},
       {"usermod": ["off", "Temperature"]}, {"usermod": ["remove", "Temperature"]}, {"chrome": "about"}], 1.0),

@@ -135,7 +135,7 @@ def build(app):
 
 def _build_welcome(app):
     c = _c()
-    with dpg.window(tag=WELCOME, label="Welcome", no_title_bar=True, show=False, width=px(600), height=px(400), no_collapse=True, no_resize=True,
+    with dpg.window(tag=WELCOME, label="Welcome", no_title_bar=True, show=False, width=px(600), height=px(470), no_collapse=True, no_resize=True,
                     on_close=lambda: welcome_closed(app)):
         _c().dialog_header(WELCOME, "Welcome")                 # one window style (C8): the frames' header
         t = dpg.add_text("WLED Effects Studio")
@@ -156,6 +156,7 @@ def _build_welcome(app):
                 dpg.add_text(why, color=c.DIM)
         dpg.add_spacer(height=px(8))
         dpg.add_text("Help > User guide (F1) has all of it later; F1 over a node explains that node.", color=c.DIM, wrap=px(560))
+        dpg.add_text("", tag="welcome_keys", color=c.DIM, wrap=px(560))       # the keys as bound, filled when shown
         dpg.add_spacer(height=px(4))
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="Show this when the studio starts", tag="welcome_always",
@@ -183,8 +184,15 @@ def welcome_closed(app):
 
 def show_welcome(app):
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
-    dpg.set_item_pos(WELCOME, [max(0, (vw - px(600)) // 2), max(20, (vh - px(400)) // 3)])
+    dpg.set_item_pos(WELCOME, [max(0, (vw - px(600)) // 2), max(20, (vh - px(470)) // 3)])
     dpg.set_value("welcome_always", bool(app.prefs.get("welcome_always")))
+    # the keys, as bound: the footer no longer carries them (C18)
+    k = lambda a: app.keys.label(a) or "-"
+    dpg.set_value("welcome_keys", f"The keys, with the pointer over the views or the graph: {k('view_net')} the logical "
+                                  f"view, {k('view_cube')} the 3-D view, {k('view_both')} both (again to come back); "
+                                  f"{k('pane_code')} the code, {k('pane_graph')} the graph; {k('presentation')} the "
+                                  f"controls away and back (Esc too); {k('play_pause')} play and pause. Every key: "
+                                  f"Settings > Keyboard shortcuts ({k('shortcuts')}).")
     dpg.show_item(WELCOME)
     dpg.focus_item(WELCOME)
 

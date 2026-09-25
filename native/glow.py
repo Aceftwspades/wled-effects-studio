@@ -1,4 +1,6 @@
-"""Rotating angular-gradient frames around what is active.
+"""Frames around what is active: a still outline in the accent (the
+default - the critique's C17: the only chrome that moved, in an app whose
+content is moving light), or an angular gradient, still or turning.
 
 The frame is an angular (conic) gradient drawn as four thin strips around a
 rectangle plus four wider, fainter ones outside them for a glow, the corners
@@ -15,8 +17,12 @@ blending back into the first, or mirrored (0 -> 1 -> 0 around the circle),
 which makes any palette seamless.
 
     frames = Frames()                                  # after the viewport exists
-    frames.set_gradient("sel", stops, mirror=False)
+    frames.style = "outline"                           # or "gradient" (still), "turning"
+    frames.set_gradient("sel", stops, mirror=False)    # an outline: one stop, the accent
     frames.update([(x0, y0, x1, y1, clip, alpha, "sel"), ...])   # every frame
+
+An outline is the border alone, two pixels; a gradient has a fainter glow
+outside it as well.
 """
 import math
 import time
@@ -33,6 +39,9 @@ RADIUS = 5                                   # the corners' rounding, unless the
 ARC_N = 5                                    # quads per rounded corner, per ring
 PER_RECT = 8 + 4 * ARC_N * 2                 # strips and corner pieces a rectangle takes
 TURNS_PER_S = 0.1
+# how a frame looks: (the settings' words, what it draws)
+STYLES = (("outline", "An outline in the accent, still"), ("gradient", "The gradient, still"),
+          ("turning", "The gradient, turning"))
 POOL = {"sel": PER_RECT * 7, "focus": PER_RECT * 2}      # pieces, split round any dialog
 
 
@@ -82,6 +91,7 @@ class Frames:
         self.tex = {}
         self.quads = {}
         self.shown = {}
+        self.style = "outline"       # STYLES: an outline (the border alone, still) or a gradient, still or turning
         with dpg.viewport_drawlist(front=True, tag="glow_front"):
             for kind, n in POOL.items():
                 self.tex[kind] = dpg.add_dynamic_texture(SIZE, SIZE, conic(DEFAULT_STOPS), parent="icon_registry")
@@ -98,14 +108,17 @@ class Frames:
         return max(0.0, min(r, (x1 - x0) / 2.0, (y1 - y0) / 2.0))
 
     @classmethod
-    def _strips(cls, x0, y0, x1, y1, radius=RADIUS):
-        """The straight parts, stopping short of the corners by the radius."""
+    def _strips(cls, x0, y0, x1, y1, radius=RADIUS, glow=True):
+        """The straight parts, stopping short of the corners by the radius;
+        the glow outside them too with `glow`."""
         b, g = BORDER, GLOW
         r = cls._radius(x0, y0, x1, y1, radius)
         yield (x0 + r, y0 - b, x1 - r, y0, 255)
         yield (x0 + r, y1, x1 - r, y1 + b, 255)
         yield (x0 - b, y0 + r, x0, y1 - r, 255)
         yield (x1, y0 + r, x1 + b, y1 - r, 255)
+        if not glow:
+            return
         o = b + g
         yield (x0 + r, y0 - o, x1 - r, y0 - b, 70)
         yield (x0 + r, y1 + b, x1 - r, y1 + o, 70)
@@ -113,7 +126,7 @@ class Frames:
         yield (x1 + b, y0 + r, x1 + o, y1 - r, 70)
 
     @classmethod
-    def _corners(cls, x0, y0, x1, y1, radius=RADIUS):
+    def _corners(cls, x0, y0, x1, y1, radius=RADIUS, glow=True):
         """The rounded corners: for each, ARC_N quads round the border ring
         and ARC_N round the glow ring, as (p1, p2, p3, p4, alpha). The
         radius is the framed thing's own corner radius, so the border ring
@@ -122,8 +135,9 @@ class Frames:
         r = cls._radius(x0, y0, x1, y1, radius)
         centres = ((x0 + r, y0 + r, math.pi), (x1 - r, y0 + r, 1.5 * math.pi),
                    (x1 - r, y1 - r, 0.0), (x0 + r, y1 - r, 0.5 * math.pi))
+        rings = ((r, r + b, 255), (r + b, r + b + g, 70)) if glow else ((r, r + b, 255),)
         for cx, cy, a0 in centres:
-            for (ri, ro, a) in ((r, r + b, 255), (r + b, r + b + g, 70)):
+            for (ri, ro, a) in rings:
                 for k in range(ARC_N):
                     t0 = a0 + (math.pi / 2) * k / ARC_N
                     t1 = a0 + (math.pi / 2) * (k + 1) / ARC_N
@@ -158,7 +172,8 @@ class Frames:
         to keep the strips inside (or None), alpha 0..1 scaling the frame,
         radius the framed thing's corner rounding. holes: rectangles
         (windows over the top) the strips are cut around."""
-        th = (time.perf_counter() * TURNS_PER_S * 2 * math.pi) % (2 * math.pi)
+        glow = self.style != "outline"
+        th = (time.perf_counter() * TURNS_PER_S * 2 * math.pi) % (2 * math.pi) if self.style == "turning" else 0.0
         c, s = math.cos(th), math.sin(th)
         used = {k: 0 for k in self.quads}
         for rect in rects:
@@ -174,7 +189,7 @@ class Frames:
                 dx, dy = (px - cx) / size, (py - cy) / size
                 return (0.5 + 0.3 * (dx * c - dy * s), 0.5 + 0.3 * (dx * s + dy * c))
 
-            for (sx0, sy0, sx1, sy1, a) in self._strips(x0, y0, x1, y1, radius):
+            for (sx0, sy0, sx1, sy1, a) in self._strips(x0, y0, x1, y1, radius, glow):
                 if clip:
                     sx0, sy0 = max(sx0, clip[0]), max(sy0, clip[1])
                     sx1, sy1 = min(sx1, clip[2]), min(sy1, clip[3])
@@ -190,7 +205,7 @@ class Frames:
                     used[kind] = k + 1
             # the corners: a piece is drawn whole or not at all - one outside
             # the clip, or under a window, is left out
-            for (p1, p2, p3, p4, a) in self._corners(x0, y0, x1, y1, radius):
+            for (p1, p2, p3, p4, a) in self._corners(x0, y0, x1, y1, radius, glow):
                 bx0 = min(p[0] for p in (p1, p2, p3, p4)); bx1 = max(p[0] for p in (p1, p2, p3, p4))
                 by0 = min(p[1] for p in (p1, p2, p3, p4)); by1 = max(p[1] for p in (p1, p2, p3, p4))
                 if clip and (bx0 < clip[0] or by0 < clip[1] or bx1 > clip[2] or by1 > clip[3]):

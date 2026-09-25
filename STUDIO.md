@@ -1874,8 +1874,35 @@ reaches furthest; (Cn) is the critique's number.
       than a lit LED in a cloud; in the GPU texture and behind a GPU point)
       and the floor (and none from below); the smoke turns both off and
       on.
-- [ ] **Polish** (C17-C18): a still selection outline by default; a
-      footer of power and fps.
+- [x] **Decoration that does not move** (C17): the pane in focus and the
+      selected nodes wore a turning rainbow gradient - the only chrome that
+      moved, in an app whose content is moving light. By default they wear
+      a still outline in the accent now: the border alone, two pixels, no
+      glow, following the accent when the theme changes. Settings >
+      Selection frames picks the look - the outline, the gradient still, or
+      the gradient turning (as it was), kept - and its gradients and the
+      gradient creator are for the gradient looks. The smoke picks the
+      turning look and goes back to the outline; a capture checked the
+      outline and the still gradient identical a second apart.
+- [x] **The footer** (C18): nine statistics and, under them, a
+      permanent line of layout keys (that went with C10). The footer keeps
+      the two figures most people want - the current the frame draws, with
+      the limiter while it is working, and the frames a second on the
+      device - and the speed and the LED under the pointer when they apply;
+      its **stats** button opens the rest above it, live while open: the
+      picture's brightness, contrast, unlit share and saturation; the
+      effect's time, the device's (the factor, measured or estimated) and
+      the studio's, split into polls, sim, draw and render; the current
+      asked for and allowed and the limiter. The button again, or Esc,
+      closes it; presenting hides it. The Welcome panel names the keys as
+      bound (with the pointer over the views or the graph: Q, E, W, C, G,
+      H, Space; every key under Settings > Keyboard shortcuts). Found on
+      the way: the popover opened over its own button (its height is only
+      known once drawn) - it is placed above the button each frame while
+      open. The smoke reads the footer, opens the stats, checks they sit
+      above the button and closes them with Esc.
+
+The eighth pass is done: C1-C18 and the plain bugs.
 
 ### Line-in (September 2026)
 

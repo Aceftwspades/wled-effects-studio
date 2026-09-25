@@ -500,6 +500,27 @@ class App(Features):
         return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
                                     unlit=unlit, floor=floor)
 
+    def fill_stats(self, pw, factor, dev_fps):
+        """The stats popover's figures, this frame (while it is open): the
+        picture's measures in words (C9: engine.stats keeps the harness's
+        maths), the time, the power."""
+        s = stats(self.frame_rgb(), self.eng.lit_mask(flat=bool(self.eng.fx.get("o3"))))
+        prof = getattr(self, "_prof_avg", None) or []
+        parts = ", ".join(f"{n} {v:.1f}" for n, v in zip(("polls", "sim", "draw", "render"), prof)) if prof else ""
+        how = f"measured {self.prefs['device_factor_measured'].get('date', '')}".strip() \
+            if isinstance(self.prefs.get("device_factor_measured"), dict) else "estimated"
+        vals = {"mean": f"{s['mean']:.1f}", "sigma": f"{s['sigma']:.1f}", "dark": f"{s['dark']:.1f}%", "sat": f"{s['sat']}",
+                "effect": f"{self.frame_ms:.2f} ms a frame" if self.frame_ms > 0 else "-",
+                "device": (f"~{dev_fps:.0f} fps (x{factor:.0f} slower, {how})" if dev_fps is not None else "-"),
+                "app": f"{self.loop_ms:.1f} ms a frame" + (f" ({parts} ms)" if parts else ""),
+                "current": (f"{pw[0] / 1000.0:.2f} A asked for, {pw[2] / 1000.0:.2f} A allowed" if pw and pw[2] else
+                            (f"{pw[0] / 1000.0:.2f} A" if pw else "-")),
+                "limiter": ((f"{int(pw[1] * 100)}% of the brightness" if pw[1] < 1.0 else "not needed") if pw and pw[2]
+                            else "no limit set")}
+        for k, v in vals.items():
+            if dpg.does_item_exist(f"stat_{k}"):
+                dpg.set_value(f"stat_{k}", v)
+
     def view_extras(self):
         """What the 3-D view adds (View menu, C16): the colour an unlit LED
         is drawn in as a dim dot (None: black), and whether the shape stands
@@ -2308,9 +2329,11 @@ class App(Features):
             dpg.configure_item(tag, border=self.ui)
         # The captions, the grips, the readout and the key hints are UI too -
         # a clean picture means nothing left over the top of it.
-        for tag in ("net_cap", "cube_cap", "stat_txt", "msg_row", "grip_net_win", "grip_cube_win"):
+        for tag in ("net_cap", "cube_cap", "stat_row", "msg_row", "grip_net_win", "grip_cube_win"):
             if dpg.does_item_exist(tag):
                 dpg.configure_item(tag, show=self.ui)
+        if not self.ui and dpg.does_item_exist("stats_pop"):
+            dpg.hide_item("stats_pop")                   # the footer's figures go with the footer
         chrome.refresh(self)
 
         # The net is upscaled by a WHOLE number so the LED grid stays hard;
@@ -2853,6 +2876,8 @@ class App(Features):
             device_ui.close(self, device_ui.focused_frame(self)); return    # Esc closes the floating frame with the focus
         if app_data == dpg.mvKey_Escape and chrome.focused_dialog() and chrome.focused_dialog() not in (reader_ui.TAG, "palette_win"):
             chrome.close_dialog(chrome.focused_dialog()); return          # ... and the dialog with the focus, as a frame
+        if app_data == dpg.mvKey_Escape and dpg.does_item_exist("stats_pop") and dpg.is_item_shown("stats_pop"):
+            dpg.hide_item("stats_pop"); return                            # the footer's figures, away
         if app_data == dpg.mvKey_Escape and not self.ui:
             self.leave_presentation(); return                             # the way out the hint names
         if reader_ui.key(self, app_data, binding):
@@ -3146,9 +3171,10 @@ class App(Features):
         return holes
 
     def poll_glow(self):
-        """The gradient frames: the pane in focus, and the selected nodes
-        (clipped to the editor). None while presenting, or while a menu is
-        up over the graph - the frame would draw over it."""
+        """The frames (an accent outline, or a gradient): the pane in focus,
+        and the selected nodes (clipped to the editor). None while
+        presenting, or while a menu is up over the graph - the frame would
+        draw over it."""
         if self.frames is None:
             return
         rects = []
@@ -3407,23 +3433,21 @@ class App(Features):
         if self.rec_msg:
             dpg.set_value("rec_msg", self.rec_msg)
 
-        raw = self.frame_rgb()
-        s = stats(raw, self.eng.lit_mask(flat=bool(self.eng.fx.get("o3"))))
         factor = float(self.prefs.get("device_factor", 60.0))
-        how = "measured" if self.prefs.get("device_factor_measured") else "est."
-        est = (f"   effect {self.frame_ms:.2f} ms  ->  device ~{1000.0 / max(0.001, self.frame_ms * factor):.0f} fps (x{factor:.0f} {how})"
-               f"   app {self.loop_ms:.1f} ms/frame") if self.frame_ms > 0 else ""
+        dev_fps = 1000.0 / max(0.001, self.frame_ms * factor) if self.frame_ms > 0 else None
         pw = getattr(self, "_power", None)
         power = ""
         if pw:
-            power = f"   power {pw[0] / 1000.0:.2f} A" + (f" (limiter {int(pw[1] * 100)}%)" if pw[2] and pw[1] < 1.0 else "")
+            power = f"power {pw[0] / 1000.0:.2f} A" + (f" (limiter {int(pw[1] * 100)}%)" if pw[2] and pw[1] < 1.0 else "")
         speed = f"   speed {speed_label(self.speed)}" if self.speed != 1.0 else ""
         hover = self.hover_text()
-        # the picture's measures in words (C9): the average brightness and its spread, 0..255; the share of
-        # LEDs all but off; how saturated the lit ones are, 0..255 - engine.stats keeps the harness's maths
-        dpg.set_value("stat_txt",
-                      f"brightness {s['mean']:5.1f}   contrast {s['sigma']:5.1f}   "
-                      f"unlit {s['dark']:4.1f}%   saturation {s['sat']:3d}" + speed + hover + power + est)
+        # the footer keeps the two figures most people want - the current, and the fps on the device (C18);
+        # the stats button has the rest
+        fps = f"device ~{dev_fps:.0f} fps" if dev_fps is not None else ""
+        dpg.set_value("stat_txt", "   ".join(t for t in (power, fps) if t) + speed + hover)
+        if dpg.does_item_exist("stats_pop") and dpg.is_item_shown("stats_pop"):
+            self.fill_stats(pw, factor, dev_fps)
+            chrome.place_stats()
         if dpg.does_item_exist("scrub_row"):
             show = (not self.playing) and len(self.history_frames) > 1
             if dpg.is_item_shown("scrub_row") != show:
@@ -3657,9 +3681,14 @@ def build(app):
                     dpg.add_text("", tag="live_msg", wrap=0)
                 app.sec_apply_order()
         with dpg.group(tag="footer"):
-          typeface.mono(dpg.add_text("", tag="stat_txt"))
+          with dpg.group(horizontal=True, tag="stat_row"):
+              typeface.mono(dpg.add_text("", tag="stat_txt"))     # power and the device's fps (C18)
+              dpg.add_button(label="stats", tag="stat_more", small=True, callback=lambda: chrome.toggle_stats(app))
+              chrome.tip("every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, "
+                         "the device's and the studio's time; the current and the limiter - live while open")
           messages.build(app, "footer")               # the latest message, the problems that stay, the log (C10)
     chrome.build_dialogs(app)
+    chrome.build_stats_popover(app)                  # the footer's stats button's figures (C18)
     messages.build_log(app)                          # the log's window: Window > Message log, the footer's log (C10)
     chrome.build_pane_menus(app)
     room.build(app)                                  # the graph's room: the rail, the windows over the canvas
@@ -3980,6 +4009,8 @@ def service_command(app):
             if "frame_gradient" in c:                   # test hook: [kind, key]
                 app.prefs.setdefault("frames", {})[c["frame_gradient"][0]] = c["frame_gradient"][1]
                 chrome.apply_frames(app); chrome.refresh_frames(app)
+            if "frame_style" in c:                      # test hook: "outline", "gradient" or "turning"
+                chrome.set_frame_style(app, c["frame_style"])
             if "name_text" in c:
                 dpg.set_value("name_input", c["name_text"])
             if "graph_zoom" in c:                       # test hook: zoom level, optionally about a screen point
