@@ -78,6 +78,27 @@ right half is the device and the frames: devices (Ctrl+Shift+N), flash
 the palettes (Ctrl+Shift+G), the LED outputs (Ctrl+Shift+O) and the audio
 input (Ctrl+Shift+M). Playback > Randomise is Ctrl+Shift+X.
 
+**Type and size.** The interface is set in the system's own face (Segoe
+UI on Windows) at the system's own size: a frame's title larger and
+heavier, the capitals over a group of controls (STEPS, ON THE DEVICE)
+smaller and heavier, a caption beside what it belongs to - a count, a
+size, a key - small. Code, the logs, the status line's figures, the
+values in a node's fields and the numbers drawn on the graph and the
+timeline are in its monospace (Consolas), so their columns line up and a
+changing figure does not shift the words after it; a node's title and
+its pins' names are words, in the interface's face. Everything comes at
+one **interface size** - the type, every control, the panes, the dialogs
+and the icons - and it starts as the monitor's own scale (the system's
+display setting), so the studio is as large as the rest of the desktop.
+Settings > Appearance > **Interface size** sets it from 80 to 200%;
+**The monitor's** goes back to the system's. The size takes effect at
+the next start: **Restart now** closes the studio and starts it again
+at once (the graph is saved; code with unsaved changes is asked about
+first). The side panel's width and the 3-D view's size over the graph
+keep their share of the window across a change; the graph keeps a zoom
+of its own (the wheel, or View > Zoom), first the one nearest the
+interface size.
+
 **The graph gets the room.** In the graph layout the canvas takes the
 window (View > Graph: canvas first; off, the 3-D view, the properties
 and the panel sit beside the graph as panes, as in the other layouts).
@@ -829,7 +850,7 @@ Every button, with what its tooltip says.
 
 **Keyboard shortcuts**: `Reset all to defaults`
 
-**Appearance**: `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped
+**Appearance**: `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped; `The monitor's` — the size the monitor is set to in the system's display settings; `Restart now` — the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first
 
 **Selection frames**: `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`
 

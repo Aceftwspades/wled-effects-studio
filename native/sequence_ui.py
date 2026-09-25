@@ -10,6 +10,9 @@ import os
 import time
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native import weight
 import numpy as np
 
@@ -61,10 +64,10 @@ def undo(app, redo=False):
 def build(app):
     c = _c()
     from native import device_ui
-    with dpg.window(tag=TAG, show=False, width=640, height=660, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=px(640), height=px(660), no_collapse=True, no_title_bar=True):
         device_ui.header(app, "sequence")
         with dpg.group(horizontal=True):
-            dpg.add_text("STEPS", color=c.ACCENT)
+            typeface.label(dpg.add_text("STEPS", color=c.ACCENT))
             dpg.add_button(label="undo", small=True, callback=lambda: undo(app))
             c.tip("the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes")
             dpg.add_button(label="+ Add from the sim", small=True, callback=lambda: add_step(app))
@@ -78,29 +81,29 @@ def build(app):
             c.info("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a playlist. "
                    "The timeline under the list: click a step to select it, drag the line between two to retime the one on the left; "
                    "the faint lines are the bpm's bars, the ticks the beats found in the WAV, the wave the WAV itself.")
-        with dpg.child_window(tag="seq_rows", height=130, border=True):
+        with dpg.child_window(tag="seq_rows", height=px(130), border=True):
             pass
         # the timeline: the steps as blocks along the time, the playhead, bars, the WAV
-        dpg.add_drawlist(tag="seq_tl", width=600, height=54)
+        dpg.add_drawlist(tag="seq_tl", width=px(600), height=px(54))       # its drawing reads its size back
         with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="seq_name", label="name", width=180, on_enter=True, callback=lambda s, v: set_field(app, "name", v))
-            dpg.add_input_float(tag="seq_dur", label="seconds", width=70, step=0, format="%.1f", on_enter=True,
+            dpg.add_input_text(tag="seq_name", label="name", width=px(180), on_enter=True, callback=lambda s, v: set_field(app, "name", v))
+            dpg.add_input_float(tag="seq_dur", label="seconds", width=px(70), step=0, format="%.1f", on_enter=True,
                                 callback=lambda s, v: set_field(app, "dur", max(0.1, float(v))))
-            dpg.add_input_float(tag="seq_trans", label="transition", width=70, step=0, format="%.1f", on_enter=True,
+            dpg.add_input_float(tag="seq_trans", label="transition", width=px(70), step=0, format="%.1f", on_enter=True,
                                 callback=lambda s, v: set_field(app, "trans", max(0.0, float(v))))
             c.tip("seconds of blend into this step")
         with dpg.group(horizontal=True):
             dpg.add_text("", tag="seq_step_desc", color=c.DIM)
         with dpg.group(horizontal=True):
-            dpg.add_text("RAMP", color=c.ACCENT)
-            dpg.add_combo(["none", "sx", "ix", "c1", "c2", "c3"], tag="seq_ramp_key", width=70, default_value="none",
+            typeface.label(dpg.add_text("RAMP", color=c.ACCENT))
+            dpg.add_combo(["none", "sx", "ix", "c1", "c2", "c3"], tag="seq_ramp_key", width=px(70), default_value="none",
                           callback=lambda s, v: _ramp_pick(app, v))
             c.tip("a slider of the first segment that moves over the step, from the step's value to the end value - "
                   "in the sim as it plays; on the device as sub-steps (a second apiece, up to twelve), since a preset cannot move a slider")
-            dpg.add_slider_int(tag="seq_ramp_end", width=140, min_value=0, max_value=255, default_value=128,
+            dpg.add_slider_int(tag="seq_ramp_end", width=px(140), min_value=0, max_value=255, default_value=128,
                                callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), int(v)))
             dpg.add_text("to", color=c.DIM)
-            dpg.add_combo(list(sequence.RAMP_SHAPES), tag="seq_ramp_shape", width=110, default_value="linear",
+            dpg.add_combo(list(sequence.RAMP_SHAPES), tag="seq_ramp_shape", width=px(110), default_value="linear",
                           callback=lambda s, v: set_ramp(app, dpg.get_value("seq_ramp_key"), None, v))
             c.tip("the ramp's shape: straight, eased at either end or both, up and back to where it began, or a jump half way")
             dpg.add_button(label="x", small=True, callback=lambda: remove_ramp(app, dpg.get_value("seq_ramp_key")))
@@ -108,7 +111,7 @@ def build(app):
             c.tip("this slider's ramp off (the others stay)")
             dpg.add_text("", tag="seq_ramp_desc", color=c.DIM)
         with dpg.group(horizontal=True):
-            dpg.add_text("PLAY", color=c.ACCENT)
+            typeface.label(dpg.add_text("PLAY", color=c.ACCENT))
             dpg.add_button(label="Play in the sim", tag="seq_play", small=True, callback=lambda: play(app))
             weight.need(dpg.last_item(), _has_steps)
             dpg.add_button(label="Stop", small=True, callback=lambda: stop(app))
@@ -120,13 +123,13 @@ def build(app):
             c.tip("plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path")
             dpg.add_checkbox(label="repeat", tag="seq_repeat", default_value=False,
                              callback=lambda s, v: (_steps(app).__setitem__("repeat", 0 if v else 1), app.project.save()))
-            dpg.add_combo(transition.STYLES, tag="seq_style", width=110, default_value="fade",
+            dpg.add_combo(transition.STYLES, tag="seq_style", width=px(110), default_value="fade",
                           callback=lambda s, v: (_steps(app).__setitem__("style", v), app.project.save()))
             c.tip("the transition's style, previewed here; on the device the transitions use its own blend-style setting")
             dpg.add_text("", tag="seq_status", color=c.TEXT)
         with dpg.group(horizontal=True):
-            dpg.add_text("BEATS", color=c.ACCENT)
-            dpg.add_input_float(tag="seq_bpm", label="bpm", width=60, step=0, format="%.1f", default_value=120.0,
+            typeface.label(dpg.add_text("BEATS", color=c.ACCENT))
+            dpg.add_input_float(tag="seq_bpm", label="bpm", width=px(60), step=0, format="%.1f", default_value=120.0,
                                 callback=lambda: setattr(app, "_tl_dirty", True))
             dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
             c.tip("tap tempo: tap on the beat, the bpm from the gaps")
@@ -134,7 +137,7 @@ def build(app):
             c.tip("the bpm of the sim's synthetic beat")
             dpg.add_button(label="WAV's", small=True, callback=lambda: beats_from_wav(app))
             c.tip("the tempo and the beats found in the WAV playing as live audio (AUDIO > play a WAV file)")
-            dpg.add_input_int(tag="seq_bar", label="a bar", width=40, step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True,
+            dpg.add_input_int(tag="seq_bar", label="a bar", width=px(40), step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True,
                               callback=lambda: setattr(app, "_tl_dirty", True))
             dpg.add_button(label="Snap durations to bars", small=True, callback=lambda: snap_durations(app))
             weight.need(dpg.last_item(), _has_steps)
@@ -142,14 +145,14 @@ def build(app):
             dpg.add_text("", tag="seq_tap", color=c.DIM)
         dpg.add_separator()
         with dpg.group(horizontal=True):
-            dpg.add_text("ON THE DEVICE", color=c.ACCENT)
-            dpg.add_input_int(tag="seq_base", label="presets from", width=50, step=0, default_value=10, min_value=1, max_value=240, min_clamped=True,
+            typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
+            dpg.add_input_int(tag="seq_base", label="presets from", width=px(50), step=0, default_value=10, min_value=1, max_value=240, min_clamped=True,
                               callback=lambda s, v: (_steps(app).__setitem__("base", int(v)), app.project.save()))
             c.tip("each step is saved as a preset, ids from here up; ones already there are overwritten")
-            dpg.add_input_int(tag="seq_pid", label="playlist", width=50, step=0, default_value=9, min_value=1, max_value=250, min_clamped=True,
+            dpg.add_input_int(tag="seq_pid", label="playlist", width=px(50), step=0, default_value=9, min_value=1, max_value=250, min_clamped=True,
                               callback=lambda s, v: (_steps(app).__setitem__("pid", int(v)), app.project.save()))
             c.tip("the preset id the playlist is saved as")
-            dpg.add_input_text(tag="seq_show", label="name", width=100, default_value="Show", on_enter=True,
+            dpg.add_input_text(tag="seq_show", label="name", width=px(100), default_value="Show", on_enter=True,
                                callback=lambda s, v: (_steps(app).__setitem__("name", v), app.project.save()))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Send presets + playlist", tag="seq_send", small=True, callback=lambda: send(app))
@@ -165,7 +168,7 @@ def build(app):
         dpg.add_separator()
         # SCHEDULE: WLED's timers - a preset at a time of day, sunrise or sunset, on chosen days
         with dpg.group(horizontal=True):
-            dpg.add_text("SCHEDULE", color=c.ACCENT)
+            typeface.label(dpg.add_text("SCHEDULE", color=c.ACCENT))
             dpg.add_button(label="+ run the playlist at", small=True, callback=lambda: add_timer(app, "playlist"))
             dpg.add_button(label="+ off at", small=True, callback=lambda: add_timer(app, "off"))
             c.tip("a time the lights go off: an Off preset (id 250) is saved on the device and timed")
@@ -175,10 +178,10 @@ def build(app):
             weight.need(dpg.last_item(), "device")
             c.info("The device's timers - eight, plus sunrise and sunset: what preset runs when, on which days. "
                    "The device needs the time (NTP) for them to fire.")
-        with dpg.child_window(tag="seq_timers", height=120, border=True):
+        with dpg.child_window(tag="seq_timers", height=px(120), border=True):
             pass
         dpg.add_text("", tag="seq_tlog", color=c.DIM, wrap=0)
-    with dpg.file_dialog(directory_selector=False, show=False, tag="seq_save_dialog", width=640, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="seq_save_dialog", width=px(640), height=px(420),
                          default_filename="presets.json", callback=lambda s, a: save_file(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(150, 150, 220))
     # the selected step's own fields and its ramp: nothing to edit with no step
@@ -199,7 +202,7 @@ def refresh(app):
     for i, st in enumerate(steps):
         fx = ", ".join(sg.get("effect", "?") for sg in st.get("segments") or [])
         with dpg.group(horizontal=True, parent="seq_rows"):
-            dpg.add_selectable(label=f"{i + 1:2d}  {st.get('name', '')}", width=180, default_value=(i == sel), user_data=i,
+            dpg.add_selectable(label=f"{i + 1:2d}  {st.get('name', '')}", width=px(180), default_value=(i == sel), user_data=i,
                                callback=lambda s, a, u: (setattr(app, "_seq_sel", u), refresh(app)))
             dpg.add_text(f"{st.get('dur', 0):.1f} s" + (f" +{st.get('trans', 0):.1f}" if st.get("trans") else ""),
                          color=c.ACCENT if playing and playing["i"] == i else c.DIM)
@@ -267,13 +270,13 @@ def refresh_timers(app):
         cb = lambda s, v, u: _tfield(app, u[0], u[1], v)
         with dpg.group(horizontal=True, parent="seq_timers"):
             dpg.add_checkbox(default_value=bool(t.get("en", True)), user_data=(k, "en"), callback=cb)
-            dpg.add_combo(WHEN, width=80, default_value=t.get("when", "time"), user_data=(k, "when"), callback=cb)
-            dpg.add_input_int(width=40, step=0, default_value=int(t.get("hour", 0)), min_value=0, max_value=23, user_data=(k, "hour"), on_enter=True, callback=cb,
+            dpg.add_combo(WHEN, width=px(80), default_value=t.get("when", "time"), user_data=(k, "when"), callback=cb)
+            dpg.add_input_int(width=px(40), step=0, default_value=int(t.get("hour", 0)), min_value=0, max_value=23, user_data=(k, "hour"), on_enter=True, callback=cb,
                               show=t.get("when", "time") == "time")
             dpg.add_text(":" if t.get("when", "time") == "time" else "+/- min", color=c.DIM)
-            dpg.add_input_int(width=45, step=0, default_value=int(t.get("min", 0)), min_value=-120, max_value=120, user_data=(k, "min"), on_enter=True, callback=cb)
+            dpg.add_input_int(width=px(45), step=0, default_value=int(t.get("min", 0)), min_value=-120, max_value=120, user_data=(k, "min"), on_enter=True, callback=cb)
             dpg.add_text("preset", color=c.DIM)
-            dpg.add_input_int(width=45, step=0, default_value=int(t.get("preset", 1)), min_value=0, max_value=250, user_data=(k, "preset"), on_enter=True, callback=cb)
+            dpg.add_input_int(width=px(45), step=0, default_value=int(t.get("preset", 1)), min_value=0, max_value=250, user_data=(k, "preset"), on_enter=True, callback=cb)
             dpg.add_text("off" if t.get("what") == "off" else ("playlist" if t.get("what") == "playlist" else ""), color=c.DIM)
             for d in range(7):
                 dpg.add_checkbox(label=DAYS[d], default_value=bool(int(t.get("dow", 127)) >> d & 1), user_data=(k, f"d{d}"), callback=cb)
@@ -676,7 +679,7 @@ def draw_timeline(app):
             dpg.configure_item("seq_tl", width=want); w = want
     dpg.draw_rectangle((0, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 60), parent="seq_tl")
     if total <= 0:
-        dpg.draw_text((6, h / 2 - 7), "the timeline: the steps along the time", color=c.DIM, size=13, parent="seq_tl"); return
+        typeface.draw_text((6, h / 2 - px(8)), "the timeline: the steps along the time", px(14), color=c.DIM, parent="seq_tl"); return
     sx = w / total
     # the WAV's wave, over the sequence's time (the WAV plays from 0 when the sequence starts)
     from native import audio
@@ -715,8 +718,8 @@ def draw_timeline(app):
         if i == sel:
             dpg.draw_rectangle((a + 1, 4), (b - 1, h - 10), color=c.ACCENT, thickness=1.5, parent="seq_tl")
         name = str(_steps(app)["steps"][i].get("name", ""))
-        if b - a > 8 * len(name[:12]) + 8:
-            dpg.draw_text((a + 5, 8), name[:12], color=(235, 238, 245, 220), size=13, parent="seq_tl")
+        if b - a > typeface.measure(name[:12], "body", px(14)) + px(10):      # a step's name, in words, where it fits
+            typeface.draw_text((a + px(5), px(6)), name[:12], px(14), color=(235, 238, 245, 220), parent="seq_tl")
         st = _steps(app)["steps"][i]
         for j, k in enumerate(st.get("ramps") or {}):
             # the ramp's curve across the block: the slider's 0..255 over the block's lower half
@@ -726,14 +729,15 @@ def draw_timeline(app):
             pts = [(a + 1 + (b - a - 2) * q / 24, bot - (bot - top) * sequence.ramp_value(st, k, q / 24) / 255.0) for q in range(25)]
             dpg.draw_polyline(pts, color=(255, 255, 255, 200 - 40 * j), thickness=1.5, parent="seq_tl")
             if b - a > 40:
-                dpg.draw_text((a + 5, top - 12), k, color=(235, 238, 245, 160), size=11, parent="seq_tl")
+                typeface.draw_text((a + px(5), top - px(13)), k, px(12), color=(235, 238, 245, 160), parent="seq_tl")
     # the playhead
     at = _tl_playhead(app, total)
     if at is not None:
         dpg.draw_line((at * sx, 0), (at * sx, h), color=(255, 255, 255, 230), thickness=2, parent="seq_tl")
     # the time scale
-    dpg.draw_text((2, h - 14), "0", color=c.DIM, size=11, parent="seq_tl")
-    dpg.draw_text((w - 8 * len(f"{total:.0f} s") - 2, h - 14), f"{total:.0f} s", color=c.DIM, size=11, parent="seq_tl")
+    typeface.draw_text((2, h - px(14)), "0", px(11), face="mono", color=c.DIM, parent="seq_tl")
+    end = f"{total:.0f} s"                           # the time scale's figures, the end right-aligned by its measured width
+    typeface.draw_text((w - typeface.measure(end, "mono", px(11)) - 2, h - px(14)), end, px(11), face="mono", color=c.DIM, parent="seq_tl")
 
 
 def _hsv(h, s, v):

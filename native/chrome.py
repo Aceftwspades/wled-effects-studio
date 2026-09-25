@@ -15,6 +15,9 @@ import os
 import time
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native.icons import texture
 from native.project import save_prefs
 from native.keys import ACTIONS, FIXED
@@ -300,23 +303,23 @@ def build_menus(app):
             dpg.add_menu_item(label="Report a problem...", callback=lambda: report_problem(app))
             tip("bundles what a bug report needs - the version, the doctor's findings, the machine, the project's settings, "
                 "the last crash - into one zip in captures/, and offers the issues page; nothing of your effects or graphs goes in")
-            dpg.add_menu_item(label="About", callback=lambda: dpg.show_item("about_win"))
+            dpg.add_menu_item(label="About", callback=lambda: show_about(app))
 
 
 # --- the toolbar --------------------------------------------------------------------
 def _sep():
-    dpg.add_spacer(width=1)
-    with dpg.drawlist(width=1, height=22):
-        dpg.draw_line((0, 3), (0, 19), color=(52, 58, 70, 255))
-    dpg.add_spacer(width=1)
+    dpg.add_spacer(width=px(1))
+    with dpg.drawlist(width=1, height=px(22)):
+        dpg.draw_line((0, px(3)), (0, px(19)), color=(52, 58, 70, 255))
+    dpg.add_spacer(width=px(1))
 
 
 def _btn(app, icon, tip, cb, tag=None, action=None):
     """An icon button with a tooltip; with an action, the tooltip carries
     its key and follows a rebind (the text is tagged by the action)."""
     kw = {"tag": tag} if tag else {}
-    b = dpg.add_image_button(texture(icon, ICON), width=ICON, height=ICON, tint_color=TEXT,
-                             frame_padding=3, callback=cb, **kw)
+    b = dpg.add_image_button(texture(icon, px(ICON)), width=px(ICON), height=px(ICON), tint_color=TEXT,
+                             frame_padding=px(3), callback=cb, **kw)
     if action:
         app._tb_btn = getattr(app, "_tb_btn", {})
         app._tb_btn.setdefault(action, b)                 # weight.poll greys it while it has nothing to act on
@@ -336,7 +339,7 @@ def build_toolbar(app):
     # them have to fit a 1280-wide window
     with dpg.theme(tag="toolbar_theme"):
         with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 4, 4)
+            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, px(4), px(4))
     with dpg.group(horizontal=True, tag="toolbar"):
         _btn(app, "new", "New effect", lambda: app.new_effect(), action="new")
         _btn(app, "open", "Open a graph or a code effect", lambda: show_open(app), tag="tb_open", action="open")
@@ -360,7 +363,7 @@ def build_toolbar(app):
         # the graph's tools, shown only while the graph is (a zoom box reading 120% over a net said nothing)
         with dpg.group(horizontal=True, tag="tb_graph_tools"):
             _btn(app, "zoom_out", "Zoom out", lambda: app.gp.zoom_step(-1), action="zoom_out")
-            z = dpg.add_button(label="100%", tag="tb_zoom", width=46, callback=lambda: app.gp.set_zoom(1.0))
+            z = dpg.add_button(label="100%", tag="tb_zoom", width=px(46), callback=lambda: app.gp.set_zoom(1.0))
             with dpg.tooltip(z):
                 dpg.add_text("", tag="tbtip_zoom_reset")
             _btn(app, "zoom_in", "Zoom in", lambda: app.gp.zoom_step(1), action="zoom_in")
@@ -392,91 +395,92 @@ def build_toolbar(app):
 
 # --- dialogs ------------------------------------------------------------------------
 def build_dialogs(app):
-    with dpg.window(tag="name_dialog", label="Name", modal=True, show=False, no_resize=True, width=360, height=118, no_collapse=True):
+    with dpg.window(tag="name_dialog", label="Name", modal=True, show=False, no_resize=True, width=px(360), height=px(118), no_collapse=True):
         dpg.add_text("", tag="name_prompt", color=DIM)
         dpg.add_input_text(tag="name_input", width=-1, on_enter=True, callback=lambda: _name_ok(app))
         with dpg.group(horizontal=True):
-            weight.primary(dpg.add_button(label="OK", width=80, callback=lambda: _name_ok(app)))
-            weight.quiet(dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("name_dialog")))
-    with dpg.window(tag="usermods_win", label="Usermods and features", show=False, width=720, height=600, no_collapse=True):
+            weight.primary(dpg.add_button(label="OK", width=px(80), callback=lambda: _name_ok(app)))
+            weight.quiet(dpg.add_button(label="Cancel", width=px(80), callback=lambda: dpg.hide_item("name_dialog")))
+    with dpg.window(tag="usermods_win", label="Usermods and features", show=False, width=px(720), height=px(600), no_collapse=True):
         with dpg.group(horizontal=True):
             dpg.add_text("What the firmware carries for this project; unticked is left out of the build.", color=DIM)
             info("The features are the studio's own optional parts. The usermods are WLED's, from this tree's "
                  "usermods/ folder: the environment's, and any you add.")
-        dpg.add_text("FEATURES", color=ACCENT)
-        with dpg.child_window(tag="um_features", height=200, border=True):
+        typeface.label(dpg.add_text("FEATURES", color=ACCENT))
+        with dpg.child_window(tag="um_features", height=px(200), border=True):
             pass
         with dpg.group(horizontal=True):
-            dpg.add_text("USERMODS", color=ACCENT)
+            typeface.label(dpg.add_text("USERMODS", color=ACCENT))
             dpg.add_text("", tag="um_env", color=DIM)
-        with dpg.child_window(tag="um_rows", height=190, border=True):
+        with dpg.child_window(tag="um_rows", height=px(190), border=True):
             pass
         with dpg.group(horizontal=True):
-            dpg.add_combo([], tag="um_pick", width=260)
+            dpg.add_combo([], tag="um_pick", width=px(260))
             dpg.add_button(label="Add", callback=lambda: app.add_usermod(dpg.get_value("um_pick")))
             dpg.add_button(label="Import a folder...", callback=lambda: dpg.show_item("um_dialog"))
             dpg.add_button(label="Import a zip...", callback=lambda: dpg.show_item("um_zip_dialog"))
-        dpg.add_text("", tag="um_status", color=DIM, wrap=690)
-    with dpg.file_dialog(directory_selector=True, show=False, tag="um_dialog", width=620, height=420,
+        dpg.add_text("", tag="um_status", color=DIM, wrap=px(690))
+    with dpg.file_dialog(directory_selector=True, show=False, tag="um_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: app.import_usermod(a.get("file_path_name", ""))):
         pass
-    with dpg.file_dialog(directory_selector=False, show=False, tag="um_zip_dialog", width=620, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="um_zip_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: app.import_usermod(a.get("file_path_name", ""))):
         dpg.add_file_extension(".zip", color=(120, 200, 120))
-    with dpg.window(tag="confirm_dialog", label="Question", modal=True, show=False, no_resize=True, width=460, height=170, no_collapse=True):
-        dpg.add_text("", tag="confirm_text", color=TEXT, wrap=440)
+    with dpg.window(tag="confirm_dialog", label="Question", modal=True, show=False, no_resize=True, width=px(460), height=px(170), no_collapse=True):
+        dpg.add_text("", tag="confirm_text", color=TEXT, wrap=px(440))
         with dpg.group(horizontal=True, tag="confirm_buttons"):
             pass
-    with dpg.window(tag="editor_dialog", label="External editor", modal=True, show=False, no_resize=True, width=460, height=150, no_collapse=True):
-        dpg.add_text("the command that opens a file at a line; {file} and {line} are filled in.\n"
-                     "Empty uses VS Code if it is on the path.", color=DIM)
-        dpg.add_input_text(tag="editor_cmd", hint="code -g {file}:{line}", width=-1)
+    with dpg.window(tag="editor_dialog", label="External editor", modal=True, show=False, no_resize=True, width=px(460), height=px(170), no_collapse=True):
+        dpg.add_text("the command that opens a file at a line; {file} and {line} are filled in. "
+                     "Empty uses VS Code if it is on the path.", color=DIM, wrap=px(440))
+        typeface.mono(dpg.add_input_text(tag="editor_cmd", hint="code -g {file}:{line}", width=-1))
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Save", width=80, callback=lambda: (app.save_editor_cmd(dpg.get_value("editor_cmd")),
+            dpg.add_button(label="Save", width=px(80), callback=lambda: (app.save_editor_cmd(dpg.get_value("editor_cmd")),
                                                                    dpg.hide_item("editor_dialog")))
             weight.primary(dpg.last_item())
-            dpg.add_button(label="Cancel", width=80, callback=lambda: dpg.hide_item("editor_dialog"))
+            dpg.add_button(label="Cancel", width=px(80), callback=lambda: dpg.hide_item("editor_dialog"))
             weight.quiet(dpg.last_item())
-    with dpg.file_dialog(directory_selector=True, show=False, tag="project_dialog", width=620, height=420,
+    with dpg.file_dialog(directory_selector=True, show=False, tag="project_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: app.new_project(a.get("file_path_name", ""))):
         pass
-    with dpg.file_dialog(directory_selector=False, show=False, tag="project_zip_dialog", width=620, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="project_zip_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: app.import_project_zip(a.get("file_path_name", ""))):
         dpg.add_file_extension(".zip", color=(120, 200, 120))
         dpg.add_file_extension(".*")
-    with dpg.file_dialog(directory_selector=False, show=False, tag="ledmap_dialog", width=620, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="ledmap_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: app.import_ledmap(path=a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(120, 200, 120))
         dpg.add_file_extension(".*")
-    with dpg.window(tag="keys_win", label="Keyboard shortcuts", show=False, width=640, height=600, no_collapse=True,
+    with dpg.window(tag="keys_win", label="Keyboard shortcuts", show=False, width=px(640), height=px(600), no_collapse=True,
                     on_close=lambda: setattr(app, "_capture", None)):
         dpg.add_text("Click a key to change it, then press the new one (Escape keeps the old). "
-                     "A key taken from another action leaves that one unbound.", color=DIM, wrap=600)
+                     "A key taken from another action leaves that one unbound.", color=DIM, wrap=px(600))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Reset all to defaults", callback=lambda: (app.keys.reset(), refresh_keys(app)))
             weight.danger(dpg.last_item())
         with dpg.child_window(tag="keys_rows", height=-1, border=False):
             pass
     from native import version
-    with dpg.window(tag="about_win", label="About", show=False, width=520, height=250, no_collapse=True):
-        dpg.add_text(f"WLED Effects Studio {version.__version__}")
-        dpg.add_text("Node graphs and C++ compiled into WLED effects, previewed on a\n"
-                     "simulated cube, sphere, matrix or strip with synthetic or live audio.", color=DIM)
-        dpg.add_spacer(height=6)
+    with dpg.window(tag="about_win", label="About", show=False, width=px(600), height=px(270), no_collapse=True):
+        typeface.heading(dpg.add_text(f"WLED Effects Studio {version.__version__}"))
+        dpg.add_text("Node graphs and C++ compiled into WLED effects, previewed on a simulated cube, sphere, matrix "
+                     "or strip with synthetic or live audio.", color=DIM, wrap=px(570))
+        dpg.add_spacer(height=px(6))
         with dpg.group(horizontal=True):
             dpg.add_button(label="The studio on GitHub", small=True, callback=lambda: app.open_url(f"https://github.com/{version.REPO}"))
             dpg.add_button(label="The WLED fork", small=True, callback=lambda: app.open_url(f"https://github.com/{version.WLED_REPO}"))
             dpg.add_button(label="WLED", small=True, callback=lambda: app.open_url(f"https://github.com/{version.WLED_UPSTREAM}"))
-        dpg.add_text("Built on WLED (Christian Schwinne and contributors), EUPL v1.2: the effects, palettes and colour maths the sim\n"
-                     "runs are WLED's own, compiled from its sources; the firmware side lives in the fork.", color=DIM)
-        dpg.add_spacer(height=6)
-        dpg.add_text("", tag="about_paths", color=DIM)
+        dpg.add_text("Built on WLED (Christian Schwinne and contributors), EUPL v1.2: the effects, palettes and colour maths "
+                     "the sim runs are WLED's own, compiled from its sources; the firmware side lives in the fork.",
+                     color=DIM, wrap=px(570))
+        dpg.add_spacer(height=px(6))
+        typeface.mono(dpg.add_text("", tag="about_paths", color=DIM))
     # UPDATE: what the check found, and the way to get it in
-    with dpg.window(tag="update_win", label="Update", show=False, width=560, height=360, no_collapse=True):
-        dpg.add_text("", tag="update_head", wrap=540)
-        with dpg.child_window(tag="update_notes", height=180, border=True):
+    with dpg.window(tag="update_win", label="Update", show=False, width=px(560), height=px(360), no_collapse=True):
+        dpg.add_text("", tag="update_head", wrap=px(540))
+        with dpg.child_window(tag="update_notes", height=px(180), border=True):
             pass
-        dpg.add_text("", tag="update_status", color=DIM, wrap=540)
+        dpg.add_text("", tag="update_status", color=DIM, wrap=px(540))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Download and install", tag="update_go", callback=lambda: get_update(app))
             weight.primary(dpg.last_item())
@@ -486,22 +490,22 @@ def build_dialogs(app):
             dpg.add_checkbox(label="check once a day", tag="update_daily", default_value=bool(app.prefs.get("update_check", True)),
                              callback=lambda s, v: (app.prefs.__setitem__("update_check", bool(v)), save_prefs(app.prefs)))
     # SNAPSHOTS: the whole graph's settings as named states, and a morph between two
-    with dpg.window(tag="snap_win", label="Snapshots", show=False, width=420, height=360, no_collapse=True):
+    with dpg.window(tag="snap_win", label="Snapshots", show=False, width=px(420), height=px(360), no_collapse=True):
         dpg.add_text("Every node's settings and typed values, as a named state of this graph. Save the look you have; "
-                     "click a name to bring it back; morph between two.", color=DIM, wrap=400)
+                     "click a name to bring it back; morph between two.", color=DIM, wrap=px(400))
         with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="snap_name", width=200, hint="a name")
+            dpg.add_input_text(tag="snap_name", width=px(200), hint="a name")
             dpg.add_button(label="Save", callback=lambda: app.gp.snapshot_save(dpg.get_value("snap_name")))
             weight.primary(dpg.last_item())
             tip("the graph as it is now, under this name (the same name updates it)")
-        with dpg.child_window(tag="snap_rows", height=150, border=True):
+        with dpg.child_window(tag="snap_rows", height=px(150), border=True):
             pass
         with dpg.group(horizontal=True):
-            dpg.add_text("MORPH", color=ACCENT)
-            dpg.add_combo([], tag="snap_a", width=110)
-            dpg.add_slider_float(tag="snap_t", width=120, min_value=0.0, max_value=1.0, default_value=0.0, format="%.2f",
+            typeface.label(dpg.add_text("MORPH", color=ACCENT))
+            dpg.add_combo([], tag="snap_a", width=px(110))
+            dpg.add_slider_float(tag="snap_t", width=px(120), min_value=0.0, max_value=1.0, default_value=0.0, format="%.2f",
                                  callback=lambda s, v: app.gp.snapshot_morph(v))
-            dpg.add_combo([], tag="snap_b", width=110)
+            dpg.add_combo([], tag="snap_b", width=px(110))
             tip("drag between the two: numbers blend, the rest switches half way; typed values follow live, a changed setting rebuilds")
     # MIDI: a controller's knobs onto the sliders (midi_ui.py)
     from native import midi_ui
@@ -510,12 +514,12 @@ def build_dialogs(app):
     from native import reader_ui
     reader_ui.build(app)
     # REPORT A PROBLEM: where the bundle landed, and the issues page
-    with dpg.window(tag="report_win", label="Report a problem", show=False, width=560, height=230, no_collapse=True):
-        dpg.add_text("", tag="report_text", wrap=540)
+    with dpg.window(tag="report_win", label="Report a problem", show=False, width=px(560), height=px(230), no_collapse=True):
+        dpg.add_text("", tag="report_text", wrap=px(540))
         dpg.add_text("It holds the version, the doctor's findings, the machine, the project's settings (device addresses "
                      "blanked), the prefs and the last crash tracebacks - nothing of your effects, graphs or captures. "
                      "Open an issue, say what you did, what you expected and what happened, and attach the zip.",
-                     color=DIM, wrap=540)
+                     color=DIM, wrap=px(540))
         with dpg.group(horizontal=True):
             weight.primary(dpg.add_button(label="Open the issues page", callback=lambda: app.open_url(f"https://github.com/{version.REPO}/issues/new")))
             tip("a new issue on the studio's GitHub page, in the browser - attach the zip there")
@@ -527,10 +531,11 @@ def build_dialogs(app):
         pass
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
-    with dpg.window(tag="appearance_win", label="Appearance", show=False, width=560, height=400, no_collapse=True):
+    with dpg.window(tag="appearance_win", label="Appearance", show=False, width=px(560), height=px(470), no_collapse=True):
         from native.app import THEME_PRESETS, THEME_ROLES
         dpg.add_text("The look. A preset to start from, then any of its seven colours - the change shows as you make it "
-                     "and is kept.", color=DIM, wrap=540)
+                     "and is kept.", color=DIM, wrap=px(540))
+        typeface.label(dpg.add_text("THEME", color=ACCENT))
         with dpg.group(horizontal=True):
             for name in THEME_PRESETS:
                 dpg.add_button(label=name, small=True, user_data=name, callback=lambda s, a, u: app.set_appearance(preset=u))
@@ -538,16 +543,17 @@ def build_dialogs(app):
         dpg.add_separator()
         for key, label, what in THEME_ROLES:
             with dpg.group(horizontal=True):
-                dpg.add_color_edit([0, 0, 0, 255], tag=f"app_col_{key}", width=150, no_alpha=True, no_label=True, user_data=key,
+                dpg.add_color_edit([0, 0, 0, 255], tag=f"app_col_{key}", width=px(150), no_alpha=True, no_label=True, user_data=key,
                                    callback=lambda s, v, u: app.set_appearance(colors={u: [int(round(c * 255)) if c <= 1.0 else int(c) for c in v[:3]]}))
                 dpg.add_text(label, tag=f"app_lbl_{key}")
-                dpg.add_text(what, color=DIM)
+                typeface.small(dpg.add_text(what, color=DIM))
         dpg.add_separator()
         with dpg.group(horizontal=True):
             dpg.add_button(label="Back to the preset", small=True, callback=lambda: app.set_appearance(preset=(app.prefs.get("theme") or {}).get("preset") or "dark"))
             tip("the preset's colours again, your changes dropped")
         dpg.add_separator()
         from native import nodeface
+        typeface.label(dpg.add_text("NODES", color=ACCENT))
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="Colour nodes by category", tag="app_cat_colours", default_value=bool(app.prefs.get("cat_colours", True)),
                              callback=lambda s, v: (app.prefs.__setitem__("cat_colours", bool(v)), save_prefs(app.prefs), app.gp.rebind_themes()))
@@ -555,14 +561,27 @@ def build_dialogs(app):
                 "a colour you give a node still wins")
         with dpg.group(horizontal=True):
             for cat in nodeface.CATEGORY_ORDER + ("subgraphs",):
-                dpg.add_color_button(list(nodeface.hue(cat)) + [255], width=12, height=12, no_border=True, no_drag_drop=True)
+                dpg.add_color_button(list(nodeface.hue(cat)) + [255], width=px(12), height=px(12), no_border=True, no_drag_drop=True)
                 dpg.add_text(cat)
-    with dpg.window(tag="sweep_win", label="Sweep a slider", show=False, width=400, height=190, no_collapse=True):
-        dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
-                     "record makes that one pass the GIF.", color=DIM, wrap=380)
+        # the interface's size: the faces and every control are made at it, so a change takes a restart
+        dpg.add_separator()
+        typeface.label(dpg.add_text("INTERFACE SIZE", color=ACCENT))
         with dpg.group(horizontal=True):
-            dpg.add_combo([], tag="sweep_key", width=200)
-            dpg.add_input_float(tag="sweep_secs", width=80, default_value=8.0, step=0, format="%.0f s")
+            dpg.add_slider_int(tag="app_ui_scale", min_value=80, max_value=200, width=px(200), format="%d%%",
+                               default_value=int(round(typeface.scale() * 100)), callback=lambda s, v: _ui_scale_pick(app, v))
+            tip("the type and every control at this size, 80 to 200%; first the monitor's own scale. Takes a restart.")
+            dpg.add_button(label="The monitor's", small=True, callback=lambda: _ui_scale_pick(app, typeface.monitor_scale() * 100))
+            tip("the size the monitor is set to in the system's display settings")
+        with dpg.group(horizontal=True, tag="app_ui_restart_row", show=False):
+            dpg.add_text("", tag="app_ui_note", color=DIM)
+            weight.primary(dpg.add_button(label="Restart now", tag="app_ui_restart", callback=lambda: app.restart_studio()))
+            tip("the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first")
+    with dpg.window(tag="sweep_win", label="Sweep a slider", show=False, width=px(400), height=px(190), no_collapse=True):
+        dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
+                     "record makes that one pass the GIF.", color=DIM, wrap=px(380))
+        with dpg.group(horizontal=True):
+            dpg.add_combo([], tag="sweep_key", width=px(200))
+            dpg.add_input_float(tag="sweep_secs", width=px(80), default_value=8.0, step=0, format="%.0f s")
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="loop", tag="sweep_loop", default_value=True)
             dpg.add_checkbox(label="record a GIF of one pass", tag="sweep_rec")
@@ -573,23 +592,23 @@ def build_dialogs(app):
             weight.quiet(dpg.last_item())
     build_frames_dialog(app)
     device_ui.build(app)
-    with dpg.file_dialog(directory_selector=False, show=False, tag="bg_dialog", width=640, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="bg_dialog", width=px(640), height=px(420),
                          callback=lambda s, a: app.set_background(a.get("file_path_name", ""))):
         for ext in (".png", ".jpg", ".jpeg", ".bmp"):
             dpg.add_file_extension(ext, color=(120, 200, 120))
-    with dpg.window(tag="history_win", label="History", show=False, width=520, height=420, no_collapse=True):
-        dpg.add_text("", tag="history_what", color=DIM, wrap=500)
+    with dpg.window(tag="history_win", label="History", show=False, width=px(520), height=px(420), no_collapse=True):
+        dpg.add_text("", tag="history_what", color=DIM, wrap=px(500))
         with dpg.child_window(tag="history_rows", height=-1, border=False):
             pass
     # the command palette: every action by name, Enter runs the first hit
-    with dpg.window(tag="palette_win", show=False, no_title_bar=True, no_resize=True, no_move=True, width=460, height=380,
+    with dpg.window(tag="palette_win", show=False, no_title_bar=True, no_resize=True, no_move=True, width=px(460), height=px(380),
                     no_collapse=True):
-        dpg.add_input_text(tag="palette_text", hint="type an action (Esc closes)", width=440,
+        dpg.add_input_text(tag="palette_text", hint="type an action (Esc closes)", width=px(440),
                            callback=lambda s, v: _palette_fill(app, v))
         with dpg.child_window(tag="palette_rows", height=-1, border=False):
             pass
-    with dpg.window(tag="undo_win", label="Undo history", show=False, width=420, height=380, no_collapse=True):
-        dpg.add_text("the graph's edits, newest first; click one to go back to before it", color=DIM, wrap=400)
+    with dpg.window(tag="undo_win", label="Undo history", show=False, width=px(420), height=px(380), no_collapse=True):
+        dpg.add_text("the graph's edits, newest first; click one to go back to before it", color=DIM, wrap=px(400))
         with dpg.child_window(tag="undo_rows", height=-1, border=False):
             pass
 
@@ -623,9 +642,13 @@ def confirm(app, title, text, buttons):
         btn = dpg.add_button(label=label, parent="confirm_buttons", user_data=k, callback=lambda s, a, u: confirm_pick(app, u))
         if kind:
             weight.weigh(btn, kind)
-    lines = max(2, len(text) // 58 + 1)
-    _centre("confirm_dialog", 460, 78 + 17 * lines)
-    dpg.configure_item("confirm_dialog", height=78 + 17 * lines)
+    # as tall as the question: its lines as Dear ImGui wraps them in the body's face, a line and its
+    # spacing each, over the title bar, the padding and the answers (sizes at 100%)
+    from native import reader
+    lines = max(2, len(reader.wrap_lines(text, px(440), typeface.advance("body"))))
+    h = 84 + (typeface.SIZES["body"] + 4) * lines
+    _centre("confirm_dialog", 460, h)
+    dpg.configure_item("confirm_dialog", height=px(h))
     dpg.show_item("confirm_dialog")
 
 
@@ -674,23 +697,28 @@ def refresh_keys(app):
     last = None
     for action, label, default, ctx in sorted(ACTIONS, key=lambda a: a[3] != "global"):   # each context's keys together, once
         if ctx != last:
-            dpg.add_text("anywhere" if ctx == "global" else "in the graph", parent="keys_rows", color=ACCENT)
+            typeface.label(dpg.add_text("ANYWHERE" if ctx == "global" else "IN THE GRAPH", parent="keys_rows", color=ACCENT))
             last = ctx
         with dpg.group(horizontal=True, parent="keys_rows"):
             b = app.keys.label(action)
             waiting = app._capture == action
-            dpg.add_button(label="press a key..." if waiting else (b or "-"), width=130, user_data=action,
+            dpg.add_button(label="press a key..." if waiting else (b or "-"), width=px(130), user_data=action,
                            callback=lambda s, a, u: (setattr(app, "_capture", u), refresh_keys(app)))
             dpg.add_button(label="x", small=True, user_data=action, enabled=bool(b),
                            callback=lambda s, a, u: (app.keys.set(u, ""), refresh_keys(app)))
             weight.quiet(dpg.last_item())
             dpg.add_text(label, color=TEXT if b else DIM)
             if b != default:
-                dpg.add_text(f"(default {default or '-'})", color=DIM)
-    dpg.add_spacer(height=6, parent="keys_rows")
-    dpg.add_text("always", parent="keys_rows", color=ACCENT)
-    for key, what in FIXED:
-        dpg.add_text(f"  {key:30s} {what}", parent="keys_rows", color=DIM)
+                typeface.small(dpg.add_text(f"(default {default or '-'})", color=DIM))
+    dpg.add_spacer(height=px(6), parent="keys_rows")
+    typeface.label(dpg.add_text("ALWAYS", parent="keys_rows", color=ACCENT))
+    with dpg.table(parent="keys_rows", header_row=False, borders_innerH=False, policy=dpg.mvTable_SizingFixedFit):
+        dpg.add_table_column()
+        dpg.add_table_column()
+        for key, what in FIXED:
+            with dpg.table_row():
+                dpg.add_text(key, color=TEXT)
+                dpg.add_text(what, color=DIM)
 
 
 def show_device(app):
@@ -705,7 +733,15 @@ def show_editor(app):
     dpg.show_item("editor_dialog")
 
 
+def show_about(app):
+    """Help > About, in the middle of the studio."""
+    _centre("about_win", 600, 270)
+    dpg.show_item("about_win")
+
+
 def _centre(tag, w, h=None):
+    """A window in the middle of the studio; w and h as laid out at 100%."""
+    w, h = px(w), (px(h) if h is not None else None)
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
     y = max(0, vh // 3) if h is None else max(10, (vh - h) // 2)
     dpg.configure_item(tag, pos=(max(0, vw // 2 - w // 2), y))
@@ -717,17 +753,17 @@ def show_open(app):
     dpg.delete_item("open_menu", children_only=True)
     graphs, codes = app.gp.files(), app.project.effect_files()
     with dpg.group(horizontal=True, parent="open_menu"):
-        with dpg.child_window(width=210, height=360, border=False):
+        with dpg.child_window(width=px(210), height=px(360), border=False):
             dpg.add_text("graphs", color=DIM)
             for f in graphs:
-                dpg.add_selectable(label=f[:-5], width=190, user_data=f,
+                dpg.add_selectable(label=f[:-5], width=px(190), user_data=f,
                                    callback=lambda s, a, u: (dpg.hide_item("open_menu"), app.open_graph(u)))
             if not graphs:
-                weight.empty(dpg.top_container_stack(), "no graphs yet", [("New effect...", lambda: (dpg.hide_item("open_menu"), app.new_effect()))], wrap=190)
-        with dpg.child_window(width=230, height=360, border=False):
+                weight.empty(dpg.top_container_stack(), "no graphs yet", [("New effect...", lambda: (dpg.hide_item("open_menu"), app.new_effect()))], wrap=px(190))
+        with dpg.child_window(width=px(230), height=px(360), border=False):
             dpg.add_text("code effects", color=DIM)
             for f in codes:
-                dpg.add_selectable(label=app.project.effect_title(f), width=210, user_data=f,
+                dpg.add_selectable(label=app.project.effect_title(f), width=px(210), user_data=f,
                                    callback=lambda s, a, u: (dpg.hide_item("open_menu"), app.open_code(u)))
             if not codes:
                 dpg.add_text("  none yet", color=DIM)
@@ -783,8 +819,10 @@ def apply_frames(app):
         app.frames.set_gradient(kind, stops, mirror)
 
 
-def _strip(stops, mirror, width=260, height=14, parent=None):
-    """A gradient drawn across a strip, as it goes round the frame."""
+def _strip(stops, mirror, width=None, height=None, parent=None):
+    """A gradient drawn across a strip, as it goes round the frame (260 by
+    14 at the interface size)."""
+    width, height = width or px(260), height or px(14)
     kw = {"parent": parent} if parent else {}
     with dpg.drawlist(width=width, height=height, **kw):
         for x in range(0, width, 2):
@@ -794,17 +832,17 @@ def _strip(stops, mirror, width=260, height=14, parent=None):
 
 def build_frames_dialog(app):
     app._gc = {"name": "", "stops": [list(st) for st in glow.DEFAULT_STOPS], "mirror": False}
-    with dpg.window(tag="frames_win", label="Selection frames", show=False, width=560, height=620, no_collapse=True):
+    with dpg.window(tag="frames_win", label="Selection frames", show=False, width=px(560), height=px(620), no_collapse=True):
         dpg.add_text("The turning gradient frame around the selected nodes, and the one around the pane "
-                     "last clicked in. Pick a WLED palette, the studio's own, or one you made below.", color=DIM, wrap=530)
+                     "last clicked in. Pick a WLED palette, the studio's own, or one you made below.", color=DIM, wrap=px(530))
         dpg.add_group(tag="frames_choice")
         dpg.add_separator()
-        dpg.add_text("GRADIENT CREATOR", color=ACCENT)
+        typeface.label(dpg.add_text("GRADIENT CREATOR", color=ACCENT))
         with dpg.group(horizontal=True):
-            dpg.add_combo([], tag="gc_from", width=220, callback=lambda s, v: _gc_load(app, v))
+            dpg.add_combo([], tag="gc_from", width=px(220), callback=lambda s, v: _gc_load(app, v))
             dpg.add_text("start from", color=DIM)
         with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="gc_name", hint="a name for this gradient", width=220,
+            dpg.add_input_text(tag="gc_name", hint="a name for this gradient", width=px(220),
                                callback=lambda s, v: app._gc.__setitem__("name", v))
             dpg.add_checkbox(label="mirror (seamless: 0 to 1 and back)", tag="gc_mirror",
                              callback=lambda s, v: (app._gc.__setitem__("mirror", bool(v)), refresh_frames(app)))
@@ -837,7 +875,7 @@ def refresh_frames(app):
         with dpg.group(parent="frames_choice"):
             dpg.add_text(label, color=TEXT)
             with dpg.group(horizontal=True):
-                dpg.add_combo(labels, width=260, default_value=gradient_label(cur), user_data=kind,
+                dpg.add_combo(labels, width=px(260), default_value=gradient_label(cur), user_data=kind,
                               callback=lambda s, v, u: _choose(app, u, keys[labels.index(v)]))
                 stops, mirror = resolve_gradient(app, cur)
                 _strip(stops, mirror)
@@ -850,9 +888,9 @@ def refresh_frames(app):
     _strip(gc["stops"], gc["mirror"], parent="gc_rows")
     for k, st in enumerate(sorted(gc["stops"], key=lambda q: q[0])):
         with dpg.group(horizontal=True, parent="gc_rows"):
-            dpg.add_input_float(width=64, default_value=float(st[0]), step=0, format="%.2f",
+            dpg.add_input_float(width=px(64), default_value=float(st[0]), step=0, format="%.2f",
                                 user_data=(k, "pos"), callback=lambda s, v, u: _gc_edit(app, u, v))
-            dpg.add_color_edit([int(st[1]), int(st[2]), int(st[3]), 255], width=90, no_alpha=True, no_inputs=True,
+            dpg.add_color_edit([int(st[1]), int(st[2]), int(st[3]), 255], width=px(90), no_alpha=True, no_inputs=True,
                                user_data=(k, "col"), callback=lambda s, v, u: _gc_edit(app, u, v))
             if len(gc["stops"]) > 2:
                 dpg.add_button(label="-", small=True, user_data=(k, "del"), callback=lambda s, a, u: _gc_edit(app, u, None))
@@ -948,11 +986,11 @@ def _feature_rows(app, parent="flash_features"):
                              callback=lambda s, a, u: app.set_feature(u, bool(a)))
             nodes = sorted(n for n, need in NEEDS.items() if need == key)
             tip(what + (f" Nodes: {', '.join(nodes)}." if nodes else ""))
-            dpg.add_text(files, color=DIM)
+            typeface.small(dpg.add_text(files, color=DIM))
     with dpg.group(horizontal=True, parent=parent):
         labels = [a[1] for a in flash.AUDIO]
         cur = next((a[1] for a in flash.AUDIO if a[0] == f["audio"]), labels[0])
-        dpg.add_combo(labels, default_value=cur, width=420, tag=f"{parent}_audio",
+        dpg.add_combo(labels, default_value=cur, width=px(420), tag=f"{parent}_audio",
                       callback=lambda s, v: app.set_feature("audio", next(a[0] for a in flash.AUDIO if a[1] == v)))
         what = next(a[2] for a in flash.AUDIO if a[0] == f["audio"])
         nodes = sorted(n for n, need in NEEDS.items() if need == "audio")
@@ -984,16 +1022,23 @@ def refresh_usermods(app):
         with dpg.group(horizontal=True, parent="um_rows"):
             dpg.add_checkbox(default_value=on, user_data=name, callback=lambda s, a, u: app.set_usermod(u, bool(a)))
             dpg.add_text(name, color=TEXT if name not in flash.CORE else ACCENT)
-            dpg.add_text("(env)" if source == "env" else "(added)", color=DIM)
+            typeface.small(dpg.add_text("(env)" if source == "env" else "(added)", color=DIM))
             if source == "project" or name in flash.features_of(app.project)["usermods"]:
                 dpg.add_button(label="remove" if source == "project" else "as the env says", small=True, user_data=name,
                                callback=lambda s, a, u: app.remove_usermod(u))
             info = flash.usermod_info(name)
             if info:
-                room = 58 - len(name)
-                dpg.add_text(info[:room] + ("..." if len(info) > room else ""), color=DIM)
+                # the line about it, as much as the row has room for after the name, its source and the button
+                from native import nodeface
+                used = px(36) + typeface.measure(name) + typeface.measure("(added)", "body", typeface.size_of("small")) + px(24)
+                if source == "project" or name in flash.features_of(app.project)["usermods"]:
+                    used += typeface.measure("as the env says") + px(24)
+                room = (dpg.get_item_width("usermods_win") or px(720)) - px(48) - used
+                small = typeface.size_of("small")
+                typeface.small(dpg.add_text(nodeface.fit_width(info, max(px(40), room), lambda t: typeface.measure(t, "body", small)),
+                                            color=DIM))
                 with dpg.tooltip(dpg.last_item()):
-                    dpg.add_text(info, wrap=400)
+                    dpg.add_text(info, wrap=px(400))
     if not rows:
         dpg.add_text("none yet - add one below", parent="um_rows", color=DIM)
     listed = {r[0] for r in rows}
@@ -1043,12 +1088,12 @@ def show_history(app):
             dpg.add_button(label="restore", small=True, user_data=(kind, stem, ext, p),
                            callback=lambda s, a, u: _restore(app, *u))
             dpg.add_text(_t.strftime("%Y-%m-%d %H:%M:%S", _t.localtime(t)))
-            dpg.add_text(f"{size / 1024:.1f} KB", color=DIM)
+            typeface.small(dpg.add_text(f"{size / 1024:.1f} KB", color=DIM))
             if kind != "effects":
                 try:
                     import json
                     n = len(json.load(open(p, encoding="utf-8")).get("nodes", []))
-                    dpg.add_text(f"{n} nodes", color=DIM)
+                    typeface.small(dpg.add_text(f"{n} nodes", color=DIM))
                 except Exception:
                     pass
     if not vs:
@@ -1082,9 +1127,9 @@ def _palette_fill(app, text):
     rows.sort(key=lambda r: (r[0], r[1].lower()) if text else 0)
     for _, label, action in rows[:40]:
         with dpg.group(horizontal=True, parent="palette_rows"):
-            dpg.add_selectable(label=label, width=330, user_data=action,
+            dpg.add_selectable(label=label, width=px(330), user_data=action,
                                callback=lambda s, a, u: (dpg.hide_item("palette_win"), app.run_action(u)))
-            dpg.add_text(app.keys.label(action), color=DIM)
+            typeface.small(dpg.add_text(app.keys.label(action), color=DIM))
     if not rows:
         dpg.add_text("no action matches", parent="palette_rows", color=DIM)
 
@@ -1165,9 +1210,9 @@ def show_compare(app):
     """Pick the effect to run beside the current one."""
     dpg.delete_item("compare_menu", children_only=True)
     dpg.add_text(f"beside {app.eng.names[app.eng.idx]}, show", parent="compare_menu", color=DIM)
-    with dpg.child_window(width=240, height=360, border=False, parent="compare_menu"):
+    with dpg.child_window(width=px(240), height=px(360), border=False, parent="compare_menu"):
         for n in app.eng.names:
-            dpg.add_selectable(label=n, width=220, user_data=n,
+            dpg.add_selectable(label=n, width=px(220), user_data=n,
                                callback=lambda s, a, u: (dpg.hide_item("compare_menu"), app.start_ab(u)))
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
     dpg.configure_item("compare_menu", show=True)
@@ -1177,7 +1222,7 @@ def show_compare(app):
 # --- appearance, pane menus ----------------------------------------------------------------
 def show_appearance(app):
     refresh_appearance(app)
-    _centre("appearance_win", 560, 400)
+    _centre("appearance_win", 560, 470)
     dpg.show_item("appearance_win")
 
 
@@ -1216,6 +1261,19 @@ def recolour_texts(old, new):
                 n += 1
                 break
     return n
+
+
+def _ui_scale_pick(app, pct):
+    """An interface size for the next start: kept, and the restart offered."""
+    new = typeface.set_scale(app.prefs, pct)
+    save_prefs(app.prefs)
+    if dpg.does_item_exist("app_ui_scale"):
+        dpg.set_value("app_ui_scale", new)
+    now = int(round(typeface.scale() * 100))
+    same = new == now
+    dpg.configure_item("app_ui_restart_row", show=not same)
+    dpg.set_value("app_ui_note", f"now {now}%; {new}% from the next start")
+    app.gp.status("the interface size as it is" if same else f"the interface at {new}% from the next start - Restart now in Appearance")
 
 
 def refresh_appearance(app):
@@ -1260,17 +1318,18 @@ def bind_value_sliders():
             dpg.bind_item_theme(tag, value_slider_theme())
 
 
-def tip(text, item=None, wrap=360):
+def tip(text, item=None, wrap=None):
     """The explanation of a control as its tooltip: on the last item made,
-    or `item`. The panel shows the control; the words come on hover."""
+    or `item`. The panel shows the control; the words come on hover,
+    wrapped at 360 at the interface size."""
     with dpg.tooltip(item or dpg.last_item()):
-        dpg.add_text(text, wrap=wrap)
+        dpg.add_text(text, wrap=wrap or px(360))
 
 
-def info(text, wrap=360):
+def info(text, wrap=None):
     """A dim (?) that explains the row it sits on, on hover - for what has
     no single control to hang the words on."""
-    dpg.add_text("(?)", color=DIM)
+    typeface.small(dpg.add_text("(?)", color=DIM))
     tip(text, wrap=wrap)
 
 
@@ -1278,12 +1337,12 @@ def grip(pane):
     """The handle a pane is dragged by: ::: at its top right (placed by the
     layout; an item with a position is out of the flow). The app's click
     handler looks for the pointer on it (app.on_mouse_click)."""
-    dpg.add_button(label=":::", tag=f"grip_{pane}", width=30, height=19, pos=(400, 8))
+    dpg.add_button(label=":::", tag=f"grip_{pane}", width=px(30), height=px(19), pos=(400, px(8)))
     if not dpg.does_item_exist("grip_theme"):
         # the default frame padding hides a third of the label
         with dpg.theme(tag="grip_theme"):
             with dpg.theme_component(dpg.mvButton):
-                dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 3, 2)
+                dpg.add_theme_style(dpg.mvStyleVar_FramePadding, px(3), px(2))
     dpg.bind_item_theme(f"grip_{pane}", "grip_theme")
     with dpg.tooltip(f"grip_{pane}"):
         dpg.add_text("drag onto another pane to move this one there")
@@ -1445,7 +1504,7 @@ def show_update(app):
     dpg.set_value("update_head", f"{u.get('name') or u.get('tag')} is out; this is {version.__version__}.")
     dpg.delete_item("update_notes", children_only=True)
     notes = u.get("notes") or "(no notes)"
-    dpg.add_text(notes[:4000], parent="update_notes", wrap=520)
+    dpg.add_text(notes[:4000], parent="update_notes", wrap=px(520))
     if not update.can_apply():
         how = "run from a checkout: git pull, then start again" if not __import__("native.paths", fromlist=["x"]).FROZEN \
               else "download the zip and unpack it over the app's folder (projects and captures are yours, keep them)"

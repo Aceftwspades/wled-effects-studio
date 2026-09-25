@@ -17,6 +17,9 @@ straight blend between entries (FastLED's CRGBPalette16 from a gradient).
 import json
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native import weight
 import numpy as np
 
@@ -102,7 +105,7 @@ def wled_json(p):
 def build(app):
     c = _c()
     from native import device_ui
-    with dpg.window(tag=TAG, show=False, width=560, height=460, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=px(560), height=px(460), no_collapse=True, no_title_bar=True):
         device_ui.header(app, "palettes")
         with dpg.group(horizontal=True):
             dpg.add_button(label="undo", small=True, callback=lambda: undo(app))
@@ -119,22 +122,22 @@ def build(app):
             weight.need(dpg.last_item(), _has_sel)
             c.info("Gradients of your own: in the sim as palettes (ids 200 down), on the device as its custom palettes - "
                    "sent by position, so the first here replaces the device's palette0.json, the second its palette1.json.")
-        with dpg.child_window(tag="pal_rows", height=120, border=True):
+        with dpg.child_window(tag="pal_rows", height=px(120), border=True):
             pass
         with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="pal_name", label="name", width=200, on_enter=True, callback=lambda s, v: rename(app, v))
+            dpg.add_input_text(tag="pal_name", label="name", width=px(200), on_enter=True, callback=lambda s, v: rename(app, v))
             dpg.add_text("", tag="pal_id", color=c.DIM)
         dpg.add_text("click: a stop  -  drag: move it  -  right-click: remove it", color=c.DIM, wrap=0)
-        dpg.add_drawlist(tag="pal_bar", width=520, height=64)
+        dpg.add_drawlist(tag="pal_bar", width=_bar()[0], height=_bar()[1])
         with dpg.group(horizontal=True):
-            dpg.add_color_edit(tag="pal_col", default_value=(255, 255, 255, 255), no_alpha=True, width=200,
+            dpg.add_color_edit(tag="pal_col", default_value=(255, 255, 255, 255), no_alpha=True, width=px(200),
                                callback=lambda s, v: set_colour(app, v))
-            dpg.add_input_int(tag="pal_pos", label="position", width=80, min_value=0, max_value=255, min_clamped=True, max_clamped=True,
+            dpg.add_input_int(tag="pal_pos", label="position", width=px(80), min_value=0, max_value=255, min_clamped=True, max_clamped=True,
                               callback=lambda s, v: set_pos(app, int(v)))
             dpg.add_button(label="spread evenly", small=True, callback=lambda: spread(app))
         dpg.add_separator()
         with dpg.group(horizontal=True):
-            dpg.add_text("ON THE DEVICE", color=c.ACCENT)
+            typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
             dpg.add_button(label="Send this one", small=True, callback=lambda: send(app, False))
             weight.primary(dpg.last_item())
             weight.need(dpg.last_item(), _dev_sel)
@@ -168,12 +171,12 @@ def refresh(app):
     dpg.delete_item("pal_rows", children_only=True)
     for i, p in enumerate(pals):
         with dpg.group(horizontal=True, parent="pal_rows"):
-            dpg.add_selectable(label=f"{i:2d}  {p.get('name', '')}", width=200, default_value=(i == sel), user_data=i,
+            dpg.add_selectable(label=f"{i:2d}  {p.get('name', '')}", width=px(200), default_value=(i == sel), user_data=i,
                                callback=lambda s, a, u: (setattr(app, "_pal_sel", u), setattr(app, "_pal_stop", 0), refresh(app)))
-            dpg.add_text(f"id {200 - i}, {len(p.get('stops') or [])} stops", color=c.DIM)
+            typeface.small(dpg.add_text(f"id {200 - i}, {len(p.get('stops') or [])} stops", color=c.DIM))
             tex = _swatch(app, i, p)
             if tex:
-                dpg.add_image(tex, width=120, height=14)
+                dpg.add_image(tex, width=px(120), height=px(14))
     if not pals:
         weight.empty("pal_rows", "No palettes of the project's own yet: a new gradient, or the one the sim shows.",
                      [("New palette", lambda: new_palette(app)), ("From the sim's palette", lambda: from_current(app))])
@@ -204,6 +207,11 @@ def _swatch(app, i, p):
     return tag
 
 
+def _bar():
+    """The gradient bar's width and height: 520 by 64 at the interface size."""
+    return px(520), px(64)
+
+
 def draw_bar(app):
     if not dpg.does_item_exist("pal_bar"):
         return
@@ -212,19 +220,20 @@ def draw_bar(app):
     if sel < 0:
         return
     p = _pals(app)[sel]
-    W, H = 520, 64
+    W, H = _bar()
+    top, bot, tri, half = px(4), H - px(18), H - px(16), px(6)
     cols = sample(p.get("stops") or [], 128)
     for i in range(128):
         x0 = int(i * W / 128); x1 = int((i + 1) * W / 128)
         col = tuple(int(v) for v in cols[i]) + (255,)
-        dpg.draw_rectangle((x0, 4), (x1, H - 18), color=col, fill=col, parent="pal_bar")
-    dpg.draw_rectangle((0, 4), (W - 1, H - 18), color=(70, 74, 82, 255), parent="pal_bar")
+        dpg.draw_rectangle((x0, top), (x1, bot), color=col, fill=col, parent="pal_bar")
+    dpg.draw_rectangle((0, top), (W - 1, bot), color=(70, 74, 82, 255), parent="pal_bar")
     k = getattr(app, "_pal_stop", 0)
     for j, q in enumerate(_stops(p)):
         x = q[0] * (W - 1) / 255.0
         col = (255, 210, 90, 255) if j == k else (235, 235, 235, 255)
-        dpg.draw_triangle((x, H - 16), (x - 6, H - 4), (x + 6, H - 4), color=col, fill=col, parent="pal_bar")
-        dpg.draw_line((x, 4), (x, H - 16), color=col, thickness=1, parent="pal_bar")
+        dpg.draw_triangle((x, tri), (x - half, H - px(4)), (x + half, H - px(4)), color=col, fill=col, parent="pal_bar")
+        dpg.draw_line((x, top), (x, tri), color=col, thickness=1, parent="pal_bar")
 
 
 def poll(app):
@@ -237,7 +246,7 @@ def poll(app):
     st = dpg.get_item_state("pal_bar")
     if "rect_min" not in st:
         return
-    (x0, y0) = st["rect_min"]; W, H = 520, 64
+    (x0, y0) = st["rect_min"]; W, H = _bar()
     mx, my = dpg.get_mouse_pos(local=False)
     inside = x0 <= mx <= x0 + W and y0 <= my <= y0 + H
     pos = int(max(0, min(255, round((mx - x0) * 255.0 / (W - 1)))))
@@ -247,7 +256,7 @@ def poll(app):
     p = _pals(app)[sel]
     stops = _stops(p)
     def nearest():
-        best, bk = 8, None
+        best, bk = px(8), None
         for k, q in enumerate(stops):
             d = abs(q[0] * (W - 1) / 255.0 - (mx - x0))
             if d < best:

@@ -31,6 +31,9 @@ import time
 import numpy as np
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 import queue
 import threading
 
@@ -57,9 +60,10 @@ import sys
 STEP = 23
 CUBE_MAX = 620          # cube render cost is quadratic in this, so it is capped
                         # and the image is scaled up if the pane is larger
-VIEW_MIN = 180
-CAP_H = 48              # a view pane above its picture: padding, the grip and caption row, spacing; and the padding below
-SIDE_W = 340            # control column
+# laid out at 100% and at the interface size (typeface.py) from here on
+VIEW_MIN = px(180)
+CAP_H = px(48)          # a view pane above its picture: padding, the grip and caption row, spacing; and the padding below
+SIDE_W = px(340)        # control column
 
 
 SECTION = (90, 169, 230)          # section titles in the side panel
@@ -155,24 +159,24 @@ def apply_theme(prefs=None):
                          (dpg.mvThemeCol_PlotHistogram, accent),
                          (dpg.mvThemeCol_ModalWindowDimBg, (0, 0, 0, 140))):
                 dpg.add_theme_color(t, c, category=dpg.mvThemeCat_Core)
-            for t, v in ((dpg.mvStyleVar_FrameRounding, 3),
-                         (dpg.mvStyleVar_ChildRounding, 5),
-                         (dpg.mvStyleVar_GrabRounding, 3),
-                         (dpg.mvStyleVar_WindowRounding, 5),
-                         (dpg.mvStyleVar_PopupRounding, 4),
-                         (dpg.mvStyleVar_ScrollbarRounding, 4),
-                         (dpg.mvStyleVar_ScrollbarSize, 10),
-                         (dpg.mvStyleVar_GrabMinSize, 10),
+            for t, v in ((dpg.mvStyleVar_FrameRounding, px(3)),
+                         (dpg.mvStyleVar_ChildRounding, px(5)),
+                         (dpg.mvStyleVar_GrabRounding, px(3)),
+                         (dpg.mvStyleVar_WindowRounding, px(5)),
+                         (dpg.mvStyleVar_PopupRounding, px(4)),
+                         (dpg.mvStyleVar_ScrollbarRounding, px(4)),
+                         (dpg.mvStyleVar_ScrollbarSize, px(10)),
+                         (dpg.mvStyleVar_GrabMinSize, px(10)),
                          (dpg.mvStyleVar_FrameBorderSize, 0),
                          (dpg.mvStyleVar_WindowBorderSize, 0),
                          (dpg.mvStyleVar_ChildBorderSize, 1),
                          (dpg.mvStyleVar_PopupBorderSize, 1)):
                 dpg.add_theme_style(t, v, category=dpg.mvThemeCat_Core)
-            for t, a, b in ((dpg.mvStyleVar_WindowPadding, 10, 10),
-                            (dpg.mvStyleVar_FramePadding, 7, 4),
-                            (dpg.mvStyleVar_ItemSpacing, 8, 6),
-                            (dpg.mvStyleVar_ItemInnerSpacing, 6, 4),
-                            (dpg.mvStyleVar_CellPadding, 6, 3)):
+            for t, a, b in ((dpg.mvStyleVar_WindowPadding, px(10), px(10)),
+                            (dpg.mvStyleVar_FramePadding, px(7), px(4)),
+                            (dpg.mvStyleVar_ItemSpacing, px(8), px(6)),
+                            (dpg.mvStyleVar_ItemInnerSpacing, px(6), px(4)),
+                            (dpg.mvStyleVar_CellPadding, px(6), px(3))):
                 dpg.add_theme_style(t, a, b, category=dpg.mvThemeCat_Core)
             # The node editor: the same slabs, a quieter grid, the accent
             # for a box-select; a selected node's own frame is the gradient
@@ -283,8 +287,8 @@ class Section:
         with dpg.group(horizontal=True, tag=f"sec_{key}_hdr"):
             dpg.add_button(arrow=True, direction=dpg.mvDir_Right if shut else dpg.mvDir_Down, tag=f"sec_{key}_arrow",
                            callback=lambda: app.sec_toggle(key))
-            dpg.add_text(self.title, color=SECTION, tag=f"sec_{key}_title")
-            dpg.add_button(label=":::", tag=f"sec_{key}_grip", width=30, height=19)
+            typeface.label(dpg.add_text(self.title, color=SECTION, tag=f"sec_{key}_title"))
+            dpg.add_button(label=":::", tag=f"sec_{key}_grip", width=px(30), height=px(19))
             if dpg.does_item_exist("grip_theme"):
                 dpg.bind_item_theme(f"sec_{key}_grip", "grip_theme")
             with dpg.tooltip(f"sec_{key}_grip"):
@@ -322,7 +326,7 @@ class App(Features):
         self.building = False
         # --- pane sizes: dragged on the splitters, remembered across runs ----
         self.prefs = load_prefs()
-        self.side_w = int(self.prefs.get("side_w", SIDE_W))
+        self.side_w = px(self.prefs["side_w"]) if self.prefs.get("side_w") else SIDE_W    # kept at 100%
         # where the panes sit: columns of rows of slots (see PRESETS), the
         # columns' shares of the width per layout mode, the rows' of a column
         self.arrangement = self._valid_arrangement(self.prefs.get("arrangement")) or [list(c) for c in self.PRESETS[0][1]]
@@ -863,7 +867,7 @@ class App(Features):
                                  default_value=bool(g.params.get(key, key == "serpentine")),
                                  callback=self.on_geom_field)
             else:
-                dpg.add_input_int(label=label, parent="geom_fields", user_data=key, width=90,
+                dpg.add_input_int(label=label, parent="geom_fields", user_data=key, width=px(90),
                                   default_value=int(g.params.get(key, {"n": 60, "w": 16, "h": 16, "B": 16}.get(key, 16))),
                                   min_value=lo, max_value=hi, min_clamped=True, max_clamped=True,
                                   on_enter=True, callback=self.on_geom_field)
@@ -876,10 +880,10 @@ class App(Features):
             # the wiring: which face first, how each is turned, how each is
             # walked - what the exported ledmap says
             dpg.add_text("wiring (the ledmap)", parent="geom_fields", color=(139, 147, 163))
-            dpg.add_input_text(label="faces, in wiring order", parent="geom_fields", user_data="faces", width=110,
+            dpg.add_input_text(label="faces, in wiring order", parent="geom_fields", user_data="faces", width=px(110),
                                default_value=str(g.params.get("faces", "")), hint="N,W,T,E,S,B" if g.params.get("six") else "N,W,T,E,S", on_enter=True,
                                callback=self.on_geom_field)
-            dpg.add_input_text(label="quarter turns per face", parent="geom_fields", user_data="rots", width=110,
+            dpg.add_input_text(label="quarter turns per face", parent="geom_fields", user_data="rots", width=px(110),
                                default_value=str(g.params.get("rots", "")), hint="0,0,0,0,0,0" if g.params.get("six") else "0,0,0,0,0", on_enter=True,
                                callback=self.on_geom_field)
             for row in ((("serpentine", "serpentine"), ("vertical", "vertical")),
@@ -1491,16 +1495,16 @@ class App(Features):
 
         with dpg.group(horizontal=True, parent=parent):
             if is_float:
-                dpg.add_slider_float(tag=st, width=142, min_value=lo, max_value=hi,
+                dpg.add_slider_float(tag=st, width=px(142), min_value=lo, max_value=hi,
                                      default_value=value, format="", callback=from_slider)
-                dpg.add_input_float(tag=it, width=68, step=0, format="%.1f",
+                dpg.add_input_float(tag=it, width=px(68), step=0, format="%.1f",
                                     min_value=lo, max_value=hi, min_clamped=True,
                                     max_clamped=True, default_value=value,
                                     callback=from_box)
             else:
-                dpg.add_slider_int(tag=st, width=142, min_value=lo, max_value=hi,
+                dpg.add_slider_int(tag=st, width=px(142), min_value=lo, max_value=hi,
                                    default_value=value, format="", callback=from_slider)
-                dpg.add_input_int(tag=it, width=68, step=0, min_value=lo, max_value=hi,
+                dpg.add_input_int(tag=it, width=px(68), step=0, min_value=lo, max_value=hi,
                                   min_clamped=True, max_clamped=True,
                                   default_value=value, callback=from_box)
             dpg.add_text(label, color=(139, 147, 163))
@@ -1556,6 +1560,25 @@ class App(Features):
         if self.layout == "edit":
             return self.edit_file
         return self.gp.effect_file() or self.edit_file
+
+    def restart_studio(self):
+        """The studio again (an interface size takes it): the code's unsaved
+        edits saved first if you say so - the graph saves as you go."""
+        from native import wledtree
+
+        def go(save=False):
+            if save and self.edit_dirty:
+                self.edit_save()
+            self.gp.save()
+            save_prefs(self.prefs)
+            wledtree.restart()
+            dpg.stop_dearpygui()
+        if self.edit_dirty and self.edit_file:
+            chrome.confirm(self, "Restart the studio", f"{self.edit_file} has changes that are not saved.",
+                           [("Save and restart", lambda: go(True)), ("Restart without saving", lambda: go(False), "danger"),
+                            ("Cancel", None)])
+        else:
+            go()
 
     def save_current(self):
         if self.layout == "edit":
@@ -1909,7 +1932,7 @@ class App(Features):
         tot = sum(fr) or 1.0
         return [f / tot for f in fr]
 
-    SPLIT = 8                    # a splitter's thickness
+    SPLIT = px(8)                # a splitter's thickness
 
     def pane_rects(self, x0, y0, W, H):
         """Where each shown slot goes, {slot: (x, y, w, h)}, and the splitters
@@ -2156,24 +2179,24 @@ class App(Features):
             # The footer is measured rather than assumed; before the first
             # frame it has no size yet and 48 px is what it comes to.
             fh = dpg.get_item_rect_size("footer")[1] if dpg.does_item_exist("footer") else 0
-            fh = fh if fh > 0 else 48
+            fh = fh if fh > 0 else px(48)
             # The menu bar and the toolbar sit above the panes; where the
             # toolbar ends is measured, since the menu bar's height is the
             # font's business. Before the first frame it has no size: 59 px
             # is what it comes to.
             tb_y = dpg.get_item_rect_min("toolbar")[1] if dpg.does_item_exist("toolbar") else 0
             tb_h = dpg.get_item_rect_size("toolbar")[1] if dpg.does_item_exist("toolbar") else 0
-            top = (tb_y + tb_h + 6) if tb_h > 0 else 59
-            pane_h = max(VIEW_MIN, vh - top - fh - 18)
-            rects, splits = self.pane_rects(8, top, vw - 16, pane_h)
+            top = (tb_y + tb_h + px(6)) if tb_h > 0 else px(59)
+            pane_h = max(VIEW_MIN, vh - top - fh - px(18))
+            rects, splits = self.pane_rects(px(8), top, vw - px(16), pane_h)
             main, cube = rects.get("main"), rects.get("cube")
             if cube is None and main and room.pip_on(self):
                 cube = room.pip_geometry(self, main)          # the 3-D view in its corner of the graph
                 dpg.configure_item("cube_win", width=cube[2], height=cube[3])   # its size before the picture is centred in it
             self._cube_rect = cube
             # each view is a square: the largest its pane's inside allows
-            side_l = max(VIEW_MIN, min(main[2] - 22, main[3] - CAP_H)) if (main and show_net) else VIEW_MIN
-            side = max(VIEW_MIN, min(cube[2] - 22, cube[3] - CAP_H)) if cube else VIEW_MIN
+            side_l = max(VIEW_MIN, min(main[2] - px(22), main[3] - CAP_H)) if (main and show_net) else VIEW_MIN
+            side = max(VIEW_MIN, min(cube[2] - px(22), cube[3] - CAP_H)) if cube else VIEW_MIN
         else:
             # Presenting: no control column, no captions, no borders and no
             # padding, so none of it gets an allowance. The picture takes the
@@ -2248,11 +2271,11 @@ class App(Features):
                 if slot in self.OPTIONAL:
                     device_ui.place_header(tag, w, True)
                 elif dpg.does_item_exist(f"grip_{tag}"):
-                    dpg.set_item_pos(f"grip_{tag}", [w - 40 - (14 if slot == "side" else 0), 8])
+                    dpg.set_item_pos(f"grip_{tag}", [w - px(40) - (px(14) if slot == "side" else 0), px(8)])
             app_ed = getattr(self, "code_ed", None)
             if app_ed and show_edit and "main" in rects:
                 x, y, w, h = rects["main"]
-                app_ed.resize(w - 18, h - 164)
+                app_ed.resize(w - px(18), h - px(164))
             for kind, i, j, x, y, w, h in splits:
                 tag = f"{kind}split_{i}_{j}"
                 if dpg.does_item_exist(tag):
@@ -2307,8 +2330,8 @@ class App(Features):
             ih = dpg.get_item_configuration(img).get("height") or 0
             if not (cw and ch and iw and ih):
                 continue
-            top = CAP_H - 10 if self.ui else 0            # the caption row (the pane pads 10 below the picture)
-            dpg.set_item_pos(img, [max(0, (cw - iw) // 2), top + max(0, (ch - top - ih - 10) // 2)])
+            top = CAP_H - px(10) if self.ui else 0        # the caption row (the pane pads 10 below the picture)
+            dpg.set_item_pos(img, [max(0, (cw - iw) // 2), top + max(0, (ch - top - ih - px(10)) // 2)])
 
     NET_SRC_SCALE = 4            # the net's upscale for the GPU-scaled view
 
@@ -2371,7 +2394,7 @@ class App(Features):
             self.point_quads = PointQuads("cube_win", "cube_img", self.view_positions())
             r = getattr(self, "_cube_rect", None)
             if r and self.ui:
-                self.point_quads.resize(self.view_side, r[2] - 22, r[3] - CAP_H)
+                self.point_quads.resize(self.view_side, r[2] - px(22), r[3] - CAP_H)
             else:
                 self.point_quads.resize(self.view_side)
             if dpg.does_item_exist("cube_cap"):
@@ -2388,7 +2411,7 @@ class App(Features):
             self.cube_quads = CubeQuads("cube_win", "cube_img", "cube_src_tex")
             r = getattr(self, "_cube_rect", None)
             if r and self.ui:
-                self.cube_quads.resize(self.view_side, r[2] - 22, r[3] - CAP_H)
+                self.cube_quads.resize(self.view_side, r[2] - px(22), r[3] - CAP_H)
             else:
                 self.cube_quads.resize(self.view_side)
             if dpg.does_item_exist("cube_cap"):
@@ -2550,7 +2573,7 @@ class App(Features):
             return
         if self._split_drag:
             self._split_drag = None
-            self.prefs["side_w"] = self.side_w
+            self.prefs["side_w"] = int(round(self.side_w / typeface.scale()))                 # at 100%, as laid out
             self.prefs["colw"] = self.colw
             self.prefs["rowh"] = self.rowh
             save_prefs(self.prefs)
@@ -2625,7 +2648,7 @@ class App(Features):
                 return
             if v0[0] == "side":
                 _, sign, w0 = v0
-                new = int(max(240, min(vw // 2, w0 + sign * (mx - x0))))
+                new = int(max(px(240), min(vw // 2, w0 + sign * (mx - x0))))
                 if abs(new - self.side_w) >= 6:
                     self.side_w = new; self.request_layout()
             elif v0[0] == "col":
@@ -3292,8 +3315,11 @@ class App(Features):
 
 
 def build(app):
+    typeface.dpi_aware()                     # drawn at the monitor's size, not stretched to it
     dpg.create_context()
-    dpg.create_viewport(title="WLED Effects Studio", width=1280, height=800, vsync=False)
+    dpg.create_viewport(title="WLED Effects Studio", width=px(1280), height=px(800), vsync=False)
+    typeface.fonts()
+    typeface.bind()                          # the interface face; the monospace where code and numbers are
 
     with dpg.handler_registry():
         dpg.add_mouse_drag_handler(button=dpg.mvMouseButton_Left, callback=app.on_drag)
@@ -3316,23 +3342,23 @@ def build(app):
         chrome.build_menus(app)
         chrome.build_toolbar(app)
         with dpg.group(horizontal=True, tag="panes_row"):
-            with dpg.child_window(tag="net_win", width=420, height=470):
+            with dpg.child_window(tag="net_win", width=px(420), height=px(470)):
                 chrome.grip("net_win")
                 with dpg.group(horizontal=True):
                     dpg.add_text("Logical view - what the effect draws", tag="net_cap", color=(139, 147, 163))
-            with dpg.child_window(tag="edit_win", width=420, height=470, show=False):
+            with dpg.child_window(tag="edit_win", width=px(420), height=px(470), show=False):
                 chrome.grip("edit_win")
                 with dpg.group(horizontal=True):
-                    dpg.add_combo(app.project.effect_files(), tag="edit_file", width=220,
+                    dpg.add_combo(app.project.effect_files(), tag="edit_file", width=px(220),
                                   default_value=app.edit_file or "",
                                   callback=lambda s, v: (app.edit_open(v), app.ensure_built()))
                     dpg.add_text("", tag="edit_status", color=(139, 147, 163))
                 # the text lives in a hidden box everything reads and writes;
                 # the editor (codeedit.py) draws and edits it
-                dpg.add_input_text(tag="code", multiline=True, width=400, height=300, show=False)
+                dpg.add_input_text(tag="code", multiline=True, width=px(400), height=px(300), show=False)
                 app.code_ed = CodeEditor(app, "edit_win")
                 with dpg.group(horizontal=True):
-                    dpg.add_input_text(tag="find_text", hint="find", width=130, on_enter=True,
+                    dpg.add_input_text(tag="find_text", hint="find", width=px(130), on_enter=True,
                                        callback=lambda: app.find())
                     dpg.add_button(label="find", callback=lambda: app.find(False))
                     chrome.tip("the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many")
@@ -3340,16 +3366,16 @@ def build(app):
                     chrome.tip("match the case as typed")
                     dpg.add_checkbox(label="word", tag="find_word", callback=lambda: app.find(False))
                     chrome.tip("whole words only")
-                    dpg.add_input_text(tag="replace_text", hint="replace with", width=130)
+                    dpg.add_input_text(tag="replace_text", hint="replace with", width=px(130))
                     dpg.add_button(label="replace", callback=lambda: app.replace_one())
                     chrome.tip("the match the cursor is on, then the next is found")
                     dpg.add_button(label="replace all", callback=lambda: app.replace_all())
                 with dpg.collapsing_header(label="Metadata - name, labels, palette, flags, defaults", default_open=False):
-                    dpg.add_input_text(tag="meta_name", label="name", width=220)
-                    dpg.add_input_text(tag="meta_labels", label="slider labels (8, comma)", width=220)
-                    dpg.add_input_text(tag="meta_colours", label="colour labels (3, comma)", width=220)
-                    dpg.add_input_text(tag="meta_flags", label="flags: 1 2 12 + v/f", width=220)
-                    dpg.add_input_text(tag="meta_defaults", label="defaults sx=,ix=,c1=,pal=", width=220)
+                    dpg.add_input_text(tag="meta_name", label="name", width=px(220))
+                    dpg.add_input_text(tag="meta_labels", label="slider labels (8, comma)", width=px(220))
+                    dpg.add_input_text(tag="meta_colours", label="colour labels (3, comma)", width=px(220))
+                    dpg.add_input_text(tag="meta_flags", label="flags: 1 2 12 + v/f", width=px(220))
+                    dpg.add_input_text(tag="meta_defaults", label="defaults sx=,ix=,c1=,pal=", width=px(220))
                     with dpg.group(horizontal=True):
                         dpg.add_button(label="read from file", callback=lambda: app.meta_read())
                         dpg.add_button(label="apply to file", callback=lambda: app.meta_write())
@@ -3358,67 +3384,67 @@ def build(app):
                     for group, items in API:
                         with dpg.tree_node(label=group):
                             for label, snippet, doc in items:
-                                dpg.add_selectable(label=f"{label:34s} {doc}"[:110], user_data=(snippet, label),
-                                                   callback=lambda s, a, u: app.api_pick(*u))
+                                typeface.mono(dpg.add_selectable(label=f"{label:34s} {doc}"[:110], user_data=(snippet, label),
+                                                   callback=lambda s, a, u: app.api_pick(*u)))
                 dpg.add_group(tag="edit_errors")
             # The wheel over the graph zooms it; the pane must not also scroll
             # (its toolbar rows plus the editor can overrun its height by a
             # few pixels, and ImGui scrolls a window on the wheel whether or
             # not a handler also took the event).
-            with dpg.child_window(tag="graph_win", width=420, height=470, show=False,
+            with dpg.child_window(tag="graph_win", width=px(420), height=px(470), show=False,
                                   no_scrollbar=True, no_scroll_with_mouse=True):
                 build_panel(app, app.gp)
-            with dpg.child_window(tag="cube_win", width=420, height=470):
+            with dpg.child_window(tag="cube_win", width=px(420), height=px(470)):
                 chrome.grip("cube_win")
                 with dpg.group(horizontal=True):
                     dpg.add_text("3-D - drag to rotate, wheel to zoom",
                                  tag="cube_cap", color=(139, 147, 163))
             # the graph's properties pane: what a node's settings need that
             # a node cannot hold (text, files); filled by GraphPanel._poll_props
-            with dpg.child_window(tag="props_win", width=300, height=300, show=False):
+            with dpg.child_window(tag="props_win", width=px(300), height=px(300), show=False):
                 chrome.grip("props_win")
                 dpg.add_text("Properties", tag="props_cap", color=(139, 147, 163))
                 with dpg.child_window(tag="graph_props", border=False, height=-1):
                     pass
-            with dpg.child_window(tag="side_win", width=app.side_w - 10, height=470):
+            with dpg.child_window(tag="side_win", width=app.side_w - 10, height=px(470)):
                 chrome.grip("side_win")
                 with Section(app, "effect", "EFFECT"):
-                    dpg.add_combo(list_projects(), label="project", tag="project_combo", width=200,
+                    dpg.add_combo(list_projects(), label="project", tag="project_combo", width=px(200),
                                   default_value=os.path.basename(app.project.path),
                                   callback=lambda s, v: app.switch_project(v))
                     dpg.add_combo(app.eng.names, label="effect", tag="fx_combo",
-                                  default_value=app.eng.names[app.eng.idx], width=200,
+                                  default_value=app.eng.names[app.eng.idx], width=px(200),
                                   callback=app.on_effect)
                     dpg.add_combo([p[0] for p in PALETTES], label="palette",
                                   default_value=app.palette_name_for(app.eng.pal),
-                                  width=200, tag="pal_combo",
+                                  width=px(200), tag="pal_combo",
                                   callback=app.on_palette)
                     # Only meaningful while a CubeFX audio palette is selected -
                     # it is where those four take their colours from.
                     dpg.add_combo([p[0] for p in PALETTES if p[1] < 201],
-                                  label="pal source", width=200, tag="pal_src",
+                                  label="pal source", width=px(200), tag="pal_src",
                                   default_value=app.palette_name_for(app.eng.pal_source),
                                   callback=app.on_pal_source)
 
                 with Section(app, "segments", "SEGMENTS"):
                     with dpg.group(horizontal=True):
-                        dpg.add_combo([], tag="seg_combo", width=200, callback=lambda s, v: app.seg_pick(v))
+                        dpg.add_combo([], tag="seg_combo", width=px(200), callback=lambda s, v: app.seg_pick(v))
                         dpg.add_button(label="+", small=True, callback=lambda: app.seg_add())
                         dpg.add_button(label="-", small=True, callback=lambda: app.seg_remove())
                         dpg.add_button(label="undo", small=True, callback=lambda: app.seg_undo())
                         chrome.tip("the segments as they were before the last change (add, remove, bounds, blend, options)")
                     dpg.add_group(tag="seg_fields")
                 with Section(app, "geometry", "GEOMETRY"):
-                    dpg.add_combo(list(KINDS), label="shape", tag="geom_kind", width=120,
+                    dpg.add_combo(list(KINDS), label="shape", tag="geom_kind", width=px(120),
                                   default_value=app.project.geometry.kind, callback=app.on_geom_kind)
                     dpg.add_group(tag="geom_fields")
                     dpg.add_combo(["strip", "bars", "arcs", "corner"], label="1-D effects as",
-                                  tag="map1d2d", width=100, default_value="strip",
+                                  tag="map1d2d", width=px(100), default_value="strip",
                                   show=app.project.geometry.is2d, callback=app.on_map1d2d)
                     dpg.add_text(app.project.geometry.describe(), tag="geom_desc",
                                  color=(139, 147, 163), wrap=0)
                     with dpg.file_dialog(directory_selector=False, show=False, tag="xyz_dialog",
-                                         width=620, height=420, callback=app.on_xyz_file,
+                                         width=px(620), height=px(420), callback=app.on_xyz_file,
                                          cancel_callback=lambda s, a: dpg.set_value("geom_kind", app.project.geometry.kind)):
                         dpg.add_file_extension(".csv", color=(120, 200, 120))
                         dpg.add_file_extension(".txt", color=(120, 200, 120))
@@ -3436,12 +3462,12 @@ def build(app):
                     for _ci, (_lbl, _rgb) in enumerate((("primary",   (255, 160, 0, 255)),
                                                         ("secondary", (0, 0, 0, 255)),
                                                         ("tertiary",  (0, 0, 0, 255)))):
-                        dpg.add_color_edit(_rgb, label=_lbl, width=170, no_alpha=True,
+                        dpg.add_color_edit(_rgb, label=_lbl, width=px(170), no_alpha=True,
                                            user_data=_ci, callback=app.on_color)
                 with Section(app, "parameters", "PARAMETERS"):
                     with dpg.group(tag="scrub_row", show=False):
                         dpg.add_text("paused - scrub the last seconds", color=SECTION)
-                        dpg.add_slider_int(tag="scrub", width=280, min_value=0, max_value=1, default_value=0, format="frame %d",
+                        dpg.add_slider_int(tag="scrub", width=px(280), min_value=0, max_value=1, default_value=0, format="frame %d",
                                            callback=lambda s, v: setattr(self_app[0], "scrub", int(v)))
                     dpg.add_group(tag="params")
                 with Section(app, "audio", "AUDIO"):
@@ -3469,20 +3495,20 @@ def build(app):
                     dpg.add_checkbox(label="silence (mute all bands)",
                                      callback=lambda s, v: setattr(app.syn, "muted", v))
                     dpg.add_color_button(tag="beat_led", default_value=(42, 47, 58, 255),
-                                         width=280, height=6, no_border=True)
+                                         width=px(280), height=px(6), no_border=True)
                 with Section(app, "live", "LIVE AUDIO"):
                     try:
                         from native.audio import list_inputs
                         _devs = ["system output"] + [n for _, n in list_inputs()]
                     except Exception:
                         _devs = ["system output"]
-                    dpg.add_combo(_devs, label="source", tag="live_dev", width=200,
+                    dpg.add_combo(_devs, label="source", tag="live_dev", width=px(200),
                                   default_value=_devs[0])
                     with dpg.group(horizontal=True):
                         dpg.add_button(label="use live audio", tag="live_btn",
                                        callback=lambda: app.toggle_live())
                         dpg.add_button(label="play a WAV file...", callback=lambda: dpg.show_item("wav_dialog"))
-                    with dpg.file_dialog(directory_selector=False, show=False, tag="wav_dialog", width=620, height=420,
+                    with dpg.file_dialog(directory_selector=False, show=False, tag="wav_dialog", width=px(620), height=px(420),
                                          callback=lambda s, a: app.start_file_audio(a.get("file_path_name", ""))):
                         dpg.add_file_extension(".wav", color=(120, 200, 120))
                         dpg.add_file_extension(".*")
@@ -3490,11 +3516,11 @@ def build(app):
                     app.pair("gain_row", "live_gain", "live gain", 3.0, 0.2, 12.0,
                              lambda v: setattr(app.live, "gain", float(v)) if app.live else None,
                              is_float=True)
-                    dpg.add_progress_bar(tag="lvl_bar", default_value=0.0, width=280)
+                    dpg.add_progress_bar(tag="lvl_bar", default_value=0.0, width=px(280))
                     dpg.add_text("", tag="live_msg", wrap=0)
                 app.sec_apply_order()
         with dpg.group(tag="footer"):
-          dpg.add_text("", tag="stat_txt")
+          typeface.mono(dpg.add_text("", tag="stat_txt"))
           dpg.add_text("Q net    E 3-D    W both    C code    G graph    H presentation    space play/pause    "
                        "Help > Keyboard shortcuts has the rest", tag="hint1", color=(130, 140, 155))
     chrome.build_dialogs(app)
@@ -3526,11 +3552,11 @@ def build(app):
     # A splitter is a thin button placed between two panes; dragging it
     # moves the boundary. Enough for any arrangement of the three slots.
     for i in range(2):
-        dpg.add_button(label="", tag=f"vsplit_{i}_0", width=8, height=470, show=False, parent="root")
+        dpg.add_button(label="", tag=f"vsplit_{i}_0", width=px(8), height=px(470), show=False, parent="root")
         app._splitters[f"vsplit_{i}_0"] = ("v", i, 0)
     for i in range(3):
         for j in range(2):
-            dpg.add_button(label="", tag=f"hsplit_{i}_{j}", width=470, height=8, show=False, parent="root")
+            dpg.add_button(label="", tag=f"hsplit_{i}_{j}", width=px(470), height=px(8), show=False, parent="root")
             app._splitters[f"hsplit_{i}_{j}"] = ("h", i, j)
     # where a dragged pane would land, drawn over everything
     with dpg.viewport_drawlist(front=True, tag="ref_dl"):      # reference meshes as wireframes over the 3-D view
@@ -3544,10 +3570,10 @@ def build(app):
         # the ghost of a pane or panel section being dragged: its outline, translucent, under the pointer
         dpg.draw_rectangle((0, 0), (10, 10), tag="ghost_rect", show=False, thickness=2, rounding=5,
                            color=tuple(chrome.ACCENT[:3]) + (200,), fill=tuple(chrome.ACCENT[:3]) + (28,))
-        dpg.draw_text((0, 0), "", tag="ghost_text", show=False, size=14, color=tuple(chrome.ACCENT[:3]) + (230,))
+        typeface.draw_text((0, 0), "", px(14), tag="ghost_text", show=False, color=tuple(chrome.ACCENT[:3]) + (230,))
         # the wiring a dragged node would splice into: two curves, drawn while the pointer is on the wire
         for t in ("splice_a", "splice_b"):
-            dpg.draw_bezier_cubic((0, 0), (0, 0), (0, 0), (0, 0), tag=t, show=False, thickness=4, color=tuple(chrome.ACCENT[:3]) + (235,))
+            dpg.draw_bezier_cubic((0, 0), (0, 0), (0, 0), (0, 0), tag=t, show=False, thickness=px(4), color=tuple(chrome.ACCENT[:3]) + (235,))
     dpg.set_primary_window("root", True)
     app.frames = glow.Frames()
     chrome.apply_frames(app)
@@ -3636,7 +3662,7 @@ def service_command(app):
             if "chrome" in c:                           # test hook: a chrome action by name
                 {"new": lambda: app.new_effect(), "rename": app.rename_current, "open": lambda: chrome.show_open(app),
                  "device": lambda: chrome.show_device(app), "editor": lambda: chrome.show_editor(app),
-                 "shortcuts": lambda: chrome.show_keys(app), "about": lambda: dpg.show_item("about_win"), "snapshots": lambda: chrome.show_snapshots(app),
+                 "shortcuts": lambda: chrome.show_keys(app), "about": lambda: chrome.show_about(app), "snapshots": lambda: chrome.show_snapshots(app),
                  "search": app.search_nodes, "name_ok": lambda: chrome._name_ok(app),
                  "frames": lambda: chrome.show_frames(app), "flash": lambda: chrome.show_flash(app),
                  "usermods": lambda: chrome.show_usermods(app), "devices": lambda: device_ui.show(app, "devices"),
@@ -4415,8 +4441,8 @@ def process_stats(app):
 
 # buttons a walk leaves alone: a flash or a firmware build, a render or a preview that takes minutes,
 # a clone or a download from the network, a restart, a program opened on the desktop, a key capture
-SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "rec_btn")
-SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Open in the browser", "Open the build folder", "Reboot the device",
+SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn")
+SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
 

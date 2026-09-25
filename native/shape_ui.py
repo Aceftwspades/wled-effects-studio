@@ -18,6 +18,9 @@ import json
 import math
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native import weight
 import numpy as np
 
@@ -78,12 +81,12 @@ def _sel(app):
 def build(app):
     c = _c()
     from native import device_ui
-    with dpg.window(tag=TAG, show=False, width=560, height=640, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=px(560), height=px(640), no_collapse=True, no_title_bar=True):
         device_ui.header(app, "shape")
         with dpg.group(horizontal=True):
             c.info("A shape is a list of parts in wiring order. Units are LED pitches: a strip of pitch 1 has its LEDs one unit apart. "
                    "The selected part's LEDs are ringed in the 3-D view, its wiring drawn through them, its axis an arrow.")
-            dpg.add_text("", tag="shape_desc", color=c.DIM, wrap=520)
+            dpg.add_text("", tag="shape_desc", color=c.DIM, wrap=px(520))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Undo", small=True, callback=lambda: undo(app))
             dpg.add_button(label="Clear", small=True, callback=lambda: _apply(app, parts=[]))
@@ -98,8 +101,8 @@ def build(app):
             c.tip("every LED as a CSV row - x, y, z, its wiring index, its part - in wiring order, for any other tool; "
                   "Import... reads the file back as a points part")
         with dpg.group(horizontal=True):
-            dpg.add_text("PARTS", color=c.ACCENT)
-            dpg.add_combo(["strip", "grid"], tag="shape_layout", width=70, default_value="strip",
+            typeface.label(dpg.add_text("PARTS", color=c.ACCENT))
+            dpg.add_combo(["strip", "grid"], tag="shape_layout", width=px(70), default_value="strip",
                           callback=lambda s, v: _apply(app, layout=v))
             c.tip("the logical layout the effects see: one strip in wiring order, or a grid seen from the front")
             dpg.add_button(label="Segment per part", small=True, callback=lambda: segments_per_part(app))
@@ -108,32 +111,32 @@ def build(app):
         for row in (kinds[:5], kinds[5:]):
             with dpg.group(horizontal=True):
                 for k in row:
-                    dpg.add_button(label="+ " + k, small=True, width=100, user_data=k, callback=lambda s, a, u: add_part(app, u))
+                    dpg.add_button(label="+ " + k, small=True, width=px(100), user_data=k, callback=lambda s, a, u: add_part(app, u))
                     c.tip(shapes.KINDS[k][1])
         with dpg.group(horizontal=True):
             dpg.add_button(label="Import...", small=True, callback=lambda: dpg.show_item("shape_import_dialog"))
             c.tip("a mesh or model as LEDs: .obj, .ply, .stl from Blender or CAD; an xLights .xmodel, or a whole xLights layout "
                   "(xlights_rgbeffects.xml: every model a part, where it stands); an x y z [index] point list (CSV, text, JSON)")
-            dpg.add_combo([m[1] for m in MESH_MODES], tag="shape_mesh_mode", width=170, default_value=MESH_MODES[0][1])
+            dpg.add_combo([m[1] for m in MESH_MODES], tag="shape_mesh_mode", width=px(170), default_value=MESH_MODES[0][1])
             c.tip("how a mesh becomes LEDs: one every pitch along its edges, one at each vertex, or spread over its surface")
-            dpg.add_input_float(tag="shape_mesh_pitch", width=60, default_value=1.0, step=0, format="%.2f")
+            dpg.add_input_float(tag="shape_mesh_pitch", width=px(60), default_value=1.0, step=0, format="%.2f")
             dpg.add_text("pitch", color=c.DIM)
             dpg.add_button(label="Reference...", small=True,
                            callback=lambda: (setattr(app, "_shape_ref", True), dpg.show_item("shape_import_dialog")))
             c.tip("a mesh drawn in the 3-D view to place LEDs against, not LEDs: the tree, the house, the enclosure")
-        with dpg.child_window(tag="shape_parts", height=110, border=True):
+        with dpg.child_window(tag="shape_parts", height=px(110), border=True):
             pass
         with dpg.group(horizontal=True):
-            dpg.add_text("PART", tag="shape_part_title", color=c.ACCENT)
+            typeface.label(dpg.add_text("PART", tag="shape_part_title", color=c.ACCENT))
             dpg.add_text("", tag="shape_part_kind", color=c.DIM)
         with dpg.child_window(tag="shape_fields", height=-30, border=False):
             pass
         # PREVIEW: a turntable of the shape, rendered off screen, looping here and saved as a GIF - folded away until wanted
         with dpg.collapsing_header(label="PREVIEW", tag="shape_prev_hdr", default_open=False):
             with dpg.group(horizontal=True):
-                dpg.add_combo(["effect", "parts", "wiring"], tag="shape_prev_mode", width=90, default_value="effect")
+                dpg.add_combo(["effect", "parts", "wiring"], tag="shape_prev_mode", width=px(90), default_value="effect")
                 c.tip("lit by the effect the sim runs, or each part in a colour of its own, or a chase along the wiring")
-                dpg.add_input_float(tag="shape_prev_secs", width=60, default_value=4.0, step=0, format="%.0f s")
+                dpg.add_input_float(tag="shape_prev_secs", width=px(60), default_value=4.0, step=0, format="%.0f s")
                 dpg.add_button(label="Generate a preview", tag="shape_prev_go", small=True, callback=lambda: generate_preview(app))
                 c.tip("a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here")
                 dpg.add_button(label="Open the folder", small=True, callback=lambda: app.reveal(os.path.join(app.project.path, "export")))
@@ -141,22 +144,22 @@ def build(app):
             with dpg.group(tag="shape_prev_img"):
                 pass
     # the file dialogs: a mesh or model in, a shape file in or out
-    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_import_dialog", width=640, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_import_dialog", width=px(640), height=px(420),
                          callback=lambda s, a: import_file(app, a.get("file_path_name", ""))):
         for ext, col in ((".obj", (120, 200, 120)), (".ply", (120, 200, 120)), (".stl", (120, 200, 120)),
                          (".xmodel", (200, 180, 90)), (".xml", (200, 180, 90)), (".csv", (150, 150, 220)), (".txt", (150, 150, 220)), (".json", (150, 150, 220))):
             dpg.add_file_extension(ext, color=col)
-    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_open_dialog", width=640, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_open_dialog", width=px(640), height=px(420),
                          callback=lambda s, a: open_shape(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".shape.json", color=(150, 150, 220))
         dpg.add_file_extension(".json", color=(150, 150, 220))
-    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_xmodel_dialog", width=640, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_xmodel_dialog", width=px(640), height=px(420),
                          default_filename="shape.xmodel", callback=lambda s, a: export_xmodel(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".xmodel", color=(200, 180, 90))
-    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_points_dialog", width=640, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_points_dialog", width=px(640), height=px(420),
                          default_filename="positions.csv", callback=lambda s, a: export_points(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".csv", color=(120, 200, 120))
-    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_save_dialog", width=640, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_save_dialog", width=px(640), height=px(420),
                          default_filename="shape.shape.json", callback=lambda s, a: save_shape(app, a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(150, 150, 220))
 
@@ -183,9 +186,9 @@ def refresh(app):
         with dpg.group(horizontal=True, parent="shape_parts"):
             dpg.add_checkbox(default_value=(i in marks), user_data=i,
                              callback=lambda s, a, u: (marks.add(u) if a else marks.discard(u), _arrange_hint(app)))
-            dpg.add_selectable(label=f"{i + 1:2d}  {part.get('name', part['kind'])}", width=190, default_value=(i == sel), user_data=i,
+            dpg.add_selectable(label=f"{i + 1:2d}  {part.get('name', part['kind'])}", width=px(190), default_value=(i == sel), user_data=i,
                                callback=lambda s, a, u: (setattr(app, "_shape_sel", u), refresh(app)))
-            dpg.add_text(f"{part['kind']}, {n} LEDs", color=c.DIM)
+            typeface.small(dpg.add_text(f"{part['kind']}, {n} LEDs", color=c.DIM))
             dpg.add_button(label="up", small=True, user_data=i, callback=lambda s, a, u: move_part(app, u, -1), show=i > 0)
             dpg.add_button(label="down", small=True, user_data=i, callback=lambda s, a, u: move_part(app, u, 1), show=i < len(parts) - 1)
             dpg.add_button(label="copy", small=True, user_data=i, callback=lambda s, a, u: dup_part(app, u))
@@ -202,7 +205,7 @@ def refresh(app):
     _arrange_hint(app)
     dpg.set_value("shape_part_kind", f"- {part['kind']}, {shapes.part_count(part)} LEDs")
     P = "shape_fields"
-    dpg.add_input_text(label="name", parent=P, width=200, default_value=str(part.get("name", "")), on_enter=True,
+    dpg.add_input_text(label="name", parent=P, width=px(200), default_value=str(part.get("name", "")), on_enter=True,
                        callback=lambda s, v: set_part(app, sel, name=v))
     if part["kind"] == "reference":
         dpg.add_text(f"{part['params'].get('file', '?')}: {len(part['params'].get('vertices') or [])} vertices, "
@@ -221,20 +224,20 @@ def refresh(app):
             dpg.add_checkbox(label=key, parent=P, default_value=bool(val), user_data=key,
                              callback=lambda s, v, u: set_param(app, sel, u, bool(v)))
         elif isinstance(default, str):
-            dpg.add_combo(shapes.CHOICES.get(key, [str(val)]), label=label, parent=P, width=140, default_value=str(val), user_data=key,
+            dpg.add_combo(shapes.CHOICES.get(key, [str(val)]), label=label, parent=P, width=px(140), default_value=str(val), user_data=key,
                           callback=lambda s, v, u: set_param(app, sel, u, str(v)))
         elif isinstance(default, int):
-            dpg.add_input_int(label=label, parent=P, width=90, default_value=int(val), min_value=1, max_value=4096, min_clamped=True,
+            dpg.add_input_int(label=label, parent=P, width=px(90), default_value=int(val), min_value=1, max_value=4096, min_clamped=True,
                               on_enter=True, user_data=key, callback=lambda s, v, u: set_param(app, sel, u, int(v)))
         else:
-            dpg.add_input_float(label=label, parent=P, width=90, default_value=float(val), step=0, format="%.2f",
+            dpg.add_input_float(label=label, parent=P, width=px(90), default_value=float(val), step=0, format="%.2f",
                                 on_enter=True, user_data=key, callback=lambda s, v, u: set_param(app, sel, u, float(v)))
         if key in TIPS and not (key == "radius" and part["kind"] == "polyhedron"):
             c.tip(TIPS[key])
     if part["kind"] == "polyline":
         # the count as a field too: the pitch follows (LEDs at both ends)
         n = shapes.part_count(part)
-        dpg.add_input_int(label="LEDs (sets the pitch)", parent=P, width=90, default_value=n, min_value=2, max_value=4096, min_clamped=True,
+        dpg.add_input_int(label="LEDs (sets the pitch)", parent=P, width=px(90), default_value=n, min_value=2, max_value=4096, min_clamped=True,
                           on_enter=True, callback=lambda s, v: set_polyline_count(app, sel, int(v)))
     if part["kind"] == "polyhedron":
         with dpg.group(horizontal=True, parent=P):
@@ -251,14 +254,14 @@ def refresh(app):
             if part["kind"] == "points":
                 dpg.add_button(label="turn into a path", small=True, callback=lambda: set_part(app, sel, kind="polyline"))
     with dpg.group(horizontal=True, parent=P):
-        dpg.add_text("PLACE", color=c.ACCENT)
+        typeface.label(dpg.add_text("PLACE", color=c.ACCENT))
         c.info("drag a number and the part moves in the 3-D view as you drag; the sim takes the shape when you let go; ctrl-click to type")
-    dpg.add_drag_floatx(label="position x y z", parent=P, width=240, size=3, default_value=list(part.get("pos", [0, 0, 0])) + [0.0], format="%.2f",
+    dpg.add_drag_floatx(label="position x y z", parent=P, width=px(240), size=3, default_value=list(part.get("pos", [0, 0, 0])) + [0.0], format="%.2f",
                         speed=0.05, callback=lambda s, v: nudge(app, sel, pos=[float(x) for x in v[:3]]))
-    dpg.add_drag_floatx(label="rotation x y z (deg)", parent=P, width=240, size=3, default_value=list(part.get("rot", [0, 0, 0])) + [0.0], format="%.1f",
+    dpg.add_drag_floatx(label="rotation x y z (deg)", parent=P, width=px(240), size=3, default_value=list(part.get("rot", [0, 0, 0])) + [0.0], format="%.1f",
                         speed=0.5, callback=lambda s, v: nudge(app, sel, rot=[float(x) for x in v[:3]]))
     sc = part.get("scale", 1.0)
-    dpg.add_drag_float(label="scale", parent=P, width=90, default_value=float(sc if not isinstance(sc, list) else sc[0]), format="%.2f",
+    dpg.add_drag_float(label="scale", parent=P, width=px(90), default_value=float(sc if not isinstance(sc, list) else sc[0]), format="%.2f",
                        speed=0.01, min_value=0.01, max_value=100.0, clamped=True, callback=lambda s, v: nudge(app, sel, scale=float(v)))
     dpg.add_checkbox(label="reverse the wiring of this part", parent=P, default_value=bool(part.get("reverse")),
                      callback=lambda s, v: set_part(app, sel, reverse=bool(v)))
@@ -269,23 +272,23 @@ def refresh(app):
     ppos = np.asarray(part.get("pos", [0, 0, 0]), np.float64); dist = float(np.linalg.norm(ppos))
     d0 = (ppos / dist) if dist > 1e-6 else np.array([0.0, 0.0, 1.0])
     with dpg.group(horizontal=True, parent=P):
-        dpg.add_text("AIM", color=c.ACCENT)
+        typeface.label(dpg.add_text("AIM", color=c.ACCENT))
         c.info(f"point {axname} along the direction (x y z, or azimuth and elevation, or an axis button). 'aim outward' also puts the part "
                "the distance from the origin along it; 'turn only' keeps its place; 'aim at the origin' points it inward from where it is. "
                "Spin turns it about the direction. The yellow arrow in the 3-D view is the axis.")
     with dpg.group(horizontal=True, parent=P):
-        dpg.add_input_floatx(tag="shape_aim_dir", width=200, size=3, default_value=[float(v) for v in d0] + [0.0], format="%.3f",
+        dpg.add_input_floatx(tag="shape_aim_dir", width=px(200), size=3, default_value=[float(v) for v in d0] + [0.0], format="%.3f",
                              callback=lambda s, v: _dir_to_angles(v))
         dpg.add_text("direction", color=c.DIM)
         az, el = _angles_of(d0)
-        dpg.add_input_float(tag="shape_aim_az", width=60, default_value=az, step=0, format="%.1f", callback=lambda: _angles_to_dir())
+        dpg.add_input_float(tag="shape_aim_az", width=px(60), default_value=az, step=0, format="%.1f", callback=lambda: _angles_to_dir())
         dpg.add_text("az", color=c.DIM)
-        dpg.add_input_float(tag="shape_aim_el", width=60, default_value=el, step=0, format="%.1f", callback=lambda: _angles_to_dir())
+        dpg.add_input_float(tag="shape_aim_el", width=px(60), default_value=el, step=0, format="%.1f", callback=lambda: _angles_to_dir())
         dpg.add_text("el", color=c.DIM)
     with dpg.group(horizontal=True, parent=P):
-        dpg.add_input_float(tag="shape_aim_dist", width=70, default_value=dist, step=0, format="%.2f")
+        dpg.add_input_float(tag="shape_aim_dist", width=px(70), default_value=dist, step=0, format="%.2f")
         dpg.add_text("distance", color=c.DIM)
-        dpg.add_input_float(tag="shape_aim_spin", width=60, default_value=0.0, step=0, format="%.1f")
+        dpg.add_input_float(tag="shape_aim_spin", width=px(60), default_value=0.0, step=0, format="%.1f")
         dpg.add_text("spin (deg)", color=c.DIM)
         for lbl, v in (("+X", (1, 0, 0)), ("-X", (-1, 0, 0)), ("+Y", (0, 1, 0)), ("-Y", (0, -1, 0)), ("+Z", (0, 0, 1)), ("-Z", (0, 0, -1))):
             dpg.add_button(label=lbl, small=True, user_data=v, callback=lambda s, a, u: _set_dir(u))
@@ -296,7 +299,7 @@ def refresh(app):
         dpg.add_button(label="from its place", small=True, callback=lambda: _set_dir(list(d0), dist))
         c.tip("the direction and distance the part is at now, into the fields")
     with dpg.group(horizontal=True, parent=P):
-        dpg.add_text("ARRANGE", color=c.ACCENT)
+        typeface.label(dpg.add_text("ARRANGE", color=c.ACCENT))
         dpg.add_text("", tag="shape_arrange_hint", color=c.DIM)
         dpg.add_text("align", color=c.DIM)
         for ax, lbl in enumerate("XYZ"):
@@ -316,20 +319,20 @@ def refresh(app):
         for ax, lbl in enumerate("XYZ"):
             dpg.add_button(label=lbl, small=True, user_data=ax, callback=lambda s, a, u: mirror_part(app, sel, u))
         dpg.add_text("  array", color=c.DIM)
-        dpg.add_input_int(tag="shape_array_n", width=60, default_value=3, min_value=2, max_value=64, min_clamped=True)
-        dpg.add_input_floatx(tag="shape_array_off", width=180, size=3, default_value=[10.0, 0.0, 0.0, 0.0], format="%.1f")
+        dpg.add_input_int(tag="shape_array_n", width=px(60), default_value=3, min_value=2, max_value=64, min_clamped=True)
+        dpg.add_input_floatx(tag="shape_array_off", width=px(180), size=3, default_value=[10.0, 0.0, 0.0, 0.0], format="%.1f")
         dpg.add_button(label="make", small=True, callback=lambda: array_part(app, sel))
     dpg.add_separator(parent=P)
     with dpg.group(horizontal=True, parent=P):
-        dpg.add_text("BY HAND", color=c.ACCENT)
+        typeface.label(dpg.add_text("BY HAND", color=c.ACCENT))
         dpg.add_checkbox(label="place", tag="shape_place", default_value=bool(getattr(app, "_shape_place", False)),
                          callback=lambda s, v: setattr(app, "_shape_place", bool(v)))
         c.tip("click the 3-D view to put an LED on the plane; they go into the selected points part, or a new one; drag one to move it")
         dpg.add_text("plane", color=c.DIM)
-        dpg.add_combo(["z", "y", "x"], tag="shape_plane_axis", width=50, default_value=getattr(app, "_shape_plane", ("z", 0.0))[0],
+        dpg.add_combo(["z", "y", "x"], tag="shape_plane_axis", width=px(50), default_value=getattr(app, "_shape_plane", ("z", 0.0))[0],
                       callback=lambda s, v: setattr(app, "_shape_plane", (v, getattr(app, "_shape_plane", ("z", 0.0))[1])))
         dpg.add_text("=", color=c.DIM)
-        dpg.add_input_float(tag="shape_plane_v", width=70, default_value=getattr(app, "_shape_plane", ("z", 0.0))[1], step=0, format="%.1f",
+        dpg.add_input_float(tag="shape_plane_v", width=px(70), default_value=getattr(app, "_shape_plane", ("z", 0.0))[1], step=0, format="%.1f",
                             callback=lambda s, v: setattr(app, "_shape_plane", (getattr(app, "_shape_plane", ("z", 0.0))[0], float(v))))
 
 
@@ -645,7 +648,7 @@ def _poll_preview(app):
                 dpg.delete_item("shape_prev_tex")
             from native.textures import registry
             dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag="shape_prev_tex", parent=registry())
-            dpg.add_image("shape_prev_tex", width=200, height=200, parent="shape_prev_img")
+            dpg.add_image("shape_prev_tex", width=px(200), height=px(200), parent="shape_prev_img")
             app._prev_tex_size = (w, h)
         g = app.project.geometry
         dpg.set_value("shape_prev_status", f"{g.describe()}: {len(frames)} frames -> {os.path.basename(paths[0])}" + (f", {os.path.basename(paths[1])}" if paths[1] else "") + " in export/")

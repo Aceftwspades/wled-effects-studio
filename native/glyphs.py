@@ -223,7 +223,7 @@ class Glyphs:
         elif t == "Text":
             dpg.delete_item(tag, children_only=True)
             text = str(n["params"].get("text", ""))
-            dpg.draw_text((2, 1), text[:24], size=self.px(18), color=self.pal()["text"], parent=tag)
+            self._draw_text((2, 1), text[:24], size=self.px(18), color=self.pal()["text"], parent=tag)
         elif t == "Path":
             self._draw_path(nid, n, d)
         elif t == "Scope" or t in nodeface.SPARK:
@@ -288,8 +288,8 @@ class Glyphs:
         dpg.draw_polyline(poly, color=self.pal()["live_line"], thickness=max(1, self.px(1.5)), parent=tag)
         size = max(7, self.px(9))
         if size >= 8:
-            dpg.draw_text((W - 26 * size / 9, 0), nodeface._fmt(hi), size=size, color=self.pal()["dim"], parent=tag)
-            dpg.draw_text((W - 26 * size / 9, H - size - 1), nodeface._fmt(lo), size=size, color=self.pal()["dim"], parent=tag)
+            self._draw_text((W - 26 * size / 9, 0), nodeface._fmt(hi), size=size, color=self.pal()["dim"], parent=tag)
+            self._draw_text((W - 26 * size / 9, H - size - 1), nodeface._fmt(lo), size=size, color=self.pal()["dim"], parent=tag)
 
     TINTS = [(235, 235, 235), (110, 190, 250), (250, 170, 90), (170, 230, 120), (250, 110, 120), (190, 120, 235),
              (250, 230, 100), (90, 220, 210), (240, 150, 200), (160, 160, 90)]
@@ -373,8 +373,8 @@ class Glyphs:
             dpg.draw_rectangle((0, 0), (W, H), color=(0, 0, 0, 0), fill=P["plot_bg"], parent=tag)
             dpg.draw_polyline([(0, H / 2), (W, H / 2)], color=P["live_line"], thickness=max(1, self.px(1.2)), parent=tag, tag=f"{tag}_line")
             if scope:
-                dpg.draw_text((2, 0), "", size=max(8, self.px(9)), color=P["dim"], parent=tag, tag=f"{tag}_hi")
-                dpg.draw_text((2, H - max(8, self.px(9)) - 1), "", size=max(8, self.px(9)), color=P["dim"], parent=tag, tag=f"{tag}_lo")
+                self._draw_text((2, 0), "", size=max(8, self.px(9)), color=P["dim"], parent=tag, tag=f"{tag}_hi")
+                self._draw_text((2, H - max(8, self.px(9)) - 1), "", size=max(8, self.px(9)), color=P["dim"], parent=tag, tag=f"{tag}_lo")
         if len(ys) < 2:
             return
         if lo is None or hi is None:
@@ -577,7 +577,7 @@ class Glyphs:
         items.append(dpg.draw_rectangle((bx, by), (bx + W, by + H), color=P["popup_edge"], fill=P["popup"], parent="wire_labels"))
         pts = [(bx + 1 + i * (W - 2) / (len(ys) - 1), by + 2 + (1.0 - (float(y) - lo) / (hi - lo)) * (H - 4)) for i, y in enumerate(ys)]
         items.append(dpg.draw_polyline(pts, color=P["live_line"], thickness=1.5, parent="wire_labels"))
-        items.append(dpg.draw_text((bx + 3, by), nodeface._fmt(hi), size=size, color=P["dim"], parent="wire_labels"))
-        items.append(dpg.draw_text((bx + 3, by + H - size - 1), nodeface._fmt(lo), size=size, color=P["dim"], parent="wire_labels"))
-        items.append(dpg.draw_text((bx + W - 3 * size, by + H - size - 1), f"{nodeface.SPARK_SECONDS:g} s", size=size, color=P["dim"], parent="wire_labels"))
+        items.append(self._draw_text((bx + 3, by), nodeface._fmt(hi), size=size, color=P["dim"], parent="wire_labels"))
+        items.append(self._draw_text((bx + 3, by + H - size - 1), nodeface._fmt(lo), size=size, color=P["dim"], parent="wire_labels"))
+        items.append(self._draw_text((bx + W - 3 * size, by + H - size - 1), f"{nodeface.SPARK_SECONDS:g} s", size=size, color=P["dim"], parent="wire_labels"))
 

@@ -23,9 +23,11 @@ import dearpygui.dearpygui as dpg
 
 from native.graph_ui import _font_file
 
-FONT_PX = 13
-LINE_H = 17
-GUTTER = 46
+from native.typeface import px
+
+FONT_PX = px(13)
+LINE_H = px(17)
+GUTTER = px(46)
 PAD = 6
 
 KEYWORDS = set("""alignas alignof and asm auto bool break case catch char char16_t char32_t class const constexpr
@@ -485,6 +487,15 @@ class CodeEditor:
         c = max(0, min(len(self.lines[l]), self.left + col))
         return l, c
 
+    def _text(self, pos, s, color):
+        """A run of code, in the editor's monospace: drawn text takes the
+        font bound to it (not its drawlist's), and the interface's face is
+        proportional - the columns fell apart."""
+        t = dpg.draw_text(pos, s, parent=self.dl, color=color, size=FONT_PX)
+        if self.font:
+            dpg.bind_item_font(t, self.font)
+        return t
+
     def poll(self):
         if not dpg.does_item_exist(self.dl) or not dpg.is_item_shown("code_ed_win"):
             return
@@ -569,7 +580,7 @@ class CodeEditor:
                         current = self.find_at == (li, i + n)
                         add(dpg.draw_rectangle((max(GUTTER, xa), y + 1), (min(W, xb), y + LINE_H - 1), parent=self.dl,
                                                color=(0, 0, 0, 0), fill=COL_FIND_CUR if current else COL_FIND, rounding=2))
-            add(dpg.draw_text((4, y + 1), f"{li + 1:>5}", parent=self.dl, color=COL_DIM, size=FONT_PX))
+            add(self._text((4, y + 1), f"{li + 1:>5}", COL_DIM))
             self._draw_line(li, x_text, y + 1, W)
         if self.focus:
             pair = self._bracket_pair()
@@ -596,7 +607,7 @@ class CodeEditor:
         if inside:
             j = shown.find("*/")
             seg = shown if j < 0 else shown[:j + 2]
-            self._items.append(dpg.draw_text((x, y), seg, parent=self.dl, color=COL_COMMENT, size=FONT_PX))
+            self._items.append(self._text((x, y), seg, COL_COMMENT))
             if j < 0:
                 return
             x += len(seg) * self.char_w
@@ -617,7 +628,7 @@ class CodeEditor:
             else:
                 col = COL_TEXT
             if x < W:
-                self._items.append(dpg.draw_text((x, y), t, parent=self.dl, color=col, size=FONT_PX))
+                self._items.append(self._text((x, y), t, col))
             x += len(t) * self.char_w
             if m.group(3):
                 break

@@ -4,33 +4,26 @@ code, the tutorial's pictures - with the contents down the left (the
 section on screen marked), a search, links between them and a Back.
 F1 over a node opens its own entry in the node reference.
 
-Set in a reading face (Segoe UI, else Helvetica or DejaVu Sans) that has
-the punctuation the guide uses, not the 13-px bitmap font the rest of
-the studio wears. Also the first-run panel: the tutorial, the guide, the
-examples, a device.
+Set in the interface's faces (typeface.py: Segoe UI, else Helvetica or
+DejaVu Sans), which have the punctuation the guide uses; the reader's
+body is the interface's, and shares its font. Also the first-run panel:
+the tutorial, the guide, the examples, a device.
 """
 import os
-import sys
 
 import dearpygui.dearpygui as dpg
+
+from native.typeface import px
+from native import typeface
 
 from native import reader, weight
 
 TAG = "reader_win"
 WELCOME = "welcome_win"
 
-_FONT_FILES = {
-    "win32": {"body": [r"C:\Windows\Fonts\segoeui.ttf"], "bold": [r"C:\Windows\Fonts\segoeuib.ttf", r"C:\Windows\Fonts\seguisb.ttf"],
-              "mono": [r"C:\Windows\Fonts\consola.ttf"]},
-    "darwin": {"body": ["/System/Library/Fonts/Helvetica.ttc", "/Library/Fonts/Arial.ttf"],
-               "bold": ["/System/Library/Fonts/Helvetica.ttc", "/Library/Fonts/Arial Bold.ttf"],
-               "mono": ["/System/Library/Fonts/Menlo.ttc", "/System/Library/Fonts/Monaco.ttf"]},
-}
-_LINUX = {"body": ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf"],
-          "bold": ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"],
-          "mono": ["/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", "/usr/share/fonts/TTF/DejaVuSansMono.ttf"]}
+# the reading roles: (face, size at 100%); code at the monospace's 13, which matches the body's x-height
 SIZES = {"body": ("body", 16), "b": ("bold", 16), "h1": ("bold", 28), "h2": ("bold", 22), "h3": ("bold", 18),
-         "mono": ("mono", 14)}
+         "mono": ("mono", 13)}
 _fonts = {}
 
 
@@ -45,20 +38,10 @@ def fonts():
     the text is kept to what it can draw)."""
     if _fonts:
         return _fonts
-    files = _FONT_FILES.get(sys.platform, _LINUX)
-    pick = lambda role: next((f for f in files[role] if os.path.exists(f)), None)
-    with dpg.font_registry():
-        for key, (role, px) in SIZES.items():
-            f = pick(role)
-            _fonts[key] = None
-            if f is None:
-                continue
-            try:
-                # every character the file has, loaded as it is first drawn (Dear PyGui 2
-                # has no ranges to ask for): the guide's dashes, arrows and pi come with it
-                _fonts[key] = dpg.add_font(f, px)
-            except Exception:
-                pass
+    # every character the file has, loaded as it is first drawn (Dear PyGui 2 has no ranges to ask
+    # for): the guide's dashes, arrows and pi come with it
+    for key, (face, size) in SIZES.items():
+        _fonts[key] = typeface.at(face, px(size))
     return _fonts
 
 
@@ -108,16 +91,16 @@ S = _State()
 
 def build(app):
     c = _c()
-    with dpg.window(tag=TAG, label="Help", show=False, width=980, height=720, no_collapse=True,
+    with dpg.window(tag=TAG, label="Help", show=False, width=px(980), height=px(720), no_collapse=True,
                     on_close=lambda: setattr(S, "keys", False)):
         with dpg.group(horizontal=True):
             dpg.add_button(label="< Back", tag="reader_back", enabled=False, callback=lambda: back(app))
             c.tip("where you were before the last link (Alt+Left, or Backspace)")
-            dpg.add_spacer(width=6)
+            dpg.add_spacer(width=px(6))
             for label, f in reader.DOCS:
                 dpg.add_button(label=label, tag=f"reader_doc_{f}", callback=lambda s, a, u: open_doc(app, u), user_data=f)
-            dpg.add_spacer(width=16)
-            dpg.add_input_text(tag="reader_find", hint="search this page", width=220, on_enter=True,
+            dpg.add_spacer(width=px(16))
+            dpg.add_input_text(tag="reader_find", hint="search this page", width=px(220), on_enter=True,
                                callback=lambda: search(app))
             dpg.add_button(label="Next", callback=lambda: search(app))
             c.tip("the next place on this page that mentions it (Enter in the box, or F3)")
@@ -125,7 +108,7 @@ def build(app):
             c.tip("the place before (Shift+F3)")
             dpg.add_text("", tag="reader_found", color=c.DIM)
         with dpg.group(horizontal=True):
-            with dpg.child_window(tag="reader_toc", width=240, height=-1, border=True):
+            with dpg.child_window(tag="reader_toc", width=px(240), height=-1, border=True):
                 pass
             with dpg.child_window(tag="reader_body", width=-1, height=-1, border=False):
                 pass
@@ -137,7 +120,7 @@ def build(app):
     with dpg.item_handler_registry(tag="reader_pic_click"):
         dpg.add_item_clicked_handler(callback=lambda s, a: _pic_clicked(app, a))
     # a picture at its full size, to read what the page had to shrink
-    with dpg.window(tag="reader_pic", label="Picture", show=False, width=900, height=600, no_collapse=True):
+    with dpg.window(tag="reader_pic", label="Picture", show=False, width=px(900), height=px(600), no_collapse=True):
         with dpg.group(horizontal=True):
             dpg.add_button(label="Fit the window", callback=lambda: _pic_zoom("fit"))
             dpg.add_button(label="Full size", callback=lambda: _pic_zoom(1.0))
@@ -150,32 +133,32 @@ def build(app):
 
 def _build_welcome(app):
     c = _c()
-    with dpg.window(tag=WELCOME, label="Welcome", show=False, width=600, height=400, no_collapse=True, no_resize=True,
+    with dpg.window(tag=WELCOME, label="Welcome", show=False, width=px(600), height=px(400), no_collapse=True, no_resize=True,
                     on_close=lambda: welcome_closed(app)):
         t = dpg.add_text("WLED Effects Studio")
         _bind(t, "h1")
         dpg.add_text("Make LED effects from nodes or from code, watch them run on any shape in 3-D, and send them "
-                     "to your WLED devices. Where would you like to start?", wrap=560, color=c.DIM)
-        dpg.add_spacer(height=6)
+                     "to your WLED devices. Where would you like to start?", wrap=px(560), color=c.DIM)
+        dpg.add_spacer(height=px(6))
         for label, why, fn in (
                 ("Start the tutorial", "a first effect from nothing, step by step", lambda: open_doc(app, "TUTORIAL.md")),
                 ("Read the user guide", "every part of the studio, and every key", lambda: open_doc(app, "GUIDE.md")),
                 ("Browse the examples", "every graph in the project, running", lambda: _frame(app, "library")),
                 ("Find a device", "the WLED devices on the network", lambda: _frame(app, "devices"))):
             with dpg.group(horizontal=True):
-                b = dpg.add_button(label=label, width=230, height=36, user_data=fn,
+                b = dpg.add_button(label=label, width=px(230), height=px(36), user_data=fn,
                                    callback=lambda s, a, u: (welcome_closed(app), u()))
                 if label == "Start the tutorial":
                     weight.primary(b)
                 dpg.add_text(why, color=c.DIM)
-        dpg.add_spacer(height=8)
-        dpg.add_text("Help > User guide (F1) has all of it later; F1 over a node explains that node.", color=c.DIM, wrap=560)
-        dpg.add_spacer(height=4)
+        dpg.add_spacer(height=px(8))
+        dpg.add_text("Help > User guide (F1) has all of it later; F1 over a node explains that node.", color=c.DIM, wrap=px(560))
+        dpg.add_spacer(height=px(4))
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="Show this when the studio starts", tag="welcome_always",
                              default_value=bool(app.prefs.get("welcome_always")))
-            dpg.add_spacer(width=40)
-            dpg.add_button(label="Close", width=90, callback=lambda: welcome_closed(app))
+            dpg.add_spacer(width=px(40))
+            dpg.add_button(label="Close", width=px(90), callback=lambda: welcome_closed(app))
             weight.quiet(dpg.last_item())
     _bind(WELCOME, "body")
 
@@ -197,7 +180,7 @@ def welcome_closed(app):
 
 def show_welcome(app):
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
-    dpg.set_item_pos(WELCOME, [max(0, (vw - 600) // 2), max(20, (vh - 400) // 3)])
+    dpg.set_item_pos(WELCOME, [max(0, (vw - px(600)) // 2), max(20, (vh - px(400)) // 3)])
     dpg.set_value("welcome_always", bool(app.prefs.get("welcome_always")))
     dpg.show_item(WELCOME)
     dpg.focus_item(WELCOME)
@@ -231,7 +214,7 @@ def open_doc(app, name, heading=None):
         render(app, name)
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
     if not dpg.is_item_shown(TAG):
-        w, h = min(1180, vw - 40), min(840, vh - 60)
+        w, h = min(px(1180), vw - 40), min(px(840), vh - 60)
         dpg.configure_item(TAG, width=w, height=h)
         dpg.set_item_pos(TAG, [max(0, (vw - w) // 2), max(20, (vh - h) // 3)])
     dpg.show_item(TAG)
@@ -329,7 +312,7 @@ def render(app, name):
         elif kind == "quote":
             col = dim
             with dpg.group(horizontal=True, parent=B) as it:
-                dpg.add_spacer(width=6)
+                dpg.add_spacer(width=px(6))
                 dpg.add_text("|", color=accent)
                 S.texts[k] = dpg.add_text(b["text"], wrap=0, color=dim)
             _links(app, b, B)
@@ -368,13 +351,13 @@ def render(app, name):
         S.fontkey.setdefault(k, "body")
         nxt = S.blocks[k + 1]["kind"] if k + 1 < len(S.blocks) else None
         if kind == "li" and nxt == "li":
-            dpg.add_spacer(height=1, parent=B)                   # a list holds together
+            dpg.add_spacer(height=px(1), parent=B)                   # a list holds together
         elif kind in ("p", "li", "quote", "code", "table", "img"):
             dpg.add_spacer(height=6 if kind in ("p", "li", "quote") else 10, parent=B)
-    dpg.add_spacer(height=200, parent=B)                     # the last heading can come to the top too
+    dpg.add_spacer(height=px(200), parent=B)                     # the last heading can come to the top too
     # the contents: every heading down to the third level
     for k, level, text in reader.headings(S.blocks):
-        sel = dpg.add_selectable(label=("   " * max(0, level - 1)) + text, parent="reader_toc", width=220, user_data=k,
+        sel = dpg.add_selectable(label=("   " * max(0, level - 1)) + text, parent="reader_toc", width=px(220), user_data=k,
                                  callback=lambda s, a, u: (_remember(), _refresh_back(), scroll_to(u)))
         S.toc.append((k, sel))
 
@@ -385,7 +368,7 @@ def _links(app, b, parent):
     if not b.get("links"):
         return
     with dpg.group(horizontal=True, parent=parent):
-        dpg.add_spacer(width=18)
+        dpg.add_spacer(width=px(18))
         for label, target in b["links"][:6]:
             dpg.add_button(label=f"{label} \u203a" if fonts().get("body") else f"{label} >", small=True,
                            user_data=target, callback=lambda s, a, u: follow(app, u))
@@ -430,7 +413,7 @@ def _image(b, parent):
         except Exception as e:
             return dpg.add_text(f"[picture unreadable: {e}]", parent=parent, color=c.DIM)
     tex, w, h = got
-    s = min(1.0, 880.0 / max(1, w))
+    s = min(1.0, px(880) / max(1, w))
     with dpg.group(parent=parent) as g:
         img = dpg.add_image(tex, width=int(w * s), height=int(h * s))
         dpg.bind_item_handler_registry(img, "reader_pic_click")

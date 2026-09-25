@@ -308,6 +308,24 @@ def fit_words(text, n):
     return cut.rstrip().rstrip(",;:").rstrip() + "..."
 
 
+def fit_width(text, width, measure):
+    """fit_words by the drawn width: the longest cut at a word, with "...",
+    whose `measure` (px, the face's) is within `width` - in a proportional
+    face "iiii" and "MMMM" are not the same length."""
+    text = str(text)
+    if measure(text) <= width:
+        return text
+    best, lo, hi = fit_words(text, 1), 1, len(text)
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        t = fit_words(text, mid)
+        if measure(t) <= width:
+            best, lo = t, mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
 def first_sentence(text, n=150):
     """A doc's first sentence (a "0..1." is not an end, "cube... This" is),
     cut at a word past n characters - the line a menu shows, the whole

@@ -9,6 +9,9 @@ limiter previewed, and both sent to the device.
 import json
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native import outputs, weight
 
 TAG = "outputs_win"
@@ -27,27 +30,27 @@ def _state(app):
 def build(app):
     c = _c()
     from native import device_ui
-    with dpg.window(tag=TAG, show=False, width=680, height=460, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=px(680), height=px(460), no_collapse=True, no_title_bar=True):
         device_ui.header(app, "outputs")
         dpg.add_text("", tag="out_desc", color=c.DIM, wrap=0)
         with dpg.group(horizontal=True):
-            dpg.add_text("SPLIT", color=c.ACCENT)
+            typeface.label(dpg.add_text("SPLIT", color=c.ACCENT))
             dpg.add_button(label="one output", small=True, callback=lambda: do_split(app, "one"))
             dpg.add_button(label="one per part", small=True, callback=lambda: do_split(app, "parts"))
             dpg.add_button(label="by count:", small=True, callback=lambda: do_split(app, "count"))
-            dpg.add_input_int(tag="out_per", width=60, step=0, default_value=300, min_value=1, min_clamped=True)
+            dpg.add_input_int(tag="out_per", width=px(60), step=0, default_value=300, min_value=1, min_clamped=True)
             dpg.add_button(label="+ output", small=True, callback=lambda: add_output(app))
             dpg.add_button(label="Read the device's", small=True, callback=lambda: read_device(app))
             weight.need(dpg.last_item(), "device")
             c.info("The wiring split into the device's LED outputs: a pin, a start and a count each, the LED type and colour order, "
                    "reversed or not. Sent as the device's LED config.")
-        with dpg.child_window(tag="out_rows", height=170, border=True):
+        with dpg.child_window(tag="out_rows", height=px(170), border=True):
             pass
         with dpg.group(horizontal=True):
-            dpg.add_text("POWER", color=c.ACCENT)
-            dpg.add_input_int(tag="out_ledma", label="mA per LED", width=60, step=0, min_value=0, max_value=255, min_clamped=True, max_clamped=True,
+            typeface.label(dpg.add_text("POWER", color=c.ACCENT))
+            dpg.add_input_int(tag="out_ledma", label="mA per LED", width=px(60), step=0, min_value=0, max_value=255, min_clamped=True, max_clamped=True,
                               callback=lambda s, v: _set(app, "ma_per_led", int(v)))
-            dpg.add_input_int(tag="out_maxma", label="supply mA", width=70, step=0, min_value=0, max_value=65000, min_clamped=True, max_clamped=True,
+            dpg.add_input_int(tag="out_maxma", label="supply mA", width=px(70), step=0, min_value=0, max_value=65000, min_clamped=True, max_clamped=True,
                               callback=lambda s, v: _set(app, "max_ma", int(v)))
             c.tip("0: no limit")
             dpg.add_checkbox(label="limiter in the sim", tag="out_abl",
@@ -58,7 +61,7 @@ def build(app):
                    "The supply less the ESP's 120 mA is what the device's auto brightness limiter dims to fit; the sim previews that dimming.")
         dpg.add_separator()
         with dpg.group(horizontal=True):
-            dpg.add_text("ON THE DEVICE", color=c.ACCENT)
+            typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
             dpg.add_button(label="Send outputs + power limit", small=True, callback=lambda: send(app))
             weight.primary(dpg.last_item())
             weight.need(dpg.last_item(), lambda a: bool(a.active_host()) and bool(_state(a).get("outs")))
@@ -84,13 +87,13 @@ def refresh(app):
     for k, o in enumerate(outs):
         with dpg.group(horizontal=True, parent="out_rows"):
             dpg.add_text(f"{k + 1:2d}", color=c.DIM)
-            dpg.add_input_text(width=90, default_value=o.get("name", ""), user_data=(k, "name"), on_enter=True, callback=cb)
-            dpg.add_input_int(label="pin", width=50, step=0, default_value=int(o["pin"]), min_value=0, max_value=48, user_data=(k, "pin"), on_enter=True, callback=cb)
-            dpg.add_input_int(label="start", width=60, step=0, default_value=int(o["start"]), min_value=0, user_data=(k, "start"), on_enter=True, callback=cb)
-            dpg.add_input_int(label="LEDs", width=60, step=0, default_value=int(o["len"]), min_value=1, user_data=(k, "len"), on_enter=True, callback=cb)
-            dpg.add_combo(types, width=130, default_value=next((t[1] for t in outputs.TYPES if t[0] == o.get("type", 22)), types[0]),
+            dpg.add_input_text(width=px(90), default_value=o.get("name", ""), user_data=(k, "name"), on_enter=True, callback=cb)
+            dpg.add_input_int(label="pin", width=px(50), step=0, default_value=int(o["pin"]), min_value=0, max_value=48, user_data=(k, "pin"), on_enter=True, callback=cb)
+            dpg.add_input_int(label="start", width=px(60), step=0, default_value=int(o["start"]), min_value=0, user_data=(k, "start"), on_enter=True, callback=cb)
+            dpg.add_input_int(label="LEDs", width=px(60), step=0, default_value=int(o["len"]), min_value=1, user_data=(k, "len"), on_enter=True, callback=cb)
+            dpg.add_combo(types, width=px(130), default_value=next((t[1] for t in outputs.TYPES if t[0] == o.get("type", 22)), types[0]),
                           user_data=(k, "type"), callback=cb)
-            dpg.add_combo(orders, width=60, default_value=next((n for i, n in outputs.ORDERS if i == o.get("order", 0)), "GRB"),
+            dpg.add_combo(orders, width=px(60), default_value=next((n for i, n in outputs.ORDERS if i == o.get("order", 0)), "GRB"),
                           user_data=(k, "order"), callback=cb)
             dpg.add_checkbox(label="rev", default_value=bool(o.get("rev")), user_data=(k, "rev"), callback=cb)
             dpg.add_button(label="x", small=True, user_data=k, callback=lambda s, a, u: del_output(app, u))

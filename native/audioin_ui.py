@@ -15,6 +15,9 @@ import urllib.request
 
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native import audioin, weight
 
 TAG = "audioin_win"
@@ -34,40 +37,40 @@ def build(app):
     c = _c()
     from native import device_ui
     labels = [label for _, label, _, _ in audioin.PRESETS]
-    with dpg.window(tag=TAG, show=False, width=640, height=340, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=px(640), height=px(340), no_collapse=True, no_title_bar=True):
         device_ui.header(app, "audioin")
-        dpg.add_text("", tag="ain_desc", color=c.DIM, wrap=600)
+        dpg.add_text("", tag="ain_desc", color=c.DIM, wrap=px(600))
         with dpg.group(horizontal=True):
-            dpg.add_text("MODULE", color=c.ACCENT)
-            dpg.add_combo(labels, tag="ain_preset", width=330, callback=lambda s, v: pick_preset(app, v))
+            typeface.label(dpg.add_text("MODULE", color=c.ACCENT))
+            dpg.add_combo(labels, tag="ain_preset", width=px(330), callback=lambda s, v: pick_preset(app, v))
             c.info("What is wired to the device: a microphone, or a line-in module - a PCM1808 / WM8782 ADC breakout, or an ES8388 "
                    "codec board (AudioKit, LyraT) with a line-in jack. The preset sets the type WLED's audioreactive usermod runs, "
                    "the levels a line signal wants, and the pins where the board fixes them.")
             dpg.add_text("", tag="ain_note", color=c.DIM, wrap=0, show=False)
-        dpg.add_text("", tag="ain_preset_note", color=c.DIM, wrap=600)
+        dpg.add_text("", tag="ain_preset_note", color=c.DIM, wrap=px(600))
         with dpg.group(horizontal=True):
-            dpg.add_text("PINS", color=c.ACCENT)
+            typeface.label(dpg.add_text("PINS", color=c.ACCENT))
             for tag, lbl in zip(PIN_TAGS, ("SD", "WS", "SCK", "MCLK")):
-                dpg.add_input_int(tag=tag, label=lbl, width=52, step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
+                dpg.add_input_int(tag=tag, label=lbl, width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
                                   callback=lambda s, v: _pins_edited(app))
             c.tip("the I2S wires: SD the data in (DOUT / ASDOUT on the module), WS the word select (LRCK), SCK the bit clock (BCK); "
                   "MCLK the master clock a line-in ADC or a codec needs (-1: none). -1 = not wired.")
-            dpg.add_input_int(tag="ain_sda", label="SDA", width=52, step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
+            dpg.add_input_int(tag="ain_sda", label="SDA", width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
                               callback=lambda s, v: _pins_edited(app))
-            dpg.add_input_int(tag="ain_scl", label="SCL", width=52, step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
+            dpg.add_input_int(tag="ain_scl", label="SCL", width=px(52), step=0, min_value=-1, max_value=48, min_clamped=True, max_clamped=True,
                               callback=lambda s, v: _pins_edited(app))
             c.tip("WLED's I2C pins - an ES8388 or ES7243 is set up over I2C before it sends audio")
         with dpg.group(horizontal=True):
-            dpg.add_text("LEVELS", color=c.ACCENT)
-            dpg.add_slider_int(tag="ain_gain", label="gain", width=130, min_value=0, max_value=255, callback=lambda s, v: _level_edited(app))
+            typeface.label(dpg.add_text("LEVELS", color=c.ACCENT))
+            dpg.add_slider_int(tag="ain_gain", label="gain", width=px(130), min_value=0, max_value=255, callback=lambda s, v: _level_edited(app))
             c.tip("audioreactive's gain, 0..255 (60 is WLED's default for a mic; a line signal is louder and steadier: 40)")
-            dpg.add_slider_int(tag="ain_squelch", label="squelch", width=110, min_value=0, max_value=255, callback=lambda s, v: _level_edited(app))
+            dpg.add_slider_int(tag="ain_squelch", label="squelch", width=px(110), min_value=0, max_value=255, callback=lambda s, v: _level_edited(app))
             c.tip("the noise gate: what counts as silence (10 for a mic; 4 for a line-in, which has no room noise)")
-            dpg.add_combo(audioin.AGC, tag="ain_agc", label="AGC", width=80, callback=lambda s, v: _level_edited(app))
+            dpg.add_combo(audioin.AGC, tag="ain_agc", label="AGC", width=px(80), callback=lambda s, v: _level_edited(app))
             c.tip("automatic gain: off, normal, vivid or lazy. A line-in seldom needs it.")
         dpg.add_separator()
         with dpg.group(horizontal=True):
-            dpg.add_text("ON THE DEVICE", color=c.ACCENT)
+            typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
             dpg.add_button(label="Read the device's", small=True, callback=lambda: read_device(app))
             weight.need(dpg.last_item(), "device")
             c.tip("what the device's audioreactive is set to now (its type, pins and levels), into these fields")
@@ -82,10 +85,10 @@ def build(app):
             dpg.add_checkbox(label="meter", tag="ain_meter", callback=lambda s, v: _meter(app, bool(v)))
             c.tip("reads the level the device hears, twice a second, while ticked: play something into the line-in and watch it move")
         with dpg.group(horizontal=True):
-            dpg.add_progress_bar(tag="ain_level", width=300, default_value=0.0, overlay="")
+            dpg.add_progress_bar(tag="ain_level", width=px(300), default_value=0.0, overlay="")
             dpg.add_text("", tag="ain_source", color=c.DIM, wrap=0)
-        dpg.add_text("", tag="ain_flash", color=c.DIM, wrap=600)
-        dpg.add_text("", tag="ain_log", color=c.DIM, wrap=600)
+        dpg.add_text("", tag="ain_flash", color=c.DIM, wrap=px(600))
+        dpg.add_text("", tag="ain_log", color=c.DIM, wrap=px(600))
 
 
 def refresh(app):

@@ -16,6 +16,9 @@ import os
 import time
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native import weight
 import numpy as np
 
@@ -34,10 +37,10 @@ def _c():
 def build(app):
     c = _c()
     from native import device_ui
-    with dpg.window(tag=TAG, show=False, width=640, height=520, no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=px(640), height=px(520), no_collapse=True, no_title_bar=True):
         device_ui.header(app, "library")
         with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="lib_search", hint="search names and tags", width=220, callback=lambda s, v: refresh(app))
+            dpg.add_input_text(tag="lib_search", hint="search names and tags", width=px(220), callback=lambda s, v: refresh(app))
             dpg.add_button(label="Remake the thumbnails", small=True, callback=lambda: (app._lib_thumbs.clear() if hasattr(app, "_lib_thumbs") else None, refresh(app)))
             c.info("Every graph of the project as a looping thumbnail with its tags (what it uses). Click a tile: its effect runs in the sim, "
                    "built first if it never was, and its graph waits in the graph pane.")
@@ -45,7 +48,7 @@ def build(app):
             dpg.add_button(label="Generate previews", tag="lib_gen", small=True, callback=lambda: generate_previews(app))
             c.tip("a turn of the 3-D view for every effect on the project's shape - a GIF and a PNG each in export/library, with an index; "
                    "the tiles then show those turns")
-            dpg.add_input_float(tag="lib_gen_secs", width=60, default_value=3.0, step=0, format="%.0f s")
+            dpg.add_input_float(tag="lib_gen_secs", width=px(60), default_value=3.0, step=0, format="%.0f s")
             dpg.add_checkbox(label="only the ones shown", tag="lib_gen_shown", default_value=False)
             dpg.add_button(label="Open the folder", small=True, callback=lambda: app.reveal(os.path.join(app.project.path, "export", "library")))
             dpg.add_text("", tag="lib_gen_status", color=c.DIM)
@@ -164,9 +167,9 @@ def refresh(app):
                     else:
                         dpg.add_button(label="no\npreview", width=TILE, height=TILE, user_data=fn, callback=lambda s, a, u: open_graph(app, u))
                     dpg.add_text(name[:14], color=c.TEXT)
-                    dpg.add_text(", ".join(tags)[:16], color=c.DIM)
+                    typeface.small(dpg.add_text(", ".join(tags)[:16], color=c.DIM))
                     with dpg.tooltip(dpg.last_item()):
-                        dpg.add_text(f"{name}\n{fn}\ntags: {', '.join(tags) or 'none'}", wrap=300)
+                        dpg.add_text(f"{name}\n{fn}\ntags: {', '.join(tags) or 'none'}", wrap=px(300))
     if not rows:
         if q:
             dpg.add_text("nothing matches", parent="lib_tiles", color=c.DIM)

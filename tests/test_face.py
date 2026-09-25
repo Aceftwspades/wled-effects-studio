@@ -45,6 +45,20 @@ def test_fit_words_cuts_at_a_word():
         assert len(F.fit_words("the microphone's volume, bands, beat", n)) <= n
 
 
+def test_fit_width_cuts_at_a_word_by_the_drawn_width():
+    """A stand-in's line in the interface's face: fitted by the width the
+    words are drawn, so narrow letters fit more of them than wide ones."""
+    even = lambda t: len(t) * 7.0
+    assert F.fit_width("the Speed slider, 0..1", 140, even) == F.fit_words("the Speed slider, 0..1", 20)
+    assert F.fit_width("abc", 1000, even) == "abc"
+    narrow = lambda t: sum(3.0 if ch in "il.,' " else 9.0 for ch in t)
+    fits_i = F.fit_width("iiii iiii iiii iiii iiii", 60, narrow)
+    fits_m = F.fit_width("MMMM MMMM MMMM MMMM MMMM", 60, narrow)
+    assert len(fits_i) > len(fits_m) and narrow(fits_i) <= 60 and narrow(fits_m) <= 60
+    for w in range(10, 300, 7):
+        assert even(F.fit_width("the microphone's volume, bands, beat", w, even)) <= max(w, 7)
+
+
 def test_hand_written_summaries():
     n, d = node("Add", inputs={"b": 0.5})
     assert F.summary(n, d, {"a"}) == "a + 0.5"

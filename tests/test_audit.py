@@ -110,6 +110,57 @@ def test_no_child_opens_a_console_window():
     assert not bad, "child processes that would open a console window:\n" + "\n".join(bad)
 
 
+SIZE_KW = {"width", "height", "wrap", "indent", "init_width_or_weight", "horizontal_spacing", "thickness"}
+# placeholders sized again before they are seen: the code editor's (and its invisible key catcher), the GPU
+# view's drawlists, the popout's first image
+SIZE_OK = {("native/codeedit.py", "__init__"), ("native/gpucube.py", "__init__"), ("native/popout.py", "frame")}
+
+
+def _literal(v):
+    return isinstance(v, ast.Constant) and isinstance(v.value, (int, float)) and not isinstance(v.value, bool) and v.value > 2
+
+
+def test_every_control_size_is_at_the_interface_size():
+    """A control's width, height or wrap - a dialog's, a swatch's, a drawn
+    line's thickness, a drawn text's size - is laid out at 100% and given
+    through typeface.px(): Settings > Appearance > Interface size scales
+    them with the type. A new literal would stay 100% at 150% - a combo too
+    narrow for its words. So would a helper's default (tip's wrap). Hairlines
+    (2 px or less) and the placeholders in SIZE_OK are left; the graph's
+    nodes are sized by its own zoom (self.px); a floatx's size is a count."""
+    bad = []
+    for d, _, files in os.walk(os.path.join(ROOT, "native")):
+        for f in sorted(files):
+            if not f.endswith(".py"):
+                continue
+            path = os.path.join(d, f)
+            rel = os.path.relpath(path, ROOT).replace("\\", "/")
+            src = open(path, encoding="utf-8").read()
+            stack = []
+
+            class V(ast.NodeVisitor):
+                def visit_FunctionDef(self, n):
+                    a = n.args
+                    pairs = list(zip(a.args[len(a.args) - len(a.defaults):], a.defaults)) + \
+                        [(k, v) for k, v in zip(a.kwonlyargs, a.kw_defaults) if v is not None]
+                    for arg, dv in pairs:
+                        if arg.arg in ("width", "height", "wrap", "indent") and _literal(dv):
+                            bad.append(f"{rel}:{n.lineno} def {n.name}({arg.arg}={dv.value}) - None, then px({dv.value})")
+                    stack.append(n.name); self.generic_visit(n); stack.pop()
+
+                def visit_Call(self, n):
+                    fn = n.func
+                    if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) and fn.value.id == "dpg" \
+                            and (rel, stack[-1] if stack else "") not in SIZE_OK:
+                        kws = SIZE_KW | ({"size"} if fn.attr == "draw_text" else set())
+                        for k in n.keywords:
+                            if k.arg in kws and _literal(k.value):
+                                bad.append(f"{rel}:{n.lineno} dpg.{fn.attr}({k.arg}={k.value.value}) - px({k.value.value})")
+                    self.generic_visit(n)
+            V().visit(ast.parse(src, rel))
+    assert not bad, "sizes that would not follow the interface size:\n" + "\n".join(bad)
+
+
 def test_gpu_points_match_the_software_projection():
     """Every LED square the GPU path places sits where render.project puts
     the LED, for every geometry kind and camera - the two are the same

@@ -13,6 +13,9 @@ import time
 
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native import weight
 import numpy as np
 
@@ -29,14 +32,19 @@ WIRE_COLOURS = [("type colour", None), ("white", (235, 235, 235)), ("red", (235,
                 ("orange", (250, 160, 60)), ("yellow", (240, 220, 80)), ("green", (120, 220, 110)),
                 ("cyan", (90, 220, 230)), ("blue", (100, 150, 250)), ("magenta", (230, 100, 220)),
                 ("grey", (130, 135, 145))]
-CHAR_W = 7.2            # the default font at 13 px, near enough to right-align by
+CHAR_W = 7.2            # Consolas at 13 px: a fallback measure when no face is found
 
 
 NARROW_W = 46           # a knot: just wide enough for its two pin names
 ZOOMS = (0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1.0, 1.2, 1.4, 1.7, 2.0)
 OVERVIEW_ZOOM = 0.5     # below this the nodes are stand-ins (Settings > Simplified nodes below)
 OVERVIEW_CHOICES = ((0.7, "70%"), (0.5, "50%"), (0.4, "40%"), (0.3, "30%"), (0.0, "never"))
-BASE_FONT = 13          # the size everything above is laid out for
+BASE_FONT = 13          # a field's value, in the monospace, at 100% zoom
+NODE_TEXT = 16          # a node's words - title, pin names, summary - in the interface's face (its body size)
+# the fields whose text is a value (set in the monospace); a combo, a checkbox, a swatch show words
+VALUE_ITEMS = ("mvAppItemType::mvSliderFloat", "mvAppItemType::mvSliderInt", "mvAppItemType::mvDragFloat",
+               "mvAppItemType::mvInputInt", "mvAppItemType::mvInputFloat", "mvAppItemType::mvInputText",
+               "mvAppItemType::mvInputFloatMulti")
 HELP_H = 46             # the description box, px: two lines
 THUMB = 96              # the preview thumbnail on a node, layout px
 PAD = 56                # an XY pad on a node, layout px (its texture is PAD_PX square)
@@ -44,11 +52,12 @@ PAD_PX = 56
 THUMB_PX = 96           # its texture
 
 
-def _right(text, width=NODE_W, char_w=CHAR_W):
-    """Indent that puts `text` against the node's right edge, so an output's
-    name sits beside its pin on the right the way an input's sits beside its
-    pin on the left. Inputs left, outputs right, on every node."""
-    return max(0, int(width - len(text) * char_w))
+def _right(text_w, width=NODE_W):
+    """Indent that puts a text `text_w` wide against the node's right edge,
+    so an output's name sits beside its pin on the right the way an input's
+    sits beside its pin on the left. Inputs left, outputs right, on every
+    node. The width is measured (typeface.measure): the face is proportional."""
+    return max(0, int(width - text_w + 0.999))
 
 
 def _font_file():
@@ -138,8 +147,8 @@ class GraphPanel(Glyphs):
         self.offset = [0.0, 0.0]
         self.pan = [0.0, 0.0]
         self._mid_last = None
-        self._fonts = {}         # px size -> font
-        self._node_font = None   # the font at this zoom, bound to each node as it is made
+        self._node_font = None   # the node's words at this zoom, bound to each node as it is made
+        self._val_font = None    # a field's value at this zoom (the monospace)
         self._standin_line = {}  # nid -> the height a stand-in gives its summary line (0: none)
         self._font_file = _font_file()
         self._zoom_themes = {}   # zoom -> node-editor style theme
@@ -251,7 +260,9 @@ class GraphPanel(Glyphs):
             return
         self.refresh_lib()
         if self.graph is None:
-            self.zoom = min(ZOOMS[-1], max(ZOOMS[0], float(self.app.prefs.get("zoom", 1.0))))
+            from native import typeface          # no zoom kept yet: the interface's size, to the nearest step
+            first = min(ZOOMS, key=lambda z: abs(z - typeface.scale()))
+            self.zoom = min(ZOOMS[-1], max(ZOOMS[0], float(self.app.prefs.get("zoom", first))))
         self.offset = [0.0, 0.0]
         d = self.sub_dir if sub else self.dir
         self.graph = G.load(os.path.join(d, fname), lib=self.lib, resolver=self.resolve_sub)
@@ -498,9 +509,9 @@ class GraphPanel(Glyphs):
         title = f"{n.get('label') or d.get('label') or n['type']} #{nid}"
         if n.get("label"):
             title += f"  ({n['type']})"
-        dpg.add_text(title, parent="graph_props")
+        typeface.heading(dpg.add_text(title, parent="graph_props"))
         if len(sel) > 1:
-            dpg.add_text(f"and {len(sel) - 1} more selected", parent="graph_props", color=DIM)
+            typeface.small(dpg.add_text(f"and {len(sel) - 1} more selected", parent="graph_props", color=DIM))
         long_ = [p for p in d["params"] if p["type"] in ("text", "file") and not p.get("lines") is False]
         curves = [p for p in d["params"] if p["type"] == "curve"]
         self._curve_ed = None
@@ -511,8 +522,8 @@ class GraphPanel(Glyphs):
         for p in curves:
             # a curve drawn by hand: click to add a point, drag one, right-click to take it out
             dpg.add_text(f"{p['name']} - click to add a point, drag to move, right-click to remove", parent="graph_props", color=DIM, wrap=0)
-            W = max(200, int(dpg.get_item_rect_size("graph_props")[0] or 300) - 24)
-            H = 180
+            W = max(px(200), int(dpg.get_item_rect_size("graph_props")[0] or px(300)) - px(24))
+            H = px(180)
             tag = dpg.add_drawlist(width=W, height=H, parent="graph_props")
             self._curve_ed = {"nid": nid, "name": p["name"], "tag": tag, "W": W, "H": H, "drag": None, "was": False, "rwas": False}
             self._curve_draw()
@@ -524,9 +535,9 @@ class GraphPanel(Glyphs):
             v = str(n["params"].get(p["name"], p["default"]))
             shown = v.replace("/", "\n") if p.get("lines") else v
             dpg.add_text(p["name"], parent="graph_props", color=DIM)
-            dpg.add_input_text(parent="graph_props", width=-1, multiline=bool(p.get("lines")) or len(v) > 60,
-                               height=self.px(120) if p.get("lines") else 0, default_value=shown,
-                               user_data=(nid, p["name"]), callback=self._on_prop)
+            typeface.mono(dpg.add_input_text(parent="graph_props", width=-1, multiline=bool(p.get("lines")) or len(v) > 60,
+                                             height=px(120) if p.get("lines") else 0, default_value=shown,
+                                             user_data=(nid, p["name"]), callback=self._on_prop))
 
     # --- the bitmap painter in the properties pane ----------------------------------------
     BITMAP_STATES = "0123456789"
@@ -553,7 +564,7 @@ class GraphPanel(Glyphs):
                      "empties a pixel (a dot); drag to paint a run", parent="graph_props", color=DIM, wrap=0)
         with dpg.group(horizontal=True, parent="graph_props"):
             dpg.add_text("pen", color=DIM)
-            dpg.add_combo(list(self.BITMAP_STATES), tag="bitmap_pen", width=44, default_value="1",
+            dpg.add_combo(list(self.BITMAP_STATES), tag="bitmap_pen", width=px(44), default_value="1",
                           callback=lambda s, v: self._bitmap_ed.__setitem__("pen", v))
             dpg.add_button(label="empty", small=True, callback=lambda: self._bitmap_fill("."))
             dpg.add_button(label="fill", small=True, callback=lambda: self._bitmap_fill(None))
@@ -561,9 +572,9 @@ class GraphPanel(Glyphs):
             dpg.add_text("size", color=DIM)
             for lbl, dc, dr in (("+col", 1, 0), ("-col", -1, 0), ("+row", 0, 1), ("-row", 0, -1)):
                 dpg.add_button(label=lbl, small=True, user_data=(dc, dr), callback=lambda s, a, u: self._bitmap_resize(*u))
-        W = max(200, int(dpg.get_item_rect_size("graph_props")[0] or 300) - 24)
+        W = max(px(200), int(dpg.get_item_rect_size("graph_props")[0] or px(300)) - px(24))
         cols, nrows = len(rows[0]), len(rows)
-        cell = max(6, min(28, W // cols, 200 // nrows))
+        cell = max(px(6), min(px(28), W // cols, px(200) // nrows))
         tag = dpg.add_drawlist(width=cols * cell + 1, height=nrows * cell + 1, parent="graph_props")
         self._bitmap_ed = {"nid": nid, "name": name, "tag": tag, "cell": cell, "pen": "1", "was": False, "rwas": False, "stroke": None}
         self._bitmap_draw()
@@ -586,7 +597,7 @@ class GraphPanel(Glyphs):
                 fill = tints[int(ch)] + (255,) if on else (28, 30, 36, 255)
                 dpg.draw_rectangle((c * cell, r * cell), ((c + 1) * cell, (r + 1) * cell), color=(60, 64, 74, 255), fill=fill, parent=tag)
                 if on and cell >= 12 and ch != "1":
-                    dpg.draw_text((c * cell + cell * 0.3, r * cell + cell * 0.12), ch, size=max(8, cell - 6), color=(20, 22, 26, 255), parent=tag)
+                    self._draw_text((c * cell + cell * 0.3, r * cell + cell * 0.12), ch, size=max(8, cell - 6), color=(20, 22, 26, 255), parent=tag)
 
     def _bitmap_set(self, rows, text):
         n = self.graph.nodes[self._bitmap_ed["nid"]]
@@ -682,7 +693,7 @@ class GraphPanel(Glyphs):
         for k, q in enumerate(pts):
             c = (255, 180, 60, 255) if k == ed.get("drag") else P["point"]
             dpg.draw_circle((q[0] * (W - 1), (1.0 - q[1]) * (H - 1)), 5, color=c, fill=c, parent=tag)
-            dpg.draw_text((min(W - 60, q[0] * (W - 1) + 8), max(2, (1.0 - q[1]) * (H - 1) - 16)), f"{q[0]:.2f}, {q[1]:.2f}", size=12,
+            self._draw_text((min(W - 60, q[0] * (W - 1) + 8), max(2, (1.0 - q[1]) * (H - 1) - 16)), f"{q[0]:.2f}, {q[1]:.2f}", size=12,
                           color=P["dim"], parent=tag)
 
     def _poll_curve_edit(self):
@@ -885,9 +896,11 @@ class GraphPanel(Glyphs):
         """A layout size at the current zoom."""
         return int(round(v * self.zoom))
 
-    @property
-    def char_w(self):
-        return CHAR_W * self.zoom if self._font_file else CHAR_W
+    def text_w(self, text):
+        """How wide the node's words are drawn at this zoom, px."""
+        if not self._font_file:
+            return len(text) * CHAR_W
+        return typeface.measure(text, "body", self._font_px())
 
     def _disp(self, pos):
         """Graph units -> the editor's grid, where nodes are placed."""
@@ -936,7 +949,13 @@ class GraphPanel(Glyphs):
         return self._graph([screen[0] - ex - self.pan[0], screen[1] - ey - self.pan[1]])
 
     def _font_px(self):
-        return max(8 if (self.overview() and self.zoom >= 0.3) else 6, int(BASE_FONT * self.zoom)) if self._font_file else BASE_FONT
+        """The node's words at this zoom, px: never under 6, nor under 8 for a
+        stand-in's title while it is still to be read."""
+        return max(8 if (self.overview() and self.zoom >= 0.3) else 6, int(NODE_TEXT * self.zoom)) if self._font_file else BASE_FONT
+
+    def _value_px(self):
+        """A field's value at this zoom, px."""
+        return max(6, int(BASE_FONT * self.zoom)) if self._font_file else BASE_FONT
 
     def features(self):
         """The project's firmware features (flash.py): what the picker ticked."""
@@ -968,24 +987,44 @@ class GraphPanel(Glyphs):
             self._sync_pos(); self.rebuild()
         self.status("simplified nodes below " + (f"{int(z * 100)}%" if z else "- never"))
 
-    def _font(self):
+    def font_at(self, size, face="mono"):
+        """A face at a size (made once, shared with the rest of the studio):
+        drawn text takes the font bound to it. The graph's drawn figures are
+        in the monospace; words (a wire's label) in the interface's face."""
         if not self._font_file:
             return None
-        # Never larger than the zoom asks for: text that outgrows the boxes
-        # widens every node, so 50% came out a little bigger than 50%. A
-        # 6 px font at the far end is for seeing the shape of a graph, not
-        # reading it; stand-ins keep 8 px so their titles still can be.
-        size = max(8 if (self.overview() and self.zoom >= 0.3) else 6, int(BASE_FONT * self.zoom))
-        f = self._fonts.get(size)
+        return typeface.at(face, size)
+
+    def _draw_text(self, pos, text, size=13, face="mono", **kw):
+        t = dpg.draw_text(pos, text, size=size, **kw)
+        f = self.font_at(size, face)
+        if f is not None:
+            dpg.bind_item_font(t, f)
+        return t
+
+    def _font(self):
+        """The node's words at this zoom (the interface's face). Never larger
+        than the zoom asks for: text that outgrows the boxes widens every
+        node, so 50% came out a little bigger than 50%. A 6 px font at the
+        far end is for seeing the shape of a graph, not reading it;
+        stand-ins keep 8 px so their titles still can be."""
+        if not self._font_file:
+            return None
+        f = typeface.at("body", self._font_px())
         if f is None:
-            try:
-                with dpg.font_registry():
-                    f = dpg.add_font(self._font_file, size)
-            except Exception:
-                self._font_file = None
-                return None
-            self._fonts[size] = f
+            self._font_file = None
         return f
+
+    def _value_font(self):
+        """A field's value at this zoom, in the monospace: figures that line
+        up, and a changing one does not shift its neighbours."""
+        return typeface.at("mono", self._value_px()) if self._font_file else None
+
+    def _value_face(self, w):
+        """A field whose text is a value, set in the monospace at the zoom."""
+        f = getattr(self, "_val_font", None)
+        if f is not None and w and dpg.does_item_exist(w) and dpg.get_item_type(w) in VALUE_ITEMS:
+            dpg.bind_item_font(w, f)
 
     def _zoom_styles(self):
         """The styles the zoom scales, added to the theme component open
@@ -1175,9 +1214,12 @@ class GraphPanel(Glyphs):
         x0 = min(p[0] for p, _ in boxes); y0 = min(p[1] for p, _ in boxes)
         x1 = max(p[0] + sz[0] for p, sz in boxes); y1 = max(p[1] + sz[1] for p, sz in boxes)
         w, h = dpg.get_item_rect_size("node_editor") if dpg.does_item_exist("node_editor") else (0, 0)
-        if w <= 0 or h <= 0:                             # not drawn since a rebuild: the pane's size, less its rows
-            w, h = dpg.get_item_rect_size("graph_win") if dpg.does_item_exist("graph_win") else (0, 0)
-            w, h = (w, max(200, h - 160)) if w > 60 and h > 200 else (800, 600)
+        if w <= 0 or h <= 0:
+            # not drawn yet (the layout changed to the graph this frame): the pane's size as the layout set it,
+            # less its padding and the row above the canvas - a guess of 800 x 600 framed a big graph at 20%
+            w, h = (dpg.get_item_width("graph_win") or 0, dpg.get_item_height("graph_win") or 0) \
+                if dpg.does_item_exist("graph_win") else (0, 0)
+            w, h = (w - px(20), h - px(58)) if w > 60 and h > 200 else (800, 600)
         fit = min((w - 40) / max(1.0, x1 - x0), (h - 40) / max(1.0, y1 - y0))
         z = min(most, max([zz for zz in ZOOMS if zz <= fit] or [ZOOMS[0]]))
         self.zoom = z
@@ -1526,6 +1568,7 @@ class GraphPanel(Glyphs):
             return
         f = self._font()
         self._node_font = f
+        self._val_font = self._value_font()
         if f is not None:
             dpg.bind_item_font("node_editor", f)         # (Dear PyGui 2.3 does not hand an editor's font down: each node binds it too)
         dpg.bind_item_theme("node_editor", self._zoom_theme())
@@ -1696,7 +1739,7 @@ class GraphPanel(Glyphs):
                 tag = f"gout_{nid}_{o['name']}"
                 with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Output, tag=tag,
                                         user_data=(nid, o["name"]), shape=dpg.mvNode_PinShape_CircleFilled):
-                    dpg.add_text(o["name"], indent=_right(o["name"], width, self.char_w))
+                    dpg.add_text(o["name"], indent=_right(self.text_w(o["name"]), width))
                 dpg.bind_item_theme(tag, th.pin[o["type"]])
                 self._pins[(nid, "out", o["name"])] = tag
                 self._ptype[tag] = o["type"]
@@ -1740,7 +1783,7 @@ class GraphPanel(Glyphs):
             with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                 if text:
                     # the function under the title, in a line of its own
-                    dpg.add_text(nodeface.fit_words(text, max(1, int(width / max(1.0, self.char_w)))), tag=f"gsum_{nid}", color=self.pal()["soft"])
+                    dpg.add_text(nodeface.fit_width(text, width, self.text_w), tag=f"gsum_{nid}", color=self.pal()["soft"])
                 else:
                     dpg.add_spacer(width=width, height=1)
             for kind, p in pins:
@@ -1975,7 +2018,6 @@ class GraphPanel(Glyphs):
             self._draw_mod_ranges((x0, y0, x1, y1), size)      # the ranges stand without a running build; the dot needs one
             return
         scope = getattr(self, "_probe_scope", {}) or {}
-        cw = self.char_w
         now = time.time()
         if not dpg.does_item_exist("wire_labels"):
             dpg.add_viewport_drawlist(front=True, tag="wire_labels")
@@ -1997,7 +2039,7 @@ class GraphPanel(Glyphs):
                 # a light, not a word: on is bright, off is dim, and a one-frame hit glows out over 150 ms
                 lvl = self._light_level(nid, name, v > 0.5, now)
                 r = max(3.0, 4.0 * self.zoom)
-                cx, cy = ax - 10 - len(name) * cw - 6 - r, ay
+                cx, cy = ax - 10 - self.text_w(name) - 6 - r, ay
                 if cx - r < x0 or cx + r > x1 or cy - r < y0 or cy + r > y1:
                     continue
                 fill = (int(70 + 100 * lvl), int(76 + 154 * lvl), int(88 + 32 * lvl), 255)
@@ -2008,12 +2050,12 @@ class GraphPanel(Glyphs):
                 continue
             text = f"{v:.3g}" if abs(v) < 1e5 else f"{v:.2e}"
             # left of the pin's name, inside the node: the name is right-aligned to the pin
-            w = len(text) * size * 0.6
-            rx = ax - 10 - len(name) * cw - 6 - w
+            w = typeface.measure(text, "mono", size)
+            rx = ax - 10 - self.text_w(name) - 6 - w
             ry = ay - size * 0.55
             if rx < x0 or rx + w > x1 or ry < y0 or ry + size > y1:
                 continue
-            self._readout_items.append(dpg.draw_text((rx, ry), text, parent="wire_labels", color=self.pal()["live"], size=size))
+            self._readout_items.append(self._draw_text((rx, ry), text, parent="wire_labels", color=self.pal()["live"], size=size))
             rng = nodeface.out_range(n, d, name) if d else None
             if rng and ry + size + 3 < y1:
                 # a meter under the number: how far along its range the value is
@@ -2057,13 +2099,14 @@ class GraphPanel(Glyphs):
                 continue
             (ax, ay), (bx, by) = pa, pb
             mx, my = (ax + bx) / 2, (ay + by) / 2
-            w = len(text) * 7 + 10
-            if mx - w / 2 < x0 or mx + w / 2 > x1 or my - 9 < y0 or my + 9 > y1:
+            size = typeface.size_of("small")             # a wire's own name: words, in the interface's face
+            w, hh = typeface.measure(text, "body", size) + px(10), size / 2 + px(2)
+            if mx - w / 2 < x0 or mx + w / 2 > x1 or my - hh < y0 or my + hh > y1:
                 continue
-            self._label_items.append(dpg.draw_rectangle((mx - w / 2, my - 9), (mx + w / 2, my + 9), parent="wire_labels",
+            self._label_items.append(dpg.draw_rectangle((mx - w / 2, my - hh), (mx + w / 2, my + hh), parent="wire_labels",
                                                         color=self.pal()["popup_edge"], fill=self.pal()["popup"], rounding=4))
-            self._label_items.append(dpg.draw_text((mx - w / 2 + 5, my - 7), text, parent="wire_labels",
-                                                   color=self.pal()["text"], size=13))
+            self._label_items.append(self._draw_text((mx - w / 2 + px(5), my - size / 2), text, parent="wire_labels",
+                                                   color=self.pal()["text"], size=size, face="body"))
 
     # --- presets --------------------------------------------------------------------------
     # A node as it is set up now, saved by name, to drop in again. Global
@@ -2157,6 +2200,7 @@ class GraphPanel(Glyphs):
                                        callback=self._on_param)
                 h_ = dpg.add_input_int(label="h", width=self.px(70), default_value=h, step=0, user_data=(nid, "h"),
                                        callback=self._on_param)
+                self._value_face(w_); self._value_face(h_)
                 self._widgets.update((w_, h_))
 
     def _frame_rect(self, nid, pos=None):
@@ -2214,6 +2258,7 @@ class GraphPanel(Glyphs):
             w = dpg.add_color_edit([int(c) for c in rgb] + [255], label=i["name"], tag=tag, width=self.px(90),
                                no_alpha=True, no_inputs=True, user_data=ud, callback=self._on_input, show=show)
         dpg.bind_item_theme(w, self._field_theme())
+        self._value_face(w)
         self._widgets.add(w)
 
     def _same_type_selected(self, nid):
@@ -2490,9 +2535,9 @@ class GraphPanel(Glyphs):
             if f is not None:
                 items.append(dpg.draw_rectangle((bx, by), (bx + mw * f, by + 3), parent="wire_labels", color=(0, 0, 0, 0), fill=P["mod"]))
                 items.append(dpg.draw_circle((bx + mw * f, by + 1.5), 2.5, parent="wire_labels", color=(0, 0, 0, 0), fill=P["mod_dot"]))
-            items.append(dpg.draw_text((bx, by + 4), nodeface._fmt(lo), parent="wire_labels", size=small, color=P["mod_text"]))
+            items.append(self._draw_text((bx, by + 4), nodeface._fmt(lo), parent="wire_labels", size=small, color=P["mod_text"]))
             t = nodeface._fmt(hi)
-            items.append(dpg.draw_text((bx + mw - len(t) * small * 0.6, by + 4), t, parent="wire_labels", size=small, color=P["mod_text"]))
+            items.append(self._draw_text((bx + mw - typeface.measure(t, "mono", small), by + 4), t, parent="wire_labels", size=small, color=P["mod_text"]))
             self._mod_bars[(bx, by, bx + mw, by + small + 4)] = r
 
     def _step_mod_range(self, direction):
@@ -2635,6 +2680,7 @@ class GraphPanel(Glyphs):
         else:
             return
         dpg.bind_item_theme(w, self._field_theme())
+        self._value_face(w)
         self._widgets.add(w)
 
     def _field_theme(self):
@@ -2724,7 +2770,7 @@ class GraphPanel(Glyphs):
             btn = dpg.add_image_button(tex, width=size, height=size, frame_padding=0, user_data=(nid, a, b, lo, hi))
             with dpg.tooltip(btn):
                 dpg.add_text(f"{a} and {b} as one point, {lo:g}..{hi:g}: drag to set both (the fields above follow); "
-                             "the fields still take a typed value", wrap=260)
+                             "the fields still take a typed value", wrap=px(260))
             stem = a[:-2] if a.endswith(("_u", "_x")) else a.rstrip("xu")
             dpg.add_text(stem or f"{a} {b}", color=DIM)
         self._pads[btn] = (nid, a, b, float(lo), float(hi), tex)
@@ -2812,7 +2858,7 @@ class GraphPanel(Glyphs):
         param (relative to the project when it is inside it) and rebuilds."""
         self._file_target = target
         if not dpg.does_item_exist("graph_file_dialog"):
-            with dpg.file_dialog(directory_selector=False, show=False, tag="graph_file_dialog", width=640, height=440,
+            with dpg.file_dialog(directory_selector=False, show=False, tag="graph_file_dialog", width=px(640), height=px(440),
                                  callback=lambda s_, a_: self._file_picked(a_.get("file_path_name", ""))):
                 for ext, col in ((".png", (120, 200, 120)), (".jpg", (120, 200, 120)), (".jpeg", (120, 200, 120)),
                                  (".gif", (120, 200, 120)), (".bmp", (120, 200, 120)), (".*", (180, 180, 180))):
@@ -2895,6 +2941,7 @@ class GraphPanel(Glyphs):
                                          user_data=(nid, p["name"], k, "pos"), callback=self._on_ramp)
                 w2 = dpg.add_color_edit([int(st[1]), int(st[2]), int(st[3]), 255], width=self.px(60), no_alpha=True, no_inputs=True,
                                         user_data=(nid, p["name"], k, "col"), callback=self._on_ramp)
+                self._value_face(w1)
                 self._widgets.update((w1, w2))
                 if len(stops) > 2:
                     dpg.add_button(label="-", small=True, user_data=(nid, p["name"], k, "del"), callback=self._on_ramp)
@@ -2921,6 +2968,7 @@ class GraphPanel(Glyphs):
                                          user_data=(nid, p["name"], k, "x"), callback=self._on_curve)
                 w2 = dpg.add_input_float(width=self.px(56), default_value=float(q[1]), step=0, format="%.2f",
                                          user_data=(nid, p["name"], k, "y"), callback=self._on_curve)
+                self._value_face(w1); self._value_face(w2)
                 self._widgets.update((w1, w2))
                 if len(pts) > 2:
                     dpg.add_button(label="-", small=True, user_data=(nid, p["name"], k, "del"), callback=self._on_curve)
@@ -3595,7 +3643,7 @@ class GraphPanel(Glyphs):
             if parent == P:
                 dpg.add_menu_item(label=label, shortcut=k, parent=P, user_data=fn, callback=lambda s, a, u: (close(), u()))
             else:
-                dpg.add_selectable(label=f"{label}   {k}" if k else label, parent=parent, user_data=fn, width=280,
+                dpg.add_selectable(label=f"{label}   {k}" if k else label, parent=parent, user_data=fn, width=px(280),
                                    callback=lambda s, a, u: (close(), u()))
 
         def sep():
@@ -3610,7 +3658,7 @@ class GraphPanel(Glyphs):
             dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
             pd_ = next((x.get("doc") for x in d["inputs"] if x["name"] == name), None)
             if pd_:
-                dpg.add_text(pd_, parent=P, color=self.pal()["soft"], wrap=260)
+                dpg.add_text(pd_, parent=P, color=self.pal()["soft"], wrap=px(260))
             i = next(x for x in d["inputs"] if x["name"] == name)
             if linked:
                 row("disconnect", lambda: self._disconnect_in(nid, name))
@@ -3660,7 +3708,7 @@ class GraphPanel(Glyphs):
             dpg.add_text(f"{n['type']} . {name}", parent=P, color=DIM)
             pd_ = next((x.get("doc") for x in d["outputs"] if x["name"] == name), None)
             if pd_:
-                dpg.add_text(pd_, parent=P, color=self.pal()["soft"], wrap=260)
+                dpg.add_text(pd_, parent=P, color=self.pal()["soft"], wrap=px(260))
             o = next(x for x in d["outputs"] if x["name"] == name)
             if self.preview == (nid, name):
                 row("stop previewing this output", self.stop_preview)
@@ -3683,10 +3731,10 @@ class GraphPanel(Glyphs):
             title = n.get("label") or d.get("label") or n["type"]
             dpg.add_text(title if title == n["type"] else f"{title}  ({n['type']})", parent=P, color=DIM)
             if d.get("doc"):
-                dpg.add_text(nodeface.first_sentence(d["doc"]), parent=P, color=self.pal()["soft"], wrap=300)
+                dpg.add_text(nodeface.first_sentence(d["doc"]), parent=P, color=self.pal()["soft"], wrap=px(300))
             if nid in self.problems:
                 m = self.problems[nid]
-                dpg.add_text(m, parent=P, color=(235, 80, 70) if m.startswith("error") else (240, 190, 70), wrap=300)
+                dpg.add_text(m, parent=P, color=(235, 80, 70) if m.startswith("error") else (240, 190, 70), wrap=px(300))
             reference()
             sep()
             if n["type"].startswith(G.SUB):
@@ -3783,7 +3831,7 @@ class GraphPanel(Glyphs):
         """The list, in a small window: a click opens that graph."""
         P = "where_win"
         if not dpg.does_item_exist(P):
-            dpg.add_window(tag=P, label="Where used", width=360, height=300, show=False, no_collapse=True)
+            dpg.add_window(tag=P, label="Where used", width=px(360), height=px(300), show=False, no_collapse=True)
         dpg.delete_item(P, children_only=True)
         label = self.lib.get(type_, {}).get("label") or (type_[len(G.SUB):] + " (sub-graph)" if type_.startswith(G.SUB) else type_)
         dpg.add_text(label, parent=P, color=(90, 169, 230))
@@ -3791,7 +3839,7 @@ class GraphPanel(Glyphs):
         if not rows:
             dpg.add_text("used in no graph", parent=P, color=DIM)
         for f, sub, n in rows:
-            dpg.add_selectable(label=f"{f[:-5]}{'  (sub-graph)' if sub else ''}   x{n}", parent=P, user_data=(f, sub), width=300,
+            dpg.add_selectable(label=f"{f[:-5]}{'  (sub-graph)' if sub else ''}   x{n}", parent=P, user_data=(f, sub), width=px(300),
                                callback=lambda s, a, u: (dpg.hide_item(P), self.app.show_layout("graph"), self.open(u[0], sub=u[1])))
         vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
         dpg.configure_item(P, pos=(vw // 2 - 180, vh // 3), show=True)
@@ -3839,7 +3887,7 @@ class GraphPanel(Glyphs):
                         dpg.add_button(label="auto", small=True,
                                        callback=lambda: (self._hide_menus(), self._set_colour(nid, None)))
                     else:
-                        dpg.add_color_button(default_value=list(col) + [255], width=18, height=18, no_border=True,
+                        dpg.add_color_button(default_value=list(col) + [255], width=px(18), height=px(18), no_border=True,
                                              user_data=col, callback=lambda s, a, u: (self._hide_menus(), self._set_colour(nid, u)))
 
     def _set_colour(self, nid, col):
@@ -3895,7 +3943,7 @@ class GraphPanel(Glyphs):
                         dpg.add_button(label="auto", small=True,
                                        user_data=keys, callback=lambda s, a, u: (self._hide_menus(), self._set_wire(u, None)))
                     else:
-                        dpg.add_color_button(default_value=list(col) + [255], width=18, height=18, no_border=True,
+                        dpg.add_color_button(default_value=list(col) + [255], width=px(18), height=px(18), no_border=True,
                                              user_data=(keys, col), callback=lambda s, a, u: (self._hide_menus(), self._set_wire(*u)))
 
     def _set_wire(self, keys, col):
@@ -4324,15 +4372,15 @@ class GraphPanel(Glyphs):
             dpg.add_button(label="paste here", small=True,
                            callback=lambda: (self._hide_menus(), self.paste(self._menu_pos)))
             dpg.add_button(label="arrange", small=True, callback=lambda: (self._hide_menus(), self.arrange()))
-        dpg.add_input_text(tag="graph_search", parent="graph_menu", hint="search nodes", width=200,
+        dpg.add_input_text(tag="graph_search", parent="graph_menu", hint="search nodes", width=px(200),
                            callback=self._search, on_enter=False)
         # on_enter would stop the per-keystroke callback; Enter is read separately
         dpg.add_text("add node", parent="graph_menu", color=DIM)
         # child windows rather than groups: a collapsing header stretches to
         # its parent, and an autosized popup would stretch with it
-        dpg.add_child_window(tag="graph_hits", parent="graph_menu", show=False, width=230, height=60,
+        dpg.add_child_window(tag="graph_hits", parent="graph_menu", show=False, width=px(230), height=px(60),
                              border=False)
-        with dpg.child_window(tag="graph_cats", parent="graph_menu", width=230, height=430, border=False):
+        with dpg.child_window(tag="graph_cats", parent="graph_menu", width=px(230), height=px(430), border=False):
             # the last few added and the starred ones sit on top; refilled each open
             dpg.add_group(tag="graph_quick")
             self._fill_quick()
@@ -4341,7 +4389,7 @@ class GraphPanel(Glyphs):
                 with dpg.collapsing_header(label="presets", default_open=True):
                     for name in sorted(pre):
                         with dpg.group(horizontal=True):
-                            dpg.add_selectable(label=name, user_data="preset:" + name, width=180,
+                            dpg.add_selectable(label=name, user_data="preset:" + name, width=px(180),
                                                callback=lambda s, a, u: self.add_node_at_menu(u))
                             dpg.add_button(label="x", small=True, user_data=name,
                                            callback=lambda s, a, u: self.delete_preset(u))
@@ -4359,7 +4407,7 @@ class GraphPanel(Glyphs):
                         dpg.add_selectable(label=lbl, user_data=n,
                                            callback=lambda s, a, u: self.add_node_at_menu(u))
             if hidden:
-                dpg.add_text(f"{hidden} node(s) hidden: their feature is off in Flash > Features", color=DIM, wrap=220)
+                dpg.add_text(f"{hidden} node(s) hidden: their feature is off in Flash > Features", color=DIM, wrap=px(220))
         self._widgets.add("graph_search")
 
     # --- a node hovered in the add menu is described in the properties pane ---------------
@@ -4408,20 +4456,20 @@ class GraphPanel(Glyphs):
         dpg.delete_item("graph_props", children_only=True)
         self._props_for = ("preview", type_)
         if type_.startswith("preset:"):
-            dpg.add_text(f"preset: {type_[7:]}", parent="graph_props")
+            typeface.heading(dpg.add_text(f"preset: {type_[7:]}", parent="graph_props"))
             dpg.add_text("a node saved with its settings, from a node's menu", parent="graph_props", color=DIM, wrap=0)
             return
         d = self.lib.get(type_)
         if not d:
             return
-        dpg.add_text(d.get("label") or type_, parent="graph_props")
-        dpg.add_text(f"{d.get('cat', '')} - runs per {d.get('scope', 'pixel')}", parent="graph_props", color=DIM)
+        typeface.heading(dpg.add_text(d.get("label") or type_, parent="graph_props"))
+        typeface.small(dpg.add_text(f"{d.get('cat', '')} - runs per {d.get('scope', 'pixel')}", parent="graph_props", color=DIM))
         if d.get("doc"):
             dpg.add_text(d["doc"], parent="graph_props", wrap=0)
         for title, items in (("inputs", d.get("inputs", [])), ("outputs", d.get("outputs", [])), ("settings", d.get("params", []))):
             if not items:
                 continue
-            dpg.add_text(title, parent="graph_props", color=DIM)
+            typeface.label(dpg.add_text(title.upper(), parent="graph_props", color=DIM))
             for p in items:
                 line = f"  {p['name']} ({p.get('type', '')})"
                 if p.get("doc"):
@@ -4808,10 +4856,10 @@ def build_panel(app, panel):
         dpg.add_button(label="< back", tag="graph_back", show=False, callback=lambda: panel.back())
         with dpg.group(horizontal=True, tag="graph_crumbs", show=False):     # inside a sub-graph: the trail down to it
             pass
-        dpg.add_combo(panel.files(), tag="graph_file", width=220, default_value=panel.file or "",
+        dpg.add_combo(panel.files(), tag="graph_file", width=px(220), default_value=panel.file or "",
                       callback=lambda s, v: panel.open(v))
         dpg.add_text("", tag="graph_status", color=DIM)
-    with dpg.file_dialog(directory_selector=False, show=False, tag="graph_import_dialog", width=620, height=420,
+    with dpg.file_dialog(directory_selector=False, show=False, tag="graph_import_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: panel.import_bundle(a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(120, 200, 120))
         dpg.add_file_extension(".*")
@@ -4821,7 +4869,7 @@ def build_panel(app, panel):
     with dpg.child_window(tag="graph_help_box", height=int(app.prefs.get("help_h", HELP_H)), border=False,
                           no_scrollbar=True, no_scroll_with_mouse=True):
         dpg.add_text("", tag="graph_help", color=(170, 178, 192), wrap=0)
-    dpg.add_button(label="", tag="help_split", width=-1, height=5)
+    dpg.add_button(label="", tag="help_split", width=-1, height=px(5))
     with dpg.node_editor(tag="node_editor", callback=panel.on_link, delink_callback=panel.on_delink,
                          minimap=True, minimap_location=dpg.mvNodeMiniMap_Location_BottomRight,
                          width=-1, height=-1):
@@ -4832,8 +4880,8 @@ def build_panel(app, panel):
     # an expression typed into a field: a small box at the pointer (= over a value, or a menu row)
     with dpg.window(tag="expr_win", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         dpg.add_text("", tag="expr_label", color=DIM)
-        dpg.add_input_text(tag="expr_text", width=240, on_enter=True, callback=lambda s, v: app.gp.expr_enter(v))
-        dpg.add_text("2*pi, x*2 (x: the value now), sqrt(2), min(a, 4)...", tag="expr_hint", color=DIM, wrap=240)
+        typeface.mono(dpg.add_input_text(tag="expr_text", width=px(240), on_enter=True, callback=lambda s, v: app.gp.expr_enter(v)))
+        dpg.add_text("2*pi, x*2 (x: the value now), sqrt(2), min(a, 4)...", tag="expr_hint", color=DIM, wrap=px(240))
     with dpg.window(tag="graph_ctx", show=False, no_title_bar=True, no_resize=True, no_move=True,
                     autosize=True, popup=True):
         pass

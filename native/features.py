@@ -12,6 +12,9 @@ import time
 import numpy as np
 import dearpygui.dearpygui as dpg
 
+from native.typeface import px
+from native import typeface
+
 from native import chrome, device_ui, devices, live_out
 from native.project import save_prefs
 from native.engine import Engine
@@ -224,13 +227,13 @@ class Features:
         for row in ((("x0", x0), ("y0", y0)), (("x1", x1), ("y1", y1))):
             with dpg.group(horizontal=True, parent="seg_fields"):
                 for key, val in row:
-                    dpg.add_input_int(label=key, width=60, default_value=val, user_data=key, on_enter=True, step=0,
+                    dpg.add_input_int(label=key, width=px(60), default_value=val, user_data=key, on_enter=True, step=0,
                                       callback=self.on_seg_field)
-        dpg.add_slider_int(label="opacity", parent="seg_fields", width=200, min_value=0, max_value=255, default_value=op,
+        dpg.add_slider_int(label="opacity", parent="seg_fields", width=px(200), min_value=0, max_value=255, default_value=op,
                            callback=lambda s, v: self.on_seg_field(s, v, "opacity"))
         # WLED's per-segment blend mode ("bm"): how this segment lands on the ones under it
         modes = self.eng.BLEND_MODES
-        dpg.add_combo(modes, label="blend mode", parent="seg_fields", width=200, default_value=modes[bm if bm < len(modes) else 0],
+        dpg.add_combo(modes, label="blend mode", parent="seg_fields", width=px(200), default_value=modes[bm if bm < len(modes) else 0],
                       callback=lambda s, v: self.on_seg_blend(modes.index(v)))
         self._seg_option_rows(y1 - y0 > 1)
     def _seg_option_rows(self, is2d):
@@ -247,7 +250,7 @@ class Features:
                                      callback=lambda s, v, u: self.on_seg_option(u, bool(v)))
         with dpg.group(horizontal=True, parent="seg_fields"):
             for key, label, lo, hi in (("grp", "group", 1, 255), ("spc", "space", 0, 255), ("of", "offset", 0, 65535)):
-                dpg.add_input_int(label=label, width=50, step=0, default_value=int(o[key]), min_value=lo, max_value=hi, min_clamped=True, max_clamped=True,
+                dpg.add_input_int(label=label, width=px(50), step=0, default_value=int(o[key]), min_value=lo, max_value=hi, min_clamped=True, max_clamped=True,
                                   on_enter=True, user_data=key, callback=lambda s, v, u: self.on_seg_option(u, int(v)))
             chrome.info("WLED's segment options: reverse runs the effect the other way, mirror folds it, transpose swaps the axes; "
                         "group lights that many LEDs as one, space leaves that many dark between, offset rotates along the strip.")
@@ -344,8 +347,8 @@ class Features:
             col = (90, 169, 230, 255) if k == self.eng.seg else (255, 184, 70, 200)
             self._seg_items.append(dpg.draw_rectangle((ox + x0 * sc, oy + y0 * ry), (ox + x1 * sc, oy + y1 * ry),
                                                       parent="seg_overlay", color=col, thickness=2))
-            self._seg_items.append(dpg.draw_text((ox + x0 * sc + 4, oy + y0 * ry + 2), str(k), parent="seg_overlay",
-                                                 color=col, size=14))
+            self._seg_items.append(typeface.draw_text((ox + x0 * sc + 4, oy + y0 * ry + 2), str(k), px(14), face="mono",
+                                                      parent="seg_overlay", color=col))
     # --- the scripted runtime ---------------------------------------------------------
     def compile_current_script(self):
         """The current graph as bytecode, or None with the reason in the status."""

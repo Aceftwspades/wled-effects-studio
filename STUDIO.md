@@ -1527,13 +1527,62 @@ reaches furthest; (Cn) is the critique's number.
       project started so - they are recoloured when the theme changes and
       once at start; Delete took imnodes' selection alone (A, Ctrl+[ ...
       selected nothing it would delete).
-- [ ] **A type foundation and an interface size** (C2): a UI face at
-      three sizes with monospace kept for code and numbers; Settings >
-      Appearance > Interface size, 80-200%, from the monitor's scale.
+- [x] **A type foundation and an interface size** (C2):
+      native/typeface.py. The platform's interface face (Segoe UI,
+      Helvetica, DejaVu Sans) where Dear PyGui's 13-px bitmap face was, in
+      roles: body 16, small 14 (captions: a count, a size, a key beside
+      what it belongs to), label 14 semibold (the capitals over a group:
+      STEPS, ON THE DEVICE, and the side panel's sections), heading 20
+      semibold (a frame's title, the properties' node, About), and the
+      monospace, Consolas 13, for code, logs, the status figures, the
+      expression box and every field's value on a node. Dear ImGui's sizes
+      are line heights, not ems - Segoe UI's line is 1.33 em, Consolas' 1.0
+      - so a first cut at "14" drew a 10.5-px em, smaller than the bitmap
+      face it replaced and than the code beside it; 16 is the platform's
+      9 pt, x-height for x-height with Consolas 13 (a test holds it). The
+      graph sets a node's title, pin names and summary in the interface's
+      face at its zoom and its fields' values in the monospace; text is
+      placed by measured width - typeface.measure, Pillow at the em Dear
+      ImGui asks FreeType for, the same hinted advances to the pixel in 510
+      of 510 cases, before a frame has built the atlas - where it counted
+      characters (right-aligned output names, readouts beside them, wire
+      labels, the modulation ranges' ends, stand-in summaries cut at a word
+      by width, the timeline's names, a usermod's line, the confirm's
+      height by the reader's word wrap). The interface size: Settings >
+      Appearance > Interface size, 80-200% in 5% steps, first the
+      monitor's own scale; the process is per-monitor DPI aware, so
+      Windows no longer stretches a 100% picture; The monitor's goes back
+      to the system's; Restart now saves the graph, asks about unsaved
+      code and starts the studio again (the old process ends, the new one
+      runs at the size - tried end to end; the menu walk skips it). Every
+      size in the interface is laid out at 100% and passes through px():
+      panes, splitters, the rail, the 3-D view's corner, dialogs, file
+      dialogs, swatches, the palette bar (drawn and hit-tested at it),
+      tooltips' wrap, icons (rendered at the size, not stretched); the
+      prefs keep the panel's width and the 3-D view's size at 100%, so
+      they keep their share across a change; the graph's first zoom is the
+      step nearest the size. test_audit fails on a literal size on any
+      Dear PyGui call or helper default. Found on the way: drawn text takes
+      only the font bound to the text item, not its drawlist's - the code
+      editor's columns fell apart once the global face was proportional,
+      and the timeline scaled the monospace to other sizes (soft); each
+      drawn text binds a face made at its size now (typeface.draw_text).
+      The properties pane sized its text box by the graph's zoom (48 px
+      tall at 40%). About broke its sentences by hand for the old face's
+      width and opened in the window's corner; Home framed a big graph at
+      20% when the layout changed to the graph in the same frame (it
+      guessed an 800 x 600 canvas; it reads the pane's laid-out size now).
+      The reader shares the interface's fonts. Left for C6 and C7, where
+      each control gets a label of its own: the panel's and the frames'
+      field values in the monospace (their inline labels would go with
+      them), and a node field's name in the interface's face.
 - [ ] **Forms read left to right** (C6): a label column, the control
-      after it, units inside; colours as a swatch and hex.
+      after it, units inside; colours as a swatch and hex. With the label
+      its own text, the control's value takes the monospace (C2).
 - [ ] **One number control** (C7): the value on the track, drag, click to
       type, the unit inside, a fill rather than a grab; in the panel too.
+      On a node the name leaves the field for the interface's face, the
+      value keeps the monospace (C2).
 - [ ] **One window style, frames docked** (C8).
 - [ ] **Names people use** (C9): settings, keys, usermod descriptions,
       the footer's statistics.

@@ -31,13 +31,15 @@ import time
 
 import dearpygui.dearpygui as dpg
 
-RAIL_W = 44             # the rail's width, px
-RAIL_GAP = 6            # between the rail and the panel open beside it
-MARGIN = 10             # between what floats and the canvas's edges
-PIP_MIN = 200           # the 3-D view's smallest side
-PIP_DEFAULT = 320
-PIP_CAP = 26            # its caption row: the pane's CAP_H less the pane's side padding (the picture stays square)
-PROPS_W = 380
+from native.typeface import px
+
+RAIL_W = px(44)         # the rail's width (px: at the interface size)
+RAIL_GAP = px(6)        # between the rail and the panel open beside it
+MARGIN = px(10)         # between what floats and the canvas's edges
+PIP_MIN = px(200)       # the 3-D view's smallest side
+PIP_DEFAULT = 320       # at 100% (the prefs keep it so: a size change keeps its proportion)
+PIP_CAP = px(26)        # its caption row: the pane's CAP_H less the pane's side padding (the picture stays square)
+PROPS_W = px(380)
 TIP_DELAY = 0.35        # s the pointer rests before the help comes up
 CORNERS = ("br", "bl", "tr", "tl")
 
@@ -202,7 +204,7 @@ def build(app):
     panes: the rail is one of them, the controls go into two."""
     from native import chrome
     from native.icons import texture
-    with dpg.child_window(tag="rail_win", parent="panes_row", width=RAIL_W, height=400, show=False,
+    with dpg.child_window(tag="rail_win", parent="panes_row", width=RAIL_W, height=px(400), show=False,
                           no_scrollbar=True, no_scroll_with_mouse=True):
         pass
     fill_rail(app)
@@ -211,27 +213,27 @@ def build(app):
                     no_scrollbar=True, no_scroll_with_mouse=True, no_focus_on_appearing=True, no_saved_settings=True,
                     width=PIP_DEFAULT, height=PIP_DEFAULT + PIP_CAP):
         pass
-    dpg.add_image_button(texture("tuck", 14), tag="pip_tuck", parent="cube_win", width=14, height=14, show=False,
+    dpg.add_image_button(texture("tuck", px(14)), tag="pip_tuck", parent="cube_win", width=px(14), height=px(14), show=False,
                          callback=lambda: set_tucked(app, True))
     chrome.tip("tuck the 3-D view away to a tab in its corner (it is not drawn while it is away)", item="pip_tuck")
-    dpg.add_image_button(texture("resize", 14), tag="pip_size", parent="cube_win", width=14, height=14, show=False)
+    dpg.add_image_button(texture("resize", px(14)), tag="pip_size", parent="cube_win", width=px(14), height=px(14), show=False)
     chrome.tip("drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner", item="pip_size")
     with dpg.window(tag="pip_tab", show=False, no_title_bar=True, no_resize=True, no_move=True, no_collapse=True,
-                    no_scrollbar=True, no_focus_on_appearing=True, no_saved_settings=True, width=104, height=36):
-        dpg.add_button(label="3-D view", tag="pip_tab_btn", width=88, callback=lambda: set_tucked(app, False))
+                    no_scrollbar=True, no_focus_on_appearing=True, no_saved_settings=True, width=px(104), height=px(36)):
+        dpg.add_button(label="3-D view", tag="pip_tab_btn", width=px(88), callback=lambda: set_tucked(app, False))
         chrome.tip("the 3-D view back in its corner of the graph")
     # the properties over the canvas; props_win moves in
     with dpg.window(tag="props_fly", show=False, no_title_bar=True, no_resize=True, no_move=True, no_collapse=True,
                     no_scrollbar=True, no_scroll_with_mouse=True, no_focus_on_appearing=True, no_saved_settings=True,
-                    width=PROPS_W, height=240):
+                    width=PROPS_W, height=px(240)):
         pass
-    dpg.add_image_button(texture("close", 14), tag="props_close", parent="props_win", width=14, height=14, show=False,
+    dpg.add_image_button(texture("close", px(14)), tag="props_close", parent="props_win", width=px(14), height=px(14), show=False,
                          callback=lambda: dismiss_props(app))
     chrome.tip("close until another node is selected (N keeps it open)", item="props_close")
     # the help at the pointer
     with dpg.window(tag="help_tip", show=False, no_title_bar=True, no_resize=True, no_move=True, no_collapse=True,
                     no_scrollbar=True, no_focus_on_appearing=True, no_saved_settings=True, autosize=True):
-        dpg.add_text("", tag="help_tip_text", wrap=420)
+        dpg.add_text("", tag="help_tip_text", wrap=px(420))
     app.props_pinned = False
 
 
@@ -249,16 +251,16 @@ def fill_rail(app):
         return
     S.rail_sig, S.rail_here = _rail_sig(app), None
     dpg.delete_item("rail_win", children_only=True)
-    dpg.add_spacer(height=2, parent="rail_win")
+    dpg.add_spacer(height=px(2), parent="rail_win")
     shut = folded(app)
-    b = dpg.add_image_button(texture("rail_open" if shut else "rail_fold", 20), tag="rail_open", parent="rail_win",
-                             width=20, height=20, tint_color=chrome.TEXT, callback=lambda: toggle_panel(app))
+    b = dpg.add_image_button(texture("rail_open" if shut else "rail_fold", px(20)), tag="rail_open", parent="rail_win",
+                             width=px(20), height=px(20), tint_color=chrome.TEXT, callback=lambda: toggle_panel(app))
     chrome.tip("open the side panel beside the graph (the rail stays: its icons go to the sections)" if shut
                else "fold the panel away: the graph gets the room back", item=b)
     dpg.add_separator(parent="rail_win")
     for key in app.sec_order:
-        b = dpg.add_image_button(texture(ICON.get(key, "gear"), 20), tag=f"rail_{key}", parent="rail_win", width=20,
-                                 height=20, tint_color=chrome.TEXT, user_data=key,
+        b = dpg.add_image_button(texture(ICON.get(key, "gear"), px(20)), tag=f"rail_{key}", parent="rail_win", width=px(20),
+                                 height=px(20), tint_color=chrome.TEXT, user_data=key,
                                  callback=lambda s, a, u: open_panel(app, u))
         chrome.tip(TIP.get(key, key.upper()) + (" - opens the panel there" if shut else " - goes to it"), item=b)
 
@@ -295,7 +297,7 @@ def _editor_top():
     pos, size = st.get("pos"), st.get("rect_size")
     if pos and size and size[1] > 0:
         return int(pos[1] + size[1] + 6)                  # the theme's item spacing under the row
-    return 38
+    return px(38)
 
 
 def editor_rect(main):
@@ -303,13 +305,19 @@ def editor_rect(main):
     (the theme's 10) off the sides and the bottom."""
     x, y, w, h = main
     top = _editor_top()
-    return (x + 10, y + top, max(1, w - 20), max(1, h - top - 10))
+    return (x + px(10), y + top, max(1, w - px(20)), max(1, h - top - px(10)))
 
 
 def _pip_side(app, ed):
     ex, ey, ew, eh = ed
     most = max(PIP_MIN, min(ew * 0.6, eh - PIP_CAP - 2 * MARGIN))
-    return int(max(PIP_MIN, min(pip(app)["size"], most))), int(most)
+    return int(max(PIP_MIN, min(px(pip(app)["size"]), most))), int(most)
+
+
+def _set_side(app, s):
+    """The 3-D view's side, s px on the screen, into the prefs at 100%."""
+    from native import typeface
+    pip(app)["size"] = int(round(s / typeface.scale()))
 
 
 def pip_geometry(app, main):
@@ -332,12 +340,12 @@ def place_side(app, rect):
     rx = x
     if not folded(app):
         pw = max(1, w - RAIL_W - RAIL_GAP)
-        px = x if right else x + RAIL_W + RAIL_GAP
+        panel_x = x if right else x + RAIL_W + RAIL_GAP
         rx = x + pw + RAIL_GAP if right else x
         dpg.configure_item("side_win", width=pw, height=h)
-        dpg.set_item_pos("side_win", [px, y])
+        dpg.set_item_pos("side_win", [panel_x, y])
         if dpg.does_item_exist("grip_side_win"):
-            dpg.set_item_pos("grip_side_win", [pw - 40 - 14, 8])
+            dpg.set_item_pos("grip_side_win", [pw - px(40 + 14), px(8)])
     dpg.configure_item("rail_win", width=RAIL_W, height=h)
     dpg.set_item_pos("rail_win", [rx, y])
 
@@ -377,11 +385,11 @@ def place(app, rects):
         dpg.set_item_pos("cube_win", [0, 0])
         for t, dx in (("pip_size", 92), ("pip_tuck", 66)):
             dpg.configure_item(t, show=True, tint_color=chrome.TEXT)
-            dpg.set_item_pos(t, [w - dx, 8])
+            dpg.set_item_pos(t, [w - px(dx), px(8)])
         if dpg.does_item_exist("grip_cube_win"):
-            dpg.set_item_pos("grip_cube_win", [w - 40, 8])
+            dpg.set_item_pos("grip_cube_win", [w - px(40), px(8)])
         if dpg.does_item_exist("cube_cap") and not app.ab:
-            dpg.set_value("cube_cap", "3-D  drag: turn  wheel: zoom" if w >= 330 else "3-D")
+            dpg.set_value("cube_cap", "3-D  drag: turn  wheel: zoom" if w >= px(330) else "3-D")
         dpg.hide_item("pip_tab")
     else:
         S.pip_rect = None
@@ -390,8 +398,8 @@ def place(app, rects):
         if p["tucked"] and not app.popouts.is_out("cube"):
             ex, ey, ew, eh = S.editor
             c = p["corner"]
-            tx = ex + ew - 104 - MARGIN if c[1] == "r" else ex + MARGIN
-            ty = ey + eh - 36 - MARGIN if c[0] == "b" else ey + MARGIN
+            tx = ex + ew - px(104) - MARGIN if c[1] == "r" else ex + MARGIN
+            ty = ey + eh - px(36) - MARGIN if c[0] == "b" else ey + MARGIN
             dpg.configure_item("pip_tab", show=True)
             dpg.set_item_pos("pip_tab", [int(tx), int(ty)])
         else:
@@ -467,7 +475,7 @@ def _poll_props(app):
     room = eh - 2 * MARGIN
     if c and S.pip_rect and c[0] == "b" and (c[1] == "r") == right:
         room -= S.pip_rect[3] + MARGIN                  # above the 3-D view on the same side
-    h = int(max(120, min(room, _props_content_h() + 52)))
+    h = int(max(px(120), min(room, _props_content_h() + px(52))))
     w = int(min(PROPS_W, ew - 2 * MARGIN))
     if not dpg.is_item_shown("props_fly"):
         dpg.configure_item("props_win", show=True)
@@ -478,7 +486,7 @@ def _poll_props(app):
     dpg.set_item_pos("props_win", [0, 0])
     from native import chrome
     dpg.configure_item("props_close", show=True, tint_color=chrome.TEXT)
-    dpg.set_item_pos("props_close", [w - 30, 8])
+    dpg.set_item_pos("props_close", [w - px(30), px(8)])
 
 
 def _poll_tip(app):
@@ -503,11 +511,11 @@ def _poll_tip(app):
     mx, my = at if at is not None else dpg.get_mouse_pos(local=False)
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
     w, h = dpg.get_item_rect_size("help_tip") or (0, 0)
-    x, y = mx + 18, my + 22
+    x, y = mx + px(18), my + px(22)
     if w and x + w > vw - 4:
-        x = mx - w - 12                                    # near the right edge: on the pointer's left
+        x = mx - w - px(12)                                # near the right edge: on the pointer's left
     if h and y + h > vh - 4:
-        y = my - h - 12                                    # near the bottom: above it
+        y = my - h - px(12)                                # near the bottom: above it
     dpg.set_item_pos("help_tip", [int(max(0, x)), int(max(0, y))])
     if not S.tip_shown:
         dpg.show_item("help_tip")
@@ -571,7 +579,7 @@ def press(app):
         S.pip_drag = ("move", mp, S.pip_rect)
         return True
     if dpg.is_item_hovered("pip_size"):
-        S.pip_drag = ("size", mp, int(pip(app)["size"]))
+        S.pip_drag = ("size", mp, px(pip(app)["size"]))
         return True
     return False
 
@@ -594,8 +602,8 @@ def drag(app):
     dy = (my0 - my) if c[0] == "b" else (my - my0)
     _, most = _pip_side(app, S.editor)
     s = int(max(PIP_MIN, min(most, v0 + (dx + dy) / 2.0)))
-    if abs(s - int(pip(app)["size"])) >= 6:
-        pip(app)["size"] = s
+    if abs(s - px(pip(app)["size"])) >= px(6):
+        _set_side(app, s)
         app.request_layout()
     return True
 
@@ -621,7 +629,7 @@ def wheel(app, delta):
     if not (dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)):
         return False
     _, most = _pip_side(app, S.editor)
-    pip(app)["size"] = int(max(PIP_MIN, min(most, int(pip(app)["size"]) + 40 * (1 if delta > 0 else -1))))
+    _set_side(app, int(max(PIP_MIN, min(most, px(pip(app)["size"]) + px(40) * (1 if delta > 0 else -1)))))
     _save(app)
     app.request_layout()
     return True
