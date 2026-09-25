@@ -313,6 +313,8 @@ STEPS = [
     # go to from another layout opens the graph pane with the interface (it went to a full frame once)
     ([{"check": "'graph:sad_smoke.json' in messages.HELD and dpg.is_item_shown('msg_problems')"},
       {"py": "messages.show_log(app)"}, {"check": "dpg.is_item_shown('log_win')"}, {"py": "dpg.hide_item('log_win')"},
+      {"layout": "both"}, {"py": "messages.goto(app, messages.HELD['graph:sad_smoke.json'])"}], 1.0),
+    ([{"check": "app.ui and app.layout == 'graph' and app.gp.file == 'sad_smoke.json'"},
       {"graph_open": "box_fire.json"}, {"py": "setattr(app, '_goto_nid', next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Output'))"},
       {"graph_open": "fan.json"}, {"layout": "both"},
       {"py": "messages.goto(app, {'node': ('box_fire.json', app._goto_nid, False)})"}], 1.0),

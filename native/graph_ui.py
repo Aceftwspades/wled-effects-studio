@@ -279,8 +279,9 @@ class GraphPanel(Glyphs):
         dpg.configure_item("graph_back", show=bool(self.stack))
         self._crumbs()
         stray = getattr(self.graph, "stray", None) or []
-        self.status(("sub-graph " if sub else "") + fname
-                    + (f" - {len(stray)} wire(s) to nodes or pins that are not there dropped" if stray else ""))
+        self.status(("opened the sub-graph " if sub else "opened ") + fname
+                    + (f" - {len(stray)} wire(s) to nodes or pins that are not there dropped" if stray else ""),
+                    "warn" if stray else "info")
         self.app.refresh_import_buttons()
 
     def save(self):
@@ -503,8 +504,8 @@ class GraphPanel(Glyphs):
 
     def goto_node(self, fname, nid, sub=False):
         """A message's node: its graph open in the graph pane, the node
-        selected and framed. A sub-graph opens as if entered from the graph
-        open now, so back returns there."""
+        selected and framed (no node: the whole graph framed). A sub-graph
+        opens as if entered from the graph open now, so back returns there."""
         here = self.graph is not None and fname == self.file and (self.cur_dir == self.sub_dir) == bool(sub)
         if not here:
             d = self.sub_dir if sub else self.dir
@@ -520,6 +521,10 @@ class GraphPanel(Glyphs):
                 self.stack.clear()
             self.open(fname, sub=bool(sub))
         self.app.show_pane("graph")
+        if nid is None:
+            if self.graph and self.graph.nodes:
+                self._frame_view(list(self.graph.nodes))
+            return
         if not self.graph or nid not in self.graph.nodes:
             self.status(f"#{nid} is not in {fname} any more"); return
         self.set_selection([nid])
@@ -527,7 +532,7 @@ class GraphPanel(Glyphs):
 
     # --- help: what is under the pointer ---------------------------------------------
     # A tooltip inside a node crashes the node editor, so the help is a
-    # line of its own under the status: hover a pin and it names the pin
+    # line of its own under the pane's row: hover a pin and it names the pin
     # and says what to plug in or what comes out; hover a node's title and
     # it says what the node is for. Checked a few times a second.
     def help(self, text):
@@ -4859,11 +4864,13 @@ class GraphPanel(Glyphs):
             self._live = {v: k for k, v in (getattr(g or self.graph, "live", {}) or {}).items()}   # (nid, input, comp) -> slot
         except G.GraphError as e:
             self._mark_problems()
-            if messages.held(f"problem:{self._key()}:"):
-                # the nodes' problems are held already and say where: this is their consequence
-                self.status(f"{self.file} does not compile: {e}", "error")
-            else:
-                self.status(f"{self.file} does not compile: {e}", "error", key=f"graph:{self._key()}")   # held until it does
+            at = messages.held(f"problem:{self._key()}:")
+            if at:
+                # the nodes' problems are held already and say where: this is their consequence, and goes to the first
+                self.status(f"{self.file} does not compile: {e}", "error", node=at[0]["node"])
+            else:                                                            # held until it does; goes to the graph
+                self.status(f"{self.file} does not compile: {e}", "error", key=f"graph:{self._key()}",
+                            node=(self.file, None, self.cur_dir == self.sub_dir))
             return None
         messages.clear(self.app, f"graph:{self._key()}")
         self._mark_problems()

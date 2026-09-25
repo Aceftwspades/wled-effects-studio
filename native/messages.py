@@ -301,7 +301,8 @@ def fill_log(app):
             if e.get("node") or e.get("code"):
                 dpg.add_button(label="go to", small=True, user_data=e, callback=lambda s, a, u: goto(app, u))
                 where = e.get("node") or e.get("code")
-                c.tip(f"{where[0]}, node #{where[1]}" if e.get("node") else f"{where[0]}, line {where[1]}")
+                c.tip((f"{where[0]}, node #{where[1]}" if where[1] is not None else f"{where[0]}, the whole graph")
+                      if e.get("node") else f"{where[0]}, line {where[1]}")
             dpg.add_text(e["text"] + _times(e), color=_colour(e["kind"]) if e["kind"] != "info" else c.TEXT,
                          wrap=px(500))
 

@@ -1714,7 +1714,9 @@ reaches furthest; (Cn) is the critique's number.
       the problems, newest first, with the time; one about a node or a
       line has go to - its graph opened (a sub-graph as if entered from
       the graph open, so back returns), the node selected and framed, or
-      its effect at the line; one from another project says so. copy all,
+      its effect at the line; a graph that does not compile goes to the
+      node at fault, or frames the graph; one from another project says
+      so. Opening a graph says so ("opened box_fire.json"). copy all,
       clear (the problems stay); a problem report carries the log. A
       value dragged on the running effect is one line that changes
       ("Noise #12 scale: 0.61 - live"), the same message again is counted
