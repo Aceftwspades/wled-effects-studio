@@ -2229,7 +2229,7 @@ proposal's number; in the order to do them.
       the grid layout of a 3-D shape leaves the LEDs behind others dark (a
       tree of 360 kept 197), now a check.
 
-The ninth pass is done: S1-S19.
+The ninth pass is done: S1-S19, released as 1.3.0.
 
 ### Line-in (September 2026)
 
