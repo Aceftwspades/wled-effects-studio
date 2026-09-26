@@ -2308,6 +2308,13 @@ The seven are done, released as 1.3.1.
       the other kinds, the stream's order and bytes; the smoke sends a cube's
       ledmap to the fake WLED, rewires the studio's cube and reads it back,
       and checks the last streamed frame is the whole net.
+- [x] **No console window with the studio**: run_studio.pyw, run by
+      pythonw, is the desktop shortcut's launcher from a checkout (Desktop
+      shortcut.cmd makes it so): the engine built once when there is none,
+      the studio started, both without a console; if either fails, the
+      reason comes up in a message box and all of it is in
+      %TEMP%\cubefx\launch.log (the studio's own output). run_studio.cmd
+      still starts it in a console.
 - [x] **Packaging left the checkout's studio without its effects**:
       package.py builds the stock engine the release ships, and build.py
       pointed build/latest at it; it is put back after.

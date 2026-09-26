@@ -26,7 +26,7 @@ checks for newer releases once a day and updates itself.
 pip install -r requirements.txt
 python -m native.doctor            # what this machine has, what it lacks
 python build.py --native-only      # the engine, once (a C++ compiler: clang or gcc)
-python -m native.app               # or run_studio.cmd / run_studio.sh
+python -m native.app               # or run_studio.pyw (no console window) / run_studio.cmd / run_studio.sh
 ```
 
 `python package.py` makes the release folder; `--toolchain` bundles a

@@ -10,7 +10,7 @@ The pictures come from the studio itself. Yours will look the same.
 ## Before you start
 
 Open the studio (`WLED Effects Studio.exe` from a release, or
-`run_studio.cmd` in a clone). This page is in the studio too - Help >
+`run_studio.pyw` in a clone). This page is in the studio too - Help >
 Tutorial - so it can sit beside the graph while you work; the Welcome
 panel's **Start the tutorial** opens it the first time. In the side
 panel's **GEOMETRY** section set the shape to
