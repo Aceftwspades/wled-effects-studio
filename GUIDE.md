@@ -396,8 +396,9 @@ people light, ready to size - a matrix, a cube, a sphere, a Christmas tree,
 a star, the 241-LED ring disc, a room's ceiling outline, a window, an
 infinity cube, a soccer ball, a helix column, a spiral disc - each opening
 the gallery below on its sizes; or **Draw a run**, **Import a model or a
-layout...**, or **Any part...** (the whole gallery). Choosing "shape" under
-GEOMETRY opens this and changes nothing until the first part goes in.
+layout...**, **Map lights by camera...** (below), or **Any part...** (the
+whole gallery). Choosing "shape" under GEOMETRY opens this and changes
+nothing until the first part goes in.
 
 **Checks as you build.** Under the tools, what is likely a mistake or will
 matter on the bench: LEDs sitting on another (two parts laid over each
@@ -405,8 +406,8 @@ other, a copy left on its part), a lead of a metre or more (a data wire
 that long may want a buffer, or a sacrificial LED near the controller), LED
 outputs carrying another count than the shape, the current at full white
 against the limiter's ceiling, a formula that does not work out, parts
-hidden - each with **show me**, which selects and frames it (or opens the
-Outputs frame).
+hidden, LEDs of mapped lights no two sides of the films saw - each with
+**show me**, which selects and frames it (or opens the Outputs frame).
 
 **Adding parts.** **Add part...** opens a gallery of pictures - LINES
 (strip, path, arch, helix round a tube, flat spiral), FLAT (ring, rings in
@@ -428,6 +429,33 @@ carry its run on), each run after it to a round length at 15 degrees (Ctrl:
 no snapping). As it grows the view shows its LEDs, each run's length, and
 the whole in the unit and in LEDs. Enter, or a click back on the last
 corner, ends it; Backspace takes a corner back; Esc leaves.
+
+**Mapping lights by camera** (**Map lights by camera...**, in File... and
+the start) is for lights in no pattern - a string wound round a real tree,
+lights along a hedge. The studio plays a **plan**: a white flash, each LED
+alone in wiring order for **each lit for** (0.2 s: a camera at 30 pictures
+a second catches each one five or six times), then a white flash again.
+The sim shows it, and the device does while the sim is streamed to it
+(**Stream the sim to the device**, Ctrl+Shift+T - the device gets the
+plan's own frame of **LEDs**, whatever geometry the sim has). Set **LEDs**
+to the device's count, darken the room, stand the camera on something
+still with the whole object in view - well back and zoomed in, since the
+places come out truest from far off - press **Play the plan**, and film all
+of it: the two flashes line the film up with the plan, whatever the
+camera's clock or the stream's delay. Turn the object a quarter (or move
+the camera round it, as far off and as high) and play and film again. Each
+side gets its angle, anticlockwise seen from above, and **Add its film...**
+(an mp4, mov, avi, mkv or webm, read with ffmpeg, which has to be on the
+PATH); its card then shows the picture with the LEDs it found marked.
+**+ a side** adds another angle; **Stop** ends the plan part way. With
+**its height** measured, **Make the part** puts the lights in the shape as
+a points part in wiring order, sized to it: from two sides or more in 3-D,
+from one side flat as it faces the camera (a window, a wall). An LED no two
+sides saw is estimated from its neighbours in the wiring: the checks list
+them, the view rings them in amber while the part is selected, and with
+BY HAND's **place** ticked each drags to where it really is. **Film with
+the webcam** does a side with no video file when OpenCV is installed (`pip
+install opencv-python`): the plan plays while the webcam takes its pictures.
 
 **Building in the 3-D view.** While the frame is open the view shows each
 part in a colour of its own - the selected ones bright, the rest dimmed
@@ -538,8 +566,9 @@ anything else as a strip of its LEDs); or an `x y z [index]` point list
 (CSV, whitespace or JSON; the index column is the wiring order) - puts in
 a **reference mesh** (a wireframe to place LEDs against, not LEDs: the
 tree, the house, the enclosure - moved, turned and scaled like any part),
-**exports** an xLights model (any geometry on its grid, the wiring as its
-node numbers) or the positions (a CSV row per LED), makes a **preview** (a
+**maps lights by camera** (above), **exports** an xLights model (any
+geometry on its grid, the wiring as its node numbers) or the positions (a
+CSV row per LED), makes a **preview** (a
 turn of the shape off screen - lit by the effect, the parts' colours or a
 chase along the wiring - looping in the frame's PREVIEW fold and written as
 `shape_preview.gif` and `.png` in the export folder), or clears the shape.
@@ -1117,6 +1146,8 @@ Every button, with what its tooltip says.
 **A WLED checkout**: `close` — close (Esc while it has the focus); `Clone`; `Restart the studio`; `Close`
 
 **Report a problem**: `close` — close (Esc while it has the focus); `Open the issues page` — a new issue on the studio's GitHub page, in the browser - attach the zip there; `Show the zip` — the captures folder, where the report landed; `Close`
+
+**Map lights by camera**: `close` — close (Esc while it has the focus); `Play the plan` — in the sim - and on the device while the sim is streamed to it (Stream the sim to the device, Ctrl+Shift+T); `Stop` — the plan stopped part way; `+ a side` — another side: how far it was turned from the first, then its film; `Film with the webcam` — the plan played while the webcam takes its pictures: a side without a video file (needs OpenCV: pip install opencv-python); `Make the part` — the lights as a points part in the shape, in wiring order: an LED no two sides saw is estimated (the shape's checks list them, to drag where they are)
 
 **Message log**: `close` — close (Esc while it has the focus); `copy all` — the log as text, to paste into an issue or a note; `clear` — empties the recent messages; the problems stay until they are fixed
 

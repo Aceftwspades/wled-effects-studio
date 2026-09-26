@@ -509,6 +509,21 @@ def poll(app):
         x = x if x is not None else c_ - tw - px(8)
         if clear(cov, x, y) and clear(cov, x + tw, y + size):
             typeface.draw_text((x, y), text, size, color=tuple(chrome.DIM[:3]) + (230,), parent=D)
+    # 5b. a mapped part's estimated LEDs (no two sides of the films saw them), ringed while it is selected
+    amber = tuple(chrome.AMBER[:3]) + (230,)
+    all_parts = g.params.get("parts") or []
+    for k in sel:
+        q = all_parts[k] if 0 <= k < len(all_parts) else None
+        guess = (q or {}).get("guessed") or []
+        if not guess or k not in R:
+            continue
+        a, b = R[k]
+        m = min(b - a, shapes.local_count(q))
+        for i in guess:
+            if 0 <= i < m:
+                w = (b - 1 - i) if q.get("reverse") else (a + i)
+                if good[w]:
+                    dpg.draw_circle((sx[w], sy[w]), px(7), color=amber, thickness=1.5, parent=D)
     # 6. the handles on the selection, a box, a join, a modal move's readout
     from native import shape_tools
     shape_tools.draw(app, v, D)

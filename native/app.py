@@ -3859,11 +3859,12 @@ CMD_FILE = os.path.join(SHOT_DIR, "command.json")
 def _hook_names(app):
     """What a test hook's line of Python ("py", "check") has in scope."""
     from native import shape_view, shapes, units, shape_gallery, shape_run, shape_fields, shape_checks, shape_start
+    from native import camera_map, camera_map_ui
     return {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
             "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,
-            "shape_checks": shape_checks, "shape_start": shape_start}
+            "shape_checks": shape_checks, "shape_start": shape_start, "camera_map": camera_map, "camera_map_ui": camera_map_ui}
 
 
 def service_command(app):
@@ -4376,6 +4377,10 @@ def service_command(app):
                 dpg.set_value("replace_text", c["replace"]); app.replace_all()
             if "graph_hover" in c:                      # test hook: help for a pin or node, as hovering would
                 kind, nid, name = c["graph_hover"]
+                if nid == "auto":                       # the first node that has the pin (a fold and its undo renumber them)
+                    side = "inputs" if kind == "in" else "outputs"
+                    nid = next(k for k in sorted(app.gp.graph.nodes)
+                               if any(x["name"] == name for x in app.gp.graph.node_def(app.gp.graph.nodes[k]).get(side, [])))
                 n = app.gp.graph.nodes[int(nid)]; d = app.gp.graph.node_def(n)
                 if kind == "node":
                     app.gp.help(f"{d.get('label') or n['type']}: {d.get('doc', '')}")
@@ -4502,7 +4507,9 @@ def service_command(app):
                         t = app.gp._ptype.get(tag)
                         dpg.bind_item_theme(tag, th.pin[t] if compatible(app.gp._drag_type, t) else th.grey[t])
         except Exception as e:
-            print(f"command {c}: {e}")
+            import traceback
+            where = traceback.extract_tb(e.__traceback__)[-1]
+            print(f"command {c}: {type(e).__name__}: {e} (at {os.path.basename(where.filename)}:{where.lineno} in {where.name})")
 
 # Recordings go in the REPO, not in the temp directory the IPC lives in. The two
 # are different kinds of file: capture.request and crash.txt are scratch that
@@ -4706,6 +4713,7 @@ def write_uiref(app, path=None):
     roots += [("Keyboard shortcuts", "keys_win"), ("Appearance", "appearance_win"), ("Selection frames", "frames_win"),
               ("History", "history_win"), ("Undo history", "undo_win"), ("About", "about_win"), ("Usermods and features", "usermods_win"),
               ("Update", "update_win"), ("A WLED checkout", "wled_dialog"), ("Report a problem", "report_win"),
+              ("Map lights by camera", "map_win"),
               ("Message log", "log_win"), ("The panes and the toolbar", "root")]
     seen = set()
     for title, tag in roots:
@@ -4767,7 +4775,8 @@ def process_stats(app):
 # buttons a walk leaves alone: a flash or a firmware build, a render or a preview that takes minutes,
 # a clone or a download from the network, a restart, a program opened on the desktop, a key capture,
 # the clipboard (the log's copy: what the user had copied stays)
-SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy")
+SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
+                    "map_webcam")                         # the webcam: a camera turned on is not a test's to do
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
@@ -4894,6 +4903,12 @@ def walk_ctx(app, kind, nid, pin=None):
     before the next. Prints one line per row."""
     import json
     gp = app.gp
+    if nid == "auto":                                # the first node that has the pin: a walk that outlives the graph's numbering
+        side = "inputs" if kind == "in" else "outputs"
+        nid = next((k for k in sorted(gp.graph.nodes)
+                    if any(x["name"] == pin for x in gp.graph.node_def(gp.graph.nodes[k]).get(side, []))), None)
+        if nid is None:
+            print(f"ctx   FAIL  no node has the {kind} pin {pin!r}"); return
     nid = int(nid)
     gp._ctx = (kind, nid, pin)
     gp._fill_ctx_menu()

@@ -33,9 +33,11 @@ LOG = os.path.join(tempfile.gettempdir(), "cubefx", "walk.log")
 
 STEPS = [
     ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"graph_select": [3]}, {"menu_walk": True}], 20.0),
-    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"action": "select_none"}, {"ctx_walk": ["node", 3, None]}], 8.0),
-    ([{"graph_open": "box_fire.json"}, {"ctx_walk": ["in", 3, "a"]}], 6.0),
-    ([{"graph_open": "box_fire.json"}, {"ctx_walk": ["out", 3, "result"]}], 6.0),
+    # the menu walk opened every project in turn (File > Project): back to the one the rest walks in
+    ([{"project": "default"}, {"layout": "graph"}, {"graph_open": "box_fire.json"}, {"action": "select_none"},
+      {"ctx_walk": ["node", 3, None]}], 8.0),
+    ([{"graph_open": "box_fire.json"}, {"ctx_walk": ["in", "auto", "a"]}], 6.0),
+    ([{"graph_open": "box_fire.json"}, {"ctx_walk": ["out", "auto", "result"]}], 6.0),
     ([{"layout": "both"}, {"pane_walk": True}], 4.0),
     # every frame's buttons, with the fake device as the active one so the sends have somewhere to go
     ([{"frame": "devices"}, {"device": "127.0.0.1:8770"}, {"frame_walk": "devices"}], 6.0),
@@ -49,13 +51,19 @@ STEPS = [
     ([{"frame_walk": "audioin"}], 6.0),
     ([{"frame_walk": "keys_win"}, {"frame_walk": "appearance_win"}, {"frame_walk": "frames_win"}], 4.0),
     ([{"frame_walk": "history_win"}, {"frame_walk": "undo_win"}, {"frame_walk": "about_win"}, {"frame_walk": "usermods_win"}], 4.0),
-    ([{"layout": "both"}, {"graph_open": "box_fire.json"}, {"frame_walk": "root"}], 10.0),
+    ([{"frame_walk": "map_win"}, {"py": "camera_map_ui.stop(app)"}], 4.0),
+    ([{"project": "default"}, {"layout": "both"}, {"graph_open": "box_fire.json"}, {"frame_walk": "root"}], 10.0),
     # every keymap action
-    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"graph_select": [3]}, {"action_walk": True}], 15.0),
+    ([{"project": "default"}, {"layout": "graph"}, {"graph_open": "box_fire.json"}, {"graph_select": [3]}, {"action_walk": True}], 15.0),
 ]
 
 
 def send(cmds, wait):
+    """A step's commands, once the app has taken the last step's (a walk of a
+    big frame outlasts its wait: written over, the step before would never run)."""
+    end = time.time() + 240
+    while os.path.exists(CMD) and time.time() < end:
+        time.sleep(0.2)
     json.dump(cmds, open(CMD, "w"))
     time.sleep(wait)
 
@@ -107,6 +115,7 @@ def main():
     # earlier row (the Add menu's sub-graphs after one was entered), not a
     # failure - an exception would show as a traceback below
     bad = [l for l in lines if " FAIL" in l] + [l for l in text.splitlines() if "Traceback" in l]
+    bad += [l for l in text.splitlines() if l.startswith("command ")]          # a step's command that raised: its walk never ran
     gone = [l for l in lines if " gone" in l]
     if gone:
         print(f"  {len(gone)} row(s) were gone by their turn (a menu rebuilt on the way): " + "; ".join(l.split(None, 2)[2] for l in gone[:4]))

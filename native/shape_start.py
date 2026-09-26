@@ -5,7 +5,8 @@ ready to size - a matrix, a cube, a sphere, a Christmas tree, a star, the
 241-LED ring disc, a room's ceiling outline, a window, an infinity cube, a
 soccer ball, a helix column, a spiral disc - each opening the add gallery
 on its kind with its sizes filled in (in the shape's unit); and drawing a
-run, importing a model or an xLights layout, mapping lights by camera.
+run, importing a model or an xLights layout, mapping lights by camera
+(camera_map_ui).
 Choosing "shape" in the panel's GEOMETRY changes nothing until a first part
 goes in.
 
@@ -66,6 +67,8 @@ def fill(app, P):
         dpg.add_text("or", color=chrome.DIM)
         dpg.add_button(label="Draw a run", small=True, callback=lambda: shape_ui._shape_run().toggle(app))
         dpg.add_button(label="Import a model or a layout...", small=True, callback=lambda: shape_ui._import(app, False))
+        dpg.add_button(label="Map lights by camera...", small=True, callback=lambda: shape_ui._camera_map(app))
+        chrome.tip("lights in no pattern - a string on a real tree - found from films of it, the LEDs lit one at a time")
         dpg.add_button(label="Any part...", small=True, callback=lambda: shape_gallery.show(app))
         chrome.tip("the gallery of every kind of part")
 

@@ -438,7 +438,41 @@ def engine_sources(extra=(), log=print):
             # what makes a palette id mean the same thing here as on the device.
             pal,
             paths.tree_path("wled00/src/dependencies/fastled_slim/fastled_slim.cpp")])
-    return srcs + [os.path.abspath(e) for e in extra]
+    return srcs + [staged(e) for e in extra]
+
+
+def staged(path):
+    """A project's effect as the compiler sees it: a copy in build/stage.
+    The compiler may map a file while it reads it (clang does on Windows),
+    and no program can then write it - so a save, a restore or the graph's
+    code landing while a build runs would fail on the effect itself. Same
+    name and contents: its errors still name the file, its object still
+    matches. A copy a build is still reading gets one beside it, named by
+    its contents."""
+    import hashlib
+    path = os.path.abspath(path)
+    try:
+        data = open(path, "rb").read()
+    except OSError:
+        return path                                         # the compiler says what is wrong with it
+    d = os.path.join(paths.BUILD, "stage")
+    out = os.path.join(d, os.path.basename(path))
+    try:
+        os.makedirs(d, exist_ok=True)
+        if not os.path.exists(out) or open(out, "rb").read() != data:
+            with open(out, "wb") as f:
+                f.write(data)
+        return out
+    except OSError:
+        alt = os.path.join(d, hashlib.sha1(data).hexdigest()[:10], os.path.basename(path))
+        try:
+            os.makedirs(os.path.dirname(alt), exist_ok=True)
+            if not os.path.exists(alt):
+                with open(alt, "wb") as f:
+                    f.write(data)
+            return alt
+        except OSError:
+            return path
 
 
 def include_dirs():

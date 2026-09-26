@@ -27,6 +27,40 @@ ROOT = os.path.dirname(os.path.abspath(EXE)) if EXE else os.path.dirname(HERE)
 CMD = os.path.join(tempfile.gettempdir(), "cubefx", "command.json")
 LOG = os.path.join(tempfile.gettempdir(), "cubefx", "smoke.log")
 
+# S18: two sides of a small tree filmed while the camera plan played - made by make_films() through ffmpeg
+# (LEDs 5 and 17 hidden from the front, 30 from the side); without ffmpeg these steps are left out
+MAP_FILMS = [os.path.join(tempfile.gettempdir(), "cubefx", f"map_side{a}.mp4") for a in (0, 90)]
+_part = "app.project.geometry.params['parts'][0]"
+MAP_STEPS = [
+    # the plan: the wiring test lights one LED at a time in the sim, the device's own frame has the plan's 60 LEDs
+    ([{"geometry": {"kind": "cube", "params": {"B": 16}}}, {"py": "camera_map_ui.show(app)"}, {"py": "num.set('map_n', 60)"},
+      {"py": "num.set('map_on', 0.2)"}, {"py": "camera_map_ui.play(app)"}], 3.0),
+    ([{"check": "app.wiring is not None and app.wiring.mode in ('index', 'off', 'white') and len(app._map_frame) == 60 * 3"},
+      {"check": "int((np.frombuffer(app._map_frame, np.uint8).reshape(-1, 3).max(1) > 0).sum()) in (0, 1, 60)"},
+      {"expect": ["map_play_words", "left"]}, {"py": "camera_map_ui.stop(app)"}], 0.5),
+    # two films read (the second waits its turn), their LEDs found; a side added and dropped
+    ([{"check": "app.wiring is None and app._map_frame is None and app._map['play'] is None"},
+      {"py": "camera_map_ui._add_side(app)"}, {"py": "camera_map_ui._add_side(app)"}, {"py": "camera_map_ui._drop_side(app, 2)"},
+      {"py": "[camera_map_ui._state(app).__setitem__('film_for', k) or camera_map_ui._film_chosen(app, p) for k, p in enumerate("
+             + repr(MAP_FILMS) + ")]"}], 8.0),
+    ([{"check": "[s['angle'] for s in app._map['sides']] == ['0°', '90°'] and app._map['busy'] is None and not app._map['queue']"},
+      {"check": "all(s['found'] and len(s['found']) >= 57 for s in app._map['sides'])"},
+      {"check": "all(s['thumb'] and dpg.does_item_exist(s['thumb'][0]) for s in app._map['sides'])"},
+      {"py": "num.set('map_height', 180.0)"}, {"py": "camera_map_ui.make(app)"}], 1.0),
+    # the part: 60 LEDs in the shape, 180 cm tall at 60 a metre, those one side missed estimated and listed by the checks
+    ([{"check": "app.project.geometry.kind == 'shape' and app.project.geometry.count == 60"},
+      {"check": f"{_part}['name'].startswith('mapped lights') and {{5, 17, 30}} <= set({_part}['guessed']) and len({_part}['guessed']) <= 5"},
+      {"check": f"abs(float(np.ptp(np.asarray({_part}['params']['points'])[:, 2])) - units.from_unit(180.0, {{'unit': 'cm'}})) < 0.01"},
+      {"check": "any('no two sides' in c.text for c in shape_checks.run(app))"},
+      {"expect": ["map_result", "60 LEDs"]},
+      {"frame": "shape"}, {"py": "shape_ui.select(app, [0])"},
+      {"py": "next(c for c in shape_checks.run(app) if 'no two sides' in c.text).show()"}], 0.8),
+    # an estimate dragged where it is (by hand) is one no longer
+    ([{"py": "setattr(app, '_shape_drag', (0, 5)) or setattr(app, '_shape_drag_to', [0.0, 0.0, 50.0]) or shape_ui.release(app)"},
+      {"check": f"5 not in {_part}['guessed'] and 17 in {_part}['guessed']"},
+      {"py": "chrome.close_dialog('map_win')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.8),
+]
+
 STEPS = [
     ([{"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
     # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
@@ -227,7 +261,7 @@ STEPS = [
       {"py": "app.gp.unfold_sub(next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'sub:smoke_sub'))"}], 1.0),
     ([{"expect": ["messages", "unfolded"]}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     ([{"graph_selected": [1, 2]}, {"action": "align_left"}, {"action": "arrange"}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
-    ([{"graph_hover": ["out", 1, "value"]}, {"graph_hover": ["node", 9, ""]}], 0.6),
+    ([{"graph_hover": ["out", "auto", "value"]}, {"graph_hover": ["node", 9, ""]}], 0.6),
     ([{"gp_call": ["set_focus_mode", [True]]}, {"gp_call": ["set_focus_mode", [False]]}, {"graph_selected": []}], 0.6),
     ([{"script_preview": True}], 3.0),
     ([{"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30}, {"ed_type": "// smoke"}, {"ed_key": ["Return", False, False]},
@@ -445,6 +479,7 @@ STEPS = [
       {"py": "shape_start.choose(app, 0)"}, {"py": "shape_gallery.add(app, app._gallery_part)"}], 1.0),
     ([{"check": "app.project.geometry.kind == 'shape' and app.project.geometry.count == 256 and dpg.get_value('geom_kind') == 'shape'"},
       {"dock": ["shape", False]}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
+    *MAP_STEPS,
     # live output to the fake device on this machine, and the wiring test
     ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
       {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),
@@ -535,12 +570,43 @@ STEPS = [
 
 
 def send(cmds, wait):
+    """A step's commands, once the app has taken the last step's (never written over unread)."""
+    end = time.time() + 240
+    while os.path.exists(CMD) and time.time() < end:
+        time.sleep(0.2)
     json.dump(cmds, open(CMD, "w"))
     time.sleep(wait)
 
 
+def make_films():
+    """The S18 films: two sides of a small tree lit by the camera plan, as mp4s. False without ffmpeg."""
+    import shutil
+    ff = shutil.which("ffmpeg")
+    if not ff:
+        return False
+    sys.path.insert(0, os.path.dirname(HERE))                  # the studio's own source, packaged app or not
+    import numpy as np
+    from native import camera_map as cm
+    t = np.linspace(0, 1, 60)
+    r = 40 * (1 - t) + 4
+    P = np.stack([r * np.cos(t * 8 * np.pi), r * np.sin(t * 8 * np.pi), t * 120], 1)
+    plan = cm.Plan(60, on=0.2, off=0.05)
+    for path, ang, hide in zip(MAP_FILMS, (0, 90), ((5, 17), (30,))):
+        frames = cm.synthetic_video(P, plan, ang, fps=30.0, size=(200, 200), hide=hide, seed=ang + 3)
+        p = subprocess.Popen([ff, "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "gray", "-s", "200x200", "-r", "30", "-i", "-",
+                              "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", path], stdin=subprocess.PIPE)
+        for f in frames:
+            p.stdin.write(f.tobytes())
+        p.stdin.close()
+        p.wait()
+    return all(os.path.exists(p) for p in MAP_FILMS)
+
+
 def main():
     os.makedirs(os.path.dirname(CMD), exist_ok=True)
+    if not make_films():
+        print("no ffmpeg: the camera-map steps are left out")
+        STEPS[:] = [s for s in STEPS if s not in MAP_STEPS]
     project = os.path.join(ROOT, "projects", "default", "project.json")
     saved = open(project, encoding="utf-8").read() if os.path.exists(project) else None
     graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
@@ -581,7 +647,8 @@ def main():
     ddp.stop()
     print(f"ddp: {ddp.ddp_packets} packets, {ddp.ddp_frames} frames received from the stream; "
           f"the fake got {len(ddp.files)} file(s), {len(ddp.presets) - 1} preset(s), {len(ddp.cfg['timers']['ins'])} timer(s)")
-    bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l]
+    bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l
+           or l.startswith("command {")]                          # a step's command that raised: the rest of its step never ran
     if "remote control" not in text:
         bad.append("the app's output was not captured (no 'remote control' line): a buffered stdout, or the wrong exe")
     if ddp.ddp_frames < 10:

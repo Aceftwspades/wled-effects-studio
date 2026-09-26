@@ -8,7 +8,9 @@ mistake, or will matter on the bench - each in words, with a "show me".
   near the controller);
 - the LED outputs (the Outputs frame) carrying another count than the shape;
 - the current at full white, against the brightness limiter's ceiling;
-- a formula that does not work out, a part with no LEDs, parts hidden.
+- a formula that does not work out, a part with no LEDs, parts hidden;
+- LEDs of lights mapped by camera that no two sides of the films saw (their
+  places estimates, to drag where they are).
 
     shape_checks.run(app)          # [Check(kind "warn"|"info", text, show)]
     shape_checks.refresh(app)      # the frame's CHECKS lines, from run()
@@ -100,6 +102,15 @@ def run(app):
                 out.append(Check("warn", f"{q.get('name', 'formula')}: {err}", lambda k=k: shape_ui.select(app, [k])))
         elif q.get("kind") != "reference" and shapes.part_count(q) == 0:
             out.append(Check("warn", f"{q.get('name', q['kind'])} has no LEDs", lambda k=k: shape_ui.select(app, [k])))
+    # lights mapped by camera: the LEDs no two sides saw, their places estimated
+    for k, q in enumerate(parts):
+        m = shapes.local_count(q)
+        guess = sorted({int(i) for i in (q.get("guessed") or []) if 0 <= int(i) < m})
+        if guess:
+            pts = np.asarray(shapes.placed(q)[0])[:m][guess]
+            out.append(Check("info", f"{q.get('name', 'mapped lights')}: {len(guess)} LED(s) no two sides of the films saw - "
+                             "their places are estimates, ringed while it is selected (BY HAND's place drags them where they are)",
+                             lambda k=k, pts=pts: (shape_ui.select(app, [k]), view3d.frame_points(app, pts))))
     # the current at full white
     from native import outputs
     ma = int(S.get("ma_per_led", outputs.LED_MA_DEFAULT))

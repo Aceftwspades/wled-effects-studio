@@ -1511,7 +1511,12 @@ def show_undo_history(app):
 
 def _restore(app, kind, stem, ext, path):
     from native import history
-    text = open(path, encoding="utf-8").read()
+    try:
+        text = open(path, encoding="utf-8").read()
+    except OSError:                                  # pruned since the list was made: the newest are kept, the oldest go
+        app.gp.status("that version is no longer kept - the list is shown again")
+        show_history(app)
+        return
     if kind == "effects":
         fname = stem + ext
         app.project.write_effect(fname, text)          # keeps the current one

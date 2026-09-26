@@ -43,6 +43,11 @@ def _shape_view():
     return shape_view
 
 
+def _camera_map(app):
+    from native import camera_map_ui
+    camera_map_ui.show(app)
+
+
 def _parts(app):
     g = app.project.geometry
     return g.params.get("parts") if g.kind == "shape" else None
@@ -293,6 +298,8 @@ def build(app):
                 ("Import a model or a layout...", lambda: _import(app, False),
                  "a mesh as LEDs (.obj, .ply, .stl from Blender or CAD); an xLights .xmodel, or a whole xLights layout "
                  "(xlights_rgbeffects.xml: every model a part, where it stands); an x y z [index] point list (CSV, text, JSON)"),
+                ("Map lights by camera...", lambda: _camera_map(app),
+                 "lights in no pattern - a string on a real tree - found from films of it, the LEDs lit one at a time"),
                 ("A reference mesh...", lambda: _import(app, True),
                  "a mesh drawn in the 3-D view to place LEDs against, not LEDs: the tree, the house, the enclosure"),
                 (None, None, None),
@@ -310,6 +317,8 @@ def build(app):
     app.FLOATING = tuple(getattr(app, "FLOATING", ())) + ("shape_file_menu",)
     shape_tools.build_menu(app)                             # a part's right-click menu (the view's and the list's)
     shape_gallery.build(app)                                # the add gallery
+    from native import camera_map_ui
+    camera_map_ui.build(app)                                # mapping lights by camera
     # the file dialogs: a mesh or model in (how a mesh becomes LEDs asked there), a shape file in or out
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_import_dialog", width=px(700), height=px(460),
                          callback=lambda s, a: import_file(app, a.get("file_path_name", ""))):
@@ -1398,6 +1407,8 @@ def click(app, at=None):
     local = _local(part, p)
     if part.get("reverse"):
         part["params"].setdefault("points", []).insert(0, [round(float(c), 3) for c in local])
+        if part.get("guessed"):
+            part["guessed"] = [i + 1 for i in part["guessed"]]
     else:
         part["params"].setdefault("points", []).append([round(float(c), 3) for c in local])
     _set_sel(app, {sel})
@@ -1438,6 +1449,8 @@ def release(app):
     pts = part["params"].get("points") or []
     if 0 <= k < len(pts):
         pts[k] = [round(float(c), 3) for c in local]
+        if k in (part.get("guessed") or []):
+            part["guessed"] = [i for i in part["guessed"] if i != k]         # put where it is: no longer an estimate
         _apply(app, parts)
     return True
 
@@ -1451,3 +1464,5 @@ def poll(app):
     from native import shape_view, shape_tools
     shape_tools.poll(app)                                   # a modal move following the pointer, before the overlay draws it
     shape_view.poll(app)
+    from native import camera_map_ui
+    camera_map_ui.poll(app)                                 # the camera plan playing, a film being read

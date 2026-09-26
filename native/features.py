@@ -642,7 +642,8 @@ class Features:
         if now < self._ddp_next:
             return
         self._ddp_next = now + 1.0 / self._ddp_fps
-        d.send(live_out.frame_bytes(self.frame_rgb(), self.project.geometry.phys))
+        own = getattr(self, "_map_frame", None)      # mapping by camera: the plan's own frame, the device's LEDs in wiring order
+        d.send(own if own is not None else live_out.frame_bytes(self.frame_rgb(), self.project.geometry.phys))
         if dpg.does_item_exist("live_status") and d.frames % 15 == 0:
             dpg.set_value("live_status", f"{d.frames} frames, {d.bytes // 1024} KB sent" + (f"; {d.errors} send errors: {d.last_error}" if d.errors else ""))
 

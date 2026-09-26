@@ -2173,13 +2173,40 @@ proposal's number; in the order to do them.
       the geometry the shape (the old way made a ring nobody asked for).
 
 **From the real object**
-- [ ] **Map by camera** (S18): for lights that follow no pattern, the
+- [x] **Map by camera** (S18): for lights that follow no pattern, the
       device lights one LED at a time, a webcam finds each, photos from
       two or more sides give 3-D, a missed LED is filled from its
       neighbours in the wiring. The method of Matt Parker's 2020 tree ("I
       wired my tree with 500 LED lights and calculated their 3D
       coordinates"; standupmaths/xmastree2020). Tested against a
-      synthetic camera; never the cube.
+      synthetic camera; never the cube. `native/camera_map.py`: a plan
+      (a white flash, each LED alone in wiring order, a white flash - the
+      flashes pin the film's clock to the plan's, so a camera's drift and
+      the stream's delay cost nothing); a video read by ffmpeg in two
+      lean passes (every frame's brightness for the flashes, then only the
+      frames wanted); each LED found against the dark frame as a softened
+      difference's peak, sub-pixel, kept when it stands ten of the
+      picture's own noise (its median absolute deviation) above it; the
+      sides combined by least squares (u = x cos a - y sin a + the axis's
+      column, found as it goes; z from the heights), a side filmed from
+      elsewhere brought to the first's scale by the LEDs both see, one
+      only one side saw given its depth from its wiring neighbours, one
+      none saw put between them; one side alone lays them flat. A webcam's
+      uneven pictures are evened to a steady rate first. The dialog
+      (`native/camera_map_ui.py`; the Shape frame's File... and its start):
+      the count, the time each is lit, the height; Play the plan drives the
+      wiring test in the sim and, while streaming, sends the device the
+      plan's own frame of that many LEDs whatever geometry the sim has;
+      each side a card - its angle, its film read on a worker thread (one
+      at a time, the rest queued), its picture with the LEDs found marked;
+      Make the part adds a points part sized to the height. The LEDs no two
+      sides saw stay listed on the part (`guessed`): the checks name them,
+      the view rings them while it is selected, and one dragged into place
+      by hand is dropped from the list. Tests: `tests/test_camera_map.py`
+      (the plan, an LED on a picture, two and three sides of a tree with
+      LEDs hidden and a camera 2% fast, one side flat, a webcam at uneven
+      times, a film through ffmpeg); the smoke reads two mp4 sides it
+      makes and checks the part, the estimates and the plan's frame.
 - [ ] **The guide and the tutorial** (S19) rewritten round the new flow:
       GUIDE's shape section, a tutorial chapter building a tree.
 
