@@ -526,16 +526,23 @@ class App(Features):
             if dpg.does_item_exist(f"stat_{k}"):
                 dpg.set_value(f"stat_{k}", v)
 
+    # the View menu's switches and what they are until changed: unlit LEDs black (an effect's own dark
+    # stays dark), the shape on its floor
+    VIEW_DEFAULTS = {"unlit_dots": False, "view_floor": True}
+
+    def view_option(self, name):
+        return bool(self.prefs.get(name, self.VIEW_DEFAULTS.get(name, True)))
+
     def view_extras(self):
         """What the 3-D view adds (View menu, C16): the colour an unlit LED
         is drawn in as a dim dot (None: black), and whether the shape stands
         on a faint floor."""
-        return (render.UNLIT if self.prefs.get("unlit_dots", True) else None), bool(self.prefs.get("view_floor", True))
+        return (render.UNLIT if self.view_option("unlit_dots") else None), self.view_option("view_floor")
 
     def set_view_option(self, name, on=None):
         """View > Unlit LEDs as dim dots / A floor under the shape: turned
         over (or set), kept in the prefs, the menu's check following."""
-        v = (not self.prefs.get(name, True)) if on is None else bool(on)
+        v = (not self.view_option(name)) if on is None else bool(on)
         self.prefs[name] = v
         save_prefs(self.prefs)
         for tag in (f"menu_{name}",):
@@ -949,6 +956,11 @@ class App(Features):
                                       on_enter=True, callback=self.on_geom_field)
         if g.kind == "xyz":
             form.note(f"{g.count} points from {g.params.get('source', 'file')}", parent="geom_fields")
+        if g.kind == "matrix":
+            with form.under(parent="geom_fields"):
+                dpg.add_button(label="Read the device's matrix", tag="geom_read_matrix", small=True, callback=lambda: self.read_device_matrix())
+                chrome.tip("the size and wiring the device's 2-D setup has (LED Preferences > 2D Configuration): where the first "
+                           "LED is, rows or columns, serpentine - and its panels and gaps file, when it has them. Read only.")
         if g.kind == "shape":                             # the description line below says what it is
             with form.under(parent="geom_fields"):
                 dpg.add_button(label="Edit the shape...", callback=lambda: device_ui.show(self, "shape"))
@@ -3197,17 +3209,27 @@ class App(Features):
     @staticmethod
     def _screen_rect(tag):
         """(x0, y0, x1, y1) on screen, or None. A child window reports no
-        rect_min; its pos is in the root window, which is the screen."""
+        rect_min; its pos is in the window it sits in - the root, which is
+        the screen, or a window over the panes (the 3-D view in the graph's
+        corner sits at 0, 0 of its own), whose place is added: the frame of
+        the pane last clicked in was drawn at the screen's corner."""
         if not dpg.does_item_exist(tag):
             return None
         st = dpg.get_item_state(tag)
         w, h = st.get("rect_size", (0, 0))
         if w <= 0 or h <= 0:
             return None
-        x, y = st.get("rect_min") or dpg.get_item_pos(tag)
+        if st.get("rect_min"):
+            x, y = st["rect_min"]
+        else:
+            x, y = dpg.get_item_pos(tag)
+            parent = dpg.get_item_parent(tag)
+            if parent is not None and dpg.get_item_type(parent).endswith("mvWindowAppItem") and dpg.get_item_alias(parent) != "root":
+                ox, oy = dpg.get_item_pos(parent)
+                x, y = x + ox, y + oy
         return (x, y, x + w, y + h)
 
-    FLOATING = ("frames_win", "keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "expr_win", "reader_win", "welcome_win", "reader_pic",
+    FLOATING = ("keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "expr_win", "reader_win", "welcome_win", "reader_pic",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -4590,7 +4612,7 @@ SKIP_MENU = ("Quit", "Record 15 s GIF", "Record 15 s video", "Fullscreen", "Chec
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
              "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device (DDP)",
-             "Import the device's ledmap")                   # these reach a real device: not a test's to do (the import would replace the shape)
+             "Import the device's ledmap", "Import the device's matrix setup")   # these reach a real device: not a test's to do (an import replaces the geometry)
 
 
 def walk_menus(app, skip=()):
@@ -4729,7 +4751,7 @@ def write_uiref(app, path=None):
                 buttons(k, out)
         return out
     roots = [(device_ui.FRAMES[w][1] + " frame", device_ui.FRAMES[w][0]) for w in device_ui.FRAMES]
-    roots += [("Keyboard shortcuts", "keys_win"), ("Appearance", "appearance_win"), ("Selection frames", "frames_win"),
+    roots += [("Keyboard shortcuts", "keys_win"), ("Appearance", "appearance_win"),
               ("History", "history_win"), ("Undo history", "undo_win"), ("About", "about_win"), ("Usermods and features", "usermods_win"),
               ("Update", "update_win"), ("A WLED checkout", "wled_dialog"), ("Report a problem", "report_win"),
               ("Map lights by camera", "map_win"),
@@ -4795,7 +4817,8 @@ def process_stats(app):
 # a clone or a download from the network, a restart, a program opened on the desktop, a key capture,
 # the clipboard (the log's copy: what the user had copied stays)
 SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
-                    "map_webcam")                         # the webcam: a camera turned on is not a test's to do
+                    "map_webcam",                         # the webcam: a camera turned on is not a test's to do
+                    "geom_read_matrix")                   # a real device's setup read: the smoke reads the fake's
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
@@ -5046,6 +5069,7 @@ def main():
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 dock.poll(app)                       # a frame's tab closed by its x
                 chrome.poll_dialogs()                # the dialogs' closes at their top right
+                chrome.poll_placed_tips()            # the words of controls placed at their own position (their tooltips never show)
                 chrome.poll_windows(app)             # the Window menu's checks: which frames are open
                 messages.poll(app)                   # a note's time on the footer's line; the open log follows
                 app.poll_present_hint()              # how to leave presentation, for a few seconds after entering it
@@ -5054,6 +5078,7 @@ def main():
                 room.poll(app)
                 weight.poll(app)                     # what has nothing to act on, greyed
                 app.poll_calibration()
+                app.poll_matrix_read()
                 chrome.poll_update(app); chrome.poll_update_download(app)
                 _t.append(time.perf_counter())
                 app.step_sim()

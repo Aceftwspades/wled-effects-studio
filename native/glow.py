@@ -40,8 +40,8 @@ ARC_N = 5                                    # quads per rounded corner, per rin
 PER_RECT = 8 + 4 * ARC_N * 2                 # strips and corner pieces a rectangle takes
 TURNS_PER_S = 0.1
 # how a frame looks: (the settings' words, what it draws)
-STYLES = (("outline", "An outline in the accent, still"), ("gradient", "The gradient, still"),
-          ("turning", "The gradient, turning"))
+STYLES = (("turning", "The gradient, turning"), ("gradient", "The gradient, still"),
+          ("outline", "An outline in the accent, still"))
 POOL = {"sel": PER_RECT * 7, "focus": PER_RECT * 2}      # pieces, split round any dialog
 
 

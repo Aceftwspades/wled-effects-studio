@@ -206,7 +206,7 @@ STEPS = [
     # the graph gets the room (canvas first): the graph most of the window, the 3-D view in its corner, the rail;
     # the panel opened at a section beside the rail, and folded; a Bitmap's properties over the canvas, closed;
     # the help at the pointer; the 3-D view tucked away and back, in another corner; the panes, and back
-    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}], 1.5),
+    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "room.fold_panel(app)"}], 1.5),    # folded, whatever the prefs say
     ([{"check": "room.active(app) and room.folded(app) and dpg.is_item_shown('rail_win') and dpg.is_item_shown('pip_win')"},
       {"check": "app._rects['main'][2] > 0.8 * dpg.get_viewport_client_width()"},
       {"check": "not dpg.is_item_shown('graph_help_box') and not dpg.is_item_shown('props_fly')"},
@@ -264,6 +264,16 @@ STEPS = [
     ([{"expect": ["messages", "unfolded"]}, {"graph_undo": True}, {"graph_undo": True}], 0.5),
     ([{"graph_selected": [1, 2]}, {"action": "align_left"}, {"action": "arrange"}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
     ([{"graph_hover": ["out", "auto", "value"]}, {"graph_hover": ["node", 9, ""]}], 0.6),
+    # the 3-D view in the graph's corner: the frame of the pane last clicked in round it, not at the screen's corner;
+    # its placed controls' words read from their tooltips; maximize lays it over the canvas, the same button puts it back
+    ([{"py": "setattr(app, 'focus', 'cube_win')"}, {"py": "room.set_max(app, False)"}], 0.6),
+    ([{"check": "not room.pip_on(app) or tuple(app._screen_rect('cube_win')[:2]) == tuple(room.S.pip_rect[:2])"},
+      {"check": "{'pip_max', 'pip_size', 'pip_tuck', 'grip_cube_win', 'appearance_win_x'} <= chrome.PLACED"},
+      {"check": "'over the whole graph' in chrome.placed_words('pip_max') and 'another pane' in chrome.placed_words('grip_cube_win')"},
+      {"py": "room.set_max(app, True)"}], 0.8),
+    ([{"check": "not room.pip_on(app) or (room.S.pip_rect[2] > 600 and not dpg.is_item_shown('pip_size') and 'back to its corner' in chrome.placed_words('pip_max'))"},
+      {"py": "room.set_max(app, False)"}], 0.6),
+    ([{"check": "not room.pip_on(app) or (room.S.pip_rect[2] < 600 and dpg.is_item_shown('pip_size'))"}], 0.2),
     ([{"gp_call": ["set_focus_mode", [True]]}, {"gp_call": ["set_focus_mode", [False]]}, {"graph_selected": []}], 0.6),
     ([{"script_preview": True}], 3.0),
     ([{"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30}, {"ed_type": "// smoke"}, {"ed_key": ["Return", False, False]},
@@ -320,17 +330,28 @@ STEPS = [
       {"py": "chrome.toggle_window(app, 'library')"}], 1.0),
     ([{"check": "dpg.get_item_theme('tb_frw_library') == chrome._word_theme(chrome.ACCENT)"},
       {"py": "chrome.toggle_window(app, 'library')"}, {"py": "(dpg.set_viewport_width(app._vp0[0]), dpg.set_viewport_height(app._vp0[1]))"}], 1.0),
-    # the views (C16): unlit LEDs as dim dots and a floor under the shape, each off and on again from its action;
-    # the GPU point cloud draws its dots while they are on
-    ([{"layout": "both"}, {"action": "unlit_dots"}, {"action": "view_floor"}], 0.8),
-    ([{"check": "app.view_extras() == (None, False) and not dpg.get_value('menu_unlit_dots') and not dpg.get_value('menu_view_floor')"},
-      {"check": "app.point_quads is None or not app.point_quads.dots"}, {"action": "unlit_dots"}, {"action": "view_floor"}], 0.8),
-    ([{"check": "app.view_extras()[0] is not None and app.view_extras()[1] and dpg.get_value('menu_unlit_dots')"},
-      {"check": "app.point_quads is None or (app.point_quads.dots and app.point_quads.floor)"}], 0.3),
-    # the frames (C17): a still outline in the accent unless a gradient is picked; the look is kept
-    ([{"check": "chrome.frame_style(app) == app.frames.style"}, {"frame_style": "turning"}], 0.4),
-    ([{"check": "app.frames.style == 'turning' and app.prefs.get('frame_style') == 'turning'"}, {"frame_style": "outline"}], 0.4),
-    ([{"check": "app.frames.style == 'outline' and dpg.get_value('frames_style') == 'An outline in the accent, still'"}], 0.3),
+    # the views (C16): unlit LEDs black until View > Unlit LEDs as dim dots (their default off), the floor on; each
+    # turned over by its action and back; the GPU point cloud draws its dots while they are on
+    ([{"layout": "both"}, {"py": "[app.prefs.pop(k, None) for k in ('unlit_dots', 'view_floor')] and None"}], 0.5),
+    ([{"check": "not app.view_option('unlit_dots') and app.view_option('view_floor') and app.view_extras() == (None, True)"},
+      {"action": "unlit_dots"}, {"action": "view_floor"}], 0.8),
+    ([{"check": "app.view_extras()[0] is not None and not app.view_extras()[1] and dpg.get_value('menu_unlit_dots') and not dpg.get_value('menu_view_floor')"},
+      {"check": "app.point_quads is None or app.point_quads.dots"}, {"action": "unlit_dots"}, {"action": "view_floor"}], 0.8),
+    ([{"check": "app.view_extras() == (None, True) and not dpg.get_value('menu_unlit_dots')"},
+      {"check": "app.point_quads is None or (not app.point_quads.dots and app.point_quads.floor)"}], 0.3),
+    # the frames (C17): the gradient turning unless another look is picked (the default with nothing kept); kept
+    ([{"py": "app.prefs.pop('frame_style', None)"}, {"check": "chrome.frame_style(app) == 'turning' == chrome.FRAME_STYLE_DEFAULT"},
+      {"frame_style": "outline"}], 0.4),
+    ([{"check": "app.frames.style == 'outline' and app.prefs.get('frame_style') == 'outline'"}, {"frame_style": "turning"}], 0.4),
+    ([{"check": "app.frames.style == 'turning' and dpg.get_value('frames_style') == 'The gradient, turning'"}], 0.3),
+    # Appearance in tabs (the Selection frames window one of them): each opens with all of it in view
+    ([{"py": "chrome.show_appearance(app, 'colours')"}], 0.8),
+    ([{"check": "not dpg.does_item_exist('frames_win') and dpg.get_value('app_tabs') in ('app_tab_colours', dpg.get_alias_id('app_tab_colours'))"},
+      {"check": "dpg.is_item_visible('app_cat_colours') and dpg.is_item_visible('app_col_accent')"},
+      {"py": "chrome.show_frames(app)"}], 0.8),
+    ([{"check": "dpg.get_value('app_tabs') in ('app_tab_frames', dpg.get_alias_id('app_tab_frames')) and dpg.is_item_visible('gc_status') and dpg.is_item_visible('frames_style')"},
+      {"py": "chrome.show_appearance(app, 'size')"}], 0.8),
+    ([{"check": "dpg.is_item_visible('app_ui_scale')"}, {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
     # the footer (C18): power and the device's fps; the stats popover live while open, above its button; Esc closes it
     ([{"check": "'device ~' in dpg.get_value('stat_txt') and 'brightness' not in dpg.get_value('stat_txt')"},
       {"py": "chrome.toggle_stats(app)"}], 0.8),
@@ -364,7 +385,7 @@ STEPS = [
     # pointer (the hooks' stand-in for it); the view's own keys - a view along an axis is orthographic, 5 turns it
     # over, F frames the selected part, Home everything; a pan; the view's frame held while a part moves, grown when
     # one is added out of it
-    ([{"py": "chrome.close_all_frames(app) or [dpg.hide_item(w) for w in ('usermods_win', 'keys_win', 'about_win', 'frames_win') "
+    ([{"py": "chrome.close_all_frames(app) or [dpg.hide_item(w) for w in ('usermods_win', 'keys_win', 'about_win', 'appearance_win') "
              "if dpg.does_item_exist(w)] and None"},                    # the dialogs and frames the steps above left over the view
       {"layout": "cube", "with_ui": True}, {"frame": "shape"}, {"dock": ["shape", True]}, {"shape": ["clear"]},
       {"shape": ["layout", "strip"]}, {"shape": ["add", "ring"]}, {"shape": ["add", "strip"]}, {"shape": ["select", 1]}], 1.5),
@@ -502,6 +523,11 @@ STEPS = [
     ([{"expect": ["send_status", "the device is running it"]}, {"effect": "Rainbow"}, {"py": "app.push_settings()"}], 3.0),
     ([{"expect": ["edit_status", "Rainbow"]}, {"py": "app.send_shape(True)"}, {"py": "app.send_ledmap(True)"}], 4.0),
     ([{"expect": ["edit_status", "ledmap"]}], 0.5),
+    # the device's 2-D setup read as the matrix (the fake's: one 48 x 48 panel, serpentine; it has a ledmap by now)
+    ([{"geometry": {"kind": "matrix", "params": {"w": 8, "h": 8}}}, {"py": "app.read_device_matrix()"}], 1.5),
+    ([{"check": "app.project.geometry.params == {'w': 48, 'h': 48, 'serpentine': True, 'vertical': False, 'start_right': False, 'start_bottom': False}"},
+      {"expect": ["messages", "rows from the top left, serpentine"]}, {"expect": ["messages", "Import the device's ledmap"]},
+      {"check": "dpg.does_item_exist('geom_read_matrix')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.5),
     # a sequence: two steps from the sim, played, a step loaded back, one deleted
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},
       {"seq": ["field", "dur", 1.0]}, {"seq": ["play"]}], 3.0),

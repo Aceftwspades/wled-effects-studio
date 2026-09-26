@@ -59,10 +59,12 @@ def header(app, slot):
     with dpg.tooltip(f"dock_{tag}"):
         dpg.add_text("", tag=f"dock_{tag}_tip")
     _dock_tip(tag)
+    c.placed(f"dock_{tag}")
     dpg.add_image_button(texture("close", px(14)), tag=f"close_{tag}", width=px(14), height=px(14), frame_padding=2, tint_color=c.TEXT,
                          pos=(340, 8), user_data=slot, callback=lambda s, a, u: close(app, u))
     with dpg.tooltip(f"close_{tag}"):
         dpg.add_text("close (Esc while the frame has the focus); the menu opens it again")
+    c.placed(f"close_{tag}")
 
 
 def close(app, which):

@@ -65,7 +65,7 @@ jobs:
           $env:STUDIO_NO_WELCOME = "1"
           foreach ($t in "test_shapes", "test_device", "test_graph", "test_roundtrip", "test_docs", "test_audit", "test_nodes", "test_parity",
                       "test_face", "test_expr", "test_midi", "test_reader", "test_typeface", "test_num", "test_messages", "test_view3d",
-                      "test_camera_map") {
+                      "test_camera_map", "test_matrix2d") {
             python tests\$t.py
             if ($LASTEXITCODE) { exit 1 }
           }

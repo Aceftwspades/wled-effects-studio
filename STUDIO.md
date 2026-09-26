@@ -2231,6 +2231,48 @@ proposal's number; in the order to do them.
 
 The ninth pass is done: S1-S19, released as 1.3.0.
 
+### After 1.3.0: seven reports (September 2026)
+
+- [x] **Appearance opened with controls out of view.** It was 470 high and
+      its interface size sat under the fold. It is three tabs now -
+      Colours, Selection frames, Interface size - and takes the size of the
+      tab in front (the smoke checks the last control of each is visible).
+- [x] **Selection frames a tab of Appearance**, not a window of its own
+      (Settings > Selection frames is gone; the hook and show_frames open
+      Appearance at the tab).
+- [x] **Unlit LEDs black by default**: View > Unlit LEDs as dim dots
+      starts off (App.VIEW_DEFAULTS; one default for the menu, the toggle,
+      the view and the shape editor).
+- [x] **The turning gradient the frames' default** (chrome.FRAME_STYLE_DEFAULT;
+      the looks listed turning first).
+- [x] **A frame stuck in the screen's top left** after switching to the
+      graph: the pane last clicked in wears the frame, and the 3-D view in
+      the graph's corner sits at 0, 0 of its own window - App._screen_rect
+      took that for the screen. A child window's place now adds its
+      window's when that is not the root.
+- [x] **The graph's 3-D view: no words on hover, a maximize that did
+      nothing.** Dear PyGui never shows the tooltip of a control placed at
+      a position of its own (pos=, set_item_pos): it is checked against the
+      item before it in the flow - so the panes' ::: grips, the dialogs'
+      and frames' close and dock buttons, the dock's float and the 3-D
+      view's corner controls had none (found by posting the mouse to the
+      window: the button lit, no tooltip; a flowed button's came up).
+      chrome.placed marks them and poll_placed_tips draws their tooltip's
+      words on the viewport's front, beside the pointer after a short rest.
+      The "maximize" was the size handle, diagonal arrows that looked like
+      one: it is a striped grip now, drawn in the corner the view grows
+      toward, and a real maximize lays the view over the whole canvas (a
+      restore puts it back; the view's own buttons move clear of it).
+- [x] **The matrix's wiring and orientation read from the device**
+      (native/matrix2d.py; GEOMETRY > Read the device's matrix, Device >
+      Import the device's matrix setup): GET /json/cfg's hw.led.matrix and
+      /2d-gaps.json, walked as WLED's setUpMatrix does - one panel in the
+      corner becomes the matrix's four switches, anything else the map WLED
+      itself makes; a device with a ledmap is said to use that instead.
+      tests/test_matrix2d.py: WLED's walk and the matrix geometry agree for
+      every start corner, direction and serpentine; panels, offsets, holes
+      and gaps.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

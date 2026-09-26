@@ -78,9 +78,10 @@ explains itself on hover; a dim **(?)** at the end of a row holds what
 the row as a whole is for. Buttons say what they weigh: the one a dialog
 or a frame is for is filled in the accent, one that changes a device or
 deletes something is red, a way out (Cancel, Not now) has no slab. The
-pane last clicked in and the selected nodes wear a still outline in the
-accent; Settings > Selection frames can make it a gradient - a WLED
-palette, the studio's own, or one made there - still or turning. What
+pane last clicked in and the selected nodes wear a frame of a gradient
+going round them; Settings > Appearance, in its **Selection frames** tab,
+picks the gradient - a WLED palette, the studio's own, or one made there -
+and whether it turns, stands still, or is a plain outline in the accent. What
 has nothing to act on is greyed - on the menus, the toolbar and in the
 frames: Delete with nothing selected, Undo with nothing done, a send
 with no device - and its key says why instead. An empty list says what
@@ -109,7 +110,7 @@ its pins' names are words, in the interface's face. Everything comes at
 one **interface size** - the type, every control, the panes, the dialogs
 and the icons - and it starts as the monitor's own scale (the system's
 display setting), so the studio is as large as the rest of the desktop.
-Settings > Appearance > **Interface size** sets it from 80 to 200%;
+Settings > Appearance, in its **Interface size** tab, sets it from 80 to 200%;
 **The monitor's** goes back to the system's. The size takes effect at
 the next start: **Restart now** closes the studio and starts it again
 at once (the graph is saved; code with unsaved changes is asked about
@@ -138,7 +139,9 @@ window's edge: a click opens the panel beside the rail at that
 section (or, the panel open, goes to it, the section in view lit on the
 rail), and the rail's top button folds it away again. The **3-D view** sits in
 a corner of the graph: its `:::` drags it to another corner, its size
-handle (or Ctrl+wheel over it) sizes it, and its tuck button puts it
+grip (the striped corner, or Ctrl+wheel over it) sizes it, its maximize
+button lays it over the whole graph (the same button, then a restore,
+puts it back in its corner at its size), and its tuck button puts it
 away to a tab in the corner, where it is not drawn until the tab (or
 View > 3-D view over the graph) brings it back. The **minimap** sits
 faint over its corner of the graph - the nodes under it read through -
@@ -269,8 +272,8 @@ typed values, following a drag. A collapsed node shows it as its body,
 and the help on hover puts it before the node's description. Nodes wear their **category's colour** on the title bar (amber
 sliders, blue signals, teal coordinates, violet patterns, slate maths,
 rust colour, green custom code, magenta output; the add menu's headers
-match), so a graph reads by colour first; Settings > Appearance has the
-legend and the switch, and a colour you give a node still wins. Nodes
+match), so a graph reads by colour first; Settings > Appearance's Colours
+tab has the legend and the switch, and a colour you give a node still wins. Nodes
 also **show what they do**, like a rack module's face: a strip of the
 palette or a colour ramp with a marker at the live index, the audio's
 sixteen bands live (an FFT bin's own bar lit), a period of the Wave with
@@ -312,7 +315,14 @@ The geometry section sets the cube's face size and whether it has six
 faces (a lit bottom; it takes the net's bottom-right corner block, and
 the flash build and the settings push tell the device) - or a matrix,
 cylinder, sphere, strip, or an XYZ file - and for the cube its wiring - which face
-first, turns, serpentine - which is what the exported ledmap says. Audio
+first, turns, serpentine - which is what the exported ledmap says. A
+matrix's wiring can come from the device: **Read the device's matrix**
+(under GEOMETRY, or Device > Import the device's matrix setup) reads its
+2-D setup (LED Preferences > 2D Configuration, read only): the size, where
+the first LED is, rows or columns, serpentine - one panel becomes those
+switches, several panels (or a gaps file) the map WLED itself makes from
+them. A device with a ledmap uses that over its 2-D setup, and the footer
+says so: Device > Import the device's ledmap takes the ledmap instead. Audio
 comes from the synth (sliders, a beat clock), a live capture, or a WAV
 file. Playback has A/B compare (two effects side by side), a slider sweep,
 scrubbing back through the last seconds while paused (in every view,
@@ -359,12 +369,12 @@ front is seen from -Y, X to the right and Z up. View > Camera has the same
 presets, three saved views (the pan and the projection kept with them),
 and a **background picture** - the room, the house - dimmed
 behind the LEDs, for the point cloud and the GPU cube alike. An LED that
-is off is a **dim dot** there (smaller than a lit one, in the middle of
-its cell on a cube's face), so the shape reads when most of it is dark,
-and the shape stands on a faint **floor** that fades out from the middle
-(left out when the view looks up from below it) - View > Unlit LEDs as
-dim dots and View > A floor under the shape turn them off; a popped-out
-view does the same, and a screenshot or a recording takes the view as
+is off is black, as on the real thing; View > Unlit LEDs as dim dots draws
+it as a **dim dot** instead (smaller than a lit one, in the middle of its
+cell on a cube's face), so the shape reads when most of it is dark. The
+shape stands on a faint **floor** that fades out from the middle (left out
+when the view looks up from below it) - View > A floor under the shape
+turns it off; a popped-out view does the same, and a screenshot or a recording takes the view as
 it is shown (the library's and the shape's previews leave both out). The
 **logical view** fits its pane: as many whole pixels an LED as the
 pane's width and height both allow (a wide net in a tall pane was drawn
@@ -788,8 +798,11 @@ on and install what it carries.
 - A frame that throws is written once to `%TEMP%\cubefx\crash.txt` (this
   run's; the last run's is `crash.prev.txt`) and to the console, and the
   footer's line says so (the message log keeps it); the sim pauses.
-- Settings > Appearance: dark, light, soft light or slate, and every one
-  of the theme's seven colours editable.
+- Settings > Appearance, in three tabs: **Colours** (dark, light, soft
+  light or slate, and every one of the theme's seven colours editable;
+  the nodes' category colours), **Selection frames** (the frames' look
+  and gradients) and **Interface size**. The window opens at the size of
+  the tab in front, so all of it is in view.
 - Settings > "Draw the 3-D view on the GPU" / "Scale the logical view on
   the GPU" are the fast paths: a cube is drawn as its faces, textured;
   every other geometry as a cloud of squares, one per LED, coloured from
@@ -854,6 +867,7 @@ on and install what it carries.
 - **Device** › Send the shape (ledmap + positions)
 - **Device** › Send the ledmap only
 - **Device** › Import the device's ledmap
+- **Device** › Import the device's matrix setup — the matrix's size and wiring as the device has them (LED Preferences > 2D Configuration): where the first LED is, rows or columns, serpentine, its panels and gaps - read only, the device is not changed
 - **Device** › Import a ledmap file...
 - **Device** › Usermods and features...
 - **View** › Logical net `Q`
@@ -966,8 +980,7 @@ on and install what it carries.
 - **Window** › Message log...
 - **Window** › Close every frame
 - **Settings** › Keyboard shortcuts... `Shift+F1`
-- **Settings** › Selection frames...
-- **Settings** › Appearance...
+- **Settings** › Appearance... — the colours, the selection frames and the interface size, a tab each
 - **Settings** › External editor command...
 - **Settings** › Draw the 3-D view on the GPU — the shape's faces as textured quads on the GPU, where it has them; loose LEDs are drawn as points either way. Off: the software renderer for everything - the fallback when a machine's GPU misbehaves
 - **Settings** › Scale the logical view on the GPU — softer LED edges and faster; off: the CPU repeats each LED's pixels
@@ -1130,7 +1143,7 @@ Every button, with what its tooltip says.
 
 **Send to device frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Find a device`; `Read` — ask the device again what it is and runs; `Open in the browser`; `Calibrate the speed factor` — the current effect's settings sent, the device's fps read for three seconds, and the footer's device fps estimate set from the measurement (Settings > Device speed factor holds the number); `Send the graph as a script` — the graph as bytecode for the Studio Script effect - no firmware build; the device runs it at once; `Send the effect's settings` — the effect the sim shows, with its sliders, checks, palette and colours, onto the device's segment; `Send the shape` — the ledmap (the wiring) and the positions table, so Position and Direction see the real shape; `Send the ledmap only`; `Import the device's` — the device's ledmap becomes the geometry: a matrix with its gaps and wiring, or a strip; `Import a file...`; `<`; `>`
 
-**Shape frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Add part...` — a strip, a ring, a tree, a star... picked from pictures, its sizes asked first; it joins the end of the selected part (or goes beside it); `Draw a run` — click corners in the 3-D view and a strip is laid along them, an LED every spacing; double-click or Enter ends it, Backspace takes the last corner back, Esc leaves it; `File...` — open or save a shape; import a model, an xLights model or layout, a point list; a reference mesh; export an xLights model or the positions; a preview; `Undo`; `Redo`; `the way its LEDs run along it` — the way its LEDs run along it: click to turn its wiring round; `shown` — shown: click to hide it while you build (it stays LEDs on the device); `click to lock it` — click to lock it: the view's clicks, handles and keys pass it by; `x` — delete the part (Undo brings it back); `delete the last`; `renumber: nearest chain from the first`; `turn into a path`; `X`; `Y`; `Z`; `+X`; `-X`; `+Y`; `-Y`; `+Z`; `-Z`; `aim outward`; `turn only`; `aim at the origin`; `from its place` — the direction and distance the part is at now, into the fields; `first`; `earlier`; `later`; `last`; `light it` — the wiring test lighting this part: in the sim, and on the device while the sim is streamed to it; `Generate a preview` — a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here; `Open the folder`
+**Shape frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Add part...` — a strip, a ring, a tree, a star... picked from pictures, its sizes asked first; it joins the end of the selected part (or goes beside it); `Draw a run` — click corners in the 3-D view and a strip is laid along them, an LED every spacing; double-click or Enter ends it, Backspace takes the last corner back, Esc leaves it; `File...` — open or save a shape; import a model, an xLights model or layout, a point list; a reference mesh; export an xLights model or the positions; a preview; `Undo`; `Redo`; `show me`; `the way its LEDs run along it` — the way its LEDs run along it: click to turn its wiring round; `shown` — shown: click to hide it while you build (it stays LEDs on the device); `click to lock it` — click to lock it: the view's clicks, handles and keys pass it by; `x` — delete the part (Undo brings it back); `delete the last`; `renumber: nearest chain from the first`; `turn into a path`; `X`; `Y`; `Z`; `+X`; `-X`; `+Y`; `-Y`; `+Z`; `-Z`; `aim outward`; `turn only`; `aim at the origin`; `from its place` — the direction and distance the part is at now, into the fields; `first`; `earlier`; `later`; `last`; `light it` — the wiring test lighting this part: in the sim, and on the device while the sim is streamed to it; `Generate a preview` — a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here; `Open the folder`
 
 **Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ Add from the sim` — a new step: what the sim shows now - effect, sliders, palette, colours, segments; `Update from the sim` — the selected step becomes what the sim shows now; `Load into the sim` — the sim shows the selected step; `Add what the sim shows`; `x` — this slider's ramp off (the others stay); `Play in the sim`; `Stop`; `Render GIF` — plays the sequence once and records it as a GIF, into captures/; `Render video` — plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path; `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `WAV's` — the tempo and the beats found in the WAV playing as live audio (AUDIO > play a WAV file); `Snap durations to bars` — every step's seconds rounded to whole bars, so the sequence changes on the music; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Send and run it`; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 
@@ -1138,15 +1151,13 @@ Every button, with what its tooltip says.
 
 **Palettes frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ New`; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy`; `Remove`; `Use in the sim`; `New palette`; `spread evenly`; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all`; `Remove this one there`
 
-**LED outputs frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `one output`; `one per part`; `by count:`; `+ output`; `Read the device's`; `One output`; `Send outputs + power limit` — over /json/cfg; the device re-initialises its outputs (reboot it if it does not)
+**LED outputs frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `one output`; `one per part`; `by count:`; `+ output`; `Read the device's`; `x`; `Send outputs + power limit` — over /json/cfg; the device re-initialises its outputs (reboot it if it does not)
 
 **Audio input frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Read the device's` — what the device's audioreactive is set to now (its type, pins and levels), into these fields; `Send the audio input` — over /json/cfg; the levels take at once, a new type or new pins after a reboot (offered when needed); `Reboot the device` — restarts the device so a new type or new pins take effect; the LEDs go dark for a few seconds
 
 **Keyboard shortcuts**: `close` — close (Esc while it has the focus); `Reset all to defaults`
 
-**Appearance**: `close` — close (Esc while it has the focus); `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped; `The monitor's` — the size the monitor is set to in the system's display settings; `Restart now` — the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first
-
-**Selection frames**: `close` — close (Esc while it has the focus); `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`
+**Appearance**: `close` — close (Esc while it has the focus); `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped; `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`; `The monitor's` — the size the monitor is set to in the system's display settings; `Restart now` — the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first
 
 **History**: `close` — close (Esc while it has the focus)
 
@@ -1166,6 +1177,6 @@ Every button, with what its tooltip says.
 
 **Message log**: `close` — close (Esc while it has the focus); `copy all` — the log as text, to paste into an issue or a note; `clear` — empties the recent messages; the problems stay until they are fixed
 
-**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play a WAV file...`; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or a WAV file - goes to it; `Panel` — Panel - brings it to the front; `Devices - brings it to the front`; `x` — close Devices (the menus open it again); `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
+**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `pip_max`; `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play a WAV file...`; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or a WAV file - goes to it; `Panel` — Panel - brings it to the front; `Devices - brings it to the front`; `x` — close Devices (the menus open it again); `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
 
 <!-- uiref end -->

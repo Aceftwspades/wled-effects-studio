@@ -492,7 +492,7 @@ def poll(app):
         _label(mx + px(16), my + px(12), [line1, line2], D, v.clip, col=tuple(int(c) for c in part_colour(part)) + (255,))
     # 5. the floor's step and the camera's keys, at the view's foot
     foot = []
-    if app.prefs.get("view_floor", True):
+    if app.view_option("view_floor"):
         foot.append(f"grid {view3d.floor_label(app)}")
     foot.append(f"{units.density(g.params):g} LEDs a metre")
     keys = app.keys

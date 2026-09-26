@@ -380,6 +380,32 @@ def _resize(ic):
     ic.poly([(0.08, 0.08), (0.5, 0.08), (0.08, 0.5)])
     ic.poly([(0.92, 0.92), (0.5, 0.92), (0.92, 0.5)])
 
+def _maximize(ic):
+    # a window, its title bar thick: the 3-D view over the whole graph
+    ic.box(0.12, 0.14, 0.88, 0.86, w=0.09)
+    ic.rect(0.12, 0.14, 0.88, 0.3)
+
+
+def _restore(ic):
+    # a window in front of another: back to its corner
+    ic.path([(0.34, 0.3), (0.34, 0.12), (0.88, 0.12), (0.88, 0.62), (0.7, 0.62)], w=0.08)
+    ic.box(0.12, 0.34, 0.66, 0.88, w=0.08)
+    ic.rect(0.12, 0.34, 0.66, 0.46)
+
+
+def _size_grip(corner):
+    """The resize grip - three strokes across a corner - in the corner the box grows toward ("tl", "tr", "bl", "br")."""
+    def draw(ic):
+        for k in (0.26, 0.5, 0.74):
+            a, b = (0.9 - k, 0.9), (0.9, 0.9 - k)                  # the bottom-right grip
+            if corner[1] == "l":
+                a, b = (1 - a[0], a[1]), (1 - b[0], b[1])
+            if corner[0] == "t":
+                a, b = (a[0], 1 - a[1]), (b[0], 1 - b[1])
+            ic.seg(a, b, w=0.1)
+    return draw
+
+
 def _pip(ic):
     # a small window in the corner of a big one: the 3-D view over the graph
     ic.box(0.06, 0.12, 0.94, 0.88, w=0.08)
@@ -438,7 +464,8 @@ def _add_part(ic):
 
 ICONS = {
     "fx": _fx, "segments": _segments, "swatches": _swatches, "sliders": _sliders, "audio": _audio, "mic": _mic,
-    "rail_open": _rail_open, "rail_fold": _rail_fold, "tuck": _tuck, "resize": _resize, "pip": _pip,
+    "rail_open": _rail_open, "rail_fold": _rail_fold, "tuck": _tuck, "resize": _resize, "pip": _pip, "maximize": _maximize, "restore": _restore,
+    "size_tl": _size_grip("tl"), "size_tr": _size_grip("tr"), "size_bl": _size_grip("bl"), "size_br": _size_grip("br"),
     "new": _new, "open": _open, "save": _save, "build": _build, "live": _live,
     "undo": _undo, "redo": _redo, "play": _play, "pause": _pause, "step": _step, "restart": _restart,
     "net": _net, "cube": _cube, "both": _both, "code": _code, "graph": _graph,

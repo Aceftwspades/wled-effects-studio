@@ -56,6 +56,52 @@ class Features:
         dpg.set_value("geom_kind", g.kind)
         self.rebuild_geom_fields()
         self.gp.status(f"geometry from {source}: {g.describe()}")
+    def read_device_matrix(self):
+        """The active device's 2-D setup - its matrix's size, where the first
+        LED is, rows or columns, serpentine, its panels and gaps file - read
+        (GET only) on a thread; poll_matrix_read makes it the geometry."""
+        host = self.active_host()
+        if not host:
+            device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
+        if getattr(self, "_matrix_reading", False):
+            return
+        self._matrix_reading = True
+        self.gp.status(f"reading {host}'s 2-D setup...")
+
+        def run():
+            from native import matrix2d
+            try:
+                self._matrix_result = (host, matrix2d.read(host), None)
+            except Exception as e:
+                self._matrix_result = (host, None, str(e) or type(e).__name__)
+        threading.Thread(target=run, daemon=True).start()
+
+    def poll_matrix_read(self):
+        r = getattr(self, "_matrix_result", None)
+        if r is None:
+            return
+        self._matrix_result = None
+        self._matrix_reading = False
+        host, got, err = r
+        from native import matrix2d
+        if err:
+            self.gp.status(f"could not read {host}'s setup: {err}"); return
+        if not got["panels"]:
+            self.gp.status(f"{host} has no 2-D setup (LED Preferences > 2D Configuration): its LEDs are a strip there"); return
+        try:
+            params, words = matrix2d.geometry_params(got["panels"], got["gaps"], f"{host} 2-D setup")
+        except ValueError as e:
+            self.gp.status(f"{host}'s 2-D setup: {e}"); return
+        self.apply_geometry(Geometry("matrix", **params))
+        n = self.project.geometry.count
+        more = got["total"] - n if got["total"] > n else 0
+        msg = (f"the matrix as {host} has it: {words}" + (f"; its outputs drive {more} LEDs more, after the matrix" if more else "")
+               + ("; it also has a ledmap, which WLED lays over this setup - Device > Import the device's ledmap takes that"
+                  if got["ledmap"] else ""))
+        self.gp.status(msg)
+        if dpg.does_item_exist("geom_desc"):
+            dpg.set_value("geom_desc", self.project.geometry.describe() + " - " + words)
+
     # --- files dropped on the window -----------------------------------------
     def poll_drops(self):
         drop = getattr(self, "drops", None)

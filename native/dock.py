@@ -301,6 +301,7 @@ def _fill(app, w):
         fb = dpg.add_button(label="float", tag="dock_float", parent="dock_tabs", small=True, pos=(max(0, w - px(52)), px(6)),
                             callback=lambda: float_frame(app, active(app)))
         chrome.tip("float the frame in front: a window of its own over the panes (it opens so until docked again)", item=fb)
+        chrome.placed("dock_float")
 
 
 def poll(app):

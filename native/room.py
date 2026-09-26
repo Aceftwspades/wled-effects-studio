@@ -6,8 +6,9 @@ canvas takes the window.
   goes to it (the section in view lit on the rail); the rail's top button
   opens and folds it.
 - The 3-D view floats in a corner of the canvas. Its ::: drags it to
-  another corner, its handle (or Ctrl+wheel over it) sizes it, and its tuck
-  button puts it away to a tab. While tucked it is not drawn.
+  another corner, its grip (or Ctrl+wheel over it) sizes it, its maximize
+  button lays it over the whole canvas (again: back to its corner), and its
+  tuck button puts it away to a tab. While tucked it is not drawn.
 - The properties come up over the canvas only when the selected node has
   settings a node cannot hold (text over several lines, a file, a curve, a
   bitmap), or while the add menu describes a node. N pins them open; their
@@ -130,6 +131,7 @@ def pip(app):
         p["corner"] = "br"
     p.setdefault("size", PIP_DEFAULT)
     p.setdefault("tucked", False)
+    p.setdefault("max", False)
     return p
 
 
@@ -159,6 +161,19 @@ def set_tucked(app, v):
     pip(app)["tucked"] = bool(v)
     _save(app)
     app.request_layout()
+
+
+def maxed(app):
+    return pip_on(app) and bool(pip(app)["max"])
+
+
+def set_max(app, v):
+    """The 3-D view over the whole canvas, or back in its corner at its size."""
+    pip(app)["max"] = bool(v)
+    _save(app)
+    app.request_layout()
+    app.gp.status("the 3-D view over the graph (its button again, or the restore: back to its corner)" if v
+                  else "the 3-D view back in its corner")
 
 
 def open_panel(app, key=None):
@@ -222,8 +237,15 @@ def build(app):
     dpg.add_image_button(texture("tuck", px(14)), tag="pip_tuck", parent="cube_win", width=px(14), height=px(14), show=False,
                          callback=lambda: set_tucked(app, True))
     chrome.tip("tuck the 3-D view away to a tab in its corner (it is not drawn while it is away)", item="pip_tuck")
-    dpg.add_image_button(texture("resize", px(14)), tag="pip_size", parent="cube_win", width=px(14), height=px(14), show=False)
+    chrome.placed("pip_tuck")
+    dpg.add_image_button(texture("maximize", px(14)), tag="pip_max", parent="cube_win", width=px(14), height=px(14), show=False,
+                         callback=lambda: set_max(app, not pip(app)["max"]))
+    with dpg.tooltip("pip_max"):
+        dpg.add_text("", tag="pip_max_tip")
+    chrome.placed("pip_max")
+    dpg.add_image_button(texture("size_tl", px(14)), tag="pip_size", parent="cube_win", width=px(14), height=px(14), show=False)
     chrome.tip("drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner", item="pip_size")
+    chrome.placed("pip_size")
     with dpg.window(tag="pip_tab", show=False, no_title_bar=True, no_resize=True, no_move=True, no_collapse=True,
                     no_scrollbar=True, no_focus_on_appearing=True, no_saved_settings=True, width=px(104), height=px(36)):
         dpg.add_button(label="3-D view", tag="pip_tab_btn", width=px(88), callback=lambda: set_tucked(app, False))
@@ -236,6 +258,7 @@ def build(app):
     dpg.add_image_button(texture("close", px(14)), tag="props_close", parent="props_win", width=px(14), height=px(14), show=False,
                          callback=lambda: dismiss_props(app))
     chrome.tip("close until another node is selected (N keeps it open)", item="props_close")
+    chrome.placed("props_close")
     # the help at the pointer
     with dpg.window(tag="help_tip", show=False, no_title_bar=True, no_resize=True, no_move=True, no_collapse=True,
                     no_scrollbar=True, no_focus_on_appearing=True, no_saved_settings=True, autosize=True):
@@ -336,9 +359,12 @@ def _set_side(app, s):
 
 
 def pip_geometry(app, main):
-    """Where the 3-D view goes in its corner of the canvas: (x, y, w, h)."""
+    """Where the 3-D view goes in its corner of the canvas: (x, y, w, h) -
+    maximized, the whole canvas but a margin."""
     ed = editor_rect(main)
     ex, ey, ew, eh = ed
+    if pip(app)["max"]:
+        return (int(ex + MARGIN), int(ey + MARGIN), int(max(PIP_MIN, ew - 2 * MARGIN)), int(max(PIP_MIN, eh - 2 * MARGIN)))
     s, _ = _pip_side(app, ed)
     w, h = s, s + PIP_CAP
     c = pip(app)["corner"]
@@ -420,7 +446,7 @@ def place(app, rects):
     from native import chrome
     main = rects.get("main")
     if not active(app) or not main:
-        for t in ("pip_win", "pip_tab", "props_fly", "help_tip", "pip_tuck", "pip_size", "props_close"):
+        for t in ("pip_win", "pip_tab", "props_fly", "help_tip", "pip_tuck", "pip_size", "pip_max", "props_close"):
             if dpg.does_item_exist(t):
                 dpg.hide_item(t)
         for t in ("graph_help_box", "help_split"):
@@ -443,17 +469,26 @@ def place(app, rects):
         dpg.set_item_pos("pip_win", [x, y])
         dpg.configure_item("cube_win", width=w, height=h)
         dpg.set_item_pos("cube_win", [0, 0])
-        for t, dx in (("pip_size", 92), ("pip_tuck", 66)):
-            dpg.configure_item(t, show=True, tint_color=chrome.TEXT)
+        # the controls, right to left: ::: (move to another corner), tuck, maximize or restore, the size grip -
+        # drawn in the corner the view grows toward; maximized, neither moving nor sizing means anything
+        big = bool(p["max"])
+        grow = {"br": "tl", "bl": "tr", "tr": "bl", "tl": "br"}[p["corner"]]
+        dpg.configure_item("pip_size", texture_tag=_icon(f"size_{grow}"))
+        dpg.configure_item("pip_max", texture_tag=_icon("restore" if big else "maximize"))
+        dpg.set_value("pip_max_tip", "back to its corner, at its size" if big else
+                      "the 3-D view over the whole graph (again: back to its corner)")
+        for t, dx, on in (("pip_size", 118, not big), ("pip_max", 92, True), ("pip_tuck", 66, True)):
+            dpg.configure_item(t, show=on, tint_color=chrome.TEXT)
             dpg.set_item_pos(t, [w - px(dx), px(8)])
         if dpg.does_item_exist("grip_cube_win"):
+            dpg.configure_item("grip_cube_win", show=not big)
             dpg.set_item_pos("grip_cube_win", [w - px(40), px(8)])
         if dpg.does_item_exist("cube_cap") and not app.ab:
             dpg.set_value("cube_cap", "3-D  drag: turn  wheel: zoom" if w >= px(330) else "3-D")
         dpg.hide_item("pip_tab")
     else:
         S.pip_rect = None
-        for t in ("pip_win", "pip_size", "pip_tuck"):
+        for t in ("pip_win", "pip_size", "pip_tuck", "pip_max"):
             dpg.hide_item(t)
         if p["tucked"] and not app.popouts.is_out("cube"):
             ex, ey, ew, eh = S.editor
@@ -634,10 +669,15 @@ def poll(app):
 
 
 # --- the pointer on the 3-D view's controls ---------------------------------------------------------
+def _icon(name):
+    from native.icons import texture
+    return texture(name, px(14))
+
+
 def press(app):
-    """A press on the 3-D view's ::: (to move it) or its size handle. True
-    when it was one of those."""
-    if not pip_on(app) or not dpg.is_item_shown("pip_win") or S.pip_rect is None:
+    """A press on the 3-D view's ::: (to move it) or its size grip. True
+    when it was one of those (neither, maximized)."""
+    if not pip_on(app) or not dpg.is_item_shown("pip_win") or S.pip_rect is None or pip(app)["max"]:
         return False
     mp = tuple(dpg.get_mouse_pos(local=False))
     if dpg.does_item_exist("grip_cube_win") and dpg.is_item_hovered("grip_cube_win"):
@@ -689,7 +729,7 @@ def release(app):
 
 def wheel(app, delta):
     """Ctrl+wheel over the 3-D view in its corner: its size."""
-    if not pip_on(app) or S.editor is None or not dpg.is_item_hovered("pip_win"):
+    if not pip_on(app) or S.editor is None or not dpg.is_item_hovered("pip_win") or pip(app)["max"]:
         return False
     if not (dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)):
         return False

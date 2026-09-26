@@ -334,11 +334,13 @@ def place_buttons(app):
         shape_tools.set_mode(app, getattr(app, "_gizmo", "move"))
         app._gizmo_weighed = True
     bw = dpg.get_item_rect_size("view3d_btns")[0] or px(190)
-    show = bool(w) and getattr(app, "ui", True) and w >= bw + px(200)
-    key = (int(w), int(bw), show, ed)
+    from native import room
+    right = px(128) if room.pip_on(app) else px(48)      # over the graph: clear of its size grip, maximize and tuck too
+    show = bool(w) and getattr(app, "ui", True) and w >= bw + right + px(152)
+    key = (int(w), int(bw), show, ed, right)
     if key == getattr(app, "_view3d_btn_key", None):
         return
     app._view3d_btn_key = key
     dpg.configure_item("view3d_btns", show=show)
     if show:
-        dpg.set_item_pos("view3d_btns", [int(w - bw - px(48)), px(8)])
+        dpg.set_item_pos("view3d_btns", [int(w - bw - right), px(8)])

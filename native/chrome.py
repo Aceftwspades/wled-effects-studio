@@ -178,6 +178,9 @@ def build_menus(app):
             dpg.add_menu_item(label="Send the ledmap only", callback=lambda: app.send_ledmap())
             dpg.add_menu_item(label="Import the device's ledmap", callback=lambda: app.import_ledmap(host=app.active_host())
                               if app.active_host() else device_ui.show(app, "devices"))
+            dpg.add_menu_item(label="Import the device's matrix setup", callback=lambda: app.read_device_matrix())
+            tip("the matrix's size and wiring as the device has them (LED Preferences > 2D Configuration): where the "
+                "first LED is, rows or columns, serpentine, its panels and gaps - read only, the device is not changed")
             dpg.add_menu_item(label="Import a ledmap file...", callback=lambda: dpg.show_item("ledmap_dialog"))
             dpg.add_separator()
             dpg.add_menu_item(label="Usermods and features...", callback=lambda: show_usermods(app))
@@ -246,11 +249,11 @@ def build_menus(app):
                 dpg.add_menu_item(label="Background picture...", callback=lambda: dpg.show_item("bg_dialog"))
                 dpg.add_menu_item(label="Clear the background", callback=lambda: app.set_background(""))
             _mi(app, "Unlit LEDs as dim dots", "unlit_dots", check=True, tag="menu_unlit_dots",
-                default_value=bool(app.prefs.get("unlit_dots", True)), callback=lambda s, a: app.set_view_option("unlit_dots", a))
+                default_value=app.view_option("unlit_dots"), callback=lambda s, a: app.set_view_option("unlit_dots", a))
             tip("the 3-D view draws an LED that is off as a dim dot, so the shape reads on black; off: black, as the "
                 "LEDs are")
             _mi(app, "A floor under the shape", "view_floor", check=True, tag="menu_view_floor",
-                default_value=bool(app.prefs.get("view_floor", True)), callback=lambda s, a: app.set_view_option("view_floor", a))
+                default_value=app.view_option("view_floor"), callback=lambda s, a: app.set_view_option("view_floor", a))
             tip("a faint grid under the shape in the 3-D view, fading out from the middle - something for it to stand on")
             with dpg.menu(label="Layout"):
                 for k, (label, arr) in enumerate(app.PRESETS):
@@ -342,8 +345,8 @@ def build_menus(app):
             dpg.add_menu_item(label="Close every frame", callback=lambda: close_all_frames(app))
         with dpg.menu(label="Settings"):
             _mi(app, "Keyboard shortcuts...", "shortcuts", callback=lambda: show_keys(app))
-            dpg.add_menu_item(label="Selection frames...", callback=lambda: show_frames(app))
             dpg.add_menu_item(label="Appearance...", callback=lambda: show_appearance(app))
+            tip("the colours, the selection frames and the interface size, a tab each")
             dpg.add_menu_item(label="External editor command...", callback=lambda: show_editor(app))
             dpg.add_menu_item(label="Draw the 3-D view on the GPU", check=True, default_value=app.gpu_cube, tag="menu_gpu",
                               callback=lambda s, a: app.set_gpu_cube(bool(a)))
@@ -711,51 +714,17 @@ def build_dialogs(app):
         pass
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
-    with dpg.window(tag="appearance_win", label="Appearance", no_title_bar=True, show=False, width=px(560), height=px(470), no_collapse=True):
+    # Appearance: a tab each for the colours, the selection frames and the interface size; the window takes its
+    # tab's size, so nothing opens below its edge (it was 470 high, the interface size under the fold)
+    with dpg.window(tag="appearance_win", label="Appearance", no_title_bar=True, show=False, autosize=True, no_collapse=True):
         dialog_header("appearance_win", "Appearance")                 # one window style (C8): the frames' header
-        from native.app import THEME_PRESETS, THEME_ROLES
-        dpg.add_text("The look. A preset to start from, then any of its seven colours - the change shows as you make it "
-                     "and is kept.", color=DIM, wrap=px(540))
-        typeface.label(dpg.add_text("THEME", color=ACCENT))
-        with dpg.group(horizontal=True):
-            for name in THEME_PRESETS:
-                dpg.add_button(label=name, small=True, user_data=name, callback=lambda s, a, u: app.set_appearance(preset=u))
-            dpg.add_text("", tag="app_preset", color=DIM)
-        dpg.add_separator()
-        for key, label, what in THEME_ROLES:
-            # a colour as its swatch and hex, the role's name first (C6)
-            with form.row(label, width=96):
-                form.swatch(f"app_col_{key}", (0, 0, 0), lambda c, u=key: app.set_appearance(colors={u: list(c)}))
-                typeface.small(dpg.add_text(what, color=DIM))
-        dpg.add_separator()
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Back to the preset", small=True, callback=lambda: app.set_appearance(preset=(app.prefs.get("theme") or {}).get("preset") or "dark"))
-            tip("the preset's colours again, your changes dropped")
-        dpg.add_separator()
-        from native import nodeface
-        typeface.label(dpg.add_text("NODES", color=ACCENT))
-        with dpg.group(horizontal=True):
-            dpg.add_checkbox(label="Colour nodes by category", tag="app_cat_colours", default_value=bool(app.prefs.get("cat_colours", True)),
-                             callback=lambda s, v: (app.prefs.__setitem__("cat_colours", bool(v)), save_prefs(app.prefs), app.gp.rebind_themes()))
-            tip("a node's title bar in its category's hue, so a graph reads by colour before it is read by name; "
-                "a colour you give a node still wins")
-        with dpg.group(horizontal=True):
-            for cat in nodeface.CATEGORY_ORDER + ("subgraphs",):
-                dpg.add_color_button(list(nodeface.hue(cat)) + [255], width=px(12), height=px(12), no_border=True, no_drag_drop=True)
-                dpg.add_text(cat)
-        # the interface's size: the faces and every control are made at it, so a change takes a restart
-        dpg.add_separator()
-        typeface.label(dpg.add_text("INTERFACE SIZE", color=ACCENT))
-        with dpg.group(horizontal=True):
-            num.add("app_ui_scale", int(round(typeface.scale() * 100)), 80, 200, integer=True, unit="%", width=px(200),
-                    callback=lambda s, v: _ui_scale_pick(app, v))
-            tip("the type and every control at this size, 80 to 200%; first the monitor's own scale. Takes a restart.")
-            dpg.add_button(label="The monitor's", small=True, callback=lambda: _ui_scale_pick(app, typeface.monitor_scale() * 100))
-            tip("the size the monitor is set to in the system's display settings")
-        with dpg.group(horizontal=True, tag="app_ui_restart_row", show=False):
-            dpg.add_text("", tag="app_ui_note", color=DIM)
-            weight.primary(dpg.add_button(label="Restart now", tag="app_ui_restart", callback=lambda: app.restart_studio()))
-            tip("the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first")
+        with dpg.tab_bar(tag="app_tabs"):
+            with dpg.tab(label="Colours", tag="app_tab_colours"):
+                _appearance_colours(app)
+            with dpg.tab(label="Selection frames", tag="app_tab_frames"):
+                _frames_content(app)
+            with dpg.tab(label="Interface size", tag="app_tab_size"):
+                _appearance_size(app)
     with dpg.window(tag="sweep_win", label="Sweep a slider", no_title_bar=True, show=False, width=px(400), height=px(190), no_collapse=True):
         dialog_header("sweep_win", "Sweep a slider")                 # one window style (C8): the frames' header
         dpg.add_text("The slider goes 0 to full and back over the seconds given, so the whole range is seen; "
@@ -773,7 +742,6 @@ def build_dialogs(app):
             weight.primary(dpg.last_item())
             dpg.add_button(label="Cancel", callback=lambda: dpg.hide_item("sweep_win"))
             weight.quiet(dpg.last_item())
-    build_frames_dialog(app)
     device_ui.build(app)
     with dpg.file_dialog(directory_selector=False, show=False, tag="bg_dialog", width=px(640), height=px(420),
                          callback=lambda s, a: app.set_background(a.get("file_path_name", ""))):
@@ -1043,11 +1011,14 @@ def place_stats():
     dpg.set_item_pos("stats_pop", [int(max(0, x - px(8))), int(max(0, y - h - px(6)))])
 
 
+FRAME_STYLE_DEFAULT = "turning"          # the gradient, going round, until Appearance > Selection frames says otherwise
+
+
 def frame_style(app):
-    """How the frames look (glow.STYLES): a still outline in the accent
-    unless Settings > Selection frames picks a gradient."""
-    s = app.prefs.get("frame_style", "outline")
-    return s if s in dict(glow.STYLES) else "outline"
+    """How the frames look (glow.STYLES): the gradient turning, unless
+    Appearance > Selection frames picks a still one or the accent outline."""
+    s = app.prefs.get("frame_style", FRAME_STYLE_DEFAULT)
+    return s if s in dict(glow.STYLES) else FRAME_STYLE_DEFAULT
 
 
 def apply_frames(app):
@@ -1067,8 +1038,8 @@ def apply_frames(app):
 
 
 def set_frame_style(app, style):
-    """Settings > Selection frames: the look, kept."""
-    app.prefs["frame_style"] = style if style in dict(glow.STYLES) else "outline"
+    """Appearance > Selection frames: the look, kept."""
+    app.prefs["frame_style"] = style if style in dict(glow.STYLES) else FRAME_STYLE_DEFAULT
     from native.project import save_prefs
     save_prefs(app.prefs)
     apply_frames(app)
@@ -1086,40 +1057,90 @@ def _strip(stops, mirror, width=None, height=None, parent=None):
             dpg.draw_rectangle((x, 0), (x + 2, height), color=(r, g, b, 255), fill=(r, g, b, 255))
 
 
-def build_frames_dialog(app):
+def _appearance_colours(app):
+    """Appearance's Colours tab: a preset, its seven colours, the nodes' colours by category."""
+    from native.app import THEME_PRESETS, THEME_ROLES
+    dpg.add_text("The look: a preset to start from, then any of its seven colours - the change shows as you make it "
+                 "and is kept.", color=DIM, wrap=px(540))
+    typeface.label(dpg.add_text("THEME", color=ACCENT))
+    with dpg.group(horizontal=True):
+        for name in THEME_PRESETS:
+            dpg.add_button(label=name, small=True, user_data=name, callback=lambda s, a, u: app.set_appearance(preset=u))
+        dpg.add_text("", tag="app_preset", color=DIM)
+    dpg.add_separator()
+    for key, label, what in THEME_ROLES:
+        # a colour as its swatch and hex, the role's name first (C6)
+        with form.row(label, width=96):
+            form.swatch(f"app_col_{key}", (0, 0, 0), lambda c, u=key: app.set_appearance(colors={u: list(c)}))
+            typeface.small(dpg.add_text(what, color=DIM))
+    dpg.add_separator()
+    with dpg.group(horizontal=True):
+        dpg.add_button(label="Back to the preset", small=True, callback=lambda: app.set_appearance(preset=(app.prefs.get("theme") or {}).get("preset") or "dark"))
+        tip("the preset's colours again, your changes dropped")
+    dpg.add_separator()
+    from native import nodeface
+    typeface.label(dpg.add_text("NODES", color=ACCENT))
+    with dpg.group(horizontal=True):
+        dpg.add_checkbox(label="Colour nodes by category", tag="app_cat_colours", default_value=bool(app.prefs.get("cat_colours", True)),
+                         callback=lambda s, v: (app.prefs.__setitem__("cat_colours", bool(v)), save_prefs(app.prefs), app.gp.rebind_themes()))
+        tip("a node's title bar in its category's hue, so a graph reads by colour before it is read by name; "
+            "a colour you give a node still wins")
+    with dpg.group(horizontal=True):
+        for cat in nodeface.CATEGORY_ORDER + ("subgraphs",):
+            dpg.add_color_button(list(nodeface.hue(cat)) + [255], width=px(12), height=px(12), no_border=True, no_drag_drop=True)
+            dpg.add_text(cat)
+
+
+def _appearance_size(app):
+    """Appearance's Interface size tab: the size, the monitor's, the restart it takes."""
+    # the interface's size: the faces and every control are made at it, so a change takes a restart
+    dpg.add_text("The type and every control at a size of their own - the monitor's own scale to start with.",
+                 color=DIM, wrap=px(540))
+    typeface.label(dpg.add_text("INTERFACE SIZE", color=ACCENT))
+    with dpg.group(horizontal=True):
+        num.add("app_ui_scale", int(round(typeface.scale() * 100)), 80, 200, integer=True, unit="%", width=px(200),
+                callback=lambda s, v: _ui_scale_pick(app, v))
+        tip("the type and every control at this size, 80 to 200%; first the monitor's own scale. Takes a restart.")
+        dpg.add_button(label="The monitor's", small=True, callback=lambda: _ui_scale_pick(app, typeface.monitor_scale() * 100))
+        tip("the size the monitor is set to in the system's display settings")
+    with dpg.group(horizontal=True, tag="app_ui_restart_row", show=False):
+        dpg.add_text("", tag="app_ui_note", color=DIM)
+        weight.primary(dpg.add_button(label="Restart now", tag="app_ui_restart", callback=lambda: app.restart_studio()))
+        tip("the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first")
+
+
+def _frames_content(app):
+    """Appearance's Selection frames tab (it was a window of its own)."""
     app._gc = {"name": "", "stops": [list(st) for st in glow.DEFAULT_STOPS], "mirror": False}
-    with dpg.window(tag="frames_win", label="Selection frames", no_title_bar=True, show=False, width=px(560), height=px(620), no_collapse=True):
-        dialog_header("frames_win", "Selection frames")                 # one window style (C8): the frames' header
-        dpg.add_text("The frame around the selected nodes, and the one around the pane last clicked in: an "
-                     "outline in the accent, or a gradient - a WLED palette, the studio's own, or one you make "
-                     "below - still or turning.", color=DIM, wrap=px(530))
-        with form.row("look"):
-            dpg.add_radio_button([w for _, w in glow.STYLES], tag="frames_style", default_value=glow.STYLES[0][1],
-                                 callback=lambda s, v: set_frame_style(app, next(k for k, w in glow.STYLES if w == v)))
-        dpg.add_group(tag="frames_choice")
-        dpg.add_separator()
-        typeface.label(dpg.add_text("GRADIENT CREATOR", color=ACCENT))
-        with dpg.group(horizontal=True):
-            form.inline("start from")
-            dpg.add_combo([], tag="gc_from", width=px(220), callback=lambda s, v: _gc_load(app, v))
-        with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="gc_name", hint="a name for this gradient", width=px(220),
-                               callback=lambda s, v: app._gc.__setitem__("name", v))
-            dpg.add_checkbox(label="mirror (seamless: 0 to 1 and back)", tag="gc_mirror",
-                             callback=lambda s, v: (app._gc.__setitem__("mirror", bool(v)), refresh_frames(app)))
-        dpg.add_group(tag="gc_rows")
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Save", callback=lambda: _gc_save(app))
-            dpg.add_button(label="Save + use for nodes", callback=lambda: _gc_save(app, "sel"))
-            dpg.add_button(label="Save + use for pane", callback=lambda: _gc_save(app, "focus"))
-            dpg.add_button(label="Delete", tag="gc_delete", callback=lambda: _gc_delete(app))
-        dpg.add_text("", tag="gc_status", color=DIM)
+    dpg.add_text("The frame around the selected nodes, and the one around the pane last clicked in: a "
+                 "gradient - a WLED palette, the studio's own, or one you make below - turning or still, or "
+                 "an outline in the accent.", color=DIM, wrap=px(540))
+    with form.row("look"):
+        dpg.add_radio_button([w for _, w in glow.STYLES], tag="frames_style", default_value=dict(glow.STYLES)[FRAME_STYLE_DEFAULT],
+                             callback=lambda s, v: set_frame_style(app, next(k for k, w in glow.STYLES if w == v)))
+    dpg.add_group(tag="frames_choice")
+    dpg.add_separator()
+    typeface.label(dpg.add_text("GRADIENT CREATOR", color=ACCENT))
+    with dpg.group(horizontal=True):
+        form.inline("start from")
+        dpg.add_combo([], tag="gc_from", width=px(220), callback=lambda s, v: _gc_load(app, v))
+    with dpg.group(horizontal=True):
+        dpg.add_input_text(tag="gc_name", hint="a name for this gradient", width=px(220),
+                           callback=lambda s, v: app._gc.__setitem__("name", v))
+        dpg.add_checkbox(label="mirror (seamless: 0 to 1 and back)", tag="gc_mirror",
+                         callback=lambda s, v: (app._gc.__setitem__("mirror", bool(v)), refresh_frames(app)))
+    dpg.add_group(tag="gc_rows")
+    with dpg.group(horizontal=True):
+        dpg.add_button(label="Save", callback=lambda: _gc_save(app))
+        dpg.add_button(label="Save + use for nodes", callback=lambda: _gc_save(app, "sel"))
+        dpg.add_button(label="Save + use for pane", callback=lambda: _gc_save(app, "focus"))
+        dpg.add_button(label="Delete", tag="gc_delete", callback=lambda: _gc_delete(app))
+    dpg.add_text("", tag="gc_status", color=DIM)
 
 
 def show_frames(app):
-    refresh_frames(app)
-    _centre("frames_win", 560, 620)
-    dpg.show_item("frames_win")
+    """The selection frames: Appearance, at their tab."""
+    show_appearance(app, "frames")
 
 
 def refresh_frames(app):
@@ -1552,9 +1573,13 @@ def show_compare(app):
 
 
 # --- appearance, pane menus ----------------------------------------------------------------
-def show_appearance(app):
+def show_appearance(app, tab=None):
+    """Settings > Appearance, at a tab ("colours", "frames", "size") or the one it was left at."""
     refresh_appearance(app)
-    _centre("appearance_win", 560, 470)
+    refresh_frames(app)
+    if tab and dpg.does_item_exist(f"app_tab_{tab}"):
+        dpg.set_value("app_tabs", f"app_tab_{tab}")
+    _centre("appearance_win", 600, 660)
     dpg.show_item("appearance_win")
 
 
@@ -1653,6 +1678,7 @@ def dialog_header(tag, title, on_close=None):
     dpg.add_image_button(texture("close", px(14)), tag=f"{tag}_x", width=px(14), height=px(14), frame_padding=2,
                          tint_color=TEXT, pos=(px(200), px(8)), callback=lambda: close_dialog(tag))
     tip("close (Esc while it has the focus)")
+    placed(f"{tag}_x")
     DIALOGS[tag] = on_close
 
 
@@ -1695,6 +1721,106 @@ def tip(text, item=None, wrap=None):
         dpg.add_text(text, wrap=wrap or px(360))
 
 
+# --- the words of placed controls ------------------------------------------------------------------
+# Dear PyGui draws a control placed at a position of its own (pos=, set_item_pos) out of the
+# flow, and the tooltip made for it - checked against the item drawn before it in the flow -
+# never comes up: the panes' ::: grips, the dialogs' and the frames' close and dock buttons, the
+# dock's float, the 3-D view's corner controls in the graph. Their words come up here instead,
+# beside the pointer after the same short rest, read from that tooltip (which stays: the
+# reference and the walk name the control by it, and a tooltip whose words change - the dock
+# button's - is read as it is).
+PLACED = set()            # the placed controls, by tag
+PLACED_REST = 0.35        # s the pointer rests on one before its words come up
+_placed = {"item": None, "since": 0.0, "shown": False}
+
+
+def placed(item):
+    """A control placed at a position of its own, whose tooltip is to come up at the pointer."""
+    PLACED.add(item)
+
+
+def placed_words(item):
+    """The words of a control's tooltip (the tooltip made right after it), or ""."""
+    try:
+        parent = dpg.get_item_parent(item)
+        kids = dpg.get_item_children(parent, 1) or []
+        me = dpg.get_alias_id(item) if isinstance(item, str) else item
+        j = kids.index(me)
+    except Exception:
+        return ""
+    if j + 1 < len(kids) and dpg.get_item_type(kids[j + 1]).endswith("::mvTooltip"):
+        for t in dpg.get_item_children(kids[j + 1], 1) or []:
+            if dpg.get_item_type(t).endswith("::mvText") and dpg.get_value(t):
+                return str(dpg.get_value(t))
+    return ""
+
+
+PLACED_DL = "placed_tip_dl"   # the words' drawlist: the viewport's front, over every window (a window of its
+                              # own went behind the one the control sat in, and could not be shorter than 100 px)
+
+
+def _placed_lines(words, width, size):
+    """The words in lines no wider than `width` px."""
+    out = []
+    for para in words.splitlines() or [""]:
+        line = ""
+        for w in para.split(" "):
+            t = (line + " " + w).strip()
+            if line and typeface.measure(t, "body", size) > width:
+                out.append(line); line = w
+            else:
+                line = t
+        out.append(line)
+    return out
+
+
+def poll_placed_tips():
+    """Per frame: the words of the placed control under the pointer, beside it once it has rested there;
+    away as soon as it leaves or a button goes down (a grip being dragged)."""
+    over = None
+    if not any(dpg.is_mouse_button_down(b) for b in (dpg.mvMouseButton_Left, dpg.mvMouseButton_Right, dpg.mvMouseButton_Middle)):
+        for item in tuple(PLACED):
+            try:
+                st = dpg.get_item_state(item)
+            except Exception:
+                PLACED.discard(item)                   # made again under another tag, or gone
+                continue
+            if st.get("hovered") and st.get("visible", True):
+                over = item
+                break
+    s = _placed
+    if over != s["item"]:
+        s["item"], s["since"] = over, time.time()
+        if s["shown"]:
+            dpg.delete_item(PLACED_DL, children_only=True)
+            s["shown"] = False
+    if over is None or s["shown"] or time.time() - s["since"] < PLACED_REST:
+        return
+    words = placed_words(over)
+    if not words:
+        return
+    if not dpg.does_item_exist(PLACED_DL):
+        dpg.add_viewport_drawlist(front=True, tag=PLACED_DL)      # made at the first use: after the frames' own, so over them
+    size = typeface.size_of("body")
+    pad, lh = px(8), int(round(size * 1.35))
+    lines = _placed_lines(words, px(360), size)
+    w = max(typeface.measure(line, "body", size) for line in lines) + 2 * pad
+    h = len(lines) * lh + 2 * pad - (lh - size)
+    mx, my = dpg.get_mouse_pos(local=False)
+    vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+    x, y = mx + px(14), my + px(20)
+    if x + w > vw - 4:
+        x = mx - w - px(8)                            # at the right edge (the controls are at their panes' top right): on the pointer's left
+    if y + h > vh - 4:
+        y = my - h - px(8)
+    x, y = max(2, x), max(2, y)
+    dpg.draw_rectangle((x, y), (x + w, y + h), color=tuple(LINE[:3]) + (255,), fill=tuple(PANEL[:3]) + (250,),
+                       rounding=px(4), parent=PLACED_DL)
+    for i, line in enumerate(lines):
+        typeface.draw_text((x + pad, y + pad + i * lh), line, size, color=tuple(TEXT[:3]) + (255,), parent=PLACED_DL)
+    s["shown"] = True
+
+
 def info(text, wrap=None):
     """A dim (?) that explains the row it sits on, on hover - for what has
     no single control to hang the words on."""
@@ -1715,6 +1841,7 @@ def grip(pane):
     dpg.bind_item_theme(f"grip_{pane}", "grip_theme")
     with dpg.tooltip(f"grip_{pane}"):
         dpg.add_text("drag onto another pane to move this one there")
+    placed(f"grip_{pane}")
 
 
 def _pane_menu(app, pane, rows):
