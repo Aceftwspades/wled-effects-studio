@@ -147,6 +147,28 @@ def test_a_parts_ends_for_joining():
     assert shapes.reordered(parts, 3, 1) == ["a", "d", "b", "c"] and shapes.reordered(parts, 0, 3) == ["b", "c", "d", "a"]
 
 
+def test_leds_on_one_spot_are_found():
+    from native import shape_checks
+    rs = np.random.RandomState(1)
+    W = rs.uniform(-10, 10, (400, 3))
+    W[:50] = rs.uniform(-10, 10, (50, 3)) * 1000               # far apart: none near another
+    W = W * 10
+    assert shape_checks._overlaps(W) == []
+    W[7] = W[300] + [0.1, 0.0, 0.05]                          # one on top of another
+    pairs = shape_checks._overlaps(W)
+    assert pairs == [(7, 300)], pairs
+
+
+def test_every_start_object_builds():
+    from native import shape_start
+    for i, (label, kind, params, rot, what) in enumerate(shape_start.OBJECTS):
+        q = shape_start.part(i)
+        assert q["kind"] == kind and shapes.part_count(q) > 0, label
+    tree = shape_start.part(3)
+    assert shapes.part_count(tree) == 600
+    assert shapes.part_count(shape_start.part(5)) == 241      # the ring disc
+
+
 if __name__ == "__main__":
     bad = 0
     for name, fn in list(globals().items()):

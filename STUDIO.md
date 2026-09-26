@@ -2147,13 +2147,30 @@ proposal's number; in the order to do them.
       from what changed ("moved strip 1", "added tree 1", "re-wired",
       "deleted ring 1", "changed the shape's density") and Edit > Undo
       history lists the shape's steps when the shape is what Undo acts on.
-- [ ] **Checks as you build** (S16): two LEDs on one spot, a long lead, a
+- [x] **Checks as you build** (S16): two LEDs on one spot, a long lead, a
       total that is not the outputs' count, the power - each with a "show
-      me" that frames it.
-- [ ] **A starting point** (S17): an empty editor offers objects (matrix,
+      me" that frames it. `native/shape_checks.py`, run on every change
+      and shown under the frame's tools: LEDs within a quarter spacing of
+      another (a grid of those cells, each against its neighbours - a copy
+      left on its part is the usual one), leads of a metre and more (with
+      what a wire that long may want), the LED outputs' count against the
+      shape's, the current at full white against the limiter's ceiling (the
+      Outputs frame's numbers), a formula that does not work out, a part
+      with no LEDs, hidden parts; "show me" selects and frames it, or opens
+      the Outputs frame; the footer gets a word when there is newly more to
+      look at.
+- [x] **A starting point** (S17): an empty editor offers objects (matrix,
       cube, sphere, tree, star, ring disc, room outline), drawing a run,
       importing a model or an xLights layout; choosing "shape" changes
-      nothing until one is picked.
+      nothing until one is picked. `native/shape_start.py`: twelve objects -
+      the matrix, the cube, the sphere, a 180 cm Christmas tree of 12
+      strands, a star, the 241-LED ring disc, a 4 x 3 m ceiling's outline, a
+      window, an infinity cube, a soccer ball, a helix column, a spiral
+      disc - pictured, each opening the gallery on its kind with its sizes
+      in (and turned as it stands); then Draw a run, Import a model or a
+      layout, Any part. GEOMETRY > shape on another geometry puts the combo
+      back and opens the Shape frame on its start; the first part in makes
+      the geometry the shape (the old way made a ring nobody asked for).
 
 **From the real object**
 - [ ] **Map by camera** (S18): for lights that follow no pattern, the

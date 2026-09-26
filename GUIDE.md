@@ -391,6 +391,23 @@ Only what is shown changes - the device gets the shape fitted to its box as
 ever. (Both are the shape's own settings: click on nothing to see them.)
 A part can have a strip of another density: its own **LEDs a metre**.
 
+**A starting point.** With no parts yet, the list is a start: objects
+people light, ready to size - a matrix, a cube, a sphere, a Christmas tree,
+a star, the 241-LED ring disc, a room's ceiling outline, a window, an
+infinity cube, a soccer ball, a helix column, a spiral disc - each opening
+the gallery below on its sizes; or **Draw a run**, **Import a model or a
+layout...**, or **Any part...** (the whole gallery). Choosing "shape" under
+GEOMETRY opens this and changes nothing until the first part goes in.
+
+**Checks as you build.** Under the tools, what is likely a mistake or will
+matter on the bench: LEDs sitting on another (two parts laid over each
+other, a copy left on its part), a lead of a metre or more (a data wire
+that long may want a buffer, or a sacrificial LED near the controller), LED
+outputs carrying another count than the shape, the current at full white
+against the limiter's ceiling, a formula that does not work out, parts
+hidden - each with **show me**, which selects and frames it (or opens the
+Outputs frame).
+
 **Adding parts.** **Add part...** opens a gallery of pictures - LINES
 (strip, path, arch, helix round a tube, flat spiral), FLAT (ring, rings in
 rings, polygon, star, spokes, frame for a window or a door, panel), SOLID

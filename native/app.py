@@ -897,7 +897,12 @@ class App(Features):
             return
         params = dict(self.project.geometry.params) if self.project.geometry.kind == val else {}
         if val == "shape" and not params.get("parts"):
-            params["parts"] = [dict(__import__("native.shapes", fromlist=["new_part"]).new_part("ring", n=24), name="ring 1")]
+            # nothing changes until a first part goes in: the Shape frame opens on its start (shape_start)
+            dpg.set_value("geom_kind", self.project.geometry.kind)
+            device_ui.show(self, "shape")
+            shape_ui.refresh(self)
+            self.gp.status("pick a start in the Shape frame: the geometry becomes the shape when its first part goes in")
+            return
         self.apply_geometry(Geometry(val, **params))
         self.rebuild_geom_fields()
         if val == "shape":
@@ -3853,11 +3858,12 @@ CMD_FILE = os.path.join(SHOT_DIR, "command.json")
 
 def _hook_names(app):
     """What a test hook's line of Python ("py", "check") has in scope."""
-    from native import shape_view, shapes, units, shape_gallery, shape_run, shape_fields
+    from native import shape_view, shapes, units, shape_gallery, shape_run, shape_fields, shape_checks, shape_start
     return {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
-            "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields}
+            "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,
+            "shape_checks": shape_checks, "shape_start": shape_start}
 
 
 def service_command(app):

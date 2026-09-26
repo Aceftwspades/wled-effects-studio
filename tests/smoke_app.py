@@ -434,8 +434,17 @@ STEPS = [
     ([{"check": "[q.get('group') for q in app.project.geometry.params['parts'][:3]] == ['walls', 'walls', None]"},
       {"check": "any(dpg.get_item_configuration(i).get('label', '').strip() == 'walls' for i in dpg.get_item_children('shape_parts', 1) "
                 "for i in (dpg.get_item_children(i, 1) or []))"},
-      {"key": "0", "over": "view"}, {"dock": ["shape", False]},
-      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
+      {"key": "0", "over": "view"}, {"py": "shape_ui.select(app, [3]) or shape_tools.duplicate(app)"}, {"key": "Escape"}], 0.8),
+    # S16: a copy left on top of its part is found (and "show me" frames it); S17: GEOMETRY > shape from a cube changes
+    # nothing but opens the start; an object from it (the matrix) is the first part - and the geometry becomes the shape
+    ([{"check": "any('sit on another' in c.text for c in shape_checks.run(app))"},
+      {"py": "next(c for c in shape_checks.run(app) if 'sit on another' in c.text).show()"},
+      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.8),
+    ([{"py": "app.on_geom_kind(None, 'shape')"}], 0.8),
+    ([{"check": "app.project.geometry.kind == 'cube' and dpg.get_value('geom_kind') == 'cube' and dpg.does_item_exist('start_obj_0')"},
+      {"py": "shape_start.choose(app, 0)"}, {"py": "shape_gallery.add(app, app._gallery_part)"}], 1.0),
+    ([{"check": "app.project.geometry.kind == 'shape' and app.project.geometry.count == 256 and dpg.get_value('geom_kind') == 'shape'"},
+      {"dock": ["shape", False]}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
     # live output to the fake device on this machine, and the wiring test
     ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
       {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),

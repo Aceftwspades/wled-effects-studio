@@ -258,6 +258,7 @@ def build(app):
                   "export an xLights model or the positions; a preview")
             dpg.add_button(label="Undo", tag="shape_undo_btn", callback=lambda: undo(app))
             dpg.add_button(label="Redo", tag="shape_redo_btn", callback=lambda: redo(app))
+        dpg.add_group(tag="shape_checks")                    # what is likely a mistake, each with a "show me" (shape_checks)
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("WIRING", color=c.ACCENT))
             dpg.add_text("the parts in the order the LEDs are wired: drag a row to move it", tag="shape_list_hint", color=c.DIM)
@@ -406,10 +407,19 @@ def refresh(app):
     dpg.delete_item("shape_parts", children_only=True)
     dpg.delete_item("shape_fields", children_only=True)
     _undo_buttons(app)
-    if parts is None:
-        dpg.set_value("shape_desc", "the geometry is not a shape: add a part to start one (Add part...), or draw a run")
+    from native import shape_checks, shape_start
+    if not parts:
+        dpg.configure_item("shape_parts", height=px(300))
+        dpg.set_value("shape_desc", "no parts yet: start with an object, draw a run or import one - the geometry becomes "
+                      "the shape when its first part goes in" if parts is None else "no parts yet: start with an object below")
+        shape_start.fill(app, "shape_parts")
         dpg.set_value("shape_part_title", "SHAPE"); dpg.set_value("shape_part_kind", "")
+        if dpg.does_item_exist("shape_checks"):
+            dpg.delete_item("shape_checks", children_only=True)
+        if parts is not None:
+            _shape_settings(app, "shape_fields", g.params)
         return
+    dpg.configure_item("shape_parts", height=px(150))
     sp = g.params
     dpg.set_value("shape_desc", f"{len(parts)} part(s), {g.count} LEDs  ·  {units.density(sp):g} LEDs a metre  ·  in {units.unit(sp)}"
                   + (f"  ·  {g.collisions} LEDs share a grid cell" if getattr(g, "collisions", 0) else ""))
@@ -456,10 +466,7 @@ def refresh(app):
             weight.danger(dpg.last_item())
             c.tip("delete the part (Undo brings it back)")
         start += n
-    if not parts:
-        with dpg.group(parent="shape_parts"):
-            dpg.add_text("No parts yet. Add one (Add part...) or draw a run in the 3-D view (Draw a run); File... imports a "
-                         "model or an xLights layout.", color=c.DIM, wrap=px(480))
+    shape_checks.refresh(app)
     P = "shape_fields"
     if not chosen:
         dpg.set_value("shape_part_title", "SHAPE"); dpg.set_value("shape_part_kind", "- nothing selected: the shape's own settings")

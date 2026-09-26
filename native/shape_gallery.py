@@ -82,13 +82,14 @@ def build(app):
                 pass
 
 
-def show(app, kind=None):
-    """Open the gallery on a kind (the last one added, at first a strip)."""
+def show(app, kind=None, preset=None):
+    """Open the gallery on a kind (the last one added, at first a strip) -
+    with `preset`, a part of that kind with its sizes filled in (a start's object)."""
     from native import chrome
     if not dpg.does_item_exist(TAG):
         return
     _fill_tiles(app)
-    choose(app, kind or getattr(app, "_gallery_kind", None) or "strip")
+    choose(app, kind or getattr(app, "_gallery_kind", None) or "strip", preset=preset)
     chrome._centre(TAG, 760, 600)
     dpg.show_item(TAG)
     dpg.focus_item(TAG)
@@ -120,13 +121,16 @@ def _fill_tiles(app):
         chrome.tip("a mesh drawn in the 3-D view to place LEDs against, not LEDs: the tree, the house, the enclosure")
 
 
-def choose(app, kind):
+def choose(app, kind, preset=None):
     """A picture picked: its sizes asked, with what the part comes to."""
     from native import chrome, shape_fields as sf
     if kind not in shapes.KINDS:
         kind = "strip"
     app._gallery_kind = kind
-    app._gallery_part = _sample(kind) if kind in ("polyline", "points") else shapes.new_part(kind)
+    if preset is not None and preset.get("kind") == kind:
+        app._gallery_part = json.loads(json.dumps(preset))
+    else:
+        app._gallery_part = _sample(kind) if kind in ("polyline", "points") else shapes.new_part(kind)
     for _, kinds in GROUPS:
         for k in kinds:
             if dpg.does_item_exist(f"gallery_tile_{k}"):
@@ -243,7 +247,8 @@ def add(app, part, close=True):
     parts = list(shape_ui._parts(app) or [])
     sel = shape_ui._sel(app) if parts else -1
     q = placed(parts, sel, part)
-    q["name"] = f"{name_of(q['kind'])} {sum(1 for p in parts if p['kind'] == q['kind']) + 1}"
+    base = part.get("name") if part.get("name") and part.get("name") != part.get("kind") else name_of(q["kind"])
+    q["name"] = f"{base} {sum(1 for p in parts if p.get('name', '').startswith(base)) + 1}"
     at = sel + 1 if 0 <= sel < len(parts) else len(parts)
     parts.insert(at, q)
     shape_ui._set_sel(app, {at})
