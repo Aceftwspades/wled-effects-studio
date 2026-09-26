@@ -2045,39 +2045,108 @@ proposal's number; in the order to do them.
       with it.
 
 **Real sizes, real objects**
-- [ ] **Real units** (S8): the shape's LED density (30, 60, 96, 144 a
+- [x] **Real units** (S8): the shape's LED density (30, 60, 96, 144 a
       metre or a spacing) and a unit (mm, cm, in); strips by length or
       count, rings by diameter, leads in centimetres. The display only:
       the device's table is fitted to its box as before; old shapes open
-      at 60 a metre.
-- [ ] **Add from a gallery** (S9): a thumbnail per kind, grouped (lines,
+      at 60 a metre. The shape's settings (nothing selected) set both;
+      `native/shape_fields.py` gives every kind its natural sizes as
+      fields - counts, lengths in the unit, a density as LEDs a metre,
+      angles, text - with a "work it out" setting (a ring's radius at 0)
+      shown as what it comes to until typed (a polygon's and a star's
+      across their corners, which have no LED); a strip's length typed
+      sets its count. Positions, a path's corners, copies' steps, the
+      working plane and AIM's distance are in the unit too.
+- [x] **Add from a gallery** (S9): a thumbnail per kind, grouped (lines,
       flat, solid, free, from a file), each asking its natural sizes; the
-      new part joined to the end of the selected one.
-- [ ] **The shapes people light** (S10), xLights' model types the
+      new part joined to the end of the selected one. `native/
+      shape_gallery.py`: the pictures are the kinds' LEDs drawn dim to
+      bright along the wiring (once, as textures); a picture asks its
+      fields marked "ask" and says what the part comes to and where it
+      goes. A line (strip, path, arch, helix, spiral) is joined on - its
+      first LED one spacing past the selected part's last, turned to run on
+      the same way (`shapes.ends`); anything else beside it, its foot level;
+      either way next after it in the wiring. The frame's "+ kind" buttons,
+      and the old placing "to the right of the last", went with it (the
+      test hook's add uses the gallery's placing).
+- [x] **The shapes people light** (S10), xLights' model types the
       checklist: tree (strands down a cone, or a spiral), star, helix or
       spiral, arch, concentric rings, frame (window, door, screen, room
       edge), spokes; and a formula part - x, y and z as expressions of the
       place along it, Pixelblaze's mapper's way. The xLights layout import
       maps its trees, stars, arches, spinners and window frames onto them.
-- [ ] **Draw a run** (S11): click corners on the working plane (the grid
+      Each in `shapes.py`: a tree's strands evenly along a cone or a spiral
+      (up one, down the next), a star's edges centred between its points, a
+      helix's LEDs a spacing apart along it with the turns its length makes
+      over the height given, a flat Archimedean spiral sampled until it is
+      the strip's length, an arch's LEDs evenly along an elliptic arc on its
+      feet, rings in rings (counts from the middle out; each sized by its
+      LEDs or a gap), a frame's sides (three with no bottom, from any
+      corner, either way round), spokes back and forth; a formula's x, y
+      and z parsed once (`expr.compile`) and worked out per LED, a bad one
+      named in the frame. A part's LEDs are cached by kind and settings (a
+      drag re-resolves every frame). The xLights reader: Tree (strings x
+      strands, turns, the bottom/top ratio, the degrees in its name), Star
+      (its points and ratio), Arches (an arch part each, side by side),
+      Spinner (spokes), Window Frame (its counts, the sides stretched to its
+      height) - tests for each kind's spacing and for the import.
+- [x] **Draw a run** (S11): click corners on the working plane (the grid
       and 15-degree snapping, the length in centimetres and LEDs as it
       grows); the corners handles afterwards, and a table in the frame.
-- [ ] **Live copies** (S12): repeat (a count, a step, a turn a copy, round
+      `native/shape_run.py`: the plane is the one the view faces most (from
+      above a floor level with the last corner, from the front or side a
+      wall), so 7, 1 and 3 draw flat, upright and side-on runs; the first
+      corner also snaps onto a part's end (a run carried on); the run
+      becomes a path part after the selected one. A lone selected path's
+      corners are squares to drag - a longer or shorter path goes through
+      the engine as it is dragged, its count changing - and a table: x, y,
+      z in the unit, one put in halfway to the next, deleted, the path
+      reversed, drawn on from its end.
+- [x] **Live copies** (S12): repeat (a count, a step, a turn a copy, round
       a centre, every other one reversed) and mirror as settings of a part,
       exact mirrors; "make separate" when one copy needs its own change.
+      `shapes.with_copies` repeats a part's LEDs in the shape - each copy
+      moved by the step and turned about the axis through its middle or the
+      origin, every other one run back - then mirrors them all across the
+      planes ticked (exact: the positions negated, no turn), run back if
+      asked; one part in the list and the wiring, `part_count` counting
+      them. `shapes.separate` gives them as parts again with the LEDs where
+      they were (copies the same kind, moved and turned; mirrors loose
+      points). The one-shot mirror (a rotation "near enough") and array
+      went; the part's menu mirrors and repeats live.
 
 **The frame as an inspector**
-- [ ] **What the selection needs** (S13): nothing selected, the shape
+- [x] **What the selection needs** (S13): nothing selected, the shape
       (density, units, layout, segments, a File menu); one part, its size,
       its place (flat / upright / outward and 90-degree turns, the exact
       angles folded), its copies and its wiring; several, align, spread
-      and match. The import settings move into the import dialog.
-- [ ] **The list is the wiring** (S14): rows dragged to reorder, a swatch
+      and match. The import settings move into the import dialog. The
+      frame's top: Add part, Draw a run, File (open, save, import, a
+      reference, the exports, a preview, clear - a popup), Undo, Redo. A
+      part: SIZE (its fields; a path's corners; a solid's split; loose
+      points' tools and BY HAND), PLACE (the position in the unit; lie
+      flat, upright or facing out from the shape's middle; turn 90 degrees;
+      folded, the exact angles, the scale and AIM - the fold stays as it
+      was left), COPIES, WIRING (the other way, its place in the wiring,
+      light it). Several: align, spread, same scale, same turn, lie and
+      turn each, group. The audit's rule that a word after a field is its
+      label caught the working plane's "at".
+- [x] **The list is the wiring** (S14): rows dragged to reorder, a swatch
       in the part's colour, the LED range, reverse as an arrow, hide and
-      lock, groups.
-- [ ] **Undo and redo** (S15) as the rest of the studio has them: Ctrl+Z
+      lock, groups. Drawn icons for the way a part's LEDs run, shown or
+      hidden and locked (icons.py); a row dropped on another wires the part
+      there; right-click a row for the part's menu (one handler for every
+      row). A group is a name on its parts: a heading in the list before
+      each run of them selects them all, "group them..." and "ungroup" in
+      ARRANGE, and the part's menu selects its group.
+- [x] **Undo and redo** (S15) as the rest of the studio has them: Ctrl+Z
       and Ctrl+Y over the view or the frame, a drag one step, the steps
-      named in the undo history.
+      named in the undo history. A redo stack beside the undo one; Ctrl+Z
+      and Ctrl+Y act on the shape with the pointer on the 3-D view while it
+      is built (and with the frame's keyboard, as before); each step named
+      from what changed ("moved strip 1", "added tree 1", "re-wired",
+      "deleted ring 1", "changed the shape's density") and Edit > Undo
+      history lists the shape's steps when the shape is what Undo acts on.
 - [ ] **Checks as you build** (S16): two LEDs on one spot, a long lead, a
       total that is not the outputs' count, the power - each with a "show
       me" that frames it.

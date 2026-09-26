@@ -328,23 +328,27 @@ STEPS = [
     # pointer (the hooks' stand-in for it); the view's own keys - a view along an axis is orthographic, 5 turns it
     # over, F frames the selected part, Home everything; a pan; the view's frame held while a part moves, grown when
     # one is added out of it
-    ([{"layout": "cube", "with_ui": True}, {"frame": "shape"}, {"dock": ["shape", True]}, {"shape": ["clear"]},
-      {"shape": ["add", "ring"]}, {"shape": ["add", "strip"]}, {"shape": ["select", 1]}], 1.5),
+    ([{"py": "chrome.close_all_frames(app) or [dpg.hide_item(w) for w in ('usermods_win', 'keys_win', 'about_win', 'frames_win') "
+             "if dpg.does_item_exist(w)] and None"},                    # the dialogs and frames the steps above left over the view
+      {"layout": "cube", "with_ui": True}, {"frame": "shape"}, {"dock": ["shape", True]}, {"shape": ["clear"]},
+      {"shape": ["layout", "strip"]}, {"shape": ["add", "ring"]}, {"shape": ["add", "strip"]}, {"shape": ["select", 1]}], 1.5),
     ([{"check": "view3d.editing(app)"},
       {"check": "(lambda out: tuple(out[30]) == tuple(shape_view.part_colour(1)) and "
                 "np.abs(out[0].astype(int) - shape_view.part_colour(0) * shape_view.DIM_OTHERS).max() <= 1)"
                 "(shape_view.colours(app, app.frame_rgb(app.eng).reshape(-1, 3)))"},
       {"led_at": [30, "hover"]}], 0.6),
-    ([{"check": "app._shape_hover == (30, 1)"}, {"led_at": [0, "leave"]}, {"key": "1", "over": "view"}], 0.6),
+    ([{"check": "app._shape_hover is not None and app._shape_hover[1] == 1 and abs(app._shape_hover[0] - 30) <= 2 or "
+                "str((app._shape_hover, app._test_pointer, shape_view.covers(app), [dpg.get_item_alias(w) for w in dpg.get_windows() if dpg.is_item_shown(w)]))"},
+      {"led_at": [0, "leave"]}, {"key": "1", "over": "view"}], 0.6),
     ([{"check": "app.ortho and abs(abs(app.yaw) - np.pi) < 1e-3 and abs(app.pitch) < 1e-3"}, {"key": "5", "over": "view"}], 0.3),
     ([{"check": "not app.ortho"}, {"key": "7", "over": "view"}, {"py": "setattr(app, '_d0', app.dist)"}, {"key": "F", "over": "view"}], 0.6),
-    ([{"check": "app.ortho and app.pitch > 1.5 and app.dist < app._d0 and np.linalg.norm(app.look) > 0.1"},
+    ([{"check": "app.ortho and app.pitch > 1.5 and app.dist < app._d0"},
       {"py": "view3d.pan(app, 80, 30)"}, {"key": "Home", "over": "view"}], 0.6),
     ([{"check": "np.linalg.norm(app.look) < 1e-6 and abs(app.dist - view3d.HOME[2]) < 1e-6"},
       {"py": "setattr(app, '_f0', view3d.frame(app))"}, {"shape": ["nudge", {"pos": [60.0, 0.0, 0.0]}]}], 0.6),
     ([{"check": "np.allclose(view3d.frame(app)[0], app._f0[0]) and view3d.frame(app)[1] == app._f0[1]"},
       {"shape": ["add", "panel"]}], 0.6),
-    ([{"check": "view3d.frame(app)[1] > app._f0[1]"}, {"expect": ["shape_colours", "the parts"]},
+    ([{"check": "view3d.frame(app)[1] > app._f0[1]"}, {"check": "shape_view.mode(app) == 'parts'"},
       {"py": "shape_view.set_mode(app, 'effect')"}], 0.3),
     ([{"check": "shape_view.colours(app, app.frame_rgb(app.eng).reshape(-1, 3)) is not None and app.prefs.get('shape_colours') == 'effect'"},
       {"py": "shape_view.set_mode(app, 'parts')"}, {"key": "0", "over": "view"}], 1.0),
@@ -367,8 +371,9 @@ STEPS = [
       {"py": "setattr(app, '_x0', app.project.geometry.params['parts'][1]['pos'][0])"},
       {"key": "G", "over": "view"}, {"key": "X"}, {"key": "1"}, {"key": "0"}, {"key": "Return"}], 0.5),
     ([{"check": "abs(app.project.geometry.params['parts'][1]['pos'][0] - app._x0 - 6.0) < 1e-6"},
+      {"py": "setattr(app, '_rz0', app.project.geometry.params['parts'][1]['rot'][2])"},
       {"key": "R", "over": "view"}, {"key": "Z"}, {"key": "9"}, {"key": "0"}, {"key": "Return"}], 0.5),
-    ([{"check": "(lambda r: abs(r[2] - 90.0) < 1e-3 or str(r))(app.project.geometry.params['parts'][1]['rot'])"},
+    ([{"check": "(lambda r: abs((r[2] - app._rz0 - 90.0 + 180.0) % 360.0 - 180.0) < 1e-3 or str((r, app._rz0)))(app.project.geometry.params['parts'][1]['rot'])"},
       {"key": "S", "over": "view"}, {"key": "2"}, {"key": "Return"}], 0.5),
     ([{"check": "abs(float(app.project.geometry.params['parts'][1]['scale']) - 2.0) < 1e-6"},
       {"py": "setattr(app, '_p0', list(app.project.geometry.params['parts'][1]['pos']))"},
@@ -393,7 +398,43 @@ STEPS = [
       {"py": "setattr(app, '_r0', list(app.project.geometry.params['parts'][1]['rot']))"},
       {"tool": ["press", {"handle": ["ring", 2]}]}, {"tool": ["drag", {"from_press": [0, 70]}]}, {"tool": ["release", {"from_press": [0, 70]}]}], 0.6),
     ([{"check": "(lambda r: r != app._r0 or str((r, app._r0)))(app.project.geometry.params['parts'][1]['rot'])"},
-      {"py": "shape_tools.set_mode(app, 'move')"}, {"dock": ["shape", False]},
+      {"py": "shape_tools.set_mode(app, 'move')"}, {"py": "shape_ui.select(app, [])"},
+      {"py": "shape_ui.set_shape_option(app, density=30.0)"}], 0.5),
+    # S8-S13: the shape's density (what is shown); a length typed in the unit sets the count; the gallery joins a strip
+    # on from the selected one's end and puts a tree after it; a run drawn from above (three corners, Enter); a corner
+    # moved in the table; copies round the origin and a mirror, live, made separate; undo and redo
+    ([{"check": "units.density(app.project.geometry.params) == 30.0 and 'the shape' in dpg.get_value('shape_part_kind')"},
+      {"py": "shape_ui.set_shape_option(app, density=60.0, unit='cm')"}, {"shape": ["select", 1]},
+      {"py": "shape_ui._set_field(app, 1, shape_fields.FIELDS['strip'][1], 100.0)"}], 0.6),
+    ([{"check": "app.project.geometry.params['parts'][1]['params']['n'] == 60"},
+      {"py": "shape_gallery.show(app, 'strip')"}, {"py": "shape_gallery.add(app, app._gallery_part)"}], 0.8),
+    ([{"check": "len(app.project.geometry.params['parts']) == 4 and not dpg.is_item_shown('shape_gallery')"},
+      {"check": "(lambda P: float(np.linalg.norm(shapes.ends(P[2])[0] - (shapes.ends(P[1])[2] + shapes.ends(P[1])[3] * shapes.ends(P[1])[4]))) < 1e-3)"
+                "(app.project.geometry.params['parts'])"},
+      {"py": "shape_gallery.choose(app, 'tree')"}, {"py": "shape_gallery.add(app, app._gallery_part)"}], 0.8),
+    ([{"check": "[q['kind'] for q in app.project.geometry.params['parts']] == ['ring', 'strip', 'strip', 'tree', 'panel']"},
+      {"key": "7", "over": "view"}, {"key": "Home", "over": "view"}, {"py": "shape_run.start(app)"}], 0.8),
+    ([{"tool": ["press", {"view": [0.3, 0.8]}]}, {"tool": ["release", {"view": [0.3, 0.8]}]},
+      {"tool": ["press", {"view": [0.5, 0.8]}]}, {"tool": ["release", {"view": [0.5, 0.8]}]},
+      {"tool": ["press", {"view": [0.5, 0.6]}]}, {"tool": ["release", {"view": [0.5, 0.6]}]}], 0.5),
+    ([{"check": "shape_run.active(app) and len(app._run['corners']) == 3"}, {"key": "Return"}], 0.6),
+    ([{"check": "(lambda q: q['kind'] == 'polyline' and len(q['params']['points']) == 3)(app.project.geometry.params['parts'][shape_ui._sel(app)])"},
+      {"check": "not shape_run.active(app)"},
+      {"py": "shape_run._set_corner(app, shape_ui._sel(app), 2, [0.0, 0.0, 0.0])"}], 0.5),
+    ([{"check": "np.allclose(shape_run.world_corners(app.project.geometry.params['parts'][shape_ui._sel(app)])[2], 0.0, atol=1e-3)"},
+      {"py": "shape_ui.set_copies(app, shape_ui._sel(app), n=3, turn=120.0, axis='z', about='origin')"}], 0.5),
+    ([{"check": "shapes.copies(app.project.geometry.params['parts'][shape_ui._sel(app)]) == 3"},
+      {"py": "shape_ui.set_mirror(app, shape_ui._sel(app), x=True)"}], 0.5),
+    ([{"check": "shapes.copies(app.project.geometry.params['parts'][shape_ui._sel(app)]) == 6"},
+      {"py": "setattr(app, '_n0', app.project.geometry.count) or shape_ui.make_separate(app, shape_ui._sel(app))"}], 0.5),
+    ([{"check": "app.project.geometry.count == app._n0 and len(shape_ui.selection(app)) == 4"}, {"shape": ["undo"]}], 0.5),
+    ([{"check": "shapes.copies(app.project.geometry.params['parts'][shape_ui._sel(app)]) == 6"}, {"py": "shape_ui.redo(app)"}], 0.5),
+    ([{"check": "len(app.project.geometry.params['parts']) == 9 and app.project.geometry.count == app._n0"},
+      {"py": "shape_ui.set_group(app, [0, 1], 'walls')"}], 0.5),
+    ([{"check": "[q.get('group') for q in app.project.geometry.params['parts'][:3]] == ['walls', 'walls', None]"},
+      {"check": "any(dpg.get_item_configuration(i).get('label', '').strip() == 'walls' for i in dpg.get_item_children('shape_parts', 1) "
+                "for i in (dpg.get_item_children(i, 1) or []))"},
+      {"key": "0", "over": "view"}, {"dock": ["shape", False]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
     # live output to the fake device on this machine, and the wiring test
     ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},

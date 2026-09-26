@@ -371,118 +371,169 @@ as if the pane were square).
 
 ## Any shape: the shape editor
 
-GEOMETRY > shape (or Window > Shape editor) opens the **Shape** frame - in
-the dock like the Device ones, and floats the same way. A shape is a list of
-**parts** in wiring order: strips, rings, panels, cylinders, spheres, cubes,
-polygons (sides of so many LEDs each), polyhedra (the edges of a solid -
-tetrahedron to icosahedron, and the **soccer ball**, a truncated
-icosahedron - or every face outlined on its own), a strip run along a
-path (polyline), and loose points. Each part has its own settings - the
-LED count is always among them: LEDs, LEDs a side, LEDs an edge, wide x
-high; a path takes a count and sets its pitch - then:
+Window > Shape editor (Ctrl+Shift+E), or GEOMETRY > shape, opens the
+**Shape** frame - in the dock like the Device ones, and floats the same
+way. A shape is a list of **parts** in wiring order - strips, rings,
+panels, trees, stars, arches, paths, loose points and more - and the LEDs
+run through them part after part. You build it in the **3-D view**; the
+frame is where the exact values are. At its top: **Add part...**, **Draw a
+run**, **File...**, **Undo** and **Redo**. Under them the parts in wiring
+order, and under that what the selection needs: with nothing selected,
+the shape's own settings; one part, its sizes, place, copies and wiring;
+several, lining them up.
 
-- **In the 3-D view**: click a part to select it (on nothing: none),
-  Shift-click to add one or take it away, Shift-drag a box to add every
-  part with an LED in it; the list selects the same way (Ctrl or Shift
-  for more than one), and the frame shows the last one picked. The
-  selection wears **handles**: drag an arrow (X red, Y green, Z blue) to
-  move it along that axis, a square between two arrows to move it in their
-  plane, the ring in the middle to move it in the screen's plane - its
-  place snapping to a round distance that follows the zoom (Ctrl held:
+**Real sizes.** A shape is measured in LED spacings; its **LEDs a metre**
+(30, 60, 96 and 144 are the strips sold, or type any other) says what a
+spacing is on the bench - 60 a metre is 1.67 cm - and **lengths in** picks
+mm, cm or inches. Every length in the frame and the view is in that unit:
+a strip's length, a ring's diameter, a lead's gap, the floor's squares.
+Only what is shown changes - the device gets the shape fitted to its box as
+ever. (Both are the shape's own settings: click on nothing to see them.)
+A part can have a strip of another density: its own **LEDs a metre**.
+
+**Adding parts.** **Add part...** opens a gallery of pictures - LINES
+(strip, path, arch, helix round a tube, flat spiral), FLAT (ring, rings in
+rings, polygon, star, spokes, frame for a window or a door, panel), SOLID
+(cube, cylinder, sphere, tree, a solid's edges) and FREE (loose points, and
+a **formula**: x, y and z as expressions of t, i and n) - and FROM A FILE.
+A picture asks its natural sizes in the unit (a tree: strands, LEDs a
+strand, height, across the base) and says what it comes to (240 LEDs, 30
+x 30 x 50 cm) and where it will go: a line **joined to the end of the
+selected part** - its first LED one spacing on from that part's last,
+running on the same way - anything else **beside** it, its foot level
+with it; either way next after it in the wiring, and selected. **Add
+another** keeps the gallery open.
+
+**Draw a run** lays a strip where you click: corners on the plane the view
+faces most - from above (7) the floor, from the front (1) or the side (3) a
+wall - the first snapping to a round distance (or onto a part's end, to
+carry its run on), each run after it to a round length at 15 degrees (Ctrl:
+no snapping). As it grows the view shows its LEDs, each run's length, and
+the whole in the unit and in LEDs. Enter, or a click back on the last
+corner, ends it; Backspace takes a corner back; Esc leaves.
+
+**Building in the 3-D view.** While the frame is open the view shows each
+part in a colour of its own - the selected ones bright, the rest dimmed
+("colours" switches to the effect the sim runs) - and the **wiring drawn
+on the shape**: IN at the first LED, END at the last, arrows along each
+part the way its LEDs run, and every **lead** from one part's last LED to
+the next part's first dashed and labelled with its length (a gap of one
+spacing is a join and is not drawn). The part under the pointer is named
+with its LEDs and size and the LED's number. The view keeps its scale
+while you build; a part added outside it grows it, and Home fits it again.
+
+- Click a part to select it (on nothing: none), Shift-click to add one or
+  take it away, Shift-drag a box to add every part with an LED in it; the
+  list selects the same way (Ctrl or Shift for more than one). The frame
+  shows the last one picked - the **active** part.
+- The selection wears **handles**: drag an arrow (X red, Y green, Z blue)
+  to move it along that axis, a square between two arrows to move it in
+  their plane, the ring in the middle to move it in the screen's plane -
+  its place snapping to a round distance that follows the zoom (Ctrl held:
   free). **Turn** (at the view's top right, beside **Move**) makes the
   handles rings: drag one to turn the selection about that axis, 15
-  degrees at a time. From the keyboard, with the pointer on the view, it
-  is Blender's: **G** moves, **R** turns, **S** scales - then X, Y or Z
-  locks the axis (again: free), a typed number is exact (in the shape's
-  unit, in degrees, as a factor: G X 10 Enter is ten centimetres along
-  X), Enter or a click keeps it, Esc or a right-click puts it back.
-  **Shift+D** copies the selection and starts moving the copies, **Delete**
-  deletes it, **A** selects every part (again: none). Moving one part so
-  its first LED comes near another part's end **joins** them: it lands one
-  LED spacing on from that end ("join after ring 1" shows where) and goes
-  after it in the wiring; its last LED near a part's first puts it before
-  that part. Each move is one step to undo.
-- **A part's menu** (right-click it in the view): duplicate and move, a
-  mirrored copy across X, Y or Z, reverse its wiring, move it in the
-  wiring (first, earlier, later, last), frame it, rename it, **hide** it
-  (dark in the view while you build, not picked, still LEDs on the
-  device), **lock** it (not picked or moved by the handles or keys - the
-  list still selects it), **light it** (the wiring test lighting that part
-  - in the sim, and on the device while the sim is streamed to it),
-  delete it.
-- **PLACE**: position, rotation and scale as drag-numbers - drag one and
-  the part moves in the 3-D view as you drag (the sim takes the new
-  shape when you let go; ctrl-click to type a value). "reverse" turns its
-  wiring round; mirror and array make copies; up/down reorder parts,
-  which reorders the wiring. **ARRANGE** works on the selected parts:
-  align them to the active part (the last picked) on X, Y or Z, spread
-  three or more evenly along an axis, or give them its scale or turn.
-- **AIM**: a direction (x y z, or azimuth and elevation, or one of the
-  six axis buttons), a distance and a spin. **aim outward** turns the
-  part so its axis - a strip's length, a panel's face, a flat part's
-  normal - runs along the direction and puts it that far from the
-  origin along it; **turn only** keeps its place; **aim at the origin**
-  points it inward from where it is. The yellow arrow in the 3-D view is
-  the selected part's axis. This is how a ball is built by hand: a
-  pentagon aimed outward at radius 9, then a hexagon beside it at
-  another direction, and so on - or start from a polyhedron in "faces"
-  mode and **split into parts**, which gives every face its own polygon
-  (every edge its own strip in "edges" mode) with the LEDs exactly where
-  they were, each then moved, turned and re-counted alone.
+  degrees at a time.
+- From the keyboard, with the pointer on the view, it is Blender's: **G**
+  moves, **R** turns, **S** scales - then X, Y or Z locks the axis (again:
+  free), a typed number is exact (in the unit, in degrees, as a factor: G
+  X 10 Enter is ten centimetres along X), Enter or a click keeps it, Esc or
+  a right-click puts it back. **Shift+D** copies the selection and starts
+  moving the copies, **Delete** deletes it, **A** selects every part
+  (again: none).
+- Moving one part so its first LED comes near another part's end **joins**
+  them: it lands one spacing on from that end ("join after ring 1" shows
+  where) and goes after it in the wiring; its last LED near a part's first
+  puts it before that part. Each move is one step to undo.
+- **A part's menu** (right-click it, in the view or in the list):
+  duplicate and move, repeat it (copies), mirror it across X, Y or Z,
+  reverse its wiring, move it in the wiring (first, earlier, later, last),
+  frame it, rename it, **hide** it (dark while you build, not picked, still
+  LEDs on the device), **lock** it (not picked or moved in the view - the
+  list still selects it), **light it** (the wiring test lighting that part:
+  in the sim, and on the device while the sim is streamed to it), delete it.
+- A path's corners, while it is the only part selected, are squares to
+  drag (on the plane the view faces most, snapped the same way).
 
-Units are LED pitches - a strip with pitch 1 has its LEDs one unit
-apart - so a mesh's own units are the pitch when it is imported.
+**The wiring list.** Each row: the part's colour, its name, its kind and
+its LEDs (54-117), an arrow the way its LEDs run (click: the other way),
+an eye (click: hidden while you build), a lock, and x to delete it. Drag a
+row onto another to wire it there; right-click it for its menu.
 
-- **Import...** reads a whole xLights layout (`xlights_rgbeffects.xml`:
-  every model a part, placed by its world position and rotation, sized by
-  its scale - custom models, matrices, lines and poly lines exactly,
-  circles, spheres, cubes, window frames, arches, trees and stars near
-  enough and named in the footer's line; anything else as a strip of its LEDs),
-  or `.obj`, `.ply` and `.stl` from
-  Blender or any CAD program - LEDs **along the edges** at a pitch (a
-  strip run round the outline, chained into as few runs as it can), or
-  one **per vertex**, or **over the surface** - an xLights **`.xmodel`**
-  custom model (the LEDs, their numbering, and its grid), or an `x y z
-  [index]` point list (CSV, whitespace or JSON; the index column is the
-  wiring order).
-- **Reference...** puts a mesh in the 3-D view as a wireframe
-  that is not LEDs - the tree, the house, the enclosure - moved, turned
-  and scaled like any part, to place the LEDs against.
-- **Place** LEDs by hand: tick "place", click the 3-D view and an LED lands
-  on the working plane (z = 0 by default; choose x, y or z and a value);
-  they go into the selected points part, or a new one. Drag an LED to move
-  it; "renumber: nearest chain" rewires a points part the way a strip
-  would most likely be run through them; "turn into a path" makes a
-  polyline of the points and fills it with LEDs at the pitch.
-- **Export .xmodel** writes the shape (any geometry, on its grid) as an
-  xLights custom model, the wiring as the node numbers.
-- **Generate a preview** (the frame's PREVIEW fold) renders a turn of
-  the shape off screen - lit by
-  the effect the sim runs, or each part in a colour of its own, or a chase
-  along the wiring - loops it in the frame and writes `shape_preview.gif`
-  and `.png` into the project's export folder, for a README or a forum
-  post.
-- **The 3-D view while you build** (the frame open): each part in a
-  colour of its own - the selected part bright, the rest dimmed ("colours"
-  in the frame switches to the effect the sim runs) - and the **wiring
-  drawn on the shape**: IN at the first LED, END at the last, arrows along
-  each part the way its LEDs run, and every **lead** from one part's last
-  LED to the next part's first dashed and labelled with its length (a gap
-  of one LED spacing is a join and is not drawn). The part under the
-  pointer is named with its LEDs and its size, and the LED's number. The
-  view keeps its scale while you build - moving a part at the edge does
-  not refit everything; adding one that does not fit grows it, and Home
-  fits it again. The floor's squares are a round distance, named at the
-  view's foot ("grid 20 cm") with the shape's LED density.
-- Undo steps back; Save/Open keep a shape as a file (`.shape.json`) to
-  reuse across projects.
+**One part's settings.**
+
+- **SIZE**: the kind's own - LEDs, a length (typing it sets the count), a
+  diameter, LEDs a metre, a height, turns, a formula - in the unit. A
+  setting that works itself out (a ring's diameter from its LEDs, an arch's
+  span) shows what it comes to until you type one. A path shows its
+  **CORNERS**: x, y and z in the unit, **+** to put a corner halfway to the
+  next, **x** to delete one, **reverse the path**, **draw on from its end**.
+  A solid's edges can **split into parts** (a strip per edge, or a polygon
+  per face in faces mode, the LEDs where they were). Loose points have
+  their tools and **BY HAND**: tick "place", click the view and an LED
+  lands on the working plane (choose x, y or z and a value in the unit);
+  drag one to move it; "renumber: nearest chain" rewires them the way a
+  strip would most likely run, "turn into a path" fills them in at the
+  spacing.
+- **PLACE**: its position in the unit (drag a number and the part moves as
+  you drag; ctrl-click to type); **lie** - flat on the floor, upright
+  facing the front, or facing out from the shape's middle; **turn 90°**
+  about X, Y or Z. Folded under "exact rotation, scale and aim": its three
+  angles, its scale, and **AIM** - a direction (x y z, or azimuth and
+  elevation, or an axis button), a distance and a spin: **aim outward**
+  turns its axis (a strip's length, a panel's face, a flat part's normal)
+  along the direction and puts it that far from the origin; **turn only**
+  keeps its place; **aim at the origin** points it inward.
+- **COPIES**: the part repeated, live - **copies** (itself included), each
+  moved a step from the one before and turned about X, Y or Z through its
+  middle or the shape's origin (360 / copies round the origin makes a
+  ring of them), every other one running back if the strip goes back and
+  forth; and **mirrored across** X, Y or Z, exactly, through the origin or
+  its middle, the mirror running back if asked. Change the part and they
+  follow; they are one part in the list and the wiring. **make separate**
+  turns them into parts of their own, the LEDs where they were (mirrors as
+  loose points - no turn makes a mirror).
+- **WIRING**: its LEDs the other way, its place in the wiring (first,
+  earlier, later, last), and **light it**.
+
+**Several parts: ARRANGE.** The selected parts aligned to the active one
+on X, Y or Z, spread evenly along an axis (three or more, between the two
+farthest apart), given its scale (**same scale**) or its turn
+(**same turn**), each laid flat, upright or facing out, or each turned 90°
+about X, Y or Z. **group them...** names them together - a heading in the
+list that selects them all (a tree's strands, a room's walls; a part's
+menu selects its group too) - and **ungroup** parts them again.
+
+**The shape's own settings** (nothing selected): real sizes (above), the
+**layout** the effects see (below), **Segment per part**, the colours the
+view builds in, and BY HAND.
+
+**File...** opens a shape file (`.shape.json`, to reuse across projects),
+saves one, **imports** a model - `.obj`, `.ply` and `.stl` from Blender or
+any CAD program as LEDs **along the edges** at a spacing (a strip run round
+the outline, chained into as few runs as it can), one **per vertex**, or
+**over the surface** (asked in the import dialog); an xLights **`.xmodel`**
+custom model (the LEDs, their numbering and its grid); a whole xLights
+layout (`xlights_rgbeffects.xml`: every model a part where it stands -
+custom models, matrices, lines and poly lines exactly; trees, stars,
+arches, spinners and window frames as the tree, star, arch, spokes and
+frame parts; circles, spheres and cubes near enough, named in the footer;
+anything else as a strip of its LEDs); or an `x y z [index]` point list
+(CSV, whitespace or JSON; the index column is the wiring order) - puts in
+a **reference mesh** (a wireframe to place LEDs against, not LEDs: the
+tree, the house, the enclosure - moved, turned and scaled like any part),
+**exports** an xLights model (any geometry on its grid, the wiring as its
+node numbers) or the positions (a CSV row per LED), makes a **preview** (a
+turn of the shape off screen - lit by the effect, the parts' colours or a
+chase along the wiring - looping in the frame's PREVIEW fold and written as
+`shape_preview.gif` and `.png` in the export folder), or clears the shape.
+**Undo** and **Redo** step through every change, the handles' and keys'
+too (Ctrl+Z and Ctrl+Y while the frame has the keyboard).
 
 **Parts in a graph**: the **Shape part** node says which part a pixel is
 in, where along it (0..1), how many parts there are, and gives a mask for
-a chosen part - one graph, the parts treated differently. **One segment
-per part** in the frame gives every part its own WLED segment instead,
-each with its own effect, palette and sliders (the strip layout; up to
-eight).
+a chosen part - one graph, the parts treated differently. **Segment per
+part** gives every part its own WLED segment instead, each with its own
+effect, palette and sliders (the strip layout; up to eight).
 
 **Layout**: a shape is one logical strip in wiring order (what 1-D effects
 and the 3-D nodes work on), or, as "grid", a w x h matrix the LEDs are
@@ -1018,7 +1069,7 @@ Every button, with what its tooltip says.
 
 **Send to device frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Find a device`; `Read` — ask the device again what it is and runs; `Open in the browser`; `Calibrate the speed factor` — the current effect's settings sent, the device's fps read for three seconds, and the footer's device fps estimate set from the measurement (Settings > Device speed factor holds the number); `Send the graph as a script` — the graph as bytecode for the Studio Script effect - no firmware build; the device runs it at once; `Send the effect's settings` — the effect the sim shows, with its sliders, checks, palette and colours, onto the device's segment; `Send the shape` — the ledmap (the wiring) and the positions table, so Position and Direction see the real shape; `Send the ledmap only`; `Import the device's` — the device's ledmap becomes the geometry: a matrix with its gaps and wiring, or a strip; `Import a file...`; `<`; `>`
 
-**Shape frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Undo`; `Clear`; `Open...` — a shape file (.shape.json) saved from here; `Save...`; `Export .xmodel...` — the shape as an xLights custom model, the wiring as its node numbers; `Export positions...` — every LED as a CSV row - x, y, z, its wiring index, its part - in wiring order, for any other tool; Import... reads the file back as a points part; `Segment per part` — each part its own WLED segment - effect, palette, sliders - up to eight; `+ strip` — a straight run of n LEDs along X; `+ ring` — n LEDs round a circle in the X-Y plane (radius 0: from the pitch); `+ panel` — w x h LEDs, stood up in the X-Z plane facing the camera; `+ cylinder` — w round, h tall, seamless; `+ sphere` — w round, h latitude rows; `+ cube` — B x B a face, five faces (six with the bottom); `+ polygon` — sides straight sides of per_side LEDs each, in the X-Y plane (radius 0: from the pitch); `+ polyhedron` — the edges of a solid, per_edge LEDs each (mode faces: every face outlined on its own); `+ polyline` — a strip run laid along a path, an LED every pitch; `+ points` — LEDs where they are put, in that order; `Import...` — a mesh or model as LEDs: .obj, .ply, .stl from Blender or CAD; an xLights .xmodel, or a whole xLights layout (xlights_rgbeffects.xml: every model a part, where it stands); an x y z [index] point list (CSV, text, JSON); `Reference...` — a mesh drawn in the 3-D view to place LEDs against, not LEDs: the tree, the house, the enclosure; `up`; `down`; `copy`; `x`; `delete the last`; `renumber: nearest chain from the first`; `turn into a path`; `+X`; `-X`; `+Y`; `-Y`; `+Z`; `-Z`; `aim outward`; `turn only`; `aim at the origin`; `from its place` — the direction and distance the part is at now, into the fields; `X`; `Y`; `Z` — the selected parts given the active part's position on that axis; `same scale`; `same turn` — the selected parts given the active part's scale, or its rotation; `all` — every part selected (A with the pointer on the 3-D view); `none`; `make`; `Generate a preview` — a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here; `Open the folder`
+**Shape frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Add part...` — a strip, a ring, a tree, a star... picked from pictures, its sizes asked first; it joins the end of the selected part (or goes beside it); `Draw a run` — click corners in the 3-D view and a strip is laid along them, an LED every spacing; double-click or Enter ends it, Backspace takes the last corner back, Esc leaves it; `File...` — open or save a shape; import a model, an xLights model or layout, a point list; a reference mesh; export an xLights model or the positions; a preview; `Undo`; `Redo`; `the way its LEDs run along it` — the way its LEDs run along it: click to turn its wiring round; `shown` — shown: click to hide it while you build (it stays LEDs on the device); `click to lock it` — click to lock it: the view's clicks, handles and keys pass it by; `x` — delete the part (Undo brings it back); `delete the last`; `renumber: nearest chain from the first`; `turn into a path`; `X`; `Y`; `Z`; `+X`; `-X`; `+Y`; `-Y`; `+Z`; `-Z`; `aim outward`; `turn only`; `aim at the origin`; `from its place` — the direction and distance the part is at now, into the fields; `first`; `earlier`; `later`; `last`; `light it` — the wiring test lighting this part: in the sim, and on the device while the sim is streamed to it; `Generate a preview` — a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here; `Open the folder`
 
 **Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ Add from the sim` — a new step: what the sim shows now - effect, sliders, palette, colours, segments; `Update from the sim` — the selected step becomes what the sim shows now; `Load into the sim` — the sim shows the selected step; `Add what the sim shows`; `x` — this slider's ramp off (the others stay); `Play in the sim`; `Stop`; `Render GIF` — plays the sequence once and records it as a GIF, into captures/; `Render video` — plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path; `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `WAV's` — the tempo and the beats found in the WAV playing as live audio (AUDIO > play a WAV file); `Snap durations to bars` — every step's seconds rounded to whole bars, so the sequence changes on the music; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Send and run it`; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 

@@ -343,6 +343,9 @@ def size_text(g, part_index, a, b, W):
     P = W[a:b]
     if len(P) == 0:
         return ""
+    k = shapes.copies(part)
+    if k > 1:
+        return f"{k} x {size_text_of(part, g.params)}"
     if part.get("kind") in shapes.LINEAR:
         seg = np.linalg.norm(np.diff(P, axis=0), axis=1) if len(P) > 1 else np.zeros(0)
         spacing = float(np.median(seg)) if len(seg) else 1.0
@@ -355,6 +358,16 @@ def size_text(g, part_index, a, b, W):
     u = units.unit(g.params)
     nums = " x ".join(units.number(d, g.params) for d in shown)
     return f"{nums} {u}"
+
+
+def size_text_of(part, sp):
+    """One copy of a part in words: a run's length, else its box."""
+    P, _ = shapes.transform(dict(part, reverse=False), *shapes.part_points(part))
+    if part.get("kind") in shapes.LINEAR and len(P) > 1:
+        seg = np.linalg.norm(np.diff(P, axis=0), axis=1)
+        return units.show(float(seg.sum()) + float(np.median(seg)), sp)
+    from native import shape_fields
+    return shape_fields.box(part, sp)
 
 
 def poll(app):
@@ -409,11 +422,14 @@ def poll(app):
             every = max(px(46), total / 6.0)
             acc, nxt = 0.0, min(px(20), total * 0.25)
             for i in range(len(seg)):
-                if not (good[a + i] and good[a + i + 1]) or not np.isfinite(seg[i]):
-                    acc += seg[i] if np.isfinite(seg[i]) else 0.0
+                if not np.isfinite(seg[i]):
                     continue
-                if acc + seg[i] >= nxt:
-                    t = (nxt - acc) / seg[i] if seg[i] > 0 else 0.0
+                if not (good[a + i] and good[a + i + 1]):
+                    acc += seg[i]
+                    nxt = max(nxt, acc + px(10))            # a covered stretch: the next arrow waits for the part to show again
+                    continue
+                while seg[i] > 0 and acc + seg[i] >= nxt:
+                    t = (nxt - acc) / seg[i]                 # 0..1 along this step: never back under what covers it
                     x = sx[a + i] + (sx[a + i + 1] - sx[a + i]) * t
                     y = sy[a + i] + (sy[a + i + 1] - sy[a + i]) * t
                     _chevron(x, y, sx[a + i + 1] - sx[a + i], sy[a + i + 1] - sy[a + i], px(6) if mine else px(5),

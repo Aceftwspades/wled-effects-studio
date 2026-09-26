@@ -35,6 +35,14 @@ class ExprError(ValueError):
 
 def evaluate(text, names=None):
     """The value of `text`, a float; ExprError says what was wrong."""
+    return compile(text)(names)
+
+
+def compile(text):
+    """`text` parsed once: a function of the names ({name: number}) giving
+    the value - for an expression worked out many times (a formula part's
+    x, y and z for every LED). ExprError on a text that does not parse; a
+    call raises it for what only the numbers show (division by zero)."""
     text = (text or "").strip().replace("^", "**")
     if not text:
         raise ExprError("nothing to work out")
@@ -42,6 +50,10 @@ def evaluate(text, names=None):
         tree = ast.parse(text, mode="eval")
     except SyntaxError as e:
         raise ExprError(f"not an expression: {e.msg}")
+    return lambda names=None: _value(tree, names)
+
+
+def _value(tree, names):
     env = dict(CONSTANTS)
     env.update({k: float(v) for k, v in (names or {}).items() if isinstance(v, (int, float)) and not isinstance(v, bool)})
 

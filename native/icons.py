@@ -386,6 +386,56 @@ def _pip(ic):
     ic.rect(0.52, 0.5, 0.86, 0.8)
 
 
+# --- the shape editor's list: a part shown or hidden, locked or not, the way its LEDs run, a grip ----
+def _eye(ic):
+    ic.arc((0.5, 1.02), 0.64, -130, -50, w=0.09)
+    ic.arc((0.5, -0.02), 0.64, 50, 130, w=0.09)
+    ic.circle((0.5, 0.5), 0.13)
+
+
+def _eye_off(ic):
+    _eye(ic)
+    ic.cut(np.abs((ic.x - ic.y)) <= 0.1)
+    ic.seg((0.16, 0.16), (0.84, 0.84), w=0.09)
+
+
+def _lock(ic):
+    ic.rect(0.2, 0.46, 0.8, 0.88)
+    ic.arc((0.5, 0.46), 0.2, 180, 360, w=0.1)
+    ic.seg((0.3, 0.46), (0.3, 0.36), w=0.1); ic.seg((0.7, 0.46), (0.7, 0.36), w=0.1)
+
+
+def _unlock(ic):
+    ic.rect(0.2, 0.46, 0.8, 0.88)
+    ic.arc((0.5, 0.3), 0.2, 180, 360, w=0.1)
+    ic.seg((0.3, 0.3), (0.3, 0.2), w=0.1)
+
+
+def _run_on(ic):
+    ic.arrow((0.1, 0.5), (0.9, 0.5), w=0.1, hw=0.2, hl=0.28)
+
+
+def _run_back(ic):
+    ic.arrow((0.9, 0.5), (0.1, 0.5), w=0.1, hw=0.2, hl=0.28)
+
+
+def _grip(ic):
+    for y in (0.3, 0.5, 0.7):
+        ic.seg((0.2, y), (0.8, y), w=0.08)
+
+
+def _draw_run(ic):
+    # corners clicked in turn, a run between them
+    pts = [(0.12, 0.8), (0.4, 0.3), (0.62, 0.62), (0.88, 0.2)]
+    ic.path(pts, w=0.08)
+    for q in pts:
+        ic.circle(q, 0.09)
+
+
+def _add_part(ic):
+    ic.seg((0.5, 0.15), (0.5, 0.85), w=0.12); ic.seg((0.15, 0.5), (0.85, 0.5), w=0.12)
+
+
 ICONS = {
     "fx": _fx, "segments": _segments, "swatches": _swatches, "sliders": _sliders, "audio": _audio, "mic": _mic,
     "rail_open": _rail_open, "rail_fold": _rail_fold, "tuck": _tuck, "resize": _resize, "pip": _pip,
@@ -398,6 +448,8 @@ ICONS = {
     "search": _search, "rename": _rename, "mute": _mute,
     "devices": _devices, "flash": _flash, "stream": _stream, "shape": _shape, "sequence": _sequence,
     "library": _library, "palette": _palette, "outputs": _outputs, "dice": _dice, "dock": _dock, "float": _float, "close": _close,
+    "eye": _eye, "eye_off": _eye_off, "lock": _lock, "unlock": _unlock, "run_on": _run_on, "run_back": _run_back,
+    "grip": _grip, "draw_run": _draw_run, "add_part": _add_part,
 }
 
 _made = {}

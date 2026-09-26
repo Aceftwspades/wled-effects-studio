@@ -61,6 +61,11 @@ def _sv():
     return shape_view
 
 
+def _run():
+    from native import shape_run
+    return shape_run
+
+
 def _parts(app):
     return _ui()._parts(app) or []
 
@@ -139,9 +144,9 @@ def gizmo(app, v):
     """The handles for the selection now: {"p0" world, "c" screen, "axes":
     {a: (dir, length px, px a unit)}, "planes": {(a, b): square}, "rings":
     {a: points}} or None (nothing movable, or a modal move running)."""
-    if getattr(app, "_tool", None) is not None and app._tool.get("kind") == "modal":
+    if getattr(app, "_tool", None) is not None and app._tool.get("kind") in ("modal", "corner"):
         return None
-    if getattr(app, "_shape_place", False):
+    if getattr(app, "_shape_place", False) or _run().active(app):
         return None
     idx = movable(app)
     if not idx:
@@ -448,6 +453,10 @@ def press(app):
     if t is not None and t.get("kind") == "modal":
         _keep(app, t)
         return True
+    if _run().active(app):
+        return _run().click(app)                            # a corner of the run being drawn
+    if _run().corner_press(app):
+        return True                                         # a path's corner taken
     sv = _sv()
     v = sv.view(app)
     if v is None:
@@ -466,6 +475,8 @@ def press(app):
 
 
 def drag(app):
+    if _run().corner_drag(app):
+        return True
     t = getattr(app, "_tool", None)
     if t is None or t.get("kind") not in ("handle", "box"):
         return False
@@ -488,6 +499,8 @@ def release(app):
     """The button up: a handle's drag kept; a box's parts selected; a click
     (a press that did not move) picks the part under it - Shift: added or
     taken away; on nothing, none."""
+    if _run().corner_release(app):
+        return True
     t = getattr(app, "_tool", None)
     sv = _sv()
     if t is not None and t.get("kind") == "handle":
@@ -672,6 +685,8 @@ def key(app, code):
     """A key while a modal move runs: X, Y, Z lock the axis (again: free); a
     number (digits, a point, a minus; Backspace) is exact; Enter keeps it;
     Esc puts it back. True when taken."""
+    if _run().key(app, code):
+        return True                                         # drawing a run: Enter, Backspace, Esc
     t = getattr(app, "_tool", None)
     if t is None or t.get("kind") != "modal":
         return False
@@ -749,6 +764,8 @@ def draw(app, v, D):
     from native import chrome
     sv = _sv()
     cov = sv.covers(app)
+    _run().draw(app, v, D)                                  # a run being drawn
+    _run().draw_corners(app, v, D)                          # a lone selected path's corners
     t = getattr(app, "_tool", None)
     if t is not None and t.get("kind") == "box":
         (x0, y0), (x1, y1) = t["m0"], t["m1"]
@@ -866,10 +883,13 @@ def menu_rows(app, pi):
     lab = lambda a: keys.label(a)
     n = len(ui.selection(app))
     them = "them" if n > 1 else "it"
+    m = part.get("mirror") or {}
+    reps = int((part.get("copies") or {}).get("n", 1) or 1)
     rows = [("Duplicate and move", lab("shape_dup"), lambda: duplicate(app)),
-            ("Mirrored copy across X", "", lambda: ui.mirror_part(app, pi, 0)),
-            ("Mirrored copy across Y", "", lambda: ui.mirror_part(app, pi, 1)),
-            ("Mirrored copy across Z", "", lambda: ui.mirror_part(app, pi, 2)),
+            ("Repeat it: copies" if reps <= 1 else f"Repeated {reps} times: one copy more", "", lambda: ui.set_copies(app, pi, n=reps + 1)),
+            (("Unmirror" if m.get("x") else "Mirror") + " across X", "", lambda: ui.set_mirror(app, pi, x=not m.get("x"))),
+            (("Unmirror" if m.get("y") else "Mirror") + " across Y", "", lambda: ui.set_mirror(app, pi, y=not m.get("y"))),
+            (("Unmirror" if m.get("z") else "Mirror") + " across Z", "", lambda: ui.set_mirror(app, pi, z=not m.get("z"))),
             None,
             ("Reverse its wiring", "", lambda: ui.set_part(app, pi, reverse=not part.get("reverse"))),
             ("First in the wiring", "", lambda: wiring_move(app, pi, "first")),
@@ -877,7 +897,12 @@ def menu_rows(app, pi):
             ("Later in the wiring", "", lambda: wiring_move(app, pi, "later")),
             ("Last in the wiring", "", lambda: wiring_move(app, pi, "last")),
             None,
-            (f"Frame {them}", lab("view_frame"), lambda: ui.frame_selection(app)),
+            (f"Frame {them}", lab("view_frame"), lambda: ui.frame_selection(app))]
+    grp = part.get("group")
+    if grp:
+        members = [k for k, q in enumerate(parts) if q.get("group") == grp]
+        rows.append((f"Select its group ({grp})", "", lambda: ui.select(app, members)))
+    rows += [
             ("Rename...", "", lambda: rename(app, pi)),
             ("Show" if part.get("hidden") else "Hide", "", lambda: ui.set_part(app, pi, hidden=not part.get("hidden"))),
             ("Unlock" if part.get("locked") else "Lock", "", lambda: ui.set_part(app, pi, locked=not part.get("locked"))),

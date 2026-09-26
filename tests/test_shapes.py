@@ -71,14 +71,22 @@ def test_reference_draws_but_does_not_light():
     assert g.count == 1                                          # a placeholder pixel, so the engine has a segment
 
 
-def test_chain_mirror_array():
+def test_chain_and_live_copies():
     pts = np.array([[0, 0, 0], [5, 0, 0], [1, 0, 0], [4, 0, 0]], np.float32)
     assert shapes.chain_order(pts, 0).tolist() == [0, 2, 3, 1]
+    # copies: a row along X, every other one run back; then an exact mirror across X
     p = shapes.new_part("strip", n=3); p["pos"] = [3, 0, 0]
-    m = shapes.mirrored(p, 0)
-    assert m["pos"][0] == -3
-    arr = shapes.arrayed(p, 3, [10, 0, 0])
-    assert [q["pos"][0] for q in arr] == [13, 23]
+    p["copies"] = {"n": 3, "step": [10, 0, 0], "zigzag": True}
+    pos, _, owner = shapes.resolve([p])
+    assert len(pos) == 9 == shapes.part_count(p) and set(owner.tolist()) == {0}
+    assert np.allclose(pos[:3, 0], [2, 3, 4]) and np.allclose(pos[3:6, 0], [14, 13, 12]) and np.allclose(pos[6:, 0], [22, 23, 24])
+    p["mirror"] = {"x": True}
+    pos, _, _ = shapes.resolve([p])
+    assert len(pos) == 18 and np.allclose(pos[9:12, 0], [-2, -3, -4])
+    # made separate: the same LEDs, in the same order
+    q = shapes.separate(p)
+    assert [x["kind"] for x in q] == ["strip", "strip", "strip", "points"]
+    assert np.allclose(shapes.resolve(q)[0], pos, atol=1e-4)
 
 
 def _write(name, text, mode="w"):
@@ -179,6 +187,58 @@ def test_xlights_layout():
     line = pos[owner == 1]
     assert abs(float(line[:, 0].min()) + 50) < 1e-3 and abs(float(line[:, 0].max()) - 50) < 1e-3
     assert any("X" in n for n in notes)
+
+
+def test_xlights_models_as_the_kinds_they_are():
+    """xLights' trees, stars, arches, spinners and window frames come in as
+    the tree, star, arch, spokes and frame parts - their LEDs all there."""
+    xml = ('<xrgb><models>'
+           '<model name="T" DisplayAs="Tree 360" parm1="4" parm2="50" parm3="1" ScaleX="60" ScaleY="180" TreeSpiralRotations="0.5"/>'
+           '<model name="S" DisplayAs="Star" parm1="1" parm2="50" parm3="5" ScaleX="40"/>'
+           '<model name="A" DisplayAs="Arches" parm1="3" parm2="20" ScaleX="90" ScaleY="20"/>'
+           '<model name="W" DisplayAs="Window Frame" parm1="20" parm2="10" parm3="20" ScaleX="80" ScaleY="40"/>'
+           '<model name="R" DisplayAs="Spinner" parm1="1" parm2="10" parm3="6" ScaleX="30"/>'
+           '</models></xrgb>')
+    d = tempfile.mkdtemp(); path = os.path.join(d, "xlights_rgbeffects.xml")
+    open(path, "w").write(xml)
+    parts, notes = shape_io.read_layout(path)
+    kinds = {q["name"]: q["kind"] for q in parts}
+    assert kinds == {"T": "tree", "S": "star", "A 1": "arch", "A 2": "arch", "A 3": "arch", "W": "frame", "R": "spokes"}, kinds
+    counts = {q["name"]: shapes.part_count(q) for q in parts}
+    assert counts["T"] == 200 and counts["S"] == 50 and counts["A 2"] == 20 and counts["W"] == 60 and counts["R"] == 60, counts
+    t = [q for q in parts if q["name"] == "T"][0]
+    pos, _, _ = shapes.resolve([t])
+    assert abs(float(np.ptp(pos[:, 2])) - 180) < 1.0 and abs(t["params"]["turns"] - 0.5) < 1e-9
+    w = [q for q in parts if q["name"] == "W"][0]
+    wp, _, _ = shapes.resolve([w])
+    assert abs(float(np.ptp(wp[:, 0])) - 80) < 0.5                     # 80 wide: the sides' LEDs stand on its edges
+
+
+def test_the_kinds_people_light():
+    """Each kind of the ninth pass: its LEDs, spaced as it says."""
+    def step(part):
+        pos, _ = shapes.part_points(part)
+        return pos, np.linalg.norm(np.diff(pos, axis=0), axis=1)
+    pos, d = step(shapes.new_part("helix", n=40, radius=3.0, height=10.0))
+    assert len(pos) == 40 and np.allclose(d, 1.0, atol=0.01) and abs(float(np.ptp(pos[:, 2])) - 10.0) < 1e-6   # a spacing along the curve
+    pos, d = step(shapes.new_part("spiral", n=80, gap=2.0))
+    assert len(pos) == 80 and d.min() > 0.9 and d.max() <= 1.0 + 1e-6 and abs(float(np.ptp(pos[:, 2]))) < 1e-9
+    pos, d = step(shapes.new_part("arch", n=21))
+    assert len(pos) == 21 and np.allclose(d, d[0], atol=1e-3) and abs(float(pos[:, 2].min())) < 1e-6        # the feet on the floor
+    pos, _ = step(shapes.new_part("tree", strands=6, per_strand=20, height=30.0, base=20.0, top=2.0))
+    assert len(pos) == 120 and abs(float(np.ptp(pos[:, 2])) - 30.0) < 1e-6
+    assert pos[19, 2] > pos[0, 2] and pos[20, 2] > pos[39, 2]                                              # up one strand, down the next
+    pos, d = step(shapes.new_part("star", points=5, per_edge=4))
+    assert len(pos) == 40 and np.allclose(d[:3], 1.0, atol=1e-6)
+    pos, _ = step(shapes.new_part("rings", counts="1,8,12"))
+    assert len(pos) == 21 and np.allclose(pos[0], 0.0)
+    pos, _ = step(shapes.new_part("frame", w=10, h=5, bottom=False))
+    assert len(pos) == 20 and abs(float(pos[:, 2].min()) + 2.5) > 0.4                                     # no bottom row
+    pos, _ = step(shapes.new_part("spokes", spokes=4, per_spoke=5, zigzag=True))
+    assert len(pos) == 20 and abs(np.linalg.norm(pos[5]) - 5.0) < 1e-6 and abs(np.linalg.norm(pos[9]) - 1.0) < 1e-6   # back in along the second
+    pos, _ = step(shapes.new_part("formula", n=11, x="i", y="t*10", z="n"))
+    assert np.allclose(pos[:, 0], np.arange(11)) and np.allclose(pos[:, 1], np.arange(11)) and np.allclose(pos[:, 2], 11)
+    assert shapes.formula_error(shapes.new_part("formula", x="1/0")) and not shapes.formula_error(shapes.new_part("formula"))
 
 
 def test_beats_of_a_click_track():

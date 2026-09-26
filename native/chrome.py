@@ -1491,11 +1491,18 @@ def report_problem(app):
 
 
 def show_undo_history(app):
-    steps = app.gp.undo_steps()
+    """The steps Undo would take back - the graph's, or the shape's while the
+    shape is what Undo acts on (its frame has the keyboard, or the pointer is
+    on the 3-D view while it is built) - each a click away."""
+    if app.undo_target() == "shape":
+        from native import shape_ui
+        steps, back = shape_ui.undo_steps(app), (lambda k: shape_ui.undo_to(app, k))
+    else:
+        steps, back = app.gp.undo_steps(), app.gp.undo_to
     dpg.delete_item("undo_rows", children_only=True)
     for k, desc in enumerate(reversed(steps)):
         dpg.add_selectable(label=f"{len(steps) - k:3d}  {desc}", parent="undo_rows", user_data=k + 1,
-                           callback=lambda s, a, u: (app.gp.undo_to(u), show_undo_history(app)))
+                           callback=lambda s, a, u: (back(u), show_undo_history(app)))
     if not steps:
         dpg.add_text("nothing to undo", parent="undo_rows", color=DIM)
     _centre("undo_win", 420, 380)

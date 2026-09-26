@@ -409,40 +409,51 @@ def read_layout(path):
             part = shapes.new_part("cube", B=max(2, p2), pitch=round(sx / max(1, p2), 3), six=True)
             notes.append(f"{name}: cube from its nodes per side")
         elif kind == "Window Frame":
-            top, side, bottom = max(1, p1), max(1, p2), max(1, p3)
-            w, h = sx, sy
-            pts = [[-w / 2, 0, -h / 2], [-w / 2, 0, h / 2], [w / 2, 0, h / 2], [w / 2, 0, -h / 2], [-w / 2, 0, -h / 2]]
-            n = top + 2 * side + bottom
-            total = 2 * w + 2 * h
-            part = shapes.new_part("polyline", points=[[round(v, 3) for v in q] for q in pts], pitch=round(total / n - 1e-6, 5))
+            # the studio's frame part: top and bottom share a count (the top's), the sides theirs, sized to the model
+            top, side, bottom = max(1, p1), max(1, p2), max(0, p3)
+            pitch = round(sx / top, 5) if sx > 0 else 1.0
+            part = shapes.new_part("frame", w=top, h=side, pitch=pitch, bottom=bottom > 0)
+            if side * pitch > 0 and sy > 0:
+                part["scale"] = [1.0, 1.0, round(sy / (side * pitch), 5)]           # the sides stretched to the model's height
+            if bottom and bottom != top:
+                notes.append(f"{name}: a window frame's bottom of {bottom} LEDs as the top's {top}")
         elif kind == "Arches":
+            # an arch part per arch, side by side as xLights lays them, wired one after another
             arches, per = max(1, p1), max(2, p2)
-            pts = []
+            each = sx / arches
             for k in range(arches):
-                cx = (k - (arches - 1) / 2.0) * (sx / arches)
-                r = sx / arches * 0.45
-                ang = np.linspace(np.pi, 0, per) if k % 2 == 0 else np.linspace(0, np.pi, per)
-                pts += [[round(cx + r * float(np.cos(t)), 3), 0.0, round(r * float(np.sin(t)) * (sy / max(sx, 1e-6)) * 2, 3)] for t in ang]
-            part = shapes.new_part("points", points=pts)
-            notes.append(f"{name}: arches as half rings")
+                q = shapes.new_part("arch", n=per, span=round(each * 0.9, 4), rise=round(sy if sy > 0 else each * 0.45, 4))
+                q["name"] = f"{name} {k + 1}" if arches > 1 else name
+                q["pos"] = [round(float(v), 3) for v in np.asarray(pos) + np.asarray([(k - (arches - 1) / 2.0) * each, 0, -sy / 2])]
+                q["rot"] = rot
+                parts.append(q)
+            continue
         elif kind.startswith("Tree"):
-            strings, per = max(1, p1), max(2, p2)
-            pts = []
-            for k in range(strings):
-                ang = 2 * np.pi * k / strings
-                for j in range(per):
-                    t = j / (per - 1)
-                    r = (sx / 2) * (1 - t) * 0.5
-                    pts.append([round(r * float(np.cos(ang)), 3), round(r * float(np.sin(ang)), 3), round((t - 0.5) * sy, 3)])
-                if k % 2 == 1:
-                    pts[-per:] = pts[-per:][::-1]
-            part = shapes.new_part("points", points=pts)
-            notes.append(f"{name}: tree as a cone of strings")
+            # strings x strands a string, the nodes shared out; turns and the bottom/top ratio if the model has them
+            strands = max(1, p1 * max(1, p3))
+            per = max(2, p2 // max(1, p3))
+            digits = "".join(ch for ch in kind if ch.isdigit())
+            deg = float(digits) if digits else 360.0
+            ratio = _f(a, "TreeBottomTopRatio", 6.0) or 6.0
+            part = shapes.new_part("tree", strands=strands, per_strand=per, height=round(sy, 4) or 30.0,
+                                   base=round(sx, 4) or 18.0, top=round((sx or 18.0) / max(1.0, ratio), 4),
+                                   turns=round(_f(a, "TreeSpiralRotations", 0.0), 3), degrees=deg, zigzag=True)
+            if kind in ("Tree Flat", "Tree Ribbon"):
+                notes.append(f"{name}: {kind} as a cone of strands")
         elif kind == "Star":
-            n = max(5, p1 * p2)
-            part = shapes.new_part("polygon", sides=5, per_side=max(1, n // 5), radius=round(sx * 0.5, 3))
+            points = max(3, p3 if p3 > 1 else 5)
+            total = max(points * 2, p1 * p2)
+            ratio = _f(a, "starRatio", 2.618) or 2.618
+            part = shapes.new_part("star", points=points, per_edge=max(1, total // (2 * points)), radius=round(sx * 0.5, 4),
+                                   inner=round(1.0 / ratio, 4))
+            rot = [90.0 + rot[0], rot[1], rot[2]]                            # stood up, facing the viewer
+        elif kind == "Spinner":
+            arms = max(1, p1 * max(1, p3))
+            per = max(1, p2)
+            part = shapes.new_part("spokes", spokes=arms, per_spoke=per, pitch=round((sx * 0.5) / per, 5) if sx > 0 else 1.0,
+                                   inner=0.0, zigzag=True)
             rot = [90.0 + rot[0], rot[1], rot[2]]
-            notes.append(f"{name}: star as a pentagon outline")
+            notes.append(f"{name}: spinner as {arms} spokes of {per}")
         if part is None:
             n = max(1, p1 * p2)
             part = shapes.new_part("strip", n=n, pitch=round(sx / max(1, n), 3) if sx > 0 else 1.0)

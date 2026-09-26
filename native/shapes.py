@@ -37,19 +37,38 @@ KINDS = {
                    "the edges of a solid, per_edge LEDs each (mode faces: every face outlined on its own)"),
     "polyline": ({"points": [[0, 0, 0], [8, 0, 0], [8, 8, 0]], "pitch": 1.0}, "a strip run laid along a path, an LED every pitch"),
     "points":   ({"points": [[0, 0, 0]]}, "LEDs where they are put, in that order"),
+    # the shapes people light (xLights' model types the checklist) - the ninth pass's S10
+    "tree":     ({"strands": 8, "per_strand": 30, "height": 30.0, "base": 18.0, "top": 2.0, "turns": 0.0, "degrees": 360.0,
+                  "zigzag": True}, "strands of LEDs down a cone - or round it, with turns - wired strand after strand"),
+    "star":     ({"points": 5, "per_edge": 6, "pitch": 1.0, "radius": 0.0, "inner": 0.4, "start_deg": 90.0},
+                 "a star's outline in the X-Y plane, per_edge LEDs an edge (radius 0: from the pitch)"),
+    "helix":    ({"n": 60, "pitch": 1.0, "radius": 3.0, "height": 12.0},
+                 "a strip wound round a tube: its LEDs a pitch apart, the turns as many as its length makes"),
+    "spiral":   ({"n": 120, "pitch": 1.0, "gap": 2.0, "inner": 1.0}, "a strip laid in a flat spiral, the turns gap apart"),
+    "arch":     ({"n": 30, "pitch": 1.0, "span": 0.0, "rise": 0.0},
+                 "an arch standing in the X-Z plane, its foot at the part's place (span 0: a half circle from the LEDs)"),
+    "rings":    ({"counts": "1,8,12,16,24,32", "pitch": 1.0, "gap": 0.0, "outward": True, "start_deg": 0.0},
+                 "rings in one another, the LEDs of each from the middle out (gap 0: each ring sized by its LEDs)"),
+    "frame":    ({"w": 30, "h": 20, "pitch": 1.0, "bottom": True, "start": "bottom left", "clockwise": True},
+                 "a rectangle's outline standing in the X-Z plane - a window, a door, a screen, a room's edge"),
+    "spokes":   ({"spokes": 8, "per_spoke": 15, "pitch": 1.0, "inner": 1.0, "zigzag": True, "start_deg": 0.0},
+                 "spokes out from a middle in the X-Y plane - out along one, back along the next with zigzag"),
+    "formula":  ({"n": 100, "x": "cos(t*tau*3)*8", "y": "sin(t*tau*3)*8", "z": "t*16"},
+                 "LEDs where x, y and z say: expressions of t (0 to 1 along), i (the LED) and n (the count)"),
     "reference": ({"vertices": [], "edges": [], "file": ""}, "a mesh drawn as a wireframe to place LEDs against - not LEDs"),
 }
 
 
 # the choices a text parameter takes (the editor shows a combo)
 CHOICES = {"solid": ["tetrahedron", "cube", "octahedron", "dodecahedron", "icosahedron", "soccer ball"],
-           "mode": ["edges", "faces"]}
+           "mode": ["edges", "faces"], "start": ["bottom left", "top left", "top right", "bottom right"]}
 
 # the axis "aim" points: a strip's length, a panel's face, a flat part's normal
-AXIS = {"strip": (1.0, 0.0, 0.0), "panel": (0.0, -1.0, 0.0), "polyline": (1.0, 0.0, 0.0)}
+AXIS = {"strip": (1.0, 0.0, 0.0), "panel": (0.0, -1.0, 0.0), "polyline": (1.0, 0.0, 0.0), "arch": (0.0, -1.0, 0.0),
+        "frame": (0.0, -1.0, 0.0)}
 
 # the kinds that are one run of strip (a length says their size; the rest a box)
-LINEAR = ("strip", "ring", "polygon", "polyline")
+LINEAR = ("strip", "ring", "polygon", "polyline", "star", "helix", "spiral", "arch", "frame")
 
 
 def new_part(kind, **params):
@@ -73,8 +92,78 @@ def _matrix_order(w, h, serpentine, vertical):
     return np.asarray(out)
 
 
+_POINTS = {}
+
+
 def part_points(part):
-    """(pos, nrm) of one part before its transform: (n, 3) each; nrm may be None."""
+    """(pos, nrm) of one part before its transform: (n, 3) each; nrm may be
+    None. Worked out once per kind and settings (a drag re-resolves the
+    shape every frame; a formula or a spiral is not free) - copies handed
+    out, as the arrays are changed by those who get them."""
+    try:
+        key = (part["kind"], json.dumps(part.get("params", {}), sort_keys=True))
+    except (TypeError, ValueError):
+        return _part_points(part)
+    got = _POINTS.get(key)
+    if got is None:
+        got = _part_points(part)
+        if len(_POINTS) > 512:
+            _POINTS.clear()
+        _POINTS[key] = got
+    pos, nrm = got
+    return pos.copy(), None if nrm is None else nrm.copy()
+
+
+def _evenly(P, n=None, spacing=None):
+    """LEDs along a finely sampled path P (m, 3): n of them from end to end,
+    or one every `spacing` from its start (as many as it is long for)."""
+    P = np.asarray(P, np.float64)
+    seg = np.linalg.norm(np.diff(P, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(cum[-1])
+    if n is not None:
+        s = np.linspace(0.0, total, n) if n > 1 else np.zeros(1)
+    else:
+        s = np.arange(0.0, total + 1e-9, max(1e-6, float(spacing)))
+    i = np.clip(np.searchsorted(cum, s, side="right") - 1, 0, len(seg) - 1)
+    t = np.where(seg[i] > 0, (s - cum[i]) / np.where(seg[i] > 0, seg[i], 1.0), 0.0)
+    return P[i] + (P[i + 1] - P[i]) * t[:, None]
+
+
+def _radial(pos, z=0.0):
+    """Unit normals out from the Z axis (and tilted by z): a round thing's LEDs facing out."""
+    n = np.stack([pos[:, 0], pos[:, 1], np.full(len(pos), float(z))], 1)
+    L = np.linalg.norm(n, axis=1, keepdims=True)
+    return n / np.where(L > 1e-9, L, 1.0)
+
+
+_FORMULAS = {}
+
+
+def _formula(text):
+    from native import expr
+    f = _FORMULAS.get(text)
+    if f is None:
+        f = _FORMULAS[text] = expr.compile(text)
+    return f
+
+
+def formula_error(part):
+    """What is wrong with a formula part's expressions, in words, or ""."""
+    from native import expr
+    p = part.get("params", {})
+    n = max(1, int(p.get("n", 100)))
+    for axis in ("x", "y", "z"):
+        try:
+            f = _formula(str(p.get(axis, "0")))
+            for i in (0, n // 2, n - 1):
+                f({"t": i / max(1, n - 1), "i": i, "n": n})
+        except expr.ExprError as e:
+            return f"{axis}: {e}"
+    return ""
+
+
+def _part_points(part):
     k, p = part["kind"], part.get("params", {})
     pitch = float(p.get("pitch", 1.0)) or 1.0
     if k == "strip":
@@ -169,6 +258,138 @@ def part_points(part):
             t = (s - cum[i]) / L[i] if L[i] > 0 else 0.0
             out.append(pts[i] + seg[i] * t)
         return np.asarray(out, np.float32), None
+    if k == "tree":
+        S, m = max(1, int(p.get("strands", 8))), max(2, int(p.get("per_strand", 30)))
+        H = float(p.get("height", 30.0)) or 30.0
+        B, T = max(0.0, float(p.get("base", 18.0))), max(0.0, float(p.get("top", 0.0)))
+        turns, deg = float(p.get("turns", 0.0)), float(p.get("degrees", 360.0)) or 360.0
+        t = np.linspace(0.0, 1.0, 240)
+        out, nrm = [], []
+        for s in range(S):
+            a0 = math.radians(deg) * (s / S if deg >= 359.999 else s / max(1, S - 1))
+            r = (B / 2) * (1 - t) + (T / 2) * t
+            ang = a0 + 2 * math.pi * turns * t
+            L = _evenly(np.stack([r * np.cos(ang), r * np.sin(ang), t * H - H / 2], 1), n=m)
+            if p.get("zigzag", True) and s % 2 == 1:
+                L = L[::-1]                                      # down the next strand the way the last came up
+            out.append(L)
+            nrm.append(_radial(L, (B - T) / (2 * H) * max(1e-6, np.hypot(L[:, 0], L[:, 1]).max())))
+        return np.concatenate(out).astype(np.float32), np.concatenate(nrm).astype(np.float32)
+    if k == "star":
+        npts, m = max(3, int(p.get("points", 5))), max(1, int(p.get("per_edge", 6)))
+        inner = min(0.95, max(0.05, float(p.get("inner", 0.4))))
+        edge = m * pitch
+        R = float(p.get("radius", 0.0)) or edge / math.sqrt(1 + inner * inner - 2 * inner * math.cos(math.pi / npts))
+        a0 = math.radians(float(p.get("start_deg", 90.0)))
+        ang = a0 + np.arange(2 * npts + 1) * math.pi / npts
+        rad = np.where(np.arange(2 * npts + 1) % 2 == 0, R, R * inner)
+        corners = np.stack([np.cos(ang) * rad, np.sin(ang) * rad, np.zeros(len(ang))], 1)
+        tt = (np.arange(m) + 0.5) / m                              # centred on each edge: no LED on a point
+        pos = np.concatenate([corners[i] + (corners[i + 1] - corners[i]) * tt[:, None] for i in range(2 * npts)])
+        return pos.astype(np.float32), _radial(pos).astype(np.float32)
+    if k == "helix":
+        n = max(2, int(p.get("n", 60)))
+        r = float(p.get("radius", 3.0)) or 3.0
+        L = (n - 1) * pitch
+        H = min(abs(float(p.get("height", 12.0))), L)
+        turns = math.sqrt(max(0.0, L * L - H * H)) / (2 * math.pi * r)
+        t = np.linspace(0.0, 1.0, n)                               # a helix's length runs even with t: a pitch apart
+        ang = 2 * math.pi * turns * t
+        pos = np.stack([np.cos(ang) * r, np.sin(ang) * r, t * H - H / 2], 1)
+        return pos.astype(np.float32), _radial(pos).astype(np.float32)
+    if k == "spiral":
+        n = max(2, int(p.get("n", 120)))
+        gap = float(p.get("gap", 2.0)) or 2.0
+        r0 = max(0.0, float(p.get("inner", 1.0)))
+        need = (n - 1) * pitch
+        # an Archimedean spiral (r = r0 + gap * turns), sampled until it is as long as the strip
+        th = np.linspace(0.0, 2 * math.pi, 400)
+        while True:
+            r = r0 + gap * th / (2 * math.pi)
+            P = np.stack([np.cos(th) * r, np.sin(th) * r, np.zeros(len(th))], 1)
+            if float(np.linalg.norm(np.diff(P, axis=0), axis=1).sum()) >= need or th[-1] > 2 * math.pi * 2000:
+                break
+            th = np.linspace(0.0, th[-1] * 2, len(th) * 2)
+        pos = _evenly(P, spacing=pitch)[:n]
+        return pos.astype(np.float32), _radial(pos).astype(np.float32)
+    if k == "arch":
+        n = max(2, int(p.get("n", 30)))
+        span, rise = float(p.get("span", 0.0)), float(p.get("rise", 0.0))
+        if span <= 0:
+            span = 2 * (n - 1) * pitch / math.pi                   # a half circle as long as the strip
+        if rise <= 0:
+            rise = span / 2
+        th = np.linspace(math.pi, 0.0, 600)
+        pos = _evenly(np.stack([np.cos(th) * span / 2, np.zeros(len(th)), np.sin(th) * rise], 1), n=n)
+        return pos.astype(np.float32), np.tile([0.0, -1.0, 0.0], (n, 1)).astype(np.float32)
+    if k == "rings":
+        counts = [int(c) for c in str(p.get("counts", "1,8,12,16,24,32")).replace(";", ",").split(",") if c.strip().isdigit()]
+        counts = [max(1, c) for c in counts] or [1, 8, 12, 16, 24, 32]
+        gap = float(p.get("gap", 0.0))
+        a0 = math.radians(float(p.get("start_deg", 0.0)))
+        rings = list(enumerate(counts))
+        if not p.get("outward", True):
+            rings = rings[::-1]
+        out = []
+        for j, c in rings:
+            r = j * gap if gap > 0 else (c * pitch / (2 * math.pi) if c > 1 else 0.0)
+            a = a0 + np.arange(c) * (2 * math.pi / c)
+            out.append(np.stack([np.cos(a) * r, np.sin(a) * r, np.zeros(c)], 1))
+        pos = np.concatenate(out)
+        return pos.astype(np.float32), np.tile([0.0, 0.0, 1.0], (len(pos), 1)).astype(np.float32)
+    if k == "frame":
+        w, h = max(1, int(p.get("w", 30))), max(1, int(p.get("h", 20)))
+        W, Hh = w * pitch, h * pitch
+        bl, tl, tr, br = [np.array(c, np.float64) for c in ((-W / 2, 0, -Hh / 2), (-W / 2, 0, Hh / 2), (W / 2, 0, Hh / 2), (W / 2, 0, -Hh / 2))]
+        sides = [(bl, tl, h), (tl, tr, w), (tr, br, h), (br, bl, w)]    # clockwise from the bottom left
+        start = {"bottom left": 0, "top left": 1, "top right": 2, "bottom right": 3}.get(p.get("start", "bottom left"), 0)
+        if not p.get("clockwise", True):
+            sides = [(b, a, c) for a, b, c in sides[::-1]]              # anticlockwise from the bottom left: bl -> br -> ...
+            start = {0: 0, 1: 3, 2: 2, 3: 1}[start]
+        sides = sides[start:] + sides[:start]
+        if not p.get("bottom", True):
+            # three sides: from one open end of the bottom round to the other
+            k0 = next(i for i, (a, b, _) in enumerate(sides) if {tuple(a), tuple(b)} == {tuple(bl), tuple(br)})
+            sides = sides[k0 + 1:] + sides[:k0]
+        out = []
+        for a, b, c in sides:
+            tt = (np.arange(c) + 0.5) / c                              # centred on each side: no LED in a corner
+            out.append(a + (b - a) * tt[:, None])
+        pos = np.concatenate(out)
+        return pos.astype(np.float32), np.tile([0.0, -1.0, 0.0], (len(pos), 1)).astype(np.float32)
+    if k == "spokes":
+        S, m = max(1, int(p.get("spokes", 8))), max(1, int(p.get("per_spoke", 15)))
+        inner = max(0.0, float(p.get("inner", 1.0)))
+        a0 = math.radians(float(p.get("start_deg", 0.0)))
+        out = []
+        for s in range(S):
+            a = a0 + 2 * math.pi * s / S
+            r = inner + np.arange(m) * pitch
+            L = np.stack([np.cos(a) * r, np.sin(a) * r, np.zeros(m)], 1)
+            if p.get("zigzag", True) and s % 2 == 1:
+                L = L[::-1]                                              # back in along the next spoke
+            out.append(L)
+        pos = np.concatenate(out)
+        return pos.astype(np.float32), np.tile([0.0, 0.0, 1.0], (len(pos), 1)).astype(np.float32)
+    if k == "formula":
+        from native import expr
+        n = max(1, min(4096, int(p.get("n", 100))))
+        fs = []
+        for axis in ("x", "y", "z"):
+            try:
+                fs.append(_formula(str(p.get(axis, "0"))))
+            except expr.ExprError:
+                fs.append(None)
+        pos = np.zeros((n, 3), np.float64)
+        for i in range(n):
+            names = {"t": i / max(1, n - 1), "i": i, "n": n}
+            for a, f in enumerate(fs):
+                if f is not None:
+                    try:
+                        pos[i, a] = f(names)
+                    except (expr.ExprError, ValueError, OverflowError):
+                        pass                                             # formula_error says so
+        return pos.astype(np.float32), None
     if k == "reference":
         return np.zeros((0, 3), np.float32), None          # drawn, never lit
     if k == "points":
@@ -429,7 +650,7 @@ def ends(part):
     """A part's two ends in the shape, as a strip is joined: (first LED, the
     way into the part from it, last LED, the way on out of it, the LEDs'
     spacing) - the directions unit vectors (None with a single LED)."""
-    pos, _ = transform(part, *part_points(part))
+    pos, _ = placed(part)
     pos = np.asarray(pos, np.float64)
     pos = pos[np.isfinite(pos).all(1)]
     if len(pos) == 0:
@@ -581,13 +802,119 @@ def reference_segments(parts, limit=3000):
     return np.concatenate(out) if out else np.zeros((0, 2, 3), np.float32)
 
 
+# --- live copies and mirrors: settings of a part, its LEDs repeated as they resolve (S12) -------
+_MIRROR_SETS = ((0,), (1,), (0, 1), (2,), (0, 2), (1, 2), (0, 1, 2))
+
+
+def copies(part):
+    """How many times the part's LEDs appear: its copies times its mirrors."""
+    c = part.get("copies") or {}
+    n = max(1, min(256, int(c.get("n", 1) or 1)))
+    m = part.get("mirror") or {}
+    axes = [a for a in range(3) if m.get("xyz"[a])]
+    return n * (1 << len(axes))
+
+
+def with_copies(part, pos, nrm):
+    """A part's LEDs (in the shape: pos (n, 3), nrm or None) with its live
+    copies and mirrors, in wiring order: copy after copy - each moved by
+    `step` (the shape's axes) and turned by `turn` degrees about the axis
+    through the centre (its own middle, or the shape's origin), every other
+    one run back with zigzag - then each mirror of them all, exact (across
+    the plane through the origin or its middle), run back if asked."""
+    c = part.get("copies") or {}
+    n = max(1, min(256, int(c.get("n", 1) or 1)))
+    P = np.asarray(pos, np.float64)
+    N = None if nrm is None else np.asarray(nrm, np.float64)
+    outp, outn = [P], [N]
+    if n > 1:
+        step = np.asarray(c.get("step") or [0.0, 0.0, 0.0], np.float64)[:3]
+        turn = float(c.get("turn", 0.0) or 0.0)
+        e = np.zeros(3); e["xyz".index(str(c.get("axis", "z")).lower()[:1] or "z")] = 1.0
+        C = np.zeros(3) if c.get("about") == "origin" else np.asarray(part.get("pos", [0, 0, 0]), np.float64)
+        outp, outn = [], []
+        for k in range(n):
+            R = axis_rotation(e, k * turn)
+            Pk = (P - C) @ R.T + C + k * step
+            Nk = None if N is None else N @ R.T
+            if c.get("zigzag") and k % 2 == 1:
+                Pk = Pk[::-1]
+                Nk = None if Nk is None else Nk[::-1]
+            outp.append(Pk); outn.append(Nk)
+    base_p = np.concatenate(outp)
+    base_n = None if N is None else np.concatenate(outn)
+    m = part.get("mirror") or {}
+    axes = [a for a in range(3) if m.get("xyz"[a])]
+    if not axes:
+        return base_p.astype(np.float32), None if base_n is None else base_n.astype(np.float32)
+    centre = np.zeros(3) if m.get("about", "origin") == "origin" else np.asarray(part.get("pos", [0, 0, 0]), np.float64)
+    allp, alln = [base_p], [base_n]
+    for combo in _MIRROR_SETS:
+        if not set(combo) <= set(axes):
+            continue
+        S = np.ones(3); S[list(combo)] = -1.0
+        Pm = (base_p - centre) * S + centre
+        Nm = None if base_n is None else base_n * S
+        if m.get("back"):
+            Pm = Pm[::-1]
+            Nm = None if Nm is None else Nm[::-1]
+        allp.append(Pm); alln.append(Nm)
+    P2 = np.concatenate(allp)
+    N2 = None if base_n is None else np.concatenate(alln)
+    return P2.astype(np.float32), None if N2 is None else N2.astype(np.float32)
+
+
+def placed(part):
+    """A part's LEDs in the shape: moved, turned and scaled, with its copies and mirrors."""
+    pos, nrm = transform(part, *part_points(part))
+    return with_copies(part, pos, nrm)
+
+
+def separate(part):
+    """A part's copies and mirrors as parts of their own (its settings back to
+    one): each copy the same kind, moved and turned as it was; each mirror of
+    them, which no turn can make, its LEDs as loose points. The LEDs stay
+    where they were, in the same wiring order."""
+    c = part.get("copies") or {}
+    n = max(1, min(256, int(c.get("n", 1) or 1)))
+    one = json.loads(json.dumps(part))
+    one.pop("copies", None); one.pop("mirror", None)
+    out = []
+    step = np.asarray(c.get("step") or [0.0, 0.0, 0.0], np.float64)[:3]
+    turn = float(c.get("turn", 0.0) or 0.0)
+    e = np.zeros(3); e["xyz".index(str(c.get("axis", "z")).lower()[:1] or "z")] = 1.0
+    C = np.zeros(3) if c.get("about") == "origin" else np.asarray(part.get("pos", [0, 0, 0]), np.float64)
+    for k in range(n):
+        q = json.loads(json.dumps(one))
+        R = axis_rotation(e, k * turn)
+        q = turned(q, R, C)
+        q = moved(q, k * step)
+        if c.get("zigzag") and k % 2 == 1:
+            q["reverse"] = not q.get("reverse")
+        if n > 1:
+            q["name"] = f"{part.get('name', part['kind'])} {k + 1}"
+        out.append(q)
+    m = part.get("mirror") or {}
+    if any(m.get(a) for a in "xyz"):
+        pos, nrm = placed(part)
+        base = sum(len(transform(q, *part_points(q))[0]) for q in out)
+        rest, rest_n = pos[base:], None if nrm is None else nrm[base:]
+        per = base
+        for j in range(len(rest) // max(1, per)):
+            q = new_part("points", points=np.round(rest[j * per:(j + 1) * per], 4).tolist())
+            if rest_n is not None:
+                q["params"]["normals"] = np.round(rest_n[j * per:(j + 1) * per], 4).tolist()
+            q["name"] = f"{part.get('name', part['kind'])} mirror {j + 1}"
+            out.append(q)
+    return out
+
+
 def resolve(parts):
     """Every part's LEDs, in wiring order: (pos (n, 3), nrm (n, 3) or None, owner (n,))."""
     P, N, O = [], [], []
     have_nrm = True
     for i, part in enumerate(parts):
-        pos, nrm = part_points(part)
-        pos, nrm = transform(part, pos, nrm)
+        pos, nrm = placed(part)
         P.append(pos); O.append(np.full(len(pos), i))
         if nrm is None:
             have_nrm = False
@@ -608,6 +935,12 @@ def resolve(parts):
 
 
 def part_count(part):
+    """A part's LEDs, its copies and mirrors counted."""
+    return len(part_points(part)[0]) * copies(part)
+
+
+def local_count(part):
+    """A part's own LEDs, one of its copies."""
     return len(part_points(part)[0])
 
 
@@ -628,31 +961,6 @@ def chain_order(pos, start=0):
         k = int(np.argmin(d))
         order.append(k); left[k] = False; cur = pos[k]
     return np.asarray(order)
-
-
-def mirrored(part, axis):
-    """A copy of a part mirrored through the shape's origin along an axis (0 x, 1 y, 2 z)."""
-    q = {k: (list(v) if isinstance(v, list) else (dict(v) if isinstance(v, dict) else v)) for k, v in part.items()}
-    q["pos"] = list(part.get("pos", [0, 0, 0])); q["pos"][axis] = -q["pos"][axis]
-    rot = list(part.get("rot", [0, 0, 0]))
-    # a mirror is not a rotation: the part is turned so its face points back; near enough for LED props
-    if axis == 0: rot[1] = -rot[1]; rot[2] = 180 - rot[2]
-    elif axis == 1: rot[0] = -rot[0]; rot[2] = -rot[2]
-    else: rot[0] = 180 - rot[0]; rot[1] = -rot[1]
-    q["rot"] = rot
-    q["name"] = part.get("name", part["kind"]) + " mirror"
-    return q
-
-
-def arrayed(part, count, offset):
-    """Copies of a part stepped by an offset: [part + offset, part + 2 offset, ...]."""
-    out = []
-    for k in range(1, max(1, int(count))):
-        q = {kk: (list(v) if isinstance(v, list) else (dict(v) if isinstance(v, dict) else v)) for kk, v in part.items()}
-        q["pos"] = [float(a) + float(b) * k for a, b in zip(part.get("pos", [0, 0, 0]), offset)]
-        q["name"] = part.get("name", part["kind"]) + f" {k + 1}"
-        out.append(q)
-    return out
 
 
 # --- a logical grid for a shape ----------------------------------------------------------

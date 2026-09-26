@@ -3119,6 +3119,8 @@ class App(Features):
         docked and last clicked in) - the shape, the sequence, the
         palettes - else the code pane, else the graph."""
         f = device_ui.focused_frame(self)
+        if f is None and view3d.editing(self) and self.over_view():
+            f = "shape"                                  # the pointer on the 3-D view while a shape is built: its steps
         if f is None:
             for slot, (tag, _, _, _) in device_ui.FRAMES.items():
                 if self.focus == tag and self.docked(slot):
@@ -3131,7 +3133,7 @@ class App(Features):
         t = self.undo_target()
         if t == "shape":
             from native import shape_ui
-            shape_ui.undo(self) if not redo else self.gp.status("the shape has no redo")
+            shape_ui.redo(self) if redo else shape_ui.undo(self)
         elif t == "sequence":
             from native import sequence_ui
             sequence_ui.undo(self, redo)
@@ -3851,11 +3853,11 @@ CMD_FILE = os.path.join(SHOT_DIR, "command.json")
 
 def _hook_names(app):
     """What a test hook's line of Python ("py", "check") has in scope."""
-    from native import shape_view, shapes, units
+    from native import shape_view, shapes, units, shape_gallery, shape_run, shape_fields
     return {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
-            "units": units}
+            "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields}
 
 
 def service_command(app):
