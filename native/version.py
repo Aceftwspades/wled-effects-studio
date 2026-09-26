@@ -5,7 +5,7 @@ the bundle, and what the update check compares with the newest release
 tag (vX.Y.Z) of REPO. Bump it with each release; the tag is the same
 number with a v in front.
 """
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 REPO = "Aceftwspades/wled-effects-studio"            # owner/name on GitHub: the releases the update check reads
 WLED_REPO = "Aceftwspades/WLED"                       # the WLED fork the firmware side lives in (branch playground)
 WLED_UPSTREAM = "Aircoookie/WLED"                     # the WLED project itself
