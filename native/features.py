@@ -56,51 +56,48 @@ class Features:
         dpg.set_value("geom_kind", g.kind)
         self.rebuild_geom_fields()
         self.gp.status(f"geometry from {source}: {g.describe()}")
-    def read_device_matrix(self):
-        """The active device's 2-D setup - its matrix's size, where the first
-        LED is, rows or columns, serpentine, its panels and gaps file - read
-        (GET only) on a thread; poll_matrix_read makes it the geometry."""
+    def read_device_wiring(self):
+        """The active device's wiring - its ledmap, else its 2-D setup, else
+        its LEDs in order - read (GET only) on a thread; poll_wiring_read
+        lays it over the geometry the studio has, whatever its kind."""
         host = self.active_host()
         if not host:
             device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
-        if getattr(self, "_matrix_reading", False):
+        if getattr(self, "_wiring_reading", False):
             return
-        self._matrix_reading = True
-        self.gp.status(f"reading {host}'s 2-D setup...")
+        self._wiring_reading = True
+        self.gp.status(f"reading {host}'s wiring...")
 
         def run():
-            from native import matrix2d
+            from native import device_wiring
             try:
-                self._matrix_result = (host, matrix2d.read(host), None)
+                self._wiring_result = (host, device_wiring.read(host), None)
             except Exception as e:
-                self._matrix_result = (host, None, str(e) or type(e).__name__)
+                self._wiring_result = (host, None, str(e) or type(e).__name__)
         threading.Thread(target=run, daemon=True).start()
 
-    def poll_matrix_read(self):
-        r = getattr(self, "_matrix_result", None)
+    def poll_wiring_read(self):
+        r = getattr(self, "_wiring_result", None)
         if r is None:
             return
-        self._matrix_result = None
-        self._matrix_reading = False
+        self._wiring_result = None
+        self._wiring_reading = False
         host, got, err = r
-        from native import matrix2d
+        from native import device_wiring
         if err:
-            self.gp.status(f"could not read {host}'s setup: {err}"); return
-        if not got["panels"]:
-            self.gp.status(f"{host} has no 2-D setup (LED Preferences > 2D Configuration): its LEDs are a strip there"); return
+            self.gp.status(f"could not read {host}'s wiring: {err}"); return
+        g = self.project.geometry
         try:
-            params, words = matrix2d.geometry_params(got["panels"], got["gaps"], f"{host} 2-D setup")
+            new, words = device_wiring.apply(g, got, host)
         except ValueError as e:
-            self.gp.status(f"{host}'s 2-D setup: {e}"); return
-        self.apply_geometry(Geometry("matrix", **params))
-        n = self.project.geometry.count
-        more = got["total"] - n if got["total"] > n else 0
-        msg = (f"the matrix as {host} has it: {words}" + (f"; its outputs drive {more} LEDs more, after the matrix" if more else "")
-               + ("; it also has a ledmap, which WLED lays over this setup - Device > Import the device's ledmap takes that"
-                  if got["ledmap"] else ""))
-        self.gp.status(msg)
-        if dpg.does_item_exist("geom_desc"):
-            dpg.set_value("geom_desc", self.project.geometry.describe() + " - " + words)
+            self.gp.status(f"{host}'s wiring cannot be this {g.kind}'s: {e}"); return
+        self.apply_geometry(new)
+        if getattr(self, "ddp", None) is not None and self.ddp.host == host:
+            self._stream_wiring = got                  # the stream to it follows at once
+        order = device_wiring.stream_order(got)
+        self.gp.status(f"the {new.kind} wired as {host} has it: {words}; "
+                       + ("a stream goes in its own order (it maps each pixel with its table)" if order == "logical"
+                          else "a stream goes in wiring order (its Respect LED maps is off)"))
 
     # --- files dropped on the window -----------------------------------------
     def poll_drops(self):
@@ -649,14 +646,73 @@ class Features:
         self.ddp = live_out.DdpOut(host)
         self._ddp_fps = max(1.0, float(fps))
         self._ddp_next = 0.0
+        self._stream_wiring = None                     # until the device says: WLED's default, its own map applied (logical order)
         self.gp.status(f"streaming to {host} over DDP at {int(fps)} fps - the device shows the sim while this runs")
         device_ui.refresh_live(self)
+
+        def ask():
+            from native import device_wiring
+            try:
+                self._stream_wiring_got = (host, device_wiring.read(host, timeout=4.0), None)
+            except Exception as e:
+                self._stream_wiring_got = (host, None, str(e) or type(e).__name__)
+        threading.Thread(target=ask, daemon=True).start()
         return True
+
+    def stream_order(self):
+        """The order the stream is in: "logical" (the device maps it with its own ledmap or 2-D setup -
+        Respect LED maps, WLED's default) or "wiring" (it takes the pixels as they are wired)."""
+        from native import device_wiring
+        return device_wiring.stream_order(getattr(self, "_stream_wiring", None))
+
+    def stream_of_physical(self, rgb_by_led):
+        """A frame of (n, 3) colours by the device's LED number, as the stream must carry it: the same
+        in wiring order; in logical order, each at the place the device's table sends to that LED."""
+        cols = np.asarray(rgb_by_led, np.uint8).reshape(-1, 3)
+        info = getattr(self, "_stream_wiring", None)
+        if self.stream_order() == "wiring" or info is None:
+            return cols.tobytes()
+        from native import device_wiring
+        _, _, tab, _ = device_wiring.table(info)
+        tab = np.asarray(tab, int)
+        out = np.zeros((len(tab), 3), np.uint8)
+        ok = (tab >= 0) & (tab < len(cols))
+        out[ok] = cols[tab[ok]]
+        return out.tobytes()
+
+    def poll_stream_wiring(self):
+        """The device's answer, once: the order the stream goes in from here, and a word when its layout is
+        not the studio's (the stream then cannot line up)."""
+        got = getattr(self, "_stream_wiring_got", None)
+        if got is None:
+            return
+        self._stream_wiring_got = None
+        host, info, err = got
+        d = getattr(self, "ddp", None)
+        if d is None or d.host != host:
+            return
+        if err:
+            self.gp.status(f"streaming to {host}; its settings could not be read ({err}) - the frames go as WLED takes them by default")
+            return
+        from native import device_wiring
+        self._stream_wiring = info
+        w, h, _, source = device_wiring.table(info)
+        g = self.project.geometry
+        order = device_wiring.stream_order(info)
+        words = (f"streaming to {host} in the device's own order: it maps each pixel to its LED with {source} (Respect LED maps)"
+                 if order == "logical" else f"streaming to {host} in wiring order: its Respect LED maps is off")
+        if order == "logical" and (info.get("ledmap") or info.get("panels")) and (w, h) != (g.w, g.h):
+            words += (f" - but it lays its pixels out {w} x {h} and this geometry is {g.w} x {g.h}: the picture will not line up"
+                      " (GEOMETRY > Read the device's wiring, or a geometry of its size)")
+        elif order == "wiring" and g.count != (info.get("total") or g.count):
+            words += f" - it drives {info.get('total')} LEDs and this geometry has {g.count}"
+        self.gp.status(words)
 
     def stream_stop(self):
         d = getattr(self, "ddp", None)
         if d is not None:
             d.close(); self.ddp = None
+            self._stream_wiring = None
             self.gp.status(f"stream stopped after {d.frames} frames; the device goes back to its effect in a couple of seconds")
             device_ui.refresh_live(self)
 
@@ -688,8 +744,9 @@ class Features:
         if now < self._ddp_next:
             return
         self._ddp_next = now + 1.0 / self._ddp_fps
-        own = getattr(self, "_map_frame", None)      # mapping by camera: the plan's own frame, the device's LEDs in wiring order
-        d.send(own if own is not None else live_out.frame_bytes(self.frame_rgb(), self.project.geometry.phys))
+        own = getattr(self, "_map_frame", None)      # mapping by camera: the plan's own frame, by the device's LED numbers
+        d.send(self.stream_of_physical(own) if own is not None
+               else live_out.stream_bytes(self.frame_rgb(), self.project.geometry, self.stream_order()))
         if dpg.does_item_exist("live_status") and d.frames % 15 == 0:
             dpg.set_value("live_status", f"{d.frames} frames, {d.bytes // 1024} KB sent" + (f"; {d.errors} send errors: {d.last_error}" if d.errors else ""))
 

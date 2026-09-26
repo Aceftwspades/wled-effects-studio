@@ -956,15 +956,21 @@ class App(Features):
                                       on_enter=True, callback=self.on_geom_field)
         if g.kind == "xyz":
             form.note(f"{g.count} points from {g.params.get('source', 'file')}", parent="geom_fields")
-        if g.kind == "matrix":
+        if g.kind not in ("xyz", "shape"):
             with form.under(parent="geom_fields"):
-                dpg.add_button(label="Read the device's matrix", tag="geom_read_matrix", small=True, callback=lambda: self.read_device_matrix())
-                chrome.tip("the size and wiring the device's 2-D setup has (LED Preferences > 2D Configuration): where the first "
-                           "LED is, rows or columns, serpentine - and its panels and gaps file, when it has them. Read only.")
+                dpg.add_button(label="Read the device's wiring", tag="geom_read_wiring", small=True, callback=lambda: self.read_device_wiring())
+                chrome.tip("the order the active device's LEDs are wired in, as WLED uses it - its ledmap, else its 2-D setup "
+                           "(where the first LED is, rows or columns, serpentine, panels, gaps), else a strip - over this "
+                           f"{g.kind}: a cube's faces, their order and turns. Read only; the device is not changed.")
         if g.kind == "shape":                             # the description line below says what it is
             with form.under(parent="geom_fields"):
                 dpg.add_button(label="Edit the shape...", callback=lambda: device_ui.show(self, "shape"))
-        if g.kind == "cube":
+        if g.kind == "cube" and g.params.get("map") is not None:
+            # wired by a device's own map, which the settings below cannot say: they come back on request
+            with form.under(parent="geom_fields"):
+                dpg.add_button(label="Use the wiring fields instead", small=True, callback=self.drop_geom_map)
+                chrome.tip("the face order, turns and switches set the wiring again (the device's map dropped)")
+        elif g.kind == "cube":
             # the wiring: which face first, how each is turned, how each is
             # walked - what the exported ledmap says
             form.note("the wiring, as the ledmap has it:", parent="geom_fields")
@@ -991,6 +997,13 @@ class App(Features):
         if g.kind != "xyz":
             form.check("show the wiring on the net", parent="geom_fields", default_value=self.show_wiring,
                        callback=lambda s, v: setattr(self, "show_wiring", bool(v)))
+
+    def drop_geom_map(self):
+        """A device's map off the geometry: its own settings wire it again."""
+        g = self.project.geometry
+        p = {k: v for k, v in g.params.items() if k not in ("map", "source")}
+        self.apply_geometry(Geometry(g.kind, **p))
+        self.gp.status(f"the {g.kind}'s own wiring settings again (the device's map dropped)")
 
     def on_map1d2d(self, s, val):
         self.eng.set_map1d2d(["strip", "bars", "arcs", "corner"].index(val))
@@ -4612,7 +4625,7 @@ SKIP_MENU = ("Quit", "Record 15 s GIF", "Record 15 s video", "Fullscreen", "Chec
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
              "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device (DDP)",
-             "Import the device's ledmap", "Import the device's matrix setup")   # these reach a real device: not a test's to do (an import replaces the geometry)
+             "Import the device's ledmap", "Read the device's wiring")   # these reach a real device: not a test's to do (a read replaces the wiring)
 
 
 def walk_menus(app, skip=()):
@@ -4818,7 +4831,7 @@ def process_stats(app):
 # the clipboard (the log's copy: what the user had copied stays)
 SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
                     "map_webcam",                         # the webcam: a camera turned on is not a test's to do
-                    "geom_read_matrix")                   # a real device's setup read: the smoke reads the fake's
+                    "geom_read_wiring")                   # a real device's wiring read: the smoke reads the fake's
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
@@ -5078,7 +5091,8 @@ def main():
                 room.poll(app)
                 weight.poll(app)                     # what has nothing to act on, greyed
                 app.poll_calibration()
-                app.poll_matrix_read()
+                app.poll_wiring_read()
+                app.poll_stream_wiring()
                 chrome.poll_update(app); chrome.poll_update_download(app)
                 _t.append(time.perf_counter())
                 app.step_sim()

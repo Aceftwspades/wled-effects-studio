@@ -13,11 +13,9 @@ unused one (counted, not shown).
     panels = matrix2d.panels_of(cfg)            # [{"w","h","x","y","b","r","v","s"}], or None
     w, h, table = matrix2d.layout(panels, gaps) # table[y * w + x] = the LED there, or -1
     params, words = matrix2d.geometry_params(panels, gaps, source)
-    info = matrix2d.read(host)                  # all of it from a device, over HTTP (read only)
+
+(device_wiring reads a device's setup and lays it over any geometry.)
 """
-import json
-import urllib.error
-import urllib.request
 
 
 def panels_of(cfg):
@@ -87,29 +85,3 @@ def geometry_params(panels, gaps=None, source="the device"):
                 "start_right": p["r"], "start_bottom": p["b"]}, words
     W, H, table = layout(panels, gaps)
     return {"w": W, "h": H, "map": table, "source": source}, words + (" (with its gaps file)" if gaps is not None else "")
-
-
-def _get(host, path, timeout):
-    """A path's JSON from the device, or None when it has no such file (404)."""
-    try:
-        with urllib.request.urlopen(f"http://{host}{path}", timeout=timeout) as r:
-            return json.loads(r.read().decode("utf-8", "replace"))
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return None
-        raise
-
-
-def read(host, timeout=6.0):
-    """The device's 2-D setup (GET only - nothing on it changes): {"panels",
-    "gaps", "ledmap" (whether it has one, which WLED lays over the setup),
-    "total" (the LEDs its outputs drive)}; panels None: no 2-D setup."""
-    cfg = _get(host, "/json/cfg", timeout) or {}
-    panels = panels_of(cfg)
-    gaps = None
-    if panels:
-        g = _get(host, "/2d-gaps.json", timeout)
-        gaps = [int(v) for v in g] if isinstance(g, list) else None
-    lm = _get(host, "/ledmap.json", timeout)
-    total = int((((cfg.get("hw") or {}).get("led") or {}).get("total")) or 0)
-    return {"panels": panels, "gaps": gaps, "ledmap": isinstance(lm, dict) and bool(lm.get("map")), "total": total}

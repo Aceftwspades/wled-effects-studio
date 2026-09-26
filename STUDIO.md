@@ -2275,6 +2275,43 @@ The ninth pass is done: S1-S19, released as 1.3.0.
 
 The seven are done, released as 1.3.1.
 
+### After 1.3.1: the device's wiring for any geometry, and the stream in its order (September 2026)
+
+- [x] **The stream was scrambled on the cube.** WLED puts realtime pixels
+      on its segment's LOGICAL places (_pixels[n]) and maps them to the
+      wiring with its own table at show time while "Respect LED maps" is on
+      (wled00/FX.h getMappedPixelIndex; if.live.rlm, on by default); the
+      studio streamed in wiring order, as live_out's notes said, so a device
+      with a map applied it twice. The stream now asks the device as it
+      starts (device_wiring.read, on a thread) and goes in logical order -
+      the whole frame, the cube's 48 x 48 net - unless the device says
+      Respect LED maps is off, when it goes in wiring order, each LED at its
+      number (a device map's own numbering where the geometry has one). The
+      footer says which, and when the device lays its pixels out at another
+      size than the geometry; the camera plan's one-LED frames go through
+      the device's table the same way. DDP goes to a device written with a
+      web port (host:port) on DDP's own port.
+- [x] **The device's wiring read for whatever geometry is loaded**
+      (native/device_wiring.py; GEOMETRY > Read the device's wiring, Device >
+      Read the device's wiring - the matrix's read of 1.3.1 grown): what
+      WLED uses - its ledmap, else its 2-D setup, else its LEDs in order -
+      laid over the geometry the studio has. A cube's faces come back as
+      its own settings (face order from each face's run of LEDs, then each
+      face's quarter turns under the plainest switches that make exactly the
+      table) or, wired some other way, as the device's map kept on the cube
+      (Use the wiring fields instead gives the settings back); a cube of
+      another face size takes the device's. Strips, matrices, cylinders,
+      spheres and tori take a map at their size (Geometry.MAPPABLE); a shape
+      keeps its parts' order. tests/test_device_wiring.py: every cube wiring
+      the settings can make found back exactly (five and six faces, every
+      switch), a cube wired its own way kept as a map, the table WLED uses,
+      the other kinds, the stream's order and bytes; the smoke sends a cube's
+      ledmap to the fake WLED, rewires the studio's cube and reads it back,
+      and checks the last streamed frame is the whole net.
+- [x] **Packaging left the checkout's studio without its effects**:
+      package.py builds the stock engine the release ships, and build.py
+      pointed build/latest at it; it is put back after.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

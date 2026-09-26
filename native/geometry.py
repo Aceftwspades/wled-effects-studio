@@ -55,16 +55,22 @@ class Geometry:
         self.nrm = None      # (h*w, 3) float, outward unit normals, or None (the direction from the centre then)
         self.phys = None     # (n_lit,) logical indices in PHYSICAL (wiring) order
         self._build()
-        if self.params.get("map") is not None and self.kind in ("strip", "matrix"):
+        if self.params.get("map") is not None and self.kind in self.MAPPABLE:
             self._apply_map()
+
+    # the kinds a device's map can wire: their logical positions are a w x h raster, as WLED's segment is
+    MAPPABLE = ("strip", "matrix", "cube", "cylinder", "sphere", "torus")
 
     def _apply_map(self):
         """A device's ledmap, WLED's way round: map[logical] = physical, -1
         for a logical position with no LED. Unlit positions leave the
-        picture; the wiring order is the map's."""
+        picture (on a cube, the net's corners stay dark whatever the map
+        says); the wiring order is the map's."""
         m = [int(v) for v in self.params["map"]][:self.w * self.h]
         m += [-1] * (self.w * self.h - len(m))
         arr = np.asarray(m)
+        base = np.asarray(self.lit, bool) if self.lit is not None and len(self.lit) == len(arr) else np.ones(len(arr), bool)
+        arr = np.where(base, arr, -1)
         self.lit = arr >= 0
         logical = np.nonzero(self.lit)[0]
         order = np.argsort(arr[logical], kind="stable")

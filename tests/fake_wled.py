@@ -25,7 +25,6 @@ Everything is in memory; .state, .presets, .files, .cfg, .ddp_frames are
 there for a test to look at.
 """
 import json
-import os
 import socket
 import sys
 import threading
@@ -84,6 +83,7 @@ class FakeWled:
         self.t0 = time.time()
         self.pending = None                              # (id, object, is_api_call)
         self.ddp_packets = self.ddp_frames = 0
+        self.ddp_last = b""                              # the last whole frame streamed (its packets put together at their offsets)
         self.live_until = 0.0
         self.log = []
         self._lock = threading.Lock()
@@ -247,6 +247,7 @@ class FakeWled:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", self.ddp_port)); s.settimeout(0.5)
         except OSError:
             return
+        frame = bytearray()
         while self._srv is not None:
             try:
                 d, _ = s.recvfrom(4096)
@@ -254,8 +255,15 @@ class FakeWled:
                 continue
             with self._lock:
                 self.ddp_packets += 1
+                if len(d) >= 10:
+                    off, n = int.from_bytes(d[4:8], "big"), int.from_bytes(d[8:10], "big")
+                    if len(frame) < off + n:
+                        frame.extend(bytes(off + n - len(frame)))
+                    frame[off:off + n] = d[10:10 + n]
                 if len(d) >= 10 and d[0] & 0x01:
                     self.ddp_frames += 1
+                    self.ddp_last = bytes(frame)
+                    frame = bytearray()
                 self.live_until = time.time() + 2.5
         s.close()
 

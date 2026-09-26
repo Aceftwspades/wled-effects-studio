@@ -315,14 +315,23 @@ The geometry section sets the cube's face size and whether it has six
 faces (a lit bottom; it takes the net's bottom-right corner block, and
 the flash build and the settings push tell the device) - or a matrix,
 cylinder, sphere, strip, or an XYZ file - and for the cube its wiring - which face
-first, turns, serpentine - which is what the exported ledmap says. A
-matrix's wiring can come from the device: **Read the device's matrix**
-(under GEOMETRY, or Device > Import the device's matrix setup) reads its
-2-D setup (LED Preferences > 2D Configuration, read only): the size, where
-the first LED is, rows or columns, serpentine - one panel becomes those
-switches, several panels (or a gaps file) the map WLED itself makes from
-them. A device with a ledmap uses that over its 2-D setup, and the footer
-says so: Device > Import the device's ledmap takes the ledmap instead. Audio
+first, turns, serpentine - which is what the exported ledmap says. The
+wiring can come from the device, whatever the geometry: **Read the
+device's wiring** (under GEOMETRY, or Device > Read the device's wiring)
+reads what WLED uses (read only: the device is not changed) - its ledmap,
+else its 2-D setup (LED Preferences > 2D Configuration: the size, where the
+first LED is, rows or columns, serpentine, panels, a gaps file), else its
+LEDs in order - and lays it over the geometry the studio has. A cube's
+faces are found back as its own settings - their order, each one's turns,
+serpentine and the start corner - when the wiring is one those can say,
+and kept as the device's own map when it is not (then its button
+**Use the wiring fields instead** gives the settings back); a cube of
+another face size takes the device's. A
+matrix with a ledmap on the device takes the ledmap (WLED uses it over its
+2-D setup); one panel of a 2-D setup becomes the matrix's switches,
+several (or a gaps file) the map WLED makes of them. A strip, cylinder,
+sphere or torus takes it at its size; a shape's wiring is its parts' own
+order. Audio
 comes from the synth (sliders, a beat clock), a live capture, or a WAV
 file. Playback has A/B compare (two effects side by side), a slider sweep,
 scrubbing back through the last seconds while paused (in every view,
@@ -725,8 +734,16 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
 - **LIVE**, in the same frame: **stream the sim to the device** sends
   every frame the sim draws to the device over DDP (WLED's realtime
   input, on by default) - any effect, built or not, on the real LEDs at
-  once, in the wiring order the ledmap would use; the device goes back to
-  its own effect a couple of seconds after the stream stops. The
+  once; the device goes back to its own effect a couple of seconds after
+  the stream stops. The frame goes in the order the device takes it,
+  which the studio asks it as the stream starts: WLED puts streamed pixels
+  on its segment's places and sends them to its LEDs through its own map
+  (its ledmap or 2-D setup) while its Sync settings say **Respect LED
+  maps** - on by default - so the frame goes as the effect draws it, the
+  whole net of a cube, and the device's map does the wiring; with that
+  off it goes in the wiring order the geometry has (read the device's
+  wiring first). The footer says which, and when the device lays its
+  pixels out at another size than the geometry. The
   **wiring test** under it runs a chase along the wiring order (LEDs/s),
   lights one LED by its index (< > step it), one part of a shape (or the
   parts in turn), one LED output (the outputs frame's ranges), all red /
@@ -867,7 +884,7 @@ on and install what it carries.
 - **Device** › Send the shape (ledmap + positions)
 - **Device** › Send the ledmap only
 - **Device** › Import the device's ledmap
-- **Device** › Import the device's matrix setup — the matrix's size and wiring as the device has them (LED Preferences > 2D Configuration): where the first LED is, rows or columns, serpentine, its panels and gaps - read only, the device is not changed
+- **Device** › Read the device's wiring — the order the device's LEDs are wired in, as WLED uses it (its ledmap, else its 2-D setup, else a strip), over the geometry the studio has - a cube's faces too; read only, the device is not changed
 - **Device** › Import a ledmap file...
 - **Device** › Usermods and features...
 - **View** › Logical net `Q`

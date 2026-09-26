@@ -196,6 +196,10 @@ def main():
         # the engine and its objects are made by the compiler the release ships, so the
         # app's first build reuses them (an object is stamped with the compiler that made it)
         os.environ["STUDIO_TOOLCHAIN"] = os.path.abspath(toolchain)
+    # the stock engine the release ships is built here, and build.py points build/latest at it: the
+    # checkout's own studio would then start without its project's effects - put back as it was after
+    latest_file = os.path.join(HERE, "build", "latest")
+    latest_before = open(latest_file, encoding="utf-8").read().strip() if os.path.exists(latest_file) else None
     run([sys.executable, "build.py", "--native-only"])
     sys.path.insert(0, HERE)
     from native import paths
@@ -222,6 +226,8 @@ def main():
     os.makedirs(os.path.join(DIST, "build"), exist_ok=True)
     shutil.copyfile(lib, os.path.join(DIST, "build", os.path.basename(lib)))
     open(os.path.join(DIST, "build", "latest"), "w", encoding="utf-8").write(os.path.basename(lib))
+    if latest_before and os.path.exists(os.path.join(HERE, "build", latest_before)):
+        open(latest_file, "w", encoding="utf-8").write(latest_before)       # the checkout's studio: its own engine again
     # the engine's objects too (named by relative paths, stamped by contents): a
     # first build then compiles only the effect being added, not the whole engine
     from native.toolchain import OBJ

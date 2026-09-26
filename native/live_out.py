@@ -7,9 +7,14 @@ the data type (RGB, 8 bits a channel), the destination (the display),
 the byte offset and the length, all big-endian - then the bytes, at most
 1440 a packet (480 LEDs). The device shows them in place of its effect
 for as long as they keep coming (its realtime timeout, 2.5 s by default)
-and goes back to its effect after. Pixels are addressed in PHYSICAL
-order - the wiring - so the frame is sent as the geometry's `phys` lays
-it out, which is what the device's own ledmap would do for an effect.
+and goes back to its effect after. Which order the pixels go in is the
+device's: WLED puts realtime pixels on its segment's LOGICAL places and
+maps them to the wiring with its own table (ledmap, or 2-D setup) while
+its Sync settings say "Respect LED maps" - on by default - so the frame
+goes as the effect draws it; only with that off does it take them in
+wiring order, and the geometry's `phys` lays them out (device_wiring
+.stream_order says which). Sent in wiring order to a device that maps
+them, a cube came out scrambled: its map applied twice.
 
     out = DdpOut("192.168.1.17"); out.send(rgb_bytes); out.close()
 
@@ -32,6 +37,8 @@ ID_DISPLAY = 1
 class DdpOut:
     def __init__(self, host, port=DDP_PORT):
         self.host, self.port = host, port
+        # a device written with its web port ("192.168.1.17:8080", the tests' fake WLED) takes DDP on DDP's own
+        self.ip = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setblocking(False)
         self.seq = 1
@@ -50,7 +57,7 @@ class DdpOut:
             last = off + len(chunk) >= n
             head = struct.pack("!BBBBIH", FLAG_VER1 | (FLAG_PUSH if last else 0), self.seq, TYPE_RGB8, ID_DISPLAY, off, len(chunk))
             try:
-                self.sock.sendto(head + chunk, (self.host, self.port))
+                self.sock.sendto(head + chunk, (self.ip, self.port))
                 self.bytes += len(head) + len(chunk)
             except OSError as e:
                 self.errors += 1; self.last_error = str(e)
@@ -66,6 +73,23 @@ class DdpOut:
             self.sock.close()
         except OSError:
             pass
+
+
+def stream_bytes(rgb, geom, order="logical"):
+    """The engine's picture as the device takes it: "logical" - every
+    logical pixel, as the effect draws it (the device's table maps them) -
+    or "wiring" - LED by LED, each at its number on the device (a device
+    map's own numbering where the geometry has one)."""
+    flat = np.asarray(rgb, np.uint8).reshape(-1, 3)
+    if order == "logical":
+        return flat.tobytes()
+    phys = np.asarray(geom.phys, int)
+    ids = getattr(geom, "phys_ids", None)
+    ids = np.arange(len(phys)) if ids is None else np.asarray(ids, int)
+    ok = (phys >= 0) & (phys < len(flat)) & (ids >= 0)
+    out = np.zeros((int(ids[ok].max()) + 1 if ok.any() else 0, 3), np.uint8)
+    out[ids[ok]] = flat[phys[ok]]
+    return out.tobytes()
 
 
 def frame_bytes(rgb, phys):

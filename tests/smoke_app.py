@@ -513,21 +513,35 @@ STEPS = [
     ([{"check": "not dpg.is_item_shown('fx_fit_note')"}, {"action": "tutorial_tree"}], 1.5),
     ([{"check": "dpg.is_item_shown('reader_win')"}, {"py": "chrome.close_dialog('reader_win') or dpg.hide_item('reader_win')"},
       {"effect": "Rainbow"}], 0.5),
-    # live output to the fake device on this machine, and the wiring test
-    ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
+    # live output to the fake device on this machine, and the wiring test; the stream asks the device how it takes
+    # one - the fake says nothing of Respect LED maps, so WLED's default: in logical order, its map applied there
+    ([{"frame": "send"}, {"stream": "127.0.0.1:8770"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
       {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),
-    ([{"stream": False}], 1.0),
+    ([{"check": "app._stream_wiring is not None and app.stream_order() == 'logical'"},
+      {"expect": ["messages", "in the device's own order"]}, {"stream": False}], 1.0),
     # every send to a device, against the fake WLED: the script, the settings, the shape, the ledmap
     ([{"frame": "devices"}, {"device": "127.0.0.1:8770"}, {"scan": "all"}], 6.0),
     ([{"layout": "graph"}, {"graph_open": "fan.json"}, {"py": "app.send_script()"}], 6.0),
     ([{"expect": ["send_status", "the device is running it"]}, {"effect": "Rainbow"}, {"py": "app.push_settings()"}], 3.0),
     ([{"expect": ["edit_status", "Rainbow"]}, {"py": "app.send_shape(True)"}, {"py": "app.send_ledmap(True)"}], 4.0),
     ([{"expect": ["edit_status", "ledmap"]}], 0.5),
-    # the device's 2-D setup read as the matrix (the fake's: one 48 x 48 panel, serpentine; it has a ledmap by now)
-    ([{"geometry": {"kind": "matrix", "params": {"w": 8, "h": 8}}}, {"py": "app.read_device_matrix()"}], 1.5),
-    ([{"check": "app.project.geometry.params == {'w': 48, 'h': 48, 'serpentine': True, 'vertical': False, 'start_right': False, 'start_bottom': False}"},
-      {"expect": ["messages", "rows from the top left, serpentine"]}, {"expect": ["messages", "Import the device's ledmap"]},
-      {"check": "dpg.does_item_exist('geom_read_matrix')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.5),
+    # the device's wiring read over the geometry the studio has: a cube wired one way, its ledmap sent to the fake,
+    # the studio's cube wired plainly again - the read brings the same wiring back, as the cube's own settings
+    ([{"geometry": {"kind": "cube", "params": {"B": 16, "faces": "T,N,E,S,W", "rots": "1,0,3,2,0", "serpentine": True,
+                                                   "vertical": False, "start_right": True, "start_bottom": False}}},
+      {"py": "setattr(app, '_wired_map', app.project.geometry.ledmap()['map'])"}, {"py": "app.send_ledmap(True)"}], 2.0),
+    ([{"geometry": {"kind": "cube", "params": {"B": 16}}}, {"py": "app.read_device_wiring()"}], 2.0),
+    ([{"check": "app.project.geometry.kind == 'cube' and 'map' not in app.project.geometry.params"},
+      {"check": "app.project.geometry.ledmap()['map'] == app._wired_map"},
+      {"expect": ["messages", "faces T N E S W"]}, {"check": "dpg.does_item_exist('geom_read_wiring')"},
+      # a matrix takes the device's ledmap as its map (WLED uses it over the 2-D setup)
+      {"geometry": {"kind": "matrix", "params": {"w": 8, "h": 8}}}, {"py": "app.read_device_wiring()"}], 2.0),
+    ([{"check": "(app.project.geometry.kind, app.project.geometry.w, app.project.geometry.h) == ('matrix', 48, 48)"},
+      {"check": "app.project.geometry.ledmap()['map'] == app._wired_map"},
+      # a shape's wiring is its own: the read says so and changes nothing
+      {"geometry": {"kind": "shape", "params": {"parts": [_TREE]}}}, {"py": "app.read_device_wiring()"}], 2.0),
+    ([{"expect": ["messages", "a shape's wiring is its parts' order"]}, {"check": "app.project.geometry.kind == 'shape'"},
+      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.5),
     # a sequence: two steps from the sim, played, a step loaded back, one deleted
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},
       {"seq": ["field", "dur", 1.0]}, {"seq": ["play"]}], 3.0),
@@ -691,6 +705,8 @@ def main():
         bad.append("the app's output was not captured (no 'remote control' line): a buffered stdout, or the wrong exe")
     if ddp.ddp_frames < 10:
         bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
+    if len(ddp.ddp_last) != 48 * 48 * 3:                 # the cube's whole net, in logical order - not its 1280 LEDs in wiring order
+        bad.append(f"the last streamed frame was {len(ddp.ddp_last)} bytes; the 48 x 48 cube in logical order is {48 * 48 * 3}")
     bad += [l for l in text.splitlines() if "EXPECT FAILED" in l]
     rep = next((l.split(None, 1)[1].strip() for l in text.splitlines() if l.startswith("report ")), "")
     if not rep or not os.path.exists(rep):

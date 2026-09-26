@@ -178,9 +178,9 @@ def build_menus(app):
             dpg.add_menu_item(label="Send the ledmap only", callback=lambda: app.send_ledmap())
             dpg.add_menu_item(label="Import the device's ledmap", callback=lambda: app.import_ledmap(host=app.active_host())
                               if app.active_host() else device_ui.show(app, "devices"))
-            dpg.add_menu_item(label="Import the device's matrix setup", callback=lambda: app.read_device_matrix())
-            tip("the matrix's size and wiring as the device has them (LED Preferences > 2D Configuration): where the "
-                "first LED is, rows or columns, serpentine, its panels and gaps - read only, the device is not changed")
+            dpg.add_menu_item(label="Read the device's wiring", callback=lambda: app.read_device_wiring())
+            tip("the order the device's LEDs are wired in, as WLED uses it (its ledmap, else its 2-D setup, else a strip), "
+                "over the geometry the studio has - a cube's faces too; read only, the device is not changed")
             dpg.add_menu_item(label="Import a ledmap file...", callback=lambda: dpg.show_item("ledmap_dialog"))
             dpg.add_separator()
             dpg.add_menu_item(label="Usermods and features...", callback=lambda: show_usermods(app))
