@@ -2319,6 +2319,8 @@ The seven are done, released as 1.3.1.
       package.py builds the stock engine the release ships, and build.py
       pointed build/latest at it; it is put back after.
 
+Released as 1.3.2.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads
