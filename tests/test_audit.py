@@ -310,6 +310,39 @@ def test_gpu_points_match_the_software_projection():
     assert not bad, "\n".join(bad)
 
 
+def test_gpu_points_take_a_new_count_and_a_pan():
+    """The cloud made again for another count (a part added: its colour
+    texture deleted while the background picture drew it had left the name
+    taken), and placed with a pan and the orthographic projection where
+    render.project puts them."""
+    import dearpygui.dearpygui as dpg
+    from native.gpucube import PointQuads
+    from native.render import project, frame_of
+    dpg.create_context()
+    try:
+        with dpg.window(tag="w"):
+            pass
+        pos = np.random.RandomState(3).uniform(-5, 5, (40, 3)).astype(np.float32)
+        pq = PointQuads("w", "pq_count", pos)
+        pq.resize(400)
+        for n in (60, 25, 60):                                   # more, fewer, more again
+            p = np.random.RandomState(n).uniform(-5, 5, (n, 3)).astype(np.float32)
+            pq.set_points(p)
+            pq.colours(np.full((n, 3), 200, np.uint8))
+            assert pq.n == n and len(pq.items) == n
+        look, fr = (0.2, -0.1, 0.05), frame_of(p)
+        for ortho in (False, True):
+            pq.camera(-0.6, 0.75, 4.6, look=look, ortho=ortho)
+            sx, sy, ok = project(p, 400, -0.6, 0.75, 4.6, frame=fr, look=look, ortho=ortho)
+            shown = [dpg.get_item_configuration(q) for q in pq.items if dpg.get_item_configuration(q).get("show")]
+            centres = [((c["p1"][0] + c["p3"][0]) / 2, (c["p1"][1] + c["p3"][1]) / 2) for c in shown]
+            want = [(float(x), float(y)) for x, y, o in zip(sx, sy, ok) if o and 0 <= x <= 400 and 0 <= y <= 400]
+            assert len(centres) >= len(want) - 2, (ortho, len(centres), len(want))
+            assert all(any(abs(a - cx) < 0.02 and abs(b - cy) < 0.02 for cx, cy in centres) for a, b in want), ortho
+    finally:
+        dpg.destroy_context()
+
+
 def test_gpu_cube_faces_match_the_software_projection():
     """The cube's faces on the GPU: each visible face's corner cells land
     on render()'s projection of the face corners, camera after camera."""

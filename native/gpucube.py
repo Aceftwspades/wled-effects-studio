@@ -217,8 +217,14 @@ class PointQuads:
         pos = np.asarray(pos, np.float32).reshape(-1, 3)
         n = len(pos)
         if n != self.n:
-            for q in self.items + self.dot_items:
+            for q in self.items + self.dot_items + self.floor_items:
                 dpg.delete_item(q)
+            # the background picture draws the colour texture until one of its own is set: it goes before its
+            # texture does (a texture something still draws cannot be deleted - its name stays taken), and is
+            # made again after, before the floor and the squares (a drawlist draws in the order it was made)
+            if self.bg_item is not None and dpg.does_item_exist(self.bg_item):
+                dpg.delete_item(self.bg_item)
+            self.bg_item, self.bg_key, self.floor_items = None, None, []
             if dpg.does_item_exist(self.tex):
                 dpg.delete_item(self.tex)
             if not dpg.does_item_exist(self.dot_tex):

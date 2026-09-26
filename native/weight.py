@@ -112,6 +112,15 @@ def quiet(item):
     return weigh(item, "quiet")
 
 
+def plain(item):
+    """A button back to no weight (a toggle's other state: the theme's own button)."""
+    if item is None or not dpg.does_item_exist(item):
+        return item
+    _weighted.pop(item, None)
+    dpg.bind_item_theme(item, 0)
+    return item
+
+
 def kind_of(item):
     return _weighted.get(item)
 

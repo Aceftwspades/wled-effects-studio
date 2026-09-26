@@ -86,8 +86,8 @@ def colours(app, rgb):
     a shape is built with the parts shown - each part's colour, the
     selection bright, the others dimmed, the one under the pointer lighter.
     (n, 3) uint8 in the view's (logical) order."""
-    if not view3d.editing(app) or mode(app) == "effect":
-        return rgb
+    if not view3d.editing(app) or getattr(app, "wiring", None) is not None:
+        return rgb                                          # the wiring test lighting a part shows as it is
     g = drawn(app)
     if g is None or g.kind != "shape":
         return rgb
@@ -95,6 +95,14 @@ def colours(app, rgb):
     of = _parts_of_logical(g)
     if len(of) != len(rgb):
         return rgb
+    parts = g.params.get("parts") or []
+    hidden = [k for k, q in enumerate(parts) if q.get("hidden")]
+    if mode(app) == "effect":
+        if not hidden:
+            return rgb
+        out = rgb.copy()
+        out[np.isin(of, hidden)] = 0                        # a hidden part is dark while building, whatever runs
+        return out
     nparts = int(of.max()) + 1 if len(of) and of.max() >= 0 else 0
     if nparts == 0:
         return rgb
@@ -108,6 +116,9 @@ def colours(app, rgb):
             gain[k] = 1.0
     if hov is not None and 0 <= hov[1] < nparts and hov[1] not in sel:
         gain[hov[1]] = max(gain[hov[1]], HOVER)
+    for k in hidden:
+        if 0 <= k < nparts:
+            gain[k] = 0.0
     out = np.zeros_like(rgb)
     lit = of >= 0
     out[lit] = np.clip(base[of[lit]] * gain[of[lit], None], 0, 255).astype(np.uint8)
@@ -211,6 +222,10 @@ def pick(app, v, mx, my, g=None):
     if len(W) == 0:
         return None
     sx, sy, ok, depth = project(v, W)
+    parts = g.params.get("parts") or []
+    hidden = [k for k, q in enumerate(parts) if q.get("hidden")]
+    if hidden:
+        ok = ok & ~np.isin(owner, hidden)                   # a hidden part is not there to point at
     c, ext = v.frame
     half = np.maximum(1.0, v.cam.scale(depth) * (LED / ext)) + 1.0          # the drawn square's half side, and a pixel
     under = ok & (np.abs(sx - mx) <= half) & (np.abs(sy - my) <= half)
@@ -366,6 +381,9 @@ def poll(app):
         return
     sx, sy, ok, depth = project(v, W)
     good = visible(v, cov, sx, sy) & ok
+    hidden = [k for k, q in enumerate(g.params.get("parts") or []) if q.get("hidden")]
+    if hidden:
+        good &= ~np.isin(owner, hidden)
     R = runs(owner)
     sel = shape_ui.selection(app)
     # the part under the pointer (for the colours next frame and the label now)
@@ -475,7 +493,10 @@ def poll(app):
         x = x if x is not None else c_ - tw - px(8)
         if clear(cov, x, y) and clear(cov, x + tw, y + size):
             typeface.draw_text((x, y), text, size, color=tuple(chrome.DIM[:3]) + (230,), parent=D)
-    # 6. a dragged LED's new place (by hand placing)
+    # 6. the handles on the selection, a box, a join, a modal move's readout
+    from native import shape_tools
+    shape_tools.draw(app, v, D)
+    # 7. a dragged LED's new place (by hand placing)
     to = getattr(app, "_shape_drag_to", None)
     if to is not None:
         tx, ty, tok, _ = project(v, np.asarray([to], np.float32))

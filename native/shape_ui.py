@@ -83,10 +83,58 @@ def undo(app):
     refresh(app)
 
 
-def _sel(app):
+def selection(app):
+    """The selected parts: a set of indices. Before anything is picked, the
+    part the frame shows (the first), as it always had."""
     parts = _parts(app) or []
-    i = getattr(app, "_shape_sel", 0)
-    return min(max(0, i), len(parts) - 1) if parts else -1
+    sels = getattr(app, "_shape_sels", None)
+    if sels is None:
+        sels = app._shape_sels = ({min(max(0, getattr(app, "_shape_sel", 0)), len(parts) - 1)} if parts else set())
+    return {k for k in sels if 0 <= k < len(parts)}
+
+
+def _sel(app):
+    """The active part - the one the frame shows, the one the arrange tools
+    line the others up to: the last picked of the selection; -1 with none."""
+    s = selection(app)
+    if not s:
+        return -1
+    i = getattr(app, "_shape_sel", -1)
+    return i if i in s else max(s)
+
+
+def _set_sel(app, idxs, active=None):
+    """The selection set without a refresh (an edit's _apply follows)."""
+    idxs = set(int(i) for i in idxs)
+    app._shape_sels = idxs
+    app._shape_sel = active if active is not None else (max(idxs) if idxs else -1)
+
+
+def select(app, idxs, add=False, toggle=False, active=None):
+    """The selection: `idxs`; or added to it; or each one turned over. The
+    active part is the last of idxs still selected."""
+    parts = _parts(app) or []
+    idxs = [int(i) for i in idxs if 0 <= int(i) < len(parts)]
+    cur = selection(app)
+    if toggle:
+        for i in idxs:
+            cur ^= {i}
+    elif add:
+        cur |= set(idxs)
+    else:
+        cur = set(idxs)
+    a = active if active is not None else next((i for i in reversed(idxs) if i in cur), None)
+    if a is None or a not in cur:
+        a = getattr(app, "_shape_sel", -1) if getattr(app, "_shape_sel", -1) in cur else (max(cur) if cur else -1)
+    _set_sel(app, cur, a)
+    refresh(app)
+
+
+def pick_row(app, i):
+    """A row of the list clicked: that part alone; with Ctrl or Shift, added
+    to the selection or taken out of it."""
+    mod = any(dpg.is_key_down(k) for k in (dpg.mvKey_LControl, dpg.mvKey_RControl, dpg.mvKey_LShift, dpg.mvKey_RShift))
+    select(app, [i], toggle=mod)
 
 
 # --- build ---------------------------------------------------------------------------------
@@ -162,6 +210,8 @@ def build(app):
             dpg.add_text("", tag="shape_prev_status", color=c.DIM, wrap=0)
             with dpg.group(tag="shape_prev_img"):
                 pass
+    from native import shape_tools
+    shape_tools.build_menu(app)                             # a part's right-click menu in the 3-D view
     # the file dialogs: a mesh or model in, a shape file in or out
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_import_dialog", width=px(640), height=px(420),
                          callback=lambda s, a: import_file(app, a.get("file_path_name", ""))):
@@ -199,15 +249,14 @@ def refresh(app):
     dpg.set_value("shape_desc", g.describe())
     dpg.set_value("shape_layout", g.params.get("layout", "strip"))
     sel = _sel(app)
-    marks = _marks(app)
+    chosen = selection(app)
     for i, part in enumerate(parts):
         n = shapes.part_count(part)
         with dpg.group(horizontal=True, parent="shape_parts"):
-            dpg.add_checkbox(default_value=(i in marks), user_data=i,
-                             callback=lambda s, a, u: (marks.add(u) if a else marks.discard(u), _arrange_hint(app)))
-            dpg.add_selectable(label=f"{i + 1:2d}  {part.get('name', part['kind'])}", width=px(190), default_value=(i == sel), user_data=i,
-                               callback=lambda s, a, u: (setattr(app, "_shape_sel", u), refresh(app)))
-            typeface.small(dpg.add_text(f"{part['kind']}, {n} LEDs", color=c.DIM))
+            dpg.add_selectable(label=f"{i + 1:2d}  {part.get('name', part['kind'])}", width=px(214), default_value=(i in chosen), user_data=i,
+                               callback=lambda s, a, u: pick_row(app, u))
+            flags = "".join(f", {w}" for w, on in (("hidden", part.get("hidden")), ("locked", part.get("locked"))) if on)
+            typeface.small(dpg.add_text(f"{part['kind']}, {n} LEDs{flags}", color=c.DIM))
             dpg.add_button(label="up", small=True, user_data=i, callback=lambda s, a, u: move_part(app, u, -1), show=i > 0)
             dpg.add_button(label="down", small=True, user_data=i, callback=lambda s, a, u: move_part(app, u, 1), show=i < len(parts) - 1)
             dpg.add_button(label="copy", small=True, user_data=i, callback=lambda s, a, u: dup_part(app, u))
@@ -330,16 +379,17 @@ def refresh(app):
         dpg.add_text("align", color=c.DIM)
         for ax, lbl in enumerate("XYZ"):
             dpg.add_button(label=lbl, small=True, user_data=ax, callback=lambda s, a, u: align_parts(app, u))
-        c.tip("the ticked parts given this part's position on that axis")
+        c.tip("the selected parts given the active part's position on that axis")
         dpg.add_text("  spread", color=c.DIM)
         for ax, lbl in enumerate("XYZ"):
             dpg.add_button(label=lbl, small=True, user_data=ax, callback=lambda s, a, u: distribute_parts(app, u))
-        c.tip("the ticked parts (three or more) spaced evenly along that axis between the two farthest apart")
+        c.tip("the selected parts (three or more) spaced evenly along that axis between the two farthest apart")
         dpg.add_button(label="same scale", small=True, callback=lambda: match_parts(app, "scale"))
         dpg.add_button(label="same turn", small=True, callback=lambda: match_parts(app, "rot"))
-        c.tip("the ticked parts given this part's scale, or its rotation")
-        dpg.add_button(label="tick all", small=True, callback=lambda: (_marks(app).update(range(len(_parts(app) or []))), refresh(app)))
-        dpg.add_button(label="none", small=True, callback=lambda: (_marks(app).clear(), refresh(app)))
+        c.tip("the selected parts given the active part's scale, or its rotation")
+        dpg.add_button(label="all", small=True, callback=lambda: select(app, range(len(_parts(app) or []))))
+        c.tip("every part selected (A with the pointer on the 3-D view)")
+        dpg.add_button(label="none", small=True, callback=lambda: select(app, []))
     with dpg.group(horizontal=True, parent=P):
         dpg.add_text("mirror", color=c.DIM)
         for ax, lbl in enumerate("XYZ"):
@@ -380,7 +430,7 @@ def add_part(app, kind):
         part["pos"] = [float(last.get("pos", [0, 0, 0])[0]) + half_x(last) + half_x(part) + 2.0,
                        float(last.get("pos", [0, 0, 0])[1]), float(last.get("pos", [0, 0, 0])[2])]
     parts.append(part)
-    app._shape_sel = len(parts) - 1
+    _set_sel(app, {len(parts) - 1})
     _apply(app, parts, refit="grow")
 
 
@@ -388,7 +438,7 @@ def del_part(app, i):
     parts = list(_parts(app) or [])
     if 0 <= i < len(parts):
         parts.pop(i)
-        app._shape_sel = min(i, len(parts) - 1)
+        _set_sel(app, {min(i, len(parts) - 1)} if parts else set())
         _apply(app, parts)
 
 
@@ -398,7 +448,7 @@ def dup_part(app, i):
         q = json.loads(json.dumps(parts[i]))
         q["name"] = q.get("name", q["kind"]) + " copy"
         parts.insert(i + 1, q)
-        app._shape_sel = i + 1
+        _set_sel(app, {i + 1})
         _apply(app, parts, refit="grow")
 
 
@@ -407,7 +457,7 @@ def move_part(app, i, d):
     j = i + d
     if 0 <= i < len(parts) and 0 <= j < len(parts):
         parts[i], parts[j] = parts[j], parts[i]
-        app._shape_sel = j
+        _set_sel(app, {j})
         _apply(app, parts)
 
 
@@ -468,7 +518,7 @@ def split_polyhedron(app, i):
     if 0 <= i < len(parts) and parts[i]["kind"] == "polyhedron":
         pieces = shapes.split_part(parts[i])
         parts[i:i + 1] = pieces
-        app._shape_sel = i
+        _set_sel(app, set(range(i, i + len(pieces))), i)
         _apply(app, parts, refit="grow")
         app.gp.status(f"split into {len(pieces)} parts, the LEDs where they were")
 
@@ -524,29 +574,20 @@ def set_param(app, i, key, value):
         _apply(app, parts)
 
 
-def _marks(app):
-    """The parts ticked for the arrange tools: a set of indices."""
-    m = getattr(app, "_shape_marks", None)
-    if m is None:
-        m = app._shape_marks = set()
-    return m
-
-
 def _arrange_hint(app):
     if dpg.does_item_exist("shape_arrange_hint"):
-        n = len(_marks(app))
-        dpg.set_value("shape_arrange_hint", f"{n} ticked" if n else "tick parts in the list")
+        n = len(selection(app))
+        dpg.set_value("shape_arrange_hint", f"{n} selected" if n > 1 else "select two or more: Shift-click in the view or the list")
 
 
 def _marked(app):
-    parts = _parts(app) or []
-    return sorted(i for i in _marks(app) if 0 <= i < len(parts))
+    return sorted(selection(app))
 
 
 def align_parts(app, axis):
     idxs = _marked(app)
     if not idxs:
-        app.gp.status("tick the parts to align, in the list"); return
+        app.gp.status("select the parts to align (Shift-click them in the view or the list)"); return
     _apply(app, shapes.aligned(_parts(app), idxs, _sel(app), axis))
     app.gp.status(f"{len(idxs)} part(s) aligned on {'xyz'[axis]} to part {_sel(app) + 1}")
 
@@ -554,7 +595,7 @@ def align_parts(app, axis):
 def distribute_parts(app, axis):
     idxs = _marked(app)
     if len(idxs) < 3:
-        app.gp.status("tick three parts or more to spread them"); return
+        app.gp.status("select three parts or more to spread them"); return
     _apply(app, shapes.distributed(_parts(app), idxs, axis))
     app.gp.status(f"{len(idxs)} parts spread evenly along {'xyz'[axis]}")
 
@@ -562,7 +603,7 @@ def distribute_parts(app, axis):
 def match_parts(app, what):
     idxs = _marked(app)
     if not idxs:
-        app.gp.status("tick the parts to match, in the list"); return
+        app.gp.status("select the parts to match (Shift-click them in the view or the list)"); return
     _apply(app, shapes.matched(_parts(app), idxs, _sel(app), what))
     app.gp.status(f"{len(idxs)} part(s) given part {_sel(app) + 1}'s {'turn' if what == 'rot' else 'scale'}")
 
@@ -571,7 +612,7 @@ def mirror_part(app, i, axis):
     parts = list(_parts(app) or [])
     if 0 <= i < len(parts):
         parts.insert(i + 1, shapes.mirrored(parts[i], axis))
-        app._shape_sel = i + 1
+        _set_sel(app, {i + 1})
         _apply(app, parts, refit="grow")
 
 
@@ -727,7 +768,7 @@ def import_file(app, path):
         elif ext == ".xml":
             new, notes = shape_io.read_layout(path)
             parts += new
-            app._shape_sel = len(parts) - 1
+            _set_sel(app, set(range(len(parts) - len(new), len(parts))), len(parts) - 1)
             _apply(app, parts, refit="grow")
             app.gp.status(f"{len(new)} model(s) from the layout" + (f"; approximated: {'; '.join(notes[:4])}" + (" ..." if len(notes) > 4 else "") if notes else ""))
             return
@@ -748,7 +789,7 @@ def import_file(app, path):
         dpg.set_value("shape_desc", f"could not read {os.path.basename(path)}: {e}")
         return
     parts.append(part)
-    app._shape_sel = len(parts) - 1
+    _set_sel(app, {len(parts) - 1})
     _apply(app, parts, refit="grow", **more)
     app.gp.status(note)
 
@@ -794,20 +835,13 @@ def open_shape(app, path):
             raise ValueError("not a shape file")
     except Exception as e:
         app.gp.status(f"could not open {os.path.basename(path)}: {e}"); return
-    app._shape_sel = 0
+    _set_sel(app, {0})
     _apply(app, refit="all", **g.params)
 
 
 # --- the 3-D view: the selection, placing and dragging LEDs by hand -------------------------
 # (what the view draws while a shape is built - the parts' colours, the wiring, the part under
 # the pointer - is shape_view's; the camera is view3d's)
-def selection(app):
-    """The selected parts: a set of indices."""
-    parts = _parts(app) or []
-    i = _sel(app)
-    return {i} if 0 <= i < len(parts) else set()
-
-
 def view_colours(app, rgb):
     """The 3-D view's colours this frame (shape_view.colours)."""
     from native import shape_view
@@ -815,8 +849,13 @@ def view_colours(app, rgb):
 
 
 def view_key_ok(app, action):
-    """Whether one of the 3-D view's keys applies now: the camera's always."""
-    return True
+    """Whether one of the 3-D view's keys applies now: the camera's always;
+    the shape's while a shape is built (else the key's other binding - G the
+    graph pane - has it)."""
+    if not action.startswith("shape_"):
+        return True
+    from native import view3d
+    return view3d.editing(app)
 
 
 def frame_selection(app):
@@ -884,7 +923,7 @@ def click(app, at=None):
     hit = _hit(app, mx, my)
     if hit and hit[1] is not None:
         app._shape_drag = hit
-        app._shape_sel = hit[0]
+        _set_sel(app, {hit[0]})
         return True
     axis, value = _plane(app)
     p = shape_view.unproject(v, mx, my, axis, value)
@@ -901,7 +940,7 @@ def click(app, at=None):
         part["params"].setdefault("points", []).insert(0, [round(float(c), 3) for c in local])
     else:
         part["params"].setdefault("points", []).append([round(float(c), 3) for c in local])
-    app._shape_sel = sel
+    _set_sel(app, {sel})
     _apply(app, parts)
     return True
 
@@ -949,5 +988,6 @@ def poll(app):
     reference wireframes)."""
     _poll_preview(app)
     _poll_pending(app)
-    from native import shape_view
+    from native import shape_view, shape_tools
+    shape_tools.poll(app)                                   # a modal move following the pointer, before the overlay draws it
     shape_view.poll(app)

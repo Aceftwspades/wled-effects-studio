@@ -383,6 +383,74 @@ def aimed(part, direction, distance=None, spin_deg=0.0):
     return q
 
 
+# --- moving, turning and scaling parts about a point (the 3-D view's handles and keys) ---------
+def _copy(part):
+    return json.loads(json.dumps(part))
+
+
+def axis_rotation(axis, deg):
+    """The rotation of `deg` degrees about a unit axis (right-handed)."""
+    a = np.asarray(axis, np.float64); a = a / (np.linalg.norm(a) or 1.0)
+    t = math.radians(deg)
+    K = np.array([[0, -a[2], a[1]], [a[2], 0, -a[0]], [-a[1], a[0], 0]])
+    return np.eye(3) + math.sin(t) * K + (1 - math.cos(t)) * (K @ K)
+
+
+def moved(part, delta):
+    """A copy of the part moved by `delta` (the shape's units)."""
+    q = _copy(part)
+    q["pos"] = [round(float(p) + float(d), 4) for p, d in zip(part.get("pos", [0, 0, 0]), delta)]
+    return q
+
+
+def turned(part, R, pivot):
+    """A copy of the part turned by the rotation R about `pivot`: its place
+    swung round the point, its own rotation composed with R."""
+    q = _copy(part)
+    c = np.asarray(pivot, np.float64)
+    p = np.asarray(part.get("pos", [0, 0, 0]), np.float64)
+    q["pos"] = [round(float(v), 4) for v in c + np.asarray(R) @ (p - c)]
+    q["rot"] = euler_of(np.asarray(R) @ rotation(*part.get("rot", [0, 0, 0])))
+    return q
+
+
+def scaled(part, k, pivot):
+    """A copy of the part scaled by k about `pivot` (its place too)."""
+    q = _copy(part)
+    c = np.asarray(pivot, np.float64)
+    p = np.asarray(part.get("pos", [0, 0, 0]), np.float64)
+    q["pos"] = [round(float(v), 4) for v in c + float(k) * (p - c)]
+    s = part.get("scale", 1.0)
+    q["scale"] = [round(float(v) * float(k), 5) for v in s] if isinstance(s, list) else round(float(s) * float(k), 5)
+    return q
+
+
+def ends(part):
+    """A part's two ends in the shape, as a strip is joined: (first LED, the
+    way into the part from it, last LED, the way on out of it, the LEDs'
+    spacing) - the directions unit vectors (None with a single LED)."""
+    pos, _ = transform(part, *part_points(part))
+    pos = np.asarray(pos, np.float64)
+    pos = pos[np.isfinite(pos).all(1)]
+    if len(pos) == 0:
+        return None
+    if len(pos) == 1:
+        return pos[0], None, pos[0], None, 1.0
+    d_in = pos[1] - pos[0]; d_out = pos[-1] - pos[-2]
+    sp = float(min(np.linalg.norm(d_in), np.linalg.norm(d_out))) or 1.0
+    return pos[0], d_in / (np.linalg.norm(d_in) or 1.0), pos[-1], d_out / (np.linalg.norm(d_out) or 1.0), sp
+
+
+def reordered(parts, i, j):
+    """The parts with part i moved to index j (the rest keep their order)."""
+    out = list(parts)
+    if not (0 <= i < len(out)):
+        return out
+    q = out.pop(i)
+    out.insert(max(0, min(len(out), j)), q)
+    return out
+
+
 # --- arranging several parts (the layout tools) ---------------------------------------------
 def aligned(parts, idxs, ref, axis):
     """The parts at `idxs` given the reference part's position on one axis (0 x, 1 y, 2 z)."""

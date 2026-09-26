@@ -1983,17 +1983,66 @@ proposal's number; in the order to do them.
       over it (a test's process cannot bring the window to the front).
 
 **Move things directly**
-- [ ] **Pick in the view** (S4): click a part to select it, Shift-click
+- [x] **Pick in the view** (S4): click a part to select it, Shift-click
       to add or take away, Shift-drag a box; the list's tick boxes go.
-- [ ] **Handles** (S5): arrows to move along an axis, squares to move in
+      The shape has a selection now - a set and the active part (the last
+      picked, the one the frame shows and the arrange tools line up to) -
+      in `shape_ui.select()`; the list's rows select alike (Ctrl or Shift:
+      more than one) and the tick boxes and "tick all" are gone. A press
+      on the view that does not move is a click (a moving one turns the
+      view, as ever); Shift makes a press a toggle or, dragged, a box;
+      hidden and locked parts are passed over (`shape_tools.pick`).
+- [x] **Handles** (S5): arrows to move along an axis, squares to move in
       a plane, rings to turn, snapping to the grid step and 15 degrees
       (Ctrl frees it); Blender's keys over the view - G, R, S, then X / Y /
-      Z to lock, a typed number, Enter, Esc to cancel.
-- [ ] **Snap to join** (S6): a part dragged near another's end lands one
+      Z to lock, a typed number, Enter, Esc to cancel. `native/
+      shape_tools.py`: the handles sit on the middle of the selected
+      parts' places, drawn on the overlay, an arrow shortened as its axis
+      points at the eye and left out under a fifth; the snap is not the
+      floor's step (20 cm is coarse for a strip) but the ruler division
+      nearest ten pixels at the handles' depth, applied to the place, not
+      the step - a part lands on round numbers. Move and Turn buttons join
+      the view's own while building. G, R and S (a view key context shared
+      with the camera's; G the graph pane otherwise) follow the pointer each
+      frame until Enter, a click, Esc or a right-click; X, Y, Z toggle the
+      axis (drawn through the pivot), digits, a point and a minus type an
+      exact amount in the shape's unit, degrees or a factor. A move is
+      previewed as the same LEDs in new places - the geometry the move
+      began with, its positions replaced - so the engine is not touched
+      and the layout stays as it was until it is kept, one undo step. Two
+      bugs on the way: Enter in the frame a number was typed applied the
+      pointer's move (a move is brought up to date before it is kept), and
+      on the grid layout a turn changed which LEDs shared a cell, so the
+      preview (then a rebuilt geometry) was refused for its count and the
+      turn lost - which also showed the GPU cloud could not take a new
+      count at all: its colour texture was deleted while the background
+      picture still drew it, and the name stayed taken
+      (`PointQuads.set_points` remakes the picture first; an audit test).
+- [x] **Snap to join** (S6): a part dragged near another's end lands one
       LED spacing beyond its last LED, and goes after it in the wiring.
-- [ ] **A part's menu in the view** (S7): duplicate and move, mirror,
+      `shapes.ends()` gives a part's first and last LED in the shape and
+      the way the strip runs at each; a lone moving part's first LED
+      within 16 px of another's end continued by its spacing snaps there
+      (on an axis only if the target is on the axis line), the target
+      ringed and named ("join after ring 1"); kept, the part moves in the
+      wiring to just after that part (its last LED near a first: just
+      before), with a message saying so.
+- [x] **A part's menu in the view** (S7): duplicate and move, mirror,
       repeat, reverse, move in the wiring, frame, rename, hide, lock,
-      light it on the device (the wiring test), delete.
+      light it on the device (the wiring test), delete. A right-click on a
+      part (it is selected first); its rows are the selection's where that
+      reads right ("Frame them", "Delete them"). Hidden parts are dark in
+      the view while building (either colouring), draw no wiring and are
+      not picked; locked parts are not picked or moved (the list still
+      selects them); both flags are the part's, saved with it, and named
+      in the list. "Light it" runs the wiring test's part mode on that
+      part (the sim shows it while it runs - the parts' colours step aside
+      - and the device while the sim is streamed). "Repeat" waits for the
+      live copies (S12); mirrored copies are the old one-shot kind until
+      then. A test hook (`tool`) drives the pointer's part of all this -
+      press, drag, release, right-click at an LED, a part, a handle or a
+      spot on the view, Shift or Ctrl held - and the smoke runs S4-S7
+      with it.
 
 **Real sizes, real objects**
 - [ ] **Real units** (S8): the shape's LED density (30, 60, 96, 144 a

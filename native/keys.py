@@ -120,6 +120,13 @@ ACTIONS = [
     ("view_ortho",    "Orthographic / perspective",                          "5",      "view"),
     ("view_frame",    "Frame the selected parts (the shape editor), else everything", "F", "view"),
     ("view_home",     "Everything in view: the pan and the zoom back",       "Home",   "view"),
+    # ... and, while the shape editor is open, its parts - Blender's keys
+    ("shape_move",    "Move the selected parts (then X, Y or Z, a number, Enter)", "G", "view"),
+    ("shape_turn",    "Turn the selected parts",                             "R",      "view"),
+    ("shape_scale",   "Scale the selected parts",                            "S",      "view"),
+    ("shape_dup",     "Duplicate the selected parts and move the copies",    "Shift+D", "view"),
+    ("shape_delete",  "Delete the selected parts",                           "Delete", "view"),
+    ("shape_all",     "Select every part, or none",                          "A",      "view"),
     ("select_all",    "Select every node",                                   "A",      "graph"),
     ("select_none",   "Select nothing",                                      "Alt+A",  "graph"),
     ("select_invert", "Invert the selection",                                "Ctrl+Shift+I", "graph"),

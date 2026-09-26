@@ -122,6 +122,31 @@ def test_runs_and_wiring_of_a_shape():
     assert parts_of.tolist() == [0] * 12 + [1] * 5
 
 
+def test_parts_move_turn_and_scale_about_a_point():
+    strip = shapes.new_part("strip", n=5)                    # LEDs at x = -2..2
+    strip["pos"] = [1.0, 0.0, 0.0]
+    q = shapes.turned(strip, shapes.axis_rotation((0, 0, 1), 90), (0, 0, 0))
+    assert np.allclose(q["pos"], [0, 1, 0], atol=1e-4) and abs(q["rot"][2] - 90) < 1e-6
+    pos, _, _ = shapes.resolve([q])
+    assert np.allclose(pos[:, 0], 0.0, atol=1e-4) and pos[0, 1] < pos[-1, 1]          # it runs up Y now
+    q2 = shapes.scaled(strip, 2.0, (0, 0, 0))
+    assert np.allclose(q2["pos"], [2, 0, 0]) and q2["scale"] == 2.0
+    q3 = shapes.moved(strip, (0.5, -1.0, 2.0))
+    assert np.allclose(q3["pos"], [1.5, -1.0, 2.0]) and strip["pos"] == [1.0, 0.0, 0.0]   # a copy: the original kept
+
+
+def test_a_parts_ends_for_joining():
+    strip = shapes.new_part("strip", n=5, pitch=2.0)
+    f, din, l, dout, sp = shapes.ends(strip)
+    assert np.allclose(f, [-4, 0, 0]) and np.allclose(l, [4, 0, 0])
+    assert np.allclose(din, [1, 0, 0]) and np.allclose(dout, [1, 0, 0]) and abs(sp - 2.0) < 1e-6
+    strip["reverse"] = True
+    f, din, l, dout, sp = shapes.ends(strip)
+    assert np.allclose(f, [4, 0, 0]) and np.allclose(din, [-1, 0, 0])
+    parts = ["a", "b", "c", "d"]
+    assert shapes.reordered(parts, 3, 1) == ["a", "d", "b", "c"] and shapes.reordered(parts, 0, 3) == ["b", "c", "d", "a"]
+
+
 if __name__ == "__main__":
     bad = 0
     for name, fn in list(globals().items()):

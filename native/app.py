@@ -47,7 +47,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight, view3d
+from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight, view3d, shape_tools
 from native.gpucube import CubeQuads
 from native.textures import registry as tex_registry
 from native.features import Features
@@ -2635,6 +2635,8 @@ class App(Features):
         if dpg.is_item_hovered("cube_img"):
             if shape_ui.click(self):                 # placing an LED, or picking one up
                 return
+            if shape_tools.press(self):              # a handle taken, a box begun, a modal move kept
+                return
             if dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl):
                 self._pan_drag = [0.0, 0.0]          # Ctrl+drag pans (a touchpad has no middle button)
             else:
@@ -2657,6 +2659,8 @@ class App(Features):
 
     def on_mouse_release(self, sender, app_data):
         if shape_ui.release(self):
+            return
+        if shape_tools.release(self):                # a handle's drag kept, a box's parts selected
             return
         if room.release(self):
             return
@@ -2690,6 +2694,8 @@ class App(Features):
             self.gp.on_release()
 
     def on_right_click(self, sender, app_data):
+        if shape_tools.right(self):
+            return                                       # a modal move put back, or a part's own menu
         if self.layout == "graph" and (dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)):
             if self.gp.knife_start():
                 return                                   # Ctrl+right-drag: the knife, not the menu
@@ -2710,6 +2716,8 @@ class App(Features):
 
     def on_drag(self, sender, app_data):
         if shape_ui.drag(self):
+            return
+        if shape_tools.drag(self):
             return
         if room.drag(self):
             return
@@ -2857,6 +2865,8 @@ class App(Features):
                    for t in tuple(self._inputs) + ("find_text", "replace_text", "dev_add_host", "name_input", "editor_cmd") + self.META_FIELDS)
 
     def on_key(self, sender, app_data):
+        if shape_tools.key(self, app_data):
+            return                                       # a move, turn or scale under way has the keys: X Y Z, a number, Enter, Esc
         if app_data == dpg.mvKey_Escape:
             self._picker = None
             if dpg.does_item_exist("expr_win") and dpg.is_item_shown("expr_win"):
@@ -3063,6 +3073,12 @@ class App(Features):
             "view_ortho":   lambda: view3d.toggle_ortho(self),
             "view_frame":   lambda: shape_ui.frame_selection(self),
             "view_home":    lambda: view3d.home(self),
+            "shape_move":   lambda: shape_tools.start(self, "move"),
+            "shape_turn":   lambda: shape_tools.start(self, "turn"),
+            "shape_scale":  lambda: shape_tools.start(self, "scale"),
+            "shape_dup":    lambda: shape_tools.duplicate(self),
+            "shape_delete": lambda: shape_tools.delete(self),
+            "shape_all":    lambda: shape_tools.select_all(self),
             "minimap":      lambda: room.set_minimap(self, show=not self.prefs.get("minimap", True)),
             "select_all":   gp.select_all,
             "select_none":  gp.select_none,
@@ -3838,7 +3854,8 @@ def _hook_names(app):
     from native import shape_view, shapes, units
     return {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
-            "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shapes": shapes, "units": units}
+            "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
+            "units": units}
 
 
 def service_command(app):
@@ -4028,11 +4045,11 @@ def service_command(app):
                 elif op[0] == "reference": app._shape_ref = True; shape_ui.import_file(app, op[1])
                 elif op[0] == "layout": shape_ui._apply(app, layout=op[1])
                 elif op[0] == "undo": shape_ui.undo(app)
-                elif op[0] == "mark": shape_ui._marks(app).clear(); shape_ui._marks(app).update(int(i) for i in op[1]); shape_ui.refresh(app)
+                elif op[0] == "mark": shape_ui.select(app, [int(i) for i in op[1]])     # the selection (it was the list's ticks)
                 elif op[0] == "align": shape_ui.align_parts(app, int(op[1]))
                 elif op[0] == "spread": shape_ui.distribute_parts(app, int(op[1]))
                 elif op[0] == "match": shape_ui.match_parts(app, op[1])
-                elif op[0] == "select": app._shape_sel = int(op[1]); shape_ui.refresh(app)
+                elif op[0] == "select": shape_ui.select(app, [int(op[1])])
                 elif op[0] == "place":
                     app._shape_place = True
                     st = dpg.get_item_state("cube_img"); (x0, y0) = st["rect_min"]
@@ -4203,6 +4220,8 @@ def service_command(app):
                     st = dpg.get_item_state(m)
                     kids = dpg.get_item_children(m, 1) or []
                     print("menu", dpg.get_item_configuration(m).get("label"), st, "first child", dpg.get_item_state(kids[0]) if kids else None)
+            if "tool" in c:                             # test hook: [press|drag|release|right, where, mods] - shape_tools.test_hook
+                shape_tools.test_hook(app, c["tool"])
             if "led_at" in c:                           # test hook: [k, "hover"|"leave"|"move"|"click"|"right"|"shift"|"ctrl"|None] - LED k (wiring order) on the 3-D view
                 from native import shape_view
                 k = int(c["led_at"][0]); how = c["led_at"][1] if len(c["led_at"]) > 1 else None

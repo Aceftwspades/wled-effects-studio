@@ -277,6 +277,17 @@ def build_buttons(app, parent):
     """Front, Side, Top and the projection, at the 3-D view's top right
     (left of its grip; placed by poll)."""
     with dpg.group(horizontal=True, tag="view3d_btns", parent=parent, pos=(0, px(8))):
+        # while a shape is built: the handles' mode on the selection
+        from native import shape_tools
+        dpg.add_button(label="Move", small=True, tag="gizmo_move", show=False, callback=lambda: shape_tools.set_mode(app, "move"))
+        with dpg.tooltip("gizmo_move", tag="gizmo_move_tip"):
+            dpg.add_text("the handles move the selected parts: an arrow along its axis, a square in its plane, the ring "
+                         "in the middle in the screen's plane (G does the same from the keyboard)")
+        dpg.add_button(label="Turn", small=True, tag="gizmo_turn", show=False, callback=lambda: shape_tools.set_mode(app, "turn"))
+        with dpg.tooltip("gizmo_turn", tag="gizmo_turn_tip"):
+            dpg.add_text("the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; "
+                         "R does the same from the keyboard)")
+        dpg.add_spacer(width=px(10), tag="gizmo_gap", show=False)
         for label, name, action in BUTTONS:
             dpg.add_button(label=label, small=True, tag=f"view3d_{name}", user_data=name,
                            callback=lambda s, a, u: preset(app, u))
@@ -314,9 +325,17 @@ def place_buttons(app):
     if not dpg.does_item_exist("view3d_btns") or not dpg.does_item_exist("cube_win"):
         return
     w = dpg.get_item_rect_size("cube_win")[0] if dpg.is_item_shown("cube_win") else 0
+    ed = editing(app)
+    for t in ("gizmo_move", "gizmo_turn", "gizmo_move_tip", "gizmo_turn_tip", "gizmo_gap"):
+        if dpg.does_item_exist(t) and dpg.get_item_configuration(t).get("show") != ed:
+            dpg.configure_item(t, show=ed)
+    if ed and not getattr(app, "_gizmo_weighed", False):
+        from native import shape_tools
+        shape_tools.set_mode(app, getattr(app, "_gizmo", "move"))
+        app._gizmo_weighed = True
     bw = dpg.get_item_rect_size("view3d_btns")[0] or px(190)
     show = bool(w) and getattr(app, "ui", True) and w >= bw + px(200)
-    key = (int(w), int(bw), show)
+    key = (int(w), int(bw), show, ed)
     if key == getattr(app, "_view3d_btn_key", None):
         return
     app._view3d_btn_key = key
