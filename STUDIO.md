@@ -2273,6 +2273,8 @@ The ninth pass is done: S1-S19, released as 1.3.0.
       every start corner, direction and serpentine; panels, offsets, holes
       and gaps.
 
+The seven are done, released as 1.3.1.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads
