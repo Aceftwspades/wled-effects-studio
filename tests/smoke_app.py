@@ -31,6 +31,8 @@ LOG = os.path.join(tempfile.gettempdir(), "cubefx", "smoke.log")
 # (LEDs 5 and 17 hidden from the front, 30 from the side); without ffmpeg these steps are left out
 MAP_FILMS = [os.path.join(tempfile.gettempdir(), "cubefx", f"map_side{a}.mp4") for a in (0, 90)]
 _part = "app.project.geometry.params['parts'][0]"
+_TREE = {"kind": "tree", "name": "tree", "params": {"strands": 9, "per_strand": 40, "height": 90.0, "base": 54.0, "top": 3.0,
+         "turns": 0.0, "degrees": 360.0, "zigzag": True}, "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": 1.0, "reverse": False}
 MAP_STEPS = [
     # the plan: the wiring test lights one LED at a time in the sim, the device's own frame has the plan's 60 LEDs
     ([{"geometry": {"kind": "cube", "params": {"B": 16}}}, {"py": "camera_map_ui.show(app)"}, {"py": "num.set('map_n', 60)"},
@@ -480,6 +482,16 @@ STEPS = [
     ([{"check": "app.project.geometry.kind == 'shape' and app.project.geometry.count == 256 and dpg.get_value('geom_kind') == 'shape'"},
       {"dock": ["shape", False]}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
     *MAP_STEPS,
+    # S19: a matrix-only effect on a shape's one-row layout says so under the effect (not on the cube); a grid that leaves
+    # LEDs dark behind others is a check; the tree tutorial opens at its chapter
+    ([{"geometry": {"kind": "shape", "params": {"parts": [_TREE]}}}, {"effect": "Ace 3-D Plasma"}], 1.0),
+    ([{"check": "dpg.is_item_shown('fx_fit_note') and 'matrix' in dpg.get_value('fx_fit_note')"},
+      {"geometry": {"kind": "shape", "params": {"parts": [_TREE], "layout": "grid"}}}], 1.0),
+    ([{"check": "app.project.geometry.collisions > 0 and any('grid layout puts' in c.text for c in shape_checks.run(app))"},
+      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
+    ([{"check": "not dpg.is_item_shown('fx_fit_note')"}, {"action": "tutorial_tree"}], 1.5),
+    ([{"check": "dpg.is_item_shown('reader_win')"}, {"py": "chrome.close_dialog('reader_win') or dpg.hide_item('reader_win')"},
+      {"effect": "Rainbow"}], 0.5),
     # live output to the fake device on this machine, and the wiring test
     ([{"frame": "send"}, {"stream": "127.0.0.1"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
       {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),

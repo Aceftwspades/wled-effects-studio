@@ -145,6 +145,8 @@ def _build_welcome(app):
         dpg.add_spacer(height=px(6))
         for label, why, fn in (
                 ("Start the tutorial", "a first effect from nothing, step by step", lambda: open_doc(app, "TUTORIAL.md")),
+                ("Build a Christmas tree", "a shape for real lights, in 3-D, step by step",
+                 lambda: open_doc(app, "TUTORIAL.md", "Tutorial 2: a Christmas tree in 3-D")),
                 ("Read the user guide", "every part of the studio, and every key", lambda: open_doc(app, "GUIDE.md")),
                 ("Browse the examples", "every graph in the project, running", lambda: _frame(app, "library")),
                 ("Find a device", "the WLED devices on the network", lambda: _frame(app, "devices"))):

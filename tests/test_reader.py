@@ -94,6 +94,15 @@ def test_the_tutorial_pictures_exist():
     assert not missing, missing
 
 
+def test_the_tree_tutorial_opens_at_its_chapter():
+    """Help > Tutorial: a tree in 3-D, the Welcome's button and the shape's
+    start open the tutorial at the tree chapter by its heading."""
+    src = open(os.path.join(ROOT, "native", "app.py"), encoding="utf-8").read()
+    m = re.search(r'"tutorial_tree": lambda: reader_ui.open_doc\(self, "TUTORIAL.md", "([^"]+)"\)', src)
+    assert m, "the tutorial_tree action is not where the test looks"
+    assert reader.heading_index(DOCS["TUTORIAL.md"], m.group(1)) is not None, m.group(1)
+
+
 def test_links_resolve():
     """Every link in the three documents (and the README) goes somewhere:
     a document of the three, a heading in it, a file, or the web."""

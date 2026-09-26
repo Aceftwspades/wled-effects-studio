@@ -39,10 +39,11 @@ python -m native.app                                   # or the desktop shortcut
 ```
 
 **Help**: the first time the studio starts, a Welcome panel offers the
-[tutorial](TUTORIAL.md), this guide, the example effects and a search
-for devices (Help > Welcome... brings it back; its checkbox shows it at
-every start). Help > User guide (**F1**), Tutorial and Node reference
-open in a window of the studio's own: the contents down the left mark
+[tutorial](TUTORIAL.md), a second one that builds a Christmas tree in the
+shape editor (**Build a Christmas tree**), this guide, the example effects
+and a search for devices (Help > Welcome... brings it back; its checkbox
+shows it at every start). Help > User guide (**F1**), Tutorial, Tutorial:
+a tree in 3-D and Node reference open in a window of the studio's own: the contents down the left mark
 the section on screen, the box at the top searches the page - each
 mention in turn, marked where it is (Enter or F3 for the next, Shift+F3
 the one before, with which of how many) - a link to another document
@@ -398,7 +399,9 @@ infinity cube, a soccer ball, a helix column, a spiral disc - each opening
 the gallery below on its sizes; or **Draw a run**, **Import a model or a
 layout...**, **Map lights by camera...** (below), or **Any part...** (the
 whole gallery). Choosing "shape" under GEOMETRY opens this and changes
-nothing until the first part goes in.
+nothing until the first part goes in. **The tree tutorial** (New to
+shapes?) opens the tutorial that builds a tree and its star here, step by
+step.
 
 **Checks as you build.** Under the tools, what is likely a mistake or will
 matter on the bench: LEDs sitting on another (two parts laid over each
@@ -406,8 +409,10 @@ other, a copy left on its part), a lead of a metre or more (a data wire
 that long may want a buffer, or a sacrificial LED near the controller), LED
 outputs carrying another count than the shape, the current at full white
 against the limiter's ceiling, a formula that does not work out, parts
-hidden, LEDs of mapped lights no two sides of the films saw - each with
-**show me**, which selects and frames it (or opens the Outputs frame).
+hidden, LEDs of mapped lights no two sides of the films saw, a grid
+layout that leaves LEDs dark (seen from the front, an LED behind another
+shares its cell) - each with **show me**, which selects and frames it (or
+opens the Outputs frame).
 
 **Adding parts.** **Add part...** opens a gallery of pictures - LINES
 (strip, path, arch, helix round a tube, flat spiral), FLAT (ring, rings in
@@ -584,7 +589,15 @@ effect, palette and sliders (the strip layout; up to eight).
 **Layout**: a shape is one logical strip in wiring order (what 1-D effects
 and the 3-D nodes work on), or, as "grid", a w x h matrix the LEDs are
 projected onto from the front - or the grid an xLights model came with.
-On a grid, two LEDs in one cell are reported: the cell keeps the first.
+On a grid, two LEDs in one cell are reported: the cell keeps the first,
+and the other gets no pixel and stays dark - so a grid suits a flat shape
+(a window, a wall of strips), and a 3-D one (a tree, a sphere of parts)
+keeps the strip. Effects made for any shape run on the strip by the LEDs'
+real positions: the project's own graphs, and WLED's 1-D effects along
+the wiring. An effect written for a matrix alone - WLED's 2-D effects and
+the cube's "Ace 3-D" ones - runs as one solid colour on LEDs laid out in
+one row, and a line under the effect (the side panel's EFFECT) says so
+and what to pick instead.
 
 **On the device**: the shape's positions go along with it. Device > Send
 the shape (or the Send frame's button) uploads the ledmap (the wiring) and `/geometry.bin`, a table of
@@ -966,6 +979,7 @@ on and install what it carries.
 - **Settings** › Device speed factor...
 - **Help** › User guide `F1` — every part of the studio, in a window here: the contents down the side, a search, the keys and menus at the end
 - **Help** › Tutorial — a first effect from nothing, step by step, with pictures
+- **Help** › Tutorial: a tree in 3-D — a shape for real lights: a Christmas tree and its star built in the shape editor, the wiring checked, sent
 - **Help** › Node reference — every node, pin and setting; F1 over a node in the graph opens its own entry
 - **Help** › Effect API reference — what a code effect can call, beside the code editor
 - **Help** › Welcome...
@@ -1020,6 +1034,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `F1` | User guide: the studio's help, in a window | anywhere |
 | `F1` | The reference for the node under the pointer (else the selected one) | in the graph |
 | `—` | Tutorial: a first effect, step by step | anywhere |
+| `—` | Tutorial: a Christmas tree in 3-D, the shape editor step by step | anywhere |
 | `—` | Node reference: every node, pin and setting | anywhere |
 | `—` | Welcome: where to start | anywhere |
 | `Shift+F1` | Keyboard shortcuts | anywhere |

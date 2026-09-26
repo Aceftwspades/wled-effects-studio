@@ -175,3 +175,147 @@ build.
 - Replace Speed with the **Audio** node's `bass` output at the Multiply:
   the wave scrolls with the music.
 - Hover any node for its description; NODES.md lists them all.
+
+# Tutorial 2: a Christmas tree in 3-D
+
+The shape editor from nothing to lights on a tree: nine strands of 40
+LEDs round a 150 cm cone, a star on top, the wiring checked, an effect
+that follows the tree's shape, and the lot sent to the device. Fifteen
+minutes. The last part is for lights wound round a real tree in no
+pattern at all: the studio finds each one with a camera.
+
+## Before you start
+
+In the side panel's **GEOMETRY**, set the shape to `shape`. Nothing
+changes yet: the **Shape** frame opens on its start - objects people
+light, and the other ways in (drawing a run, importing a model or an
+xLights layout, mapping lights by camera).
+
+![the start](docs/tutorial/tree_start.png)
+
+## Step 1 - the tree
+
+Click **Christmas tree**. The gallery opens on the tree, its sizes
+asked: **strands**, **LEDs a strand**, **height** and **across the
+base**. Type your tree's - here 8 strands of 40 LEDs, 150 cm tall, 90 cm
+across the base - and the gallery says what that comes to: 320 LEDs,
+90 x 90 x 150 cm. (Eight is on purpose: Step 4 shows why nine is better.)
+
+![its sizes](docs/tutorial/tree_sizes.png)
+
+Press **Add**. The tree is the shape's first part, and the geometry
+becomes the shape.
+
+## Step 2 - read the wiring
+
+While the Shape frame is open the 3-D view draws each part in a colour
+of its own, with the **wiring on the shape**: IN at the first LED, END
+at the last, arrows the way the LEDs run. **every other strand down** is
+ticked: a strand runs up, the next comes back down - the way strands are
+wired one after another, with no wire running back. Hover a strand and
+the label names the part, its LEDs (0-319) and its size, and the LED
+under the pointer - here LED 52, the 53rd of 320.
+
+![the wiring](docs/tutorial/tree_wiring.png)
+
+Drag to turn the view, middle-drag to pan, the wheel to zoom. With the
+pointer on it, **1** looks from the front, **3** from the side, **7**
+from above, **0** from three-quarters, **F** frames the selection and
+**Home** everything.
+
+## Step 3 - a star on top
+
+**Add part...**, then **star** under FLAT: 5 points, 8 LEDs an edge,
+**Add**. It lands beside the tree, next after it in the wiring. Put it
+on top: in its PLACE, type the position's height - the third field - as
+85 cm (the tree's middle is at 0, so its tip is at 75), and press
+**upright** so it stands facing the front. (Or from the keyboard, the
+pointer on the view: G, then Z, move the pointer up until the star sits
+on the tip, and click.)
+
+![the star](docs/tutorial/tree_star.png)
+
+## Step 4 - what the checks say
+
+Under the frame's tools, the checks:
+
+![the checks](docs/tutorial/tree_checks.png)
+
+**The lead from christmas tree 1 to star 1 is 1.82 m** - dashed in the
+view. With an even number of strands, every other one coming down, the
+tree's wiring ends at its foot, and the star, next in the wiring, is at
+the top: a data wire that long may want a buffer. Select the tree and
+make it **9** strands. An odd number ends at the top, beside the star:
+the lead is 26 cm, and the check goes.
+
+![nine strands](docs/tutorial/tree_nine.png)
+
+The other line is the power: 440 LEDs at full white would draw 24 A,
+and the brightness limiter keeps them to what the **Outputs** frame says
+your supply gives - **show me** opens it.
+
+## Step 5 - light it
+
+Close the Shape frame: the effect in the side panel's EFFECT section
+runs on the tree. Effects made for any shape follow its real positions -
+the project's own (Aurora Drift here: its colours drift through the
+room, so the strands and the star share them) and WLED's 1-D effects,
+along the wiring.
+
+![aurora drift](docs/tutorial/tree_effect.png)
+
+An effect written for a matrix - the "Ace 3-D" cube effects and WLED's
+2-D ones - needs a grid; on the tree's one-row layout it shows one
+colour, and a line under the effect says so. (A grid seen from the front
+would hide the LEDs behind others - the checks count them - so a tree
+keeps the strip layout.)
+
+![a matrix effect](docs/tutorial/tree_note.png)
+
+**Segment per part** (the shape's own settings: click empty space in
+the view) gives the star a segment of its own - its own effect, palette
+and sliders.
+
+## Step 6 - onto the tree
+
+Check the real wiring against the drawing first. Choose the device in
+**Devices**, turn on **Stream the sim to the device** (Ctrl+Shift+T), and
+right-click a part: **light it** lights just that part on the tree. Then
+**Send the shape** (the Send frame, or Device > Send the shape): the
+ledmap - the wiring - and the positions the effects read, so the device
+shows what the sim shows. The device's LED count has to match; the **Outputs** frame says
+what it carries.
+
+## Lights in no pattern: mapped by camera
+
+A string wound round a real tree has no pattern to type. **Map lights by
+camera...** (on the start, or the Shape frame's File...) finds each LED:
+
+1. Set **LEDs** to the string's count and **its height** to the tree's,
+   measured.
+2. Stream the sim to the device, darken the room, and stand a phone on
+   something still, well back and zoomed in, the whole tree in view.
+   Start filming, press **Play the plan**, and film until the second
+   white flash.
+3. Turn the tree a quarter (or move the camera round it, as far off and
+   as high), press **+ a side** (it takes 90°), and play and film again.
+4. Copy the films to the computer and give each side its film with **Add
+   its film...** - each card then shows the picture with the LEDs it found.
+5. **Make the part**. An LED no two sides saw is estimated from its
+   neighbours in the wiring: the checks list them, the view rings them in
+   amber, and with BY HAND's **place** ticked each drags to where it is.
+
+![map by camera](docs/tutorial/tree_camera.png)
+
+## More to try
+
+- **turns round** 1: every strand goes once round the tree on its way
+  up. One strand of 200 with 4 turns is a garland.
+- **round the tree** 180: half a tree, flat against a wall.
+- A second tree: select it, **Shift+D**, then **X** to slide the copy
+  along, and click to put it down.
+- Strip rather than strands: set the shape's **LEDs a metre** (nothing
+  selected) to your strip's before adding strip parts - it is what turns
+  their lengths into LEDs.
+- **File... > Save the shape...**: the tree as a `.shape.json`, for the
+  next project.

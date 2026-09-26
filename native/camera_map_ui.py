@@ -409,6 +409,7 @@ def poll(app):
                 if k < len(s["sides"]):
                     _analyse(app, k, work, what)
     if dpg.does_item_exist("map_stream_words") and dpg.is_item_shown(TAG):
+        _plan_words(app)                                     # a count or time set from outside (MIDI, a hook) as well as typed
         d = getattr(app, "ddp", None)
         dpg.set_value("map_stream_words", f"streaming to {app.active_host()}: the device lights the plan too" if d is not None
                       else "not streaming: only the sim shows the plan - Stream the sim to the device (Ctrl+Shift+T) to light it")

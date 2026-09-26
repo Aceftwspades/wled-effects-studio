@@ -1589,8 +1589,25 @@ class App(Features):
             num.add(it, value, lo, hi, integer=not is_float, digits=1 if is_float else None, unit=unit, width=-1,
                     callback=lambda s, v: setter(max(lo, min(hi, v))))
 
+    def fx_fit(self):
+        """A word under the effect when it cannot show on this geometry: an
+        effect written for a matrix alone, on LEDs laid out as one row (a
+        strip, a ring, a shape's strip layout), runs as a solid colour."""
+        if not dpg.does_item_exist("fx_fit_note"):
+            return
+        from native.engine import matrix_only
+        g = self.project.geometry
+        bad = bool(self.eng.meta) and not g.is2d and matrix_only(self.eng.meta[self.eng.idx])
+        if bad:
+            dpg.set_value("fx_fit_note", "an effect for a matrix: on this shape's one-row (strip) layout it shows one colour - "
+                                         "pick one made for any shape (the project's own, a 1-D one), or lay the shape out as a "
+                                         "grid in the Shape frame (THE EFFECTS SEE)" if g.kind == "shape" else
+                          "an effect for a matrix: on a single row of LEDs it shows one colour - pick a 1-D effect, or one for both")
+        dpg.configure_item("fx_fit_note", show=bad)
+
     def rebuild_params(self):
         """Sliders are labelled from the effect's own metadata, as the web UI is."""
+        self.fx_fit()                                    # the effect or the geometry changed: whether it can show here
         dpg.delete_item("params", children_only=True)
         m = self.eng.meta[self.eng.idx]
         generic = {"sx": "Speed", "ix": "Intensity", "c1": "Custom 1",
@@ -3019,6 +3036,7 @@ class App(Features):
             "shortcuts":    lambda: chrome.show_keys(self),
             "guide":        lambda: reader_ui.open_doc(self, "GUIDE.md"),
             "tutorial":     lambda: reader_ui.open_doc(self, "TUTORIAL.md"),
+            "tutorial_tree": lambda: reader_ui.open_doc(self, "TUTORIAL.md", "Tutorial 2: a Christmas tree in 3-D"),
             "node_ref":     lambda: reader_ui.open_doc(self, "NODES.md"),
             "node_help":    gp.help_here,
             "welcome":      lambda: reader_ui.show_welcome(self),
@@ -3661,6 +3679,7 @@ def build(app):
                         dpg.add_combo(app.eng.names, tag="fx_combo",
                                       default_value=app.eng.names[app.eng.idx], width=-1,
                                       callback=app.on_effect)
+                    form.note("", tag="fx_fit_note", show=False, color=chrome.AMBER)
                     with form.row("palette"):
                         dpg.add_combo([p[0] for p in PALETTES],
                                       default_value=app.palette_name_for(app.eng.pal),

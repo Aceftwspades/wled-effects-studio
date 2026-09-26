@@ -59,6 +59,7 @@ ACTIONS = [
     ("guide",         "User guide: the studio's help, in a window",          "F1",     "global"),
     ("node_help",     "The reference for the node under the pointer (else the selected one)", "F1", "graph"),
     ("tutorial",      "Tutorial: a first effect, step by step",              "",       "global"),
+    ("tutorial_tree", "Tutorial: a Christmas tree in 3-D, the shape editor step by step", "", "global"),
     ("node_ref",      "Node reference: every node, pin and setting",         "",       "global"),
     ("welcome",       "Welcome: where to start",                             "",       "global"),
     ("shortcuts",     "Keyboard shortcuts",                                  "Shift+F1", "global"),

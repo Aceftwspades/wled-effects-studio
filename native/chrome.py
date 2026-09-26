@@ -369,6 +369,8 @@ def build_menus(app):
             tip("every part of the studio, in a window here: the contents down the side, a search, the keys and menus at the end")
             _mi(app, "Tutorial", "tutorial", callback=lambda: reader_ui.open_doc(app, "TUTORIAL.md"))
             tip("a first effect from nothing, step by step, with pictures")
+            _mi(app, "Tutorial: a tree in 3-D", "tutorial_tree", callback=lambda: reader_ui.open_doc(app, "TUTORIAL.md", "Tutorial 2: a Christmas tree in 3-D"))
+            tip("a shape for real lights: a Christmas tree and its star built in the shape editor, the wiring checked, sent")
             _mi(app, "Node reference", "node_ref", callback=lambda: reader_ui.open_doc(app, "NODES.md"))
             tip("every node, pin and setting; F1 over a node in the graph opens its own entry")
             dpg.add_menu_item(label="Effect API reference", callback=lambda: app.show_api())

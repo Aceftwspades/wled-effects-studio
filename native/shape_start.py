@@ -71,6 +71,10 @@ def fill(app, P):
         chrome.tip("lights in no pattern - a string on a real tree - found from films of it, the LEDs lit one at a time")
         dpg.add_button(label="Any part...", small=True, callback=lambda: shape_gallery.show(app))
         chrome.tip("the gallery of every kind of part")
+    with dpg.group(horizontal=True, parent=P):
+        dpg.add_text("New to shapes?", color=chrome.DIM)
+        dpg.add_button(label="The tree tutorial", small=True, callback=lambda: app.run_action("tutorial_tree"))
+        chrome.tip("a Christmas tree and its star built here step by step, the wiring checked, sent to the device (Help > Tutorial: a tree in 3-D)")
 
 
 def choose(app, i):

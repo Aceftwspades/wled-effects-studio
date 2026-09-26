@@ -2207,8 +2207,27 @@ proposal's number; in the order to do them.
       LEDs hidden and a camera 2% fast, one side flat, a webcam at uneven
       times, a film through ffmpeg); the smoke reads two mp4 sides it
       makes and checks the part, the estimates and the plan's frame.
-- [ ] **The guide and the tutorial** (S19) rewritten round the new flow:
-      GUIDE's shape section, a tutorial chapter building a tree.
+- [x] **The guide and the tutorial** (S19) rewritten round the new flow:
+      GUIDE's shape section, a tutorial chapter building a tree. GUIDE's
+      shape section follows the new flow from the start through the
+      checks, the gallery, drawing a run, building in the view, the wiring
+      list, a part's settings, several parts, the shape's own settings,
+      File... and mapping by camera. TUTORIAL.md's second chapter, "a
+      Christmas tree in 3-D", builds one in six steps with pictures taken
+      from the studio walking them (docs/tutorial/tree_*.png): the start,
+      the tree's sizes, reading the wiring, a star put on top and stood
+      up, what the checks say - eight strands end at the tree's foot and
+      leave a 1.8 m lead to the star, nine end beside it - an effect that
+      follows the tree, onto the device, and the camera for lights in no
+      pattern. It opens from Help > Tutorial: a tree in 3-D (a key action),
+      the Welcome's Build a Christmas tree, and the start's The tree
+      tutorial. Writing it turned up two things a new builder would trip
+      on, now said where they happen: an effect written for a matrix alone
+      (WLED's 2-D effects, the cube's "Ace 3-D" ones: the metadata's flags
+      say "2" and not "1") runs as one solid colour on LEDs laid out in
+      one row, and a line under the effect says so and what to pick; and
+      the grid layout of a 3-D shape leaves the LEDs behind others dark (a
+      tree of 360 kept 197), now a check.
 
 ### Line-in (September 2026)
 

@@ -84,7 +84,15 @@ def parse_meta(s):
                     defs[k.strip()] = int(v)
                 except ValueError:
                     pass
-    return {"name": name, "labels": labels, "defs": defs}
+    # flags: "1" runs on a strip, "2" on a matrix (both: "12"; none: a strip, WLED's default); "v"/"f" audio
+    flags = seg[3] if len(seg) > 3 and "=" not in seg[3] else ""
+    return {"name": name, "labels": labels, "defs": defs, "flags": flags}
+
+
+def matrix_only(meta):
+    """An effect written for a matrix alone: on a single row of LEDs WLED runs it as a solid colour."""
+    f = meta.get("flags", "")
+    return "2" in f and "1" not in f
 
 
 class Engine:

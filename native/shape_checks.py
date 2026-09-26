@@ -6,6 +6,8 @@ mistake, or will matter on the bench - each in words, with a "show me".
 - a long lead between one part's last LED and the next's first (a metre
   and more: a data wire that long may want a buffer, or a sacrificial LED
   near the controller);
+- a grid layout that leaves LEDs dark (seen from the front, one behind
+  another shares its cell);
 - the LED outputs (the Outputs frame) carrying another count than the shape;
 - the current at full white, against the brightness limiter's ceiling;
 - a formula that does not work out, a part with no LEDs, parts hidden;
@@ -86,6 +88,12 @@ def run(app):
             out.append(Check("warn", f"the lead from {parts[k0].get('name', parts[k0]['kind'])} to {parts[k1].get('name', parts[k1]['kind'])} "
                              f"is {units.show(gap, sp)}: a data wire that long may want a buffer, or a sacrificial LED near the controller",
                              lambda e=ends, ks=(k0, k1): (shape_ui.select(app, list(ks)), view3d.frame_points(app, e))))
+    # a grid layout seen from the front: an LED behind another shares its cell, and the cell keeps the first
+    lost = int(getattr(g, "collisions", 0) or 0) if sp.get("layout") == "grid" else 0
+    if lost:
+        out.append(Check("warn", f"the grid layout puts {lost} LEDs behind others, seen from the front: they get no pixel and "
+                         "stay dark - a 3-D shape wants the strip layout (THE EFFECTS SEE), with effects made for any shape",
+                         lambda: shape_ui.select(app, [])))
     # the outputs' count
     S = app.project.options.get("outputs") or {}
     outs = S.get("outs") or []
