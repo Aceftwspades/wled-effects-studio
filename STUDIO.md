@@ -2229,6 +2229,8 @@ proposal's number; in the order to do them.
       the grid layout of a 3-D shape leaves the LEDs behind others dark (a
       tree of 360 kept 197), now a check.
 
+The ninth pass is done: S1-S19.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads
