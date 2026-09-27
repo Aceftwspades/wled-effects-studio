@@ -1,5 +1,8 @@
 * text=auto
 *.cmd text eol=crlf
+# the Linux and macOS launchers and the desktop entry run as they are checked out: LF always, a Windows clone too
+*.sh text eol=lf
+*.desktop text eol=lf
 *.png binary
 *.gif binary
 *.wav binary

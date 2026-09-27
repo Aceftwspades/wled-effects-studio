@@ -40,31 +40,43 @@ def run(cmd, **kw):
         sys.exit(f"package: failed: {cmd}")
 
 
-def icon_file():
-    """An .ico from the toolbar's cube icon, in the accent colour on the panel colour."""
+def icon_image(px):
+    """The toolbar's cube icon at px square, in the accent colour on a rounded square of the panel colour."""
     sys.path.insert(0, HERE)
     from native.icons import Icon, ICONS
     from PIL import Image
     import numpy as np
+    ic = Icon(px); ICONS["cube"](ic)
+    a = np.array(ic.data(), np.float32).reshape(px, px, 4)[:, :, 3]
+    img = np.zeros((px, px, 4), np.uint8)
+    img[:, :, 0], img[:, :, 1], img[:, :, 2] = 24, 27, 33          # the panel's dark
+    img[:, :, 3] = 255
+    # a rounded square behind, the icon in the accent
+    yy, xx = np.mgrid[0:px, 0:px]
+    r = px * 0.22
+    inside = ((np.clip(np.abs(xx - px / 2 + 0.5) - (px / 2 - r), 0, None)) ** 2 + (np.clip(np.abs(yy - px / 2 + 0.5) - (px / 2 - r), 0, None)) ** 2) <= r * r
+    img[~inside, 3] = 0
+    col = np.array([90, 169, 230], np.float32)
+    for c in range(3):
+        img[:, :, c] = np.where(inside, img[:, :, c] * (1 - a) + col[c] * a, 0).astype(np.uint8)
+    return Image.fromarray(img, "RGBA")
+
+
+def icon_file():
+    """An .ico from the toolbar's cube icon, in the accent colour on the panel colour."""
     out = os.path.join(HERE, "build", "app.ico")
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    frames = []
-    for px in (256, 128, 64, 48, 32, 16):
-        ic = Icon(px); ICONS["cube"](ic)
-        a = np.array(ic.data(), np.float32).reshape(px, px, 4)[:, :, 3]
-        img = np.zeros((px, px, 4), np.uint8)
-        img[:, :, 0], img[:, :, 1], img[:, :, 2] = 24, 27, 33          # the panel's dark
-        img[:, :, 3] = 255
-        # a rounded square behind, the icon in the accent
-        yy, xx = np.mgrid[0:px, 0:px]
-        r = px * 0.22
-        inside = ((np.clip(np.abs(xx - px / 2 + 0.5) - (px / 2 - r), 0, None)) ** 2 + (np.clip(np.abs(yy - px / 2 + 0.5) - (px / 2 - r), 0, None)) ** 2) <= r * r
-        img[~inside, 3] = 0
-        col = np.array([90, 169, 230], np.float32)
-        for c in range(3):
-            img[:, :, c] = np.where(inside, img[:, :, c] * (1 - a) + col[c] * a, 0).astype(np.uint8)
-        frames.append(Image.fromarray(img, "RGBA"))
+    frames = [icon_image(px) for px in (256, 128, 64, 48, 32, 16)]
     frames[0].save(out, format="ICO", sizes=[(f.width, f.height) for f in frames], append_images=frames[1:])
+    return out
+
+
+def linux_icon():
+    """The same icon as a PNG for the Linux app launcher (linux/wled-effects-studio.png, which
+    install_linux.sh names in the desktop entry): python package.py --linux-icon."""
+    out = os.path.join(HERE, "linux", "wled-effects-studio.png")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    icon_image(256).save(out, format="PNG", optimize=True)
     return out
 
 
@@ -191,6 +203,8 @@ def main():
     toolchain = args[args.index("--toolchain") + 1] if "--toolchain" in args else None
     if "--trim" in args:                                   # python package.py --trim <mingw64> <out>: the cut-down toolchain alone
         i = args.index("--trim"); trim_toolchain(args[i + 1], args[i + 2]); return
+    if "--linux-icon" in args:                             # python package.py --linux-icon: the launcher's PNG alone
+        print("package:", linux_icon()); return
     print("package: the engine" + (" (with the toolchain that ships)" if toolchain else ""))
     if toolchain:
         # the engine and its objects are made by the compiler the release ships, so the

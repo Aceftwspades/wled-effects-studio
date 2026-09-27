@@ -5,6 +5,8 @@ cubefx.wasm
 gen/_probe.cpp
 gen/*.o
 cubefx.dll
+cubefx.so
+cubefx.dylib
 obj_native/
 __pycache__/
 *.pyc
@@ -16,3 +18,5 @@ examples/_check/
 dist/
 gen/stock1d_skip.json
 captures/
+# a virtual environment for an install from source (README), whatever tool made it
+.venv/

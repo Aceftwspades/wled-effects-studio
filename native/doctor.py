@@ -13,8 +13,30 @@ import sys
 from native import paths
 
 REQUIRED = (("numpy", "numpy"), ("dearpygui", "dearpygui"), ("PIL", "pillow"))
-OPTIONAL = (("sounddevice", "sounddevice", "live audio capture"),
-            ("pyaudiowpatch", "pyaudiowpatch", "capturing what the PC plays (Windows loopback)"))
+
+
+def optional(platform=None):
+    """(module, package, what it is for): the optional packages this platform can have - the
+    Windows loopback only on Windows (requirements.txt installs it nowhere else)."""
+    platform = platform or sys.platform
+    out = [("sounddevice", "sounddevice", "live audio capture")]
+    if platform == "win32":
+        out.append(("pyaudiowpatch", "pyaudiowpatch", "capturing what the PC plays (Windows loopback)"))
+    out.append(("rtmidi", "python-rtmidi", "a MIDI controller's knobs on the sliders"))
+    return out
+
+
+def optional_fix(pkg, error, platform=None, pip="python -m pip install"):
+    """How to get an optional package working: pip for one that is not there - but sounddevice
+    installed without PortAudio (Linux, where it does not bring the library) needs the system's."""
+    platform = platform or sys.platform
+    if pkg == "sounddevice" and isinstance(error, OSError) and "portaudio" in str(error).lower():
+        return ("install PortAudio: libportaudio2 (Debian, Ubuntu), portaudio (Arch, Fedora, Homebrew) - "
+                "the sounddevice package is there already")
+    if pkg == "python-rtmidi" and platform.startswith("linux"):
+        return (f"{pip} python-rtmidi  (where there is no wheel for this Python it builds from source: a C++ compiler "
+                "and the ALSA headers - libasound2-dev, alsa-lib-devel - and JACK's if you have it)")
+    return f"{pip} {pkg}"
 
 
 def _ver(mod):
@@ -33,11 +55,17 @@ def check():
             m = importlib.import_module(mod); out.append((True, f"{pkg} {_ver(m)}", ""))
         except Exception:
             out.append((False, f"{pkg} missing", f"{pip} {pkg}"))
-    for mod, pkg, what in OPTIONAL:
+    for mod, pkg, what in optional():
         try:
-            m = importlib.import_module(mod); out.append((True, f"{pkg} {_ver(m)} ({what})", ""))
-        except Exception:
-            out.append((None, f"{pkg} not installed - {what} is off", f"{pip} {pkg}"))
+            m = importlib.import_module(mod)
+            line = f"{pkg} {_ver(m)} ({what})"
+            if pkg == "sounddevice" and sys.platform.startswith("linux"):
+                line += " - what the PC plays: a PipeWire / PulseAudio \"Monitor of ...\" input in the panel's LIVE, where it lists one"
+            out.append((True, line, ""))
+        except Exception as e:
+            gone = isinstance(e, OSError)             # there, but a library of the system's is not
+            out.append((None, f"{pkg} {'cannot load its library' if gone else 'not installed'} - {what} is off",
+                        optional_fix(pkg, e, pip=pip)))
     # the compiler
     try:
         from native.toolchain import find_compiler, bundled_compiler

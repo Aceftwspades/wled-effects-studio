@@ -20,14 +20,44 @@ prebuilt and a compiler is inside, so building your own effects works with
 nothing installed. `Desktop shortcut.cmd` puts it on the desktop; the app
 checks for newer releases once a day and updates itself.
 
-**From the source** (Windows, Linux, macOS):
+**From the source**, on Windows:
 
 ```bash
 pip install -r requirements.txt
 python -m native.doctor            # what this machine has, what it lacks
 python build.py --native-only      # the engine, once (a C++ compiler: clang or gcc)
-python -m native.app               # or run_studio.pyw (no console window) / run_studio.cmd / run_studio.sh
+python -m native.app               # or run_studio.pyw (no console window) / run_studio.cmd
 ```
+
+On Linux and macOS, in a virtual environment - current distributions refuse
+a `pip install` into the system's Python (PEP 668: "externally-managed-environment"),
+and many have `python3` but no `python`:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m native.doctor     # what this machine has, what it lacks
+.venv/bin/python build.py --native-only
+.venv/bin/python -m native.app        # or ./run_studio.sh - it takes .venv by itself
+./install_linux.sh                    # Linux: the studio in the app launcher, with its icon
+```
+
+Linux wants a few system packages too: PortAudio for live audio (the
+sounddevice package does not bring it there), and a C++ compiler with the
+ALSA (and JACK) headers for python-rtmidi, which pip builds from source
+where there is no wheel for your Python (3.14, for one):
+
+```bash
+# Debian / Ubuntu
+sudo apt install python3-venv clang libportaudio2 libasound2-dev libjack-jackd2-dev
+# Arch
+sudo pacman -S clang portaudio alsa-lib
+# Fedora
+sudo dnf install clang portaudio alsa-lib-devel jack-audio-connection-kit-devel
+```
+
+To hear what the computer plays on Linux, choose a PipeWire / PulseAudio
+"Monitor of ..." input under the panel's LIVE, where the system lists one.
 
 `python package.py` makes the release folder; `--toolchain` bundles a
 MinGW-w64 into it; `--zip` zips it.

@@ -2321,6 +2321,43 @@ The seven are done, released as 1.3.1.
 
 Released as 1.3.2.
 
+### Linux from source (issue #2, September 2026)
+
+Found installing from source on Arch Linux (Hyprland/Wayland, Python 3.14,
+clang): the studio itself ran - the engine built with clang, the app under
+Wayland - but getting there by the README did not.
+
+- [x] **pip refused the system's Python** (PEP 668) and `python` is not on
+      many distributions: the README and the GUIDE give Linux and macOS a
+      virtual environment (`python3 -m venv .venv`, then `.venv/bin/...`),
+      Windows' commands as they were.
+- [x] **run_studio.sh used the system's python3**: it takes the checkout's
+      `.venv` when there is one; from the app launcher (no terminal) its
+      output goes to $TMPDIR/cubefx/launch.log and a failure is said by
+      notify-send, zenity or kdialog, as run_studio.pyw says it on Windows.
+      Committed executable (the mode bit is lost from a Windows commit), and
+      `*.sh` / `*.desktop` checked out LF everywhere (.gitattributes).
+- [x] **The Linux and macOS engines were not ignored**: `cubefx.so`,
+      `cubefx.dylib` and `.venv/` in .gitignore.
+- [x] **The doctor asked Linux for a Windows-only package**: pyaudiowpatch
+      is looked for on Windows only (doctor.optional); sounddevice installed
+      without the PortAudio library is sent to the system's package, not to
+      pip; python-rtmidi, which the doctor never looked for, is, with its
+      build's needs on Linux; on Linux the live-audio line says where what
+      the PC plays is heard (a "Monitor of ..." input in LIVE).
+      tests/test_doctor.py runs it as Linux, PortAudio missing.
+- [x] **The system packages were not written down**: the README names them
+      for Debian/Ubuntu, Arch and Fedora (PortAudio; a compiler and the ALSA
+      and JACK headers python-rtmidi builds against).
+- [x] **No Linux launcher entry**: `./install_linux.sh` writes a desktop
+      entry for the checkout from `linux/wled-effects-studio.desktop` into
+      ~/.local/share/applications (`--uninstall` takes it out), its icon
+      `linux/wled-effects-studio.png` - the cube, drawn by native/icons.py
+      (`python package.py --linux-icon`). Tried here with a stand-in home
+      and a folder named with `&` and `|`; the launcher's paths with stand-in
+      Pythons (the venv taken, python3 without it, the engine built first,
+      each failure logged).
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

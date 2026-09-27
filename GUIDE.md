@@ -28,7 +28,7 @@ daily check off). A newer release shows in Help as "Update available";
 one over its folder - projects, captures and the toolchain untouched - and
 starts it again. From a checkout the answer is `git pull`.
 
-**From the tree**:
+**From the tree** (Windows):
 
 ```bash
 cd wled-effects-studio                                 # the clone
@@ -36,6 +36,19 @@ pip install -r requirements.txt                        # dearpygui, numpy, pillo
 python -m native.doctor                                # what is here and what is missing
 python build.py --native-only                          # once; the app rebuilds the engine as it needs
 python -m native.app                                   # or the desktop shortcut
+```
+
+On Linux and macOS the packages go in a virtual environment (a current
+distribution refuses them in the system's Python), and `run_studio.sh`
+uses it by itself; the README names the system packages Linux wants
+(PortAudio; the ALSA headers python-rtmidi builds against):
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m native.doctor
+.venv/bin/python build.py --native-only
+./run_studio.sh                                        # ./install_linux.sh puts it in the app launcher
 ```
 
 **Help**: the first time the studio starts, a Welcome panel offers the
