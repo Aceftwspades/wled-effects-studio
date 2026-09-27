@@ -3987,13 +3987,22 @@ def service_command(app):
         if not os.path.exists(CMD_FILE):
             return
         import json
-        text = scratch.read_text(CMD_FILE)
+        # A file the test is moving in this very moment is locked on Windows
+        # (a sharing violation, Errno 13): it is taken next frame. Treated as
+        # a broken file it was removed, and a CI run's steps never ran.
+        try:
+            text = scratch.read_text(CMD_FILE)
+        except PermissionError:
+            return
         if not text.strip():
             return                                    # still being written: next frame
         cmds = json.loads(text)
         if isinstance(cmds, list) and cmds and isinstance(cmds[0], dict) and cmds[0].get("wait_build") and app.building:
             return                                    # the build first: the batch is taken on a later frame
-        os.remove(CMD_FILE)
+        try:
+            os.remove(CMD_FILE)
+        except PermissionError:
+            return                                    # held a moment longer: taken next frame - once, when it goes
         # the messages a test may expect: those posted since the last batch began
         # (what it did, the wait after it, and this batch so far)
         app._msg_since, app._msg_batch = getattr(app, "_msg_batch", 0), messages.seq()
