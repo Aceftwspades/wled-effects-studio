@@ -2358,6 +2358,8 @@ Wayland - but getting there by the README did not.
       Pythons (the venv taken, python3 without it, the engine built first,
       each failure logged).
 
+Released as 1.3.3.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads
