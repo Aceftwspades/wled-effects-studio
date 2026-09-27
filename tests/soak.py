@@ -36,7 +36,7 @@ FRAMES = ["devices", "shape", "sequence", "library", "palettes", "outputs", "sen
 
 
 def send(cmds, wait):
-    json.dump(cmds, open(CMD, "w"))
+    scratch.write_whole(CMD, json.dumps(cmds))            # whole: the app takes it the moment it is there
     time.sleep(wait)
 
 

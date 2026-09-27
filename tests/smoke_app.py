@@ -663,7 +663,7 @@ def send(cmds, wait):
     end = time.time() + 240
     while os.path.exists(CMD) and time.time() < end:
         time.sleep(0.2)
-    json.dump(cmds, open(CMD, "w"))
+    scratch.write_whole(CMD, json.dumps(cmds))            # whole: the app takes it the moment it is there
     time.sleep(wait)
 
 

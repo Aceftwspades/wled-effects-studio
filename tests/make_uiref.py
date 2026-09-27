@@ -37,12 +37,12 @@ def main():
         # frames built (they are made on first show); the graph at 100%, since the zoom button's
         # label is the zoom (the reference would say whatever the last session left); then the
         # section written
-        json.dump([{"geometry": {"kind": "shape", "params": {"parts": [{"kind": "points", "name": "points", "params": {"points": [[0, 0, 0], [1, 0, 0], [2, 0, 0]]},
+        scratch.write_whole(CMD, json.dumps([{"geometry": {"kind": "shape", "params": {"parts": [{"kind": "points", "name": "points", "params": {"points": [[0, 0, 0], [1, 0, 0], [2, 0, 0]]},
                                                                         "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": 1.0, "reverse": False}]}}},
                    {"frame": "devices"}, {"frame": "flash"}, {"frame": "send"}, {"frame": "shape"}, {"frame": "sequence"},
-                   {"frame": "library"}, {"frame": "palettes"}, {"frame": "outputs"}, {"graph_zoom": 1.0}], open(CMD, "w"))
+                   {"frame": "library"}, {"frame": "palettes"}, {"frame": "outputs"}, {"graph_zoom": 1.0}]))
         time.sleep(5)
-        json.dump([{"uiref": os.path.join(ROOT, "GUIDE.md")}], open(CMD, "w"))
+        scratch.write_whole(CMD, json.dumps([{"uiref": os.path.join(ROOT, "GUIDE.md")}]))
         time.sleep(3)
     finally:
         proc.kill()

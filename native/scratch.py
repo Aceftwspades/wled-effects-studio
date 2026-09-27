@@ -22,6 +22,7 @@ tests set it, nobody else needs it.
 import os
 import stat
 import tempfile
+import time
 
 NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
@@ -95,3 +96,19 @@ def write_text(p, text, append=False):
     fd = _open(p, flags)
     with os.fdopen(fd, "ab" if append else "wb") as f:
         f.write(text.encode("utf-8"))
+
+
+def write_whole(p, text):
+    """A file written whole: into <p>.tmp, then moved over p, so a reader
+    never finds it half written - the tests' command file, which the app
+    takes (and removes) the moment it is there. On Windows a reader that
+    has the file open holds the move off for a moment: tried again."""
+    tmp = p + ".tmp"
+    write_text(tmp, text)
+    for _ in range(40):
+        try:
+            os.replace(tmp, p)
+            return
+        except PermissionError:
+            time.sleep(0.05)
+    os.replace(tmp, p)
