@@ -2406,7 +2406,15 @@ From running the studio and its harnesses on Arch Linux at 1.3.3.
       each build (`{"wait_build": true}` at the head of a batch). An
       `{"effect": ...}` the build does not have is an error that names it.
       release.yml runs every unit test on Linux too, and the smoke test under
-      a virtual display; the draft release waits on both platforms.
+      a virtual display; the draft release waits on both platforms. That
+      Linux run found two more: a key "over the panel" was left to where the
+      real pointer was (mid-screen under xvfb, over the canvas) - the hook
+      holds it on the panel now - and the run against the packaged app had
+      failed at the face demo since it was written (a relative path to
+      tests/, which a packaged app does not have). And the harnesses write
+      the command file whole (scratch.write_whole: a temporary file moved
+      over it) - the release's run caught the app removing one the test had
+      not yet closed.
 - [x] **native.cli tracebacks** (#10): an unknown effect (with the near
       names), a --set or --sweep that is not name=number, --fps 0 - one-line
       errors from argparse; tests/test_cli.py.
@@ -2420,6 +2428,8 @@ From running the studio and its harnesses on Arch Linux at 1.3.3.
       someone else's or open to others - and its files (crash.txt, the
       popouts' places, run_studio.sh's launch.log) are never opened through a
       link. tests/test_scratch.py.
+
+Released as 1.3.4.
 
 ### Line-in (September 2026)
 
