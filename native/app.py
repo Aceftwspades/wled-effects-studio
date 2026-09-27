@@ -3023,6 +3023,8 @@ class App(Features):
         editor's) apply there. (The test hooks hold it true for a moment.)"""
         if time.time() < getattr(self, "_view_hold", 0.0):
             return True
+        if time.time() < getattr(self, "_panel_hold", 0.0):
+            return False                                     # the hooks' pointer on the panel, wherever the real one is
         return dpg.does_item_exist("cube_win") and dpg.is_item_shown("cube_win") and dpg.is_item_hovered("cube_win")
 
     def over_canvas(self):
@@ -3032,6 +3034,8 @@ class App(Features):
         hold it true for a moment: they have no pointer.)"""
         if not self.ui or time.time() < getattr(self, "_canvas_hold", 0.0):
             return True
+        if time.time() < getattr(self, "_panel_hold", 0.0):
+            return False                                     # the hooks' pointer on the panel, wherever the real one is
         for tag in ("node_editor", "net_win", "cube_win"):
             if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_hovered(tag):
                 return True
@@ -4007,11 +4011,14 @@ def service_command(app):
             if "key" in c:                              # test hook: a key press, by mvKey_ name
                 if c.get("over") != "panel":            # ... as if over the canvas (the hooks have no pointer)
                     app._canvas_hold = time.time() + 0.5
+                else:                                   # ... or on the panel: not where the real pointer happens to be
+                    app._panel_hold = time.time() + 0.5
                 if c.get("over") == "view":             # ... or on the 3-D view, where its own keys apply
                     app._view_hold = time.time() + 0.5
                 app.on_key(None, getattr(dpg, "mvKey_" + c["key"]))
                 app._canvas_hold = 0.0
                 app._view_hold = 0.0
+                app._panel_hold = 0.0
             if "action" in c:                           # test hook: a keymap action by name
                 app.run_action(c["action"])
             if "bind" in c:                             # test hook: [action, binding]

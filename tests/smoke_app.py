@@ -171,7 +171,7 @@ STEPS = [
     # every kind of face, live: the demo graph written into the project, built, and its glyphs asked after -
     # the Wave's dot moves, the Scope and the sparklines draw, the lights and meters are on the pins, the
     # Noise scrolls with its z, the Steps node lights its step, a hovered output shows its plot
-    ([{"py": "__import__('runpy').run_path('tests/face_demo.py', run_name='x')['write'](app.project.path)[0]"},
+    ([{"py": f"__import__('runpy').run_path({os.path.join(HERE, 'face_demo.py')!r}, run_name='x')['write'](app.project.path)[0]"},   # the tree's: a packaged app has no tests/
       {"graph_open": "face_demo.json"}, {"graph_zoom": 1.0}, {"py": "app.gp.compile()"}], 22.0),
     ([{"check": "app.eng.names[app.eng.idx] == 'face_demo'"}, {"check": "app.gp._hist_n > 30"},
       {"check": "set(app.gp._live_glyphs.values()) >= {'wave', 'scope', 'spark', 'bars', 'strip', 'noise', 'steps'}"},
