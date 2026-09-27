@@ -1249,10 +1249,21 @@ def import_file(app, path):
                 more = {"layout": "grid", "grid": [m["grid"][0], m["grid"][1], list(m["grid"][2])]}
             note = f"{len(m['points'])} LEDs of xLights model {m['name']} ({m['w']} x {m['h']}" + (f" x {m['d']}" if m['d'] > 1 else "") + ")"
         else:
-            pts, order = shape_io.read_points(path)
+            info = {}
+            pts, order = shape_io.read_points(path, info)
             part = shapes.new_part("points", points=pts.tolist())
             part["name"] = os.path.basename(path)
             note = f"{len(pts)} LEDs from {os.path.basename(path)}" + (" in the file's numbering" if order is not None else "")
+            if info.get("skipped"):
+                note += f" ({info['skipped']} row(s) without numbers - nan, inf - skipped)"
+    except shape_io.TooManyLeds as e:
+        # the mesh is big for its pitch (millimetres, most likely): the pitch that would do goes in the field
+        if e.pitch is not None and dpg.does_item_exist("shape_mesh_pitch"):
+            dpg.set_value("shape_mesh_pitch", float(e.pitch))
+        say = f"{os.path.basename(path)} not imported: {e}" + (" The pitch is set to that: import it again." if e.pitch else "")
+        app.gp.status(say)
+        dpg.set_value("shape_desc", say)
+        return
     except Exception as e:
         app.gp.status(f"could not read {os.path.basename(path)}: {e}")
         dpg.set_value("shape_desc", f"could not read {os.path.basename(path)}: {e}")

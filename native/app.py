@@ -25,7 +25,6 @@ Two things here are deliberate and easy to undo by accident:
 """
 import os
 import re
-import tempfile
 import time
 
 import numpy as np
@@ -813,6 +812,8 @@ class App(Features):
 
     # --- callbacks -----------------------------------------------------------
     def on_effect(self, s, val):
+        if val not in self.eng.names:                    # a name from elsewhere (a command, an old preset): said, not raised
+            self.gp.status(f"no effect named {val!r} in this build", "error"); return
         self.eng.select(self.eng.names.index(val))
         self.rebuild_params()
         self.sync_palette_combo()
@@ -937,6 +938,9 @@ class App(Features):
         self.apply_geometry(g)
         dpg.set_value("geom_kind", "xyz")
         self.rebuild_geom_fields()
+        if getattr(g, "skipped", 0):
+            messages.post(self, f"{os.path.basename(path)}: {g.skipped} row(s) without three finite numbers "
+                                "(nan, inf, a missing column) left out", "warn")
 
     def rebuild_geom_fields(self):
         if not dpg.does_item_exist("geom_fields"):
@@ -1081,6 +1085,17 @@ class App(Features):
         self.set_usermod(name, True)
         self.gp.status(f"imported usermods/{name}")
 
+    def report_project_load(self):
+        """A project.json that did not read, said where it cannot be missed:
+        a problem in the messages and a dialog. The project then runs on
+        the defaults, its old settings kept in project.json.bad-<time>."""
+        err = getattr(self.project, "load_error", None)
+        messages.clear(self, "project:load")
+        if err:
+            print("project:", err)
+            messages.post(self, err, "error", key="project:load")
+            chrome.confirm(self, "The project's settings did not read", err, [("OK", None)])
+
     def switch_project(self, path, create=False):
         path = project_path(path)
         if not create and not os.path.isdir(path):
@@ -1091,6 +1106,7 @@ class App(Features):
             self.gp.save()
         self.project = Project(path)
         messages.clear(self, "")                         # the last project's problems are not this one's
+        self.report_project_load()
         if create:
             from native import flash
             self.project.options["features"] = dict(flash.NEW_DEFAULTS)     # no hardware assumed until ticked
@@ -3903,11 +3919,15 @@ def build(app):
 #
 # A file rather than a socket or a hotkey because it needs no port, no focus and
 # no window manager: anything that can create a file can ask for a frame, and
-# the app answers on its next tick.
-SHOT_DIR = os.path.join(tempfile.gettempdir(), "cubefx")
-SHOT_REQ = os.path.join(SHOT_DIR, "capture.request")
-SHOT_PNG = os.path.join(SHOT_DIR, "capture.png")
-CMD_FILE = os.path.join(SHOT_DIR, "command.json")
+# the app answers on its next tick. That is also why it is the tests' alone: on
+# only with STUDIO_REMOTE_CONTROL=1, in a folder of this user's alone
+# (native/scratch.py; GHSA-h8r2-jh8g-f2xh) - a command runs Python.
+from native import scratch
+SHOT_DIR = scratch.DIR
+SHOT_REQ = scratch.path("capture.request")
+SHOT_PNG = scratch.path("capture.png")
+CMD_FILE = scratch.path("command.json")
+REMOTE = scratch.remote_control()
 
 
 def _hook_names(app):
@@ -3931,15 +3951,23 @@ def service_command(app):
 
     It exists so the app can be tested without a hand on the mouse - every
     panel here was checked by writing this file and reading the capture.
+    Off unless STUDIO_REMOTE_CONTROL=1 (REMOTE): the "py" and "check"
+    commands run Python, so the file is the tests' alone. A batch that
+    starts with {"wait_build": true} waits for a build in hand to be loaded
+    (the file is left until then), however long this machine takes.
     """
+    if not REMOTE:
+        return
     try:
         if not os.path.exists(CMD_FILE):
             return
         import json
-        text = open(CMD_FILE, encoding="utf-8").read()
+        text = scratch.read_text(CMD_FILE)
         if not text.strip():
             return                                    # still being written: next frame
         cmds = json.loads(text)
+        if isinstance(cmds, list) and cmds and isinstance(cmds[0], dict) and cmds[0].get("wait_build") and app.building:
+            return                                    # the build first: the batch is taken on a later frame
         os.remove(CMD_FILE)
         # the messages a test may expect: those posted since the last batch began
         # (what it did, the wait after it, and this batch so far)
@@ -3959,6 +3987,8 @@ def service_command(app):
                 dpg.set_value("geom_kind", g.kind)
                 app.rebuild_geom_fields()
             if "effect" in c:
+                if c["effect"] not in app.eng.names:     # the step's other commands would work on the wrong effect
+                    raise ValueError(f"no effect named {c['effect']!r} in this build ({app.eng.count} effects)")
                 app.on_effect(None, c["effect"])
                 dpg.set_value("fx_combo", c["effect"])
             if "palette_run" in c:                      # test hook: the command palette's first row for this text, run
@@ -4278,6 +4308,7 @@ def service_command(app):
                         for w in dpg.get_windows():
                             if dpg.get_item_alias(w) not in ("root", "") and dpg.is_item_shown(w) and dpg.get_item_alias(w).endswith(("_win", "_dialog")):
                                 dpg.hide_item(w)
+                print("walk  done  pane")
             if "menus" in c:                            # test hook: every menu's state (an open one shows)
                 for m in [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]:
                     st = dpg.get_item_state(m)
@@ -4590,6 +4621,8 @@ def service_capture():
     Must be called from inside the render loop - the buffer does not exist
     outside it.
     """
+    if not REMOTE:                          # the tests' too (STUDIO_REMOTE_CONTROL=1): a picture of the window
+        return
     try:
         if not os.path.exists(SHOT_REQ):
             return
@@ -4684,6 +4717,7 @@ def walk_menus(app, skip=()):
         app.stop_sweep()
     if getattr(app, "rec", None) is not None:
         app.rec = None
+    print("walk  done  menu")                            # the harness counts these: a walk the app did not finish has none
 
 
 UIREF_START = "<!-- uiref start"
@@ -4831,7 +4865,8 @@ def process_stats(app):
 # the clipboard (the log's copy: what the user had copied stays)
 SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
                     "map_webcam",                         # the webcam: a camera turned on is not a test's to do
-                    "geom_read_wiring")                   # a real device's wiring read: the smoke reads the fake's
+                    "geom_read_wiring",                   # a real device's wiring read: the smoke reads the fake's
+                    "history_switch")                     # its rows would put the walked project's settings back: the smoke does, in its own
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
@@ -4914,6 +4949,7 @@ def walk_frame(app, which):
         _close_dialogs(keep=(root,))
         if which in device_ui.FRAMES and not dpg.is_item_shown(root):
             device_ui.show(app, which)                        # a close button: the frame back for the rest
+    print(f"walk  done  frame {which}")
 
 
 # actions a walk leaves alone: the window's shape, a 15 s recording, another program, the firmware, the app's end
@@ -4936,6 +4972,7 @@ def walk_actions(app, skip=()):
         if name in skip:
             print(f"act   skip  {name}"); continue
         before = json.dumps(gp.graph.to_json(), sort_keys=True) if gp.graph else None
+        print(f"act   ...   {name}", flush=True)                # first: a crash's last line names the action that did it
         try:
             app.run_action(name)
             if name in TOGGLE_ACTION:
@@ -4950,6 +4987,7 @@ def walk_actions(app, skip=()):
         if gp.graph is not None and before is not None and json.dumps(gp.graph.to_json(), sort_keys=True) != before:
             gp.undo()
     gp._hide_menus()
+    print("walk  done  act")
 
 
 def walk_ctx(app, kind, nid, pin=None):
@@ -5001,6 +5039,7 @@ def walk_ctx(app, kind, nid, pin=None):
         if json.dumps(gp.graph.to_json(), sort_keys=True) != before:
             gp.undo()
     gp._hide_menus()
+    print(f"walk  done  ctx {kind}")
 
 
 def speed_label(v):
@@ -5035,21 +5074,24 @@ def main():
     build(app)
     dpg.show_viewport()
     app.drops = DropFiles("WLED Effects Studio")
-    os.makedirs(SHOT_DIR, exist_ok=True)
     os.makedirs(GIF_DIR, exist_ok=True)
-    crash = os.path.join(SHOT_DIR, "crash.txt")
+    crash = scratch.path("crash.txt")        # None: no folder of this user's alone to be had (the traceback: the console)
     try:                                     # this run's own file; the last run's kept beside it
-        if os.path.exists(crash):
+        if crash and os.path.lexists(crash):
             os.replace(crash, os.path.join(SHOT_DIR, "crash.prev.txt"))
     except OSError:
         pass
-    print(f"if a frame throws, the traceback lands in {crash}")
-    print(f"frame capture: create {SHOT_REQ} to get a PNG at {SHOT_PNG}")
-    print(f"remote control: write a JSON list of commands to {CMD_FILE}")
+    print(f"if a frame throws, the traceback lands in {crash or 'the console alone (no private scratch folder)'}")
+    if REMOTE:
+        print(f"frame capture: create {SHOT_REQ} to get a PNG at {SHOT_PNG}")
+        print(f"remote control: write a JSON list of commands to {CMD_FILE}")
+    else:
+        print("remote control: off (the tests turn it on with STUDIO_REMOTE_CONTROL=1)")
     from native import update as _update
     if _update.due(app.prefs) and not os.environ.get("STUDIO_NO_UPDATE_CHECK"):
         chrome.check_updates(app)                    # once a day, on a thread; the tests set STUDIO_NO_UPDATE_CHECK
     reader_ui.maybe_welcome(app)                     # the first run's panel; the tests set STUDIO_NO_WELCOME
+    app.report_project_load()                        # a project.json that did not read: said now the window is up
     try:
         while dpg.is_dearpygui_running():
             try:
@@ -5111,11 +5153,10 @@ def main():
                     app._last_tb = tb
                     traceback.print_exc()
                     try:
-                        with open(crash, "a", encoding="utf-8") as fh:
-                            fh.write(tb + "\n")
+                        scratch.write_text(crash, tb + "\n", append=True)     # not through a link
                     except Exception:
                         pass
-                    app.gp.status(f"a frame failed: {tb.strip().splitlines()[-1][:90]} - see crash.txt", "error")
+                    app.gp.status(f"a frame failed: {tb.strip().splitlines()[-1][:90]}" + (" - see crash.txt" if crash else ""), "error")
                 app.playing = False
             _r0 = time.perf_counter()
             dpg.render_dearpygui_frame()

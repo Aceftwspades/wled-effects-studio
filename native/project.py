@@ -92,6 +92,31 @@ def _ident(name):
     return ident(name)
 
 
+def write_atomic(path, text):
+    """A text file written whole or not at all: into <path>.tmp, flushed to
+    the disk, then moved over the file - a crash or a power cut mid-write
+    leaves the old file, never half of the new one (issue #5). On Windows a
+    virus scanner or a sync tool can hold the file for a moment: the move is
+    tried a few times, then the file is written in place rather than not."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    for k in range(6):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            time.sleep(0.05 * (k + 1))
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+
+
 class Project:
     def __init__(self, path):
         self.path = os.path.abspath(path)
@@ -135,21 +160,50 @@ class Project:
     UNDO_MAX = 40
 
     def load(self):
+        self.load_error = None          # what went wrong reading project.json, for the app to say (issue #5)
+        self.save_blocked = False       # True: the file could not even be copied, so nothing is saved over it
         if not os.path.exists(self.file):
             self.save()
             return
         try:
-            d = json.load(open(self.file, encoding="utf-8"))
-        except Exception:
+            with open(self.file, encoding="utf-8") as f:
+                d = json.load(f)
+            if not isinstance(d, dict):
+                raise ValueError("it is not a JSON object")
+        except Exception as e:
+            self._set_aside(e)
             return
         try:
             self.geometry = Geometry.from_json(d.get("geometry", {}))
         except Exception:
             self.geometry = Geometry("cube", B=16)
-        self.selected = d.get("selected", "")
-        self.options = d.get("options", {})
+        self.selected = d.get("selected", "") if isinstance(d.get("selected", ""), str) else ""
+        opts = d.get("options", {})
+        self.options = opts if isinstance(opts, dict) else {}
         self.imported = [f for f in d.get("imported", []) if isinstance(f, str)]
         self._journal_reset()
+
+    def _set_aside(self, err):
+        """project.json that does not read - a hand edit's stray comma, a
+        merge, a write cut short: the project starts from the defaults, and
+        the next save would write them over every setting it held. So the
+        file is copied to project.json.bad-<time> first and load_error says
+        where; when it cannot even be copied, nothing is saved over it."""
+        why = f"{type(err).__name__}: {err}" if not isinstance(err, ValueError) else str(err)
+        bad = f"{self.file}.bad-{time.strftime('%Y%m%d-%H%M%S')}"
+        k = 2
+        while os.path.exists(bad):
+            bad = f"{self.file}.bad-{time.strftime('%Y%m%d-%H%M%S')}-{k}"; k += 1
+        try:
+            shutil.copy2(self.file, bad)
+        except OSError as e:
+            self.save_blocked = True
+            self.load_error = (f"{self.file} could not be read ({why}), nor copied ({e}). The studio will not save "
+                               "over it: close the studio, see to the file, and start it again.")
+            return
+        self.load_error = (f"project.json could not be read ({why}). It was kept as {os.path.basename(bad)} in "
+                           f"{self.path}, and the project starts from the defaults: put the settings back by fixing "
+                           "that file and copying it over project.json, or from File > History.")
 
     def _journal_reset(self):
         self._undo = {k: [] for k in self.UNDO_KEYS}
@@ -202,13 +256,40 @@ class Project:
             self._restoring = False
         return True
 
+    # a copy of the settings kept in the history (File > History) at most this often: they
+    # are saved at every change, so a copy at every save would push the older ones out within minutes
+    HISTORY_EVERY = 300.0
+
     def save(self):
+        if getattr(self, "save_blocked", False):
+            return                      # the file on disk could not be read or copied: left as it is
         self._journal()
         d = {"geometry": self.geometry.to_json(), "selected": self.selected,
              "options": self.options, "imported": self.imported,
              "saved": time.strftime("%Y-%m-%d %H:%M:%S")}
-        with open(self.file, "w", encoding="utf-8") as f:
-            json.dump(d, f, indent=1)
+        text = json.dumps(d, indent=1)
+        self._keep_history()
+        write_atomic(self.file, text)
+
+    def _keep_history(self):
+        """What project.json held before this save, into history/project/ -
+        the first save of a session, then at most every HISTORY_EVERY
+        seconds, and only a file that reads (a broken one is kept aside by
+        load, not here)."""
+        now = time.time()
+        if now - getattr(self, "_kept_at", 0.0) < self.HISTORY_EVERY:
+            return
+        try:
+            old = open(self.file, encoding="utf-8").read()
+            json.loads(old)
+        except (OSError, ValueError):
+            return
+        from native import history
+        try:
+            history.keep(self, "project", "project", ".json", old)
+            self._kept_at = now
+        except OSError:
+            pass
 
     # --- effects ------------------------------------------------------------------
     @property
@@ -442,13 +523,33 @@ def unzip_project(path, name=None):
             dest = os.path.join(PROJECTS, f"{base}_{k}"); k += 1
         os.makedirs(dest)
         for n, rel in zip(names, inside):
-            if not rel or rel.startswith(("/", "..")) or ".." in rel.split("/"):
+            out = _inside(dest, rel)
+            if out is None:
                 continue                                          # nothing outside the folder
-            out = os.path.join(dest, *rel.split("/"))
             os.makedirs(os.path.dirname(out), exist_ok=True)
             with z.open(n) as src, open(out, "wb") as f:
                 shutil.copyfileobj(src, f)
     return dest
+
+
+def _inside(dest, rel):
+    """Where a zip entry's path lands under dest - or None when it would
+    land anywhere else. The name is not trusted to say: a drive letter
+    ("D:/x.txt") makes os.path.join drop dest on Windows, a backslash is a
+    separator there too, and a colon also names an NTFS stream
+    ("a.cpp:hidden") - so any part with a colon is refused, and the path is
+    resolved and compared with the folder (issue #8)."""
+    parts = [p for p in rel.replace("\\", "/").split("/") if p not in ("", ".")]
+    if not parts or rel.startswith(("/", "\\")) or any(p == ".." or ":" in p for p in parts):
+        return None
+    out = os.path.realpath(os.path.join(dest, *parts))
+    root = os.path.realpath(dest)
+    try:
+        if os.path.commonpath([out, root]) != root or out == root:
+            return None
+    except ValueError:                                            # another drive altogether
+        return None
+    return out
 
 
 def list_projects():

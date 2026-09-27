@@ -27,15 +27,53 @@ WARM = 60           # discarded frames - the same count harness.js uses, so a
                     # native run and a browser run sample the same instants
 
 
+def _pairs(spec, what="--set"):
+    """'sx=200,o1=1' -> {'sx': 200, 'o1': 1}; ValueError naming the one that is not name=number."""
+    out = {}
+    for kv in (spec or "").split(","):
+        kv = kv.strip()
+        if not kv:
+            continue
+        if "=" not in kv:
+            raise ValueError(f"{what}: {kv!r} is not name=number")
+        k, v = kv.split("=", 1)
+        try:
+            out[k.strip()] = int(v)
+        except ValueError:
+            raise ValueError(f"{what}: {k.strip()}={v.strip()!r} - the value is a whole number")
+    return out
+
+
+def _sweep(spec):
+    """'c3=50,120,210' -> ('c3', [50, 120, 210])."""
+    if "=" not in spec:
+        raise ValueError(f"--sweep: {spec!r} is not name=n1,n2,...")
+    k, vals = spec.split("=", 1)
+    try:
+        return k.strip(), [int(v) for v in vals.split(",") if v.strip()]
+    except ValueError:
+        raise ValueError(f"--sweep: {vals!r} - the values are whole numbers, comma separated")
+
+
+def _number(kind, least):
+    """An argparse type: a number of `kind` no smaller than `least` (0 or
+    1), so --fps 0 is refused by argparse, not a ZeroDivisionError."""
+    def conv(text):
+        try:
+            v = kind(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"{text!r} is not a {'whole ' if kind is int else ''}number")
+        if not v >= least:                      # NaN too
+            raise argparse.ArgumentTypeError(f"{text} - it has to be {'positive' if least else '0 or more'}")
+        return v
+    return conv
+
+
 def _apply(eng, spec):
     """--set sx=200,o1=1 -> parameter overrides."""
-    if not spec:
+    over = _pairs(spec)
+    if not over:
         return
-    over = {}
-    for kv in spec.split(","):
-        if "=" in kv:
-            k, v = kv.split("=", 1)
-            over[k.strip()] = int(v)
     eng.fx.update({k: v for k, v in over.items() if k in eng.fx})
     if "pal" in over:
         eng.pal = over["pal"]
@@ -87,24 +125,31 @@ def main():
     ap.add_argument("--snapshot", metavar="EFFECT")
     ap.add_argument("--gif", metavar="EFFECT",
                     help="animated preview. a still cannot show motion")
-    ap.add_argument("--secs", type=float, default=15.0)
-    ap.add_argument("--fps", type=int, default=15)
+    ap.add_argument("--secs", type=_number(float, 0), default=15.0)
+    ap.add_argument("--fps", type=_number(int, 1), default=15)
     ap.add_argument("--view", default="both", choices=("net", "cube", "both"))
-    ap.add_argument("--size", type=int, default=160, help="cube render px")
+    ap.add_argument("--size", type=_number(int, 1), default=160, help="cube render px")
     ap.add_argument("--spin", type=float, default=0.0,
                     help="turns of yaw over the whole clip")
-    ap.add_argument("--ms", type=int, default=20000)
+    ap.add_argument("--ms", type=_number(int, 1), default=20000)
     ap.add_argument("--at", default="", help="snapshot times in ms, comma separated")
-    ap.add_argument("--scale", type=int, default=6)
+    ap.add_argument("--scale", type=_number(int, 1), default=6)
     ap.add_argument("--out", default="shot")
     ap.add_argument("--set", default="", help="sx=200,c3=90,o1=1")
     ap.add_argument("--sweep", default="", help="c3=50,120,210")
-    ap.add_argument("--faceB", type=int, default=16)
-    ap.add_argument("--every", type=int, default=40, help="sample every N frames")
-    ap.add_argument("--live", type=float, metavar="SECONDS",
+    ap.add_argument("--faceB", type=_number(int, 1), default=16)
+    ap.add_argument("--every", type=_number(int, 1), default=40, help="sample every N frames")
+    ap.add_argument("--live", type=_number(float, 0), metavar="SECONDS",
                     help="capture system audio and print band levels, to check "
                          "the loopback path before wiring it to anything")
     a = ap.parse_args()
+    # what is typed checked before the engine loads: a one-line error, not a traceback
+    try:
+        _pairs(a.set)
+        sweep = _sweep(a.sweep) if a.sweep else None
+        times = [int(x) for x in a.at.split(",") if x.strip()] or [8000]
+    except ValueError as e:
+        ap.error(str(e) if "--" in str(e) else f"--at: {a.at!r} - times in ms, whole numbers, comma separated")
 
     if a.live:
         import time
@@ -136,8 +181,17 @@ def main():
     if not target:
         ap.print_help()
         return
-    eng.resize(a.faceB)
-    idx = eng.find(target)
+    try:
+        eng.resize(a.faceB)
+    except ValueError as e:
+        ap.error(f"--faceB {a.faceB}: {e}")
+    try:
+        idx = eng.find(target)
+    except KeyError:
+        import difflib
+        near = difflib.get_close_matches(target, eng.names, n=3, cutoff=0.5)
+        ap.error(f"no effect matching {target!r}" + (f" - did you mean {', '.join(repr(n) for n in near)}?" if near
+                                                     else " (--list names them)"))
 
     if a.gif:
         import time
@@ -192,7 +246,6 @@ def main():
         return
 
     if a.snapshot:
-        times = [int(x) for x in a.at.split(",") if x.strip()] or [8000]
         eng.select(idx)
         _apply(eng, a.set)
         syn = Synth()
@@ -210,16 +263,16 @@ def main():
 
     # --measure, optionally as a sweep over one parameter
     runs = {}
-    if a.sweep:
-        k, vals = a.sweep.split("=", 1)
-        for v in vals.split(","):
+    if sweep:
+        k, vals = sweep
+        for v in vals:
             eng.select(idx)
             _apply(eng, a.set)
-            eng.fx[k.strip()] = int(v)
+            eng.fx[k] = v
             eng.push()
             rows = run(eng, Synth(), a.ms, a.every)
-            runs[f"{k.strip()}={v}"] = {"all": average(rows), "lid": average(rows, "lid"),
-                                        "swing": swing(rows)}
+            runs[f"{k}={v}"] = {"all": average(rows), "lid": average(rows, "lid"),
+                                "swing": swing(rows)}
     else:
         eng.select(idx)
         _apply(eng, a.set)

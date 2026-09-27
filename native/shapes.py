@@ -138,6 +138,7 @@ def _radial(pos, z=0.0):
 
 
 _FORMULAS = {}
+_FORMULA_BAD = {}         # (expression, n) -> the first LED it failed at, as the points were made
 
 
 def _formula(text):
@@ -148,18 +149,37 @@ def _formula(text):
     return f
 
 
+def _formula_n(p):
+    try:
+        return max(1, min(4096, int(p.get("n", 100))))
+    except (TypeError, ValueError, OverflowError):
+        return 100
+
+
 def formula_error(part):
-    """What is wrong with a formula part's expressions, in words, or ""."""
+    """What is wrong with a formula part's expressions, in words, or "":
+    three LEDs tried here, and whatever failed at any LED when its points
+    were made (cosh(i) is fine at 50 LEDs, too big past the 710th)."""
     from native import expr
     p = part.get("params", {})
-    n = max(1, int(p.get("n", 100)))
+    n = _formula_n(p)
+    try:
+        part_points(part)                           # every LED worked out (kept: the view wants them anyway)
+    except Exception:
+        pass
     for axis in ("x", "y", "z"):
+        text = str(p.get(axis, "0"))
         try:
-            f = _formula(str(p.get(axis, "0")))
+            f = _formula(text)
             for i in (0, n // 2, n - 1):
                 f({"t": i / max(1, n - 1), "i": i, "n": n})
         except expr.ExprError as e:
             return f"{axis}: {e}"
+        except Exception as e:                      # an evaluator's leak never takes the shape editor with it
+            return f"{axis}: {type(e).__name__}: {e}"
+        bad = _FORMULA_BAD.get((text, n))
+        if bad:
+            return f"{axis}: {bad}"
     return ""
 
 
@@ -373,22 +393,30 @@ def _part_points(part):
         return pos.astype(np.float32), np.tile([0.0, 0.0, 1.0], (len(pos), 1)).astype(np.float32)
     if k == "formula":
         from native import expr
-        n = max(1, min(4096, int(p.get("n", 100))))
+        n = _formula_n(p)
+        texts = [str(p.get(axis, "0")) for axis in ("x", "y", "z")]
         fs = []
-        for axis in ("x", "y", "z"):
+        for text in texts:
             try:
-                fs.append(_formula(str(p.get(axis, "0"))))
+                fs.append(_formula(text))
             except expr.ExprError:
                 fs.append(None)
+        if len(_FORMULA_BAD) > 256:
+            _FORMULA_BAD.clear()
+        for text in texts:
+            _FORMULA_BAD.pop((text, n), None)
         pos = np.zeros((n, 3), np.float64)
         for i in range(n):
             names = {"t": i / max(1, n - 1), "i": i, "n": n}
             for a, f in enumerate(fs):
                 if f is not None:
                     try:
-                        pos[i, a] = f(names)
-                    except (expr.ExprError, ValueError, OverflowError):
-                        pass                                             # formula_error says so
+                        v = f(names)
+                        if abs(v) > 1e30:                                # past what a float32 position holds
+                            raise expr.ExprError("too big for a position")
+                        pos[i, a] = v
+                    except Exception as e:                               # the LED stays at 0; formula_error says where
+                        _FORMULA_BAD.setdefault((texts[a], n), f"at LED {i}: {e}")
         return pos.astype(np.float32), None
     if k == "reference":
         return np.zeros((0, 3), np.float32), None          # drawn, never lit

@@ -312,6 +312,49 @@ def test_xmodel_and_points():
     assert pts[:, 0].tolist() == [1.0, 0.0, 2.0]
 
 
+def test_a_mesh_in_millimetres_is_refused_with_a_pitch():
+    """A mesh reading that would place more LEDs than MESH_MAX is refused
+    before any is placed - a 1 m triangle drawn in millimetres at pitch 1 is
+    half a million - with a round pitch that gives about MESH_AIM (issue #7)."""
+    import time
+    m = shape_io.Mesh()
+    m.v = np.array([[0, 0, 0], [1000, 0, 0], [0, 1000, 0]], np.float32)
+    m.faces = [[0, 1, 2]]
+    m.finish()
+    assert abs(shape_io.mesh_estimate(m, "surface", 1.0) - 501501) < 2000
+    t0 = time.perf_counter()
+    try:
+        shape_io.mesh_leds(m, "surface", 1.0)
+        raise AssertionError("placed half a million LEDs")
+    except shape_io.TooManyLeds as e:
+        assert time.perf_counter() - t0 < 1.0 and e.pitch and "millimetres" in str(e), e
+        pitch = e.pitch
+    pts, _ = shape_io.mesh_leds(m, "surface", pitch)
+    assert 0 < len(pts) <= shape_io.MESH_AIM * 1.2, (pitch, len(pts))
+    assert abs(len(pts) - shape_io.mesh_estimate(m, "surface", pitch)) <= 0.1 * len(pts)
+    e_pitch = shape_io.mesh_pitch_for(m, "edges", 1.0)                 # along the edges: 3,414 mm of them
+    assert len(shape_io.mesh_leds(m, "edges", e_pitch)[0]) <= shape_io.MESH_AIM * 1.2
+    assert len(shape_io.mesh_leds(m, "edges", 10.0)[0]) > 300           # under the cap: as it was
+    assert shape_io._round_up(13.0) == 20.0 and shape_io._round_up(2.2) == 2.5 and shape_io._round_up(0.03) == 0.05
+
+
+def test_points_that_are_not_numbers_are_left_out():
+    """nan and inf rows - a script's division by zero - are left out of a
+    points file and an xyz geometry, and counted; one inf used to turn every
+    position of an xyz geometry into NaN, and the device's table to zeros."""
+    g = Geometry("xyz", points=[[0, 0, 0], [1, 1, 1], [2, 0, 1], [float("inf"), 0, 0]])
+    assert g.count == 3 and np.isfinite(g.pos).all()
+    txt = _write("bad.csv", "\n".join(["x,y,z", "0,0,0", "1,nan,0", "2,0,inf", "1e999,0,0", "3,0,0", "4,5", ""]))
+    info = {}
+    pts, _ = shape_io.read_points(txt, info)
+    assert pts[:, 0].tolist() == [0.0, 3.0] and info["skipped"] == 3
+    g = Geometry.from_xyz_file(txt)
+    assert g.count == 2 and g.skipped == 4 and np.isfinite(g.pos).all()   # and the row short of a column
+    js = _write("bad.json", '[[0, 0, 0], [NaN, 1, 2], {"x": 1, "y": Infinity, "z": 0}, [5, 5, 5]]')
+    g = Geometry.from_xyz_file(js)
+    assert g.count == 2 and g.skipped == 2
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

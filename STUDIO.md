@@ -2360,6 +2360,67 @@ Wayland - but getting there by the README did not.
 
 Released as 1.3.3.
 
+### A Linux run's reports, and a private scratch folder (issues #3-#10, GHSA-h8r2-jh8g-f2xh, September 2026)
+
+From running the studio and its harnesses on Arch Linux at 1.3.3.
+
+- [x] **Every engine swap crashed Linux and macOS** (#3): `dlclose` was
+      called without argtypes, so ctypes passed the handle - a 64-bit
+      pointer - as a 32-bit int. engine._unload sets `c_void_p`;
+      tests/test_engine.py swaps between copies of a build (and on Windows
+      deletes the old file, which only works once FreeLibrary did).
+- [x] **Delete a node with a wire out, then undo: a crash** (#4): the
+      piecemeal delete left the wire in the editor, tied to a freed pin, and
+      the next rebuild crashed in `mvNodeEditor::onChildRemoved`.
+      delete_selected removes from the graph and rebuilds from it, as cut
+      and dissolve do; the smoke test deletes node 3 of box_fire and undoes.
+- [x] **A project.json that did not parse was wiped by the next save**
+      (#5): it is copied to `project.json.bad-<time>` first (when it cannot
+      even be copied, nothing is saved over it), the app says so in a dialog
+      and a held problem; the settings are written whole (a temporary file,
+      fsync, `os.replace`); and File > History keeps copies of them too
+      (**The project's settings**, at most one every five minutes), with a
+      restore that opens the project again from it.
+- [x] **Expressions escaped ExprError** (#6): a negative number to a
+      fractional power (complex), an overflow in a function (exp, cosh,
+      floor(inf)), a nesting past the walk's depth, a NaN hidden by sign()
+      or clamp() - each an ExprError now, caught where it is made; texts
+      past 2,000 characters are refused. A formula part reports a failure
+      at any LED, not only the three it samples (cosh(i) past the 710th).
+- [x] **Imports** (#7): a mesh reading that would place more than 20,000
+      LEDs is refused before any is placed - a CAD file in millimetres at
+      pitch 1 was half a million LEDs and a frozen window - with a round
+      pitch for about 3,000 put in the field; an xyz geometry or a points
+      file leaves out rows that are not finite numbers (one inf made every
+      position NaN) and says how many.
+- [x] **A drive letter in a project zip wrote outside the project on
+      Windows** (#8): an entry's path is resolved and compared with the
+      folder; a part with a colon (a drive, an NTFS stream) or a backslash
+      climb is left out.
+- [x] **The harnesses** (#9): walk_menus counts an app that exits early as a
+      failure, and each walk prints its end (`walk  done  <kind>`) so a walk
+      the app did not live through is one; `act` lines name the action before
+      it runs. soak.py fails a run the app did not survive, with its exit
+      code. smoke_app.py works in a project of its own (`smoke_run`, from the
+      examples, deleted after), builds the graphs it uses first and waits for
+      each build (`{"wait_build": true}` at the head of a batch). An
+      `{"effect": ...}` the build does not have is an error that names it.
+      release.yml runs every unit test on Linux too, and the smoke test under
+      a virtual display; the draft release waits on both platforms.
+- [x] **native.cli tracebacks** (#10): an unknown effect (with the near
+      names), a --set or --sweep that is not name=number, --fps 0 - one-line
+      errors from argparse; tests/test_cli.py.
+- [x] **The remote control's file was in a shared /tmp** (the advisory):
+      another account on a Linux or macOS machine could hand the app
+      commands, one of which runs Python. The remote control and the frame
+      capture are on only with `STUDIO_REMOTE_CONTROL=1`, which the harnesses
+      set; the scratch folder (native/scratch.py) is the user's own -
+      `%TEMP%\cubefx` on Windows, `$XDG_RUNTIME_DIR/cubefx` or
+      `<tmp>/cubefx-<uid>` elsewhere, made 0700 and refused when it is a link,
+      someone else's or open to others - and its files (crash.txt, the
+      popouts' places, run_studio.sh's launch.log) are never opened through a
+      link. tests/test_scratch.py.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

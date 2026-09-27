@@ -84,7 +84,8 @@ def bundle(app=None, log_lines=()):
     """The zip, in captures/. Returns its path."""
     os.makedirs(paths.CAPTURES, exist_ok=True)
     path = os.path.join(paths.CAPTURES, time.strftime("report_%Y%m%d_%H%M%S.zip"))
-    scratch = os.path.join(__import__("tempfile").gettempdir(), "cubefx")
+    from native import scratch as _scratch
+    scratch = _scratch.DIR or ""                              # a folder of this user's alone, or none
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("version.json", _what_build())
         z.writestr("doctor.txt", _doctor())
@@ -95,7 +96,7 @@ def bundle(app=None, log_lines=()):
             z.write(prefs, "studio.json")
         for name in ("crash.txt", "crash.prev.txt"):
             p = os.path.join(scratch, name)
-            if os.path.exists(p):
+            if scratch and os.path.isfile(p) and not os.path.islink(p):
                 z.write(p, name)
         latest = os.path.join(paths.BUILD, "latest")
         if os.path.exists(latest):

@@ -38,6 +38,9 @@ def evaluate(text, names=None):
     return compile(text)(names)
 
 
+MAX_LEN = 2000        # characters: far past any formula, short of a nesting that exhausts the stack
+
+
 def compile(text):
     """`text` parsed once: a function of the names ({name: number}) giving
     the value - for an expression worked out many times (a formula part's
@@ -46,11 +49,31 @@ def compile(text):
     text = (text or "").strip().replace("^", "**")
     if not text:
         raise ExprError("nothing to work out")
+    if len(text) > MAX_LEN:
+        raise ExprError(f"too long: {len(text)} characters, {MAX_LEN} at most")
     try:
         tree = ast.parse(text, mode="eval")
     except SyntaxError as e:
         raise ExprError(f"not an expression: {e.msg}")
+    except (ValueError, RecursionError, MemoryError):           # a null byte; a nesting too deep to parse
+        raise ExprError("not an expression: nested too deeply, or not text")
     return lambda names=None: _value(tree, names)
+
+
+def _real(v, what):
+    """A result as a float - or ExprError for what is not a real number: a
+    negative number to a fractional power (Python makes that complex), a
+    NaN (inf - inf), a value too big for a float. A NaN is caught where it
+    is made, not at the end: sign(), clamp(), min() would hide it."""
+    if isinstance(v, complex):
+        raise ExprError(f"{what}: not a real number")
+    try:
+        v = float(v)
+    except OverflowError:
+        raise ExprError(f"{what}: too big")
+    if math.isnan(v):
+        raise ExprError(f"{what}: not a number")
+    return v
 
 
 def _value(tree, names):
@@ -63,10 +86,10 @@ def _value(tree, names):
         if isinstance(node, ast.Constant):
             if isinstance(node.value, bool) or not isinstance(node.value, (int, float)):
                 raise ExprError("numbers only")
-            return float(node.value)
+            return _real(node.value, "a number")
         if isinstance(node, ast.Name):
             if node.id in env:
-                return env[node.id]
+                return _real(env[node.id], node.id)
             raise ExprError(f"unknown name {node.id!r}" + (f" - the names here: {', '.join(sorted(k for k in env if k not in CONSTANTS))}"
                                                            if any(k not in CONSTANTS for k in env) else ""))
         if isinstance(node, ast.BinOp) and type(node.op) in _BIN:
@@ -74,23 +97,32 @@ def _value(tree, names):
             if isinstance(node.op, ast.Pow) and abs(b) > 1e4 and abs(a) > 1.0:
                 raise ExprError("too big")
             try:
-                return float(_BIN[type(node.op)](a, b))
+                r = _BIN[type(node.op)](a, b)
             except ZeroDivisionError:
                 raise ExprError("division by zero")
             except OverflowError:
                 raise ExprError("too big")
+            return _real(r, "the sum" if isinstance(node.op, (ast.Add, ast.Sub)) else "the result")
         if isinstance(node, ast.UnaryOp) and type(node.op) in _UN:
-            return float(_UN[type(node.op)](walk(node.operand)))
+            return _real(_UN[type(node.op)](walk(node.operand)), "the result")
         if isinstance(node, ast.Call):
             if not isinstance(node.func, ast.Name) or node.func.id not in FUNCTIONS or node.keywords:
                 raise ExprError("the functions here: " + ", ".join(sorted(FUNCTIONS)))
             args = [walk(a) for a in node.args]
             try:
-                return float(FUNCTIONS[node.func.id](*args))
-            except (TypeError, ValueError) as e:
+                r = FUNCTIONS[node.func.id](*args)
+            except (TypeError, ValueError, ZeroDivisionError) as e:
                 raise ExprError(f"{node.func.id}: {e}")
+            except OverflowError:                                    # exp(1000), floor(inf), pow(10, 400)
+                raise ExprError(f"{node.func.id}: too big")
+            return _real(r, node.func.id)
         raise ExprError("only numbers, + - * / ^ %, brackets and the maths functions")
-    v = walk(tree)
-    if isinstance(v, complex) or not math.isfinite(v):
+    try:
+        v = walk(tree)
+    except RecursionError:                                           # 1+1+1... twenty thousand terms deep
+        raise ExprError("too long, or nested too deeply")
+    if isinstance(v, complex) or math.isnan(v):
         raise ExprError("not a number")
+    if math.isinf(v):
+        raise ExprError("infinite: too big")
     return v

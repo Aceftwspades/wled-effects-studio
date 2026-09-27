@@ -3,6 +3,8 @@
 # and zipped by package.py, the zip attached to a DRAFT release for the
 # tag. Publish it by hand; the app's update check reads the newest
 # published release. The tag must match native/version.py's __version__.
+# The unit tests run on Linux too (issue #9): a crash only Linux has (the
+# engine's unload, issue #3) cannot show on Windows - the draft waits on both.
 name: release
 
 on:
@@ -17,6 +19,51 @@ env:
   WINLIBS_URL: https://github.com/brechtsanders/winlibs_mingw/releases/download/16.2.0posix-14.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-16.2.0-mingw-w64ucrt-14.0.0-r1.zip
 
 jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # PortAudio for sounddevice, ALSA and JACK headers for python-rtmidi's build, a virtual display and
+      # the GL and X libraries Dear PyGui opens its window with
+      - name: the system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libportaudio2 libasound2-dev libjack-jackd2-dev xvfb libgl1 libegl1 \
+            libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 ffmpeg
+
+      - name: the packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: the engine
+        run: python build.py --native-only
+
+      # no display needed: every tests/test_*.py - the engine swapped (issue #3), the scratch folder's
+      # permissions (GHSA-h8r2-jh8g-f2xh), the graph compiler, the shapes, every device path against the fake WLED
+      - name: the tests
+        env:
+          STUDIO_NO_UPDATE_CHECK: "1"
+          STUDIO_NO_WELCOME: "1"
+        run: |
+          for t in tests/test_*.py; do
+            echo "== $t"
+            python "$t" || exit 1
+          done
+
+      # the app itself, under a virtual display: a bonus where the runner's GL is enough for Dear PyGui
+      - name: the app, under a virtual display
+        env:
+          STUDIO_NO_UPDATE_CHECK: "1"
+          STUDIO_NO_WELCOME: "1"
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" python tests/smoke_app.py
+        continue-on-error: true
+
   windows:
     runs-on: windows-latest
     steps:
@@ -56,18 +103,16 @@ jobs:
           $env:STUDIO_TOOLCHAIN = "$PWD\mingw\mingw64"
           python package.py --toolchain "$PWD\mingw\mingw64" --zip
 
-      # no display needed: the graph compiler, the shapes, every device path against the fake WLED
+      # no display needed: every tests\test_*.py - the graph compiler, the shapes, every device path against the fake WLED
       - name: the tests
         shell: pwsh
         run: |
           $env:STUDIO_TOOLCHAIN = "$PWD\mingw\mingw64"
           $env:STUDIO_NO_UPDATE_CHECK = "1"
           $env:STUDIO_NO_WELCOME = "1"
-          foreach ($t in "test_shapes", "test_device", "test_graph", "test_roundtrip", "test_docs", "test_audit", "test_nodes", "test_parity",
-                      "test_face", "test_expr", "test_midi", "test_reader", "test_typeface", "test_num", "test_messages", "test_view3d",
-                      "test_camera_map", "test_matrix2d", "test_device_wiring",
-                      "test_doctor") {
-            python tests\$t.py
+          foreach ($t in Get-ChildItem tests\test_*.py) {
+            Write-Host "== $($t.Name)"
+            python $t.FullName
             if ($LASTEXITCODE) { exit 1 }
           }
 
@@ -89,8 +134,17 @@ jobs:
           name: WLED_Effects_Studio
           path: dist/WLED_Effects_Studio.zip
 
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: WLED_Effects_Studio
+          path: dist
+
       - name: the draft release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           draft: true

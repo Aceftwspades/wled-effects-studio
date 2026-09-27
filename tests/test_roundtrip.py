@@ -209,6 +209,98 @@ def test_project_zip_round_trip():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_project_json_that_does_not_read_is_kept():
+    """A project.json that does not parse - one stray comma, from a hand
+    edit, a merge or a sync tool - is not wiped by the next save: a
+    .bad-<time> copy keeps it byte for byte, load_error says so for the app
+    to show, and the save after is written whole (issue #5)."""
+    from native.project import Project
+    tmp = tempfile.mkdtemp()
+    try:
+        p = Project(os.path.join(tmp, "p"))
+        p.options = {"palettes": [{"name": "mine"}], "segments": [1, 2, 3], "sequence": ["step"]}
+        p.save()
+        broken = open(p.file, encoding="utf-8").read().rstrip().rstrip("}") + ",}"
+        open(p.file, "w", encoding="utf-8").write(broken)
+        q = Project(p.path)
+        assert q.options == {} and q.load_error and "project.json.bad-" in q.load_error, q.load_error
+        q.selected = "x"
+        q.save()                                                           # any ordinary save
+        bad = [f for f in os.listdir(p.path) if f.startswith("project.json.bad-")]
+        assert len(bad) == 1, bad
+        kept = open(os.path.join(p.path, bad[0]), encoding="utf-8").read()
+        assert kept == broken
+        assert json.loads(kept[:-2] + "}")["options"]["palettes"] == [{"name": "mine"}]
+        assert json.load(open(p.file, encoding="utf-8"))["selected"] == "x"
+        assert not os.path.exists(p.file + ".tmp")                          # written whole: the temporary moved over it
+        r = Project(p.path)
+        assert r.load_error is None and r.selected == "x"
+        # not a JSON object at all: the same
+        open(p.file, "w", encoding="utf-8").write("[1, 2]")
+        s = Project(p.path)
+        assert s.load_error and len([f for f in os.listdir(p.path) if f.startswith("project.json.bad-")]) == 2
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_project_settings_kept_in_the_history():
+    """What project.json held is kept in history/project/ (File > History
+    lists it): at the first save of a session, then at most every
+    HISTORY_EVERY seconds - the settings are saved at every change."""
+    from native.project import Project
+    from native import history
+    tmp = tempfile.mkdtemp()
+    try:
+        p = Project(os.path.join(tmp, "h"))
+        p.options["palettes"] = [{"name": "a", "stops": []}]; p.save()      # keeps the new project's defaults
+        p.options["palettes"] = [{"name": "b", "stops": []}]; p.save()      # too soon: not kept
+        vs = history.versions(p, "project", "project")
+        assert len(vs) == 1 and "palettes" not in json.load(open(vs[0][0], encoding="utf-8"))["options"]
+        p._kept_at = 0.0                                                    # the interval gone by
+        p.options["palettes"] = [{"name": "c", "stops": []}]; p.save()
+        vs = history.versions(p, "project", "project")
+        assert len(vs) == 2
+        assert [x["name"] for x in json.load(open(vs[0][0], encoding="utf-8"))["options"]["palettes"]] == ["b"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_project_zip_keeps_to_its_folder():
+    """A project zip's entries land in the project's folder or nowhere: a
+    drive letter (os.path.join on Windows would drop the folder for it), an
+    NTFS stream name, a climb with .. or backslashes are left out (issue #8)."""
+    import ntpath
+    import zipfile
+    from native.project import unzip_project, _inside
+    from native import project as P
+    tmp = tempfile.mkdtemp()
+    was = P.PROJECTS
+    try:
+        P.PROJECTS = os.path.join(tmp, "projects")
+        z = os.path.join(tmp, "evil.zip")
+        with zipfile.ZipFile(z, "w") as zz:
+            zz.writestr("proj/project.json", "{}")
+            zz.writestr("proj/D:/x.txt", "another drive")
+            zz.writestr("proj/effects/a.cpp:ads", "a hidden stream")
+            zz.writestr("proj/..\\..\\evil.txt", "a climb, Windows' way")
+            zz.writestr("proj/effects/../../evil2.txt", "a climb")
+            zz.writestr("proj/effects/./ok.cpp", "// fine")
+        dest = unzip_project(z)
+        landed = sorted(os.path.relpath(os.path.join(d, f), tmp) for d, _, fs in os.walk(tmp) for f in fs)
+        want = sorted(["evil.zip", os.path.join("projects", "proj", "project.json"),
+                       os.path.join("projects", "proj", "effects", "ok.cpp")])
+        assert landed == want, landed
+        assert os.path.basename(dest) == "proj"
+        # the join the guard is there for, as Windows makes it (on any machine)
+        assert ntpath.join(r"C:\studio\projects\proj", "D:", "x.txt") == "D:x.txt"
+        assert _inside(dest, "D:/x.txt") is None and _inside(dest, "C:/x.txt") is None
+        assert _inside(dest, "graphs/a.json") == os.path.realpath(os.path.join(dest, "graphs", "a.json"))
+        assert _inside(dest, "") is None and _inside(dest, "/etc/passwd") is None and _inside(dest, "\\x") is None
+    finally:
+        P.PROJECTS = was
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_sequence_presets_file_round_trip():
     """The presets.json the sequence writes is the presets and the playlist it sent."""
     from native import sequence

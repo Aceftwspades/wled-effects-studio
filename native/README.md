@@ -127,15 +127,24 @@ For a repeatable clip of a known effect at known settings, use the headless
 
 ## Frame capture
 
-The running app will write a PNG of its own window on request. Create the
-trigger file and it answers on its next tick:
+The running app will write a PNG of its own window on request, when it was
+started with `STUDIO_REMOTE_CONTROL=1` (the tests set it; see below). Create
+the trigger file and it answers on its next tick:
 
 ```
-%TEMP%\cubefx\capture.request   ->   %TEMP%\cubefx\capture.png
+<scratch>\capture.request   ->   <scratch>\capture.png
 ```
 
 Any empty file will do; the app deletes the request and writes the PNG. This
 exists so the window can be looked at without a screen grab.
+
+`<scratch>` is the studio's private scratch folder (`native/scratch.py`):
+`%TEMP%\cubefx` on Windows; `$XDG_RUNTIME_DIR/cubefx`, or
+`$TMPDIR/cubefx-<uid>`, on Linux and macOS - made readable by its owner
+alone, and not used when it is anyone else's. `crash.txt` goes there too. The
+same switch turns on the remote control the tests drive the app with
+(`<scratch>/command.json`, `service_command` in app.py): it runs Python, so
+it is off in everyday use - never where another account could write the file.
 
 It uses `dpg.output_frame_buffer`, which returns the frame Dear PyGui just
 rendered — the viewport and nothing else. No other window, no desktop, no

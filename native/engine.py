@@ -51,15 +51,22 @@ def ensure_library(project=None, log=print):
 
 def _unload(lib):
     """Drop a ctypes library so its file can be replaced. Best effort; a
-    library that refuses to unload is simply left until the process exits."""
+    library that refuses to unload is simply left until the process exits.
+    The handle is a pointer: without argtypes ctypes passes it as a 32-bit
+    int, and dlclose on the cut-down pointer crashes the process on 64-bit
+    Linux and macOS (issue #3) - a segfault no except can catch."""
     try:
         if os.name == "nt":
             import ctypes.wintypes
             k32 = C.windll.kernel32
             k32.FreeLibrary.argtypes = [ctypes.wintypes.HMODULE]
+            k32.FreeLibrary.restype = ctypes.wintypes.BOOL
             k32.FreeLibrary(lib._handle)
         else:
-            C.CDLL(None).dlclose(lib._handle)
+            libc = C.CDLL(None)
+            libc.dlclose.argtypes = [C.c_void_p]
+            libc.dlclose.restype = C.c_int
+            libc.dlclose(lib._handle)
     except Exception:
         pass
 

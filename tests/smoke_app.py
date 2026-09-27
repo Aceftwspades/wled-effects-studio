@@ -6,6 +6,11 @@ This launches the app, walks the layouts, opens a graph and a code effect,
 exercises the editor, segments, A/B, sweep, the script preview, the
 dialogs and the keys, then reads the app's log for tracebacks.
 
+It works in a project of its own (SMOKE), made from the examples at the
+start and deleted at the end, so it starts the same on any machine and
+leaves the others alone; the app's remote control is turned on for it
+(STUDIO_REMOTE_CONTROL=1), in the private scratch folder (native/scratch.py).
+
     python tests/smoke_app.py          # from studio; ~60 s; exits 1 on a traceback
 
 It is deliberately not a pytest: it needs the window, the engine and a
@@ -13,23 +18,26 @@ minute; run it before a release, not on every save.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
-import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(HERE))                  # the studio's own source: native.scratch, the films
+from native import scratch                                 # noqa: E402 - the app's private scratch folder
 # STUDIO_EXE: the packaged app's exe to test instead of the tree - its
 # folder is then the home (projects/, build/) the test saves and restores
 EXE = os.environ.get("STUDIO_EXE")
 ROOT = os.path.dirname(os.path.abspath(EXE)) if EXE else os.path.dirname(HERE)
-CMD = os.path.join(tempfile.gettempdir(), "cubefx", "command.json")
-LOG = os.path.join(tempfile.gettempdir(), "cubefx", "smoke.log")
+CMD = scratch.path("command.json")
+LOG = scratch.path("smoke.log")
+SMOKE = "smoke_run"                    # the run's own project, made from the examples and deleted after (issue #9)
 
 # S18: two sides of a small tree filmed while the camera plan played - made by make_films() through ffmpeg
 # (LEDs 5 and 17 hidden from the front, 30 from the side); without ffmpeg these steps are left out
-MAP_FILMS = [os.path.join(tempfile.gettempdir(), "cubefx", f"map_side{a}.mp4") for a in (0, 90)]
+MAP_FILMS = [scratch.path(f"map_side{a}.mp4") for a in (0, 90)]
 _part = "app.project.geometry.params['parts'][0]"
 _TREE = {"kind": "tree", "name": "tree", "params": {"strands": 9, "per_strand": 40, "height": 90.0, "base": 54.0, "top": 3.0,
          "turns": 0.0, "degrees": 360.0, "zigzag": True}, "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": 1.0, "reverse": False}
@@ -64,10 +72,23 @@ MAP_STEPS = [
 ]
 
 STEPS = [
-    ([{"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
+    # the run's own project, from the examples; Maelstrom's graph compiled, built and put on the effects list
+    # (a batch that starts with wait_build is taken once the build in hand is loaded, however long that is here)
+    ([{"project": SMOKE}], 3.0),
+    ([{"wait_build": True}, {"check": f"app.project.path.endswith({SMOKE!r})"}, {"layout": "graph"},
+      {"graph_open": "maelstrom.json"}, {"py": "app.gp.compile()"}, {"py": "app.project.set_imported('maelstrom.cpp', True)"}], 5.0),
+    ([{"wait_build": True}, {"expect": ["edit_status", "loaded cubefx_"]}, {"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
     # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
-    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile()"}], 20.0),
-    ([{"expect": ["edit_status", "loaded cubefx_"]}, {"key": "Home"}, {"speed": 0.5},
+    ([{"check": "app.eng.names[app.eng.idx] == 'Maelstrom'"}, {"layout": "graph"}, {"graph_open": "box_fire.json"},
+      {"py": "app.gp.compile()"}], 5.0),
+    # a node with a wire OUT deleted, then undone: its wires go with it - one used to stay in the editor, tied to a
+    # freed pin, and the undo's rebuild crashed the app (issue #4)
+    ([{"wait_build": True}, {"expect": ["edit_status", "loaded cubefx_"]}, {"py": "setattr(app, '_links_before', len(app.gp.links))"},
+      {"graph_select": [3]}, {"action": "delete"}], 0.5),
+    ([{"check": "3 not in app.gp.graph.nodes and len(app.gp.links) == len(app.gp.graph.links) < app._links_before"},
+      {"check": "len(dpg.get_item_children('node_editor', 0) or []) == len(app.gp.links)"}, {"graph_undo": True}], 0.5),
+    ([{"check": "3 in app.gp.graph.nodes and len(app.gp.links) == app._links_before"}, {"action": "select_none"},
+      {"key": "Home"}, {"speed": 0.5},
       # a typed value poked into the running effect's parameter table: no rebuild
       {"py": "(app.eng.names[app.eng.idx], (lambda k: app.gp.live_poke(k[0], k[1], 0.42))(next(iter(app.gp._live))))"}], 1.5),
     ([{"expect": ["stat_txt", "speed 1/2x"]}, {"action": "speed_up"}, {"action": "speed_up"}, {"action": "speed_up"}], 1.0),
@@ -213,11 +234,11 @@ STEPS = [
       {"check": "room.parent_is('cube_win', 'pip_win')"},
       {"py": "room.open_panel(app, 'parameters')"}], 1.0),
     ([{"check": "dpg.is_item_shown('side_win') and dpg.is_item_shown('rail_win') and not room.folded(app)"},
-      {"py": "room.fold_panel(app)"}, {"graph_open": "smiley.json"}, {"graph_selected": [5]}], 1.5),
+      {"py": "room.fold_panel(app)"}, {"graph_open": "question_block.json"}, {"graph_selected": [29]}], 1.5),   # 29: a Bitmap
     ([{"check": "dpg.is_item_shown('props_fly') and room.parent_is('props_win', 'props_fly')"},
       {"py": "room.dismiss_props(app)"}], 0.6),
     ([{"check": "not dpg.is_item_shown('props_fly')"}, {"graph_selected": []}, {"py": "room.S.__setattr__('test_at', (600, 400))"},
-      {"graph_hover": ["node", 5, None]}], 1.0),
+      {"graph_hover": ["node", 29, None]}], 1.0),
     ([{"check": "dpg.is_item_shown('help_tip') and 'Bitmap' in dpg.get_value('help_tip_text')"},
       {"py": "room.S.__setattr__('test_at', None)"}, {"py": "room.set_tucked(app, True)"}], 1.0),
     ([{"check": "dpg.is_item_shown('pip_tab') and not dpg.is_item_shown('pip_win') and not app.cube_on()"},
@@ -379,7 +400,7 @@ STEPS = [
       {"shape": ["layout", "strip"]}, {"shape": ["undo"]},
       {"shape": ["mark", [0, 1]]}, {"shape": ["align", 2]}, {"shape": ["match", "scale"]}, {"shape": ["mark", []]}, {"shape": ["undo"]}, {"shape": ["undo"]},
       {"shape": ["segments"]}, {"seg": "remove"}, {"seg": "remove"},
-      {"shape": ["preview", "parts", 1]}, {"shape": ["xmodel", "projects/default/export/_smoke.xmodel"]},
+      {"shape": ["preview", "parts", 1]}, {"shape": ["xmodel", f"projects/{SMOKE}/export/_smoke.xmodel"]},
       {"dock": ["shape", True]}, {"dock": ["shape", False]}], 4.0),
     # building in 3-D (the ninth pass, S1-S3): each part its colour, the selected one bright; the part under the
     # pointer (the hooks' stand-in for it); the view's own keys - a view along an axis is orthographic, 5 turns it
@@ -606,7 +627,7 @@ STEPS = [
     # the library: thumbnails made for the graphs, the frame docked and floated
     ([{"frame": "library"}, {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
-      {"graph_import": "projects/default/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
+      {"graph_import": f"projects/{SMOKE}/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),
     ([{"popout": ["net", True]}, {"layout": "both"}], 4.0),
     ([{"popout": ["cube", False]}, {"popout": ["net", False]}], 2.0),
@@ -617,6 +638,22 @@ STEPS = [
       {"graph_select": [4]}, {"action": "swap_inputs"}, {"action": "frame_sel"}, {"action": "snap"}, {"action": "snap"},
       {"gp_call": ["set_label", [4, "my node"]]}, {"action": "dissolve"}, {"action": "undo_history"}, {"action": "repeat"},
       {"palette": "sel"}, {"key": "Escape"}, {"graph_zoom": 0.2}, {"action": "frame_all"}, {"graph_zoom": 1.0}, {"graph_undo": True}, {"graph_undo": True}, {"graph_undo": True}, {"graph_undo": True}], 3.0),
+    # the project's settings in File > History (issue #5): listed, and the newest copy put back - the project opened again from it
+    ([{"layout": "both"}, {"py": "chrome.show_history(app, 'project')"}], 0.5),
+    ([{"check": "dpg.is_item_shown('history_win') and dpg.get_value('history_what').startswith(\"The project's settings\")"},
+      {"py": "setattr(app, '_kept', __import__('native.history', fromlist=['versions']).versions(app.project, 'project', 'project'))"},
+      {"check": "len(app._kept) >= 1"}, {"py": "chrome._restore(app, 'project', 'project', '.json', app._kept[0][0])"}], 1.0),
+    ([{"check": f"app.project.path.endswith({SMOKE!r}) and not dpg.is_item_shown('history_win')"},
+      {"expect": ["messages", "settings restored"]}], 0.5),
+    # a project.json that does not read (issue #5): kept aside as project.json.bad-<time>, said in a dialog and a held
+    # problem, the project on its defaults - and nothing of it held once another project is open
+    ([{"py": "(lambda d: (__import__('os').makedirs(d, exist_ok=True), open(__import__('os').path.join(d, 'project.json'), 'w').write('{broken')))"
+             "(__import__('os').path.join(__import__('os').path.dirname(app.project.path), 'smoke_bad'))"},
+      {"project": "smoke_bad"}], 2.0),
+    ([{"check": "dpg.is_item_shown('confirm_dialog') and 'project:load' in messages.HELD"},
+      {"check": "any(f.startswith('project.json.bad-') for f in __import__('os').listdir(app.project.path))"},
+      {"py": "dpg.hide_item('confirm_dialog')"}, {"project": SMOKE}], 2.0),
+    ([{"check": f"app.project.path.endswith({SMOKE!r}) and 'project:load' not in messages.HELD"}], 0.5),
 ]
 
 
@@ -655,54 +692,54 @@ def make_films():
 
 
 def main():
-    os.makedirs(os.path.dirname(CMD), exist_ok=True)
+    if not scratch.DIR:
+        print("smoke: no private scratch folder to drive the app through (native/scratch.py)")
+        return 1
     if not make_films():
         print("no ffmpeg: the camera-map steps are left out")
         STEPS[:] = [s for s in STEPS if s not in MAP_STEPS]
-    project = os.path.join(ROOT, "projects", "default", "project.json")
-    saved = open(project, encoding="utf-8").read() if os.path.exists(project) else None
-    graph = os.path.join(ROOT, "projects", "default", "graphs", "box_fire.json")
-    saved_graph = open(graph, encoding="utf-8").read() if os.path.exists(graph) else None
-    gdir = os.path.join(ROOT, "projects", "default", "graphs")
-    sdir = os.path.join(ROOT, "projects", "default", "subgraphs")
-    subs_before = set(os.listdir(sdir)) if os.path.isdir(sdir) else set()
+    smoke_dir = os.path.join(ROOT, "projects", SMOKE)
+    for d in (smoke_dir, os.path.join(ROOT, "projects", "smoke_bad")):
+        if os.path.isdir(d):
+            shutil.rmtree(d)                                  # a run that was stopped: started afresh
     caps_before = set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()
-    before = set(os.listdir(gdir)) if os.path.isdir(gdir) else set()      # a first run makes the project
-    STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs: a saved view would otherwise stay
+    STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs, and the last project: put back after
     saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
     from fake_wled import FakeWled                          # the device every send goes to, and the DDP receiver
     ddp = FakeWled(port=8770, ddp_port=4048).start()
     with open(LOG, "w") as log:
         # the console variant of the packaged app keeps its stdout, which is the log the test reads
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
-        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1")
+        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1", STUDIO_REMOTE_CONTROL="1")
         proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env)
+    early = None
     try:
         time.sleep(9 if not EXE else 30)                 # the packaged app unpacks itself first
-        for cmds, wait in STEPS:
+        for k, (cmds, wait) in enumerate(STEPS):
             if proc.poll() is not None:
-                print("the app exited early"); break
+                early = f"the app exited early (code {proc.returncode}) before step {k + 1} of {len(STEPS)}"
+                print(early); break
             send(cmds, wait)
+        if early is None and proc.poll() is not None:
+            early = f"the app exited early (code {proc.returncode}) during the last step"
     finally:
         proc.kill()
         time.sleep(1)
-        if saved is not None:
-            open(project, "w", encoding="utf-8").write(saved)
-        if saved_graph is not None:
-            open(graph, "w", encoding="utf-8").write(saved_graph)
         if saved_prefs is not None:
             open(STUDIO_FILE, "w", encoding="utf-8").write(saved_prefs)
-        for f in (set(os.listdir(gdir)) if os.path.isdir(gdir) else set()) - before:
-            if before:                                                         # a project made by this run keeps its examples
-                os.remove(os.path.join(gdir, f))                               # the import's copy
+        shutil.rmtree(smoke_dir, ignore_errors=True)          # the run's project, and all it made in it
+        shutil.rmtree(os.path.join(ROOT, "projects", "smoke_bad"), ignore_errors=True)    # the one with the broken project.json
     text = open(LOG, encoding="utf-8", errors="replace").read()
     ddp.stop()
     print(f"ddp: {ddp.ddp_packets} packets, {ddp.ddp_frames} frames received from the stream; "
           f"the fake got {len(ddp.files)} file(s), {len(ddp.presets) - 1} preset(s), {len(ddp.cfg['timers']['ins'])} timer(s)")
     bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l
            or l.startswith("command {")]                          # a step's command that raised: the rest of its step never ran
-    if "remote control" not in text:
-        bad.append("the app's output was not captured (no 'remote control' line): a buffered stdout, or the wrong exe")
+    if early:
+        bad.append(early)
+    if "remote control: write" not in text:
+        bad.append("the app's output was not captured, or its remote control was off (no 'remote control: write' line): "
+                   "a buffered stdout, the wrong exe, or STUDIO_REMOTE_CONTROL not reaching it")
     if ddp.ddp_frames < 10:
         bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
     if len(ddp.ddp_last) != 48 * 48 * 3:                 # the cube's whole net, in logical order - not its 1280 LEDs in wiring order
@@ -718,11 +755,6 @@ def main():
             if want not in names:
                 bad.append(f"the report zip lacks {want}")
         os.remove(rep)
-    for f in (set(os.listdir(sdir)) if os.path.isdir(sdir) else set()) - subs_before:
-        os.remove(os.path.join(sdir, f))                        # the sub-graph the fold made
-    for f in ("effects/face_demo.cpp", "graphs/face_demo.json"):    # the face demo's graph and its build
-        if os.path.exists(os.path.join(ROOT, "projects", "default", f)):
-            os.remove(os.path.join(ROOT, "projects", "default", f))
     for f in (set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()) - caps_before:
         if f.endswith(".zip"):                                  # the project zip the run made
             os.remove(os.path.join(ROOT, "captures", f))

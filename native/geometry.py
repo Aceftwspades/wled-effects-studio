@@ -207,15 +207,17 @@ class Geometry:
                 self.lit = np.ones(n, bool)
                 self.phys = np.arange(n)
         elif k == "xyz":
-            pts = np.asarray(p.get("points", []), dtype=np.float32).reshape(-1, 3)
-            pts = pts[~np.isnan(pts).any(1)][:self.MAX_PIXELS]      # a bad row is dropped, not drawn at NaN
+            pts = np.asarray(p.get("points", []), dtype=np.float64).reshape(-1, 3)
+            # a bad row is dropped, not drawn: a NaN, and an inf too - one inf made every
+            # position NaN in the centring below, and the device a geometry of zeros (issue #7)
+            pts = pts[np.isfinite(pts).all(1)][:self.MAX_PIXELS]
             n = len(pts)
             if n == 0:
-                pts = np.zeros((1, 3), np.float32); n = 1
+                pts = np.zeros((1, 3), np.float64); n = 1
             self.w, self.h = n, 1
             c = pts.mean(0)
             span = float(np.abs(pts - c).max()) or 1.0
-            self.pos = (pts - c) / span * (n ** 0.5) * 0.5
+            self.pos = ((pts - c) / span * (n ** 0.5) * 0.5).astype(np.float32)
             self.lit = np.ones(n, bool)
             self.phys = np.arange(n)
 
@@ -381,15 +383,18 @@ class Geometry:
 
     @classmethod
     def from_xyz_file(cls, path):
-        """CSV / whitespace / JSON list of x y z rows."""
-        pts = []
+        """CSV / whitespace / JSON list of x y z rows. A row without three
+        finite numbers - nan, inf or 1e999 from a script's division by zero,
+        a row short of a column - is left out (issue #7); how many were is
+        the geometry's `skipped`, for the app to say."""
+        rows = []
         txt = open(path, encoding="utf-8").read()
         if txt.lstrip().startswith("["):
             for row in json.loads(txt):
                 if isinstance(row, dict):
-                    pts.append([row.get("x", 0), row.get("y", 0), row.get("z", 0)])
-                else:
-                    pts.append(list(row)[:3])
+                    rows.append([row.get("x", 0), row.get("y", 0), row.get("z", 0)])
+                elif isinstance(row, (list, tuple)):
+                    rows.append(list(row)[:3])
         else:
             for line in txt.splitlines():
                 line = line.strip()
@@ -397,10 +402,22 @@ class Geometry:
                     continue
                 parts = [v for v in line.replace(",", " ").split() if v]
                 try:
-                    pts.append([float(v) for v in parts[:3]])
+                    rows.append([float(v) for v in parts[:3]])
                 except ValueError:
-                    continue
-        return cls("xyz", points=pts, source=os.path.basename(path))
+                    continue                                   # a header, a comment: not a row
+        pts, skipped = [], 0
+        for r in rows:
+            try:
+                v = [float(x) for x in r]
+            except (TypeError, ValueError, OverflowError):
+                v = []
+            if len(v) == 3 and all(math.isfinite(x) for x in v):
+                pts.append(v)
+            else:
+                skipped += 1
+        g = cls("xyz", points=pts, source=os.path.basename(path))
+        g.skipped = skipped
+        return g
 
 
 def _cube_net(B, six=False):

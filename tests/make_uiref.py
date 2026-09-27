@@ -10,24 +10,27 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-CMD = os.path.join(tempfile.gettempdir(), "cubefx", "command.json")
-LOG = os.path.join(tempfile.gettempdir(), "cubefx", "uiref.log")
+sys.path.insert(0, ROOT)
+from native import scratch                                 # noqa: E402 - the app's private scratch folder
+CMD = scratch.path("command.json")
+LOG = scratch.path("uiref.log")
 
 
 def main():
-    os.makedirs(os.path.dirname(CMD), exist_ok=True)
+    if not scratch.DIR:
+        print("uiref: no private scratch folder to drive the app through (native/scratch.py)")
+        return 1
     project = os.path.join(ROOT, "projects", "default", "project.json")
     saved = open(project, encoding="utf-8").read() if os.path.exists(project) else None
     prefs = os.path.join(ROOT, "projects", "studio.json")     # the zoom set below would otherwise stay
     saved_prefs = open(prefs, encoding="utf-8").read() if os.path.exists(prefs) else None
     with open(LOG, "w") as log:
         proc = subprocess.Popen([sys.executable, "-u", "-m", "native.app"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
-                                env=dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1"))
+                                env=dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1", STUDIO_REMOTE_CONTROL="1"))
     try:
         time.sleep(9)
         # a shape of parts, so the side panel's and the shape frame's per-part buttons exist; the

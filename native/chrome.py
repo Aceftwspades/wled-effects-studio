@@ -750,6 +750,10 @@ def build_dialogs(app):
     with dpg.window(tag="history_win", label="History", no_title_bar=True, show=False, width=px(520), height=px(420), no_collapse=True):
         dialog_header("history_win", "History")                 # one window style (C8): the frames' header
         dpg.add_text("", tag="history_what", color=DIM, wrap=px(500))
+        dpg.add_button(tag="history_switch", label="The project's settings", small=True)
+        with dpg.tooltip("history_switch"):
+            dpg.add_text("The copies kept of the project's settings (project.json: the geometry, palettes, segments, "
+                         "sequence, outputs), or back to those of the graph or code open", wrap=px(320))
         with dpg.child_window(tag="history_rows", height=-1, border=False):
             pass
     # the command palette: every action and menu command by name, Enter runs the first hit
@@ -1350,20 +1354,34 @@ def poll_flash(app):
     device_ui.poll(app)
 
 
-def show_history(app):
+def show_history(app, which=None):
     """The versions kept of the current graph (graph pane) or code effect
-    (code pane), newest first; restore keeps the current one first."""
+    (code pane) - or of the project's settings (project.json), asked for
+    with which="project" or when neither is open - newest first; restore
+    keeps the current one first."""
     from native import history
     import time as _t
+    cur = None
     if app.layout == "edit" and app.edit_file:
-        kind, stem, ext, what = "effects", os.path.splitext(app.edit_file)[0], ".cpp", app.edit_file
+        cur = ("effects", os.path.splitext(app.edit_file)[0], ".cpp", app.edit_file)
     elif app.gp.graph and app.gp.file:
-        kind = "subgraphs" if app.gp.cur_dir == app.gp.sub_dir else "graphs"
-        stem, ext, what = app.gp.file[:-5], ".json", app.gp.file
+        cur = ("subgraphs" if app.gp.cur_dir == app.gp.sub_dir else "graphs", app.gp.file[:-5], ".json", app.gp.file)
+    if which == "project" or cur is None:
+        kind, stem, ext, what = "project", "project", ".json", "The project's settings"
+        every = f"a copy kept at most every {int(app.project.HISTORY_EVERY // 60)} minutes as they change"
     else:
-        app.gp.status("open a graph or a code effect first"); return
+        kind, stem, ext, what = cur
+        every = "a copy kept at every save"
+    # the other list, from a button: the project's settings from a graph's or a code effect's, and back
+    if kind == "project" and cur is not None:
+        dpg.configure_item("history_switch", label=f"{cur[3]}'s history", show=True, callback=lambda: show_history(app))
+    elif kind != "project":
+        dpg.configure_item("history_switch", label="The project's settings", show=True,
+                           callback=lambda: show_history(app, "project"))
+    else:
+        dpg.configure_item("history_switch", show=False)
     vs = history.versions(app.project, kind, stem)
-    dpg.set_value("history_what", f"{what}: {len(vs)} earlier version(s), a copy kept at every save (the newest {history.KEEP}). "
+    dpg.set_value("history_what", f"{what}: {len(vs)} earlier version(s), {every} (the newest {history.KEEP}). "
                                   "Restoring keeps the current one here first.")
     dpg.delete_item("history_rows", children_only=True)
     for p, t, size in vs:
@@ -1375,8 +1393,13 @@ def show_history(app):
             if kind != "effects":
                 try:
                     import json
-                    n = len(json.load(open(p, encoding="utf-8")).get("nodes", []))
-                    typeface.small(dpg.add_text(f"{n} nodes", color=DIM))
+                    d = json.load(open(p, encoding="utf-8"))
+                    if kind == "project":
+                        from native.geometry import Geometry
+                        words = Geometry.from_json(d.get("geometry", {})).describe()
+                    else:
+                        words = f"{len(d.get('nodes', []))} nodes"
+                    typeface.small(dpg.add_text(words, color=DIM))
                 except Exception:
                     pass
     if not vs:
@@ -1538,7 +1561,10 @@ def _restore(app, kind, stem, ext, path):
         text = open(path, encoding="utf-8").read()
     except OSError:                                  # pruned since the list was made: the newest are kept, the oldest go
         app.gp.status("that version is no longer kept - the list is shown again")
-        show_history(app)
+        show_history(app, "project" if kind == "project" else None)
+        return
+    if kind == "project":
+        _restore_project(app, text)
         return
     if kind == "effects":
         fname = stem + ext
@@ -1556,6 +1582,32 @@ def _restore(app, kind, stem, ext, path):
         app.gp.touch()
     dpg.hide_item("history_win")
     app.gp.status(f"restored {os.path.basename(path)}")
+
+
+def _restore_project(app, text):
+    """The project's settings (project.json) put back from a kept copy: the
+    current ones kept first, the file written whole, the project opened
+    again from it - geometry, palettes, segments, sequence and all."""
+    import json
+    from native import history
+    from native.project import write_atomic
+    try:
+        json.loads(text)
+    except ValueError:
+        app.gp.status("that version does not read as settings - not restored"); return
+    if app.edit_dirty:
+        app.edit_save()
+    if app.gp.graph:
+        app.gp.save()
+    f = app.project.file
+    try:
+        history.keep(app.project, "project", "project", ".json", open(f, encoding="utf-8").read())
+    except OSError:
+        pass
+    write_atomic(f, text)
+    dpg.hide_item("history_win")
+    app.switch_project(app.project.path)
+    app.gp.status("the project's settings restored")
 
 
 # --- compare ------------------------------------------------------------------------------

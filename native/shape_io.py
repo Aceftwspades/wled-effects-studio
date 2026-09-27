@@ -23,6 +23,7 @@ kind), which gives positions, the wiring order (the numbers) and a logical
 grid WLED can use directly. Other xLights model types are not read.
 """
 import json
+import math
 import os
 import re
 import struct
@@ -227,12 +228,88 @@ def _chain_edges(edges, v):
     return out
 
 
-def mesh_leds(mesh, mode="edges", pitch=1.0):
-    """The LEDs a mesh implies: (pos (n, 3), nrm (n, 3) or None)."""
+MESH_MAX = 20000        # LEDs one reading of a mesh may place: the studio holds 65,536, a WLED drives a few thousand
+MESH_AIM = 3000         # what the pitch suggested past MESH_MAX aims for
+
+
+class TooManyLeds(ValueError):
+    """A mesh reading that would place more than MESH_MAX LEDs; `pitch` is
+    one that gives about MESH_AIM (None when the pitch is not the reason)."""
+    def __init__(self, text, pitch=None):
+        super().__init__(text)
+        self.pitch = pitch
+
+
+def mesh_estimate(mesh, mode="edges", pitch=1.0):
+    """About how many LEDs mesh_leds places, from the edges' lengths and
+    the triangles' sides alone - worked out before any is placed, as a CAD
+    file in millimetres at a pitch of 1 is hundreds of thousands (a 1 m
+    triangle: 501,501), minutes of work and a frozen window (issue #7)."""
+    v = np.asarray(mesh.v, np.float64)
+    if len(v) == 0:
+        return 0
+    if mode == "vertices":
+        return len(v)
+    pitch = abs(float(pitch)) or 1.0
+    if mode == "edges":
+        if not mesh.edges:
+            return 0
+        e = np.asarray(mesh.edges, np.int64).reshape(-1, 2)
+        L = np.linalg.norm(v[e[:, 1]] - v[e[:, 0]], axis=1)
+        return int(np.sum(np.maximum(1, np.round(L / pitch)) + 1))
+    if mode == "surface":
+        tri = [(f[0], f[k], f[k + 1]) for f in mesh.faces for k in range(1, len(f) - 1)]
+        if not tri:
+            return 0
+        t = np.asarray(tri, np.int64)
+        a, b, c = v[t[:, 0]], v[t[:, 1]], v[t[:, 2]]
+        na = np.maximum(1, np.floor(np.linalg.norm(b - a, axis=1) / pitch))
+        nc = np.maximum(1, np.floor(np.linalg.norm(c - a, axis=1) / pitch))
+        return int(np.sum((na + 1) * (nc + 1) / 2 + np.minimum(na, nc) / 2 + 1))
+    raise ValueError(f"unknown mesh reading {mode!r}")
+
+
+def _round_up(x):
+    """The next of 1, 2, 2.5, 5 times a power of ten, at or above x."""
+    k = 10.0 ** math.floor(math.log10(x))
+    for m in (1.0, 2.0, 2.5, 5.0, 10.0):
+        if m * k >= x * (1 - 1e-9):
+            return m * k
+    return 10.0 * k
+
+
+def mesh_pitch_for(mesh, mode, pitch=1.0, aim=MESH_AIM):
+    """A round pitch that places about `aim` LEDs or fewer - the count goes
+    with 1/pitch along edges, 1/pitch squared over a surface."""
+    pitch = abs(float(pitch)) or 1.0
+    n = mesh_estimate(mesh, mode, pitch)
+    if n <= aim:
+        return pitch
+    p = _round_up(pitch * (n / aim) ** (0.5 if mode == "surface" else 1.0))
+    for _ in range(12):
+        if mesh_estimate(mesh, mode, p) <= aim * 1.2:
+            break
+        p = _round_up(p * 1.01)
+    return p
+
+
+def mesh_leds(mesh, mode="edges", pitch=1.0, limit=MESH_MAX):
+    """The LEDs a mesh implies: (pos (n, 3), nrm (n, 3) or None). More than
+    `limit` of them is TooManyLeds, said before any is placed, with a pitch
+    that would do."""
     v = mesh.v
     if len(v) == 0:
         return np.zeros((0, 3), np.float32), None
-    pitch = float(pitch) or 1.0
+    pitch = abs(float(pitch)) or 1.0
+    if limit:
+        n = mesh_estimate(mesh, mode, pitch)
+        if n > limit and mode == "vertices":
+            raise TooManyLeds(f"{n:,} vertices: one LED each is more than {limit:,} - read it by its edges or its "
+                              "surface, with a pitch")
+        if n > limit:
+            p = mesh_pitch_for(mesh, mode, pitch)
+            raise TooManyLeds(f"this would be about {n:,} LEDs; at a pitch of {p:g} it is about "
+                              f"{mesh_estimate(mesh, mode, p):,}. Is the file in millimetres?", pitch=p)
     if mode == "vertices":
         return v.copy(), (mesh.vn.copy() if mesh.vn is not None else None)
     if mode == "edges":
@@ -527,11 +604,12 @@ def write_points(geom, path):
     return n
 
 
-def read_points(path):
+def read_points(path, info=None):
     """x y z [index] rows - CSV, whitespace or a JSON list (of rows or of
     {x, y, z[, i]} objects): (pos (n, 3), order or None). With an index
     column the rows are sorted by it: the wiring order as the other program
-    numbered the LEDs."""
+    numbered the LEDs. A row without finite numbers (nan, inf) is left out;
+    `info`, a dict, gets how many as "skipped"."""
     txt = open(path, encoding="utf-8").read()
     rows = []
     if txt.lstrip().startswith("["):
@@ -553,6 +631,21 @@ def read_points(path):
     rows = [r for r in rows if len(r) >= 3]
     if not rows:
         raise ValueError("no x y z rows found")
+    good, skipped = [], 0
+    for r in rows:
+        try:
+            v = [float(x) for x in r[:4]]
+        except (TypeError, ValueError, OverflowError):
+            v = [math.nan]
+        if len(v) >= 3 and all(math.isfinite(x) for x in v):
+            good.append(v)
+        else:
+            skipped += 1
+    if info is not None:
+        info["skipped"] = skipped
+    if not good:
+        raise ValueError(f"no x y z rows with numbers found ({skipped} without)")
+    rows = good
     pts = np.asarray([r[:3] for r in rows], np.float32)
     idx = [r[3] for r in rows if len(r) >= 4]
     order = None

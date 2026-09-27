@@ -824,10 +824,20 @@ on and install what it carries.
   --check` compiles, builds and runs them all (and every scriptable one in
   the Script effect). `python tests/smoke_app.py` drives the app through
   its main flows and fails on any traceback; `python tests/walk_menus.py`
-  calls every menu item and context-menu row.
-- A frame that throws is written once to `%TEMP%\cubefx\crash.txt` (this
-  run's; the last run's is `crash.prev.txt`) and to the console, and the
-  footer's line says so (the message log keeps it); the sim pauses.
+  calls every menu item and context-menu row. The smoke test works in a
+  project of its own (made from the examples, deleted after); both turn on
+  the app's remote control (`STUDIO_REMOTE_CONTROL=1`), which is off in
+  everyday use.
+- A frame that throws is written once to `crash.txt` in the studio's
+  private scratch folder - `%TEMP%\cubefx` on Windows, `$XDG_RUNTIME_DIR/cubefx`
+  or `$TMPDIR/cubefx-<uid>` on Linux and macOS (this run's; the last run's
+  is `crash.prev.txt`) - and to the console, and the footer's line says so
+  (the message log keeps it); the sim pauses.
+- A `project.json` that does not read (a hand edit's stray comma, a write
+  cut short) is kept as `project.json.bad-<time>` before anything is saved
+  over it, and the studio says so; the settings are saved whole (to a
+  temporary file, then moved over), and File > History keeps copies of them
+  too (**The project's settings**, at most one every five minutes).
 - Settings > Appearance, in three tabs: **Colours** (dark, light, soft
   light or slate, and every one of the theme's seven colours editable;
   the nodes' category colours), **Selection frames** (the frames' look
@@ -1189,7 +1199,7 @@ Every button, with what its tooltip says.
 
 **Appearance**: `close` — close (Esc while it has the focus); `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped; `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`; `The monitor's` — the size the monitor is set to in the system's display settings; `Restart now` — the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first
 
-**History**: `close` — close (Esc while it has the focus)
+**History**: `close` — close (Esc while it has the focus); `The project's settings` — The copies kept of the project's settings (project.json: the geometry, palettes, segments, sequence, outputs), or back to those of the graph or code open
 
 **Undo history**: `close` — close (Esc while it has the focus)
 

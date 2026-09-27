@@ -16,16 +16,14 @@ remembers where it was, which on two monitors is the point.
 """
 import json
 import os
-from native import procs
+from native import procs, scratch               # scratch: the window places, in a folder of this user's alone
 import sys
-import tempfile
 import time
 from multiprocessing import shared_memory
 
 import numpy as np
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-POS_DIR = os.path.join(tempfile.gettempdir(), "cubefx")
 
 MAX_NET = 512 * 512 * 3          # bytes: the net (or the raw LEDs) at LED resolution
 MAX_PTS = 65536 * 3              # floats: LED positions
@@ -166,12 +164,12 @@ class Popouts:
 
 # --- the window ---------------------------------------------------------------------
 def _pos_file(view):
-    return os.path.join(POS_DIR, f"popout_{view}.json")
+    return scratch.path(f"popout_{view}.json")
 
 
 def _load_pos(view):
     try:
-        return json.load(open(_pos_file(view)))
+        return json.loads(scratch.read_text(_pos_file(view)))
     except Exception:
         return {}
 
@@ -369,20 +367,19 @@ def run(view, name, parent=0):
                 if view == "cube" and drag["on"] or (stale % 30 == 0):
                     frame()                    # the camera moves while the app is paused
             dpg.render_dearpygui_frame()
-            # a capture on request, the way the app does it (checked, not the app's window)
-            req = os.path.join(POS_DIR, f"popout_{view}.request")
-            if os.path.exists(req):
+            # a capture on request, the way the app does it (checked, not the app's window) - the tests' alone
+            req = scratch.path(f"popout_{view}.request") if scratch.remote_control() else None
+            if req and os.path.exists(req):
                 try:
                     os.remove(req)
-                    dpg.output_frame_buffer(os.path.join(POS_DIR, f"popout_{view}.png"))
+                    dpg.output_frame_buffer(scratch.path(f"popout_{view}.png"))
                 except Exception:
                     pass
     finally:
         try:
-            os.makedirs(POS_DIR, exist_ok=True)
             x, y = dpg.get_viewport_pos()
-            json.dump({"x": int(x), "y": int(y), "w": int(dpg.get_viewport_width()), "h": int(dpg.get_viewport_height())},
-                      open(_pos_file(view), "w"))
+            scratch.write_text(_pos_file(view), json.dumps({"x": int(x), "y": int(y), "w": int(dpg.get_viewport_width()),
+                                                            "h": int(dpg.get_viewport_height())}))
         except Exception:
             pass
         dpg.destroy_context()

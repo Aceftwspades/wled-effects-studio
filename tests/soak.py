@@ -11,19 +11,22 @@ Like smoke_app.py it drives the app through its JSON command file
 sample. Growth is judged on the second half of the run against the
 first, so the warm-up (fonts, textures, the first builds) does not
 count: more than 60 MB or 25% of RSS, or more than 200 items, is a leak.
+An app that exits before the time is up fails the run with its exit code
+(a crash - a signal on Linux - leaves no traceback to find).
 """
 import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))                  # the studio's own source: native.scratch
+from native import scratch                                 # noqa: E402 - the app's private scratch folder
 EXE = os.environ.get("STUDIO_EXE")
 ROOT = os.path.dirname(os.path.abspath(EXE)) if EXE else os.path.dirname(HERE)
-CMD = os.path.join(tempfile.gettempdir(), "cubefx", "command.json")
-LOG = os.path.join(tempfile.gettempdir(), "cubefx", "soak.log")
+CMD = scratch.path("command.json")
+LOG = scratch.path("soak.log")
 
 GEOMETRIES = [{"kind": "cube", "params": {"B": 16}}, {"kind": "matrix", "params": {"w": 32, "h": 16}},
               {"kind": "sphere", "params": {"w": 24, "h": 12}}, {"kind": "strip", "params": {"n": 150}},
@@ -39,14 +42,17 @@ def send(cmds, wait):
 
 def main():
     minutes = float(sys.argv[sys.argv.index("--minutes") + 1]) if "--minutes" in sys.argv else 10.0
-    os.makedirs(os.path.dirname(CMD), exist_ok=True)
+    if not scratch.DIR:
+        print("soak: no private scratch folder to drive the app through (native/scratch.py)")
+        return 1
     project = os.path.join(ROOT, "projects", "default", "project.json")
     saved = open(project, encoding="utf-8").read() if os.path.exists(project) else None
     with open(LOG, "w") as log:
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
-        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1")
+        env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1", STUDIO_REMOTE_CONTROL="1")
         proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env)
     t0 = time.time()
+    died = None
     try:
         time.sleep(9 if not EXE else 30)
         send([{"layout": "both"}, {"py": "len(app.eng.names)"}], 1.0)
@@ -74,6 +80,10 @@ def main():
             send(step, 3.0)
             k += 1
         send([{"geometry": GEOMETRIES[0]}, {"layout": "both"}, {"stats": True}], 2.0)
+        if proc.poll() is not None:
+            code = proc.returncode
+            died = (f"the app exited after {(time.time() - t0) / 60:.1f} of {minutes:g} minutes, code {code}"
+                    + (f" (signal {-code})" if code < 0 else ""))
     finally:
         proc.kill()
         time.sleep(1)
@@ -88,6 +98,8 @@ def main():
             except ValueError:
                 pass
     crashed = "Traceback" in text
+    if died:
+        print(f"soak: FAILED - {died} ({len(rows)} sample(s), log {LOG})"); return 1
     if len(rows) < 4:
         print(f"soak: FAILED - only {len(rows)} sample(s) (log {LOG})"); return 1
     half = len(rows) // 2

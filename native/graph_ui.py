@@ -4918,19 +4918,14 @@ class GraphPanel(Glyphs):
         self.snapshot()
         self.ext_sel = []
         for nid in sel:
-            tag = f"gnode_{nid}"
             self.graph.remove(nid)
-            for lid, (b, inp) in list(self.links.items()):
-                if b == nid or not dpg.does_item_exist(lid):
-                    self.links.pop(lid, None)
-            if dpg.does_item_exist(tag):
-                dpg.delete_item(tag)
-        # links from the removed node's outputs are gone with the node in DPG;
-        # rebuild the link map from the editor's truth
-        alive = set(dpg.get_item_children("node_editor", 0) or [])
-        for lid in list(self.links):
-            if lid not in alive:
-                self.links.pop(lid, None)
+        # drawn again from the graph, as cut and dissolve are. Deleting the
+        # node items one by one left a wire from a removed node's OUTPUT in
+        # the editor (Dear PyGui does not take it with the node), tied to a
+        # freed pin: the next rebuild - an undo, a zoom - crashed on it
+        # (issue #4). The nodes that lost an input wire get its field back too.
+        self.rebuild()
+        self.status(f"deleted {len(sel)} node(s)")
 
     # --- compile -------------------------------------------------------------------------
     # --- sharing a graph -----------------------------------------------------------------
