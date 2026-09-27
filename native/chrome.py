@@ -195,12 +195,13 @@ def build_menus(app):
                               callback=lambda: app.toggle_side())
             _mi(app, "Properties pane (graph)", "props_pane", check=True, tag="menu_props",
                 callback=lambda: app.toggle_props())
-            tip("the selected node's longer settings; canvas first they come up over the graph when a node needs them, "
-                "and this (N) keeps them open")
+            tip("the selected node's settings and the values of its free inputs; canvas first they come up over the "
+                "graph when the node has something to set, and this (N) keeps them open")
             _mi(app, "Graph: canvas first", "graph_room", check=True, tag="menu_graph_room",
                 callback=lambda: room.set_on(app, not room.on(app)))
-            tip("the graph takes the window: the 3-D view in a corner of it, the properties over it when a node needs "
-                "them, the panel a rail of its sections, the help at the pointer; off, they sit beside the graph as panes")
+            tip("the graph takes the window: the 3-D view in a corner of it, the properties over it when the selected "
+                "node has something to set, the panel a rail of its sections, the help at the pointer; off, they sit "
+                "beside the graph as panes")
             _mi(app, "3-D view over the graph", "pip", check=True, tag="menu_pip",
                 callback=lambda: room.set_tucked(app, not room.pip(app)["tucked"]))
             tip("canvas first: the 3-D view in its corner of the graph, or tucked away to a tab")

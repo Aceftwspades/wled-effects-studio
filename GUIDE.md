@@ -161,11 +161,14 @@ faint over its corner of the graph - the nodes under it read through -
 and comes up full when the pointer reaches it; a click on it moves the
 view there. View > Minimap shows or hides it and picks its corner (or
 leaves it to one the 3-D view leaves free; a corner the view has, it
-cedes to the other corner of that edge). A node's long settings (bitmap rows,
-expressions, files, curves) come up in the **properties** over the graph
-while such a node is selected; N keeps them open, their x closes them
-until another node is selected. As panes, the properties sit under the
-3-D view (N hides them). The **add menu** describes the node under the
+cedes to the other corner of that edge). Select a node with anything to
+set and its **properties** come up over the graph: its settings and the
+values of the inputs nothing is wired to, each field a twin of the
+node's own (an edit in one shows in the other), and what a node has no
+room for - bitmap rows, long expressions and paths, curves - there
+alone. N keeps them open, their x closes them until another node is
+selected. As panes, the properties sit under the 3-D view (N hides
+them). The **add menu** describes the node under the
 pointer in a column beside its list - what it does, every pin and
 setting - before you add it: go straight across to it to read on (the
 wheel scrolls a long one); a search describes its first hit, the one
@@ -919,8 +922,8 @@ on and install what it carries.
 - **View** › Graph `G`
 - **View** › Presentation (hide controls) `H`
 - **View** › Side panel
-- **View** › Properties pane (graph) `N` — the selected node's longer settings; canvas first they come up over the graph when a node needs them, and this (N) keeps them open
-- **View** › Graph: canvas first — the graph takes the window: the 3-D view in a corner of it, the properties over it when a node needs them, the panel a rail of its sections, the help at the pointer; off, they sit beside the graph as panes
+- **View** › Properties pane (graph) `N` — the selected node's settings and the values of its free inputs; canvas first they come up over the graph when the node has something to set, and this (N) keeps them open
+- **View** › Graph: canvas first — the graph takes the window: the 3-D view in a corner of it, the properties over it when the selected node has something to set, the panel a rail of its sections, the help at the pointer; off, they sit beside the graph as panes
 - **View** › 3-D view over the graph — canvas first: the 3-D view in its corner of the graph, or tucked away to a tab
 - **View** › Focus mode (dim all but the selection) `/`
 - **View** › Light a node's wires — the wires of the node under the pointer (or of the pin) and of the selection drawn bright, every other wire faded to a trace of its colour

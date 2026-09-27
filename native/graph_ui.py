@@ -566,7 +566,98 @@ class GraphPanel(Glyphs):
         if dpg.does_item_exist("graph_help") and dpg.get_value("graph_help") != text:
             dpg.set_value("graph_help", text)
 
-    # --- properties: the selected node's long text, in a wide box under the toolbar ----
+    # --- properties: the selected node's settings and typed inputs, and its long text ----
+    PROP_KINDS = ("float", "int", "choice", "color", "text", "file", "bool", "ramp", "curve")
+
+    def editable(self, nid):
+        """(settings, typed inputs) a node's properties can set: its settings,
+        and its inputs with a value of their own - not wired. Both empty for a
+        node with neither (Time, Pixel...)."""
+        n = self.graph.nodes.get(nid) if self.graph else None
+        if n is None:
+            return [], []
+        d = self.graph.node_def(n)
+        wired = {l[3] for l in self.graph.links if l[2] == nid}
+        params = [p for p in d.get("params", []) if p["type"] in self.PROP_KINDS]
+        inputs = [i for i in d.get("inputs", []) if i["name"] not in wired and i["type"] in ("float", "bool", "vector", "color")]
+        return params, inputs
+
+    def _mirror(self, sender, nid, name, val, pads=True):
+        """An edit shown everywhere the value is: on the node and in its
+        properties (both are fields of (nid, name)), the one edited left alone
+        - and any XY pad drawn from it. A setting kept as rows ("/" between
+        them: a Bitmap's) is shown a row a line."""
+        n = self.graph.nodes.get(nid) if self.graph else None
+        spec = next((p for p in self.graph.node_def(n)["params"] if p["name"] == name), None) if n else None
+        shown = val.replace("/", "\n") if spec and spec.get("lines") and isinstance(val, str) else val
+        for w in list(self._widgets):
+            if w != sender and dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (nid, name):
+                self._show_value(w, shown)
+        for btn, pad in list(self._pads.items()) if pads else ():
+            if pad[0] == nid and name in (pad[1], pad[2]):
+                self._pad_draw(btn)
+
+    def _prop_width(self):
+        """A field's width in the properties: the pane less a form row's label column."""
+        from native import form
+        W = int(dpg.get_item_rect_size("graph_props")[0] or 0) or px(360)
+        return max(px(120), W - px(form.LABEL_W) - px(form.GAP) - px(14))
+
+    def _prop_section(self, title, nid, n, specs, kind):
+        """A list of fields in the properties, one form row each: the
+        settings (kind "param") or the typed inputs ("input"), made as the
+        node's own are and edited through the same callbacks - so either one
+        edited, the other follows (_mirror)."""
+        from native import form
+        P = "graph_props"
+        typeface.label(dpg.add_text(title, parent=P, color=self.pal()["dim"]))
+        fw = self._prop_width()
+        vals = n["params"] if kind == "param" else n.get("inputs", {})
+        note = bool(self.graph.node_def(n).get("multiline"))       # a Note: its text over lines, as on the node
+        for s in specs:
+            words = nodeface.label(n["type"], s["name"])
+            v = vals.get(s["name"], s.get("default", 0))
+            ud = (nid, s["name"])
+            if kind == "param" and s["type"] in ("text", "file") and (s.get("lines") or note or len(str(v)) > 40):
+                # a long text: its name, then its box across the pane - a row a line for a setting kept as rows (a
+                # Bitmap's) and for a Note, one line for the rest (an expression, a path: a new line means nothing)
+                lines = bool(s.get("lines")) or (note and s["type"] == "text")
+                dpg.add_text(words, parent=P, color=DIM)
+                w = dpg.add_input_text(parent=P, width=-1, multiline=lines, height=px(120) if lines else 0,
+                                       default_value=str(v).replace("/", "\n") if s.get("lines") else str(v),
+                                       user_data=ud, callback=self._on_param)
+                typeface.mono(w)
+                self._widgets.add(w)
+                continue
+            if kind == "param" and s["type"] == "ramp":
+                dpg.add_text(words, parent=P, color=DIM)
+                with dpg.group(parent=P):
+                    self._ramp_widget(nid, n, s, v)
+                continue
+            with form.row(words, parent=P):
+                self._prop_field(nid, n, s, v, ud, kind, fw)
+
+    def _prop_field(self, nid, n, s, v, ud, kind, fw):
+        cb = self._on_param if kind == "param" else self._on_input
+        t = s["type"]
+        if t == "bool":
+            w = dpg.add_checkbox(default_value=bool(v), user_data=ud, callback=cb)
+        elif kind == "input" and t == "float":
+            w = self._number_widget(s, float(v), None, ud, cb, True, fw)
+        elif kind == "input" and t == "vector":
+            vv = [float(c) for c in (list(v) + [0, 0, 0])[:3]] if isinstance(v, (list, tuple)) else [float(v)] * 3
+            w = dpg.add_input_floatx(width=fw, size=3, default_value=vv + [0.0], format="%.2f", user_data=ud, callback=cb)
+        elif kind == "input":
+            rgb = list(v)[:3] if isinstance(v, (list, tuple)) else [0, 0, 0]
+            w = dpg.add_color_edit([int(c) for c in rgb] + [255], no_label=True, no_alpha=True, no_inputs=True,
+                                   user_data=ud, callback=cb)
+        else:
+            self._param_field(nid, n, s, v, ud, cb, fw)           # a number, a choice, a colour, a text, a file: as on the node
+            return
+        dpg.bind_item_theme(w, self._field_theme())
+        self._value_face(w)
+        self._widgets.add(w)
+
     def _poll_props(self):
         if not dpg.does_item_exist("graph_props") or not self.graph:
             return
@@ -577,9 +668,12 @@ class GraphPanel(Glyphs):
         self._props_for = key
         # the pane is always there (its own pane, sized by the layout): what
         # changes is what it says, never the editor beside it
+        self._widgets.difference_update(getattr(self, "_props_widgets", set()))
+        self._props_widgets = set()
         dpg.delete_item("graph_props", children_only=True)
+        num.prune()                                      # the last node's number fields are gone
         if not sel:
-            dpg.add_text("select a node: its longer settings (text, files) are edited here",
+            dpg.add_text("select a node: its settings and the values of its free inputs are edited here",
                          parent="graph_props", color=DIM, wrap=0)
             return
         nid = sel[0]
@@ -593,10 +687,9 @@ class GraphPanel(Glyphs):
         typeface.heading(dpg.add_text(title, parent="graph_props"))
         if len(sel) > 1:
             typeface.small(dpg.add_text(f"and {len(sel) - 1} more selected", parent="graph_props", color=DIM))
-        long_ = [p for p in d["params"] if p["type"] in ("text", "file") and not p.get("lines") is False
-                 and not nodeface.is_meta(n["type"], p["name"])]
         curves = [p for p in d["params"] if p["type"] == "curve"]
         meta = [p for p in d["params"] if nodeface.is_meta(n["type"], p["name"])]
+        before = set(self._widgets)
         if meta:
             self._meta_rows(nid, n, meta)
         self._curve_ed = None
@@ -613,18 +706,18 @@ class GraphPanel(Glyphs):
             tag = dpg.add_drawlist(width=W, height=H, parent="graph_props")
             self._curve_ed = {"nid": nid, "name": p["name"], "tag": tag, "W": W, "H": H, "drag": None, "was": False, "rwas": False}
             self._curve_draw()
-        if not long_ and not curves:
-            if not meta:
-                dpg.add_text("all of this node's settings are on the node", parent="graph_props",
-                             color=DIM, wrap=0)
-            return
-        for p in long_:
-            v = str(n["params"].get(p["name"], p["default"]))
-            shown = v.replace("/", "\n") if p.get("lines") else v
-            dpg.add_text(nodeface.label(n["type"], p["name"]), parent="graph_props", color=DIM)
-            typeface.mono(dpg.add_input_text(parent="graph_props", width=-1, multiline=bool(p.get("lines")) or len(v) > 60,
-                                             height=px(120) if p.get("lines") else 0, default_value=shown,
-                                             user_data=(nid, p["name"]), callback=self._on_prop))
+        # every other setting, and the value of every input nothing is wired to - as the node has them
+        params, inputs = self.editable(nid)
+        drawn = {p["name"] for p in meta + curves} | ({"rows"} if n["type"] == "Bitmap" else set())
+        params = [p for p in params if p["name"] not in drawn]
+        if params:
+            self._prop_section("SETTINGS", nid, n, params, "param")
+        if inputs:
+            self._prop_section("INPUTS", nid, n, inputs, "input")
+        self._props_widgets = set(self._widgets) - before
+        if not (params or inputs or meta or curves or n["type"] == "Bitmap"):
+            dpg.add_text("nothing to set on this node: its pins take what is wired to them",
+                         parent="graph_props", color=DIM, wrap=0)
 
     def _meta_rows(self, nid, n, meta):
         """A control node's settings that are the effect's, not the graph's
@@ -871,22 +964,6 @@ class GraphPanel(Glyphs):
         ed["was"], ed["rwas"] = down, rdown
         if down and ed["drag"] is not None or inside:
             self._curve_draw()
-
-    def _on_prop(self, sender, val):
-        nid, name = dpg.get_item_user_data(sender)
-        if nid not in self.graph.nodes:
-            return
-        self.touch(); self.snapshot(("prop", nid, name))
-        if isinstance(val, str) and "\n" in val:
-            val = val.replace("\r", "").replace("\n", "/")
-        self.graph.nodes[nid]["params"][name] = val
-        # the node's own box shows the same text
-        for w in list(self._widgets):
-            if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (nid, name):
-                try:
-                    dpg.set_value(w, val.replace("/", "\n") if isinstance(val, str) and "/" in val and "\n" not in val and dpg.get_item_configuration(w).get("multiline") else val)
-                except Exception:
-                    pass
 
     def _poll_help(self):
         now = time.time()
@@ -1363,6 +1440,17 @@ class GraphPanel(Glyphs):
                 self._bind_node_theme(nid, n)
         self._focus_sel = None                                  # focus mode follows
 
+    def end_key_selection(self):
+        """The key selection (ext_sel) over; imnodes' own left as it is."""
+        if not self.graph:
+            return
+        self.ext_sel = []
+        self._ext_last = {}
+        for nid, n in self.graph.nodes.items():
+            if dpg.does_item_exist(f"gnode_{nid}"):
+                self._bind_node_theme(nid, n)
+        self._focus_sel = None
+
     def select_all(self):
         self.set_selection(list(self.graph.nodes) if self.graph else [])
         self.status(f"{len(self.ext_sel)} nodes selected")
@@ -1682,7 +1770,15 @@ class GraphPanel(Glyphs):
         keep = self._clicked()
         if keep:
             self.ext_sel = [n for n in dict.fromkeys(list(self.ext_sel) + keep)]
+        props = [w for w in getattr(self, "_props_widgets", ()) if dpg.does_item_exist(w)]
         self._widgets.clear(); self._pads.clear(); self._glyph_clear(); self._glyph_pal = None
+        # The properties' fields are not the editor's: they stay, and their
+        # twins on the new nodes still follow them. They are drawn again from
+        # the graph (an undo, a wire, a node's type) unless one is in use - a
+        # Frame's title typed there rebuilds the editor at every key.
+        self._widgets.update(props)
+        if not any(dpg.is_item_active(w) for w in props):
+            self._props_for = "unset"
         self._standin_line.clear()
         dpg.delete_item("node_editor", children_only=True)
         num.prune()                                      # the old nodes' number fields are gone
@@ -2602,6 +2698,10 @@ class GraphPanel(Glyphs):
                 dpg.set_value(w, [c / 255.0 for c in list(val)[:3]] + [1.0])
             elif dpg.get_item_type(w).endswith("InputFloatMulti") and isinstance(val, (list, tuple)) and len(val) == 3:
                 dpg.set_value(w, list(val) + [0.0])
+            elif dpg.get_item_type(w).endswith("Combo") and isinstance(val, int) and not isinstance(val, bool):
+                # a number shown by name (the Effect settings' palette: "11  Rainbow")
+                items = dpg.get_item_configuration(w).get("items") or []
+                dpg.set_value(w, next((s for s in items if str(s).split("  ", 1)[0] == str(val)), str(val)))
             else:
                 dpg.set_value(w, val)
         except Exception:
@@ -2679,10 +2779,7 @@ class GraphPanel(Glyphs):
         was_dirty = self._dirty
         self.touch(); self.snapshot(("midi", nid, name))    # a knob's stroke is one undo step
         n.setdefault("inputs", {})[name] = val
-        self._show_value(f"gin_{nid}_{name}_w", val)
-        for btn, pad in list(self._pads.items()):          # a pad showing this pin follows
-            if pad[0] == nid and name in (pad[1], pad[2]):
-                self._pad_draw(btn)
+        self._mirror(None, nid, name, val)                 # its fields - the node's, the properties' - and its pads
         if self.live_poke(nid, name, val) and not was_dirty:
             self._dirty = 0.0
         self._refresh_summary(nid)
@@ -2700,11 +2797,12 @@ class GraphPanel(Glyphs):
         elif isinstance(val, (list, tuple)) and len(val) >= 3 and all(isinstance(x, float) for x in val):
             val = [int(round(x * 255)) if x <= 1.0 else int(x) for x in val[:3]]
         self.graph.nodes[nid].setdefault("inputs", {})[name] = val
+        self._mirror(sender, nid, name, val)             # the node's field, or its properties', follows the other
         poked = ptype != "color" and self.live_poke(nid, name, val)
         for k in self._same_type_selected(nid):
             self.graph.nodes[k].setdefault("inputs", {})[name] = val
             poked = poked and self.live_poke(k, name, val)
-            self._show_value(f"gin_{k}_{name}_w", val)
+            self._mirror(None, k, name, val)
         if poked and not was_dirty:
             self._dirty = 0.0                            # the running effect has the value: nothing to rebuild
             self.status(f"{self.graph.nodes[nid]['type']} #{nid} {nodeface.label(self.graph.nodes[nid]['type'], name)}: "
@@ -2736,9 +2834,8 @@ class GraphPanel(Glyphs):
         return None
 
     def _set_param_widget(self, nid, name, val):
-        for w in self._widgets:
-            if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (nid, name):
-                self._show_value(w, val)
+        """A value set from outside (an expression, a snapshot, a pad): every field of (nid, name)."""
+        self._mirror(None, nid, name, val, pads=False)
 
     def expr_hovered(self):
         """= over a value box: the expression box for it."""
@@ -3186,7 +3283,7 @@ class GraphPanel(Glyphs):
         n = self.graph.nodes[nid]
         n.setdefault("inputs", {})[a] = round(x, 4); n["inputs"][b] = round(y, 4)
         for name, val in ((a, x), (b, y)):
-            self._show_value(f"gin_{nid}_{name}_w", float(val))
+            self._set_param_widget(nid, name, float(val))         # its fields: the node's, and in the properties
         was_dirty = self._dirty
         self.touch()
         if self.live_poke(nid, a, x) and self.live_poke(nid, b, y) and not was_dirty:
@@ -3383,14 +3480,22 @@ class GraphPanel(Glyphs):
         nid, name = dpg.get_item_user_data(sender)
         self.snapshot(("param", nid, name))
         if isinstance(val, str) and "\n" in val:
-            val = val.replace("\r", "").replace("\n", "/")      # a bitmap's lines back to rows
+            d = self.graph.node_def(self.graph.nodes[nid])
+            spec = next((p for p in d["params"] if p["name"] == name), {})
+            val = val.replace("\r", "")
+            if spec.get("lines"):
+                val = val.replace("\n", "/")                   # a bitmap's lines back to rows
+            elif not d.get("multiline"):
+                val = val.replace("\n", " ")                   # pasted into a line of text: in an expression "/" divides
+            # a Note's text keeps its lines
         if isinstance(val, (list, tuple)) and len(val) >= 3 and all(isinstance(x, float) for x in val):
             val = [int(round(x * 255)) if x <= 1.0 else int(x) for x in val[:3]]
         self.graph.nodes[nid]["params"][name] = val
+        self._mirror(sender, nid, name, val)             # the node's field, or its properties', follows the other
         self._refresh_summary(nid)
         for k in self._same_type_selected(nid):
             self.graph.nodes[k]["params"][name] = val
-            self._set_param_widget(k, name, val)
+            self._mirror(None, k, name, val)
             self._refresh_summary(k)
         if self.graph.nodes[nid]["type"] == "Frame" and name in ("title", "colour"):
             self._sync_pos(); self.rebuild()
@@ -3498,6 +3603,7 @@ class GraphPanel(Glyphs):
             self.status("that wire closed a loop: a Delay on it hands last frame's value round (undo takes both out)")
             return
         self._make_link(a, out, b, inp)
+        self._props_for = "unset"                          # a wired input leaves the properties' list
 
     def on_delink(self, sender, app_data):
         self.touch()
@@ -3507,6 +3613,7 @@ class GraphPanel(Glyphs):
         if b is not None:
             self.graph.unlink(b, inp)
             self._show_input(b, inp, False)
+            self._props_for = "unset"                      # a freed input joins the properties' list
         dpg.delete_item(lid)
 
     # --- greying out while a wire is dragged -----------------------------------------
@@ -3532,8 +3639,14 @@ class GraphPanel(Glyphs):
                 k = (outs.index(self.preview[1]) + 1) % len(outs) if self.preview and self.preview[0] == over and self.preview[1] in outs else 0
                 self.preview_pin(over, outs[k])
             return
-        if dpg.is_item_hovered("node_editor") and not ctrl and not shift and self.ext_sel and over not in self.ext_sel                 and not getattr(self.app, "_popup_click", False):
-            self.set_selection([])                     # a plain click elsewhere: the key selection is over
+        if dpg.is_item_hovered("node_editor") and not ctrl and not shift and self.ext_sel and over not in self.ext_sel \
+                and not getattr(self.app, "_popup_click", False):
+            # a plain click elsewhere: the key selection is over. imnodes' own
+            # is left as the click made it: this runs a frame after imnodes took
+            # the click, and clearing it too took away the node just clicked -
+            # after a zoom, which carries the selection on by key, a second
+            # node clicked was never selected
+            self.end_key_selection()
         # where every node is now: a node dragged onto a wire is spliced in on release
         self._press_pos = {nid: tuple(dpg.get_item_pos(f"gnode_{nid}")) for nid in self.graph.nodes if dpg.does_item_exist(f"gnode_{nid}")}
         self._node_press = over is not None          # a press on a node: the drag that follows moves the selection
@@ -4357,7 +4470,7 @@ class GraphPanel(Glyphs):
         for nid in touched:
             n = self.graph.nodes[nid]
             for k, v in (n.get("inputs") or {}).items():
-                self._show_value(f"gin_{nid}_{k}_w", v)
+                self._set_param_widget(nid, k, v)                   # its fields: the node's, and in the properties
                 if live and not isinstance(v, (list, tuple)) or (isinstance(v, (list, tuple)) and len(v) == 3):
                     all_live = self.live_poke(nid, k, v) and all_live
         for btn in list(self._pads):

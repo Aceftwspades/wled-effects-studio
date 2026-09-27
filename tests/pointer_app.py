@@ -18,7 +18,10 @@ menu's description beside its list, reached and scrolled; the properties
 over the canvas kept by clicks on them after a click on a node (the side
 panel open and folded); the 3-D view turned by a drag after a click on a
 node; the Bitmap painter left alone by a drag from the canvas, painting at
-a press. It works in a project of its own, deleted after.
+a press; a number dragged in a plain node's properties, the node's own
+field following; a node clicked after another and a zoom, selected; the
+focus frame drawn where the 3-D view is in every frame while it is moved
+and sized. It works in a project of its own, deleted after.
 """
 import ctypes
 import json
@@ -214,6 +217,16 @@ def node_rect(app, nid):
                    f"[int(v) for v in dpg.get_item_state('gnode_{nid}')['rect_size']]")
 
 
+def title_point(app, nid):
+    """The middle of a node's title bar, or None where the canvas does not show it (off it, or under a window on it)."""
+    r = node_rect(app, nid)
+    x, y = r[0] + r[2] // 2, r[1] + 6
+    ok = app.ask(f"(lambda ed, holes: ed[0] + 10 < {x} < ed[0] + ed[2] - 10 and ed[1] + 10 < {y} < ed[1] + ed[3] - 10 and "
+                 f"not any(a - 12 <= {x} <= c + 12 and b - 12 <= {y} <= d + 12 for a, b, c, d in holes))"
+                 f"(room.S.editor, list(app._holes or []))")
+    return (x, y) if ok else None
+
+
 def empty_spot(app):
     """A point of the canvas with no node and no window over it."""
     return app.ask("(lambda ed, holes, nodes: next(((x, y) for y in range(int(ed[1]) + 60, int(ed[1] + ed[3]) - 40, 24) "
@@ -299,6 +312,113 @@ def check_properties(app, bad, panel):
             bad.append(f"({panel}) a click on the properties' {name} lost them or the selection"); return
 
 
+def check_props_field(app, bad):
+    """A plain node's properties (a Noise's: its settings and its free input): a drag on a number there changes it,
+    the node's own field follows, the node stays selected and its properties up."""
+    app.send([{"graph_open": "box_fire.json"}, {"py": "room.fold_panel(app)"}, {"action": "select_none"},
+              {"graph_zoom": 1.0}, {"graph_selected": []}], 1.5)
+    at = title_point(app, 12)
+    if not at:
+        bad.append("the Noise (12) is not in sight on the canvas"); return
+    app.click(*at)
+    time.sleep(0.6)
+    w = app.ask("next((w for w in app.gp._props_widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (12, 'scale')), None)")
+    r = app.rect(w) if w else None
+    if app.ask("(dpg.is_item_shown('props_fly'), app.gp._selected())") != (True, [12]) or not r:
+        bad.append("a click on the Noise did not select it and bring its properties up, its scale among them"); return
+    before = app.ask("app.gp.graph.nodes[12]['inputs'].get('scale')")
+    x, y = r[0] + r[2] // 2, r[1] + r[3] // 2
+    app.down(x, y)
+    app.move([(x + 10, y), (x + 40, y), (x + 70, y)], 0.5)
+    app.up()
+    time.sleep(0.3)
+    after = app.ask("app.gp.graph.nodes[12]['inputs'].get('scale')")
+    twins = app.ask("[dpg.get_value(w) for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (12, 'scale')]")
+    if after == before:
+        bad.append(f"a drag on the Noise's scale in its properties did not change it ({before})")
+    elif any(abs(v - after) > 1e-6 for v in twins) or len(twins) != 2:
+        bad.append(f"the Noise's scale dragged to {after} in its properties: its fields show {twins}")
+    if app.ask("(dpg.is_item_shown('props_fly'), app.gp._selected())") != (True, [12]):
+        bad.append("a drag on a number in the properties lost them or the selection")
+    app.send([{"graph_undo": True}], 0.5)
+
+
+def check_zoom_select(app, bad):
+    """A node clicked, the canvas zoomed, another node clicked: the second is the selection. (The click after a
+    zoom used to leave nothing selected: the zoom carries the selection on by key, and ending that ended the
+    selection imnodes had just made.)"""
+    app.send([{"graph_open": "box_fire.json"}, {"py": "room.fold_panel(app)"}, {"action": "select_none"},
+              {"graph_zoom": 1.0}, {"graph_selected": []}], 1.5)
+    first = next((n for n in (2, 3, 1, 4) if title_point(app, n)), None)
+    if first is None:
+        bad.append("no control node in sight on the canvas"); return
+    app.click(*title_point(app, first))
+    time.sleep(0.4)
+    if app.ask("app.gp._selected()") != [first]:
+        bad.append(f"a click on node {first}'s title did not select it"); return
+    zoom = app.ask("app.gp.zoom")
+    app.wheel(*empty_spot(app), -1)
+    time.sleep(0.5)
+    if app.ask(f"abs(app.gp.zoom - {zoom}) > 0.01") is not True:
+        bad.append("the wheel over the canvas did not zoom it"); return
+    second = next((n for n in app.ask("sorted(app.gp.graph.nodes)") if n != first and title_point(app, n)), None)
+    app.click(*title_point(app, second))
+    time.sleep(0.4)
+    got = app.ask("app.gp._selected()")
+    if got != [second]:
+        bad.append(f"after a click on node {first} and a zoom, a click on node {second} left the selection {got}")
+    app.send([{"graph_zoom": 1.0}], 0.3)
+
+
+FRAME_REC = "\n".join([
+    "orig = app.poll_glow",
+    "app._frame_rec = []",
+    "def rec():",
+    "    orig()",
+    "    q = [(c['p1'], c['p3']) for c in (dpg.get_item_configuration(k) for k in app.frames.quads['focus']) if c['show']]",
+    "    box = (min(a[0] for a, b in q), min(a[1] for a, b in q), max(b[0] for a, b in q), max(b[1] for a, b in q)) if q else None",
+    "    app._frame_rec.append((room.S.pip_rect, box))",
+    "app.poll_glow = rec", ""])
+
+
+def check_frame_follows(app, bad):
+    """The 3-D view over the graph moved by its ::: towards another corner, then sized by its grip: in every frame
+    its focus frame is drawn where the view is that frame - the same margin round it, never a frame behind."""
+    app.send([{"graph_open": "box_fire.json"}, {"py": "room.fold_panel(app)"}, {"action": "select_none"}, {"graph_selected": []},
+              {"py": "(room.pip(app).__setitem__('corner', 'br'), app.request_layout())"}], 1.5)
+    x, y, w, h = app.rect("pip_win")
+    app.click(x + w // 2, y + h // 2 + 30)
+    time.sleep(0.4)
+    if app.ask("app.focus") != "cube_win":
+        bad.append("a click in the 3-D view over the graph did not give it the focus"); return
+    app.send([{"py": f"exec({FRAME_REC!r}, {{'app': app, 'dpg': dpg, 'room': room}})"}], 0.3)
+    try:
+        for what, tag in (("moved", "grip_cube_win"), ("sized", "pip_size")):
+            g = app.rect(tag)
+            if not g:
+                bad.append(f"the 3-D view's {tag} is not shown"); continue
+            gx, gy = g[0] + g[2] // 2, g[1] + g[3] // 2
+            c = app.ask("room.pip(app)['corner']")
+            # moved: towards the far corner; sized: away from the corner it is anchored in
+            dx, dy = ((-420, -220) if what == "moved" else (-150 if c[1] == "r" else 150, 150 if c[0] == "t" else -150))
+            app.hold(gx, gy)
+            app.send([{"py": "app._frame_rec.clear()"}], 0.1)
+            app.down(gx, gy)
+            app.move([(gx + dx * k // 30, gy + dy * k // 30) for k in range(1, 31)], 1.2)
+            app.up()
+            time.sleep(0.4)
+            rows = app.ask("[(tuple(round(v) for v in r), tuple(round(v) for v in b)) for r, b in app._frame_rec if r and b]") or []
+            margins = {(r[0] - b[0], r[1] - b[1], b[2] - (r[0] + r[2]), b[3] - (r[1] + r[3])) for r, b in rows}
+            places = {r for r, b in rows}
+            if len(places) < 5:
+                bad.append(f"the 3-D view {what} by its {tag} went through {len(places)} places (a drag not taken?)")
+            elif len(margins) != 1:
+                bad.append(f"the 3-D view {what}: its focus frame off its place in some frames - margins {sorted(margins)[:4]}")
+    finally:
+        app.send([{"py": "app.__dict__.pop('poll_glow', None)"},
+                  {"py": "(room.pip(app).__setitem__('corner', 'br'), app.request_layout())"}], 0.8)
+
+
 def check_pip_drag(app, bad):
     """After a click on a node, a drag in the 3-D view over the graph turns it and keeps the selection."""
     r = node_rect(app, 1)
@@ -359,7 +479,10 @@ def main():
         for name, fn in (("frame", lambda: check_frame(app, bad)), ("add menu", lambda: check_add_menu(app, bad)),
                          ("properties, panel open", lambda: check_properties(app, bad, "open_panel")),
                          ("properties, panel folded", lambda: check_properties(app, bad, "fold_panel")),
-                         ("3-D view", lambda: check_pip_drag(app, bad)), ("painter", lambda: check_painter(app, bad))):
+                         ("3-D view", lambda: check_pip_drag(app, bad)), ("painter", lambda: check_painter(app, bad)),
+                         ("a plain node's properties", lambda: check_props_field(app, bad)),
+                         ("a click after a zoom", lambda: check_zoom_select(app, bad)),
+                         ("the frame round a moving 3-D view", lambda: check_frame_follows(app, bad))):
             n = len(bad)
             try:
                 fn()

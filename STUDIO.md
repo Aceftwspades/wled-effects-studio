@@ -2480,6 +2480,49 @@ moment the app opened it, was locked (a Windows sharing violation) and the
 app took it for a broken one and removed it. A locked file is taken on the
 next frame now (service_command).
 
+### After 1.3.5: three more from the graph view (September 2026)
+
+- [x] **Every node with something to set has properties.** They came up
+      only for what a node cannot hold (long text, a file, a curve, a
+      bitmap); now for any node with a setting, or an input nothing is
+      wired to (GraphPanel.editable): its SETTINGS and its INPUTS, each
+      field made as the node's own and edited through the same callbacks,
+      a twin of the node's - an edit in one shows in the other
+      (GraphPanel._mirror; MIDI, the XY pads, snapshots and expressions go
+      through it too). A wire made or cut draws them again (an input joins
+      or leaves the list), an undo too; a field being typed in is left
+      alone - a Frame's title typed there rebuilds the editor at every key,
+      and the properties' fields are kept across it. A node with nothing
+      to set (a Time) brings none. On the way: a drawlist reports its
+      position as 0, 0, so a Bitmap's painter last in the pane left the
+      flyout the painter's height short (room._props_content_h takes a
+      drawlist's rectangle); the close button, drawn after the pane at a
+      position of its own, put the cursor back an item spacing past it and
+      the pane scrolled 5 px for nothing (it is drawn before the pane); a
+      new line pasted into a one-line text became "/" - a division in an
+      expression - and is a space now, a row only in a setting kept as
+      rows, while a Note keeps its lines.
+- [x] **A node clicked after a zoom was not selected.** A zoom rebuilds the
+      editor and carries the selection on by key (ext_sel); a click on
+      another node ended that key selection a frame after imnodes had
+      taken the click - with set_selection([]), which emptied imnodes'
+      selection too: the node just clicked. Ending the key selection leaves
+      imnodes' own as the click made it (GraphPanel.end_key_selection).
+- [x] **The frame round the 3-D view lagged** while the view was sized or
+      dragged to another corner, a frame or more behind it and jittering:
+      it was placed from the window's item state, which Dear PyGui reports
+      a frame late after a move or a size. It is placed where the room puts
+      the view that frame (room.placed, in App._screen_rect and
+      App._window_hole) - a recorder of each frame's place and frame: 0
+      frames off over a move and a size.
+
+`tests/pointer_app.py` checks each: a number dragged in a Noise's
+properties, the node's field following; a node clicked after another and a
+zoom, selected (the check fails with the old set_selection([])); the
+frame's margin round the view the same in every frame of a move and of a
+size (it fails without room.placed). The smoke test has the twins both ways
+and their undo, and no properties for a Time.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads

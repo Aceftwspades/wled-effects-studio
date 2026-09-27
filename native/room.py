@@ -9,11 +9,12 @@ canvas takes the window.
   another corner, its grip (or Ctrl+wheel over it) sizes it, its maximize
   button lays it over the whole canvas (again: back to its corner), and its
   tuck button puts it away to a tab. While tucked it is not drawn.
-- The properties come up over the canvas only when the selected node has
-  settings a node cannot hold (text over several lines, a file, a curve, a
-  bitmap). N pins them open; their x closes them until another node is
-  selected. (The add menu describes the node under the pointer in a column
-  of its own.)
+- The properties come up over the canvas whenever the selected node has
+  something to set - its settings, the values of its inputs nothing is
+  wired to - each field the node's own twin, and those a node cannot hold
+  (text over several lines, a file, a curve, a bitmap) there alone. N pins
+  them open; their x closes them until another node is selected. (The add
+  menu describes the node under the pointer in a column of its own.)
 - The help that was a band above the graph follows the pointer.
 
 Anything over the canvas is a top-level window of its own. Child windows
@@ -66,6 +67,7 @@ class _State:
         self.tip_shown = False
         self.props_key = None    # the selection the properties are for
         self.props_dismissed = None
+        self.props_content = 0   # the height of what the properties hold, as last measured
         self.sec_scroll = None   # [section, frames waited]: the panel opened at a section
         self.rail_sig = None     # what the rail was built from
         self.rail_here = None    # the section lit on the rail: the one in view in the open panel
@@ -148,6 +150,21 @@ def tucked(app):
     return active(app) and bool(pip(app)["tucked"])
 
 
+def placed(tag):
+    """(x, y, w, h) where the 3-D view over the graph is put this frame, for
+    it (cube_win, in pip_win) and its window - or None for anything else.
+    Dear PyGui reports a window's place and size once it has drawn there, a
+    frame late: the focus frame round the view, drawn from that, trailed
+    every step of a resize (and jittered with it)."""
+    if S.pip_rect is None or not dpg.does_item_exist(tag):
+        return None
+    alias = dpg.get_item_alias(tag)
+    if alias == "cube_win":
+        parent = dpg.get_item_parent(tag)
+        alias = "pip_win" if parent is not None and dpg.get_item_alias(parent) == "pip_win" else ""
+    return S.pip_rect if alias == "pip_win" else None
+
+
 def _save(app):
     from native.project import save_prefs
     save_prefs(app.prefs)
@@ -209,11 +226,12 @@ def toggle_panel(app):
 
 def pin_props(app, v):
     """N while canvas first: the properties kept open (the selection's, or
-    what to do), or back to showing only when a node needs them."""
+    what to do), or back to showing only when the selected node has
+    something to set."""
     app.props_pinned = bool(v)
     S.props_dismissed = None
-    app.gp.status("the properties stay open (N again: only when a node needs them)" if v
-                  else "the properties come up when a node needs them")
+    app.gp.status("the properties stay open (N again: only when a node has something to set)" if v
+                  else "the properties come up when the selected node has something to set")
 
 
 def dismiss_props(app):
@@ -259,8 +277,10 @@ def build(app):
                     no_scrollbar=True, no_scroll_with_mouse=True, no_focus_on_appearing=True, no_saved_settings=True,
                     width=PROPS_W, height=px(240)):
         pass
-    dpg.add_image_button(texture("close", px(14)), tag="props_close", parent="props_win", width=px(14), height=px(14), show=False,
-                         callback=lambda: dismiss_props(app))
+    # before the pane in the drawing order: an item with a position of its own puts the cursor back where the flow
+    # left it, and after the pane that reached an item spacing past it - the properties scrolled 5 px for nothing
+    dpg.add_image_button(texture("close", px(14)), tag="props_close", parent="props_win", before="graph_props",
+                         width=px(14), height=px(14), show=False, callback=lambda: dismiss_props(app))
     chrome.tip("close until another node is selected (N keeps it open)", item="props_close")
     chrome.placed("props_close")
     # the help at the pointer
@@ -527,29 +547,28 @@ def _props_need(app):
         return True, key
     if not sel:
         return False, None
-    n = gp.graph.nodes.get(sel[0])
-    if not n:
+    if sel[0] not in gp.graph.nodes:
         return False, None
-    if n["type"] == "Bitmap":
-        return True, key
-    from native import nodeface
-    if n["type"] in nodeface.META:
-        return True, key                                   # its label and where it starts are edited there (C12)
-    d = gp.graph.node_def(n)
-    for q in d["params"]:
-        v = str(n["params"].get(q["name"], q.get("default", "")))
-        if q["type"] in ("curve", "file") or (q["type"] == "text" and (q.get("lines") or len(v) > 40)):
-            return True, key
-    return False, key
+    params, inputs = gp.editable(sel[0])                   # any setting, any value of an unwired input
+    return bool(params or inputs), key
 
 
 def _props_content_h():
-    """How tall the properties' content is: the lowest of its items."""
+    """How tall the properties' content is: the lowest of its items. A
+    drawlist (a Bitmap's painter, a curve) reports its position as 0, 0: its
+    bottom is its rectangle's, less where the pane's top is on the screen -
+    found from an item that reports both. (Measured by position alone, a
+    painter last in the pane left the flyout its own height short.)"""
+    states = [(dpg.get_item_type(k), dpg.get_item_state(k)) for k in dpg.get_item_children("graph_props", 1) or []]
+    top = next((st["rect_min"][1] - st["pos"][1] for t, st in states
+                if not t.endswith("mvDrawlist") and st.get("pos") and st.get("rect_min")), None)
     low = 0
-    for kid in dpg.get_item_children("graph_props", 1) or []:
-        st = dpg.get_item_state(kid)
+    for t, st in states:
         pos, size = st.get("pos"), st.get("rect_size")
-        if pos and size:
+        if t.endswith("mvDrawlist"):
+            if top is not None and st.get("rect_max"):
+                low = max(low, st["rect_max"][1] - top)
+        elif pos and size:
             low = max(low, pos[1] + size[1])
     return low
 
@@ -577,7 +596,13 @@ def _poll_props(app):
     # below it and the window's below that (the theme's 10 each): an allowance of 52 in all left the last
     # line of a control node's note scrolled out of sight
     top = (dpg.get_item_state("graph_props").get("pos") or [0, px(40)])[1]
-    h = int(max(px(120), min(room, _props_content_h() + top + px(30))))
+    content = _props_content_h()
+    if content <= 0 and dpg.is_item_shown("props_fly"):
+        # made again this frame (another node, an undo, a zoom): nothing measured yet - its size is kept a frame,
+        # not shrunk to nothing and grown back
+        content = S.props_content
+    S.props_content = content
+    h = int(max(px(120), min(room, content + top + px(30))))
     w = int(min(PROPS_W, ew - 2 * MARGIN))
     if not dpg.is_item_shown("props_fly"):
         dpg.configure_item("props_win", show=True)

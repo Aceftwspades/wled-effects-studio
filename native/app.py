@@ -3248,6 +3248,10 @@ class App(Features):
         the pane last clicked in was drawn at the screen's corner."""
         if not dpg.does_item_exist(tag):
             return None
+        placed = room.placed(tag)
+        if placed:                           # the 3-D view over the graph: where the room puts it this frame
+            x, y, w, h = placed
+            return (x, y, x + w, y + h)
         st = dpg.get_item_state(tag)
         w, h = st.get("rect_size", (0, 0))
         if w <= 0 or h <= 0:
@@ -3322,6 +3326,10 @@ class App(Features):
     def _window_hole(tag):
         """A shown window's rectangle as a hole, with a frame's border and
         rounding round it - or None before it has a size."""
+        placed = room.placed(tag)
+        if placed:
+            x, y, w, h = placed
+            return (x - 2, y - 2, x + w + 3, y + h + 3)
         st = dpg.get_item_state(tag)
         w, h = st.get("rect_size") or (0, 0)
         if w <= 0 or h <= 0:

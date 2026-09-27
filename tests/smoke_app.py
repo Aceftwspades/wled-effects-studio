@@ -253,6 +253,26 @@ STEPS = [
                 "if 'rect_min' in dpg.get_item_state(f'gnode_{n}')) >= app.gp.editor_origin()[0]"},
       {"check": "min(dpg.get_item_state(f'gnode_{n}')['rect_min'][1] for n in app.gp.graph.nodes "
                 "if 'rect_min' in dpg.get_item_state(f'gnode_{n}')) >= app.gp.editor_origin()[1]"}], 0.5),
+    # any node with something to set brings its properties up (12, a Noise: its settings and its free input); a value
+    # set there is the node's field's too, and one set on the node theirs; undone, both go back; a node with nothing
+    # to set (6, a Time) brings none
+    ([{"graph_selected": [12]}], 1.0),
+    ([{"check": "dpg.is_item_shown('props_fly') and {dpg.get_item_user_data(w) for w in app.gp._props_widgets} >= "
+                "{(12, 'octaves'), (12, 'roughness'), (12, 'scale')}"},
+      {"py": "setattr(app, '_twins', lambda name: [dpg.get_value(w) for w in app.gp._widgets if dpg.does_item_exist(w) "
+             "and dpg.get_item_user_data(w) == (12, name)])"},
+      {"py": "(lambda w: (dpg.set_value(w, 4.5), app.gp._on_input(w, 4.5)))"
+             "(next(w for w in app.gp._props_widgets if dpg.get_item_user_data(w) == (12, 'scale')))"},
+      {"check": "app.gp.graph.nodes[12]['inputs']['scale'] == 4.5 and app._twins('scale') == [4.5, 4.5]"},
+      {"py": "(lambda w: (dpg.set_value(w, 0.25), app.gp._on_param(w, 0.25)))"
+             "(next(w for w in app.gp._widgets if w not in app.gp._props_widgets and dpg.does_item_exist(w) "
+             "and dpg.get_item_user_data(w) == (12, 'roughness')))"},
+      {"check": "app.gp.graph.nodes[12]['params']['roughness'] == 0.25 and app._twins('roughness') == [0.25, 0.25]"},
+      {"graph_undo": True}, {"graph_undo": True}], 1.0),
+    ([{"check": "app.gp.graph.nodes[12]['inputs']['scale'] != 4.5 and 4.5 not in app._twins('scale')"},
+      {"check": "app.gp.graph.nodes[12]['params']['roughness'] != 0.25 and 0.25 not in app._twins('roughness')"},
+      {"graph_selected": [6]}], 1.0),
+    ([{"check": "not dpg.is_item_shown('props_fly')"}, {"graph_selected": []}], 0.5),
     # what has nothing to act on is greyed (the toolbar, the menus, a frame's buttons) and a key for it says why;
     # the confirm's answers weighed; the Send frame with no device offers one; a theme switch recolours the dialogs' lines
     ([{"graph_open": "box_fire.json"}, {"graph_selected": []}], 0.6),
