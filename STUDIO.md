@@ -2474,6 +2474,12 @@ and the release workflow runs it.
       lying over a curve put a point down. A stroke or a point now begins
       only with a press on them (their drawlist hovered).
 
+Released as 1.3.5. Its release run lost two steps of the smoke test against
+the packaged app: the command file, moved into place by the test at the
+moment the app opened it, was locked (a Windows sharing violation) and the
+app took it for a broken one and removed it. A locked file is taken on the
+next frame now (service_command).
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads
