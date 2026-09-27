@@ -129,6 +129,16 @@ jobs:
           & $py tests\smoke_app.py
         continue-on-error: true            # a headless runner has no display for Dear PyGui; the run is a bonus where it works
 
+      # the graph view with a mouse: hover, focus, clicks on what floats over the canvas (posted to its window)
+      - name: the pointer, against the tree's app
+        shell: pwsh
+        run: |
+          $env:STUDIO_TOOLCHAIN = "$PWD\mingw\mingw64"
+          $env:STUDIO_NO_UPDATE_CHECK = "1"
+          $env:STUDIO_NO_WELCOME = "1"
+          python tests\pointer_app.py
+        continue-on-error: true
+
       - uses: actions/upload-artifact@v4
         with:
           name: WLED_Effects_Studio

@@ -3313,15 +3313,36 @@ class App(Features):
             holes.append((x0 - 2, y0 - 2, x0 + w + 2, y0 + h + 2))
         for tag in tags:
             if dpg.does_item_exist(tag) and dpg.is_item_shown(tag):
-                st = dpg.get_item_state(tag)
-                w, h = st.get("rect_size") or (0, 0)
-                if w <= 0 or h <= 0:
-                    cfg = dpg.get_item_configuration(tag)      # a window not yet measured: its set size
-                    w, h = cfg.get("width") or 0, cfg.get("height") or 0
-                if w > 0 and h > 0:
-                    x, y = dpg.get_item_pos(tag)
-                    holes.append((x - 2, y - 2, x + w + 3, y + h + 3))   # the frame's border and rounding
+                hole = self._window_hole(tag)
+                if hole:
+                    holes.append(hole)
         return holes
+
+    @staticmethod
+    def _window_hole(tag):
+        """A shown window's rectangle as a hole, with a frame's border and
+        rounding round it - or None before it has a size."""
+        st = dpg.get_item_state(tag)
+        w, h = st.get("rect_size") or (0, 0)
+        if w <= 0 or h <= 0:
+            cfg = dpg.get_item_configuration(tag)      # a window not yet measured: its set size
+            w, h = cfg.get("width") or 0, cfg.get("height") or 0
+        if w <= 0 or h <= 0:
+            return None
+        x, y = dpg.get_item_pos(tag)
+        return (x - 2, y - 2, x + w + 3, y + h + 3)
+
+    def _host_hole(self, tag):
+        """The hole of the window a pane floats in (the 3-D view over the
+        graph is in pip_win), or None for a pane among the panes. Every
+        frame keeps off that window but the pane's own, which is drawn round
+        the window itself: cut by it, only scraps of the glow were left."""
+        item = dpg.get_item_parent(tag) if dpg.does_item_exist(tag) else None
+        while item is not None:
+            if dpg.get_item_type(item).endswith("::mvWindowAppItem"):
+                return None if dpg.get_item_alias(item) == "root" else self._window_hole(item)
+            item = dpg.get_item_parent(item)
+        return None
 
     def poll_glow(self):
         """The frames (an accent outline, or a gradient): the pane in focus,
@@ -3341,7 +3362,7 @@ class App(Features):
             if self.focus:
                 r = self._screen_rect(self.focus)
                 if r:
-                    rects.append(r + (None, 0.55, "focus"))
+                    rects.append(r + (None, 0.55, "focus", glow.RADIUS, self._host_hole(self.focus)))
             pane = self._screen_rect("graph_win")
             if self.layout == "graph" and self.gp.graph and pane and dpg.does_item_exist("node_editor") \
                     and not (dpg.is_item_shown("graph_menu") or dpg.is_item_shown("graph_ctx")):

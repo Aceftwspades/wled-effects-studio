@@ -168,17 +168,22 @@ class Frames:
         return out
 
     def update(self, rects, holes=()):
-        """rects: (x0, y0, x1, y1, clip, alpha, kind[, radius]) - clip a rect
-        to keep the strips inside (or None), alpha 0..1 scaling the frame,
-        radius the framed thing's corner rounding. holes: rectangles
-        (windows over the top) the strips are cut around."""
+        """rects: (x0, y0, x1, y1, clip, alpha, kind[, radius[, own]]) - clip
+        a rect to keep the strips inside (or None), alpha 0..1 scaling the
+        frame, radius the framed thing's corner rounding, own the hole of
+        the window the framed thing floats in: every other frame keeps off
+        that window, its own is drawn round it. holes: rectangles (windows
+        over the top) the strips are cut around."""
         glow = self.style != "outline"
         th = (time.perf_counter() * TURNS_PER_S * 2 * math.pi) % (2 * math.pi) if self.style == "turning" else 0.0
         c, s = math.cos(th), math.sin(th)
         used = {k: 0 for k in self.quads}
+        all_holes = holes
         for rect in rects:
             x0, y0, x1, y1, clip, alpha, kind = rect[:7]
             radius = rect[7] if len(rect) > 7 else RADIUS
+            own = rect[8] if len(rect) > 8 else None
+            holes = all_holes if own is None else [h for h in all_holes if h != own]
             quads = self.quads.get(kind)
             if quads is None:
                 continue

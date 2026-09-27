@@ -163,11 +163,13 @@ view there. View > Minimap shows or hides it and picks its corner (or
 leaves it to one the 3-D view leaves free; a corner the view has, it
 cedes to the other corner of that edge). A node's long settings (bitmap rows,
 expressions, files, curves) come up in the **properties** over the graph
-while such a node is selected, and while the add menu is open the node
-under the pointer is described there - what it does, every pin and
-setting - before you add it; N keeps them open, their x closes them
+while such a node is selected; N keeps them open, their x closes them
 until another node is selected. As panes, the properties sit under the
-3-D view (N hides them). What a node or pin does comes up **at the
+3-D view (N hides them). The **add menu** describes the node under the
+pointer in a column beside its list - what it does, every pin and
+setting - before you add it: go straight across to it to read on (the
+wheel scrolls a long one); a search describes its first hit, the one
+Enter adds. What a node or pin does comes up **at the
 pointer** when it rests on one (as panes, in the box above the graph).
 
 The panes go where you want them: drag one by the `:::` at its top right

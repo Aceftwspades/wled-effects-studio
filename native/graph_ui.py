@@ -200,7 +200,7 @@ class GraphPanel(Glyphs):
         self._ext_last = {}      # node -> its position last poll, while ext_sel has nodes
         self._knife = None       # (x0, y0) while a Ctrl+right-drag cuts wires
         self._splice = None      # (node, link, a, out, b, inp, my_in, my_out) while a dragged node sits over a wire
-        self._add_preview = None # the node type the add menu is describing in the properties pane
+        self._add_preview = None # the node type the add menu is describing, in its column beside the list
         self._menu_entries_cache = None
         self._press_pos = {}     # node -> position at the last press (a drop onto a wire)
         self._undo_desc = []     # what each undo snapshot precedes
@@ -570,8 +570,6 @@ class GraphPanel(Glyphs):
     def _poll_props(self):
         if not dpg.does_item_exist("graph_props") or not self.graph:
             return
-        if self._add_preview is not None:
-            return                                        # the add menu is describing a node there
         sel = self._selected()
         key = (self.file, sel[0]) if sel else None
         if key == getattr(self, "_props_for", "unset"):
@@ -756,7 +754,12 @@ class GraphPanel(Glyphs):
         c, r = int((mx - x0) // cell), int((my - y0) // cell)
         inside = 0 <= r < len(rows) and 0 <= c < len(rows[0]) and mx >= x0 and my >= y0
         down, rdown = dpg.is_mouse_button_down(0), dpg.is_mouse_button_down(1)
-        if (down or rdown) and inside:
+        # A stroke starts only with a press on the grid itself: a box selection
+        # or a node dragged on the canvas, passing under the properties, painted
+        # the cells it crossed; so did a click on a menu lying over the grid.
+        if dpg.is_mouse_button_clicked(0) or dpg.is_mouse_button_clicked(1):
+            ed["armed"] = inside and dpg.is_item_hovered(ed["tag"])
+        if (down or rdown) and inside and ed.get("armed"):
             ch = "." if rdown else ed["pen"]
             if ed["stroke"] is None:                     # the first cell of a stroke: one undo step for the whole stroke
                 self.touch(); self.snapshot("paint bitmap")
@@ -766,9 +769,11 @@ class GraphPanel(Glyphs):
                 self._bitmap_set(rows, None)
                 ed["stroke"].add((r, c))
                 self._bitmap_draw()
-        elif not down and not rdown and ed["stroke"] is not None:   # the stroke ends: the node and the code follow
-            ed["stroke"] = None
-            self._sync_pos(); self.rebuild()
+        elif not down and not rdown:
+            ed["armed"] = False
+            if ed["stroke"] is not None:                 # the stroke ends: the node and the code follow
+                ed["stroke"] = None
+                self._sync_pos(); self.rebuild()
 
     # --- the curve editor in the properties pane -------------------------------------------
     def _curve_pts(self):
@@ -823,6 +828,9 @@ class GraphPanel(Glyphs):
         v = max(0.0, min(1.0, 1.0 - (my - y0) / max(1, H - 1)))
         down, rdown = dpg.is_mouse_button_down(0), dpg.is_mouse_button_down(1)
         pressed, rpressed = dpg.is_mouse_button_clicked(0), dpg.is_mouse_button_clicked(1)   # a click within one frame still counts
+        press = pressed or rpressed or (down and not ed["was"]) or (rdown and not ed["rwas"])
+        if press and not dpg.is_item_hovered(ed["tag"]):
+            inside = False                     # a press counts on the curve itself, not through a menu or a list over it
         n, pts = self._curve_pts()
         if n is None:
             return
@@ -3878,6 +3886,7 @@ class GraphPanel(Glyphs):
         empty. `only` narrows it to those node types (a dropped wire)."""
         self._only = only
         self._fill_quick()
+        self._desc_hint()
         dpg.set_value("graph_search", "")
         self._search("graph_search", "")
         dpg.configure_item("graph_menu", show=True)
@@ -3918,6 +3927,9 @@ class GraphPanel(Glyphs):
             dpg.add_text("no match", parent="graph_hits", color=DIM)
         rows = min(len(hits), 24) + (1 if only is not None and not text else 0)
         dpg.configure_item("graph_hits", height=max(30, 21 * max(rows, 1) + 12))
+        if hits:                                          # what Enter would add, until the pointer rests on another
+            self._add_preview = hits[0][2]
+            self.describe_type(hits[0][2])
 
     def _search_enter(self, sender, text):
         """Enter in the search box adds the first hit."""
@@ -4710,15 +4722,22 @@ class GraphPanel(Glyphs):
         for name in self.type_names():
             c, n = name.split(" / ", 1)
             cats.setdefault(c, []).append(n)
-        dpg.add_input_text(tag="graph_search", parent="graph_menu", hint="search nodes", width=px(200),
+        # two columns: the list, and beside it what the node under the pointer does. In the menu itself, so the
+        # pointer goes straight across to it and the wheel scrolls it: in the properties over the canvas it was cut
+        # short, out of the pointer's reach while the menu was up, and the first time it came up it took the focus
+        # and closed the menu
+        row = dpg.add_group(horizontal=True, parent="graph_menu")
+        dpg.add_group(tag="graph_menu_list", parent=row)
+        dpg.add_input_text(tag="graph_search", parent="graph_menu_list", hint="search nodes", width=px(200),
                            callback=self._search, on_enter=False)
         # on_enter would stop the per-keystroke callback; Enter is read separately
-        dpg.add_text("add node", parent="graph_menu", color=DIM)
+        dpg.add_text("add node", parent="graph_menu_list", color=DIM)
         # child windows rather than groups: a collapsing header stretches to
         # its parent, and an autosized popup would stretch with it
-        dpg.add_child_window(tag="graph_hits", parent="graph_menu", show=False, width=px(230), height=px(60),
+        dpg.add_child_window(tag="graph_hits", parent="graph_menu_list", show=False, width=px(230), height=px(60),
                              border=False)
-        with dpg.child_window(tag="graph_cats", parent="graph_menu", width=px(230), height=px(430), border=False):
+        dpg.add_child_window(tag="graph_desc", parent=row, width=px(330), height=px(480), border=True)
+        with dpg.child_window(tag="graph_cats", parent="graph_menu_list", width=px(230), height=px(430), border=False):
             # the last few added and the starred ones sit on top; refilled each open
             dpg.add_group(tag="graph_quick")
             self._fill_quick()
@@ -4747,8 +4766,34 @@ class GraphPanel(Glyphs):
             if hidden:
                 dpg.add_text(f"{hidden} node(s) hidden: their feature is off in Flash > Features", color=DIM, wrap=px(220))
         self._widgets.add("graph_search")
+        self._desc_hint()
 
-    # --- a node hovered in the add menu is described in the properties pane ---------------
+    # --- a node hovered in the add menu is described beside the list ----------------------
+    def _desc_hint(self):
+        """The description column before a node is under the pointer."""
+        self._add_preview = None
+        if dpg.does_item_exist("graph_desc"):
+            dpg.delete_item("graph_desc", children_only=True)
+            dpg.add_text("rest the pointer on a node to read what it does - its pins and its settings",
+                         parent="graph_desc", color=DIM, wrap=0)
+
+    def _fit_add_menu(self):
+        """The description column as tall as the list beside it (the list
+        grows with a search's hits), and the menu - opened at the pointer,
+        and wide with its description - kept inside the window."""
+        if dpg.does_item_exist("graph_menu_list") and dpg.does_item_exist("graph_desc"):
+            lh = int(dpg.get_item_rect_size("graph_menu_list")[1])
+            want = max(lh, px(300))
+            if lh > 0 and abs(dpg.get_item_height("graph_desc") - want) > 1:
+                dpg.configure_item("graph_desc", height=want)
+        w, h = dpg.get_item_rect_size("graph_menu")
+        if w <= 0 or h <= 0:
+            return
+        x, y = dpg.get_item_pos("graph_menu")
+        vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+        nx, ny = max(0, min(x, vw - w - 4)), max(0, min(y, vh - h - 4))
+        if (nx, ny) != (x, y):
+            dpg.set_item_pos("graph_menu", [int(nx), int(ny)])
     def _menu_entries(self):
         """Every selectable in the add menu, with the type it adds."""
         out = []
@@ -4767,14 +4812,14 @@ class GraphPanel(Glyphs):
 
     def _poll_add_preview(self):
         """While the add menu is up, the node under the pointer is described
-        in the properties pane; the menu gone, the pane goes back to the
-        selection."""
+        in its column beside the list - and stays while the pointer goes
+        across to read it (nothing is under the pointer on the way)."""
         if not dpg.does_item_exist("graph_menu") or not dpg.is_item_shown("graph_menu"):
             if self._add_preview is not None:
                 self._add_preview = None
                 self._menu_entries_cache = None
-                self._props_for = "unset"                 # the pane back to the selection
             return
+        self._fit_add_menu()
         if self._menu_entries_cache is None:
             self._menu_entries_cache = self._menu_entries()
         hovered = None
@@ -4787,33 +4832,37 @@ class GraphPanel(Glyphs):
         self.describe_type(hovered)
 
     def describe_type(self, type_):
-        """A node type in the properties pane: what it is, its pins and
-        settings, each with its words."""
-        if not dpg.does_item_exist("graph_props"):
+        """A node type in the add menu's description column: what it is,
+        its pins and settings, each with its words."""
+        P = "graph_desc"
+        if not dpg.does_item_exist(P):
             return
-        dpg.delete_item("graph_props", children_only=True)
-        self._props_for = ("preview", type_)
+        dpg.delete_item(P, children_only=True)
+        dpg.set_y_scroll(P, 0.0)
         if type_.startswith("preset:"):
-            typeface.heading(dpg.add_text(f"preset: {type_[7:]}", parent="graph_props"))
-            dpg.add_text("a node saved with its settings, from a node's menu", parent="graph_props", color=DIM, wrap=0)
+            typeface.heading(dpg.add_text(f"preset: {type_[7:]}", parent=P))
+            dpg.add_text("a node saved with its settings, from a node's menu", parent=P, color=DIM, wrap=0)
             return
         d = self.lib.get(type_)
         if not d:
             return
-        typeface.heading(dpg.add_text(d.get("label") or type_, parent="graph_props"))
-        typeface.small(dpg.add_text(f"{d.get('cat', '')} - runs per {d.get('scope', 'pixel')}", parent="graph_props", color=DIM))
+        typeface.heading(dpg.add_text(d.get("label") or type_, parent=P, wrap=0))
+        typeface.small(dpg.add_text(f"{d.get('cat', '')} - runs per {d.get('scope', 'pixel')}", parent=P, color=DIM))
         if d.get("doc"):
-            dpg.add_text(d["doc"], parent="graph_props", wrap=0)
+            dpg.add_text(d["doc"], parent=P, wrap=0)
         for title, items in (("inputs", d.get("inputs", [])), ("outputs", d.get("outputs", [])), ("settings", d.get("params", []))):
             if not items:
                 continue
-            typeface.label(dpg.add_text(title.upper(), parent="graph_props", color=DIM))
+            typeface.label(dpg.add_text(title.upper(), parent=P, color=DIM))
+            lines = []
             for p in items:
                 shown = nodeface.label(type_, p["name"])
                 line = f"  {shown}" + (f" [{p['name']}]" if shown != p["name"] else "") + f" ({p.get('type', '')})"
                 if p.get("doc"):
                     line += f": {p['doc']}"
-                dpg.add_text(line, parent="graph_props", wrap=0)
+                lines.append(line)
+            # one block a list: its lines as close as a paragraph's (a text each had the theme's gap between them)
+            dpg.add_text("\n".join(lines), parent=P, wrap=0)
 
     def _fill_quick(self):
         """Favourites (starred in a node's menu) and the recently added, at

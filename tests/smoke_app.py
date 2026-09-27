@@ -341,7 +341,8 @@ STEPS = [
     ([{"check": "(lambda ks: [dpg.get_item_type(k).split('::')[-1] for k in ks].index('mvMenuItem') <= 4)(dpg.get_item_children('graph_ctx', 1))"},
       {"check": "'node reference' in dpg.get_item_configuration([k for k in dpg.get_item_children('graph_ctx', 1) "
                 "if dpg.get_item_type(k).endswith('mvMenuItem')][-1])['label']"},
-      {"check": "dpg.get_item_alias(dpg.get_item_children('graph_menu', 1)[0]) == 'graph_search'"},
+      {"check": "dpg.get_item_alias(dpg.get_item_children('graph_menu_list', 1)[0]) == 'graph_search'"},     # the list leads with its search
+      {"check": "dpg.get_item_parent('graph_desc') == dpg.get_item_parent('graph_menu_list')"},          # the description beside it
       {"py": "dpg.configure_item('graph_ctx', show=False)"}], 0.5),
     # the toolbar (C15): the frames in words in a wide window, icons in a narrow one; an open frame lit
     ([{"py": "setattr(app, '_vp0', (dpg.get_viewport_width(), dpg.get_viewport_height()))"}, {"viewport": [1900, 1000]}], 1.2),

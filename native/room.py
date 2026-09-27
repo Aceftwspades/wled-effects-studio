@@ -11,8 +11,9 @@ canvas takes the window.
   tuck button puts it away to a tab. While tucked it is not drawn.
 - The properties come up over the canvas only when the selected node has
   settings a node cannot hold (text over several lines, a file, a curve, a
-  bitmap), or while the add menu describes a node. N pins them open; their
-  x closes them until another node is selected.
+  bitmap). N pins them open; their x closes them until another node is
+  selected. (The add menu describes the node under the pointer in a column
+  of its own.)
 - The help that was a band above the graph follows the pointer.
 
 Anything over the canvas is a top-level window of its own. Child windows
@@ -71,6 +72,9 @@ class _State:
         self.was_folded = None   # the panel's last state, and where the canvas started then
         self.main_x = None
         self.test_at = None      # the tests' pointer for the help at the pointer: (x, y), or None
+        self.fly_primed = 0      # the flyout's first appearance: 0 to come, 1 shown off the screen, 2 done
+        self.float_in = None     # the window over the canvas the pointer is on, once the focus is settled there
+        self.float_owner = None  # the window over the canvas last clicked in (None: the canvas, or elsewhere)
 
 
 S = _State()
@@ -517,8 +521,6 @@ def place(app, rects):
 def _props_need(app):
     """(whether the properties should be up, the selection they are for)."""
     gp = app.gp
-    if gp._add_preview is not None:
-        return True, ("preview", gp._add_preview)
     sel = gp._selected() if gp.graph else []
     key = (gp.file, sel[0]) if sel else None
     if getattr(app, "props_pinned", False):
@@ -654,7 +656,27 @@ def _poll_rail_here(app):
             dpg.configure_item(f"rail_{key}", tint_color=chrome.ACCENT if key == here else chrome.TEXT)
 
 
+def _prime_fly():
+    """Dear PyGui gives a window the focus the first time it is shown,
+    no_focus_on_appearing or not, and a window taking the focus closes any
+    popup that is up - the add menu, a node's menu. So the flyout makes its
+    first appearance at the start, off the screen, for a frame: shown later
+    over the canvas, it takes nothing from anyone."""
+    if not dpg.does_item_exist("props_fly"):
+        S.fly_primed = 2
+        return
+    if S.fly_primed == 0:
+        dpg.configure_item("props_fly", show=True, width=px(8), height=px(8))
+        dpg.set_item_pos("props_fly", [-4000, -4000])
+    else:
+        dpg.configure_item("props_fly", show=False)
+    S.fly_primed += 1
+
+
 def poll(app):
+    if S.fly_primed < 2:
+        _prime_fly()
+        return
     if not active(app):
         if S.tip_shown and dpg.does_item_exist("help_tip"):
             dpg.hide_item("help_tip")
@@ -663,9 +685,62 @@ def poll(app):
             dpg.hide_item("props_fly")
         return
     _poll_props(app)
+    _poll_float_focus(app)
     _poll_tip(app)
     _poll_sec_scroll()
     _poll_rail_here(app)
+
+
+FLOATING = ("props_fly", "pip_win", "pip_tab")     # the windows over the canvas that take clicks
+
+
+def _floating_under_pointer():
+    mx, my = dpg.get_mouse_pos(local=False)
+    for t in FLOATING:
+        if dpg.does_item_exist(t) and dpg.is_item_shown(t):
+            x, y = dpg.get_item_pos(t)
+            w, h = dpg.get_item_state(t).get("rect_size") or (0, 0)
+            if x <= mx < x + w and y <= my < y + h:
+                return t
+    return None
+
+
+def _others_up(app):
+    """A window with the focus that is not the canvas's (a menu, a dialog),
+    or a menu bar menu open: the focus is theirs to keep."""
+    root = dpg.get_alias_id("root")
+    if any(w != root and dpg.get_item_state(w).get("focused") for w in dpg.get_windows()):
+        return True
+    return any((dpg.get_item_state(m).get("rect_size") or (0, 0))[0] > 0
+               for m in (getattr(app, "_menus", None) or ()) if dpg.does_item_exist(m))
+
+
+def _poll_float_focus(app):
+    """imnodes takes a click anywhere in its canvas while the canvas has
+    the focus - its window hovered OR focused - so after a click on a node,
+    a click on the properties or the 3-D view over the canvas landed on the
+    canvas under them too: on empty canvas it cleared the selection (the
+    properties went with it) and began a box selection. So as the pointer
+    comes onto one of those windows, the focus goes to it, before a click -
+    unless a button is down (a drag keeps its window), a box is being typed
+    in (it would lose the keyboard), a menu or a dialog has the focus
+    (taking it would close them), or the last click was in that window
+    (being worked in, a list of its own may be open)."""
+    here = _floating_under_pointer()
+    if any(dpg.is_mouse_button_clicked(b) for b in (0, 1, 2)):
+        S.float_owner = here                        # the window clicked in, or None: the canvas, a pane
+    if here is None:
+        S.float_in = None
+        return
+    if here == S.float_in:
+        return
+    if here == S.float_owner:
+        S.float_in = here
+        return
+    if any(dpg.is_mouse_button_down(b) for b in (0, 1, 2)) or app.typing() or app.gp.typing() or _others_up(app):
+        return                                      # tried again next frame: the button up, the menu gone
+    dpg.focus_item(here)
+    S.float_in = here
 
 
 # --- the pointer on the 3-D view's controls ---------------------------------------------------------

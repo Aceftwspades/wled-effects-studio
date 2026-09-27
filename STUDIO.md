@@ -2431,6 +2431,49 @@ From running the studio and its harnesses on Arch Linux at 1.3.3.
 
 Released as 1.3.4.
 
+### After 1.3.4: three reports from the graph view (September 2026)
+
+Each reproduced before it was fixed, and checked after, with a studio driven
+by posted mouse messages - its own window only, the real pointer never
+moved, the app handing the front back to the window that had it (a window
+in front reads the real cursor), and ImGui told it has the focus. That is
+`tests/pointer_app.py` now (Windows): each fix below is one of its checks,
+and the release workflow runs it.
+
+- [x] **The frame round the 3-D view over the graph was cut** to scraps of
+      its glow: every window over the panes is a hole the frames keep off,
+      the 3-D view's own window too, and the focus frame is drawn just
+      outside the pane. The framed pane's own window is no hole in its own
+      frame (glow.update takes it; App._host_hole finds it), so the border
+      and the rounded corners are whole.
+- [x] **The add menu's description** went to the properties over the
+      canvas: cut short when the 3-D view was below it, out of the pointer's
+      reach while the menu was up (a popup lets no other window be hovered,
+      so the wheel did nothing), and the first time it came up it took the
+      focus and closed the menu. It is a column of the menu itself now,
+      beside the list: the pointer goes straight across to it, the wheel
+      scrolls a long one, a search describes its first hit (what Enter
+      adds), each list of pins one block (its lines as close as a
+      paragraph's - the menu kept the theme's gap between separate lines);
+      the menu, wider, is kept inside the window.
+- [x] **The properties over the canvas vanished at a click on them**:
+      imnodes takes a click anywhere in its canvas while the canvas has the
+      focus - its window hovered OR focused - so after a click on a node, a
+      click on the properties (or the 3-D view) landed on the canvas under
+      them as well; on empty canvas it cleared the selection, and the
+      properties went. As the pointer comes onto one of those windows, the
+      focus goes to it (room._poll_float_focus) - not while a button is
+      down, a box is typed in, a menu or a dialog has the focus, or the
+      last click was in that window (a list of its own may be open). A
+      window's first appearance takes the focus whatever it asks for, which
+      had hidden this the first time; the flyout makes its first appearance
+      off the screen at the start (room._prime_fly).
+- [x] **The Bitmap painter and the curve editor** took presses that were
+      not theirs: a box selection or a node dragged across the canvas
+      under the properties painted the cells it crossed; a click on a menu
+      lying over a curve put a point down. A stroke or a point now begins
+      only with a press on them (their drawlist hovered).
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads
