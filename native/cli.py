@@ -138,6 +138,7 @@ def main():
     ap.add_argument("--set", default="", help="sx=200,c3=90,o1=1")
     ap.add_argument("--sweep", default="", help="c3=50,120,210")
     ap.add_argument("--faceB", type=_number(int, 1), default=16)
+    ap.add_argument("--six", action="store_true", help="a six-faced cube: the bottom lit too, in the net's corner")
     ap.add_argument("--every", type=_number(int, 1), default=40, help="sample every N frames")
     ap.add_argument("--live", type=_number(float, 0), metavar="SECONDS",
                     help="capture system audio and print band levels, to check "
@@ -182,7 +183,11 @@ def main():
         ap.print_help()
         return
     try:
-        eng.resize(a.faceB)
+        if a.six:
+            from native.geometry import Geometry
+            eng.set_geometry(Geometry("cube", B=a.faceB, six=True))
+        else:
+            eng.resize(a.faceB)
     except ValueError as e:
         ap.error(f"--faceB {a.faceB}: {e}")
     try:

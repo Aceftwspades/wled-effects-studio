@@ -18,9 +18,11 @@ static inline uint8_t cfx_edgeTaper(int d, int soft) {
 // inscribed circle. rad is 0 at a face's centre and 255 at the circle
 // touching its edges (corners clamp to 255, so they read as rim rather than
 // as an out-of-range value). ang is the usual 0..255 atan2 wrap.
-// faceId: 0 top, 1 north, 2 south, 3 west, 4 east. Flat panels get one face.
+// faceId: 0 top, 1 north, 2 south, 3 west, 4 east, 5 the bottom of a six-faced
+// cube (the net's (2,2) block; it read as south, and took the walls' bars with
+// a band column that is no column). Flat panels get one face.
 static void cfx_buildFaceCircle(uint8_t *rad, uint8_t *ang, uint8_t *faceId,
-                                int cols, int rows, bool cubeNet, int B) {
+                                int cols, int rows, bool cubeNet, int B, bool six = false) {
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
       const size_t i = (size_t)y * cols + x;
@@ -28,7 +30,8 @@ static void cfx_buildFaceCircle(uint8_t *rad, uint8_t *ang, uint8_t *faceId,
       uint8_t fid;
       if (cubeNet) {
         const int bx = x / B, by = y / B;
-        fid = (bx == 1 && by == 1) ? 0 : (uint8_t)(by == 0 ? 1 : (by == 2 ? 2 : (bx == 0 ? 3 : 4)));
+        fid = (six && bx == 2 && by == 2) ? 5
+            : (bx == 1 && by == 1) ? 0 : (uint8_t)(by == 0 ? 1 : (by == 2 ? 2 : (bx == 0 ? 3 : 4)));
         cxf = (float)(x % B) - (B - 1) * 0.5f;
         cyf = (float)(y % B) - (B - 1) * 0.5f;
         maxR = (B - 1) * 0.5f;
@@ -53,7 +56,9 @@ static void cfx_buildFaceCircle(uint8_t *rad, uint8_t *ang, uint8_t *faceId,
 // from the middle row toward the top and bottom rims together, the way a
 // mirrored analyser normally works. The top face runs a CIRCULAR GEQ: each
 // wedge grows from the centre OUTWARD as its band gets louder, exactly the
-// treatment the walls take when Circles in all faces is on.
+// treatment the walls take when Circles in all faces is on. A six-faced
+// cube's bottom is the lid's twin: the same circle, so the bars run from one
+// circle to the other through the equator.
 //
 // Inverse edge EQ (o1) flips the fill direction everywhere, top face included:
 // wall bars fill inward from each rim instead of outward from the equator, and
@@ -103,12 +108,14 @@ static FX_RET mode_split_geq() {
 
   const bool cube = cfx_isCube(cols, rows);
   const int  B    = cube ? (cols / 3) : 1;
-  if (SEGENV.call == 0 || st[0] != (uint8_t)(cube ? 1 : 2)) {
+  const bool six  = cube && cfx_sixFaces;
+  const uint8_t kind = (uint8_t)(cube ? (six ? 3 : 1) : 2);   // the net it was built for: a change rebuilds
+  if (SEGENV.call == 0 || st[0] != kind) {
     cfx_buildBand(bu, bv, cols, rows, cube, B);
-    cfx_buildFaceCircle(rad, ang, fid, cols, rows, cube, B);
+    cfx_buildFaceCircle(rad, ang, fid, cols, rows, cube, B, six);
     for (int k = 0; k < 16; k++) spec[k] = 0;
     for (int k = 1; k < 16; k++) st[k] = 0;
-    st[0] = (uint8_t)(cube ? 1 : 2);
+    st[0] = kind;
   }
 
   um_data_t     *um   = cfx_getAudioData();
@@ -173,7 +180,7 @@ static FX_RET mode_split_geq() {
     CFX_NET_ROW(y);
     for (int x = 0; x < cols; x++, i++) {
       CFX_NET_SKIP(x);
-      const bool isTop = (fid[i] == 0);
+      const bool isTop = (fid[i] == 0 || fid[i] == 5);      // the lid, and a six-faced cube's floor: circles
       const uint8_t angR = (uint8_t)(ang[i] + angOff);      // this face, turned
       uint8_t lum = 0;
 

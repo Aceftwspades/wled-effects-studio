@@ -66,6 +66,13 @@
 // Ball position and velocity are Q8 (256 = one cell) so the ball can travel at
 // any speed and still be tested against a grid, with no floats in the frame
 // path.
+//
+// A SIX-FACED CUBE closes the bottom, and the floor is the BALL RETURN: the
+// ruler carries on past the paddle row, over the bottom fold and in across the
+// floor to a drain at its middle. A missed ball rolls off the paddle row and
+// across the floor (it can no longer be caught), and the life is lost when it
+// drains; the spare balls sit in a tray round the drain - the floor keeps the
+// score while the game goes on above it.
 // ---------------------------------------------------------------------------
 
 #ifndef BO_BRICK_W
@@ -119,6 +126,7 @@ struct BoState {
   uint16_t serveAt;
   uint16_t actAt;               // last brick break or paddle touch, for the stall watchdog
   uint8_t  clk[2];              // fx_dt8 store
+  uint8_t  rolling;             // six faces: a missed ball rolling across the floor to the drain
 };
 
 // Where a paddle may sit, as a half-open range of Q8 ring columns. Co-op is
@@ -218,8 +226,11 @@ static int boEdge(int t, int den, int B) {
   return idx;
 }
 
+// A six-faced cube's floor (the net's (2,2) block) faces the same X and Y as the
+// lid, so its columns are the lid's; its depth runs on from the paddle row
+// (dmax) - dmax+1 at its rim, dmax+topd at the drain in its middle.
 static void boBuildMap(uint8_t *col, uint8_t *dep, int cols, int rows,
-                       bool cube, int B, int topd) {
+                       bool cube, int B, int topd, bool six = false, int dmax = 0) {
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
       const size_t i = (size_t)y * cols + x;
@@ -227,13 +238,14 @@ static void boBuildMap(uint8_t *col, uint8_t *dep, int cols, int rows,
       if (!cube) { col[i] = (uint8_t)x; dep[i] = (uint8_t)y; continue; }
 
       const int bx = x / B, by = y / B, lx = x % B, ly = y % B;
-      if (bx != 1 && by != 1) { col[i] = 255; dep[i] = 0; continue; }   // gap corner
+      const bool floor_ = six && bx == 2 && by == 2;
+      if (bx != 1 && by != 1 && !floor_) { col[i] = 255; dep[i] = 0; continue; }   // gap corner
 
-      if (bx == 1 && by == 1) {                          // TOP: radial, centre out
+      if ((bx == 1 && by == 1) || floor_) {              // TOP (and the floor): radial, centre out
         const int ax = 2 * lx - (B - 1), ay = 2 * ly - (B - 1);
         const int aax = (ax < 0) ? -ax : ax, aay = (ay < 0) ? -ay : ay;
         const int r2  = (aax > aay) ? aax : aay;
-        dep[i] = (uint8_t)(r2 >> 1);
+        dep[i] = (uint8_t)(floor_ ? (dmax + topd - (r2 >> 1)) : (r2 >> 1));
         if (r2 == 0) { col[i] = 0; continue; }            // dead centre, odd B only
 
         // An exact diagonal leaves through a CORNER and has to be broken by
@@ -284,6 +296,7 @@ static void boResetBricks(uint8_t *brick, BoState *s, const uint8_t *col,
 
 static void boPark(BoState *s, int dmax, uint8_t who) {
   s->served  = 0;
+  s->rolling = 0;
   s->parkOn  = (who < 2) ? who : 0;
   s->bu      = s->pad[s->parkOn];
   s->bd      = (int32_t)(dmax - 1) << 8;
@@ -316,6 +329,8 @@ static FX_RET mode_breakout() {
   const int wallH = cube ? B : rows;
   const int dmax  = topd + wallH - 1;                    // the paddle row
   if (wallH < 5 || ringW < 8) { SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
+  const bool six  = cube && cfx_sixFaces;
+  const int  dtot = dmax + topd;                         // six faces: the drain, the floor's middle
 
   const int bcols = ringW / BO_BRICK_W;
   // Bricks never come more than halfway down the walls: past that there is no
@@ -380,9 +395,10 @@ static FX_RET mode_breakout() {
   if (wallBrick > wallMax) wallBrick = wallMax;
   const int bdepth = topd + wallBrick;
 
-  const uint8_t want = (uint8_t)(cube ? 1 : 2);
+  const uint8_t want = (uint8_t)(cube ? (six ? 3 : 1) : 2);    // the net it was built for: a change rebuilds
   if (SEGENV.call == 0 || s->mode != want || s->bcols != (uint16_t)bcols) {
-    boBuildMap(col, dep, cols, rows, cube, B, topd);
+    boBuildMap(col, dep, cols, rows, cube, B, topd, six, dmax);
+    s->rolling = 0;
     s->mode   = want;
     s->bcols  = (uint16_t)bcols;
     s->bdepth = (uint8_t)bdepth;
@@ -508,7 +524,10 @@ static FX_RET mode_breakout() {
     if (steps > 8) steps = 8;
 
     for (int it = 0; it < steps && s->served; it++) {
-      const int32_t us = boUScale(s->bd, topd);
+      // sideways motion fades out toward the lid's centre - and on a six-faced cube's floor toward the drain,
+      // where the columns converge the same way
+      const int32_t dQ = (six && s->bd > ((int32_t)dmax << 8)) ? (((int32_t)dtot << 8) - s->bd) : s->bd;
+      const int32_t us = boUScale(dQ, topd);
       s->bu = boWrap(s->bu + (((s->vu * us) >> 8) * dt) / (BO_TICK_MS * steps), ringQ);
       s->bd += (s->vd * dt) / (BO_TICK_MS * steps);
 
@@ -564,6 +583,29 @@ static FX_RET mode_breakout() {
         }
       }
 
+      // AI: below section was generated by an AI
+      // Six faces: a ball past the paddle row is on the floor - it rolls on, slower, and can no longer be
+      // caught; it is lost when it reaches the drain in the middle (served again as a miss always was)
+      if (six && s->served && (s->rolling || cd > dmax)) {
+        if (!s->rolling) {
+          s->rolling = 1;
+          s->vd = (s->vd > 0 ? s->vd : -s->vd) / 3 + 8;   // a roll you can follow across the floor
+          s->vu /= 2;
+        }
+        if (s->bd >= ((int32_t)dtot << 8)) {
+          if (s->lives) s->lives--;
+          s->flash = 255;
+          if (!s->lives) {
+            s->lives = BO_LIVES;
+            s->level = 0;
+            boResetBricks(brick, s, col, dep, n, bcols, bdepth);
+          }
+          boPark(s, dmax, s->hitPad);
+        }
+        continue;
+      }
+      // AI: end
+
       if (s->served && s->vd > 0 && cd >= dmax) {
         int caught = -1;
         for (int p = 0; p < 2; p++) if (boOnPaddle(s->pad[p], halfW, cu, ringW)) { caught = p; break; }
@@ -597,7 +639,7 @@ static FX_RET mode_breakout() {
           s->hitPad = (uint8_t)caught;
           s->flash  = qadd8(s->flash, 40);
           s->actAt  = (uint16_t)strip.now;
-        } else if (s->bd > ((int32_t)(dmax + 1) << 8)) {
+        } else if (!six && s->bd > ((int32_t)(dmax + 1) << 8)) {     // five faces: off the open bottom edge
           if (s->lives) s->lives--;
           s->flash = 255;
           if (!s->lives) {
@@ -687,6 +729,13 @@ static FX_RET mode_breakout() {
       } else if (d > dmax - (int)s->lives && d <= dmax - 1 && !s->served
                  && boOnPaddle(s->pad[0], 0, u, ringW)) {
         c = RGBW32(120, 90, 20, 0);                      // lives, stacked over the server
+      } else if (six && d == dtot - 1 && s->lives > 1) {
+        // the spare balls in their tray round the drain: one for each life after the one in play
+        for (int k = 0; k < (int)s->lives - 1; k++) {
+          int32_t dk = boLoopDelta((int32_t)u, (int32_t)((k * ringW) / BO_LIVES + ringW / 8), (int32_t)ringW);
+          if (dk < 0) dk = -dk;
+          if (dk * 16 < ringW) { c = RGBW32(110, 110, 110, 0); break; }
+        }
       }
 
       // The event flash deliberately skips the paddles. A full-strength miss

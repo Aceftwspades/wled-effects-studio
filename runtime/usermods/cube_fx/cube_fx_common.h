@@ -1332,13 +1332,19 @@ static void lf_fwd(int f, float a, float b, float &X, float &Y, float &Z) {
     case 1:  X =  a; Y =  1.0f; Z =  b; break;   // NORTH
     case 2:  X =  a; Y = -1.0f; Z = -b; break;   // SOUTH
     case 3:  X = -1.0f; Y = -b; Z =  a; break;   // WEST
+    case 5:  X =  a; Y = -b; Z = -1.0f; break;   // BOTTOM (six faces: the net's (2,2) block, as cfx_pos has it)
     default: X =  1.0f; Y = -b; Z = -a; break;   // EAST
   }
 }
-static int lf_inv(float X, float Y, float Z, float &a, float &b) {
+// The face a direction points at and where on it; -1 for the bottom unless
+// `six` (a six-faced cube), when it is face 5.
+static int lf_inv(float X, float Y, float Z, float &a, float &b, bool six = false) {
   const float ax = fabsf(X), ay = fabsf(Y), az = fabsf(Z);
   if (az >= ax && az >= ay) {
-    if (Z <= 0.0f) return -1;                    // the open bottom: no cell there
+    if (Z <= 0.0f) {
+      if (!six) return -1;                       // the open bottom: no cell there
+      a = X / az; b = -Y / az; return 5;
+    }
     a = X / az; b = -Y / az; return 0;
   }
   if (ay >= ax) {
@@ -1350,10 +1356,11 @@ static int lf_inv(float X, float Y, float Z, float &a, float &b) {
 }
 
 
-// Face normals and tangent bases, matching lf_fwd exactly.
-static const int8_t LF_N[5][3] = {{0,0,1},{0,1,0},{0,-1,0},{-1,0,0},{1,0,0}};
-static const int8_t LF_U[5][3] = {{1,0,0},{1,0,0},{1,0,0},{0,0,1},{0,0,-1}};
-static const int8_t LF_V[5][3] = {{0,-1,0},{0,0,1},{0,0,-1},{0,-1,0},{0,-1,0}};
+// Face normals and tangent bases, matching lf_fwd exactly (the sixth, the bottom, for a six-faced cube).
+static const int8_t LF_N[6][3] = {{0,0,1},{0,1,0},{0,-1,0},{-1,0,0},{1,0,0},{0,0,-1}};
+static const int8_t LF_U[6][3] = {{1,0,0},{1,0,0},{1,0,0},{0,0,1},{0,0,-1},{1,0,0}};
+static const int8_t LF_V[6][3] = {{0,-1,0},{0,0,1},{0,0,-1},{0,-1,0},{0,-1,0},{0,-1,0}};
+#define CFX_CELLS_MAX 384              // six faces of 8 x 8 cells; five (320) unless the cube has six
 
 // ---------------------------------------------------------------------------
 // Directional transition table over all five faces: 320 cells x 4 headings,
@@ -1365,10 +1372,12 @@ static const int8_t LF_V[5][3] = {{0,-1,0},{0,0,1},{0,0,-1},{0,-1,0},{0,-1,0}};
 // the new face's basis. Without it a cycle would cross a fold and carry on in
 // a direction that no longer means anything.
 //
-// 0xFFFF marks a step onto the unwired bottom, which behaves as a wall.
+// 0xFFFF marks a step onto the unwired bottom, which behaves as a wall - on a
+// five-faced cube. With `six` the bottom is face 5, its 64 cells after the
+// walls' (384 in all, CFX_CELLS_MAX), and the arena is closed all round.
 // ---------------------------------------------------------------------------
-static void cfx_buildDirLut(uint16_t *lut) {
-  for (int f = 0; f < 5; f++)
+static void cfx_buildDirLut(uint16_t *lut, bool six = false) {
+  for (int f = 0; f < (six ? 6 : 5); f++)
     for (int j = 0; j < 8; j++)
       for (int i2 = 0; i2 < 8; i2++) {
         const int c = f * 64 + j * 8 + i2;
@@ -1379,7 +1388,7 @@ static void cfx_buildDirLut(uint16_t *lut) {
           float X, Y, Z, na, nb;
           lf_fwd(f, a + da, b + db, X, Y, Z);
           const float m = fmaxf(fabsf(X), fmaxf(fabsf(Y), fabsf(Z)));
-          const int nf = lf_inv(X / m, Y / m, Z / m, na, nb);
+          const int nf = lf_inv(X / m, Y / m, Z / m, na, nb, six);
           if (nf < 0) { lut[c * 4 + d] = 0xFFFF; continue; }
           int ni = (int)((na + 1.0f) * 4.0f); if (ni < 0) ni = 0; if (ni > 7) ni = 7;
           int nj = (int)((nb + 1.0f) * 4.0f); if (nj < 0) nj = 0; if (nj > 7) nj = 7;
@@ -1398,16 +1407,18 @@ static void cfx_buildDirLut(uint16_t *lut) {
       }
 }
 
-// Pixel -> surface cell, the five faces the cycles ride. 0xFFFF for gaps and
-// for the six-face bottom, which the transition table treats as a wall.
-static void cfx_buildCells(uint16_t *cellOf, int cols, int rows, bool cube, int B) {
+// Pixel -> surface cell, the faces the cycles ride. 0xFFFF for gaps, and for
+// the bottom unless `six` - then its (2,2) block is face 5, which the
+// transition table built with `six` joins to the walls.
+static void cfx_buildCells(uint16_t *cellOf, int cols, int rows, bool cube, int B, bool six = false) {
   for (int y = 0; y < rows; y++)
     for (int x = 0; x < cols; x++) {
       const size_t i = (size_t)y * cols + x;
       if (!cube) { cellOf[i] = (uint16_t)(((y * 8) / rows) * 8 + (x * 8) / cols); continue; }
       const int bx = x / B, by = y / B;
-      if ((bx != 1 && by != 1) || B < 8) { cellOf[i] = 0xFFFF; continue; }
-      const int f = (bx == 1 && by == 1) ? 0 : (by == 0 ? 1 : (by == 2 ? 2 : (bx == 0 ? 3 : 4)));
+      const bool bottom = six && bx == 2 && by == 2;
+      if (((bx != 1 && by != 1) && !bottom) || B < 8) { cellOf[i] = 0xFFFF; continue; }
+      const int f = bottom ? 5 : ((bx == 1 && by == 1) ? 0 : (by == 0 ? 1 : (by == 2 ? 2 : (bx == 0 ? 3 : 4))));
       cellOf[i] = (uint16_t)(f * 64 + (((y % B) * 8) / B) * 8 + (((x % B) * 8) / B));
     }
 }

@@ -31,6 +31,12 @@
 //
 // Code pours out of a point above the cube and cascades down all four sides.
 //
+// A six-faced cube closes the bottom, and the ruler carries on under it: past
+// DMAX the streams cross the bottom fold and run in across the floor to its
+// centre, where they converge and fade - the lid's pool mirrored, the code
+// draining away underneath (the same column groups per ring, the same fade
+// toward the middle, no glyphs).
+//
 // ---------------------------------------------------------------------------
 // THE ALIASING PROBLEM, AND WHY THERE IS A SPAN TABLE
 // ---------------------------------------------------------------------------
@@ -193,9 +199,11 @@ static inline int mx_edge(int t, int den, int B) {
 // ---------------------------------------------------------------------------
 static void mx_buildMap(uint8_t *col, uint8_t *dep, uint8_t *tsp, uint8_t *lcol,
                         int cols, int rows, bool cube, int B,
-                        int ncol, int topd, int depShift) {
+                        int ncol, int topd, int depShift, bool six = false) {
   uint16_t cnt[MX_TOPD_MAX];
   for (int k = 0; k < MX_TOPD_MAX; k++) { cnt[k] = 0; tsp[k] = 1; }
+  // a six-faced cube's floor: its rim one past the walls' last row, its centre topd further (the depth total)
+  const int dtot = topd + B - 1 + topd;
 
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
@@ -211,15 +219,16 @@ static void mx_buildMap(uint8_t *col, uint8_t *dep, uint8_t *tsp, uint8_t *lcol,
       }
 
       const int bx = x / B, by = y / B, lx = x % B, ly = y % B;
-      if (bx != 1 && by != 1) { col[i] = 255; dep[i] = 0; lcol[i] = 0; continue; }   // gap corner
+      const bool floor_ = six && bx == 2 && by == 2;
+      if (bx != 1 && by != 1 && !floor_) { col[i] = 255; dep[i] = 0; lcol[i] = 0; continue; }   // gap corner
 
-      if (bx == 1 && by == 1) {                      // TOP: radial, centre out
+      if ((bx == 1 && by == 1) || floor_) {          // TOP (and the floor, facing the same X, Y): radial
         const int ax = 2 * lx - (B - 1), ay = 2 * ly - (B - 1);
         const int aax = (ax < 0) ? -ax : ax, aay = (ay < 0) ? -ay : ay;
         const int r2  = (aax > aay) ? aax : aay;
         const int d   = r2 >> 1;
-        dep[i] = (uint8_t)d;
-        if (d < MX_TOPD_MAX) cnt[d]++;
+        dep[i] = (uint8_t)(floor_ ? (dtot - d) : d);
+        if (!floor_ && d < MX_TOPD_MAX) cnt[d]++;    // the floor's rings are the lid's
 
         if (r2 == 0) { col[i] = 0; lcol[i] = 0; continue; }   // dead centre, odd B only
 
@@ -279,15 +288,16 @@ static void mx_buildMap(uint8_t *col, uint8_t *dep, uint8_t *tsp, uint8_t *lcol,
     tsp[d] = (uint8_t)sp;
   }
 
-  // Snap each top-face pixel to its group's base column.
-  for (int y = B; y < 2 * B; y++)
-    for (int x = B; x < 2 * B; x++) {
-      const size_t i = (size_t)y * cols + x;
-      const int d = dep[i];
-      if (d >= MX_TOPD_MAX) continue;
-      const int sp = tsp[d];
-      col[i] = (uint8_t)(col[i] & (uint8_t)~(sp - 1));
-    }
+  // Snap each top-face pixel to its group's base column (and each of a six-faced cube's floor's, by its ring).
+  for (int f = 0; f < (six ? 2 : 1); f++)
+    for (int y = (f ? 2 * B : B); y < (f ? 3 * B : 2 * B); y++)
+      for (int x = (f ? 2 * B : B); x < (f ? 3 * B : 2 * B); x++) {
+        const size_t i = (size_t)y * cols + x;
+        const int d = f ? (dtot - dep[i]) : dep[i];
+        if (d < 0 || d >= MX_TOPD_MAX) continue;
+        const int sp = tsp[d];
+        col[i] = (uint8_t)(col[i] & (uint8_t)~(sp - 1));
+      }
 }
 
 // Brightness of one column at one depth. dist comes back as rows behind the
@@ -360,6 +370,8 @@ static FX_RET mode_matrix_rain() {
   const int ncolGroup = (ncolPhys + MX_GLYPH_W - 1) / MX_GLYPH_W;
   const int ncol      = (ncolGroup > MX_MAXCOL) ? MX_MAXCOL : ncolGroup;
   const int dmax     = cube ? (topd + B - 1) : (depShift ? 255 : (rows - 1));
+  const bool six     = cube && cfx_sixFaces;
+  const int dtot     = six ? (dmax + topd) : dmax;   // a six-faced cube's floor: its rim dmax+1, its centre dtot
 
   if (!SEGENV.allocateData(6 * (size_t)ncol + 3 * n + MX_TOPD_MAX + 16 + MX_ST_LEN)) {
     SEGMENT.fill(SEGCOLOR(0)); FX_DONE;
@@ -379,9 +391,9 @@ static FX_RET mode_matrix_rain() {
   uint8_t *spec = tsp + MX_TOPD_MAX;
   uint8_t *st   = spec + 16;
 
-  const uint8_t want = (uint8_t)(cube ? 1 : 2);
+  const uint8_t want = (uint8_t)(cube ? (six ? 3 : 1) : 2);    // the net it was built for: a change rebuilds
   if (SEGENV.call == 0 || st[MX_ST_MODE] != want) {
-    mx_buildMap(col, dep, tsp, lcol, cols, rows, cube, B, ncol, topd, depShift);
+    mx_buildMap(col, dep, tsp, lcol, cols, rows, cube, B, ncol, topd, depShift, six);
     for (int k = 0; k < ncol; k++) { C.pos[k] = 0; C.bri[k] = 0; C.len[k] = 0; }
     for (int k = 0; k < 16; k++)   spec[k] = 0;
     for (int k = 0; k < MX_ST_LEN; k++) st[k] = 0;
@@ -419,7 +431,7 @@ static FX_RET mode_matrix_rain() {
     int adv = (advQ4 * (int)C.spd[c]) >> 7;
     if (adv < 1) adv = 1;
     C.pos[c] = (int16_t)(C.pos[c] + adv);
-    if (((int)C.pos[c] >> 4) - (int)C.len[c] > dmax) C.bri[c] = 0;   // off the bottom
+    if (((int)C.pos[c] >> 4) - (int)C.len[c] > dtot) C.bri[c] = 0;   // off the bottom (or drained, six faces)
   }
 
   // --- spawning ---------------------------------------------------------------
@@ -490,8 +502,12 @@ static FX_RET mode_matrix_rain() {
       uint8_t lum = 0;
       int dist = 0, cBest = c0, sp = 1;
 
-      if (d < topd) {                                // top face: brightest of the group
-        sp = tsp[d];
+      // the lid (d < topd), or a six-faced cube's floor (past dmax): brightest of the group, by ring - the
+      // floor's rings counted from its centre, as the lid's are
+      const bool pool = d < topd || d > dmax;
+      if (pool) {
+        const int ring = (d < topd) ? d : (dtot - d);
+        sp = tsp[ring];
         for (int k = 0; k < sp; k++) {
           int cc = c0 + k;
           if (cc >= ncol) cc -= ncol;
@@ -500,7 +516,7 @@ static FX_RET mode_matrix_rain() {
           const uint8_t l = mx_cell(C.pos[cc], C.len[cc], C.bri[cc], d, dk);
           if (l > lum) { lum = l; dist = dk; cBest = cc; }
         }
-        if (lum) lum = scale8(lum, tdim[d]);
+        if (lum) lum = scale8(lum, tdim[ring]);
       } else if (C.bri[c0]) {
         lum = mx_cell(C.pos[c0], C.len[c0], C.bri[c0], d, dist);
       }
@@ -520,7 +536,7 @@ static FX_RET mode_matrix_rain() {
       // The mask depends only on WHERE a pixel is, never on the stream, so the
       // head is masked too - a solid unmasked head would punch a blank block
       // through the character it is standing on.
-      if (d >= topd) {
+      if (!pool) {
         const int wd       = d - topd;             // rows down the wall, 0 at the fold
         const int charIdx  = wd / MX_GLYPH_H;
         const int localRow = wd % MX_GLYPH_H;

@@ -10,8 +10,10 @@
 // and come down the far side, its heading rotating correctly at every fold.
 //
 // The arena is closed: no outer wall exists anywhere on a cube, so the only
-// thing that can kill you is a trail. The open bottom rim is the sole hard
-// edge, and it reads as one because a step onto the missing face is a wall.
+// thing that can kill you is a trail. On a five-faced cube the open bottom
+// rim is the sole hard edge, and it reads as one because a step onto the
+// missing face is a wall; on a six-faced one the bottom is arena too, and a
+// cycle can run under the cube and come up the far side.
 // Kicks make the cycles turn, so the maze gets cut to the music.
 // ---------------------------------------------------------------------------
 #define TR_N 4
@@ -23,24 +25,29 @@ static FX_RET mode_tron() {
   if (!strip.isMatrix || !SEGMENT.is2D()) { SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
   const int cols = SEG_W, rows = SEG_H;
   const size_t n = (size_t)cols * rows;
-  if (!SEGENV.allocateData(2 * n + 320 * 4 * 2 + 8 + 320 + 24)) {
+  // room for six faces' cells (CFX_CELLS_MAX) whichever the cube has, so the flag can change under it
+  if (!SEGENV.allocateData(2 * n + CFX_CELLS_MAX * 4 * 2 + 8 + CFX_CELLS_MAX + 24)) {
     SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
 
   uint16_t *cellOf = (uint16_t *)SEGENV.data;
-  uint16_t *dlut   = cellOf + n;                 // 320 * 4
-  uint16_t *cyc    = dlut + 320 * 4;             // cycle cells
+  uint16_t *dlut   = cellOf + n;                 // CFX_CELLS_MAX * 4
+  uint16_t *cyc    = dlut + CFX_CELLS_MAX * 4;   // cycle cells
   uint8_t  *ar     = (uint8_t *)(cyc + TR_N);    // arena owners
-  uint8_t  *st     = ar + 320;
+  uint8_t  *st     = ar + CFX_CELLS_MAX;
   // st: [0] built [1..2] clock [3] flash [4..7] dir [8..11] alive
 
   const bool cube = cfx_isCube(cols, rows);
   const int  B    = cube ? (cols / 3) : 1;
+  const bool six  = cube && cfx_sixFaces;
+  const int  cells = six ? 384 : 320;
   const uint16_t nowT = (uint16_t)strip.now;
 
-  bool reset = (SEGENV.call == 0 || st[0] != (uint8_t)(cube ? 1 : 2));
+  // built for this net: a cube (1), six-faced (3), or a flat matrix (2) - a change of any rebuilds
+  const uint8_t kind = (uint8_t)(cube ? (six ? 3 : 1) : 2);
+  bool reset = (SEGENV.call == 0 || st[0] != kind);
   if (reset) {
-    cfx_buildCells(cellOf, cols, rows, cube, B);
-    cfx_buildDirLut(dlut);
+    cfx_buildCells(cellOf, cols, rows, cube, B, six);
+    cfx_buildDirLut(dlut, six);
     for (int k = 0; k < 24; k++) st[k] = 0;
   }
 
@@ -52,13 +59,13 @@ static FX_RET mode_tron() {
   for (int k = 0; k < TR_N; k++) if (st[8 + k]) living++;
   if (reset || living <= 1) {
     if (!reset) st[3] = 255;
-    for (int k = 0; k < 320; k++) ar[k] = 0;
+    for (int k = 0; k < cells; k++) ar[k] = 0;
     for (int k = 0; k < TR_N; k++) {             // one per wall, all heading up
       const int c = (k + 1) * 64 + 5 * 8 + 3;
       cyc[k] = (uint16_t)c; st[4 + k] = 3; st[8 + k] = 1;
       ar[c] = (uint8_t)(k + 1);
     }
-    st[0] = (uint8_t)(cube ? 1 : 2);
+    st[0] = kind;
     st[1] = (uint8_t)nowT; st[2] = (uint8_t)(nowT >> 8);
   }
 
@@ -97,7 +104,7 @@ static FX_RET mode_tron() {
   for (int y = 0; y < rows; y++)
     for (int x = 0; x < cols; x++, i++) {
       const uint16_t c = cellOf[i];
-      if (c == 0xFFFF || c >= 320) continue;
+      if (c == 0xFFFF || c >= cells) continue;
       uint32_t col = 0; uint8_t lvl = 0;
       if (ar[c]) { col = TR_COL[(ar[c] - 1) & 3]; lvl = 90; }
       for (int k = 0; k < TR_N; k++)

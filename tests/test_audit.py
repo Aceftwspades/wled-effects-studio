@@ -19,7 +19,9 @@ sys.path.insert(0, ROOT)
 
 from native.geometry import Geometry               # noqa: E402
 
-GEOMETRIES = [("strip", {"n": 150}), ("matrix", {"w": 32, "h": 16}), ("cube", {"B": 16}), ("cylinder", {"w": 24, "h": 10}),
+# a six-faced cube too: the bottom block is lit, and the effects that draw it (1.4.0) take their own paths there
+GEOMETRIES = [("strip", {"n": 150}), ("matrix", {"w": 32, "h": 16}), ("cube", {"B": 16}), ("cube", {"B": 16, "six": True}),
+              ("cylinder", {"w": 24, "h": 10}),
               ("sphere", {"w": 24, "h": 12}), ("torus", {"w": 24, "h": 8}),
               ("xyz", {"points": [[float(i % 7), float(i // 7), float(i % 3)] for i in range(40)]})]
 

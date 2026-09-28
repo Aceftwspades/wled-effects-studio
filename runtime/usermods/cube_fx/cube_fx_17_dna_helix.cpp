@@ -35,6 +35,11 @@
 //              over all five faces, so a strand that swings far enough simply
 //              climbs over the top rim and arcs across the top face.
 //
+//   six-faced  the ruler is symmetric: the lid 0..64, the walls 64..191, the
+//   cube       floor 191..255 (its centre last), the axis at the walls'
+//              equator, so a strand can arc over either lid; the floor's u is
+//              the lid's square angle, as it faces the same X and Y.
+//
 //   flat       u = the panel's long axis, v = its short axis. Same generator,
 //              unrolled - the classic textbook DNA ribbon.
 //
@@ -141,7 +146,8 @@
 // rather than copying it.
 // ---------------------------------------------------------------------------
 static void dna_buildUV(uint8_t *pu, uint8_t *pv, int cols, int rows,
-                        bool cube, int B, bool axisX) {
+                        bool cube, int B, bool axisX, bool six = false) {
+  const int lid = six ? 64 : 85;                     // where the lid's rim lands on the ruler
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
       const size_t i = (size_t)y * cols + x;
@@ -157,10 +163,11 @@ static void dna_buildUV(uint8_t *pu, uint8_t *pv, int cols, int rows,
       }
 
       const int bx = x / B, by = y / B, lx = x % B, ly = y % B;
+      const bool floor_ = six && bx == 2 && by == 2;
 
-      if (bx != 1 && by != 1) { pu[i] = 0; pv[i] = 255; continue; }   // gap corner
+      if (bx != 1 && by != 1 && !floor_) { pu[i] = 0; pv[i] = 255; continue; }   // gap corner
 
-      if (bx == 1 && by == 1) {                      // TOP face
+      if ((bx == 1 && by == 1) || floor_) {          // TOP face (and a six-faced cube's floor, facing the same X, Y)
         const float a = 2.0f * (lx + 0.5f) / B - 1.0f;   //  X
         const float b = 2.0f * (ly + 0.5f) / B - 1.0f;   // -Y
         const float aa = fabsf(a), ab = fabsf(b);
@@ -172,7 +179,8 @@ static void dna_buildUV(uint8_t *pu, uint8_t *pv, int cols, int rows,
         const float r = (aa > ab) ? aa : ab;         // square radius, 0 centre .. 1 rim
         int uq = (int)(u01 * 256.0f);
         pu[i] = (uint8_t)(uq & 0xFF);
-        pv[i] = (uint8_t)(int)(r * 85.0f);           // rim lands on 85
+        pv[i] = floor_ ? (uint8_t)(255 - (int)(r * (float)lid))   // the floor: its rim 191, its centre 255
+                       : (uint8_t)(int)(r * (float)lid);          // rim lands on 85 (64 with six faces)
         continue;
       }
 
@@ -183,7 +191,8 @@ static void dna_buildUV(uint8_t *pu, uint8_t *pv, int cols, int rows,
       else              { bu = 3 * B + B - 1 - ly;     bv = B - 1 - lx; }  // WEST
 
       pu[i] = (uint8_t)(((bu * 2 + 1) * 128) / (4 * B));   // cell centre on the ring
-      pv[i] = (uint8_t)(85 + ((bv * 2 + 1) * 85) / B);     // 85 at the rim, 255 at the bottom
+      pv[i] = six ? (uint8_t)(64 + ((bv * 2 + 1) * 127) / (2 * B))   // 64 at the rim, 191 at the bottom edge
+                  : (uint8_t)(85 + ((bv * 2 + 1) * 85) / B);         // 85 at the rim, 255 at the bottom
     }
   }
 }
@@ -214,10 +223,12 @@ static FX_RET mode_dna_helix() {
   const bool cube  = cfx_isCube(cols, rows);
   const int  B     = cube ? (cols / 3) : 1;
   const bool axisX = (cols >= rows);
+  const bool six   = cube && cfx_sixFaces;
+  const int  lidV  = six ? 64 : 85;                // a lid's rim on the ruler (both lids with six faces)
 
-  const uint8_t marker = cube ? 1 : (axisX ? 2 : 3);
+  const uint8_t marker = cube ? (six ? 4 : 1) : (axisX ? 2 : 3);
   if (SEGENV.call == 0 || st[DNA_ST_MODE] != marker) {
-    dna_buildUV(pu, pv, cols, rows, cube, B, axisX);
+    dna_buildUV(pu, pv, cols, rows, cube, B, axisX, six);
     for (int k = 1; k < DNA_ST_LEN; k++) st[k] = 0;
     st[DNA_ST_MODE] = marker;
   }
@@ -272,13 +283,15 @@ static FX_RET mode_dna_helix() {
   }
 
   const uint8_t phase8 = (uint8_t)((ph >> 8) + (uint8_t)((swing * DNA_SWAY) >> 7));
-  const int     centre = cube ? DNA_CENTRE_CUBE : DNA_CENTRE_FLAT;
+  // six faces: the axis at the walls' equator, the ruler symmetric about it
+  const int     centre = six ? 128 : (cube ? DNA_CENTRE_CUBE : DNA_CENTRE_FLAT);
 
   // --- pixel scales ----------------------------------------------------------
   // Widths are authored in pixels and converted here, so the helix looks the
-  // same on a 16 px face as it does on a 32 px one.
+  // same on a 16 px face as it does on a 32 px one. The ruler spans half a lid
+  // and a wall (B/2 + B pixels), and with six faces both lids (2B).
   const int uPix  = cube ? (4 * B) : ((axisX ? cols : rows) - 1);
-  const int vPix  = cube ? ((3 * B) / 2) : ((axisX ? rows : cols) - 1);
+  const int vPix  = six ? (2 * B) : (cube ? ((3 * B) / 2) : ((axisX ? rows : cols) - 1));
   const int vppQ8 = (255 * 256) / (vPix > 0 ? vPix : 1);          // v units per pixel
 
   const int wPix8 = DNA_STRAND_PX8;                                // half-width, 1/8 px
@@ -394,10 +407,13 @@ static FX_RET mode_dna_helix() {
       int     rd  = 0;
       uint8_t rlv = 0;
       bool rungCand = false;
+      // on a lid a pixel is worth more of the lap the nearer the centre: lidR, its distance from the centre on
+      // the ruler (the floor's counted from 255), or -1 off the lids
+      const int lidR = !cube ? -1 : (v < lidV ? v : ((six && v > 255 - lidV) ? 255 - v : -1));
       if (rungs) {
         rd  = (int)rdist[ang];
         rlv = rlev[ang];
-        const int rhGate = (cube && v < 85) ? (rungMid - 1) : rhBase;
+        const int rhGate = (lidR >= 0) ? (rungMid - 1) : rhBase;
         rungCand = rlv && (rd < rhGate) && (dc >= -adev) && (dc <= adev);
       }
       if (dA >= wMax && dB >= wMax && !rungCand) continue;
@@ -419,7 +435,7 @@ static FX_RET mode_dna_helix() {
       // isolated dots. So widen the v band by hypot(1, slope) - same stroke,
       // correctly sampled. hypot is the usual max + 3/8 min approximation.
       int dangQ8 = baseDangQ8;
-      if (cube && v < 85) dangQ8 = (baseDangQ8 * 85) / (v > 3 ? v : 3);
+      if (lidR >= 0) dangQ8 = (baseDangQ8 * lidV) / (lidR > 3 ? lidR : 3);
       if (dangQ8 > 20000) dangQ8 = 20000;
       const int absCs = (cs < 0) ? -cs : cs;
       const int dvdp  = (int)(((int32_t)((amp * absCs) >> 7) * dangQ8 * 100) >> 20);

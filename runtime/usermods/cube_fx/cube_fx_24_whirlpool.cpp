@@ -68,6 +68,14 @@
 //   volume     overall level
 //
 // WITH NO AUDIO it still turns on its own clock.
+//
+// A SIX-FACED CUBE is a closed box, and gets the vortex's other end: the ruler
+// carries on over the bottom rim and across the floor to a second EYE in its
+// middle, turning the same way as the lid's (one column of water, spinning),
+// with dye of its own. Each eye's arms wind out over its rim and along the
+// walls, and the two sets meet round the walls' middle - the seam where the
+// flows converge. (The lid's dye alone fades out half way down: a drain there
+// would have had nothing to swallow.)
 // ===========================================================================
 
 #define WP_Q       8                  // fixed point for the backward trace
@@ -140,8 +148,11 @@ static int wp_edge(int t, int den, int B) {
   return idx;
 }
 
+// A six-faced cube's floor (the net's (2,2) block) faces the same X and Y as the
+// lid, so its angles are the lid's; its radius carries on from the walls' last
+// row (rad) at its rim to rad + topd - 1 at the floor's eye in its middle.
 static void wp_buildMap(uint8_t *col, uint8_t *dep, int cols, int rows,
-                        bool cube, int B, int topd) {
+                        bool cube, int B, int topd, bool six = false, int rad = 0) {
   for (int y = 0; y < rows; y++) {
     for (int x = 0; x < cols; x++) {
       const size_t i = (size_t)y * cols + x;
@@ -161,14 +172,15 @@ static void wp_buildMap(uint8_t *col, uint8_t *dep, int cols, int rows,
       }
 
       const int bx = x / B, by = y / B, lx = x % B, ly = y % B;
-      if (bx != 1 && by != 1) { col[i] = 255; dep[i] = 0; continue; }   // gap corner
+      const bool floor_ = six && bx == 2 && by == 2;
+      if (bx != 1 && by != 1 && !floor_) { col[i] = 255; dep[i] = 0; continue; }   // gap corner
 
-      if (bx == 1 && by == 1) {                        // LID: radial, centre out
+      if ((bx == 1 && by == 1) || floor_) {            // LID (and the floor): radial, centre out
         const int ax = 2 * lx - (B - 1), ay = 2 * ly - (B - 1);
         const int aax = (ax < 0) ? -ax : ax, aay = (ay < 0) ? -ay : ay;
         const int r2  = (aax > aay) ? aax : aay;
-        dep[i] = (uint8_t)(r2 >> 1);
-        if (r2 == 0) { col[i] = 0; continue; }          // the eye itself
+        dep[i] = (uint8_t)(floor_ ? (rad + topd - 1 - (r2 >> 1)) : (r2 >> 1));   // the floor: its rim rad, its eye rad+topd-1
+        if (r2 == 0) { col[i] = 0; continue; }          // the eye itself (the lid's, or the floor's)
 
         int c;
         if (aay > aax) {
@@ -207,8 +219,10 @@ static FX_RET mode_whirlpool() {
 
   const int ang  = cube ? (4 * B) : 256;               // angular cells around
   const int topd = cube ? ((B + 1) / 2) : 0;
-  const int rad  = cube ? (topd + B) : (((cols < rows) ? cols : rows) / 2 + 1);
-  if (rad < 4 || ang < 8) { SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
+  const int wallEnd = cube ? (topd + B) : (((cols < rows) ? cols : rows) / 2 + 1);   // the lid and the walls
+  if (wallEnd < 4 || ang < 8) { SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
+  const bool six = cube && cfx_sixFaces;
+  const int rad  = wallEnd + (six ? topd : 0);        // and a six-faced cube's floor, to the drain
 
   const size_t cells = (size_t)ang * rad;
   const size_t need  = sizeof(WpState) + 2 * n + 2 * cells;
@@ -220,9 +234,9 @@ static FX_RET mode_whirlpool() {
   uint8_t *dye = dep + n;
   uint8_t *tmp = dye + cells;
 
-  const uint8_t want = (uint8_t)(cube ? 1 : 2);
+  const uint8_t want = (uint8_t)(cube ? (six ? 3 : 1) : 2);    // the net it was built for: a change rebuilds
   if (SEGENV.call == 0 || s->mode != want || s->ang != (uint16_t)ang) {
-    wp_buildMap(col, dep, cols, rows, cube, B, topd);
+    wp_buildMap(col, dep, cols, rows, cube, B, topd, six, wallEnd);
     s->mode = want; s->ang = (uint16_t)ang; s->rad = (uint16_t)rad;
     s->phase = 0; s->bassEnv = 0; s->beatEnv = 0;
     s->clk[0] = s->clk[1] = 0;
@@ -265,9 +279,14 @@ static FX_RET mode_whirlpool() {
   // Backward trace: for each cell, ask where its contents were one step ago and
   // read the OLD field there. Tracing forwards would scatter into gaps and
   // leave holes; going backwards guarantees every cell gets exactly one answer.
+  // six faces: past the walls' middle the floor's eye rules - the rate and the outflow measured from it, the
+  // outflow running back up the ruler (toward the lid), so its arms climb the walls to meet the lid's
+  const int wallMid = six ? (topd + B / 2) : rad;
   for (int r = 0; r < rad; r++) {
-    const int32_t om = wp_omega(r, rc, w0);
-    const int32_t vr = wp_vrad(r, rc, v0);
+    const bool low = r > wallMid;
+    const int rr = low ? (rad - 1 - r) : r;
+    const int32_t om = wp_omega(rr, rc, w0);
+    const int32_t vr = low ? -wp_vrad(rr, rc, v0) : wp_vrad(rr, rc, v0);
     for (int a = 0; a < ang; a++) {
       int32_t aQ = ((int32_t)a << WP_Q) - om;          // came from behind in angle
       int32_t rQ = ((int32_t)r << WP_Q) - vr;          // and from further in
@@ -291,13 +310,17 @@ static FX_RET mode_whirlpool() {
   s->phase = (uint16_t)(s->phase + fx_step(6, dt));
   const int inj = rc / 2 + 1;
   const uint8_t punch = (uint8_t)(150 + (s->beatEnv >> 1));
-  for (int r = 0; r <= inj && r < rad; r++) {
-    for (int a = 0; a < ang; a++) {
-      const uint8_t th = (uint8_t)(((int32_t)a * 256 * arms) / ang + (s->phase >> 6));
-      const uint8_t lobe = sin8_t(th);
-      uint8_t v = scale8(lobe, punch);
-      uint8_t &c = dye[r * ang + a];
-      if (v > c) c = v;
+  for (int e = 0; e < (six ? 2 : 1); e++) {             // the lid's eye, and a six-faced cube's floor's
+    for (int k = 0; k <= inj && k < rad; k++) {
+      const int r = e ? (rad - 1 - k) : k;
+      for (int a = 0; a < ang; a++) {
+        // the floor's lobes half a lobe round from the lid's, so the two sets of arms interleave where they meet
+        const uint8_t th = (uint8_t)(((int32_t)a * 256 * arms) / ang + (s->phase >> 6) + (e ? 128 / arms : 0));
+        const uint8_t lobe = sin8_t(th);
+        uint8_t v = scale8(lobe, punch);
+        uint8_t &c = dye[r * ang + a];
+        if (v > c) c = v;
+      }
     }
   }
 
