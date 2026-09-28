@@ -116,6 +116,50 @@ DOCS = {
                "something should happen once per press or per beat, not for as long as the input stays on.",
         "in": {"x": "the switch to watch"},
         "out": {"pulse": "true for one frame when x turns on"}},
+    "ADSR": {
+        "doc": "An envelope fired by a switch, as a synth shapes a note. One shot: every time gate turns on, the value "
+               "climbs to 1 over attack and falls back to 0 over decay, however long gate stays on - a flash on the "
+               "kick that fades the way you shape it. Held: it climbs, falls to sustain and stays there while gate "
+               "is on, then falls to 0 over release when it goes off. Feed it Audio's beat, a Gate or a Counter.",
+        "in": {"gate": "the switch that fires it (the beat)", "attack": "how long the climb to 1 takes, in milliseconds",
+               "decay": "how long the fall from 1 takes, in milliseconds",
+               "sustain": "held: the level it stays at while gate is on, 0..1",
+               "release": "held: how long the fall to 0 takes once gate is off, in milliseconds"},
+        "out": {"value": "the envelope, 0..1", "active": "true while it is anywhere but at rest"},
+        "params": {"mode": "one shot (attack, decay on each rise) or held (attack, decay, sustain, release)"}},
+    "Gate": {
+        "doc": "A switch with a gap: it turns on when x reaches high and only turns off again when x falls to low. A "
+               "level that wobbles about one point - a bass band, a noisy volume - would flicker a plain Threshold; "
+               "the gap between high and low stops that. rise is true for the one frame it turns on.",
+        "in": {"x": "the level to watch", "high": "turns on when x reaches this", "low": "turns off when x falls to this"},
+        "out": {"on": "true while on", "rise": "true for the frame it turns on", "value": "1 while on, else 0"}},
+    "Counter": {
+        "doc": "Counts: each time trigger turns on, one more, and at steps it starts again from 0. wrap fires on the "
+               "trigger that brings it back to 0, so with the beat in and 4 steps it fires once a bar - a clock "
+               "divider. phase is the count as 0..1, for stepping through a palette or a set of looks.",
+        "in": {"trigger": "a rise counts one (the beat)", "reset": "true holds the count at 0",
+               "steps": "how many counts before it starts again"},
+        "out": {"count": "the count, 0 .. steps-1", "phase": "the count over steps, 0..1",
+                "wrap": "true for the frame the count goes back to 0 - every steps-th trigger"}},
+    "Hold": {
+        "doc": "Sample and hold: x as it was the last time trigger turned on, kept until it turns on again. Feed it a "
+               "Random, a spectrum level or the time and trigger it from the beat: a value that changes only on the "
+               "beat and holds in between.",
+        "in": {"x": "the value to catch", "trigger": "a rise catches x"},
+        "out": {"value": "x as it was at the last rise", "changed": "true on the frame it caught a new one"}},
+    "Peak hold": {
+        "doc": "A VU meter's falling bar: it jumps at once to each new peak of x, holds it for hold, then falls at "
+               "fall a second - never below x. The highest a level has been lately, for a meter or a flash that "
+               "lingers.",
+        "in": {"x": "the level to follow", "hold": "how long a peak is held before it falls, in milliseconds",
+               "fall": "how fast it falls after that, in units a second"},
+        "out": {"value": "the held peak", "fresh": "true on a frame x reached a new peak"}},
+    "Slew": {
+        "doc": "Follows x, but no faster than up a second while rising and down a second while falling - a straight "
+               "glide at a speed. Ease and Envelope glide in curves over a time; Slew moves at a pace, so a big jump "
+               "takes longer than a small one.",
+        "in": {"x": "where to go", "up": "the most it may rise in a second", "down": "the most it may fall in a second"},
+        "out": {"value": "where it is now"}},
     "Spectrum": {
         "doc": "The whole spectrum as a curve you can read anywhere: index 0 is the lowest band, 1 the highest. Feed a "
                "coordinate into index and the bands spread across the cube - a graphic equaliser along u, or round "
@@ -205,7 +249,9 @@ DOCS = {
     "Number": {"doc": "A fixed number you type in. Most pins can be typed straight on the node instead; this is for a "
                       "value you want to send to several places.",
                "out": {"value": "the number"}, "params": {"value": "the number"}},
-    "Toggle": {"doc": "A fixed on or off.", "out": {"on": "the setting"}, "params": {"on": "on or off"}},
+    "Toggle": {"doc": "A switch: on or off as you set it, and flipped each time flip turns on - wire the beat in and it "
+                      "changes on every kick (a flip-flop). Nothing wired, it is a fixed on or off.",
+               "in": {"flip": "a rise flips it"}, "out": {"on": "the switch"}, "params": {"on": "how it starts"}},
     "Colour": {"doc": "A fixed colour you pick.", "out": {"color": "the colour"}, "params": {"rgb": "the colour"}},
 
     # ------------------------------------------------------------ coords

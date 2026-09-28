@@ -116,6 +116,24 @@ The Speed slider on the WLED page, as a number from 0 (left) to 1 (right). Multi
 
 ## signals
 
+### ADSR
+
+An envelope fired by a switch, as a synth shapes a note. One shot: every time gate turns on, the value climbs to 1 over attack and falls back to 0 over decay, however long gate stays on - a flash on the kick that fades the way you shape it. Held: it climbs, falls to sustain and stays there while gate is on, then falls to 0 over release when it goes off. Feed it Audio's beat, a Gate or a Counter.
+
+**Inputs**
+- **gate** *(bool)*: the switch that fires it (the beat)
+- **attack** *(float)*: how long the climb to 1 takes, in milliseconds
+- **decay** *(float)*: how long the fall from 1 takes, in milliseconds
+- **sustain** *(float)*: held: the level it stays at while gate is on, 0..1
+- **release** *(float)*: held: how long the fall to 0 takes once gate is off, in milliseconds
+
+**Outputs**
+- **value** *(float)*: the envelope, 0..1
+- **active** *(bool)*: true while it is anywhere but at rest
+
+**Settings**
+- **mode** *(choice)*: one shot (attack, decay on each rise) or held (attack, decay, sustain, release)
+
 ### Audio
 
 What the microphone hears, as numbers 0..1. volume is the overall loudness; bass, mid and treble are the low, middle and high bands; beat is true on the frame a kick lands; hit is how hard it landed. Plug bass into a brightness, beat into a Random hold or Emitters.
@@ -148,6 +166,20 @@ A fixed colour you pick.
 
 **Settings**
 - **rgb** *(color)*: the colour
+
+### Counter
+
+Counts: each time trigger turns on, one more, and at steps it starts again from 0. wrap fires on the trigger that brings it back to 0, so with the beat in and 4 steps it fires once a bar - a clock divider. phase is the count as 0..1, for stepping through a palette or a set of looks.
+
+**Inputs**
+- **trigger** *(bool)*: a rise counts one (the beat)
+- **reset** *(bool)*: true holds the count at 0
+- **steps** *(float)*: how many counts before it starts again
+
+**Outputs**
+- **count** *(float)*: the count, 0 .. steps-1
+- **phase** *(float)*: the count over steps, 0..1
+- **wrap** *(bool)*: true for the frame the count goes back to 0 - every steps-th trigger
 
 ### Delay
 
@@ -220,6 +252,20 @@ first is true only on the very first frame, for setting something up once (seedi
 - **first** *(bool)*: true on the first frame only
 - **count** *(float)*: frames since the effect started
 
+### Gate
+
+A switch with a gap: it turns on when x reaches high and only turns off again when x falls to low. A level that wobbles about one point - a bass band, a noisy volume - would flicker a plain Threshold; the gap between high and low stops that. rise is true for the one frame it turns on.
+
+**Inputs**
+- **x** *(float)*: the level to watch
+- **high** *(float)*: turns on when x reaches this
+- **low** *(float)*: turns off when x falls to this
+
+**Outputs**
+- **on** *(bool)*: true while on
+- **rise** *(bool)*: true for the frame it turns on
+- **value** *(float)*: 1 while on, else 0
+
 ### Gravity
 
 Which way is down, as a direction in the cube's own frame. With a motion sensor fitted it is the real down; without one it is straight down, tilted by the two inputs. Feed the direction into Dot 3 with Position to get 'height', or step along it to make things fall.
@@ -234,6 +280,18 @@ Which way is down, as a direction in the cube's own frame. With a motion sensor 
 - **down y** `gy` *(float)*: down's y part
 - **down z** `gz` *(float)*: down's z part (-1 is straight down)
 - **sensor** *(bool)*: true when a real sensor is supplying it
+
+### Hold
+
+Sample and hold: x as it was the last time trigger turned on, kept until it turns on again. Feed it a Random, a spectrum level or the time and trigger it from the beat: a value that changes only on the beat and holds in between.
+
+**Inputs**
+- **x** *(float)*: the value to catch
+- **trigger** *(bool)*: a rise catches x
+
+**Outputs**
+- **value** *(float)*: x as it was at the last rise
+- **changed** *(bool)*: true on the frame it caught a new one
 
 ### Integrate
 
@@ -297,6 +355,19 @@ Sparks, rain, fireworks, embers. Points are born at `rate` a second (and `burst 
 - **on the surface** `on_surface` *(bool)*: keep them on the cube's surface
 - **floor** *(choice)*: at the bottom edge: die, bounce, or wrap to the lid
 
+### Peak hold
+
+A VU meter's falling bar: it jumps at once to each new peak of x, holds it for hold, then falls at fall a second - never below x. The highest a level has been lately, for a meter or a flash that lingers.
+
+**Inputs**
+- **x** *(float)*: the level to follow
+- **hold** *(float)*: how long a peak is held before it falls, in milliseconds
+- **fall** *(float)*: how fast it falls after that, in units a second
+
+**Outputs**
+- **value** *(float)*: the held peak
+- **fresh** *(bool)*: true on a frame x reached a new peak
+
 ### Random hold
 
 A random number that stays put until the trigger fires, then picks a new one. Feed it the beat and something changes direction, colour or place on every kick and holds in between.
@@ -338,6 +409,18 @@ A timed cycle of up to four phases - a bump, a spin, a hold, a rest - each lasti
 **Settings**
 - **loop** *(bool)*: start again at the end
 - **run at start** `start_running` *(bool)*: run once from the first frame without a trigger
+
+### Slew
+
+Follows x, but no faster than up a second while rising and down a second while falling - a straight glide at a speed. Ease and Envelope glide in curves over a time; Slew moves at a pace, so a big jump takes longer than a small one.
+
+**Inputs**
+- **x** *(float)*: where to go
+- **up** *(float)*: the most it may rise in a second
+- **down** *(float)*: the most it may fall in a second
+
+**Outputs**
+- **value** *(float)*: where it is now
 
 ### Spectrum
 
@@ -429,13 +512,16 @@ The clock. t counts seconds since the effect started; feed it into a Wave, a Noi
 
 ### Toggle
 
-A fixed on or off.
+A switch: on or off as you set it, and flipped each time flip turns on - wire the beat in and it changes on every kick (a flip-flop). Nothing wired, it is a fixed on or off.
+
+**Inputs**
+- **flip** *(bool)*: a rise flips it
 
 **Outputs**
-- **on** *(bool)*: the setting
+- **on** *(bool)*: the switch
 
 **Settings**
-- **on** *(bool)*: on or off
+- **on** *(bool)*: how it starts
 
 ## coords
 

@@ -229,6 +229,116 @@ def test_tempo_follows_the_synth():
     assert min(bars[-100:]) < 0.1 and max(bars[-100:]) > 0.9         # the bar phase sweeps 0..1
 
 
+def kit_graph(summed=False):
+    """The control kit on one clock: a 2 Hz square made of the time (fract of t x 2 over a
+    Threshold at 0.5) fires ADSR, Counter, Hold and Toggle's flip and moves a Slew; the
+    saw under it (fract of t x 2) feeds a Gate and a Peak hold. Every node runs whether it
+    reaches the Output or not. `summed`: every output added into the palette's index
+    instead (the parity test compares colours). Returns the graph and its nodes by name."""
+    g = G.Graph({"name": "Census control kit" + (", summed" if summed else "")}, lib=LIB)
+    k = {}
+    k["t"] = g.add("Time", (0, 0))
+    k["m2"] = g.add("Math", (150, 0), {"op": "multiply"}); g.link(k["t"], "t", k["m2"], "a"); g.nodes[k["m2"]]["inputs"] = {"b": 2.0}
+    k["saw"] = g.add("Math", (300, 0), {"op": "fract"}); g.link(k["m2"], "result", k["saw"], "a")
+    k["sq"] = g.add("Threshold", (450, 0)); g.link(k["saw"], "result", k["sq"], "x"); g.nodes[k["sq"]]["inputs"] = {"at": 0.5}
+    k["adsr"] = g.add("ADSR", (600, 0)); g.link(k["sq"], "on", k["adsr"], "gate")
+    g.nodes[k["adsr"]]["inputs"] = {"attack": 40.0, "decay": 160.0}
+    k["held"] = g.add("ADSR", (600, 700), {"mode": "held"}); g.link(k["sq"], "on", k["held"], "gate")
+    g.nodes[k["held"]]["inputs"] = {"attack": 40.0, "decay": 80.0, "sustain": 0.5, "release": 100.0}
+    k["gate"] = g.add("Gate", (600, 100)); g.link(k["saw"], "result", k["gate"], "x")
+    g.nodes[k["gate"]]["inputs"] = {"high": 0.7, "low": 0.3}
+    k["count"] = g.add("Counter", (600, 200)); g.link(k["sq"], "on", k["count"], "trigger")
+    k["hold"] = g.add("Hold", (600, 300)); g.link(k["t"], "t", k["hold"], "x"); g.link(k["sq"], "on", k["hold"], "trigger")
+    k["peak"] = g.add("Peak hold", (600, 400)); g.link(k["saw"], "result", k["peak"], "x")
+    g.nodes[k["peak"]]["inputs"] = {"hold": 100.0, "fall": 2.0}
+    k["slew"] = g.add("Slew", (600, 500)); g.link(k["sq"], "value", k["slew"], "x")
+    g.nodes[k["slew"]]["inputs"] = {"up": 4.0, "down": 2.0}
+    k["flip"] = g.add("Toggle", (600, 600), {"on": False}); g.link(k["sq"], "on", k["flip"], "flip")
+    p = g.add("Palette", (800, 0)); o = g.add("Output", (1000, 0))
+    if not summed:
+        g.link(k["count"], "phase", p, "index")
+    else:
+        outs = [("adsr", "value"), ("held", "value"), ("gate", "value"), ("count", "phase"), ("hold", "value"),
+                ("peak", "value"), ("slew", "value"), ("flip", "on"), ("count", "wrap"), ("gate", "rise")]
+        acc = outs[0]
+        acc = (k[acc[0]], acc[1])
+        for x, (name, out) in enumerate(outs[1:]):
+            a = g.add("Add", (700, 800 + 60 * x)); g.link(acc[0], acc[1], a, "a"); g.link(k[name], out, a, "b"); acc = (a, "result")
+        f = g.add("Math", (760, 0), {"op": "fract"}); g.link(acc[0], acc[1], f, "a")
+        g.link(f, "result", p, "index")
+    g.link(p, "color", o, "color")
+    return g, k
+
+
+def test_the_control_kit_behaves():
+    """ADSR (one shot and held), Gate, Counter, Hold, Peak hold, Slew and Toggle's flip, built
+    and run on the kit graph's 2 Hz square, their outputs read back each frame (20 ms)."""
+    from native.engine import Engine
+    g, k = kit_graph()
+    g.compile()
+    slot = {v: key for key, v in g.probes.items()}
+    gs, rep = _build({"kit": g})
+    assert rep.ok, rep.link_output[-600:]
+    e = Engine(); e.load(rep.library)
+    e.set_now(0)
+    e.select(e.names.index(g.name))
+    rows = []
+    for _ in range(150):                                  # 3 s
+        e.frame(20)
+        rows.append({v: e.probe(key) for v, key in slot.items()})
+
+    def col(node, out):
+        return [r[(k[node], out)] for r in rows]
+    sq, saw = col("sq", "value"), col("saw", "result")
+    rises = [i for i in range(1, len(sq)) if sq[i] > 0.5 and sq[i - 1] < 0.5]
+    assert len(rises) >= 5, rises                         # twice a second
+    # Counter: one more on each rise, back to 0 (and wrap) on the fourth
+    count, wrap = col("count", "count"), col("count", "wrap")
+    for i in rises:
+        assert count[i] == (count[i - 1] + 1) % 4, (i, count[i - 1], count[i])
+        assert (wrap[i] > 0.5) == (count[i] == 0), (i, count[i], wrap[i])
+    assert sum(w > 0.5 for w in wrap) == sum(count[i] == 0 for i in rises)
+    # Toggle: flipped on every rise, steady between
+    flip = col("flip", "on")
+    for a, b in zip(rises, rises[1:]):
+        assert flip[a] != flip[a - 1] and len(set(flip[a:b])) == 1
+    # Hold: the time as it was at the last rise, the whole way to the next
+    hold, t = col("hold", "value"), col("t", "t")
+    for a, b in zip(rises, rises[1:]):
+        assert all(abs(h - t[a]) < 1e-3 for h in hold[a:b]), (a, hold[a:b][:3], t[a])
+    # ADSR one shot: at 1 by the rise's second frame (40 ms attack, 20 ms frames), back to 0 in 160 ms more
+    adsr = col("adsr", "value")
+    for i in rises[:-1]:
+        assert adsr[i] > 0.4 and max(adsr[i:i + 2]) > 0.99, adsr[i:i + 4]
+        assert adsr[i + 2] < 1.0 and adsr[i + 10] < 0.01, adsr[i:i + 12]
+    # ADSR held: at the sustain while the square is on, released to 0 before the next rise
+    held = col("held", "value")
+    for a, b in zip(rises, rises[1:]):
+        on = [j for j in range(a, b) if sq[j] > 0.5]
+        assert abs(held[on[-1]] - 0.5) < 1e-3, held[a:b]
+        assert held[b - 1] < 0.01, held[a:b]
+    # Gate: on once the saw passes 0.7, off once it falls below 0.3 - never at 0.5 alone
+    gate = col("gate", "on")
+    for i in range(1, len(gate)):
+        if gate[i] > 0.5 and gate[i - 1] < 0.5:
+            assert saw[i] >= 0.7
+        if gate[i] < 0.5 and gate[i - 1] > 0.5:
+            assert saw[i] <= 0.3
+    # Peak hold: never under the saw; after the saw drops it holds, then falls 2 a second
+    peak = col("peak", "value")
+    assert all(pk >= s - 1e-6 for pk, s in zip(peak, saw))
+    drops = [i for i in range(1, len(saw)) if saw[i] < saw[i - 1] - 0.5]
+    assert drops
+    i = drops[0]
+    assert abs(peak[i + 3] - peak[i - 1]) < 1e-6                             # held for 100 ms
+    assert abs((peak[i + 8] - peak[i + 9]) - 2.0 * 0.02) < 1e-3              # then 2 a second, 20 ms a frame
+    # Slew: never more than 4 a second up (0.08 a frame) or 2 down (0.04)
+    slew = col("slew", "value")
+    for a, b in zip(slew, slew[1:]):
+        assert -0.04 - 1e-4 <= b - a <= 0.08 + 1e-4, (a, b)
+    assert max(slew) > 0.99 and min(slew[40:]) < 0.5
+
+
 def test_text_in_a_face_of_this_machine():
     """The Text node in the 5x7 font and in a face of this machine's at a
     height: white scaled by its level on a 64 x 16 matrix - the 5x7 all

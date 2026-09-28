@@ -154,6 +154,88 @@ LIBRARY = [
             "$out.pulse = $in.x && $st.prev < 0.5f; $st.prev = $in.x ? 1.0f : 0.0f;",
             "true for one frame when x turns on"),
          state=["prev"]),
+    # --- the control kit: what a music effect is made of (wled-toy's signal nodes; TouchDesigner's Trigger,
+    # Count, Hold and Lag). Each keeps a few floats of state, so each is frame-scope.
+    # An envelope fired by a gate (a synth's ADSR): one shot runs the attack and the decay on every rise and
+    # ignores how long the gate stays on; held follows it - attack, decay to the sustain level while it is
+    # on, release when it goes off. Straight segments: each time is how long a full 0-to-1 sweep takes.
+    dict(_n("ADSR", "signals", "frame", [("gate", B, False), ("attack", F, 10.0), ("decay", F, 300.0),
+                                         ("sustain", F, 0.5), ("release", F, 400.0)],
+            [("value", F), ("active", B)],
+            [_p("mode", "choice", "one shot", choices=["one shot", "held"])],
+            "{ const char *m_ = \"$p.mode\"; const bool held_ = m_[0] == 'h';\n"
+            "  if ($first) { $st.stage = 0.0f; $st.level = 0.0f; $st.prev = 0.0f; }\n"
+            "  const bool on_ = $in.gate; const bool rise_ = on_ && $st.prev < 0.5f; $st.prev = on_ ? 1.0f : 0.0f;\n"
+            "  if (rise_) $st.stage = 1.0f;\n"
+            "  else if (!on_ && held_ && $st.stage > 0.5f && $st.stage < 3.5f) $st.stage = 4.0f;\n"
+            "  const float floor_ = held_ ? gc_sat($in.sustain) : 0.0f; const float ms_ = (float)dt;\n"
+            "  if ($st.stage > 0.5f && $st.stage < 1.5f) {\n"
+            "    $st.level += $in.attack > 0.0f ? ms_ / $in.attack : 1.0f;\n"
+            "    if ($st.level >= 1.0f) { $st.level = 1.0f; $st.stage = 2.0f; }\n"
+            "  } else if ($st.stage > 1.5f && $st.stage < 2.5f) {\n"
+            "    $st.level -= $in.decay > 0.0f ? ms_ / $in.decay : 1.0f;\n"
+            "    if ($st.level <= floor_) { $st.level = floor_; $st.stage = held_ ? 3.0f : 0.0f; }\n"
+            "  } else if ($st.stage > 2.5f && $st.stage < 3.5f) {\n"
+            "    $st.level = floor_;\n"
+            "  } else if ($st.stage > 3.5f) {\n"
+            "    $st.level -= $in.release > 0.0f ? ms_ / $in.release : 1.0f;\n"
+            "    if ($st.level <= 0.0f) { $st.level = 0.0f; $st.stage = 0.0f; }\n"
+            "  }\n"
+            "  $out.value = $st.level; $out.active = $st.stage > 0.5f; }",
+            "an attack / decay (/ sustain / release) envelope fired by the gate - a flash on the kick, shaped"),
+         state=["stage", "level", "prev"]),
+    # A switch with a gap (a Schmitt trigger): on when x reaches high, off only when it falls to low, so a
+    # level wobbling about one point does not flicker it; rise is the frame it turns on.
+    dict(_n("Gate", "signals", "frame", [("x", F, 0.0), ("high", F, 0.6), ("low", F, 0.4)],
+            [("on", B), ("rise", B), ("value", F)], [],
+            "if ($first) $st.on = 0.0f;\n"
+            "{ const bool was_ = $st.on > 0.5f;\n"
+            "  if (!was_ && $in.x >= $in.high) $st.on = 1.0f;\n"
+            "  else if (was_ && $in.x <= $in.low) $st.on = 0.0f;\n"
+            "  $out.on = $st.on > 0.5f; $out.rise = $out.on && !was_; $out.value = $st.on; }",
+            "on at high, off at low - the gap keeps a wobbling level from flickering it"),
+         state=["on"]),
+    # Counts the trigger's rises and starts again at steps: the count 0 .. steps-1, its phase 0..1, and wrap
+    # on the rise that brings it back to 0 - every steps-th beat (a clock divider: the beat in, a bar out).
+    dict(_n("Counter", "signals", "frame", [("trigger", B, False), ("reset", B, False), ("steps", F, 4.0)],
+            [("count", F), ("phase", F), ("wrap", B)], [],
+            "if ($first) { $st.n = 0.0f; $st.prev = 0.0f; }\n"
+            "{ const float k_ = fmaxf(1.0f, floorf($in.steps + 0.5f));\n"
+            "  const bool rise_ = $in.trigger && $st.prev < 0.5f; $st.prev = $in.trigger ? 1.0f : 0.0f;\n"
+            "  if ($in.reset) { $st.n = 0.0f; }\n"
+            "  else if (rise_) { $st.n += 1.0f; if ($st.n >= k_) { $st.n = 0.0f; $out.wrap = true; } }\n"
+            "  if ($st.n >= k_) $st.n = 0.0f;\n"
+            "  $out.count = $st.n; $out.phase = $st.n / k_; }",
+            "counts the trigger's rises, 0 .. steps-1, and fires wrap every steps-th - the beat in, the bar out"),
+         state=["n", "prev"]),
+    # Sample and hold: x as it was at the trigger's last rise, kept until the next.
+    dict(_n("Hold", "signals", "frame", [("x", F, 0.0), ("trigger", B, False)], [("value", F), ("changed", B)], [],
+            "if ($first) { $st.v = $in.x; $st.prev = 0.0f; }\n"
+            "$out.changed = $in.trigger && $st.prev < 0.5f; $st.prev = $in.trigger ? 1.0f : 0.0f;\n"
+            "if ($out.changed) $st.v = $in.x;\n"
+            "$out.value = $st.v;",
+            "x as it was at the trigger's last rise, held until the next"),
+         state=["v", "prev"]),
+    # A VU meter's falling bar: up at once to each new peak, held for hold ms, then down fall a second.
+    dict(_n("Peak hold", "signals", "frame", [("x", F, 0.0), ("hold", F, 500.0), ("fall", F, 1.0)],
+            [("value", F), ("fresh", B)], [],
+            "if ($first) { $st.peak = $in.x; $st.age = 0.0f; }\n"
+            "$out.fresh = $in.x > $st.peak;\n"
+            "if ($out.fresh) { $st.peak = $in.x; $st.age = 0.0f; }\n"
+            "else { $st.age += (float)dt;\n"
+            "  if ($st.age > $in.hold) $st.peak = fmaxf($in.x, $st.peak - fmaxf(0.0f, $in.fall) * (float)dt * 0.001f); }\n"
+            "$out.value = $st.peak;",
+            "up at once to each new peak, held for hold ms, then down fall a second - a VU meter's falling bar"),
+         state=["peak", "age"]),
+    # A straight glide: x followed no faster than up a second rising and down a second falling (Ease and
+    # Envelope glide in curves over a time; this one in lines, at a speed).
+    dict(_n("Slew", "signals", "frame", [("x", F, 0.0), ("up", F, 2.0), ("down", F, 1.0)], [("value", F)], [],
+            "if ($first) $st.y = $in.x;\n"
+            "{ const float s_ = (float)dt * 0.001f; const float d_ = $in.x - $st.y;\n"
+            "  $st.y += d_ > 0.0f ? fminf(d_, fmaxf(0.0f, $in.up) * s_) : fmaxf(d_, -fmaxf(0.0f, $in.down) * s_); }\n"
+            "$out.value = $st.y;",
+            "follows x no faster than up a second rising and down a second falling - a straight glide"),
+         state=["y"]),
     dict(_n("Spectrum", "signals", "pixel", [("index", F, 0.0)], [("level", F)],
             [_p("smooth", "float", 0.5, 0.0, 0.99), _p("interpolate", "bool", True)],
             "{ float *S_ = $st;\n"
@@ -293,8 +375,13 @@ LIBRARY = [
          state=1 + 48 * 9),
     _n("Number", "signals", "frame", [], [("value", F)], [_p("value", "float", 1.0, -1000.0, 1000.0)],
        "$out.value = $p.value;", "a constant"),
-    _n("Toggle", "signals", "frame", [], [("on", B)], [_p("on", "bool", True)],
-       "$out.on = $p.on;", "a constant boolean"),
+    # a switch: the setting as it starts, flipped on each rise of flip (a flip-flop; nothing wired, a constant)
+    dict(_n("Toggle", "signals", "frame", [("flip", B, False)], [("on", B)], [_p("on", "bool", True)],
+            "if ($first) { $st.v = $p.on ? 1.0f : 0.0f; $st.prev = 0.0f; }\n"
+            "if ($in.flip && $st.prev < 0.5f) $st.v = 1.0f - $st.v;\n"
+            "$st.prev = $in.flip ? 1.0f : 0.0f;\n"
+            "$out.on = $st.v > 0.5f;", "a boolean: the setting, flipped on each rise of flip"),
+         state=["v", "prev"]),
     _n("Colour", "signals", "frame", [], [("color", C)], [_p("rgb", "color", [255, 128, 0])],
        "$out.color = RGBW32($p.rgb_r, $p.rgb_g, $p.rgb_b, 0);", "a fixed colour"),
 
@@ -1196,6 +1283,12 @@ WIRED = {"Sprites": ("slots", "Particles or Emitters"), "Shells": ("slots", "Emi
 # Pins under the node's inputs, settings under its params; None keeps what is.
 UNITS = {
     "Envelope":   {"attack": ("ms", 1.0, 2000.0, "log"), "release": ("ms", 1.0, 5000.0, "log")},
+    "ADSR":       {"attack": ("ms", 1.0, 5000.0, "log"), "decay": ("ms", 1.0, 5000.0, "log"),
+                   "sustain": ("", 0.0, 1.0, None), "release": ("ms", 1.0, 10000.0, "log")},
+    "Gate":       {"high": ("", 0.0, 1.0, None), "low": ("", 0.0, 1.0, None)},
+    "Counter":    {"steps": ("", 1.0, 64.0, None)},
+    "Peak hold":  {"hold": ("ms", 0.0, 5000.0, None), "fall": ("/s", 0.0, 10.0, None)},
+    "Slew":       {"up": ("/s", 0.0, 20.0, None), "down": ("/s", 0.0, 20.0, None)},
     "Spring":     {"hz": ("Hz", 0.05, 20.0, "log"), "damping": ("", 0.0, 1.0, None)},
     "Ease":       {"seconds": ("s", 0.02, 20.0, "log")},
     "Delay":      {"x": None},

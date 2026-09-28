@@ -2881,12 +2881,25 @@ most valuable first:
       readers in the script. Tested: `test_unwired_coordinates_read_the_pixel`
       (the C++ and the script, typed and wired, a saved graph), and the
       smoke's Noise field saying "position x", a number and back.
-- [ ] **The control nodes a music effect is made of** (wled-toy's signal
-      set; TouchDesigner's Trigger, Count, Hold and Lag): an attack / decay /
-      sustain / release envelope fired by a trigger, Threshold with
-      hysteresis, a counter that fires every Nth beat with the phase between,
-      a toggle that flips on each trigger, sample and hold of any value, peak
-      hold and a slew limiter.
+- [x] **The control nodes a music effect is made of** (wled-toy's signal
+      set; TouchDesigner's Trigger, Count, Hold and Lag). **ADSR**: fired by
+      a gate - one shot (attack, decay on every rise) or held (attack, decay
+      to sustain while on, release when off), straight segments, times in
+      ms as pins so a slider moves them live. **Gate**: on at high, off at
+      low (Threshold is per pixel and keeps no state, so the hysteresis is a
+      node of its own), with the frame it turns on. **Counter**: counts
+      rises, starts again at steps, wrap on the rise that brings it to 0 -
+      the beat in, the bar out - and the phase between. **Hold**: sample and
+      hold. **Peak hold**: a VU bar, held then falling. **Slew**: a glide at
+      a speed, up and down apart. **Toggle** gains `flip`: a rise flips it
+      (nothing wired, the constant it was). Each keeps a few floats of state,
+      so each is frame-scope; each scripts. Tested: the census builds and
+      runs them; `test_the_control_kit_behaves` drives all of them from a
+      2 Hz square made of the clock, built, and checks each frame (the
+      counter's wrap on the fourth rise, the held ADSR at its sustain and
+      released before the next rise, the gate switching only past 0.7 and
+      0.3, the slew never over 4 a second up); the same graph, every output
+      summed into the colour, is in the script / C++ parity test.
 - [ ] **More from the audio.** From the sixteen bands, in any build: an
       onset from the spectrum's change (WLED's beat is a volume peak),
       brightness (the spectral centroid), noisiness (flatness), a silence

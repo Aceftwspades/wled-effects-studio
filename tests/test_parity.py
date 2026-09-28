@@ -23,6 +23,7 @@ FRAC_MAX = 0.06         # share of pixels off by more than 24 in a channel
 def _graphs():
     import test_nodes as T
     gs = dict(T.graphs())
+    gs["control kit"] = T.kit_graph(summed=True)[0]         # the kit moving: a census graph has no trigger
     ex = os.path.join(ROOT, "examples", "graphs")
     for fn in sorted(os.listdir(ex)):
         g = G.load(os.path.join(ex, fn)); g.project_dir = os.path.join(ROOT, "examples")

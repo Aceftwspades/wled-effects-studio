@@ -185,6 +185,13 @@ SUMMARY = {
     "Delay":      lambda V, x: "last frame's x",
     "Random hold": lambda V, x: "a new random on each trigger",
     "Rising edge": lambda V, x: "a pulse as x goes on",
+    "ADSR":       lambda V, x: (f"{_g(V, 'attack')} up, {_g(V, 'decay')} down ms" if V.get("mode") != "held"
+                               else f"{_g(V, 'attack')}/{_g(V, 'decay')} ms to {_g(V, 'sustain')}, release {_g(V, 'release')} ms"),
+    "Gate":       lambda V, x: f"on at {_g(V, 'high')}, off at {_g(V, 'low')}",
+    "Counter":    lambda V, x: f"counts to {_g(V, 'steps')}, then 0",
+    "Hold":       lambda V, x: "x at the last trigger",
+    "Peak hold":  lambda V, x: f"hold {_g(V, 'hold')} ms, fall {_g(V, 'fall')} /s",
+    "Slew":       lambda V, x: f"up {_g(V, 'up')} /s, down {_g(V, 'down')} /s",
     "Beat kick":  lambda V, x: f"throw {_g(V, 'throw')}",
     "Palette":    lambda V, x: (x.get("palette") or "the segment's palette") + (f", × {_g(V, 'brightness')}" if V.get("brightness") not in (1.0, 1, "brightness") else ""),
     "Palette source": lambda V, x: x.get("palette") or "the palette source",
@@ -192,7 +199,7 @@ SUMMARY = {
     "Colour pick": lambda V, x: f"slot {_g(V, 'index')} of 8",
     "Colour":     lambda V, x: _fmt(V.get("rgb")),
     "Number":     lambda V, x: _fmt(V.get("value")),
-    "Toggle":     lambda V, x: _fmt(V.get("on")),
+    "Toggle":     lambda V, x: _fmt(V.get("on")) + (", flips on each rise" if V.get("flip") == "flip" else ""),
     "Expression": lambda V, x: str(V.get("expr", "")),
     "Colour expression": lambda V, x: str(V.get("expr", "")),
     "Send":       lambda V, x: f"'{V.get('name', '')}'",
@@ -561,6 +568,7 @@ OUT_RANGES = {
     ("FFT bin", "level"): _UNIT, ("Loudest bin", "level"): _UNIT, ("Spectrum", "value"): _UNIT,
     ("Wave", "value"): _UNIT, ("Ease", "value"): _UNIT, ("Envelope", "value"): _UNIT, ("Random hold", "value"): _UNIT,
     ("Tempo", "phase"): _UNIT, ("Tempo", "bar"): _UNIT, ("Sequencer", "phase"): _UNIT, ("Sequencer", "progress"): _UNIT,
+    ("ADSR", "value"): _UNIT, ("Counter", "phase"): _UNIT, ("Gate", "value"): _UNIT,
     ("Beat kick", "phase"): _UNIT, ("Smoothstep", "result"): _UNIT, ("Cosine", "result"): _UNIT, ("Band", "result"): _UNIT,
     ("Fract", "result"): _UNIT, ("Threshold", "value"): _UNIT, ("Sine", "result"): (-1.0, 1.0),
     ("Speed", "value"): _UNIT, ("Intensity", "value"): _UNIT, ("Custom 1", "value"): _UNIT, ("Custom 2", "value"): _UNIT,
@@ -789,5 +797,6 @@ def strip_marker(n, d, wired, live=None):
 
 # --- what draws a sparkline, what moves ---------------------------------------------------
 SPARK = {"Integrate": "value", "Ease": "value", "Envelope": "value", "Spring": "value", "Delay": "value",
-         "Random hold": "value", "Beat kick": "phase", "Tempo": "phase"}
+         "Random hold": "value", "Beat kick": "phase", "Tempo": "phase",
+         "ADSR": "value", "Counter": "phase", "Hold": "value", "Peak hold": "value", "Slew": "value"}
 SPARK_SECONDS = 3.0
