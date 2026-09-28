@@ -522,7 +522,7 @@ LIBRARY = [
     # ---- generators -------------------------------------------------------------
     _n("Noise", "generate", "pixel", [("x", F, 0.0), ("y", F, 0.0), ("z", F, 0.0), ("scale", F, 4.0)],
        [("value", F)], [_p("octaves", "int", 1, 1, 6), _p("roughness", "float", 0.5, 0.0, 1.0)],
-       "$out.value = ($p.octaves <= 1) ? perlin8((uint16_t)($in.x * $in.scale * 256.0f), (uint16_t)($in.y * $in.scale * 256.0f), (uint16_t)($in.z * $in.scale * 256.0f)) * (1.0f / 255.0f)\n"
+       "$out.value = ($p.octaves <= 1) ? perlin8((uint16_t)(int32_t)($in.x * $in.scale * 256.0f), (uint16_t)(int32_t)($in.y * $in.scale * 256.0f), (uint16_t)(int32_t)($in.z * $in.scale * 256.0f)) * (1.0f / 255.0f)\n"
        "    : gc_fbm($in.x, $in.y, $in.z, $in.scale, $p.octaves, $p.roughness);",
        "Perlin noise of a point, 0..1 - feed Direction for a seamless field, Time into z to animate; octaves above 1 add finer detail"),
     _n("Voronoi", "generate", "pixel", [("pos", V, [0.0, 0.0, 0.0]), ("scale", F, 3.0), ("seed", F, 0.0)],
@@ -550,7 +550,7 @@ LIBRARY = [
     _n("Wave", "generate", "pixel", [("x", F, 0.0), ("phase", F, 0.0), ("cycles", F, 3.0), ("distort", F, 0.0)], [("value", F)],
        [_p("shape", "choice", "sine", choices=["sine", "triangle", "square", "saw"])],
        """
-{ float f_ = $in.x * $in.cycles + $in.phase + $in.distort * perlin8((uint16_t)($in.x * 512.0f), (uint16_t)($in.phase * 256.0f), 0) * (1.0f / 255.0f); f_ -= floorf(f_);
+{ float f_ = $in.x * $in.cycles + $in.phase + $in.distort * perlin8((uint16_t)(int32_t)($in.x * 512.0f), (uint16_t)(int32_t)($in.phase * 256.0f), 0) * (1.0f / 255.0f); f_ -= floorf(f_);
   const char *s_ = "$p.shape";
   if (s_[1] == 'i') $out.value = 0.5f + 0.5f * cfx_sinf16(f_ * 6.28318531f);
   else if (s_[0] == 't') $out.value = (f_ < 0.5f) ? f_ * 2.0f : 2.0f - f_ * 2.0f;
@@ -1029,7 +1029,7 @@ static inline float gc_rnd() { return (float)hw_random16() * (1.0f / 65535.0f); 
 static inline float gc_fbm(float x, float y, float z, float scale, int oct, float rough) {
   float sum = 0.0f, amp = 1.0f, norm = 0.0f, f = scale;
   for (int i = 0; i < oct; i++) {
-    sum += amp * perlin8((uint16_t)(x * f * 256.0f), (uint16_t)(y * f * 256.0f), (uint16_t)(z * f * 256.0f)) * (1.0f / 255.0f);
+    sum += amp * perlin8((uint16_t)(int32_t)(x * f * 256.0f), (uint16_t)(int32_t)(y * f * 256.0f), (uint16_t)(int32_t)(z * f * 256.0f)) * (1.0f / 255.0f);
     norm += amp; amp *= rough; f *= 2.0f;
   }
   return norm > 0.0f ? sum / norm : 0.0f;
