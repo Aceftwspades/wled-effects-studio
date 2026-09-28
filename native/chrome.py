@@ -2145,9 +2145,11 @@ def show_update(app):
     notes = u.get("notes") or "(no notes)"
     dpg.add_text(notes[:4000], parent="update_notes", wrap=px(520))
     if not update.can_apply():
-        how = "run from a checkout: git pull, then start again" if not __import__("native.paths", fromlist=["x"]).FROZEN \
-              else "download the zip and unpack it over the app's folder (projects and captures are yours, keep them)"
-        dpg.configure_item("update_go", label="Download the zip")
+        kind = "tarball" if str(u.get("asset") or "").endswith((".tar.gz", ".tgz")) else "zip"      # Linux's, Windows'
+        how = ("run from a checkout: git pull, then start again" if not __import__("native.paths", fromlist=["x"]).FROZEN
+               else f"download the {kind} and unpack it over the app's folder (projects and captures are yours, keep them)"
+               if u.get("asset") else "the release has no build for this system: run it from a checkout")
+        dpg.configure_item("update_go", label=f"Download the {kind}")
         dpg.set_value("update_status", how)
     else:
         dpg.configure_item("update_go", label="Download and install")
@@ -2163,7 +2165,7 @@ def get_update(app):
     from native import update, paths
     u = getattr(app, "_update", None) or {}
     if not u.get("asset"):
-        dpg.set_value("update_status", "the release has no zip to download"); return
+        dpg.set_value("update_status", "the release has no build for this system to download"); return
     if not paths.FROZEN:
         app.open_url(u.get("url") or ""); return
     dpg.configure_item("update_go", enabled=False)

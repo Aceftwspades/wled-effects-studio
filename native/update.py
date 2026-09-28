@@ -1,7 +1,8 @@
 """Updates: is there a newer release, and getting it in.
 
     check()            -> {"tag", "notes", "url", "asset", "newer"} or None (offline, no releases)
-    download(asset)    -> the zip's path in HOME/updates, called on a thread
+    download(asset)    -> the file's path in HOME/updates, called on a thread
+    asset_for(assets)  -> this platform's file among a release's (Windows zip, Linux tarball)
     apply(zip_path)    -> the packaged app replaced by the zip's contents and restarted
 
 The check reads GitHub's releases API for version.REPO (no token; sixty
@@ -10,8 +11,8 @@ version.__version__. Applying is Windows and the packaged app only: a
 script beside the zip waits for the app to close, unpacks the zip, copies
 it over the app's folder - projects, captures and the toolchain left
 alone - and starts the app again. From a checkout the answer is git pull;
-elsewhere the zip is downloaded and the folder is opened for a copy by
-hand. STUDIO_UPDATE_URL points the check at another releases JSON (a
+elsewhere (the Linux build) its tarball is downloaded and the folder is
+opened for a copy by hand. STUDIO_UPDATE_URL points the check at another releases JSON (a
 test's).
 """
 import json
@@ -19,6 +20,7 @@ import os
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 
 from native import paths, version
@@ -39,10 +41,21 @@ def check():
     except Exception:
         return None
     tag = d.get("tag_name") or ""
-    asset = next((a.get("browser_download_url") for a in d.get("assets") or []
-                  if str(a.get("name", "")).lower().endswith(".zip")), None)
-    return {"tag": tag, "notes": (d.get("body") or "").strip(), "url": d.get("html_url") or "", "asset": asset,
-            "newer": version.newer(tag), "name": d.get("name") or tag}
+    return {"tag": tag, "notes": (d.get("body") or "").strip(), "url": d.get("html_url") or "",
+            "asset": asset_for(d.get("assets")), "newer": version.newer(tag), "name": d.get("name") or tag}
+
+
+def asset_for(assets, platform=None):
+    """This platform's file among a release's: the Windows zip, the Linux
+    tarball (WLED_Effects_Studio_linux.tar.gz); None elsewhere (macOS runs
+    from a checkout)."""
+    plat = platform or sys.platform
+    rows = [(str(a.get("name", "")).lower(), a.get("browser_download_url")) for a in assets or []]
+    if plat.startswith("win"):
+        return next((u for n, u in rows if n.endswith(".zip") and "linux" not in n and "mac" not in n), None)
+    if plat.startswith("linux"):
+        return next((u for n, u in rows if "linux" in n and n.endswith((".tar.gz", ".tgz"))), None)
+    return None
 
 
 def due(prefs, every_s=86400.0):
@@ -53,10 +66,12 @@ def due(prefs, every_s=86400.0):
 
 
 def download(asset, progress=None):
-    """The release zip into HOME/updates; the path. `progress(done, total)` as it comes."""
+    """The release file into HOME/updates, under its own name (the zip, or
+    Linux's tarball); the path. `progress(done, total)` as it comes."""
     d = os.path.join(paths.HOME, "updates")
     os.makedirs(d, exist_ok=True)
-    out = os.path.join(d, "WLED_Effects_Studio.zip")
+    name = os.path.basename(urllib.parse.urlparse(asset).path) or "WLED_Effects_Studio.zip"
+    out = os.path.join(d, name)
     req = urllib.request.Request(asset, headers={"User-Agent": "wled-effects-studio"})
     with urllib.request.urlopen(req, timeout=30) as r, open(out + ".part", "wb") as f:
         total = int(r.headers.get("Content-Length") or 0)

@@ -20,6 +20,13 @@ prebuilt and a compiler is inside, so building your own effects works with
 nothing installed. `Desktop shortcut.cmd` puts it on the desktop; the app
 checks for newer releases once a day and updates itself.
 
+**Linux**: the release's tarball (`WLED_Effects_Studio_linux.tar.gz`), built
+on Ubuntu. Unpack it anywhere (`tar -xzf`), run `./WLED Effects Studio`;
+`./install_linux.sh` puts it in the app launcher. The engine comes prebuilt;
+building your own effects takes the system's gcc or clang (`build-essential`,
+`base-devel`, `gcc-c++`), live audio its PortAudio. The app says when a newer
+release is out and downloads its tarball for you to unpack over the folder.
+
 **From the source**, on Windows:
 
 ```bash
@@ -60,7 +67,7 @@ To hear what the computer plays on Linux, choose a PipeWire / PulseAudio
 "Monitor of ..." input under the panel's LIVE, where the system lists one.
 
 `python package.py` makes the release folder; `--toolchain` bundles a
-MinGW-w64 into it; `--zip` zips it.
+MinGW-w64 into it; `--zip` zips it (on Linux: the tarball).
 
 ## WLED, and this fork
 

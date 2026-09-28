@@ -2,7 +2,7 @@
 Type=Application
 Name=WLED Effects Studio
 Comment=Build and preview WLED effects
-Exec="@STUDIO@/run_studio.sh"
+Exec="@STUDIO@/@START@"
 Path=@STUDIO@
 Icon=@STUDIO@/linux/wled-effects-studio.png
 Terminal=false

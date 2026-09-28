@@ -5,6 +5,9 @@ import sys
 
 
 def main():
+    # the packaged app on Linux: the library path its children get, as it was before the bootloader
+    from native import procs
+    procs.restore_library_path()
     # the console variant, or a test reading the output: lines as they happen,
     # not a buffer lost when the process is killed
     for stream in (sys.stdout, sys.stderr):

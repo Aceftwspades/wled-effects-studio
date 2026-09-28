@@ -26,7 +26,9 @@ the same app with a console, for when something goes wrong.
 daily check off). A newer release shows in Help as "Update available";
 **Download and install** fetches the zip, closes the studio, copies the new
 one over its folder - projects, captures and the toolchain untouched - and
-starts it again. From a checkout the answer is `git pull`.
+starts it again. The Linux build (the release's tarball) downloads its own
+tarball and opens the folder it landed in, to unpack over the app's. From
+a checkout the answer is `git pull`.
 
 **From the tree** (Windows):
 

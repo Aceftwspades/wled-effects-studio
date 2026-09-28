@@ -16,12 +16,16 @@
     6. the engine's objects, named by relative paths and stamped by
        contents, so a first build in the copy compiles only the new effect
     7. --zip: the folder zipped, for a release (about 85 MB with the
-       compiler)
+       compiler); on Linux a tarball instead,
+       WLED_Effects_Studio_linux.tar.gz (the files keep their modes), with
+       install_linux.sh and linux/ for the app launcher's entry - no
+       compiler inside: the system's gcc or clang builds the effects
 
 The result is dist/WLED Effects Studio/: portable - projects, builds and
 captures land beside the exe when the folder can be written to, else in
-%LOCALAPPDATA%. The flash (firmware build + OTA) still needs a WLED
-checkout and PlatformIO: set WLED_ROOT to the checkout.
+%LOCALAPPDATA% (~/.local/share on Linux). The flash (firmware build +
+OTA) still needs a WLED checkout and PlatformIO: set WLED_ROOT to the
+checkout.
 """
 import os
 import shutil
@@ -254,15 +258,30 @@ def main():
             trim_toolchain(toolchain, os.path.join(DIST, "toolchain", "mingw64"))       # a full MinGW: cut down
         else:
             shutil.copytree(toolchain, os.path.join(DIST, "toolchain"), dirs_exist_ok=True)  # already trimmed, or a clang
-    open(os.path.join(DIST, "README.txt"), "w", encoding="utf-8").write(
-        f"{APP}\n\nRun '{APP}.exe'. Projects, builds and captures are kept in this folder (or in %LOCALAPPDATA%\\{APP} "
-        "when it cannot be written to).\n\nBuilding an effect needs a C++ compiler: the one in toolchain\\ beside the exe when "
-        "the release ships with it (a cut-down MinGW-w64 GCC), else a MinGW-w64 put there, or emsdk's clang with the MSVC Build "
-        "Tools. Without one, the effects already built, the examples, the script preview and every send to a device still work."
-        "\n\nFlashing firmware needs a WLED checkout and PlatformIO: set WLED_ROOT to the checkout.\n\n"
-        "Help > User guide (F1) opens the guide in the studio; Help > Tutorial makes a first effect step by step. "
-        "The files are in _internal\\ (GUIDE.md, TUTORIAL.md, NODES.md).\n")
-    shutil.copyfile(os.path.join(HERE, "Desktop shortcut.cmd"), os.path.join(DIST, "Desktop shortcut.cmd"))   # a .lnk holds a path: made where it lands
+    if sys.platform.startswith("linux"):
+        open(os.path.join(DIST, "README.txt"), "w", encoding="utf-8").write(
+            f"{APP}\n\nRun './{APP}' (or './{APP} (console)' to see what it prints); ./install_linux.sh puts it in the "
+            "app launcher, ./install_linux.sh --uninstall takes it out. Projects, builds and captures are kept in this "
+            f"folder (or in ~/.local/share/{APP} when it cannot be written to).\n\nBuilding an effect needs a C++ "
+            "compiler on the path - gcc or clang (build-essential, base-devel, gcc-c++). Without one, the effects already "
+            "built, the examples, the script preview and every send to a device still work. Live audio needs PortAudio "
+            "(libportaudio2, portaudio).\n\nFlashing firmware needs a WLED checkout and PlatformIO: set WLED_ROOT to the "
+            "checkout.\n\nHelp > User guide (F1) opens the guide in the studio; Help > Tutorial makes a first effect step "
+            "by step. The files are in _internal/ (GUIDE.md, TUTORIAL.md, NODES.md).\n")
+        # the app launcher's entry, written for this folder by the same script a checkout uses
+        shutil.copyfile(os.path.join(HERE, "install_linux.sh"), os.path.join(DIST, "install_linux.sh"))
+        os.chmod(os.path.join(DIST, "install_linux.sh"), 0o755)
+        shutil.copytree(os.path.join(HERE, "linux"), os.path.join(DIST, "linux"), dirs_exist_ok=True)
+    else:
+        open(os.path.join(DIST, "README.txt"), "w", encoding="utf-8").write(
+            f"{APP}\n\nRun '{APP}.exe'. Projects, builds and captures are kept in this folder (or in %LOCALAPPDATA%\\{APP} "
+            "when it cannot be written to).\n\nBuilding an effect needs a C++ compiler: the one in toolchain\\ beside the exe "
+            "when the release ships with it (a cut-down MinGW-w64 GCC), else a MinGW-w64 put there, or emsdk's clang with the "
+            "MSVC Build Tools. Without one, the effects already built, the examples, the script preview and every send to a "
+            "device still work.\n\nFlashing firmware needs a WLED checkout and PlatformIO: set WLED_ROOT to the checkout.\n\n"
+            "Help > User guide (F1) opens the guide in the studio; Help > Tutorial makes a first effect step by step. "
+            "The files are in _internal\\ (GUIDE.md, TUTORIAL.md, NODES.md).\n")
+        shutil.copyfile(os.path.join(HERE, "Desktop shortcut.cmd"), os.path.join(DIST, "Desktop shortcut.cmd"))   # a .lnk holds a path: made where it lands
     # what this build is: the version, the commit, the day - for the About dialog and a bug report
     import json, time
     from native import version
@@ -275,7 +294,11 @@ def main():
     size = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(DIST) for f in fs)
     print(f"package: {DIST}  ({size / 1e6:.0f} MB)")
     if "--zip" in args:
-        z = shutil.make_archive(os.path.join(HERE, "dist", APP.replace(" ", "_")), "zip", os.path.join(HERE, "dist"), APP)
+        base = os.path.join(HERE, "dist", APP.replace(" ", "_"))
+        if sys.platform.startswith("linux"):                # a tarball keeps the executables' modes
+            z = shutil.make_archive(base + "_linux", "gztar", os.path.join(HERE, "dist"), APP)
+        else:
+            z = shutil.make_archive(base, "zip", os.path.join(HERE, "dist"), APP)
         print(f"package: {z}  ({os.path.getsize(z) / 1e6:.0f} MB)")
 
 
