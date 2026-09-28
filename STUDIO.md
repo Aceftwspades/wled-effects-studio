@@ -2538,6 +2538,8 @@ frame's margin round the view the same in every frame of a move and of a
 size (it fails without room.placed). The smoke test has the twins both ways
 and their undo, and no properties for a Time.
 
+Released as 1.4.0, with the pass below.
+
 ### Line-in (September 2026)
 
 - [x] **A line-in module on the device.** The fork's audioreactive reads
@@ -2794,6 +2796,9 @@ on a real object; a six-faced build; every segment pushed to the cube; the
 Linux tarball on a desktop. And a known limit, not new: cube_fx with
 audioreactive does not fit a classic ESP32's 1.5 MB app partition
 (esp32dev_customfx, 54 KB over) - the S3 has room.
+
+Released as 1.4.0 - the first release with the Linux tarball beside the zip,
+every platform's tests and app runs green on its tag.
 
 ### Deferred from earlier lists
 
