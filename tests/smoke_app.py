@@ -661,8 +661,10 @@ STEPS = [
              "next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Output'), 'color'))"}, {"py": "app.gp.compile()"}], 3.0),
     ([{"expect": ["messages", "cannot take a float"]},
       {"py": "[app.gp._delete_node(i) for i, n in list(app.gp.graph.nodes.items()) if n['type'] == 'Output']"}, {"py": "app.gp.compile()"}], 3.0),
+    # (the graph's live build, armed by opening it, is called off: half a second later it rewrote box_fire.cpp - the
+    # graph's own file - under the code pane, the watcher reloaded it, and the broken line and its problem were gone)
     ([{"expect": ["messages", "exactly one Output"]}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile(False)"},
-      {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
+      {"py": "setattr(app.gp, '_dirty', 0.0)"}, {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
       {"ed_type": "this is not C++ ;"}, {"ed_key": ["Return", False, False]}, {"py": "app.edit_build()"}], 12.0),
     ([{"expect": ["edit_status", "problem"]}, {"action": "undo"}, {"action": "undo"}, {"layout": "graph"}, {"graph_open": "fan.json"},
       {"device": "127.0.0.1:1"}, {"py": "app.send_script()"}], 8.0),
