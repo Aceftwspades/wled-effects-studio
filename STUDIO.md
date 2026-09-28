@@ -594,7 +594,8 @@ them within each group; ticked when done.
 - [x] **Push the current effect's settings** (File > Project, Ctrl+Shift+P):
       the effect and palette found by name in the device's own lists, the
       five sliders, the three checkboxes and the three colours to the first
-      segment over `/json/state`.
+      segment over `/json/state` - every segment since 1.4.0, with its
+      bounds (see "The roadmap reviewed" below).
 
 ### Working with graphs
 
@@ -613,7 +614,8 @@ them within each group; ticked when done.
 - [x] **Version history** (`native/history.py`): every save of a graph, a
       sub-graph or a code effect first keeps what the file held, the newest
       40 per file under `<project>/history/`; File > History lists them
-      with a restore, which keeps the current one first.
+      with a restore, which keeps the current one first - and, since 1.4.0,
+      **changes**: what is different now, before restoring.
 - [x] **Focus mode** (View, `/`): everything but the selection and what it
       is wired to goes dim - themes rebound on a selection change, nothing
       rebuilt.
@@ -626,16 +628,22 @@ them within each group; ticked when done.
 - [x] **A/B compare** (Playback, Ctrl+Shift+B): a second engine from a copy
       of the library (one process gets one instance per file), fed A's
       geometry, colours and audio each frame, the two renders side by side
-      in the 3-D pane under a shared camera; it follows a rebuild.
+      in the 3-D pane under a shared camera; it follows a rebuild. Since
+      1.4.0 B can also be the effect **itself as built now**, kept through
+      the edits to come: before and after, side by side.
 - [x] **Slider sweep** (Playback, Ctrl+Shift+W): a slider goes 0 to full and
       back over N seconds, looping or once, optionally recorded as the GIF;
       the slider's own widgets follow.
-- [x] **Audio file input**: "play a WAV file" in the Audio section runs a
-      WAV through the same analyser as the live sources, at real time and
-      looping (`audio.FileAudio`).
-- [x] **Timeline scrub**: the last 300 net frames are kept while playing;
+- [x] **Audio file input**: "play an audio file" in the Audio section runs
+      a file through the same analyser as the live sources, at real time
+      and looping (`audio.FileAudio`) - a WAV as it is, MP3, FLAC, OGG,
+      M4A... decoded by ffmpeg since 1.4.0 (`audio.load`).
+- [x] **Timeline scrub**: the last 30 seconds of frames are kept while
+      playing (300 frames, five seconds, before 1.4.0 - one a sixtieth of
+      a second at most, and no more than 96 MB: a big matrix keeps fewer);
       paused, a slider above the parameters shows any of them in both
-      views (the point cloud too, since the seventh pass).
+      views (the point cloud too, since the seventh pass), and the row
+      says how many seconds it reaches.
 - [x] **Per-effect cost on the device**: the engine's ms/frame on this PC,
       smoothed, and a device fps from it by a factor (60 by default,
       Settings > Device speed factor) - an estimate, labelled as one, until
@@ -658,7 +666,8 @@ them within each group; ticked when done.
       (seen from below); the wiring takes `B` as a face letter. Effects
       that hand-build the four walls as a band or walk cells across folds
       (Tron, Matrix Rain, Breakout, DNA Helix, Whirlpool, Cube Fire, Split
-      GEQ) leave the bottom dark; everything reading `cfx_pos` lights it.
+      GEQ) left the bottom dark until 1.4.0, when each was given a floor of
+      its own (below); everything reading `cfx_pos` lights it.
 - [x] **Ledmap import** (File > Project): from the device (`/ledmap.json`,
       which the firmware serves from its filesystem) or a file - a matrix
       with its gaps and wiring, or a strip. **The exported ledmap was the
@@ -798,6 +807,8 @@ scheduling, video). These do, in the order to do them; ticked when done:
 - [x] **A Text node** (a 5x7 font, scrolling, any 2-D layout) beside the
       picture nodes: only the letters used are baked in; `on` and `i`
       (which letter) out, `offset` in for scrolling, loop, size, row.
+      Since 1.4.0 also this machine's sans, bold or mono face drawn at a
+      height in pixels when the graph compiles, its smooth edges as `level`.
 - [x] **Reference geometry** in the 3-D view: a `reference` part - a mesh
       imported as a wireframe (Import as a reference...), placed, turned
       and scaled like any part, never lit - the tree, the house, the
@@ -1070,7 +1081,8 @@ this repo with a compiler beside it. Done so far:
       A GitHub Actions workflow builds the Windows release zip on a
       version tag - winlibs downloaded and trimmed on the runner - and
       attaches it to a draft release for the update check to find once
-      published.
+      published; since 1.4.0 the Linux tarball beside it, and every push
+      and pull request runs the tests and drives the app too.
 - [x] **The checkout fetched from the Flash frame** (`native/wledtree.py`):
       with no WLED tree, the frame offers "Get the WLED fork..." - a
       shallow `git clone` of the fork's branch into a folder the dialog
@@ -1159,7 +1171,8 @@ the order to do them:
       device - the typed values baked in, no DRAM; a live `static` in the
       sim, bound to the effect by `GC_PARAMS` each frame) and a drag on
       the field pokes the running engine (`simParamSet`); only a change
-      of topology, a setting or a colour rebuilds. Settings stay literal:
+      of topology or a setting rebuilds - a colour typed on a pin is three
+      slots of the table since 1.4.0, red, green and blue. Settings stay literal:
       several size arrays and loops.
 - [x] **Signal visible everywhere, always.** Frame-scope values - the
       sliders, Audio, the beat, Integrate, Ease, the Sequencer - are one
@@ -1227,9 +1240,11 @@ the order to do them:
       MIDI controller: port, target, Learn, the mappings with a range
       each; a parameter slider's right-click and a pin's menu offer Learn
       too). Targets: the sliders, the checks, the palette and the effect
-      by index, a typed value on a pin (a bool pin on/off). Not tried
-      against a real controller yet: no MIDI input on this PC; the tests
-      inject messages through the port's own callback.
+      by index, a typed value on a pin (a bool pin on/off). Since 1.4.0 a
+      MIDI clock on the port (a drum machine's, a DAW's) is followed while
+      it plays: its beats fire the synth's, its tempo is the synth's. Not
+      tried against a real controller yet: no MIDI input on this PC; the
+      tests inject messages through the port's own callback.
 
 ### Sixth pass: the face of a module (September 2026)
 
@@ -2568,7 +2583,7 @@ What would say the studio is complete, in the order to do them:
       to C++, all 126 built into one engine by the toolchain and each run
       for 40 frames; then through the script compiler - 91 scripted and
       run in the Script effect, 35 refused, each as a ScriptError that
-      names the node. Found: Sprites and Shells without their slots wired
+      names the node (111 of 128 node types script since 1.4.0). Found: Sprites and Shells without their slots wired
       were a C++ error (`gc_st` undeclared) instead of a graph problem -
       now a "must be wired from" error on the node, and Split was not
       scriptable for its shifts (it reads the channels through
@@ -2637,9 +2652,10 @@ What would say the studio is complete, in the order to do them:
       the source is not named there. Run make_uiref after adding one,
       as nodedocs is run after adding a node.
 - [x] **Audits** (`tests/test_audit.py`): every effect in the roster on
-      every geometry kind for five frames (1,575 runs, none faulting);
-      the stock effects the sim leaves out listed with their reasons (2
-      of the 2-D ones, 16 of the 1-D) and the count held; the GPU view's
+      every geometry kind for five frames (1,575 runs, none faulting;
+      1,936 since 1.4.0, a six-faced cube among the geometries); the stock
+      effects the sim leaves out listed with their reasons (2 of the 2-D
+      ones, 16 of the 1-D; since 1.4.0 only Scrolling Text) and the count held; the GPU view's
       square for every LED against `render.project`, and the cube's face
       corners against `render()`, for every geometry kind and twelve
       cameras - within a hundredth of a pixel.
@@ -2659,25 +2675,119 @@ What would say the studio is complete, in the order to do them:
       last 300 lines printed, as one zip in captures/, with the issues
       page a button away - nothing of the user's effects or graphs.
 
-- [ ] A Linux / macOS pass. What is there: `paths.py` puts the home in
+- [x] A Linux / macOS pass. `paths.py` puts the home in
       `~/.local/share` or `~/Library/Application Support`, the toolchain
       takes clang or gcc from the path (`-fPIC`, `.so` / `.dylib`,
       `-undefined dynamic_lookup`), every Windows-only call (drag and
       drop, the loopback capture, the popout's parent check, the test
       hooks' real clicks) is behind a platform check, `run_studio.sh` is
-      the launcher, and `studio.spec` skips the .ico off Windows. What is
-      not: none of it has been run there yet - this machine has no Linux
-      or macOS to hand (WSL holds only Docker's distro, and Docker Desktop
-      would not come up). The pass, when a machine is there: `python3 -m
-      native.doctor`, `python3 build.py --native-only`, the four test
-      scripts, `python3 package.py` (PyInstaller builds for the platform
-      it runs on; no toolchain bundling - the system compiler), and the
-      things that only show on a screen: fonts, the viewport's flags, the
-      audio device list.
+      the launcher, and `studio.spec` skips the .ico off Windows. Run
+      since: from source on Arch Linux by a user (issues #2-#10, above);
+      on every push by CI - Linux's unit tests, the app under a virtual
+      display, and since 1.4.0 the release's Linux tarball made and driven;
+      macOS's engine with Apple's clang, the unit tests and the app on the
+      runner's screen (1.4.0; it found the Helvetica measuring crash). What
+      is left: a macOS build to download (an .app, signed) - macOS runs from
+      a checkout - and a look at the Linux tarball on a desktop that is not
+      the runner's.
 - [x] Housekeeping first: the studio no longer assumes a cube anywhere a
       user reads - `studio/` (was `cube_sim/`), "WLED Effects Studio"; the
       firmware usermod stays `cube_fx` and its effect names keep the "Ace
       3-D" family prefix the on-cube menu filters on.
+
+### The roadmap reviewed (1.4.0, September 2026)
+
+Every roadmap entry read again for what could be better; ten came out of
+it, and three smaller ones, in the order they were done.
+
+- [x] **The tests on every push, not only a tag.** release.yml ran on
+      version tags alone, so main was known good only on the machine a push
+      came from. It runs on every push to main and every pull request; the
+      smoke test, the packaged app's and the pointer's are gating, each
+      with one retry that leaves a warning; a newer push cancels the run of
+      an older one (a tag's always finishes). A macOS job builds the engine
+      with Apple's clang, runs every unit test and drives the app (outside
+      the release's needs while it settles). The smoke test stops at a step
+      the app never took and shows the app's last lines, and the app steps
+      have time limits - a hung app kept a job going for an hour.
+- [x] **Every segment pushed.** "Send the current effect's settings" sent
+      the current segment alone, without bounds, while the sequence's
+      presets carried them all: every segment goes now
+      (`flash.push_segments` through `sequence.segment_json`) - effect,
+      sliders, checks, palette by name, colours, bounds, opacity, blend
+      and options - and the device's segments past the sim's are switched
+      off. Each segment keeps its own colours (the panel's COLOURS follow
+      the one picked); a sequence step's ramp names its segment ("1:sx").
+- [x] **Colours live.** A colour typed on a node compiles as three table
+      reads, like a number: picked, it lands on the running effect with no
+      rebuild.
+- [x] **WLED's stock effects, all but one.** Sixteen 1-D ones were left out
+      of the sim for gaps in its shim (Twinklefox, Pride 2015, Aurora,
+      Fire 2012, Popcorn, Starburst, Exploding Fireworks, Ripple, TV
+      Simulator and seven more) and Game of Life for a struct: the shim has
+      WLED's CRGBW, CHSV32, blurRows/blurCols, drawCircle and the rest now -
+      144 1-D and 36 2-D stock effects, Scrolling Text alone left out
+      (WLED's font manager).
+- [x] **The script reaches further.** Loops with constant bounds, small
+      arrays, ++/--, shifts, colour channels, colours compared, integer
+      constants folding as C's; with the Studio Script VM's second version
+      (the fork's Voronoi, Vector rotate, Adjust, Blackbody, Palette source,
+      Previous, Previous at, Blur, Glow, Sparkle) 111 of 128 node types
+      send as a script, 93 before. A program says the VM it needs, the
+      device's /json/info the VM it runs, and a graph that needs the second
+      is not sent to a device with the first - the studio names its nodes.
+- [x] **Audio files of every kind.** A WAV as it is; MP3, FLAC, OGG, M4A...
+      through ffmpeg (`audio.load`), as the live audio and for the
+      sequence's beats; the picker, drag and drop and the words follow.
+- [x] **A six-faced cube's bottom, lit by every effect.** The seven that
+      left it dark each have a floor of their own (the fork's 61b1ed3c):
+      Tron rides it as arena; Split GEQ gives it its own ring of bands; DNA
+      Helix runs its ruler under the cube; Matrix Rain pools there;
+      Breakout's ball rolls back across it to the paddle, the spares in a
+      tray; Whirlpool turns a twin vortex whose eye is in the floor; Cube
+      Fire lays a hearth of coals. The five-faced picture is unchanged frame
+      for frame; the audit runs a six-faced cube too (1,936 runs);
+      `native.cli --six` previews one.
+- [x] **History says what changed.** **changes** beside a kept version:
+      a code effect as a diff, a graph as the nodes added and gone, the
+      settings and typed values changed (old -> new), the wires, and how
+      many nodes only moved; the project's settings as the keys that differ
+      (not the time they were saved) - with the restore beside it
+      (`history.changes`).
+- [x] **A/B before and after an edit.** The compare menu's first entry,
+      "itself as built now": B runs a copy of the build as it is (one the
+      rebuilds leave alone), the same effect as A with A's sliders, palette
+      and the graph's typed values as they stood; each rebuild restarts
+      both together, so the new version and the one from before run side
+      by side from the same moment, fed the same audio.
+- [x] **A Linux build.** The release carries `WLED_Effects_Studio_linux.tar.gz`
+      beside the Windows zip: PyInstaller's folder, `install_linux.sh` for
+      the app launcher (it takes a checkout's `run_studio.sh` or the
+      folder's app), no compiler inside - the system's gcc or clang builds
+      the effects. The system's libstdc++ is used, not a copy (an engine a
+      newer gcc made needs its newer runtime), and the packaged app puts
+      `LD_LIBRARY_PATH` back as it starts, so the compiler, ffmpeg and a
+      browser get their own libraries. CI makes the tarball on every push
+      and drives it; the update check takes this platform's file
+      (`update.asset_for`).
+- [x] **Smaller**: a **MIDI clock** on the port is followed while it plays
+      (its beats fire the synth's, its tempo is the synth's; the MIDI
+      window's CLOCK row turns it off); the **Text node** draws in this
+      machine's sans, bold or mono face at a height too, its smooth edges as
+      `level`; the **scrub** reaches 30 seconds back (within 96 MB).
+- [x] **On the way**: macOS's Helvetica hinting divided by zero measuring
+      text at 6 px, failing a rebuild with the graph zoomed out (it measures
+      large and scales down); a dialog grown past the window's edge comes
+      back inside it; the smoke test's checks say the geometry when a
+      dialog's contents are out of view (macOS's runner has a 1280 x 646
+      screen).
+
+Still to try on the hardware (not on this PC): a real MIDI controller and
+a clock from a drum machine or DAW; the line-in boards; the camera mapping
+on a real object; a six-faced build; every segment pushed to the cube; the
+Linux tarball on a desktop. And a known limit, not new: cube_fx with
+audioreactive does not fit a classic ESP32's 1.5 MB app partition
+(esp32dev_customfx, 54 KB over) - the S3 has room.
 
 ### Deferred from earlier lists
 
