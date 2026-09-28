@@ -185,6 +185,12 @@ SUMMARY = {
     "Delay":      lambda V, x: "last frame's x",
     "Random hold": lambda V, x: "a new random on each trigger",
     "Rising edge": lambda V, x: "a pulse as x goes on",
+    "Waveform":   lambda V, x: "the last 23 ms of sound" + (f" × {_g(V, 'gain')}" if V.get("gain") not in (1.0, 1) else ""),
+    "Notes":      lambda V, x: "twelve notes, C first" + (f", smooth {_fmt(V.get('smooth'))}" if V.get("smooth") else ""),
+    "Onset":      lambda V, x: f"hits in bands {_fmt(V.get('from'))}..{_fmt(V.get('to'))}, {_g(V, 'sensitivity')} over",
+    "Timbre":     lambda V, x: "brightness and noisiness",
+    "Silence":    lambda V, x: f"above {_g(V, 'threshold')}, held {_g(V, 'hold')} s",
+    "Spectrum history": lambda V, x: "the bands, 2 s back",
     "ADSR":       lambda V, x: (f"{_g(V, 'attack')} up, {_g(V, 'decay')} down ms" if V.get("mode") != "held"
                                else f"{_g(V, 'attack')}/{_g(V, 'decay')} ms to {_g(V, 'sustain')}, release {_g(V, 'release')} ms"),
     "Gate":       lambda V, x: f"on at {_g(V, 'high')}, off at {_g(V, 'low')}",
@@ -569,6 +575,8 @@ OUT_RANGES = {
     ("Wave", "value"): _UNIT, ("Ease", "value"): _UNIT, ("Envelope", "value"): _UNIT, ("Random hold", "value"): _UNIT,
     ("Tempo", "phase"): _UNIT, ("Tempo", "bar"): _UNIT, ("Sequencer", "phase"): _UNIT, ("Sequencer", "progress"): _UNIT,
     ("ADSR", "value"): _UNIT, ("Counter", "phase"): _UNIT, ("Gate", "value"): _UNIT,
+    ("Waveform", "sample"): (-1.0, 1.0), ("Waveform", "level"): _UNIT, ("Notes", "note"): _UNIT, ("Notes", "clarity"): _UNIT,
+    ("Onset", "strength"): _UNIT, ("Timbre", "brightness"): _UNIT, ("Timbre", "noisiness"): _UNIT, ("Silence", "mix"): _UNIT,
     ("Beat kick", "phase"): _UNIT, ("Smoothstep", "result"): _UNIT, ("Cosine", "result"): _UNIT, ("Band", "result"): _UNIT,
     ("Fract", "result"): _UNIT, ("Threshold", "value"): _UNIT, ("Sine", "result"): (-1.0, 1.0),
     ("Speed", "value"): _UNIT, ("Intensity", "value"): _UNIT, ("Custom 1", "value"): _UNIT, ("Custom 2", "value"): _UNIT,
@@ -798,5 +806,6 @@ def strip_marker(n, d, wired, live=None):
 # --- what draws a sparkline, what moves ---------------------------------------------------
 SPARK = {"Integrate": "value", "Ease": "value", "Envelope": "value", "Spring": "value", "Delay": "value",
          "Random hold": "value", "Beat kick": "phase", "Tempo": "phase",
-         "ADSR": "value", "Counter": "phase", "Hold": "value", "Peak hold": "value", "Slew": "value"}
+         "ADSR": "value", "Counter": "phase", "Hold": "value", "Peak hold": "value", "Slew": "value",
+         "Onset": "strength", "Timbre": "brightness", "Silence": "mix"}
 SPARK_SECONDS = 3.0

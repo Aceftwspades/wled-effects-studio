@@ -38,6 +38,21 @@ class Synth:
         self.gate_mid = False
         self.gate_treb = False
 
+    # a stand-in for the pitch classes: I - vi - IV - V in C, a chord a bar (four of its beats);
+    # each chord's root 1, its fifth 0.8, its third 0.7, the rest a murmur
+    CHORDS = ((0, 4, 7), (9, 0, 4), (5, 9, 0), (7, 11, 2))
+
+    def chroma(self):
+        """(twelve 0..1 C first, a level) as the device's pitch-class slot
+        gives them: the chord of the bar the synth's clock is in."""
+        if self.muted:
+            return np.zeros(12, np.float32), 0.0
+        bar = int(getattr(self, "_sim_ms", 0.0) * max(1.0, float(self.bpm)) / 60000.0 / 4.0) % len(self.CHORDS)
+        pc = np.full(12, 0.05, np.float32)
+        for c, v in zip(self.CHORDS[bar], (1.0, 0.7, 0.8)):
+            pc[c] = v
+        return pc, 0.2
+
     def pcm(self):
         """A waveform to match the bands: sixteen sines, one to sixteen
         cycles across the window, at the bins' levels, drifting - the same
@@ -70,6 +85,7 @@ class Synth:
         # Beat timing runs on the SIMULATED clock, so stepping frame by frame
         # cannot drift relative to the beat.
         period = 60000.0 / max(1, self.bpm)
+        self._sim_ms = eng.sim_ms                       # the chords' clock too (chroma)
         # The engine's clock restarts when an effect is (re)selected or the
         # engine reloads; a beat timestamp from before that would hold the
         # next beat back until the new clock caught up with the old one -

@@ -1297,7 +1297,7 @@ def _feature_rows(app, parent="flash_features"):
         dpg.add_combo(labels, default_value=cur, width=px(420), tag=f"{parent}_audio",
                       callback=lambda s, v: app.set_feature("audio", next(a[0] for a in flash.AUDIO if a[1] == v)))
         what = next(a[2] for a in flash.AUDIO if a[0] == f["audio"])
-        nodes = sorted(n for n, need in NEEDS.items() if need == "audio")
+        nodes = sorted(n for n, need in NEEDS.items() if need in ("audio", "pcm"))
         tip(what + f" Nodes: {', '.join(nodes)}.")
 
 

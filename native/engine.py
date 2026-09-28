@@ -502,6 +502,18 @@ class Engine:
         a = np.ascontiguousarray(np.clip(samples, -127, 127).astype(np.int8))
         f(a.ctypes.data_as(C.POINTER(C.c_int8)), int(a.size))
 
+    def chroma(self, pc, level=0.0):
+        """The pitch-class slot (u_data[9]) for effects that follow the
+        notes: twelve 0..1, C first, the strongest 1 (all 0 in silence),
+        as the studio's audioreactive patch gives the device, and the
+        strongest one's amplitude. Ignored by an engine built without it."""
+        try:
+            f = self.lib.simChromaSet
+        except AttributeError:
+            return
+        a = np.ascontiguousarray(np.clip(np.asarray(pc, np.float32)[:12], 0.0, 1.0), dtype=np.float32)
+        f(a.ctypes.data_as(C.POINTER(C.c_float)), int(a.size), C.c_float(float(level)))
+
     def param_set(self, idx, k, v):
         """A typed value into a running graph effect's parameter table
         (slot k of effect idx): True when it landed, False when the

@@ -256,6 +256,96 @@ LIBRARY = [
        "  int b_ = $p.from; for (int i_ = $p.from; i_ <= $p.to && i_ < 16; i_++) if (fft_[i_] > fft_[b_]) b_ = i_;\n"
        "  $out.bin = (float)b_ * (1.0f / 15.0f); $out.level = (float)fft_[b_] * (1.0f / 255.0f); }",
        "which FFT bin is loudest (0..1 across the 16) and how loud - a hue for whatever the beat drops"),
+    # --- more from the sound (wled-toy's audio nodes, within what the device has) --------------------
+    # The sound's own shape: the studio's audioreactive patch keeps the last batch - 23 ms, 256 points,
+    # scaled to its own peak (the PCM slot) - read here at index 0..1; unwired, the index is the pixel's
+    # u, so the wave lies across the picture. Without the patch (a stock audioreactive) it is flat 0.
+    _n("Waveform", "signals", "pixel", [("index", F, 0.0), ("gain", F, 1.0)], [("sample", F), ("level", F)], [],
+       "{ const float s_ = gc_wave($in.index) * $in.gain; $out.sample = s_; $out.level = fabsf(s_); }",
+       "the sound's waveform at index 0..1 (the last 23 ms), -1..1, and its size 0..1"),
+    # The twelve pitch classes, C first (the patch's pitch-class slot: the notes of the last ~190 ms,
+    # the strongest 1), smoothed a frame at a time and read at index 0..1 across the twelve; note is the
+    # strongest as 0..1 round the circle of notes (a hue), clarity how far it stands out (0 when every
+    # class is alike, 1 when one is alone). Without the patch, or on an S2 or a C3, all 0.
+    dict(_n("Notes", "signals", "pixel", [("index", F, 0.0)], [("level", F), ("note", F), ("clarity", F)],
+            [_p("smooth", "float", 0.5, 0.0, 0.99)],
+            "{ float *S_ = $st;\n"
+            "  if (S_[12] != (float)(SEGENV.call & 0xFFFF) || $first) {\n"
+            "    const float *c_ = gc_chroma_now(); const float k_ = $first ? 1.0f : 1.0f - gc_sat($p.smooth);\n"
+            "    float top_ = 0.0f, sum_ = 0.0f; int arg_ = 0;\n"
+            "    for (int i_ = 0; i_ < 12; i_++) { S_[i_] += ((c_ ? c_[i_] : 0.0f) - S_[i_]) * k_; sum_ += S_[i_];\n"
+            "      if (S_[i_] > top_) { top_ = S_[i_]; arg_ = i_; } }\n"
+            "    S_[12] = (float)(SEGENV.call & 0xFFFF); S_[13] = (float)arg_;\n"
+            "    S_[14] = top_ > 1e-4f ? gc_sat((top_ * 12.0f / sum_ - 1.0f) * (1.0f / 11.0f)) : 0.0f; }\n"
+            "  const int i_ = (int)(gc_sat($in.index) * 11.999f);\n"
+            "  $out.level = S_[i_]; $out.note = S_[13] * (1.0f / 12.0f); $out.clarity = S_[14]; }",
+            "the twelve notes' strengths, C first, at index 0..1; the strongest as 0..1 round the circle (a hue), and how far it stands out"),
+         state=15),
+    # A hit anywhere in the sound: the spectral flux - how much the bands rose since the last reading,
+    # summed over from..to - against its recent mean and spread (~half a second); an onset is a peak of
+    # it that clears the mean by sensitivity spreads, told the frame after (when the flux turns down).
+    # WLED's beat is a peak of the volume; this hears a snare or a hat over a steady bass too.
+    dict(_n("Onset", "signals", "frame", [("sensitivity", F, 1.5)], [("onset", B), ("strength", F)],
+            [_p("from", "int", 0, 0, 15), _p("to", "int", 15, 0, 15)],
+            "{ float *S_ = $st; um_data_t *um_ = cfx_getAudioData(); const uint8_t *fft_ = (const uint8_t *)um_->u_data[2];\n"
+            "  $out.onset = false; $out.strength = gc_sat(S_[18] * 4.0f);\n"
+            "  bool same_ = !$first; for (int i_ = 0; i_ < 16; i_++) if ((float)fft_[i_] != S_[i_]) same_ = false;\n"
+            "  if (!same_) {                                   // a new reading: the effect can run faster than the FFT\n"
+            "    float flux_ = 0.0f;\n"
+            "    for (int i_ = $p.from; i_ <= $p.to && i_ < 16; i_++) { const float d_ = (float)fft_[i_] - S_[i_]; if (!$first && d_ > 0.0f) flux_ += d_; }\n"
+            "    for (int i_ = 0; i_ < 16; i_++) S_[i_] = (float)fft_[i_];\n"
+            "    flux_ *= 1.0f / (255.0f * fmaxf(1.0f, (float)($p.to - $p.from + 1)));\n"
+            "    const float m_ = S_[16], d_ = S_[17];\n"
+            "    $out.onset = S_[19] > 0.5f && flux_ < S_[18] && S_[18] > m_ + $in.sensitivity * d_ + 0.002f;\n"
+            "    S_[19] = flux_ > S_[18] ? 1.0f : 0.0f;\n"
+            "    S_[16] += (flux_ - m_) * 0.05f; S_[17] += (fabsf(flux_ - m_) - d_) * 0.05f;\n"
+            "    S_[18] = flux_; $out.strength = gc_sat(flux_ * 4.0f); }\n"
+            "}",
+            "a hit anywhere in the sound - the bands' rise against its recent mean - true for a frame, and how big the rise is"),
+         state=20),
+    # The sound's colour from the sixteen bands: brightness is where its weight sits, 0 all bass .. 1
+    # all treble (the bands' centre of mass - they are log-spaced, so the spectral centroid on a log
+    # axis); noisiness is how flat it is, 0 for a tone .. 1 for a hiss (the bands' geometric over
+    # arithmetic mean, the spectral flatness). Both 0 in silence.
+    _n("Timbre", "signals", "frame", [], [("brightness", F), ("noisiness", F)], [],
+       "{ um_data_t *um_ = cfx_getAudioData(); const uint8_t *fft_ = (const uint8_t *)um_->u_data[2];\n"
+       "  float tot_ = 0.0f, w_ = 0.0f, lg_ = 0.0f;\n"
+       "  for (int i_ = 0; i_ < 16; i_++) { const float p_ = (float)fft_[i_] * (1.0f / 255.0f); tot_ += p_; w_ += p_ * (float)i_; lg_ += logf(p_ + 0.001f); }\n"
+       "  $out.brightness = tot_ > 0.05f ? w_ / tot_ * (1.0f / 15.0f) : 0.0f;\n"
+       "  $out.noisiness = tot_ > 0.05f ? gc_sat(expf(lg_ * (1.0f / 16.0f)) / (tot_ * (1.0f / 16.0f))) : 0.0f; }",
+       "where the sound's weight sits, 0 bass .. 1 treble, and how noisy it is, 0 a tone .. 1 a hiss"),
+    # Whether there is sound at all: sound is on while the volume has passed threshold within the last
+    # hold seconds; quiet counts the seconds since it last did; mix is 1 while there is sound and falls
+    # to 0 over fade seconds after the hold - the music's look times mix, an idle look times 1 - mix.
+    dict(_n("Silence", "signals", "frame", [("threshold", F, 0.03), ("hold", F, 1.5), ("fade", F, 2.0)],
+            [("sound", B), ("quiet", F), ("mix", F)], [],
+            "{ um_data_t *um_ = cfx_getAudioData(); const float v_ = *(float *)um_->u_data[0] * (1.0f / 255.0f);\n"
+            "  if ($first) $st.q = 0.0f;\n"
+            "  if (v_ > $in.threshold) $st.q = 0.0f; else $st.q += (float)dt * 0.001f;\n"
+            "  $out.quiet = $st.q; $out.sound = $st.q <= $in.hold;\n"
+            "  $out.mix = $st.q <= $in.hold ? 1.0f : gc_sat(1.0f - ($st.q - $in.hold) / fmaxf($in.fade, 0.001f)); }",
+            "on while there is sound (the volume past threshold in the last hold s), the seconds quiet, and 1 falling to 0 after"),
+         state=["q"]),
+    # The sixteen bands as they were: a row every 40 ms, 48 rows (~1.9 s) - read at index 0..1 across the
+    # bands and age 0 (now) .. 1 (the oldest). Unwired, index is the pixel's u and age its v: the spectrum
+    # across the picture, flowing down it - a waterfall.
+    dict(_n("Spectrum history", "signals", "pixel", [("index", F, 0.0), ("age", F, 0.0)], [("level", F)], [],
+            "{ float *S_ = $st;                                   // [0] the frame, [1] the newest row, [2] ms since it, rows\n"
+            "  if (S_[0] != (float)(SEGENV.call & 0xFFFF) || $first) {\n"
+            "    if ($first) for (int i_ = 0; i_ < 3 + 48 * 16; i_++) S_[i_] = 0.0f;\n"
+            "    S_[2] += (float)dt;\n"
+            "    if ($first || S_[2] >= 40.0f) {\n"
+            "      S_[2] = 0.0f; S_[1] = (float)(((int)S_[1] + 1) % 48);\n"
+            "      um_data_t *um_ = cfx_getAudioData(); const uint8_t *fft_ = (const uint8_t *)um_->u_data[2];\n"
+            "      float *row_ = S_ + 3 + (int)S_[1] * 16;\n"
+            "      for (int i_ = 0; i_ < 16; i_++) row_[i_] = (float)fft_[i_] * (1.0f / 255.0f); }\n"
+            "    S_[0] = (float)(SEGENV.call & 0xFFFF); }\n"
+            "  const float fi_ = gc_sat($in.index) * 15.0f; const int i0_ = (int)fi_; const int i1_ = i0_ < 15 ? i0_ + 1 : 15;\n"
+            "  const int age_ = (int)(gc_sat($in.age) * 47.0f + 0.5f);\n"
+            "  const float *row_ = S_ + 3 + (((int)S_[1] - age_ + 48) % 48) * 16;\n"
+            "  $out.level = row_[i0_] + (row_[i1_] - row_[i0_]) * (fi_ - (float)i0_); }",
+            "the sixteen bands as they were up to ~2 s ago: index 0..1 across them, age 0 now .. 1 the oldest - a waterfall"),
+         state=3 + 48 * 16),
     _n("Gravity", "signals", "frame", [("tilt_x", F, 0.0), ("tilt_y", F, 0.0)], [("g", V), ("gx", F), ("gy", F), ("gz", F), ("sensor", B)], [],
        "{ float gx_ = $in.tilt_x, gy_ = $in.tilt_y, gz_ = -1.0f; $out.sensor = false;\n"
        "#ifdef GC_HAS_IMU\n"
@@ -1247,6 +1337,23 @@ static inline uint32_t gc_blend_screen(uint32_t u, uint32_t o, float a) {
   for (int s = 0; s < 24; s += 8) { const uint32_t x = (u >> s) & 255, y = (o >> s) & 255; const uint32_t m = 255u - ((255u - x) * (255u - y)) / 255u;
     r |= (uint32_t)(x + (int)((int)m - (int)x) * a) << s; }
   return r; }
+// The sound's waveform and its notes for the Waveform and Notes nodes: the studio's audioreactive
+// patch's PCM slot (the last batch, 256 points) and pitch-class slot (twelve, C first), each looked
+// up once a frame (a lookup walks the usermods: a pixel's read is an index after it). None without
+// the patch: gc_wave() reads 0 and gc_chroma_now() is null.
+static inline const int8_t *gc_pcm_now() {
+  static const int8_t *p = nullptr; static uint32_t at = 0xFFFFFFFFu;
+  if (at != strip.now) { p = cfx_pcm(cfx_getAudioData()); at = strip.now; }
+  return p; }
+static inline float gc_wave(float i) {
+  const int8_t *p = gc_pcm_now();
+  if (!p) return 0.0f;
+  const float f = gc_sat(i) * 255.0f; const int a = (int)f; const int b = a < 255 ? a + 1 : 255;
+  return ((float)p[a] + ((float)p[b] - (float)p[a]) * (f - (float)a)) * (1.0f / 127.0f); }
+static inline const float *gc_chroma_now() {
+  static const float *c = nullptr; static uint32_t at = 0xFFFFFFFFu;
+  if (at != strip.now) { c = cfx_chroma(cfx_getAudioData()); at = strip.now; }
+  return c; }
 '''
 
 
@@ -1254,7 +1361,9 @@ static inline uint32_t gc_blend_screen(uint32_t u, uint32_t o, float a) {
 # picker names them, the add menu hides them while the feature is off, and a
 # graph already using one is marked. They still compile - each has a fallback.
 NEEDS = {"Gravity": "imu",
-         "Audio": "audio", "FFT bin": "audio", "Beat kick": "audio", "Spectrum": "audio", "Loudest bin": "audio"}
+         "Audio": "audio", "FFT bin": "audio", "Beat kick": "audio", "Spectrum": "audio", "Loudest bin": "audio",
+         "Onset": "audio", "Timbre": "audio", "Silence": "audio", "Spectrum history": "audio",
+         "Waveform": "pcm", "Notes": "pcm"}
 # Unwired coordinates read the pixel, as Blender's texture nodes read their own coordinates when
 # nothing is plugged in: an input listed here, with no wire and no value typed on it, is what Coords
 # or Position would give it - so a pattern dropped in shows at once, and wiring the node it names
@@ -1266,6 +1375,7 @@ IMPLICIT = {
     "Gradient": {"x": "u", "y": "v"}, "Wave": {"x": "u"}, "Mandelbrot": {"x": "cx", "y": "cy"},
     **{name: {"u": "u", "v": "v"} for name in ("Bitmap", "Image", "States", "Text", "Field", "Previous at",
                                                "Transform", "Flip", "Bifurcation")},
+    "Waveform": {"index": "u"}, "Notes": {"index": "u"}, "Spectrum history": {"index": "u", "age": "v"},
 }
 # a source: the per-pixel C++ it stands for (the names the prologue gives - the script VM's
 # registers too), and the words on the pin
@@ -1286,6 +1396,11 @@ UNITS = {
     "ADSR":       {"attack": ("ms", 1.0, 5000.0, "log"), "decay": ("ms", 1.0, 5000.0, "log"),
                    "sustain": ("", 0.0, 1.0, None), "release": ("ms", 1.0, 10000.0, "log")},
     "Gate":       {"high": ("", 0.0, 1.0, None), "low": ("", 0.0, 1.0, None)},
+    "Waveform":   {"index": ("", 0.0, 1.0, None), "gain": ("x", 0.0, 4.0, None)},
+    "Notes":      {"index": ("", 0.0, 1.0, None), "smooth": ("", None, None, None)},
+    "Onset":      {"sensitivity": ("", 0.5, 4.0, None)},
+    "Silence":    {"threshold": ("", 0.0, 1.0, None), "hold": ("s", 0.0, 30.0, None), "fade": ("s", 0.0, 30.0, None)},
+    "Spectrum history": {"index": ("", 0.0, 1.0, None), "age": ("", 0.0, 1.0, None)},
     "Counter":    {"steps": ("", 1.0, 64.0, None)},
     "Peak hold":  {"hold": ("ms", 0.0, 5000.0, None), "fall": ("/s", 0.0, 10.0, None)},
     "Slew":       {"up": ("/s", 0.0, 20.0, None), "down": ("/s", 0.0, 20.0, None)},

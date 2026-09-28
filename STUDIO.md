@@ -2900,17 +2900,38 @@ most valuable first:
       released before the next rise, the gate switching only past 0.7 and
       0.3, the slew never over 4 a second up); the same graph, every output
       summed into the colour, is in the script / C++ parity test.
-- [ ] **More from the audio.** From the sixteen bands, in any build: an
-      onset from the spectrum's change (WLED's beat is a volume peak),
-      brightness (the spectral centroid), noisiness (flatness), a silence
-      gate with a hold, and an age on Spectrum for waterfalls. From the
-      studio's audioreactive patch, which has the PCM: the waveform (the
-      PCM slot is the last batch, 256 points of ~23 ms; the sim's copy took
-      10.7 ms of 48 kHz audio and must take the device's span), and the
-      pitch classes - a longer window than the 512-sample batch (43 Hz
-      bins cannot tell semitones apart under ~700 Hz): a ring of ~190 ms,
-      one filter a note C3..B6, folded to twelve, a new slot beside the
-      PCM's; the sim, and so a stream from the live audio, the same.
+- [x] **More from the audio.** Six nodes. From the sixteen bands, in any
+      build: **Onset** (the spectral flux against its recent mean and
+      spread - it hears a snare or a hat over a steady bass, where WLED's
+      beat is a volume peak; a reading at a time, as the effect may run
+      faster than the FFT), **Timbre** (brightness: the bands' centre of
+      mass, a spectral centroid on their log axis; noisiness: the spectral
+      flatness), **Silence** (sound held for a while after the volume
+      drops, the seconds quiet, and a mix falling to 0 for an idle look) and
+      **Spectrum history** (a row every 40 ms, ~1.9 s: unwired it is a
+      waterfall). From the studio's audioreactive patch, which has the PCM:
+      **Waveform** (the PCM slot - the last batch; the sim's copy took
+      10.7 ms of 48 kHz audio and now takes the device's 23.2 ms) and
+      **Notes** - the pitch classes, a new slot beside the PCM's in the
+      fork (`cfxChromaCapture`): each batch halved to 11025 Hz into a ring of
+      2048, one Goertzel filter a semitone C3..B6 through a Hann window at
+      Q = 33.6 (two bins a semitone, so a neighbouring semitone falls on the
+      window's first null: a C major chord leaked 0.54 into C# at Q = 17,
+      0.02 now), the lowest capped at the ring; every third batch, only
+      where there is an FPU (ESP32, S3). Firmware: +4.7 KB RAM (the ring),
+      +920 bytes of flash. The studio computes the same from the audio it
+      plays or hears (`audio._chroma`), so the sim and a stream show what the
+      device will; the synth plays I - vi - IV - V a bar each for it. Notes
+      read at an index, give the strongest as 0..1 round the circle (a hue)
+      and how far it stands out. Waveform and Notes need the patch (a new
+      `pcm` need: the add menu, the problems and the flash dialog say so).
+      On the way: the sim's `simPcmSet` sat outside the `extern "C"` block,
+      so its name was mangled and ctypes never found it - Warp and Scope
+      never had the real waveform in the sim; it has C linkage now.
+      Tested: `test_audio.py` (chords and bass notes at 11025, 44100 and
+      48000 Hz, silence, the PCM's span, the synth's chords),
+      `test_the_sound_nodes_read_what_they_hear` (each node, built, fed
+      through the engine's slots), the census and the parity.
 - [ ] **What each node costs** (TouchDesigner's cook times; wled-toy only
       has the whole frame's): a profiling build times each node, scaled by
       the calibrated device factor - the ESP32's frame time is the limit.

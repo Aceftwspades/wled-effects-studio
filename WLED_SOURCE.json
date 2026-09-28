@@ -1,7 +1,7 @@
 {
  "repo": "https://github.com/Aceftwspades/WLED",
  "branch": "playground",
- "commit": "61b1ed3c8d71c097cc898cf33fd9cb16271dc2d7",
+ "commit": "d38a1332a638c47c19907c674fbd4f6fc2ca5441",
  "upstream": "https://github.com/Aircoookie/WLED",
  "wled_version": "16.0.1",
  "note": "gen/ and runtime/ were generated from this commit of the fork: gen/ by build.py's extractors from wled00/, runtime/ by build.py --runtime (usermods/cube_fx, wled_math.cpp, fastled_slim). Refresh both with WLED_ROOT=<checkout> python build.py --native-only && python build.py --runtime, then update this file."

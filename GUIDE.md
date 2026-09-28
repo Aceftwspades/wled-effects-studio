@@ -834,7 +834,12 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
   partition. Under FEATURES untick what your device has not - the motion
   sensor, the knob and screen, slider memory - and choose the audio (with
   the waveform, stock, or none): the firmware gets smaller, and the nodes
-  that lean on a feature you left out say so. Device > Usermods and
+  that lean on a feature you left out say so. "With the waveform" is the
+  studio's audioreactive patch: besides the bands it keeps the sound's
+  waveform (the Waveform node) and, on an ESP32 or an S3, which of the
+  twelve notes are sounding (the Notes node); the studio computes both
+  the same way from the audio it plays or hears, so the sim - and a
+  stream to the device - shows what the device will. Device > Usermods and
   features manages WLED's own usermods for the project as well: tick,
   untick, add one from the tree, import a folder or zip.
 

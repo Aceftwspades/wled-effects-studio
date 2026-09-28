@@ -149,9 +149,11 @@ BRIEF = {"imu": "the cube's tilt, for Gravity and the motion effects",
          "param_memory": "each effect's sliders kept across switches"}
 AUDIO = [
     ("pcm", "audioreactive with the PCM waveform (the studio's patch)",
-     "the FFT bands, volume and beat, and the raw waveform: Warp and Scope draw the real signal."),
+     "the FFT bands, volume and beat, the raw waveform and the pitch classes (on an ESP32 or S3): Warp and Scope "
+     "draw the real signal, and the Waveform and Notes nodes read them."),
     ("stock", "audioreactive as WLED ships it",
-     "the FFT bands, volume and beat; Warp and Scope rebuild a waveform from the bins (-D CFX_PCM=0)."),
+     "the FFT bands, volume and beat; Warp and Scope rebuild a waveform from the bins, and the Waveform and Notes "
+     "nodes read 0 (-D CFX_PCM=0)."),
     ("none", "no audio usermod",
      "the smallest firmware: audio nodes and effects read WLED's simulated sound (audioreactive left out of the env)."),
 ]
@@ -170,6 +172,11 @@ DEPENDENCIES = {
             "note": "registers itself as a usermod; needs the sensor on I2C and CFX_WITH_IMU=1 (the default)"},
     "audio": {"label": "the audioreactive usermod", "files": [], "marker": "cfx_getAudioData(", "standard": True,
               "note": "WLED's own audioreactive, in custom_usermods (the studio's PCM waveform patch is optional)"},
+    # not bundled: it is WLED's audioreactive with two slots added, and would stand over the receiver's own
+    "pcm": {"label": "the studio's audioreactive patch (the waveform and the pitch classes)", "files": [],
+            "marker": ("gc_wave(", "gc_chroma_now("), "standard": False,
+            "note": "usermods/audioreactive from the studio's WLED fork (Aceftwspades/WLED, playground); without it "
+                    "the Waveform and Notes nodes read 0"},
 }
 
 
@@ -193,7 +200,8 @@ def requirements_of_graph(graph, lib, resolve=None):
 
 def requirements_of_code(text):
     """The features a C++ effect calls on, by the helpers it uses."""
-    return {k for k, d in DEPENDENCIES.items() if d["marker"] and d["marker"] in text}
+    return {k for k, d in DEPENDENCIES.items()
+            if any(m in text for m in (d["marker"] if isinstance(d["marker"], tuple) else (d["marker"],)) if m)}
 
 
 def dependency_files(keys):
@@ -231,7 +239,9 @@ def missing_features(project, keys):
     for k in keys:
         if k == "audio" and f.get("audio") == "none":
             out.add(k)
-        elif k != "audio" and f.get(k) is False:
+        elif k == "pcm" and f.get("audio") != "pcm":
+            out.add(k)
+        elif k not in ("audio", "pcm") and f.get(k) is False:
             out.add(k)
     return out
 

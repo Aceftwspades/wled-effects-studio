@@ -100,21 +100,35 @@ static float   gMajorPeak = 0.0f, gMagnitude = 0.0f;
 // Puddlepeak and Waterfall WRITE (from their sliders) - a null here was an
 // access violation the moment one of them ran
 static uint8_t gMaxVol = 31, gBinNum = 8;
-static void   *gU[9];
-static um_data_t gUm = { gU, 9 };
+static void   *gU[10];
+static um_data_t gUm = { gU, 10 };
 // the PCM slot, as audioreactive's cube_fx block publishes it (u_data[8])
 struct SimPcm { volatile uint8_t which; int8_t buf[2][256]; };
 static SimPcm gPcm = { 0, {{0}, {0}} };
+// the pitch-class slot (u_data[9]): the twelve classes, C first, the strongest 1 - the studio
+// computes them from the audio as the device's cfxChromaCapture does (audio.py, chroma)
+struct SimChroma { volatile uint8_t which; float pc[2][12]; float level; };
+static SimChroma gChroma = { 0, {{0}, {0}}, 0.0f };
 
 um_data_t *simAudio() {
   gU[0] = &gVolume;  gU[1] = &gVolumeRaw; gU[2] = gFft;
   gU[3] = &gPeak;    gU[4] = &gMajorPeak; gU[5] = &gMagnitude;
   gU[6] = &gMaxVol;  gU[7] = &gBinNum;
   gU[8] = &gPcm;
+  gU[9] = &gChroma;
   return &gUm;
 }
 
-SIM_API void simPcmSet(const int8_t *samples, int n) {
+// C linkage for Python's ctypes (these sit above the extern "C" block, beside the slots they fill):
+// without it the names were C++-mangled, and simPcmSet - Warp and Scope's waveform - never arrived
+extern "C" SIM_API void simChromaSet(const float *pc, int n, float level) {
+  const uint8_t w = gChroma.which ^ 1;
+  for (int i = 0; i < 12; i++) gChroma.pc[w][i] = (i < n) ? pc[i] : 0.0f;
+  gChroma.level = level;
+  gChroma.which = w;
+}
+
+extern "C" SIM_API void simPcmSet(const int8_t *samples, int n) {
   const uint8_t w = gPcm.which ^ 1;
   for (int i = 0; i < 256; i++) gPcm.buf[w][i] = (i < n) ? samples[i] : 0;
   gPcm.which = w;

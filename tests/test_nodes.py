@@ -339,6 +339,82 @@ def test_the_control_kit_behaves():
     assert max(slew) > 0.99 and min(slew[40:]) < 0.5
 
 
+def test_the_sound_nodes_read_what_they_hear():
+    """Waveform, Notes, Onset, Timbre, Silence and Spectrum history, built, fed through the
+    engine's audio slots as the studio feeds them (the PCM, the pitch classes, the bands, the
+    volume) and read back through the probes."""
+    import numpy as np
+    from native.engine import Engine
+    g = G.Graph({"name": "Census sound"}, lib=LIB)
+    k = {}
+    k["wave"] = g.add("Waveform", (0, 0)); g.nodes[k["wave"]]["inputs"] = {"index": 0.25}
+    k["notes"] = g.add("Notes", (0, 150), {"smooth": 0.0}); g.nodes[k["notes"]]["inputs"] = {"index": 7.5 / 12.0}
+    k["onset"] = g.add("Onset", (0, 300))
+    k["timbre"] = g.add("Timbre", (0, 450))
+    k["quiet"] = g.add("Silence", (0, 600)); g.nodes[k["quiet"]]["inputs"] = {"threshold": 0.05, "hold": 0.2, "fade": 0.2}
+    k["hist"] = g.add("Spectrum history", (0, 750)); g.nodes[k["hist"]]["inputs"] = {"index": 0.0, "age": 0.0}
+    k["old"] = g.add("Spectrum history", (0, 900)); g.nodes[k["old"]]["inputs"] = {"index": 0.0, "age": 1.0}
+    p = g.add("Palette", (300, 0)); o = g.add("Output", (500, 0))
+    g.link(k["timbre"], "brightness", p, "index"); g.link(p, "color", o, "color")
+    g.compile()
+    slot = {v: key for key, v in g.probes.items()}
+    gs, rep = _build({"sound": g})
+    assert rep.ok, rep.link_output[-600:]
+    e = Engine(); e.load(rep.library)
+    e.set_now(0)
+    e.select(e.names.index(g.name))
+
+    def read(node, out):
+        return e.probe(slot[(k[node], out)])
+
+    def bands(v):
+        for i in range(16):
+            e.fft[i] = int(v[i]) if hasattr(v, "__len__") else int(v)
+    # the waveform: a ramp -127..127 across the 256 points, read a quarter of the way
+    e.pcm(np.linspace(-127.0, 127.0, 256))
+    # the notes: G strongest
+    pc = np.full(12, 0.1, np.float32); pc[7] = 1.0
+    e.chroma(pc, 0.3)
+    bands(128); e.audio(200.0, 0)
+    e.frame(20)
+    assert abs(read("wave", "sample") - (-0.5)) < 0.02, read("wave", "sample")
+    assert abs(read("wave", "level") - 0.5) < 0.02
+    assert abs(read("notes", "level") - 1.0) < 1e-4 and abs(read("notes", "note") - 7.0 / 12.0) < 1e-4
+    assert read("notes", "clarity") > 0.3, read("notes", "clarity")
+    # timbre: all bands alike - the middle, as flat as can be
+    assert abs(read("timbre", "brightness") - 0.5) < 0.01 and read("timbre", "noisiness") > 0.95
+    assert read("quiet", "sound") > 0.5 and read("quiet", "mix") > 0.99
+    # all in the bass: bright 0, a tone not a hiss
+    bands([255] + [0] * 15)
+    for _ in range(3):
+        e.frame(20)
+    assert read("timbre", "brightness") < 0.01 and read("timbre", "noisiness") < 0.2, (read("timbre", "brightness"), read("timbre", "noisiness"))
+    # the history: now is the bass band's 1.0
+    assert abs(read("hist", "level") - 1.0) < 1e-3
+    # onsets: a murmur that moves a little (so each frame is a new reading), then a hit
+    rng = np.random.default_rng(3)
+    fired = []
+    for f in range(80):
+        base = 40 + rng.integers(-3, 4, 16)
+        if f == 60:
+            base = base + 150
+        bands(np.clip(base, 0, 255))
+        e.frame(20)
+        fired.append(read("onset", "onset") > 0.5)
+    assert not any(fired[30:60]), [i for i, x in enumerate(fired) if x]      # once it has learnt the murmur
+    assert any(fired[60:63]), fired[58:66]
+    # silence: the volume gone - on for the hold, then off, mix falling to 0 over the fade
+    e.audio(0.0, 0)
+    qs = []
+    for _ in range(30):
+        e.frame(20)
+        qs.append((read("quiet", "sound"), read("quiet", "quiet"), read("quiet", "mix")))
+    assert qs[5][0] > 0.5 and qs[-1][0] < 0.5 and qs[-1][2] < 0.01 and abs(qs[-1][1] - 0.6) < 0.05, qs[::5]
+    assert qs[12][2] < 1.0 and qs[12][2] > 0.0, qs[8:16]
+    # the history two seconds back: the murmur, while now is the last reading (the bands hold through the quiet)
+    assert abs(read("old", "level") - 40.0 / 255.0) < 0.03, read("old", "level")
+
+
 def test_text_in_a_face_of_this_machine():
     """The Text node in the 5x7 font and in a face of this machine's at a
     height: white scaled by its level on a 64 x 16 matrix - the 5x7 all

@@ -55,6 +55,7 @@ class LiveAudio:
         self.channels = int(dev["maxInputChannels"])
         self.name = dev["name"]
         self._buf = np.zeros(chunk, np.float32)
+        self._hist = np.zeros(_hist_len(self.rate, chunk), np.float32)    # the pitch classes' ~0.2 s
         self._win = np.hanning(chunk).astype(np.float32)
         self._edges = self._band_edges()
         self._prev_low = 0.0
@@ -90,6 +91,7 @@ class LiveAudio:
             a = a.reshape(-1, self.channels).mean(axis=1)     # downmix
         if a.size >= self.chunk:
             self._buf = a[-self.chunk:].copy()
+        self._hist = _append(self._hist, a)
         return (None, pyaudio.paContinue)
 
     def push(self, eng):
@@ -97,6 +99,9 @@ class LiveAudio:
 
     def pcm(self):
         return _pcm(self)
+
+    def chroma(self):
+        return _chroma_every(self)
 
     def close(self):
         try:
@@ -127,17 +132,95 @@ def _band_edges(chunk, rate, LO, HI, BANDS):
     return e
 
 
+DEVICE_RATE = 22050                  # audioreactive's sample rate; a batch is 512 of them, 23.2 ms
+
+
+def _hist_len(rate, chunk):
+    """Samples of history a source keeps: the pitch classes' longest filter (C3's, ~0.13 s) and more."""
+    return int(0.2 * rate) + chunk
+
+
+def _append(hist, a):
+    """The history with `a` added at its end, the same length."""
+    n = len(hist)
+    if a.size >= n:
+        return a[-n:].astype(np.float32, copy=True)
+    return np.concatenate([hist[a.size:], a.astype(np.float32, copy=False)])
+
+
 def _pcm(self):
-    """The newest 512 samples of the buffer folded 2:1 to 256, scaled by
-    the batch peak with a floor so silence stays flat - what the device's
-    PCM slot holds."""
-    buf = self._buf
-    if buf is None or len(buf) < 512:
+    """What the device's PCM slot holds: its last batch - 512 samples at
+    22050 Hz, 23.2 ms, so the same span of this source's audio at its own
+    rate - as 256 points, scaled by the batch's peak with a floor so
+    silence stays flat. (It took 512 samples of whatever rate the source
+    had: 10.7 ms at 48 kHz, a waveform half as long as the device's.)"""
+    buf = getattr(self, "_hist", None)
+    if buf is None or len(buf) < len(self._buf):
+        buf = self._buf
+    m = int(round(512 * self.rate / float(DEVICE_RATE)))
+    if buf is None or len(buf) < m or m < 2:
         return np.zeros(256, np.float32)
-    batch = buf[-512:]
+    batch = buf[-m:]
     peak = float(np.abs(batch).max())
     scale = 127.0 / max(peak, 0.0625)
-    return np.clip(batch[::2] * scale, -127, 127)
+    pts = np.interp(np.linspace(0.0, m - 1.0, 256), np.arange(m), batch)
+    return np.clip(pts * scale, -127, 127).astype(np.float32)
+
+
+# --- the pitch classes, as the device's audioreactive patch computes them -------------------
+# cfxChromaCapture in the fork's audio_reactive.cpp, on this source's samples at their own rate:
+# one Goertzel filter a semitone, C3 to B6, each over the last Q * fs / f samples (the device's
+# ring, 2048 at 11025 Hz, at most) through a Hann window - a constant-Q transform (J. C. Brown,
+# JASA 1991); Q = 33.6, two bins a semitone, puts each neighbouring semitone on the window's first
+# null (Q = 17 leaked half a chord's third into the next semitone). Each note's amplitude
+# 2 |X| / sum(window); the energy of every octave of a class summed, the root taken, the strongest
+# scaled to 1 - all 0 in silence. Here a dot product per note with a kernel made once per rate.
+CHROMA_LO, CHROMA_NOTES, CHROMA_Q = 48, 48, 33.6
+CHROMA_SPAN = 2048 / 11025.0          # the device's ring, in seconds: the longest a filter reads
+_KERNELS = {}
+
+
+def _chroma_kernels(rate):
+    ks = _KERNELS.get(rate)
+    if ks is None:
+        ks = []
+        for k in range(CHROMA_NOTES):
+            f = 440.0 * 2.0 ** ((CHROMA_LO + k - 69) / 12.0)
+            N = max(16, min(int(CHROMA_Q * rate / f + 0.5), int(CHROMA_SPAN * rate + 0.5)))
+            n = np.arange(N)
+            hann = 0.5 - 0.5 * np.cos(2.0 * np.pi * n / (N - 1))
+            ks.append((N, (hann * np.exp(-2j * np.pi * f * n / rate)).astype(np.complex64), 2.0 / hann.sum()))
+        _KERNELS[rate] = ks
+    return ks
+
+
+def _chroma_every(self, every=0.05):
+    """A source's pitch classes, worked out at most every 50 ms (the device's patch does it
+    every third batch, ~14 Hz; the app asks every frame)."""
+    now = time.perf_counter()
+    last = getattr(self, "_chroma_last", None)
+    if last is None or now - last[0] >= every:
+        last = (now, _chroma(self._hist, self.rate))
+        self._chroma_last = last
+    return last[1]
+
+
+def _chroma(hist, rate, floor=1.0 / 32768.0):
+    """(twelve 0..1 C first, the strongest's amplitude) of the history's end."""
+    if hist is None or len(hist) == 0:
+        return np.zeros(12, np.float32), 0.0
+    e = np.zeros(12)
+    for k, (N, kern, norm) in enumerate(_chroma_kernels(int(rate))):
+        seg = hist[-N:]
+        if len(seg) < N:
+            continue
+        a = abs(complex(np.dot(seg, kern))) * norm
+        e[(CHROMA_LO + k) % 12] += a * a
+    e = np.sqrt(e)
+    top = float(e.max())
+    if top <= floor:
+        return np.zeros(12, np.float32), 0.0
+    return (e / top).astype(np.float32), top
 
 
 def _push(self, eng):
@@ -205,6 +288,7 @@ class LiveInput:
         self.rate = int(info.get("default_samplerate") or 48000)
         self.channels = max(1, min(2, int(info.get("max_input_channels") or 1)))
         self._buf = np.zeros(chunk, np.float32)
+        self._hist = np.zeros(_hist_len(self.rate, chunk), np.float32)    # the pitch classes' ~0.2 s
         self._win = np.hanning(chunk).astype(np.float32)
         self._edges = _band_edges(chunk, self.rate, self.LO, self.HI, self.BANDS)
         self._prev_low = 0.0
@@ -221,12 +305,16 @@ class LiveInput:
         a = indata.mean(axis=1) if indata.ndim > 1 and indata.shape[1] > 1 else indata.reshape(-1)
         if a.size >= self.chunk:
             self._buf = a[-self.chunk:].copy()
+        self._hist = _append(self._hist, a)
 
     def push(self, eng):
         return _push(self, eng)
 
     def pcm(self):
         return _pcm(self)
+
+    def chroma(self):
+        return _chroma_every(self)
 
     def close(self):
         try:
@@ -326,14 +414,27 @@ class FileAudio:
         if n < self.chunk:
             return 0
         end = int(self.position * self.rate) % n
+        self._end = end
         if end >= self.chunk:
             self._buf = self.samples[end - self.chunk:end]
         else:
             self._buf = np.concatenate([self.samples[n - (self.chunk - end):], self.samples[:end]])
         return _push(self, eng)
 
+    @property
+    def _hist(self):
+        """The file up to where it plays, as far back as a live source keeps (looping round)."""
+        n, m = len(self.samples), min(len(self.samples), _hist_len(self.rate, self.chunk))
+        end = getattr(self, "_end", 0)
+        if end >= m:
+            return self.samples[end - m:end]
+        return np.concatenate([self.samples[n - (m - end):], self.samples[:end]])
+
     def pcm(self):
         return _pcm(self)
+
+    def chroma(self):
+        return _chroma_every(self)
 
     def close(self):
         pass

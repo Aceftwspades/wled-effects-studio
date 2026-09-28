@@ -111,6 +111,51 @@ DOCS = {
                "something changes direction, colour or place on every kick and holds in between.",
         "in": {"trigger": "true to pick a new random (the beat)"},
         "out": {"value": "the current random, 0..1", "changed": "true on the frame it picked a new one"}},
+    "Waveform": {
+        "doc": "The sound's own shape, as a scope draws it: the last 23 ms of it, read at index 0..1 - unwired, the "
+               "pixel's u, so the wave lies across the picture. sample swings -1..1 about 0; level is its size. It "
+               "reads the studio's audioreactive patch (the PCM waveform); with WLED's stock audioreactive it is flat.",
+        "in": {"index": "where along the 23 ms to read, 0..1", "gain": "how much to scale it by"},
+        "out": {"sample": "the waveform there, -1..1", "level": "its size, 0..1"}},
+    "Notes": {
+        "doc": "Which notes are sounding: the strength of each of the twelve pitch classes, C first (C, C#, D ... B), "
+               "over the last fifth of a second, the strongest 1 - read at index 0..1 across the twelve (unwired, "
+               "the pixel's u: a strip shows the twelve as keys). note is the strongest as 0..1 round the circle of "
+               "notes - put it into a hue and each chord gets its colour; clarity is how far it stands out. It reads "
+               "the studio's audioreactive patch, on an ESP32 or an S3; elsewhere all 0.",
+        "in": {"index": "which note, 0..1 across the twelve"},
+        "out": {"level": "that note's strength, 0..1", "note": "the strongest note, 0..1 round the circle (C is 0)",
+                "clarity": "how far the strongest stands out, 0 when every note is alike, 1 when it is alone"},
+        "params": {"smooth": "0 = as heard, near 1 = slow and steady"}},
+    "Onset": {
+        "doc": "A hit anywhere in the sound - a snare, a hat, a pluck: true for one frame when the bands rise more "
+               "than they have been lately (the spectral flux against its recent mean and spread). Audio's beat is "
+               "a jump in the loudness and mostly hears the kick; this hears what lands over a steady bass too. "
+               "Narrow from and to to listen to part of the spectrum.",
+        "in": {"sensitivity": "how far over the recent rise a hit must be: lower hears more"},
+        "out": {"onset": "true for the frame after a hit", "strength": "how big the last rise was, 0..1"},
+        "params": {"from": "the lowest band to listen to, 0..15", "to": "the highest, 0..15"}},
+    "Timbre": {
+        "doc": "The colour of the sound from its sixteen bands. brightness is where its weight sits, 0 all bass to 1 "
+               "all treble - a hue that follows the mix; noisiness is how flat the spectrum is, 0 for a pure tone "
+               "to 1 for a hiss - cymbals and rain are noisy, a held chord is not. Both 0 in silence.",
+        "out": {"brightness": "where the sound's weight sits, 0 bass .. 1 treble",
+                "noisiness": "how noisy it is, 0 a tone .. 1 a hiss"}},
+    "Silence": {
+        "doc": "Whether there is any sound. sound stays on while the volume has passed threshold in the last hold "
+               "seconds; quiet counts the seconds since it last did; mix is 1 while there is sound and falls to 0 "
+               "over fade seconds after the hold. Blend a music look by mix and an idle look by 1 - mix, and the "
+               "cube settles into the idle one when the music stops.",
+        "in": {"threshold": "the volume that counts as sound, 0..1", "hold": "seconds of quiet before it gives up",
+               "fade": "seconds mix takes to fall to 0 after that"},
+        "out": {"sound": "true while there is sound", "quiet": "seconds since the last sound, 0 while there is some",
+                "mix": "1 with sound, falling to 0 after the hold"}},
+    "Spectrum history": {
+        "doc": "The sixteen bands as they were over the last two seconds: read at index 0..1 across the bands and "
+               "age 0 (now) to 1 (the oldest). Unwired, index is the pixel's u and age its v - the spectrum across "
+               "the picture flowing down it, a waterfall.",
+        "in": {"index": "which band, 0 (bass) .. 1 (treble)", "age": "how long ago, 0 now .. 1 about 2 s"},
+        "out": {"level": "how loud that band was then, 0..1"}},
     "Rising edge": {
         "doc": "Turns a switch into a tap: true for exactly one frame when its input goes from off to on. Use it when "
                "something should happen once per press or per beat, not for as long as the input stays on.",

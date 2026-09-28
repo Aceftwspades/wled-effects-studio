@@ -319,6 +319,21 @@ Which of the sixteen frequency bands is loudest right now, as a number from 0 (b
 - **from** *(int)*: only look at bands from this one
 - **to** *(int)*: up to this one
 
+### Notes
+
+Which notes are sounding: the strength of each of the twelve pitch classes, C first (C, C#, D ... B), over the last fifth of a second, the strongest 1 - read at index 0..1 across the twelve (unwired, the pixel's u: a strip shows the twelve as keys). note is the strongest as 0..1 round the circle of notes - put it into a hue and each chord gets its colour; clarity is how far it stands out. It reads the studio's audioreactive patch, on an ESP32 or an S3; elsewhere all 0.
+
+**Inputs**
+- **index** *(float)*: which note, 0..1 across the twelve - unwired, the pixel's u
+
+**Outputs**
+- **level** *(float)*: that note's strength, 0..1
+- **note** *(float)*: the strongest note, 0..1 round the circle (C is 0)
+- **clarity** *(float)*: how far the strongest stands out, 0 when every note is alike, 1 when it is alone
+
+**Settings**
+- **smooth** *(float)*: 0 = as heard, near 1 = slow and steady
+
 ### Number
 
 A fixed number you type in. Most pins can be typed straight on the node instead; this is for a value you want to send to several places.
@@ -328,6 +343,21 @@ A fixed number you type in. Most pins can be typed straight on the node instead;
 
 **Settings**
 - **value** *(float)*: the number
+
+### Onset
+
+A hit anywhere in the sound - a snare, a hat, a pluck: true for one frame when the bands rise more than they have been lately (the spectral flux against its recent mean and spread). Audio's beat is a jump in the loudness and mostly hears the kick; this hears what lands over a steady bass too. Narrow from and to to listen to part of the spectrum.
+
+**Inputs**
+- **sensitivity** *(float)*: how far over the recent rise a hit must be: lower hears more
+
+**Outputs**
+- **onset** *(bool)*: true for the frame after a hit
+- **strength** *(float)*: how big the last rise was, 0..1
+
+**Settings**
+- **from** *(int)*: the lowest band to listen to, 0..15
+- **to** *(int)*: the highest, 0..15
 
 ### Particles
 
@@ -410,6 +440,20 @@ A timed cycle of up to four phases - a bump, a spin, a hold, a rest - each lasti
 - **loop** *(bool)*: start again at the end
 - **run at start** `start_running` *(bool)*: run once from the first frame without a trigger
 
+### Silence
+
+Whether there is any sound. sound stays on while the volume has passed threshold in the last hold seconds; quiet counts the seconds since it last did; mix is 1 while there is sound and falls to 0 over fade seconds after the hold. Blend a music look by mix and an idle look by 1 - mix, and the cube settles into the idle one when the music stops.
+
+**Inputs**
+- **threshold** *(float)*: the volume that counts as sound, 0..1
+- **hold** *(float)*: seconds of quiet before it gives up
+- **fade** *(float)*: seconds mix takes to fall to 0 after that
+
+**Outputs**
+- **sound** *(bool)*: true while there is sound
+- **quiet** *(float)*: seconds since the last sound, 0 while there is some
+- **mix** *(float)*: 1 with sound, falling to 0 after the hold
+
 ### Slew
 
 Follows x, but no faster than up a second while rising and down a second while falling - a straight glide at a speed. Ease and Envelope glide in curves over a time; Slew moves at a pace, so a big jump takes longer than a small one.
@@ -435,6 +479,17 @@ The whole spectrum as a curve you can read anywhere: index 0 is the lowest band,
 **Settings**
 - **smooth** *(float)*: 0 = raw, near 1 = very smooth and slow
 - **interpolate** *(bool)*: blend between bands rather than stepping
+
+### Spectrum history
+
+The sixteen bands as they were over the last two seconds: read at index 0..1 across the bands and age 0 (now) to 1 (the oldest). Unwired, index is the pixel's u and age its v - the spectrum across the picture flowing down it, a waterfall.
+
+**Inputs**
+- **index** *(float)*: which band, 0 (bass) .. 1 (treble) - unwired, the pixel's u
+- **age** *(float)*: how long ago, 0 now .. 1 about 2 s - unwired, the pixel's v
+
+**Outputs**
+- **level** *(float)*: how loud that band was then, 0..1
 
 ### Spring
 
@@ -502,6 +557,14 @@ Musical time. Wire Audio's beat in and it measures the tempo from the gaps betwe
 - **phase** *(float)*: where in the beat, 0..1
 - **bar** *(float)*: where in a four-beat bar, 0..1
 
+### Timbre
+
+The colour of the sound from its sixteen bands. brightness is where its weight sits, 0 all bass to 1 all treble - a hue that follows the mix; noisiness is how flat the spectrum is, 0 for a pure tone to 1 for a hiss - cymbals and rain are noisy, a held chord is not. Both 0 in silence.
+
+**Outputs**
+- **brightness** *(float)*: where the sound's weight sits, 0 bass .. 1 treble
+- **noisiness** *(float)*: how noisy it is, 0 a tone .. 1 a hiss
+
 ### Time
 
 The clock. t counts seconds since the effect started; feed it into a Wave, a Noise's z, or an Add to make something drift. dt is how long this frame took, for things that move a fixed amount per second.
@@ -522,6 +585,18 @@ A switch: on or off as you set it, and flipped each time flip turns on - wire th
 
 **Settings**
 - **on** *(bool)*: how it starts
+
+### Waveform
+
+The sound's own shape, as a scope draws it: the last 23 ms of it, read at index 0..1 - unwired, the pixel's u, so the wave lies across the picture. sample swings -1..1 about 0; level is its size. It reads the studio's audioreactive patch (the PCM waveform); with WLED's stock audioreactive it is flat.
+
+**Inputs**
+- **index** *(float)*: where along the 23 ms to read, 0..1 - unwired, the pixel's u
+- **gain** *(float)*: how much to scale it by
+
+**Outputs**
+- **sample** *(float)*: the waveform there, -1..1
+- **level** *(float)*: its size, 0..1
 
 ## coords
 

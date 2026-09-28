@@ -560,6 +560,8 @@ class App(Features):
             hit = src.push(self.eng)
             if hasattr(src, "pcm"):
                 self.eng.pcm(src.pcm())
+            if hasattr(src, "chroma"):
+                self.eng.chroma(*src.chroma())          # the pitch-class slot, as the device's patch gives it
         except Exception as e:                     # a device can vanish mid-run
             dpg.set_value("live_msg", f"live audio stopped: {e}")
             self.stop_live()

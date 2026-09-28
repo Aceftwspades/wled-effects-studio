@@ -110,6 +110,9 @@ def feature_note(need, feats):
         return "needs the IMU feature, off in this project (Flash > Features): its sensor output stays false"
     if need == "audio" and feats.get("audio") == "none":
         return "audio is off in this project's features (Flash > Features): this reads WLED's simulated sound"
+    if need == "pcm" and feats.get("audio") != "pcm":
+        return ("this reads the studio's audioreactive patch (its waveform and pitch classes), not in this project's "
+                "features (Flash > Features, audio): on the device it reads 0")
     return None
 
 
