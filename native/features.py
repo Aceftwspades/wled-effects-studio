@@ -1029,16 +1029,90 @@ class Features:
         try:
             if self.ab is None:
                 self.ab = Engine(self._b_library("ab"))
+            elif self.ab_before:
+                self.ab.reload(self._b_library("ab"))     # off the kept build, onto the current one
+            self.ab_before = None
             self._ab_sync()
             self.ab.select(self.ab.names.index(name))
         except Exception as e:
-            self.gp.status(f"cannot compare: {e}"); self.ab = None; return
+            self.gp.status(f"cannot compare: {e}"); self.ab = None; self.ab_before = None; return
         self.ab_name = name
         self.request_layout()
         self.gp.status(f"A: {self.eng.names[self.eng.idx]}   B: {name}")
+    # --- before and after: B keeps the build as it is now ---------------------------------
+    # A copy of the current build that the rebuilds leave alone. B runs what A runs - the same
+    # effect when the kept build has it, A's sliders and palette, the graph's typed values as they
+    # stood - and both restart together at each rebuild, so the new version (A) and the one
+    # from before (B) run side by side from the same moment, fed the same audio.
+    def start_ab_before(self):
+        name = self.eng.names[self.eng.idx]
+        self._gpu_was = None
+        try:
+            path = self._b_library("before")
+            if self.ab is None:
+                self.ab = Engine(path)
+            elif os.path.normcase(os.path.abspath(self.ab.library)) != os.path.normcase(os.path.abspath(path)):
+                self.ab.reload(path)
+            self.ab_before = time.strftime("%H:%M:%S")
+            self._ab_sync()
+            self.ab.select(self.ab.names.index(name), params=dict(self.eng.fx, pal=self.eng.pal))
+            self.eng.select(self.eng.idx, params=dict(self.eng.fx, pal=self.eng.pal))   # both from the same moment
+            # the graph's typed values as they stand (a drag since the build is not in the copy's table): into
+            # B once its effect has run and bound its table, by the slots of this build
+            live = getattr(self.gp, "_live", None)
+            self._ab_pokes = ([(nid, nm, v, dict(live)) for nid, nm, v in self.gp.live_values()] if live else [])
+            self._ab_poke_tries = 0
+        except Exception as e:
+            self.gp.status(f"cannot compare: {e}"); self.ab = None; self.ab_before = None; return
+        self.ab_name = name
+        self.request_layout()
+        self.gp.status(f"B keeps {name} as built at {self.ab_before}: each rebuild shows beside it, "
+                       "both restarted together - the compare button again ends it")
+
+    def _ab_follow(self):
+        """Before and after: B runs A's effect (when the kept build has it),
+        sliders and palette."""
+        ab = self.ab
+        name = self.eng.names[self.eng.idx]
+        if ab.names[ab.idx] != name or self.ab_name != name:
+            if name in ab.names:
+                ab.select(ab.names.index(name), params=dict(self.eng.fx, pal=self.eng.pal))
+            now = name if name in ab.names else None                           # None: not in the kept build
+            if now != self.ab_name:
+                self.ab_name = now
+                if dpg.does_item_exist("cube_cap"):
+                    dpg.set_value("cube_cap", self.ab_caption())
+        elif ab.fx != self.eng.fx or ab.pal != self.eng.pal:
+            ab.fx = dict(self.eng.fx)
+            ab.pal = self.eng.pal
+            ab.push()
+
+    def ab_caption(self):
+        """The 3-D view's caption while comparing."""
+        a = self.eng.names[self.eng.idx]
+        if not self.ab_before:
+            return f"A: {a}    B: {self.ab_name}"
+        if self.ab_name is None:
+            return f"A: {a} now    B: not in the build kept at {self.ab_before}"
+        return f"A: {a} now    B: as built at {self.ab_before}"
+
+    def _ab_pokes_land(self):
+        """The typed values kept at the start of before-and-after into B,
+        once its effect has bound its table (a few frames' tries)."""
+        def lands(p):
+            try:
+                return self.gp.live_poke(p[0], p[1], p[2], eng=self.ab, live=p[3])
+            except (TypeError, ValueError):
+                return True                              # not a number after all: nothing to put in
+        left = [p for p in self._ab_pokes if not lands(p)]
+        self._ab_poke_tries += 1
+        self._ab_pokes = left if self._ab_poke_tries < 8 else []
+
     def stop_ab(self):
         self.ab = None
         self.ab_name = None
+        self.ab_before = None
+        self._ab_pokes = []
         self.request_layout()
     def _ab_sync(self):
         """B follows A's geometry, colours and palette source."""
@@ -1053,16 +1127,23 @@ class Features:
         except Exception:
             pass
     def _ab_reloaded(self, library):
-        """The library was rebuilt: B takes a fresh copy and its effect back."""
+        """The library was rebuilt: B takes a fresh copy and its effect back -
+        or, keeping the build from before, stays on it and restarts with A."""
         if not self.ab:
             return
         try:
+            if self.ab_before:
+                self._ab_sync()
+                name = self.eng.names[self.eng.idx]
+                if name in self.ab.names:
+                    self.ab.select(self.ab.names.index(name), params=dict(self.eng.fx, pal=self.eng.pal))
+                return
             self.ab.reload(self._b_library("ab"))
             self._ab_sync()
             if self.ab_name in self.ab.names:
                 self.ab.select(self.ab.names.index(self.ab_name))
         except Exception as e:
-            self.gp.status(f"comparison dropped: {e}"); self.ab = None
+            self.gp.status(f"comparison dropped: {e}"); self.ab = None; self.ab_before = None
     # --- the loop ------------------------------------------------------------
     # --- sweep: a slider driven through its range ----------------------------------
     def start_sweep(self, key, secs, loop=True, record=False):

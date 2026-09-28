@@ -93,6 +93,19 @@ STEPS = [
       {"py": "(app.eng.names[app.eng.idx], (lambda k: app.gp.live_poke(k[0], k[1], 0.42))(next(iter(app.gp._live))))"}], 1.5),
     ([{"expect": ["stat_txt", "speed 1/2x"]}, {"action": "speed_up"}, {"action": "speed_up"}, {"action": "speed_up"}], 1.0),
     ([{"expect": ["stat_txt", "speed 4x"]}, {"action": "speed_reset"}, {"layout": "both"}], 0.8),
+    # before and after (A/B): B keeps this build; a rebuild moves A on and leaves B on it, both on the same effect
+    # with the same sliders; another effect for B puts it back on the current build
+    ([{"compare_before": True}], 1.0),
+    ([{"check": "app.ab is not None and app.ab_before and app.ab_name == app.eng.names[app.eng.idx] and app.ab.library != app.eng.library"},
+      {"check": "'as built at' in dpg.get_value('cube_cap')"},
+      {"py": "setattr(app, '_ab_libs', (app.ab.library, app.eng.library))"}, {"py": "app.gp.compile()"}], 5.0),
+    ([{"wait_build": True}, {"check": "app.eng.library != app._ab_libs[1] and app.ab.library == app._ab_libs[0] and bool(app.ab_before)"},
+      {"param": ["sx", 201]}], 0.8),
+    ([{"check": "app.ab.names[app.ab.idx] == app.eng.names[app.eng.idx] and app.ab.fx['sx'] == app.eng.fx['sx'] == 201"},
+      {"compare": "Rainbow"}], 1.0),
+    ([{"check": "app.ab_before is None and app.ab_name == 'Rainbow' and app.ab.library.endswith('_ab' + __import__('os').path.splitext(app.eng.library)[1])"},
+      {"compare": ""}], 0.5),
+    ([{"check": "app.ab is None and app.ab_before is None"}], 0.2),
     # the LED under a point of the net and of the 3-D view, by wiring index
     ([{"py": "app.led_at(*[a + b * 0.5 for a, b in zip(dpg.get_item_state('net_img')['rect_min'], dpg.get_item_state('net_img')['rect_size'])])"},
       {"py": "app.led_at(*[a + b * 0.5 for a, b in zip(dpg.get_item_state('cube_img')['rect_min'], dpg.get_item_state('cube_img')['rect_size'])])"}], 0.5),
@@ -398,8 +411,11 @@ STEPS = [
       {"check": "dpg.is_item_visible('app_cat_colours') and dpg.is_item_visible('app_col_accent')"},
       {"py": "chrome.show_frames(app)"}], 0.8),
     ([{"check": "dpg.get_value('app_tabs') in ('app_tab_frames', dpg.get_alias_id('app_tab_frames'))"},
-      # when not, the geometry says why (a short screen, taller lines in another typeface)
+      # or, on a screen too short for it (macOS's runner: 1280 x 646), the dialog as tall as the window, scrolling;
+      # when neither, the geometry says why
       {"check": "(dpg.is_item_visible('gc_status') and dpg.is_item_visible('frames_style')) or "
+                "(dpg.is_item_visible('frames_style') and "
+                "dpg.get_item_rect_size('appearance_win')[1] >= dpg.get_viewport_client_height() - 12) or "
                 "f\"view {dpg.get_viewport_client_width()}x{dpg.get_viewport_client_height()} "
                 "win {dpg.get_item_pos('appearance_win')} {dpg.get_item_rect_size('appearance_win')} "
                 "status {dpg.get_item_rect_min('gc_status')} {dpg.is_item_visible('frames_style')}\""},
@@ -678,7 +694,7 @@ STEPS = [
     # what changed since it, before it is put back (the saved time left out)
     ([{"check": "dpg.is_item_shown('history_diff_win') and dpg.get_value('history_diff_what').startswith(\"the project's settings\")"},
       {"check": "len(dpg.get_item_children('history_diff_rows', 1)) >= 1 and "
-                "not any('saved' in str(dpg.get_value(t)) for t in dpg.get_item_children('history_diff_rows', 1))"},
+                "not any(str(dpg.get_value(t)).startswith('saved') for t in dpg.get_item_children('history_diff_rows', 1))"},
       {"py": "dpg.hide_item('history_diff_win')"}, {"py": "chrome._restore(app, 'project', 'project', '.json', app._kept[0][0])"}], 1.0),
     ([{"check": f"app.project.path.endswith({SMOKE!r}) and not dpg.is_item_shown('history_win')"},
       {"expect": ["messages", "settings restored"]}], 0.5),

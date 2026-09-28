@@ -355,7 +355,10 @@ several (or a gaps file) the map WLED makes of them. A strip, cylinder,
 sphere or torus takes it at its size; a shape's wiring is its parts' own
 order. Audio
 comes from the synth (sliders, a beat clock), a live capture, or an audio
-file (a WAV as it is; MP3, FLAC, OGG, M4A through ffmpeg). Playback has A/B compare (two effects side by side), a slider sweep,
+file (a WAV as it is; MP3, FLAC, OGG, M4A through ffmpeg). Playback has A/B compare - two effects side by side, or
+**itself as built now**: B keeps that build while you edit, and each
+rebuild shows the new version (A) beside the one from before (B), both
+restarted together with the same sliders, palette and audio - a slider sweep,
 scrubbing back through the last seconds while paused (in every view,
 the point cloud too), and a **speed** -
 1/4x to 4x (Shift+, and Shift+. step it, Shift+/ is back to 1x) - for
@@ -1084,7 +1087,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Shift+[` | Previous palette | anywhere |
 | `Shift+]` | Next palette | anywhere |
 | `L` | Live: rebuild the graph as it changes | anywhere |
-| `Ctrl+Shift+B` | Compare with another effect side by side / stop | anywhere |
+| `Ctrl+Shift+B` | Compare side by side: before and after an edit, or another effect / stop | anywhere |
 | `Ctrl+Shift+W` | Sweep a slider through its range / stop | anywhere |
 | `F5` | Compile + reload | anywhere |
 | `Ctrl+N` | New effect | anywhere |

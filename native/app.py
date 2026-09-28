@@ -397,6 +397,8 @@ class App(Features):
         self.point_quads = None      # PointQuads while it draws any other geometry
         self.ab = None               # a second engine, for comparing two effects side by side
         self.ab_name = None
+        self.ab_before = None        # the time B's build was kept at, comparing before and after an edit
+        self._ab_pokes = []          # the typed values still to go into B (features.start_ab_before)
         self._code_undo, self._code_redo, self._code_text, self._code_t = [], [], "", 0.0
         self.frames = None           # glow.Frames, once the viewport exists
         self.keys = Keymap(self.prefs)
@@ -2591,8 +2593,7 @@ class App(Features):
         dpg.add_image("cube_tex", tag="cube_img", parent="cube_win",
                       width=self.view_side, height=int(self.view_side * h / w))
         if dpg.does_item_exist("cube_cap"):
-            dpg.set_value("cube_cap", f"A: {self.eng.names[self.eng.idx]}    B: {self.ab_name}" if self.ab
-                          else "3-D - drag to rotate, wheel to zoom")
+            dpg.set_value("cube_cap", self.ab_caption() if self.ab else "3-D - drag to rotate, wheel to zoom")
         self._bufs.pop("cube", None)
 
     # --- interaction ---------------------------------------------------------
@@ -3531,11 +3532,16 @@ class App(Features):
             self.frame_ms = ms if self.frame_ms == 0.0 else self.frame_ms * 0.95 + ms * 0.05
             if self.ab:
                 try:
+                    if self.ab_before:
+                        self._ab_follow()
                     self.ab.fft[:] = self.eng.fft[:]
                     self.ab.audio(*getattr(self.eng, "last_audio", (0.0, 0)))
                     self.ab.frame(STEP)
+                    if self._ab_pokes:
+                        self._ab_pokes_land()
                 except Exception:
                     self.ab = None
+                    self.ab_before = None
             self.acc -= STEP
             n += 1
 
@@ -4238,6 +4244,8 @@ def service_command(app):
                 app.scrub = int(c["scrub"])
             if "compare" in c:                          # test hook: an effect name, or "" to stop
                 app.start_ab(c["compare"]) if c["compare"] else app.stop_ab()
+            if c.get("compare_before"):                 # test hook: B keeps the build as it is now
+                app.start_ab_before()
             if "chrome_call" in c:                      # test hook: [function in chrome, args]
                 getattr(chrome, c["chrome_call"][0])(app, *c["chrome_call"][1])
             if "frame_gradient" in c:                   # test hook: [kind, key]

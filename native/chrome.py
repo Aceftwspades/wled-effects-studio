@@ -1681,9 +1681,17 @@ def _restore_project(app, text):
 
 # --- compare ------------------------------------------------------------------------------
 def show_compare(app):
-    """Pick the effect to run beside the current one."""
+    """Pick what runs beside the current effect: itself as built now, kept
+    through the edits to come (before and after), or another effect."""
     dpg.delete_item("compare_menu", children_only=True)
-    dpg.add_text(f"beside {app.eng.names[app.eng.idx]}, show", parent="compare_menu", color=DIM)
+    name = app.eng.names[app.eng.idx]
+    dpg.add_text(f"beside {name}, show", parent="compare_menu", color=DIM)
+    dpg.add_selectable(label="itself as built now (before and after)", width=px(240), parent="compare_menu",
+                       callback=lambda: (dpg.hide_item("compare_menu"), app.start_ab_before()))
+    tip("B keeps this build while you edit: each rebuild shows the new version (A) beside this one (B), both "
+        "restarted together, with the same sliders, palette and audio")
+    dpg.add_separator(parent="compare_menu")
+    dpg.add_text("or another effect", parent="compare_menu", color=DIM)
     with dpg.child_window(width=px(240), height=px(360), border=False, parent="compare_menu"):
         for n in app.eng.names:
             dpg.add_selectable(label=n, width=px(220), user_data=n,

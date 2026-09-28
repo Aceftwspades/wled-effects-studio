@@ -40,7 +40,7 @@ ACTIONS = [
     ("prev_palette",  "Previous palette",                                    "Shift+[", "global"),
     ("next_palette",  "Next palette",                                        "Shift+]", "global"),
     ("live",          "Live: rebuild the graph as it changes",               "L",      "global"),
-    ("compare",       "Compare with another effect side by side / stop",     "Ctrl+Shift+B", "global"),
+    ("compare",       "Compare side by side: before and after an edit, or another effect / stop",     "Ctrl+Shift+B", "global"),
     ("sweep",         "Sweep a slider through its range / stop",             "Ctrl+Shift+W", "global"),
     ("build",         "Compile + reload",                                    "F5",     "global"),
     # files

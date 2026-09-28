@@ -2738,15 +2738,33 @@ class GraphPanel(Glyphs):
         t = self.graph.nodes[nid]["type"]
         return [k for k in self._selected() if k != nid and self.graph.nodes[k]["type"] == t]
 
-    def live_poke(self, nid, name, val):
+    def live_values(self):
+        """The typed values of the pins the built effect reads from its table,
+        as they stand: [(node id, pin, value)], a colour as [r, g, b] - for
+        another engine running the same build (A/B's before and after)."""
+        live = getattr(self, "_live", None) or {}
+        out = []
+        for nid, name in sorted({(k[0], k[1]) for k in live}):
+            n = self.graph.nodes.get(nid) if self.graph else None
+            if not n or name not in (n.get("inputs") or {}):
+                continue                                 # at its default: the table has it from the build
+            v = n["inputs"][name]
+            if isinstance(v, int) and not isinstance(v, bool) and (nid, name, 0) in live:
+                v = [(v >> 16) & 255, (v >> 8) & 255, v & 255]      # a colour kept as one number
+            out.append((nid, name, v))
+        return out
+
+    def live_poke(self, nid, name, val, eng=None, live=None):
         """The typed value into the running effect's parameter table, so the
         picture follows the drag with no rebuild. True when it landed: the
         effect built from this graph is in the engine and has run. A
-        vector or a colour (r, g, b 0..255) pokes three slots; a bool one."""
-        live = getattr(self, "_live", None)
+        vector or a colour (r, g, b 0..255) pokes three slots; a bool one.
+        `eng` another engine running the same build, `live` the slots of
+        that build (A/B's before and after)."""
+        live = live if live is not None else getattr(self, "_live", None)
         if not live or not getattr(self, "_probes_for", None):
             return False
-        eng = self.app.eng
+        eng = eng or self.app.eng
         title = self.app.project.effect_title(self._probes_for)
         if title not in eng.names:
             return False
