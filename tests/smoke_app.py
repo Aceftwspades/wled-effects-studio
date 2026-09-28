@@ -196,7 +196,11 @@ STEPS = [
       {"check": "app.gp._step_lit.get(5) is not None"},
       {"py": "len(app.gp._readout_items)"}, {"graph_hover": ["out", 3, "value"]}], 1.0),
     ([{"check": "app.gp._hover_out == (3, 'value')"}, {"check": "len(app.gp._readout_items) > 12"},
-      {"check": "any(dpg.get_item_type(i).endswith('DrawCircle') for i in app.gp._readout_items)"}], 0.5),
+      {"py": "app.gp.set_selection([2])"}, {"action": "frame_selected"}, {"py": "app.gp.set_zoom(1.0, app.gp.editor_origin())"},
+      {"action": "select_none"}], 1.0),
+    # a bool output's light, the Audio node's beat: framed in the top left first - in the whole graph at macOS's
+    # 1280 x 646 it sat under the minimap, where no readout is drawn
+    ([{"check": "any(dpg.get_item_type(i).endswith('DrawCircle') for i in app.gp._readout_items)"}], 0.5),
     # a wire that closes a loop (the Multiply of the time back into its own b) gets a Delay; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.on_link(None, (app.gp._pins[(11, 'out', 'result')], app.gp._pins[(11, 'in', 'b')]))"}], 1.0),
     ([{"expect": ["messages", "closed a loop"]}, {"py": "[n['type'] for n in app.gp.graph.nodes.values()].count('Delay')"}, {"graph_undo": True}], 0.5),
@@ -661,11 +665,12 @@ STEPS = [
              "next(i for i, n in app.gp.graph.nodes.items() if n['type'] == 'Output'), 'color'))"}, {"py": "app.gp.compile()"}], 3.0),
     ([{"expect": ["messages", "cannot take a float"]},
       {"py": "[app.gp._delete_node(i) for i, n in list(app.gp.graph.nodes.items()) if n['type'] == 'Output']"}, {"py": "app.gp.compile()"}], 3.0),
-    # (the graph's live build, armed by opening it, is called off: half a second later it rewrote box_fire.cpp - the
-    # graph's own file - under the code pane, the watcher reloaded it, and the broken line and its problem were gone)
     ([{"expect": ["messages", "exactly one Output"]}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile(False)"},
-      {"py": "setattr(app.gp, '_dirty', 0.0)"}, {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
-      {"ed_type": "this is not C++ ;"}, {"ed_key": ["Return", False, False]}, {"py": "app.edit_build()"}], 12.0),
+      {"layout": "edit"}, {"open": "box_fire.cpp"}, {"ed_goto": 30},
+      {"ed_type": "this is not C++ ;"}, {"ed_key": ["Return", False, False]}, {"py": "app.edit_save()"}], 1.2),
+    # the pane's own save is no change from outside: the watcher (twice a second) leaves the status alone - it said
+    # "reloaded from disk" over the build's problem when the build failed before its next look (Linux, packaged)
+    ([{"expect": ["edit_status", "box_fire.cpp saved"]}, {"py": "app.edit_build()"}], 12.0),
     ([{"expect": ["edit_status", "problem"]}, {"action": "undo"}, {"action": "undo"}, {"layout": "graph"}, {"graph_open": "fan.json"},
       {"device": "127.0.0.1:1"}, {"py": "app.send_script()"}], 8.0),
     ([{"expect": ["messages", "failed"]}, {"device": "127.0.0.1:8770"}], 1.0),

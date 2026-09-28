@@ -2825,7 +2825,17 @@ Seen in the promo film, 12 s in: numbers showing through a node, and one on the
       `tests/pointer_app.py` has it: in Maelstrom's graph, a frame-scope output
       under the node above shows no number; its node clicked to the front, it
       does (the check fails with the covering switched off: node 10's result
-      drawn through node 29, the promo's frame).
+      drawn through node 29, the promo's frame). The smoke's light check frames
+      the face demo's Audio node first: at macOS's 1280 x 646 the whole-graph
+      view had its beat light under the minimap, where it is rightly left out.
+- [x] **The code pane's own save counted as a change from outside.**
+      `edit_save` wrote the file and left the watcher's mtime as it was, so
+      within half a second the watcher "reloaded" the text just saved and said
+      so - over "compiling...", or over the build's problems when a failing
+      build finished before its next look (the packaged Linux app in CI:
+      "box_fire.cpp reloaded from disk" where the problem was expected). The
+      save takes the file's new mtime; the smoke saves, waits past two looks,
+      and expects "saved" ("reloaded from disk" with the old behaviour).
 
 ### Deferred from earlier lists
 

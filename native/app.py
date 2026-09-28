@@ -1461,6 +1461,7 @@ class App(Features):
         if not self.edit_file:
             return
         self.project.write_effect(self.edit_file, dpg.get_value("code"))
+        self._watch_mtime = self._mtime(self.edit_file)      # the pane's own save: not a change from outside for the watcher
         self.edit_dirty = False
         dpg.set_value("edit_status", f"{self.edit_file} saved")
 
