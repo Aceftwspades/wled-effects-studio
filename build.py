@@ -186,13 +186,10 @@ def extract_noise():
 STOCK_SKIP = {
     # Needs the font manager, the RTC and sprintf. None of that says anything
     # about how an effect looks on a cube.
-    "mode_2Dscrollingtext": "needs fonts, the clock and printf",
-    # Depends on a `Cell` struct declared at file scope in FX.cpp, well above
-    # the effect bodies. Each span here runs from one effect to the next, so
-    # anything declared before the first of them is out of reach. Pulling in
-    # arbitrary file-scope declarations is a much larger change than this is
-    # worth for one effect.
-    "mode_2Dgameoflife": "needs a file-scope type the per-effect spans cannot reach",
+    "mode_2Dscrollingtext": "needs WLED's font manager (fonts cached from the device's files) and the clock",
+    # (Game of Life was here: its `Cell` struct sat far above it in FX.cpp. It
+    # sits just above it now, and a span runs from where the last effect ended,
+    # so the struct comes with it.)
 }
 
 

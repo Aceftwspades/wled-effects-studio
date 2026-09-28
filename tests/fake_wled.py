@@ -131,11 +131,23 @@ class FakeWled:
                     for k in ("on", "bri", "seg", "mainseg"):
                         if k in pre:
                             st[k] = json.loads(json.dumps(pre[k]))
+        gone = set()
         for sg in d.get("seg") or []:
             i = int(sg.get("id", 0))
+            stop = sg.get("stop")
+            if stop is not None and int(stop) <= 0:
+                # WLED (json.cpp deserializeSegment, Segment::setGeometry): an id past the list with no length is
+                # ignored; an existing segment is switched off, and purged from the list - the rest move down
+                if i < len(st["seg"]):
+                    gone.add(i)
+                continue
             while len(st["seg"]) <= i:
                 st["seg"].append(_seg(len(st["seg"])))
             st["seg"][i].update({k: v for k, v in sg.items() if k != "id"})
+        if gone:
+            st["seg"] = [sg for i, sg in enumerate(st["seg"]) if i not in gone]
+            for i, sg in enumerate(st["seg"]):
+                sg["id"] = i
         if "pdel" in d:
             self.presets.pop(str(int(d["pdel"])), None); self.pmt = int(time.time())
         if "rmcpal" in d:

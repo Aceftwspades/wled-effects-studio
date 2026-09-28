@@ -321,12 +321,22 @@ class Features:
         self.eng.seg_config(k, cur["x0"], cur["y0"], cur["x1"], cur["y1"], cur["opacity"])
         self.save_segments()
         self.rebuild_seg_fields()
+    def _seg_colours_to_panel(self):
+        """The COLOURS rows show the current segment's own three: each
+        segment keeps its colours (they used to stay the last segment's,
+        and an edit then put all three on the new one)."""
+        self.seg_cols = [int(c) for c in self.eng._colors]
+        self.refresh_colours()
+
     def seg_pick(self, label):
         try:
             k = int(str(label).split(":")[0])
         except ValueError:
             return
         self.eng.seg_select(k)
+        if self.eng.seg_count() > 1:
+            self.save_segments()                          # what was changed on the one left (its sliders, colours) kept
+        self._seg_colours_to_panel()
         dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
         self.rebuild_params()
         self.sync_palette_combo()
@@ -343,6 +353,7 @@ class Features:
             self.eng.seg_config(n, 0, h // 2, w, h, 255)
         self.eng.seg_select(n)
         self.save_segments()
+        self._seg_colours_to_panel()
         dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
         self.rebuild_params(); self.sync_palette_combo(); self.rebuild_seg_fields()
     def seg_remove(self):
@@ -351,6 +362,7 @@ class Features:
             return
         self.eng.seg_truncate(n - 1)
         self.save_segments()
+        self._seg_colours_to_panel()
         dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
         self.rebuild_params(); self.sync_palette_combo(); self.rebuild_seg_fields()
     def save_segments(self):
@@ -366,6 +378,7 @@ class Features:
             self.eng.load_segments(segs)
         else:
             self.eng.seg_truncate(1); self.eng.seg_select(0)
+        self._seg_colours_to_panel()
         dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
         self.rebuild_params(); self.sync_palette_combo(); self.rebuild_seg_fields()
         self.gp.status(f"segments: {'redo' if redo else 'undo'}")
@@ -374,6 +387,8 @@ class Features:
         if len(segs) > 1:
             try:
                 self.eng.load_segments(segs)
+                if any(sg.get("colors") for sg in segs):
+                    self._seg_colours_to_panel()          # a project from before 1.4.0 keeps the panel's colours
             except Exception as e:
                 self.gp.status(f"segments not restored: {e}")
         self.rebuild_seg_fields()
@@ -454,22 +469,20 @@ class Features:
         self.gp.status(msg); device_ui.send_log(self, msg)
         self.probe_active()
     def push_settings(self):
-        """The effect on the cube here, with its sliders, checkboxes, palette
-        and colours, becomes the active device's first segment."""
+        """What the sim shows becomes the active device's: every segment -
+        its effect, sliders, checkboxes, palette and colours, its bounds,
+        opacity, blend and options - and the device's segments past the
+        sim's switched off. (It used to send the current segment alone,
+        with no bounds.)"""
         from native import flash
         host = self.active_host()
         if not host:
             device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
-        f = self.eng.fx
-        params = {k: f.get(k) for k in ("sx", "ix", "c1", "c2", "c3")}
-        params.update({k: bool(f.get(k)) for k in ("o1", "o2", "o3")})
-        bm, op = 0, 255
-        if self.eng.seg_count() >= 1:
-            g = self.eng.seg_get(self.eng.seg); bm, op = g[6], g[4]
-        ok, msg = flash.push_settings(host, self.eng.names[self.eng.idx], params,
-                                      self.palette_name_for(self.eng.pal), self.seg_cols, seg_id=self.eng.seg, blend=bm, opacity=op,
-                                      six=self.eng.six if self.project.geometry.kind == "cube" else None,
-                                      options=self.eng.seg_options(self.eng.seg))
+        if self.eng.seg_count() > 1:
+            self.save_segments()                          # what the current segment has now is in the project too
+        ok, msg = flash.push_segments(host, self.eng.segments(), self.seg_cols, (self.eng.cols, self.eng.rows),
+                                      self.palette_name_for,
+                                      six=self.eng.six if self.project.geometry.kind == "cube" else None)
         dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
         self.probe_active()
 

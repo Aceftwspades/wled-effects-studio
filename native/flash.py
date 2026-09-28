@@ -783,6 +783,90 @@ def push_settings(host, effect, params, palette, colours, seg_id=0, blend=None, 
     return True, f"{effect} with its settings sent to {host} as effect {fx}" + note
 
 
+def push_segments(host, segments, colours, size, palette_name, six=None):
+    """Every segment the sim has to the device over /json/state, as the sim
+    has them - each one's effect (found by name in the device's list), its
+    sliders, checks, palette (by name: the device's custom and usermod ids
+    are its own), colours, bounds, opacity, blend and options, as a
+    sequence's presets carry them (sequence.segment_json) - and the
+    device's segments past the sim's switched off (WLED drops a segment
+    given a stop of 0). One segment over the whole picture covers the
+    whole of the device's strip or matrix (/json/info's): the LEDs it has
+    may not be the sim's count.
+
+    segments: engine.segments(); colours: the three used by a segment that
+    carries none; size: the sim's (columns, rows); palette_name: the sim's
+    palette id -> its name. Returns (ok, message)."""
+    import json
+    from native import sequence
+    host = (host or "").strip().rstrip("/")
+    if not host:
+        return False, "no device address"
+    if not host.startswith("http"):
+        host = "http://" + host
+    if not segments:
+        return False, "no segment to send"
+    try:
+        names = _get_json(host, "/json/effects")
+        pals = _get_json(host, "/json/palettes")
+        state = _get_json(host, "/json/state")
+        leds = (_get_json(host, "/json/info").get("leds") or {})
+    except Exception as e:
+        return False, f"could not read the device's lists: {e}"
+    cols, rows = int(size[0]), int(size[1])
+    out, missing, unmatched = [], [], []
+    for k, sg in enumerate(segments):
+        d = sequence.segment_json(k, sg, names, pals, rows > 1, colours)
+        if d is None:
+            missing.append(sg.get("effect") or "?")
+            continue
+        want = str(palette_name(sg.get("pal")) or "").strip().lower()
+        idx = next((i for i, n in enumerate(pals) if str(n).strip().lower() == want), None)
+        if idx is not None:
+            d["pal"] = idx
+        else:
+            d.pop("pal", None)                           # not on the device (a custom one never sent): left as it is
+            unmatched.append(str(palette_name(sg.get("pal"))))
+        out.append(d)
+    if missing:
+        return False, f"the device has no effect called {missing[0]!r} - flash the firmware with it first"
+    b = segments[0].get("bounds") or [0, 0, cols, rows]
+    if len(out) == 1 and [int(v) for v in b] == [0, 0, cols, rows]:
+        mx = leds.get("matrix") or {}
+        if mx.get("w") and mx.get("h"):
+            out[0].update(start=0, stop=int(mx["w"]), startY=0, stopY=int(mx["h"]))
+        elif leds.get("count"):
+            out[0].update(start=0, stop=int(leds["count"]))
+            out[0].pop("startY", None); out[0].pop("stopY", None)
+        else:
+            for key in ("start", "stop", "startY", "stopY"):    # nothing said about its LEDs: its bounds left alone
+                out[0].pop(key, None)
+    ids = [int(s.get("id", i)) for i, s in enumerate(state.get("seg") or [])]
+    out += [{"id": i, "stop": 0} for i in sorted(ids, reverse=True) if i >= len(segments)]
+    body = json.dumps({"on": True, "seg": out}).encode()
+    req = urllib.request.Request(host + "/json/state", data=body, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            r.read()
+    except Exception as e:
+        return False, f"the device refused the state: {e}"
+    dropped = sum(1 for i in ids if i >= len(segments))
+    note = f"; {dropped} segment(s) of the device's off" if dropped else ""
+    if unmatched:
+        note += f" (palette {unmatched[0]!r} not on the device; left as is)"
+    if six is not None:
+        body = json.dumps({"um": {"CubeFXBank": {"six_faces": bool(six)}}}).encode()
+        req = urllib.request.Request(host + "/json/cfg", data=body, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                r.read()
+            note += f"; {'six' if six else 'five'} faces"
+        except Exception as e:
+            note += f" (the six-face setting was not taken: {e})"
+    what = segments[0].get("effect", "?") if len(segments) == 1 else f"{len(segments)} segments ({', '.join(s.get('effect', '?') for s in segments)})"
+    return True, f"{what} with {'its' if len(segments) == 1 else 'their'} settings sent to {host}" + note
+
+
 def advice(stats, env):
     """What to do about a firmware that does not fit, from what was measured:
     the effects' own sizes, and the rest - WLED, its usermods and the

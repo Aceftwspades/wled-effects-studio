@@ -42,6 +42,7 @@ static const char _data_FX_MODE_2DDNASPIRAL[] PROGMEM = "DNA Spiral@Scroll speed
 static const char _data_FX_MODE_2DDRIFT[] PROGMEM = "Drift@Rotation speed,Blur,,,,Twin,Smear;;!;2;ix=0";
 static const char _data_FX_MODE_2DFIRENOISE[] PROGMEM = "Firenoise@X scale,Y scale,,,,Palette;;!;2;pal=66";
 static const char _data_FX_MODE_2DFRIZZLES[] PROGMEM = "Frizzles@X frequency,Y frequency,Blur,,,Smear;;!;2";
+static const char _data_FX_MODE_2DGAMEOFLIFE[] PROGMEM = "Game Of Life@!,,Blur,,,,,Mutation;!,!;!;2;pal=11,sx=128";
 static const char _data_FX_MODE_2DHIPHOTIC[] PROGMEM = "Hiphotic@X scale,Y scale,,,Speed;!;!;2";
 static const char _data_FX_MODE_2DJULIA[] PROGMEM = "Julia@,Max iterations per pixel,X center,Y center,Area size, Blur;!;!;2;ix=24,c1=128,c2=128,c3=16";
 static const char _data_FX_MODE_2DLISSAJOUS[] PROGMEM = "Lissajous@X frequency,Fade rate,Blur,,Speed,Smear;!;!;2;c1=0";
@@ -305,6 +306,164 @@ void mode_2DFrizzles(void) {                 // By: Stepko https://editor.soulma
 typedef struct Cell {
     uint8_t alive : 1, faded : 1, toggleStatus : 1, edgeCell: 1, oscillatorCheck : 1, spaceshipCheck : 1, unused : 2;
 } Cell;
+
+
+void mode_2Dgameoflife(void) { // Written by Ewoud Wijma, inspired by https://natureofcode.com/book/chapter-7-cellular-automata/ 
+                                   // and https://github.com/DougHaber/nlife-color , Modified By: Brandon Butler
+  if (!strip.isMatrix || !SEGMENT.is2D()) FX_FALLBACK_STATIC; // not a 2D set-up
+  const int cols = SEG_W, rows = SEG_H;
+  const unsigned maxIndex = cols * rows;
+
+  if (!SEGENV.allocateData(SEGMENT.length() * sizeof(Cell))) FX_FALLBACK_STATIC; // allocation failed
+
+  Cell *cells = reinterpret_cast<Cell*> (SEGENV.data);
+
+  uint16_t& generation = SEGENV.aux0, &gliderLength = SEGENV.aux1; // rename aux variables for clarity
+  bool mutate = SEGMENT.check3;
+  uint8_t blur = map(SEGMENT.custom1, 0, 255, 255, 4);
+
+  uint32_t bgColor    = SEGCOLOR(1);
+  uint32_t birthColor = SEGMENT.color_from_palette(128, false, PALETTE_SOLID_WRAP, 255);
+
+  bool setup = SEGENV.call == 0;
+  if (setup) {
+    // Calculate glider length LCM(rows,cols)*4 once
+    unsigned a = rows, b = cols;
+    while (b) { unsigned t = b; b = a % b; a = t; }
+    gliderLength = (cols * rows / a) << 2;
+  }
+
+  if (abs(long(strip.now) - long(SEGENV.step)) > 2000) SEGENV.step = 0; // Timebase jump fix
+  bool paused = SEGENV.step > strip.now;
+
+  // Setup New Game of Life
+  if ((!paused && generation == 0) || setup) {
+    SEGENV.step = strip.now + 1280; // show initial state for 1.28 seconds
+    generation = 1;
+    paused = true;
+    //Setup Grid
+    memset(cells, 0, maxIndex * sizeof(Cell));
+
+    for (unsigned i = 0; i < maxIndex; i++) {
+      bool isAlive = !hw_random8(3); // ~33%
+      cells[i].alive = isAlive;
+      cells[i].faded = !isAlive;
+      unsigned x = i % cols, y = i / cols;
+      cells[i].edgeCell = (x == 0 || x == cols-1 || y == 0 || y == rows-1);
+
+      SEGMENT.setPixelColor(i, isAlive ? SEGMENT.color_from_palette(hw_random8(), false, PALETTE_SOLID_WRAP, 0) : bgColor);
+    }
+  }
+
+  if (paused || (strip.now - SEGENV.step < 1000 / map(SEGMENT.speed,0,255,1,42))) {
+    // Redraw if paused or between updates to remove blur
+    for (unsigned i = maxIndex; i--; ) {
+      if (!cells[i].alive) {
+        uint32_t cellColor = SEGMENT.getPixelColor(i);
+        if (cellColor != bgColor) {
+          uint32_t newColor;
+          bool needsColor = false;
+          if (cells[i].faded) { newColor = bgColor; needsColor = true; }
+          else {
+            uint32_t blended = color_blend(cellColor, bgColor, 2);
+            if (blended == cellColor) { blended = bgColor; cells[i].faded = 1; }
+            newColor = blended; needsColor = true;
+          }
+          if (needsColor) SEGMENT.setPixelColor(i, newColor);
+        }
+      }
+    }
+    return;
+  }
+
+  // Repeat detection
+  bool updateOscillator = generation % 16 == 0;
+  bool updateSpaceship  = gliderLength && generation % gliderLength == 0;
+  bool repeatingOscillator = true, repeatingSpaceship = true, emptyGrid = true;
+
+  unsigned cIndex = maxIndex-1;
+  for (unsigned y = rows; y--; ) for (unsigned x = cols; x--; cIndex--) {
+    Cell& cell = cells[cIndex];
+
+    if (cell.alive) emptyGrid = false;
+    if (cell.oscillatorCheck != cell.alive) repeatingOscillator = false;
+    if (cell.spaceshipCheck  != cell.alive) repeatingSpaceship  = false;
+    if (updateOscillator) cell.oscillatorCheck = cell.alive;
+    if (updateSpaceship)  cell.spaceshipCheck  = cell.alive;
+
+    unsigned neighbors = 0, aliveParents = 0, parentIdx[3];
+    // Count alive neighbors
+    for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) if (i || j) {
+      int nX = x + j, nY = y + i;
+      if (cell.edgeCell) {
+        nX = (nX + cols) % cols;
+        nY = (nY + rows) % rows;
+      }
+      unsigned nIndex = nX + nY * cols;
+      Cell& neighbor = cells[nIndex];
+      if (neighbor.alive) {
+        neighbors++;
+        if (!neighbor.toggleStatus && neighbors < 4) { // Alive and not dying
+          parentIdx[aliveParents++] = nIndex;
+        }
+      }
+    }
+
+    uint32_t newColor;
+    bool needsColor = false;
+
+    if (cell.alive && (neighbors < 2 || neighbors > 3)) { // Loneliness or Overpopulation
+      cell.toggleStatus = 1;
+      if (blur == 255) cell.faded = 1;
+      newColor = cell.faded ? bgColor : color_blend(SEGMENT.getPixelColor(cIndex), bgColor, blur);
+      needsColor = true;
+    }
+    else if (!cell.alive) {
+      byte mutationRoll = mutate ? hw_random8(128) : 1; // if 0: 3 neighbor births fail and 2 neighbor births mutate
+      if ((neighbors == 3 && mutationRoll) || (mutate && neighbors == 2 && !mutationRoll)) { // Reproduction or Mutation
+        cell.toggleStatus = 1;
+        cell.faded = 0;
+
+        if (aliveParents) {
+          // Set color based on random neighbor
+          unsigned parentIndex = parentIdx[hw_random8(aliveParents)];
+          birthColor = SEGMENT.getPixelColor(parentIndex);
+        }
+        newColor = birthColor;
+        needsColor = true;
+      }
+      else if (!cell.faded) {// No change, fade dead cells
+          uint32_t cellColor = SEGMENT.getPixelColor(cIndex);
+          uint32_t blended = color_blend(cellColor, bgColor, blur);
+          if (blended == cellColor) { blended = bgColor; cell.faded = 1; }
+          newColor = blended;
+          needsColor = true;
+      }
+    }
+
+    if (needsColor) SEGMENT.setPixelColor(cIndex, newColor);
+  }
+  // Loop through cells, if toggle, swap alive status
+  for (unsigned i = maxIndex; i--; ) {
+    cells[i].alive ^= cells[i].toggleStatus;
+    cells[i].toggleStatus = 0;
+  }
+
+  if (repeatingOscillator || repeatingSpaceship || emptyGrid) {
+    generation = 0; // reset on next call
+    SEGENV.step += 1024; // pause final generation for ~1 second
+  }
+  else {
+    ++generation;
+    SEGENV.step = strip.now;
+  }
+} // mode_2Dgameoflife()
+
+
+
+/////////////////////////
+//     2D Hiphotic     //
+/////////////////////////
 
 void mode_2DHiphotic() {                        //  By: ldirko  https://editor.soulmatelights.com/gallery/810 , Modified by: Andrew Tuline
   if (!strip.isMatrix || !SEGMENT.is2D()) FX_FALLBACK_STATIC; // not a 2D set-up
@@ -2620,6 +2779,7 @@ void simRegisterStock() {
   cfxBankAdd(&mode_2DDrift, _data_FX_MODE_2DDRIFT);
   cfxBankAdd(&mode_2Dfirenoise, _data_FX_MODE_2DFIRENOISE);
   cfxBankAdd(&mode_2DFrizzles, _data_FX_MODE_2DFRIZZLES);
+  cfxBankAdd(&mode_2Dgameoflife, _data_FX_MODE_2DGAMEOFLIFE);
   cfxBankAdd(&mode_2DHiphotic, _data_FX_MODE_2DHIPHOTIC);
   cfxBankAdd(&mode_2DJulia, _data_FX_MODE_2DJULIA);
   cfxBankAdd(&mode_2DLissajous, _data_FX_MODE_2DLISSAJOUS);

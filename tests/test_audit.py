@@ -63,7 +63,14 @@ def test_stock_skips_are_explained():
         print(f"    {k}: {why[:90]}")
     assert all(isinstance(v, str) and v.strip() for v in two_d.values()), "a 2-D skip without a reason"
     assert all(isinstance(v, str) and v.strip() for v in one_d.values()), "a 1-D skip without a reason"
-    assert len(two_d) <= 6 and len(one_d) <= 24, "more stock effects left out than before - the extractor regressed?"
+    # since 1.4.0 one is left out (Scrolling Text, WLED's font manager): a little room for a new FX.cpp's needs,
+    # no more - the shim's gaps (CRGBW, CHSV32, blurCols...) were what cost sixteen of them their place
+    assert len(two_d) <= 2 and len(one_d) <= 4, "more stock effects left out than before - the extractor regressed?"
+    # and what the vendored files register (a checkout's skip list is not there on a machine without the tree)
+    n1 = open(os.path.join(ROOT, "gen", "wled_fx1d.cpp"), encoding="utf-8").read().count("cfxBankAdd(")
+    n2 = open(os.path.join(ROOT, "gen", "wled_fx.cpp"), encoding="utf-8").read().count("cfxBankAdd(")
+    print(f"  registered: {n1} 1-D, {n2} 2-D")
+    assert n1 >= 144 and n2 >= 36, (n1, n2)
 
 
 def _cameras():

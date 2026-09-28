@@ -144,6 +144,9 @@ def discover(fxsrc):
                 sym = near.group(1)
                 mm = re.search(r'static const char ' + sym + LIT, region)
         pre = re.sub(r'static const char _data_FX_MODE_\w+' + LIT, "", pre)
+        # the shim has FX.cpp's Ripple already (the 2-D and audio ripples use it, far from this one): the copy
+        # above mode_ripple would be a redefinition, and it cost Ripple and Ripple Rainbow their place
+        pre = re.sub(r"typedef\s+struct\s+Ripple\s*\{[^{}]*\}\s*ripple\s*;", "", pre)
         if not mm:
             items.append((name, None, None, pre, body))
             continue
@@ -151,7 +154,9 @@ def discover(fxsrc):
     return _balance(top), items
 
 
-_DEF = re.compile(r"^([ \t]*)((?:uint16_t|uint8_t|uint32_t|int|void|bool|float|CRGB|static)\b[^;{()=]*?\b\w+\s*\([^;{]*\)\s*(?:const\s*)?\{)", re.M)
+# at the start of a line: a file-scope function. An indented one is a class's method (Aurora's AuroraWave), and
+# a method made static loses its object - "invalid use of member 'ttl' in static member function"
+_DEF = re.compile(r"^()((?:uint16_t|uint8_t|uint32_t|int|void|bool|float|CRGB|static)\b[^;{()=]*?\b\w+\s*\([^;{]*\)\s*(?:const\s*)?\{)", re.M)
 
 def _staticise(text):
     """Give every free function DEFINED in a preamble internal linkage. The 2-D

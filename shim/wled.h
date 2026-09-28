@@ -248,6 +248,106 @@ static inline long  map(long x, long a, long b, long c, long d) {
   #define constrain(v, lo, hi) ((v) < (lo) ? (lo) : ((v) > (hi) ? (hi) : (v)))
 #endif
 
+// --- WLED's 32-bit colour types (wled00/colors.h, colors.cpp) -----------------
+// Copied, not approximated: Twinklefox, Twinklecat, Pride 2015, Colorwaves,
+// Aurora and Colortwinkle build their colours in these, and without them six
+// of WLED's best-known 1-D effects were left out of the simulator. The layouts
+// match the firmware's (CRGBW's bytes are B, G, R, W - a 0xWWRRGGBB word).
+struct CRGBW;
+struct CHSV32 {                                   // HSV with a 16-bit hue
+  union {
+    struct { uint16_t h; uint8_t s; uint8_t v; };
+    uint32_t hsv32;
+  };
+  inline CHSV32() = default;
+  inline CHSV32(uint16_t ih, uint8_t is, uint8_t iv) : h(ih), s(is), v(iv) {}
+  inline CHSV32(uint8_t ih, uint8_t is, uint8_t iv) : h((uint16_t)ih << 8), s(is), v(iv) {}
+  inline CHSV32(const CHSV &chsv) : h((uint16_t)chsv.h << 8), s(chsv.s), v(chsv.v) {}
+  inline operator CHSV() const { return CHSV((uint8_t)(h >> 8), s, v); }
+  inline CHSV32(const CRGBW &rgb);
+  inline CHSV32 &operator=(const CRGBW &rgb);
+};
+static inline void hsv2rgb_spectrum(const CHSV32 &hsv, CRGBW &rgb);
+struct CRGBW {                                    // a 32-bit colour, 0xWWRRGGBB
+  union {
+    uint32_t color32;
+    struct { uint8_t b; uint8_t g; uint8_t r; uint8_t w; };
+    uint8_t raw[4];
+  };
+  inline CRGBW() = default;
+  constexpr CRGBW(uint32_t color) : color32(color) {}
+  constexpr CRGBW(uint8_t red, uint8_t green, uint8_t blue, uint8_t white = 0) : b(blue), g(green), r(red), w(white) {}
+  constexpr CRGBW(CRGB rgb) : b(rgb.b), g(rgb.g), r(rgb.r), w(0) {}
+  inline CRGBW(CHSV32 hsv) { hsv2rgb_rainbow(hsv.h, hsv.s, hsv.v, raw, true); }
+  inline CRGBW(CHSV hsv) { hsv2rgb_rainbow(hsv.h << 8, hsv.s, hsv.v, raw, true); }
+  inline const uint8_t &operator[](uint8_t x) const { return raw[x]; }
+  inline CRGBW &operator=(uint32_t color) { color32 = color; return *this; }
+  inline CRGBW &operator=(CHSV32 hsv) { hsv2rgb_rainbow(hsv.h, hsv.s, hsv.v, raw, true); return *this; }
+  inline CRGBW &operator=(CHSV hsv) { hsv2rgb_rainbow(hsv.h << 8, hsv.s, hsv.v, raw, true); return *this; }
+  inline CRGBW &operator=(const CRGB &rgb) { b = rgb.b; g = rgb.g; r = rgb.r; w = 0; return *this; }
+  inline operator uint32_t() const { return color32; }
+  inline void adjust_hue(int hueshift) {
+    CHSV32 hsv = *this;
+    hsv.h += hueshift << 8;
+    hsv2rgb_spectrum(hsv, *this);
+  }
+  uint8_t getAverageLight() const { return (r + g + b + w) >> 2; }
+  uint8_t getRGBaverage() const { return ((r + g + b) * 21846) >> 16; }
+};
+// colors.cpp: HSV (16-bit hue) to RGB, white 0
+static inline void hsv2rgb_spectrum(const CHSV32 &hsv, CRGBW &rgb) {
+  unsigned p, q, t;
+  unsigned region = ((unsigned)hsv.h * 6) >> 16;
+  unsigned remainder = (hsv.h - (region * 10923)) * 6;
+  if (hsv.s == 0) { rgb.r = rgb.g = rgb.b = hsv.v; return; }
+  p = (hsv.v * (255 - hsv.s)) >> 8;
+  q = (hsv.v * (255 - ((hsv.s * remainder) >> 16))) >> 8;
+  t = (hsv.v * (255 - ((hsv.s * (65535 - remainder)) >> 16))) >> 8;
+  switch (region) {
+    case 0:  rgb.r = hsv.v; rgb.g = t;     rgb.b = p;     break;
+    case 1:  rgb.r = q;     rgb.g = hsv.v; rgb.b = p;     break;
+    case 2:  rgb.r = p;     rgb.g = hsv.v; rgb.b = t;     break;
+    case 3:  rgb.r = p;     rgb.g = q;     rgb.b = hsv.v; break;
+    case 4:  rgb.r = t;     rgb.g = p;     rgb.b = hsv.v; break;
+    default: rgb.r = hsv.v; rgb.g = p;     rgb.b = q;     break;
+  }
+}
+static inline void hsv2rgb_spectrum(const CHSV &hsv, CRGB &rgb) {
+  CRGBW rgb32;
+  hsv2rgb_spectrum(CHSV32(hsv), rgb32);
+  rgb = CRGB(rgb32.r, rgb32.g, rgb32.b);
+}
+// colors.cpp: RGB to HSV (16-bit hue), white ignored
+static inline void rgb2hsv(const CRGBW &rgb, CHSV32 &hsv) {
+  int32_t r = rgb.r, g = rgb.g, b = rgb.b;
+  uint32_t maxval = (r > g) ? ((r > b) ? r : b) : ((g > b) ? g : b);
+  if (maxval == 0) { hsv.hsv32 = 0; return; }
+  uint32_t minval = (r < g) ? ((r < b) ? r : b) : ((g < b) ? g : b);
+  hsv.v = maxval;
+  int32_t delta = maxval - minval;
+  if (delta != 0) {
+    hsv.s = (255 * delta) / maxval;
+    if ((int32_t)maxval == r)      hsv.h = (uint16_t)((10923 * (g - b)) / delta);
+    else if ((int32_t)maxval == g) hsv.h = (uint16_t)(21845 + (10923 * (b - r)) / delta);
+    else                           hsv.h = (uint16_t)(43690 + (10923 * (r - g)) / delta);
+  } else {
+    hsv.s = 0; hsv.h = 0;
+  }
+}
+inline CHSV32::CHSV32(const CRGBW &rgb) { rgb2hsv(rgb, *this); }
+inline CHSV32 &CHSV32::operator=(const CRGBW &rgb) { rgb2hsv(rgb, *this); return *this; }
+static inline CRGBW hsv2rgb(const CHSV32 &hsv) { return CRGBW(hsv); }
+static inline void  hsv2rgb(const CHSV32 &hsv, CRGBW &rgb) { rgb = CRGBW(hsv); }
+static inline void  hsv2rgb(const CHSV32 &hsv, uint32_t &rgb) { rgb = CRGBW(hsv).color32; }
+
+// FX.h: three colours a segment; the data a segment may fairly take - the
+// ESP32's 64 KB over its 32 segments (Popcorn, Starburst and Exploding
+// Fireworks size their particles from it)
+#define NUM_COLORS        3
+#define MAX_NUM_SEGMENTS  32
+#define MAX_SEGMENT_DATA  (64 * 1024)
+#define FAIR_DATA_PER_SEG (MAX_SEGMENT_DATA / MAX_NUM_SEGMENTS)
+
 // The file-scope generator several stock effects draw from. WLED seeds it from
 // hardware entropy; here it is the same deterministic xorshift everything else
 // uses, so a run stays reproducible.
@@ -285,6 +385,9 @@ typedef struct Ripple {
   #define bitRead(v, b)  (((v) >> (b)) & 1)
   #define bitSet(v, b)   ((v) |= (1UL << (b)))
   #define bitClear(v, b) ((v) &= ~(1UL << (b)))
+#endif
+#ifndef bitWrite
+  #define bitWrite(v, b, bv) ((bv) ? bitSet(v, b) : bitClear(v, b))     // Arduino's (Colortwinkle keeps its state in bits)
 #endif
 
 // --- palettes --------------------------------------------------------------
@@ -448,6 +551,10 @@ class Segment {
   void setPixelColorXY(int x, int y, const CRGB &c) {
     setPixelColorXY(x, y, RGBW32(c.r, c.g, c.b, 0));
   }
+  // FX.h's overload for channels given apart (Exploding Fireworks' flare on a matrix)
+  void setPixelColorXY(int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t w = 0) {
+    setPixelColorXY(x, y, RGBW32(r, g, b, w));
+  }
   uint32_t getPixelColorXY(int x, int y) const {
     if (x < 0 || y < 0 || x >= _vw || y >= _vh) return 0;
     return pixels[y * _vw + x];
@@ -469,6 +576,13 @@ class Segment {
   // WLED calls blur2D(amount, amount, smear), which is symmetric; running the
   // second pass in reverse cancels the bias.
   void blur(uint8_t n, bool = false) {
+    blurRows(n);
+    blurCols(n);
+  }
+  void blur2D(uint8_t n, bool b = false) { blur(n, b); }
+  // FX.h: blurRows / blurCols are blur2D with one axis at 0 - Fire 2012 blurs
+  // its columns alone on a matrix. Each is its half of blur(), both ways.
+  void blurRows(uint8_t n, bool = false) {
     if (!n) return;
     const uint8_t keep = 255 - n;
     for (int y = 0; y < _vh; y++) {
@@ -479,6 +593,10 @@ class Segment {
         pixels[y*_vw+x] = color_add(color_fade(pixels[y*_vw+x], keep),
                                     color_fade(pixels[y*_vw+x+1], n), true);
     }
+  }
+  void blurCols(uint8_t n, bool = false) {
+    if (!n) return;
+    const uint8_t keep = 255 - n;
     for (int x = 0; x < _vw; x++) {
       for (int y = 1; y < _vh; y++)
         pixels[y*_vw+x] = color_add(color_fade(pixels[y*_vw+x], keep),
@@ -488,7 +606,6 @@ class Segment {
                                     color_fade(pixels[(y+1)*_vw+x], n), true);
     }
   }
-  void blur2D(uint8_t n, bool b = false) { blur(n, b); }
 
   // --- what the stock 2-D effects reach for --------------------------------
   // Reimplementations, not extractions: these are Segment methods spread across
@@ -575,6 +692,10 @@ class Segment {
   void setPixelColor(int i, const CRGB &c) {
     setPixelColor(i, RGBW32(c.r, c.g, c.b, 0));
   }
+  // FX.h's own overload for channels given apart (Fire Flicker, TV Simulator)
+  void setPixelColor(int i, uint8_t r, uint8_t g, uint8_t b, uint8_t w = 0) {
+    setPixelColor(i, RGBW32(r, g, b, w));
+  }
   void addPixelColor(int i, uint32_t c, bool pc = true) {
     setPixelColor(i, color_add(getPixelColor(i), c, pc));
   }
@@ -633,6 +754,43 @@ class Segment {
     return RGBW32(rgb[0], rgb[1], rgb[2], 0);
   }
 
+  // FX_2Dfcn.cpp's drawCircle: the outline - Xiaolin Wu's when soft, Bresenham's
+  // otherwise (Ripple and Ripple Rainbow on a matrix)
+  void drawCircle(int cx, int cy, int radius, uint32_t col, bool soft = false) {
+    if (radius <= 0) return;
+    if (soft) {
+      const int rsq = radius * radius;
+      int x = 0, y = radius;
+      unsigned oldFade = 0;
+      while (x < y) {
+        const float yf = sqrtf((float)(rsq - x * x));
+        const uint8_t fade = (uint8_t)(255.0f * (ceilf(yf) - yf));
+        if (oldFade > fade) y--;
+        oldFade = fade;
+        for (uint8_t i = 0; i < 16; i++) {
+          const int swaps = (i & 0x4) ? 1 : 0, adj = (i < 8) ? 0 : 1;
+          const int dx = (i & 1) ? -1 : 1, dy = (i & 2) ? -1 : 1;
+          const int px = swaps ? cx + (y - adj) * dx : cx + x * dx;
+          const int py = swaps ? cy + x * dy : cy + (y - adj) * dy;
+          const uint32_t pixCol = getPixelColorXY(px, py);
+          setPixelColorXY(px, py, adj ? color_blend(pixCol, col, fade) : color_blend(col, pixCol, fade));
+        }
+        x++;
+      }
+    } else {
+      int d = 3 - 2 * radius, y = radius, x = 0;
+      while (y >= x) {
+        for (int i = 0; i < 4; i++) {
+          const int dx = (i & 1) ? -x : x, dy = (i & 2) ? -y : y;
+          setPixelColorXY(cx + dx, cy + dy, col);
+          setPixelColorXY(cx + dy, cy + dx, col);
+        }
+        x++;
+        if (d > 0) { y--; d += 4 * (x - y) + 10; } else d += 4 * x + 6;
+      }
+    }
+  }
+
   void fillCircle(int cx, int cy, int radius, uint32_t col, bool = false) {
     if (radius <= 0) return;
     for (int y = -radius; y <= radius; y++)
@@ -687,6 +845,12 @@ class WS2812FX {
   unsigned getMainSegmentId() const { return 0; }
   unsigned getCurrSegmentId() const { return 0; }
   unsigned getActiveSegmentsNum() const { return 1; }
+  // FX.h: the strip's brightness - the sim draws at full brightness, the
+  // picture before the global brightness is put on it (Colortwinkle paces its
+  // fades by it) - and the most segments a device takes (Starburst and
+  // Exploding Fireworks size their share of the data by it)
+  uint8_t  getBrightness() const  { return 255; }
+  static constexpr unsigned getMaxSegments() { return MAX_NUM_SEGMENTS; }
   uint8_t  getModeCount() const   { return 1; }
   const char *getModeData(unsigned = 0) const { return ""; }
   uint8_t  addEffect(uint8_t, void (*)(), const char *) { return 0; }

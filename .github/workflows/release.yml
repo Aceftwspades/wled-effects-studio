@@ -33,9 +33,9 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -70,6 +70,7 @@ jobs:
       # the app itself, under a virtual display (the runner's GL is enough for Dear PyGui); a second run
       # when the first fails, with a warning - a failure twice fails the job
       - name: the app, under a virtual display
+        timeout-minutes: 25
         env:
           STUDIO_NO_UPDATE_CHECK: "1"
           STUDIO_NO_WELCOME: "1"
@@ -84,9 +85,9 @@ jobs:
     runs-on: macos-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -113,6 +114,7 @@ jobs:
           done
 
       - name: the app
+        timeout-minutes: 20
         env:
           STUDIO_NO_UPDATE_CHECK: "1"
           STUDIO_NO_WELCOME: "1"
@@ -124,9 +126,9 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -174,6 +176,7 @@ jobs:
           }
 
       - name: the tests, against the packaged app
+        timeout-minutes: 30
         shell: pwsh
         run: |
           Expand-Archive dist\WLED_Effects_Studio.zip -DestinationPath packaged
@@ -193,6 +196,7 @@ jobs:
 
       # the graph view with a mouse: hover, focus, clicks on what floats over the canvas (posted to its window)
       - name: the pointer, against the tree's app
+        timeout-minutes: 15
         shell: pwsh
         run: |
           $env:STUDIO_TOOLCHAIN = "$PWD\mingw\mingw64"

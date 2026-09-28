@@ -234,7 +234,7 @@ def refresh(app):
     if 0 <= sel < len(steps):
         ramps = steps[sel].get("ramps") or {}
         names = app._ramp_names = _ramp_names(app, steps[sel])       # what the picker's names stand for (_ramp_key)
-        dpg.configure_item("seq_ramp_key", items=["none"] + [names[k] for k in RAMP_KEYS])
+        dpg.configure_item("seq_ramp_key", items=["none"] + list(names.values()))
         first = _ramp_key(app) if _ramp_key(app) in ramps else next(iter(ramps), "none")
         dpg.set_value("seq_ramp_key", names.get(first, "none"))
         if first != "none":
@@ -244,10 +244,10 @@ def refresh(app):
         st = steps[sel]
         dpg.set_value("seq_name", st.get("name", "")); dpg.set_value("seq_dur", float(st.get("dur", 10))); dpg.set_value("seq_trans", float(st.get("trans", 0.7)))
         segs = st.get("segments") or []
-        names = _ramp_names(app, st)                         # the sliders by the effect's own words (C9)
+        words = [_slider_words(app, sg.get("effect")) for sg in segs]    # each segment's sliders by its effect's words (C9)
         dpg.set_value("seq_step_desc", f"step {sel + 1}: {len(segs)} segment(s) - " + "; ".join(
-            f"{sg.get('effect', '?')}, {names['sx']} {sg.get('params', {}).get('sx', '?')}, {names['ix']} {sg.get('params', {}).get('ix', '?')},"
-            f" palette {sg.get('pal', '?')}" for sg in segs)
+            f"{sg.get('effect', '?')}, {w['sx']} {sg.get('params', {}).get('sx', '?')}, {w['ix']} {sg.get('params', {}).get('ix', '?')},"
+            f" palette {sg.get('pal', '?')}" for sg, w in zip(segs, words))
             + f"; brightness {st.get('bri', 128)}; {len(steps)} steps, {total:.0f} s in all")
     else:
         dpg.set_value("seq_step_desc", "")
@@ -426,15 +426,13 @@ RAMP_KEYS = ("sx", "ix", "c1", "c2", "c3")
 GENERIC = {"sx": "Speed", "ix": "Intensity", "c1": "Custom 1", "c2": "Custom 2", "c3": "Custom 3"}
 
 
-def _ramp_names(app, step):
-    """{key: the slider's name} for the step's first segment's effect - its
-    own words where it has them (C9: no keys on screen), two the same told
-    apart by the slider's place."""
-    segs = step.get("segments") or []
-    fx = segs[0].get("effect") if segs else None
+def _slider_words(app, effect):
+    """{slider key: its name} for an effect - its own words where it has
+    them (C9: no keys on screen), two the same told apart by the slider's
+    place."""
     labels = []
-    if fx in (app.eng.names or []):
-        labels = app.eng.meta[app.eng.names.index(fx)].get("labels") or []
+    if effect in (app.eng.names or []):
+        labels = app.eng.meta[app.eng.names.index(effect)].get("labels") or []
     out, seen = {}, set()
     for i, k in enumerate(RAMP_KEYS):
         lab = (labels[i] if i < len(labels) else "").strip()
@@ -442,6 +440,18 @@ def _ramp_names(app, step):
         if lab in seen or lab == "none":
             lab = f"{lab} ({GENERIC[k]})"
         seen.add(lab); out[k] = lab
+    return out
+
+
+def _ramp_names(app, step):
+    """{ramp key: what the RAMP picker calls it}: the step's sliders by
+    their effect's words - every segment's, each led by the segment's
+    number, when the step has more than one (sequence.ramp_key)."""
+    segs = step.get("segments") or [{}]
+    out = {}
+    for s, sg in enumerate(segs):
+        for k, lab in _slider_words(app, sg.get("effect")).items():
+            out[sequence.ramp_key(s, k)] = f"{s}: {lab}" if len(segs) > 1 else lab
     return out
 
 
@@ -462,7 +472,8 @@ def _ramp_pick(app, key):
         refresh(app); return                                 # the picker back to none: the ramps stay (x removes one)
     if key not in ramps:
         segs = st.get("segments") or []
-        ramps[key] = {"end": int((segs[0].get("params") or {}).get(key, 128)) if segs else 128, "shape": "linear"}
+        seg, slider = sequence.ramp_target(key)
+        ramps[key] = {"end": int((segs[seg].get("params") or {}).get(slider, 128)) if seg < len(segs) else 128, "shape": "linear"}
         st["ramps"] = ramps; app.project.save()
     end, shape = sequence.ramp_of(st, key)
     num.set("seq_ramp_end", end); dpg.set_value("seq_ramp_shape", shape); refresh(app)
@@ -506,7 +517,7 @@ def load_step(app, i=None):
     i = getattr(app, "_seq_sel", 0) if i is None else i
     if 0 <= i < len(S["steps"]):
         sequence.apply(app.eng, S["steps"][i])
-        app.seg_cols = [int(c) for c in S["steps"][i].get("colors") or app.seg_cols]
+        app.seg_cols = [int(c) for c in app.eng._colors]         # the current segment's, as the step left them
         app.refresh_colours()
         dpg.set_value("fx_combo", app.eng.names[app.eng.idx])
         app.rebuild_params(); app.sync_palette_combo(); app.rebuild_seg_fields()
@@ -660,15 +671,20 @@ def poll(app):
     if 0 <= i < len(steps) and dpg.does_item_exist("seq_status"):
         dpg.set_value("seq_status", f"step {i + 1}/{len(steps)}: {steps[i].get('name')}, {max(0.0, p['next'] - now):.1f} s left")
     if 0 <= i < len(steps) and steps[i].get("ramps"):
-        # the ramps: the first segment's sliders move with the time into the step
+        # the ramps: each moves its segment's slider with the time into the step - the panel's field too
+        # when that segment is the one the panel shows
         dur = float(steps[i].get("dur", 10)) or 1.0
         t = 1.0 - max(0.0, p["next"] - now) / dur
         changed = False
         for k in steps[i]["ramps"]:
             v = sequence.ramp_value(steps[i], k, t)
-            if app.eng.seg == 0 and app.eng.fx.get(k) != v:
-                app.eng.fx[k] = v; changed = True
-                num.set(f"inp_{k}", v)
+            seg, slider = sequence.ramp_target(k)
+            if seg == app.eng.seg:
+                if app.eng.fx.get(slider) != v:
+                    app.eng.fx[slider] = v; changed = True
+                    num.set(f"inp_{slider}", v)
+            elif seg < app.eng.seg_count():
+                app.eng.seg_push(seg, {slider: v})
         if changed:
             app.eng.push()
 

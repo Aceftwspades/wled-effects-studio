@@ -2742,7 +2742,7 @@ class GraphPanel(Glyphs):
         """The typed value into the running effect's parameter table, so the
         picture follows the drag with no rebuild. True when it landed: the
         effect built from this graph is in the engine and has run. A
-        vector pokes three slots; a bool one."""
+        vector or a colour (r, g, b 0..255) pokes three slots; a bool one."""
         live = getattr(self, "_live", None)
         if not live or not getattr(self, "_probes_for", None):
             return False
@@ -2755,6 +2755,9 @@ class GraphPanel(Glyphs):
             return False                                 # something else is on screen (the script preview, another effect): as before
         if isinstance(val, (list, tuple)):
             slots = [(live.get((nid, name, j)), float(c)) for j, c in enumerate(list(val)[:3])]
+            n = self.graph.nodes.get(nid)
+            if n and next((i["type"] for i in self.graph.node_def(n)["inputs"] if i["name"] == name), "") == "color":
+                slots = [(k, max(0.0, min(255.0, round(c)))) for k, c in slots]    # the C++ casts them to bytes
         else:
             slots = [(live.get((nid, name, None)), (1.0 if val else 0.0) if isinstance(val, bool) else float(val))]
         if any(k is None for k, _ in slots):
@@ -2798,16 +2801,17 @@ class GraphPanel(Glyphs):
             val = [int(round(x * 255)) if x <= 1.0 else int(x) for x in val[:3]]
         self.graph.nodes[nid].setdefault("inputs", {})[name] = val
         self._mirror(sender, nid, name, val)             # the node's field, or its properties', follows the other
-        poked = ptype != "color" and self.live_poke(nid, name, val)
+        poked = self.live_poke(nid, name, val)          # a colour too, since 1.4.0: picked with no rebuild
         for k in self._same_type_selected(nid):
             self.graph.nodes[k].setdefault("inputs", {})[name] = val
             poked = poked and self.live_poke(k, name, val)
             self._mirror(None, k, name, val)
         if poked and not was_dirty:
             self._dirty = 0.0                            # the running effect has the value: nothing to rebuild
+            shown = (f"#{int(val[0]) & 255:02X}{int(val[1]) & 255:02X}{int(val[2]) & 255:02X}" if ptype == "color"
+                     else val if not isinstance(val, float) else round(val, 4))
             self.status(f"{self.graph.nodes[nid]['type']} #{nid} {nodeface.label(self.graph.nodes[nid]['type'], name)}: "
-                        f"{val if not isinstance(val, float) else round(val, 4)} - live",
-                        node=self.where(nid), merge=f"live:{nid}:{name}")
+                        f"{shown} - live", node=self.where(nid), merge=f"live:{nid}:{name}")
         self._refresh_summary(nid)
 
     def _show_input(self, b, inp, linked):

@@ -985,13 +985,13 @@ class Graph:
             for pn in names:
                 nfields = max(nfields, int(self.nodes[nid]["params"].get(pn, 0)) + 1)
 
-        # Live parameters: a typed value on an unwired number, check or vector
-        # input reads from a table instead of standing in the code as a
+        # Live parameters: a typed value on an unwired number, check, vector or
+        # colour input reads from a table instead of standing in the code as a
         # literal - `static const` on the device (the values baked in, no DRAM),
         # a live static in the sim the studio pokes as the field is dragged,
-        # so a turned knob shows at once with no rebuild. Settings stay
-        # literals: several size arrays and loops. live: slot -> (nid, input,
-        # component or None); live_init: the slots' starting values.
+        # so a turned knob (or a picked colour) shows at once with no rebuild.
+        # Settings stay literals: several size arrays and loops. live: slot ->
+        # (nid, input, component or None); live_init: the slots' starting values.
         self.live, self.live_init = {}, []
 
         def live_slot(nid, name, v, comp=None):
@@ -1009,6 +1009,13 @@ class Graph:
                 vv = [float(c) for c in (list(v) + [0, 0, 0])[:3]] if isinstance(v, (list, tuple)) else [float(v)] * 3
                 ks = [live_slot(nid, i["name"], c, j) for j, c in enumerate(vv)]
                 return f"gc_v3(gc_param[{ks[0]}], gc_param[{ks[1]}], gc_param[{ks[2]}])"
+            if i["type"] == "color":
+                # three slots, 0..255 each as the picker gives them, packed as the literal would be
+                rgb = ([int(c) for c in (list(v) + [0, 0, 0])[:3]] if isinstance(v, (list, tuple))
+                       else [(int(v) >> 16) & 255, (int(v) >> 8) & 255, int(v) & 255])
+                ks = [live_slot(nid, i["name"], c, j) for j, c in enumerate(rgb)]
+                return (f"(((uint32_t)gc_param[{ks[0]}] << 16) | ((uint32_t)gc_param[{ks[1]}] << 8) | "
+                        f"(uint32_t)gc_param[{ks[2]}])")
             return None
 
         def expand(nid, late=False):

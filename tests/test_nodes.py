@@ -172,6 +172,37 @@ def test_live_parameters_poke_the_running_effect():
     assert len({tuple(px) for px in after[lit]}) == 1 and len({tuple(px) for px in before[lit]}) > 1
 
 
+def test_a_colour_is_poked_live():
+    """A typed colour compiles as three table reads (since 1.4.0, where it
+    was a literal and a picked colour rebuilt the effect): poked on the
+    running effect, the picture takes it with no rebuild."""
+    import numpy as np
+    from native.engine import Engine
+    g = G.Graph({"name": "Census live colour"}, lib=LIB)
+    o = g.add("Output", (0, 0))
+    g.nodes[o]["inputs"] = {"color": [255, 0, 0]}
+    g.compile()
+    slots = {v[2]: k for k, v in g.live.items() if v[:2] == (o, "color")}
+    assert set(slots) == {0, 1, 2} and [g.live_init[slots[j]] for j in range(3)] == [255.0, 0.0, 0.0]
+    gs, rep = _build({"livecol": g})
+    assert rep.ok, rep.link_output[-600:]
+    e = Engine(); e.load(rep.library)
+    idx = e.names.index(g.name)
+    e.select(idx)
+    for _ in range(3):
+        e.frame()
+    lit = np.asarray(e.lit_mask(), bool)
+    px = np.asarray(e.rgb())[lit].astype(int)
+    assert len(px) and (px[:, 0] > 0).all() and (px[:, 1:] == 0).all()          # red
+    for j, c in enumerate((0, 0, 255)):
+        assert e.param_set(idx, slots[j], float(c))
+    for _ in range(3):
+        e.frame()
+    lit = np.asarray(e.lit_mask(), bool)
+    px = np.asarray(e.rgb())[lit].astype(int)
+    assert len(px) and (px[:, 2] > 0).all() and (px[:, :2] == 0).all()          # blue, no rebuild
+
+
 def test_tempo_follows_the_synth():
     """A Tempo fed by Audio's beat measures the synth's bpm within a few
     percent after ten seconds of beats, and its bar phase runs 0..1 over

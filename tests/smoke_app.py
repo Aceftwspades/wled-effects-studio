@@ -335,6 +335,12 @@ STEPS = [
     ([{"layout": "both"}, {"geometry": {"kind": "matrix", "params": {"w": 32, "h": 16}}}, {"seg": "add"},
       {"seg": {"k": 1, "x0": 8, "y0": 4, "x1": 24, "y1": 12, "opacity": 160, "blend": 10}}, {"seg": "remove"},
       {"seg": "undo"}, {"py": "app.eng.seg_count()"}, {"expect": ["messages", "segments: undo"]}, {"seg": "remove"}], 1.5),
+    # each segment its own colours: the panel shows the current one's, an edit lands on it alone, kept with the
+    # project's segments
+    ([{"py": "app.on_color(0, (255, 0, 0))"}, {"seg": "add"}, {"py": "app.on_color(0, (0, 0, 255))"}, {"seg": 0}], 0.8),
+    ([{"check": "app.seg_cols[0] == 0xFF0000 and app.eng.segments()[1]['colors'][0] == 0x0000FF"},
+      {"check": "app.project.options['segments'][1]['colors'][0] == 0x0000FF"}, {"seg": 1}], 0.5),
+    ([{"check": "app.seg_cols[0] == 0x0000FF and app.eng.segments()[0]['colors'][0] == 0xFF0000"}, {"seg": "remove"}], 0.5),
     ([{"geometry": {"kind": "cube", "params": {"B": 16}}}, {"compare": "Rainbow"}], 2.0),
     ([{"compare": ""}, {"sweep": ["sx", 3, False, False]}], 3.5),
     ([{"sweep": None}, {"key": "Q"}, {"key": "Q"}, {"key": "E"}, {"key": "E"}, {"key": "W"}, {"key": "W"}], 1.5),
@@ -680,12 +686,17 @@ STEPS = [
 
 
 def send(cmds, wait):
-    """A step's commands, once the app has taken the last step's (never written over unread)."""
+    """A step's commands, once the app has taken the last step's (never written over unread). False when
+    the last step's were not taken in four minutes: the app has stopped taking commands, and waiting four
+    more for each of the steps left kept a hung run going for hours (a macOS runner's first try)."""
     end = time.time() + 240
     while os.path.exists(CMD) and time.time() < end:
         time.sleep(0.2)
+    if os.path.exists(CMD):
+        return False
     scratch.write_whole(CMD, json.dumps(cmds))            # whole: the app takes it the moment it is there
     time.sleep(wait)
+    return True
 
 
 def make_films():
@@ -740,7 +751,9 @@ def main():
             if proc.poll() is not None:
                 early = f"the app exited early (code {proc.returncode}) before step {k + 1} of {len(STEPS)}"
                 print(early); break
-            send(cmds, wait)
+            if not send(cmds, wait):
+                early = f"the app stopped taking commands: step {k} of {len(STEPS)} was never taken"
+                print(early); break
         if early is None and proc.poll() is not None:
             early = f"the app exited early (code {proc.returncode}) during the last step"
     finally:
@@ -786,6 +799,8 @@ def main():
         print("smoke: FAILED")
         i = text.find("Traceback")
         print(text[i - 200:i + 1500] if i >= 0 else "\n".join(bad[:20]))
+        if early:                                             # what the app said last, for a run nobody watched
+            print("the app's last lines:\n" + "\n".join("  " + l for l in text.splitlines()[-40:]))
         return 1
     print(f"smoke: ok ({len(STEPS)} steps, log {LOG})")
     return 0

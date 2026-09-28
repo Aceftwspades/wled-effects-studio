@@ -40,8 +40,10 @@ def apply(eng, step):
                                       min(int(b[2]), eng.cols), min(int(b[3]), eng.rows)])
             fixed.append(sg)
         eng.load_segments(fixed)
+    # the step's colours - the panel's when it was captured - unless its segments carry their own (since 1.4.0)
     cols = step.get("colors")
-    if cols and len(cols) == 3:
+    own = any(isinstance(sg.get("colors"), (list, tuple)) and len(sg["colors"]) == 3 for sg in segs)
+    if cols and len(cols) == 3 and not own:
         eng.colors(*[int(c) for c in cols])
 
 
@@ -56,17 +58,20 @@ def _find(names, want):
 
 def segment_json(k, sg, names, pals, is2d, colours):
     """One segment of a step as WLED's /json/state wants it; None when
-    the device has no such effect."""
+    the device has no such effect. Its colours are its own when it carries
+    them (since 1.4.0), else `colours`."""
     fx = _find(names, sg.get("effect", ""))
     if fx is None:
         return None
     b = sg.get("bounds") or [0, 0, 1, 1]
     p = sg.get("params") or {}
+    own = sg.get("colors")
+    cols = own if isinstance(own, (list, tuple)) and len(own) == 3 else colours
     d = {"id": k, "start": int(b[0]), "stop": int(b[2]), "fx": fx,
          "sx": int(p.get("sx", 128)), "ix": int(p.get("ix", 128)), "c1": int(p.get("c1", 128)), "c2": int(p.get("c2", 128)),
          "c3": int(p.get("c3", 16)), "o1": bool(p.get("o1")), "o2": bool(p.get("o2")), "o3": bool(p.get("o3")),
          "bri": int(sg.get("opacity", 255)), "bm": int(sg.get("blend", 0)), "on": True,
-         "col": [[(c >> 16) & 255, (c >> 8) & 255, c & 255] for c in colours]}
+         "col": [[(int(c) >> 16) & 255, (int(c) >> 8) & 255, int(c) & 255] for c in cols]}
     if is2d:
         d["startY"], d["stopY"] = int(b[1]), int(b[3])
     for key, v in (sg.get("options") or {}).items():          # rev, mi, rY, mY, tp, grp, spc, of - WLED's own names
@@ -79,6 +84,23 @@ def segment_json(k, sg, names, pals, is2d, colours):
 
 RAMP_KEYS = ("sx", "ix", "c1", "c2", "c3")
 RAMP_SHAPES = ("linear", "ease in", "ease out", "ease in-out", "up and back", "step")
+
+
+def ramp_key(seg, slider):
+    """A ramp's key in a step's ramps: the slider's for the first segment
+    (as every ramp was before they had a segment), "k:slider" for segment k."""
+    return slider if int(seg) == 0 else f"{int(seg)}:{slider}"
+
+
+def ramp_target(key):
+    """(segment, slider) a ramp's key names; (0, key) for a plain one."""
+    if ":" in str(key):
+        seg, slider = str(key).split(":", 1)
+        try:
+            return int(seg), slider
+        except ValueError:
+            return 0, slider
+    return 0, str(key)
 
 
 def ramp_of(step, key):
@@ -109,10 +131,11 @@ def shape_t(shape, t):
 
 
 def ramp_value(step, key, t):
-    """The first segment's slider `key` at t (0..1) into the step: from the
-    step's value to the ramp's end, along the ramp's shape."""
+    """The slider a ramp's key names (on its segment) at t (0..1) into the
+    step: from the step's value to the ramp's end, along the ramp's shape."""
     segs = step.get("segments") or []
-    start = int((segs[0].get("params") or {}).get(key, 128)) if segs else 128
+    seg, slider = ramp_target(key)
+    start = int((segs[seg].get("params") or {}).get(slider, 128)) if seg < len(segs) else 128
     r = ramp_of(step, key)
     if r is None:
         return start
@@ -125,8 +148,10 @@ def sub_steps(step):
     at each of n values in turn, a step apiece (WLED presets cannot move a
     slider). n from the duration - a second a sub-step, 2..12 - so a
     playlist stays under its hundred entries."""
-    ramps = {k: v for k, v in (step.get("ramps") or {}).items() if k in RAMP_KEYS}
-    if not ramps or not step.get("segments"):
+    segs = step.get("segments") or []
+    ramps = {k: v for k, v in (step.get("ramps") or {}).items()
+             if ramp_target(k)[1] in RAMP_KEYS and ramp_target(k)[0] < len(segs)}
+    if not ramps or not segs:
         return [step]
     dur = float(step.get("dur", 10))
     n = max(2, min(12, int(dur)))
@@ -144,7 +169,8 @@ def sub_steps(step):
         if j > 0:
             q["trans"] = 0.0
         for k in ramps:
-            q["segments"][0].setdefault("params", {})[k] = ramp_value(step, k, t)
+            seg, slider = ramp_target(k)
+            q["segments"][seg].setdefault("params", {})[slider] = ramp_value(step, k, t)
         q.pop("ramps", None)
         out.append(q)
     return out

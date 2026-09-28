@@ -318,18 +318,21 @@ def test_sequence_presets_file_round_trip():
 
 def test_segments_round_trip():
     """The engine's segments saved and loaded back: the same bounds,
-    effects, options and blend."""
+    effects, options, blend and each one's own colours."""
     from native.engine import Engine
     e = Engine(); e.set_geometry(Geometry("matrix", w=16, h=8))
+    e.colors(0xFF0000, 0x00FF00, 0)
     e.seg_config(1, 2, 1, 14, 7, 160); e.seg_select(1); e.select(e.names.index("Rainbow"), params={"sx": 200, "ix": 30, "pal": 5})
     e.seg_set_options(1, rev=True, mi=True, grp=2); e.seg_blend(1, 3)
+    e.colors(0x0000FF, 0, 0x112233)
     e.seg_select(0)
     segs = json.loads(json.dumps(e.segments()))
+    assert segs[0]["colors"] == [0xFF0000, 0x00FF00, 0] and segs[1]["colors"] == [0x0000FF, 0, 0x112233]
     e.load_segments(segs)
     again = e.segments()
     assert len(again) == len(segs) == 2
     for a, b in zip(segs, again):
-        for key in ("bounds", "effect", "opacity", "blend", "pal"):
+        for key in ("bounds", "effect", "opacity", "blend", "pal", "colors"):
             assert a.get(key) == b.get(key), (key, a.get(key), b.get(key))
         assert a.get("params", {}).get("sx") == b.get("params", {}).get("sx")
         assert a.get("options") == b.get("options"), (a.get("options"), b.get("options"))

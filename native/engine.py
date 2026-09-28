@@ -293,18 +293,21 @@ class Engine:
             self._colors = st["colors"]
         else:
             self.select(self.idx)                  # a new segment starts on the current effect
+            self.lib.simColors(*self._colors)      # and its colours - the engine's segment had amber until one was edited
             self._segstate[k] = {"idx": self.idx, "fx": dict(self.fx), "pal": self.pal, "colors": self._colors}
 
     def segments(self):
         """Every segment as the host sees it: bounds, opacity, the effect's
-        name, its params and palette - for saving with the project."""
+        name, its params, palette and colours - for saving with the project,
+        a sequence's step and a push to the device."""
         out = []
         cur = {"idx": self.idx, "fx": dict(self.fx), "pal": self.pal, "colors": self._colors}
         for k in range(self.seg_count()):
             x0, y0, x1, y1, op, fx, bm = self.seg_get(k)
             st = cur if k == self.seg else (self._segstate.get(k) or {"idx": fx, "fx": {}, "pal": self.pal, "colors": self._colors})
             name = self.names[st["idx"]] if 0 <= st["idx"] < len(self.names) else ""
-            row = {"bounds": [x0, y0, x1, y1], "opacity": op, "blend": bm, "effect": name, "params": dict(st["fx"]), "pal": st["pal"]}
+            row = {"bounds": [x0, y0, x1, y1], "opacity": op, "blend": bm, "effect": name, "params": dict(st["fx"]), "pal": st["pal"],
+                   "colors": [int(c) for c in st["colors"]]}
             opts = self.seg_options(k)
             if any(opts[key] for key in ("rev", "mi", "rY", "mY", "tp", "spc", "of")) or opts["grp"] != 1:
                 row["options"] = opts                                # only when something is set: older files stay as they were
@@ -328,8 +331,31 @@ class Engine:
             if sg.get("effect") in self.names:
                 self.select(self.names.index(sg["effect"]), params=dict(sg.get("params") or {}, pal=sg.get("pal", self.pal)))
             self.lib.simSegEffect(k, self.idx)
+            cols = sg.get("colors")                # each segment's own (saved since 1.4.0; before, all had the panel's)
+            if isinstance(cols, (list, tuple)) and len(cols) == 3:
+                self.colors(*[int(c) for c in cols])
         if segs:
             self.seg_select(0)
+
+    def seg_push(self, k, params):
+        """Sliders or checks of segment k into the engine without making it
+        the current one (a sequence's ramp on another segment)."""
+        k = int(k)
+        if k == self.seg:
+            self.fx.update(params)
+            self.push()
+            return
+        st = self._segstate.get(k)
+        if not st:
+            return
+        st["fx"].update(params)
+        f = st["fx"]
+        self.lib.simSegSelect(k)
+        try:
+            self.lib.simParams(f.get("sx", 128), f.get("ix", 128), f.get("c1", 128), f.get("c2", 128), f.get("c3", 16),
+                               f.get("o1", 0), f.get("o2", 0), f.get("o3", 0), st["pal"])
+        finally:
+            self.lib.simSegSelect(self.seg)
 
     def select(self, idx, params=None):
         """Pick an effect and reset it, exactly as WLED does on a mode change."""

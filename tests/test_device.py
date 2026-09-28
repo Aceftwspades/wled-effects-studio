@@ -12,7 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
-from fake_wled import FakeWled, EFFECTS                   # noqa: E402
+from fake_wled import FakeWled, EFFECTS, PALETTES         # noqa: E402
 from native import devices, flash, sequence, outputs      # noqa: E402
 from native.geometry import Geometry                      # noqa: E402
 
@@ -120,6 +120,42 @@ def test_ramps_become_sub_presets():
     assert sequence.ramp_value(st, "ix", 0.5) == 250 and sequence.ramp_value(st, "sx", 1.0) == 0
     assert sequence.ramp_of({"ramps": {"c1": 7}, "segments": []}, "c1") == (7, "linear")  # a ramp saved before shapes
     assert sequence.shape_t("step", 0.49) == 0.0 and sequence.shape_t("step", 0.5) == 1.0
+    # a ramp on the second segment ("1:sx"): that segment's slider moves, the first's stays; a key past the
+    # step's segments is left out
+    two = {"name": "two", "dur": 4.0, "rows": 48, "colors": [0, 0, 0], "ramps": {"1:sx": {"end": 0, "shape": "linear"}, "5:ix": 9},
+           "segments": [{"effect": "Rainbow", "params": {"sx": 30}, "bounds": [0, 0, 24, 48]},
+                        {"effect": "Scan", "params": {"sx": 240}, "bounds": [24, 0, 48, 48]}]}
+    subs = sequence.sub_steps(two)
+    assert [q["segments"][1]["params"]["sx"] for q in subs] == [240, 160, 80, 0]
+    assert all(q["segments"][0]["params"]["sx"] == 30 for q in subs)
+    assert sequence.ramp_key(1, "sx") == "1:sx" and sequence.ramp_key(0, "sx") == "sx" and sequence.ramp_target("sx") == (0, "sx")
+
+
+def test_push_every_segment():
+    """What the sim shows becomes the device's: every segment with its bounds, effect, sliders, palette and own
+    colours, the device's extra segments dropped; one segment over the whole picture spans the device's whole matrix."""
+    DEV.apply({"seg": [{"id": 1, "start": 10, "stop": 20}, {"id": 2, "start": 20, "stop": 30}]})
+    assert len(DEV.state["seg"]) == 3
+    segs = [{"bounds": [0, 0, 24, 48], "opacity": 255, "blend": 0, "effect": "Rainbow", "params": {"sx": 50, "ix": 60}, "pal": 11,
+             "colors": [0xFF0000, 0x00FF00, 0x0000FF]},
+            {"bounds": [24, 0, 48, 48], "opacity": 180, "blend": 2, "effect": "Scan", "params": {"sx": 70}, "pal": 11,
+             "colors": [0x112233, 0, 0], "options": {"rev": True, "mi": False, "rY": False, "mY": False, "tp": False, "grp": 2, "spc": 0, "of": 0}}]
+    ok, msg = flash.push_segments(DEV.host, segs, [0xFFA000, 0, 0], (48, 48), lambda pid: "Rainbow")
+    assert ok, msg
+    st = DEV.state["seg"]
+    assert len(st) == 2 and "1 segment(s) of the device's off" in msg, (len(st), msg)
+    assert (st[0]["start"], st[0]["stop"], st[0]["startY"], st[0]["stopY"]) == (0, 24, 0, 48)
+    assert EFFECTS[st[0]["fx"]] == "Rainbow" and st[0]["sx"] == 50 and st[0]["col"][1] == [0, 255, 0]
+    assert PALETTES[st[0]["pal"]] == "Rainbow"
+    assert st[1]["start"] == 24 and EFFECTS[st[1]["fx"]] == "Scan" and st[1]["bri"] == 180 and st[1]["bm"] == 2
+    assert st[1]["col"][0] == [0x11, 0x22, 0x33] and st[1]["rev"] is True and st[1]["grp"] == 2
+    # one segment over the whole picture: the device's whole matrix, whatever its segment 0 was
+    ok, msg = flash.push_segments(DEV.host, [dict(segs[0], bounds=[0, 0, 48, 48])], [0xFFA000, 0, 0], (48, 48), lambda pid: "Rainbow")
+    assert ok and len(DEV.state["seg"]) == 1, msg
+    assert (DEV.state["seg"][0]["start"], DEV.state["seg"][0]["stop"], DEV.state["seg"][0]["stopY"]) == (0, 48, 48)
+    # an effect the device lacks: refused, nothing sent
+    ok, msg = flash.push_segments(DEV.host, [dict(segs[0], effect="No Such Effect")], [0, 0, 0], (48, 48), lambda pid: "")
+    assert not ok and "no effect called" in msg
 
 
 def test_off_preset_and_timers():
