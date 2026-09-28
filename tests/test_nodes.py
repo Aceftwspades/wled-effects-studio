@@ -257,7 +257,7 @@ def test_every_node_scripts_or_says_why():
         took.append(name)
     print(f"  scripted {len(took)}, refused {len(refused)}: {', '.join(refused)}")
     assert not bad, "\n".join(bad)
-    assert len(took) >= 60, "the script subset shrank"
+    assert len(took) >= 108, "the script subset shrank"          # 93 before 1.4.0; 111 with the second VM
 
 
 if __name__ == "__main__":

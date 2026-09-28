@@ -4,12 +4,21 @@ the device from a file sent over the network - no firmware build.
 
 The node library's templates are C. This is a compiler for the subset they
 use: expressions over floats, colours and 3-vectors, calls into a table of
-known functions, if/else and ternaries, local declarations, assignments to
-outputs and state. Constant parameters are folded, so a node's `if
-(!strcmp("$p.mode", "add"))` chain becomes one branch; an `if` on a live
-value becomes a select of both sides. A node the subset cannot express -
-loops, per-pixel fields, the codegen nodes, Expression - makes the graph
-"not scriptable", with the node named.
+known functions, if/else and ternaries, local declarations and small local
+arrays, loops with constant bounds (unrolled; a continue or break under a
+live condition masks the rest of the turn), assignments to outputs and
+state. Constant parameters are folded, so a node's `if (!strcmp("$p.mode",
+"add"))` chain becomes one branch; an `if` on a live value becomes a select
+of both sides; two integer constants fold as C's (1 / 3 is 0). Expression
+nodes' text goes through the same. A node the subset cannot express -
+per-pixel fields, a block of state, a baked table - makes the graph "not
+scriptable", with the node named.
+
+A program's header says the VM it needs: 1 for the first set of ops, which
+every firmware with the Script effect runs; 2 once an op of the second (the
+library's helpers: Voronoi, Vector rotate, Adjust, Blackbody, Palette
+source, the previous picture, Sparkle's hash) is used - firmware from
+1.4.0, which says so in /json/info (devices.script_vm).
 
     prog = compile_script(graph)     # bytes, or ScriptError(node, why)
 
@@ -54,15 +63,23 @@ OPS = {                                      # name: (code, operands) f=float re
     "OUT": (55, "c"), "STLD": (56, "fi"), "STST": (57, "if"), "RND": (58, "f"), "BLEND": (59, "cccfi"),
     "RINGUV": (60, "ffff"), "POSUV": (61, "fffff"), "FOLD": (62, "ffffffi"), "KNOT": (63, "ffffffffffffff"),
     "MANDEL": (64, "ffffff"), "EASE": (65, "fff"), "LOUDEST": (66, "ffii"),
+    # the second version of the VM (1.4.0): the library's helpers a script could not reach
+    "VORONOI": (67, "ffffffffff"), "VROT": (68, "ffffffffff"), "SRCPAL": (69, "cff"), "ADJUST": (70, "ccffffff"),
+    "BLACKBODY": (71, "cf"), "PREVAT": (72, "cff"), "BLUR": (73, "cffi"), "PREV": (74, "cff"), "SPARKLE": (75, "fffff"),
 }
 # how many leading operands an op writes (the rest it reads), and the ops
-# that are not a pure function of their operands
-DESTS = {"END": 0, "OUT": 0, "STST": 0, "RINGUV": 2, "POSUV": 2, "FOLD": 3, "KNOT": 6, "LOUDEST": 2}
-IMPURE = {"END", "OUT", "STST", "STLD", "RND", "LOUDEST"}
+# that are not a pure function of their operands (those reading the picture
+# as it is being drawn among them: they must stay in the pixel stream)
+DESTS = {"END": 0, "OUT": 0, "STST": 0, "RINGUV": 2, "POSUV": 2, "FOLD": 3, "KNOT": 6, "LOUDEST": 2, "VORONOI": 6, "VROT": 3}
+IMPURE = {"END", "OUT", "STST", "STLD", "RND", "LOUDEST", "PREVAT", "BLUR", "PREV"}
 # the fixed registers that change from pixel to pixel; the rest hold for a frame
 PIXEL_FIXED = {FIXED_INDEX[n] for n in ("u", "v", "cx", "cy", "r", "ang", "px", "py", "X3", "Y3", "Z3", "nx", "ny", "nz", "part", "along")}
 MAGIC = b"STUV"
-VERSION = 1
+VERSION = 1                                  # a program only the first VM's ops need is this, for any firmware
+VERSION2_FROM = 67                           # an op from here on makes the program version 2: firmware from 1.4.0
+# the nodes whose programs need the second VM (named when a device has only the first)
+V2_NODES = {"Voronoi", "Vector rotate", "Adjust", "Blackbody", "Palette source", "Previous", "Previous at",
+            "Blur", "Glow", "Sparkle"}
 
 
 class Asm:
@@ -137,8 +154,19 @@ class Asm:
             out.append(0)
             return bytes(out)
         f, p = ops(self.frame), ops(self.pixel)
-        head = MAGIC + struct.pack("<BHHHII", VERSION, self.nf, max(1, self.nc), nstate, len(f), len(p))
+        head = MAGIC + struct.pack("<BHHHII", self.version(), self.nf, max(1, self.nc), nstate, len(f), len(p))
         return head + f + p
+
+    def version(self):
+        """1 when the first VM's ops do, 2 when an op of the second is used:
+        a VM refuses a version it does not know, where it would stop at an op
+        it does not know part way."""
+        return 2 if any(OPS[op][0] >= VERSION2_FROM for op, _ in self.frame + self.pixel) else VERSION
+
+
+def program_version(prog):
+    """The VM version a compiled program needs (its header's byte)."""
+    return prog[4] if len(prog) > 4 and bytes(prog[:4]) == MAGIC else 0
 
 
 # --- the C subset: tokens, expressions, statements ----------------------------------
@@ -146,7 +174,7 @@ TOK = re.compile(r"""\s*(?:
     (?P<num>0[xX][0-9a-fA-F]+[uUlL]*|(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?[fFuUlL]*) |
     (?P<str>"(?:[^"\\]|\\.)*") | (?P<chr>'(?:[^'\\]|\\.)') |
     (?P<id>[A-Za-z_][A-Za-z0-9_]*) |
-    (?P<op>\+=|-=|\*=|/=|==|!=|<=|>=|&&|\|\||->|[-+*/%!<>=?:()\[\]{},;.&|^~])
+    (?P<op>\+\+|--|<<|>>|\+=|-=|\*=|/=|==|!=|<=|>=|&&|\|\||->|[-+*/%!<>=?:()\[\]{},;.&|^~])
 )""", re.X)
 
 
@@ -165,16 +193,18 @@ def tokenize(src):
             continue
         text = m.group(kind)
         if kind == "num":
+            # an integer literal stays an int, so constant arithmetic on two of them is C's - 1 / 3 is 0
             if text.lower().startswith("0x"):
                 t = re.sub(r"[uUlL]+$", "", text)         # only the suffix: rstrip would eat a hex digit F too (0xFFFFu -> 0x)
-                val = float(int(t, 16))
+                val = int(t, 16)
             else:
-                val = float(re.sub(r"[fFuUlL]+$", "", text))
+                body = re.sub(r"[fFuUlL]+$", "", text)
+                val = int(body) if re.fullmatch(r"\d+", body) and not re.search(r"[fF]$", text) else float(body)
             out.append(("num", val))
         elif kind == "str":
             out.append(("str", bytes(text[1:-1], "utf-8").decode("unicode_escape")))
         elif kind == "chr":
-            out.append(("num", float(ord(bytes(text[1:-1], "utf-8").decode("unicode_escape")))))
+            out.append(("num", ord(bytes(text[1:-1], "utf-8").decode("unicode_escape"))))
         elif kind == "id":
             out.append(("id", text))
         else:
@@ -183,9 +213,10 @@ def tokenize(src):
     return out
 
 
-CASTS = {"float", "int", "uint8_t", "uint16_t", "uint32_t", "int32_t", "unsigned", "bool", "const"}
+CASTS = {"float", "int", "uint8_t", "uint16_t", "uint32_t", "int32_t", "unsigned", "bool", "const", "void"}
 DECL_TYPES = {"float", "int", "uint8_t", "uint16_t", "uint32_t", "bool", "const", "char", "GcVec", "unsigned", "static"}
-BIN_PREC = [("||",), ("&&",), ("|",), ("^",), ("&",), ("==", "!="), ("<", ">", "<=", ">="), ("+", "-"), ("*", "/", "%")]
+BIN_PREC = [("||",), ("&&",), ("|",), ("^",), ("&",), ("==", "!="), ("<", ">", "<=", ">="), ("<<", ">>"), ("+", "-"), ("*", "/", "%")]
+LOOP_MAX = 64                                  # iterations a constant-bound loop is unrolled to, at most
 
 
 class Parser:
@@ -237,34 +268,77 @@ class Parser:
             if self.accept("id", "else"):
                 els = self.statement()
             return ("if", cond, then, els)
-        if tok == ("id", "for") or tok == ("id", "while"):
+        if tok == ("id", "for"):
+            # unrolled when lowered: its bounds must fold to constants (Lower.loop)
+            self.take(); self.expect("op", "(")
+            init = None if self.accept("op", ";") else self.simple(";")
+            cond = None if self.peek() == ("op", ";") else self.expr()
+            self.expect("op", ";")
+            step = None
+            if not self.accept("op", ")"):
+                step = self.simple(")")
+            return ("for", init, cond, step, self.statement())
+        if tok in (("id", "while"), ("id", "do")):
             raise ScriptError("a loop")
+        if tok in (("id", "continue"), ("id", "break")):
+            self.take(); self.expect("op", ";")
+            return (tok[1],)
+        return self.simple(";")
+
+    def simple(self, end):
+        """A declaration, an assignment, x++ / x-- or an expression, then `end` (";", or ")" for a for's step)."""
+        tok = self.peek()
+        if tok[0] == "op" and tok[1] in ("++", "--"):
+            op = self.take()[1]
+            target = self.unary()
+            self.expect("op", end)
+            return ("assign", "+=" if op == "++" else "-=", target, ("k", 1))
         if tok[0] == "id" and tok[1] in DECL_TYPES:
-            # a declaration: qualifiers and type words, then name [= expr] {, name [= expr]}
-            static = False
+            # a declaration: qualifiers and type words, then name [= expr] {, name [= expr]}, a name[n] = {...}
+            # an array. `static` alone is state kept between frames; `static const` is a constant like any other
+            static = const = False
             while self.peek()[0] == "id" and self.peek()[1] in DECL_TYPES:
                 tok = self.take()                     # taken whatever it is (`static or take()` skipped the take once static was seen)
                 static = static or tok[1] == "static"
+                const = const or tok[1] == "const"
             while self.accept("op", "*"):
                 pass
             decls = []
             while True:
                 name = self.expect("id")[1]
                 if self.accept("op", "["):
-                    raise ScriptError("an array")
-                init = self.expr() if self.accept("op", "=") else None
-                decls.append(("static", name, init) if static else ("decl", name, init))
+                    size = None if self.peek() == ("op", "]") else self.expr()
+                    self.expect("op", "]")
+                    init = None
+                    if self.accept("op", "="):
+                        self.expect("op", "{")
+                        init = []
+                        while not self.accept("op", "}"):
+                            init.append(self.expr())
+                            if not self.accept("op", ","):
+                                self.expect("op", "}")
+                                break
+                    if static and not const:
+                        raise ScriptError("an array kept between frames")
+                    decls.append(("arr", name, size, init))
+                else:
+                    init = self.expr() if self.accept("op", "=") else None
+                    decls.append(("static", name, init) if static and not const else ("decl", name, init))
                 if not self.accept("op", ","):
                     break
-            self.expect("op", ";")
+            self.expect("op", end)
             return ("block", decls)
         e = self.expr()
+        if self.peek()[0] == "op" and self.peek()[1] in ("++", "--"):             # x++; x--
+            op = self.take()[1]
+            self.expect("op", end)
+            return ("assign", "+=" if op == "++" else "-=", e, ("k", 1))
         if self.peek()[0] == "op" and self.peek()[1] in ("=", "+=", "-=", "*=", "/="):
             op = self.take()[1]
             rhs = self.expr()
-            self.expect("op", ";")
+            self.expect("op", end)
             return ("assign", op, e, rhs)
-        self.expect("op", ";")
+        self.expect("op", end)
         return ("expr", e)
 
     # expressions
@@ -362,9 +436,46 @@ class Lower:
         self.label = node_label
         self.alloc_state = alloc_state        # () -> a state slot, for statics
         self.statics = []                     # (name, slot) to write back at the end
+        # inside an unrolled loop: where this turn still runs (a continue or a break under a live condition
+        # takes that part away - the ops still run, their stores are selects), and where a break ended it
+        self.alive = None                     # None: everywhere
+        self.broken = None                    # None: nowhere
+        self.loops = 0
 
     def fail(self, why):
         raise ScriptError(f"{self.label}: {why}")
+
+    # -- conditions: None is "always"; a constant folds ---------------------------------------
+    def cand(self, a, b):
+        if a is None:
+            return b
+        if b is None:
+            return a
+        if a[0] == "k":
+            return b if a[1] else ("k", 0.0)
+        if b[0] == "k":
+            return a if b[1] else ("k", 0.0)
+        return self.f2("AND", a, b)
+
+    def cor(self, a, b):
+        if a is None or b is None:
+            return a if b is None else b
+        if a[0] == "k":
+            return ("k", 1.0) if a[1] else b
+        if b[0] == "k":
+            return ("k", 1.0) if b[1] else a
+        return self.f2("OR", a, b)
+
+    def cnot(self, a):
+        if a is None:
+            return ("k", 0.0)
+        if a[0] == "k":
+            return ("k", 0.0 if a[1] else 1.0)
+        return self.f1("NOT", a)
+
+    def eff(self, cond):
+        """The condition a statement runs under: its own, and the loop turn's."""
+        return self.cand(cond, self.alive)
 
     # -- helpers ----------------------------------------------------------------------
     def to_f(self, v):
@@ -377,6 +488,10 @@ class Lower:
             return v[1][0]
         if v[0] == "c":
             self.fail("a colour where a number is needed")
+        if v[0] == "cs":
+            self.fail("a colour's bits, other than a channel's (c >> 16) & 255")
+        if v[0] == "a":
+            self.fail("an array where a number is needed")
         self.fail(f"cannot use {v[0]} as a number")
 
     def to_c(self, v):
@@ -391,6 +506,17 @@ class Lower:
             self.asm.emit("CCONST", r, int(v[1]) & 0xFFFF)     # low half only; colours are made by RGB()/PAL
             return r
         self.fail("a number where a colour is needed")
+
+    def channels(self, v):
+        """A colour's red, green and blue, 0..1 - a constant's folded, a register's read by CR, CG, CB."""
+        if v[0] == "k":
+            x = int(v[1])
+            return [("k", ((x >> s) & 255) / 255.0) for s in (16, 8, 0)]
+        c = self.to_c(v)
+        out = []
+        for op in ("CR", "CG", "CB"):
+            r = self.asm.freg(); self.asm.emit(op, r, c); out.append(("f", r))
+        return out
 
     def to_v(self, v):
         if v[0] == "v":
@@ -457,7 +583,19 @@ class Lower:
             if base[0] == "s" and idx[0] == "k":
                 i = int(idx[1])
                 return ("k", float(ord(base[1][i])) if i < len(base[1]) else 0.0)
-            self.fail("indexing is only for constant strings")
+            if base[0] == "a":
+                elems = base[1]
+                if idx[0] == "k":
+                    i = int(idx[1])
+                    if not 0 <= i < len(elems):
+                        self.fail(f"an array read past its end ({i} of {len(elems)})")
+                    return elems[i]
+                # a live index: the element it names, as a chain of selects (the templates clamp it first)
+                acc = elems[0]
+                for k in range(1, len(elems)):
+                    acc = self.select(self.f2("EQ", idx, ("k", float(k))), elems[k], acc)
+                return acc
+            self.fail("indexing is only for constant strings and arrays")
         if kind == "un":
             op, a = e[1], self.ev(e[2])
             if op == "+":
@@ -474,14 +612,20 @@ class Lower:
             self.fail(f"operator {op}")
         if kind == "cast":
             types, a = e[1], self.ev(e[2])
+            if "void" in types:
+                return ("k", 0)                            # (void)x: the Expression node's "unused" silencers
             if a[0] == "k":
                 v = a[1]
-                if "int" in types or "uint8_t" in types or "uint16_t" in types or "uint32_t" in types:
-                    v = float(int(v))
-                    if "uint8_t" in types: v = float(int(v) & 255)
-                    if "uint16_t" in types: v = float(int(v) & 65535)
+                if "float" in types:
+                    return ("k", float(v))
+                if "bool" in types:
+                    return ("k", int(bool(v)))
+                if any(t in types for t in ("int", "uint8_t", "uint16_t", "uint32_t", "int32_t", "unsigned")):
+                    v = int(v)                             # toward zero, as C's; an int from here, so C's integer maths folds
+                    if "uint8_t" in types: v &= 255
+                    if "uint16_t" in types: v &= 65535
                 return ("k", v)
-            if a[0] == "c" or a[0] == "s" or a[0] == "v":
+            if a[0] in ("c", "s", "v", "cs"):
                 return a
             if "uint8_t" in types:
                 return self.wrap(self.f1("TRUNC", a), 256.0)
@@ -516,20 +660,71 @@ class Lower:
             return ("v", tuple(rs))
         r = self.asm.freg(); self.asm.emit("SEL", r, self.to_f(c), self.to_f(a), self.to_f(b)); return ("f", r)
 
+    @staticmethod
+    def fold(op, x, y):
+        """A constant binary operation as C does it: two ints stay ints - their division and remainder
+        truncate toward zero (1 / 3 is 0, -7 % 2 is -1) - and a float on either side makes it float."""
+        import math
+        ints = isinstance(x, int) and isinstance(y, int)
+        if op == "/":
+            if not y:
+                return 0 if ints else 0.0
+            if ints:
+                q = abs(x) // abs(y)
+                return q if (x >= 0) == (y >= 0) else -q
+            return x / y
+        if op == "%":
+            if not y:
+                return 0 if ints else 0.0
+            return int(math.fmod(x, y)) if ints else math.fmod(x, y)
+        if op in ("<<", ">>", "&", "|", "^"):
+            x, y = int(x), int(y)
+            return {"<<": x << y if 0 <= y < 64 else 0, ">>": x >> y if 0 <= y < 64 else 0,
+                    "&": x & y, "|": x | y, "^": x ^ y}[op]
+        return {"+": x + y, "-": x - y, "*": x * y, "<": int(x < y), ">": int(x > y), "<=": int(x <= y),
+                ">=": int(x >= y), "==": int(x == y), "!=": int(x != y), "&&": int(bool(x) and bool(y)),
+                "||": int(bool(x) or bool(y))}[op]
+
     def binop(self, op, a, b):
         if a[0] == "k" and b[0] == "k":
-            x, y = a[1], b[1]
             try:
-                v = {"+": x + y, "-": x - y, "*": x * y, "/": (x / y if y else 0.0), "%": (x % y if y else 0.0),
-                     "<": float(x < y), ">": float(x > y), "<=": float(x <= y), ">=": float(x >= y),
-                     "==": float(x == y), "!=": float(x != y), "&&": float(bool(x) and bool(y)),
-                     "||": float(bool(x) or bool(y)), "&": float(int(x) & int(y)), "|": float(int(x) | int(y)),
-                     "^": float(int(x) ^ int(y))}[op]
+                return ("k", self.fold(op, a[1], b[1]))
             except KeyError:
                 self.fail(f"operator {op}")
-            return ("k", v)
         if a[0] == "s" or b[0] == "s":
             self.fail("string arithmetic")
+        if op in ("<<", ">>"):
+            if b[0] != "k":
+                self.fail("a shift by a live amount")
+            k = int(b[1])
+            if a[0] == "c":
+                if op == ">>" and k in (8, 16, 24):
+                    return ("cs", (a[1], k))               # half of (c >> 16) & 255: the & takes the channel
+                self.fail("a colour's bits, other than a channel's (c >> 16) & 255")
+            if not 0 <= k < 32:
+                self.fail(f"a shift by {k}")
+            # an int's shift, on a float that holds one: >> floors (C's arithmetic shift), << multiplies
+            if op == ">>":
+                return self.f1("FLOOR", self.f2("DIV", a, ("k", float(1 << k))))
+            return self.f2("MUL", a, ("k", float(1 << k)))
+        if op == "&":
+            if a[0] == "k" and b[0] != "k":
+                a, b = b, a
+            if b[0] == "k":
+                m = int(b[1])
+                if m == 255 and a[0] in ("c", "cs"):
+                    # a channel: (c >> 16) & 255 is red, >> 8 green, c & 255 blue - 0..255, as the C++ has it;
+                    # the white byte (>> 24) is 0 in the studio's colours
+                    reg, shift = (a[1], 0) if a[0] == "c" else a[1]
+                    if shift == 24:
+                        return ("k", 0)
+                    ch = self.asm.freg(); self.asm.emit({16: "CR", 8: "CG", 0: "CB"}[shift], ch, reg)
+                    return self.f1("ROUND", self.f2("MUL", ("f", ch), ("k", 255.0)))
+                if m > 0 and (m & (m + 1)) == 0 and a[0] == "f":
+                    return self.wrap(a, float(m + 1))       # x & 2^k-1 on an integer: x mod 2^k, negatives too
+            self.fail("operator & (other than a mask of low bits, or a colour's channel)")
+        if a[0] == "cs" or b[0] == "cs":
+            self.fail("a colour's bits, other than a channel's (c >> 16) & 255")
         if a[0] == "v" or b[0] == "v":
             if op in ("+", "-", "*", "/"):
                 av, bv = self.to_v(a), self.to_v(b)
@@ -540,8 +735,12 @@ class Lower:
             if op in ("|", "+"):
                 r = self.asm.creg(); self.asm.emit("CADD", r, self.to_c(a), self.to_c(b)); return ("c", r)
             if op in ("==", "!="):
-                # colours compare as packed numbers: rarely in templates; via their red for the mask nodes
-                return self.f2("EQ" if op == "==" else "NE", self.f1("CR", a), self.f1("CR", b))
+                # colours compare as the packed numbers they are: every channel (Layers skips a black layer).
+                # This took the red alone through f1, which makes its operand a float - a colour failed there
+                same = None
+                for x, y in zip(self.channels(a), self.channels(b)):
+                    same = self.cand(same, ("k", float(x[1] == y[1])) if x[0] == "k" and y[0] == "k" else self.f2("EQ", x, y))
+                return same if op == "==" else self.cnot(same)
             self.fail(f"colour {op}")
         opn = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV", "%": "MOD", "<": "LT", ">": "GT", "<=": "LE", ">=": "GE",
                "==": "EQ", "!=": "NE", "&&": "AND", "||": "OR"}.get(op)
@@ -557,10 +756,12 @@ class Lower:
             name = fn[1]
         else:
             self.fail("a call through an expression")
-        if name in ("gc_ring_uv", "gc_pos_uv", "gc_fold", "gc_knot"):
-            nval = {"gc_ring_uv": 6, "gc_pos_uv": 7, "gc_fold": 1, "gc_knot": 8}[name]
+        if name in ("gc_ring_uv", "gc_pos_uv", "gc_fold", "gc_knot", "gc_voronoi"):
+            nval = {"gc_ring_uv": 6, "gc_pos_uv": 7, "gc_fold": 1, "gc_knot": 8, "gc_voronoi": 4}[name]
             A = [self.ev(a) for a in args[:nval]] + [None] * (len(args) - nval)
             return self.byref(name, args, A)
+        if name == "SEGMENT.is2D" and not args:
+            return self.env["is2d"]
         A = [self.ev(a) for a in args]
         if name in self.FUN1 and len(A) == 1:
             if A[0][0] == "k":
@@ -637,8 +838,32 @@ class Lower:
             r = self.asm.freg(); self.asm.emit("EASE", r, self.to_f(A[0]), self.to_f(A[1])); return ("f", r)
         if name == "gc_rnd" and not A:
             r = self.asm.freg(); self.asm.emit("RND", r); return ("f", r)
-        if name == "gc_ease" and len(A) == 2:
-            self.fail("Ease's curve table")
+        if name == "color_add" and len(A) in (2, 3):
+            if len(A) == 3 and not (A[2][0] == "k" and A[2][1]):
+                self.fail("color_add without keeping the hue (the VM's adds keep it)")
+            r = self.asm.creg(); self.asm.emit("CADD", r, self.to_c(A[0]), self.to_c(A[1])); return ("c", r)
+        # the second VM's (1.4.0): the library's helpers, each an op calling the same gc_* function
+        if name == "gc_vrot" and len(A) == 3:
+            v, ax = self.to_v(A[0]), self.to_v(A[1])
+            rs = tuple(self.asm.freg() for _ in range(3))
+            self.asm.emit("VROT", *rs, *v, *ax, self.to_f(A[2]))
+            return ("v", rs)
+        if name == "gc_srcpal" and len(A) == 2:
+            r = self.asm.creg(); self.asm.emit("SRCPAL", r, self.to_f(A[0]), self.to_f(A[1])); return ("c", r)
+        if name == "gc_adjust" and len(A) == 7:
+            r = self.asm.creg(); self.asm.emit("ADJUST", r, self.to_c(A[0]), *[self.to_f(a) for a in A[1:]]); return ("c", r)
+        if name == "gc_blackbody" and len(A) == 1:
+            r = self.asm.creg(); self.asm.emit("BLACKBODY", r, self.to_f(A[0])); return ("c", r)
+        # the picture as it stands (last frame's, where this frame has not drawn yet): W, H and is2d are the VM's own
+        if name == "gc_prev_at" and len(A) == 5:
+            r = self.asm.creg(); self.asm.emit("PREVAT", r, self.to_f(A[0]), self.to_f(A[1])); return ("c", r)
+        if name == "gc_blur" and len(A) == 6:
+            if A[2][0] != "k":
+                self.fail("a blur of a live radius")
+            r = self.asm.creg(); self.asm.emit("BLUR", r, self.to_f(A[0]), self.to_f(A[1]), max(0, min(8, int(A[2][1])))); return ("c", r)
+        if name in ("SEGMENT.getPixelColorXY", "SEGMENT.getPixelColor") and len(A) in (1, 2):
+            y = self.to_f(A[1]) if len(A) == 2 else self.asm.const(0.0)
+            r = self.asm.creg(); self.asm.emit("PREV", r, self.to_f(A[0]), y); return ("c", r)
         self.fail(f"{name}() is not available to a script")
 
     def byref(self, name, args, A):
@@ -670,6 +895,12 @@ class Lower:
             for e, r in zip(args[8:13], outs[1:]):
                 self.store(target(e), ("f", r))
             return ("f", outs[0])
+        if name == "gc_voronoi" and len(A) == 10:           # (x, y, z, seed, &d1, &d2, &id, &cx, &cy, &cz) - the second VM's
+            outs = [self.asm.freg() for _ in range(6)]
+            self.asm.emit("VORONOI", *outs, *[self.to_f(a) for a in A[:4]])
+            for e, r in zip(args[4:10], outs):
+                self.store(target(e), ("f", r))
+            return ("k", 0.0)
         self.fail(f"{name}() with those arguments")
 
     # -- statements -------------------------------------------------------------------
@@ -678,10 +909,42 @@ class Lower:
             return e[1]
         if e[0] == "member" and e[1][0] == "id" and e[2] in ("x", "y", "z"):
             return (e[1][1], e[2])
+        if e[0] == "index" and e[1][0] == "id":
+            return ("elem", e[1][1], e[2])                    # arr[i] = ...
         self.fail("an assignment to something that is not a name")
+
+    def target_value(self, target):
+        """What an assignment's target holds now (for +=, -=...)."""
+        if isinstance(target, str):
+            return self.env.get(target)
+        if target[0] == "elem":
+            return self.ev(("index", ("id", target[1]), target[2]))
+        cur = self.env.get(target[0])
+        return ("f", cur[1]["xyz".index(target[1])]) if cur and cur[0] == "v" else None
 
     def store(self, name, val, cond=None):
         """name = val, under a condition (a select against the old value)."""
+        if cond is not None and cond[0] == "k":
+            if not cond[1]:
+                return                                        # a store that never happens (after a continue, a false if)
+            cond = None
+        if isinstance(name, tuple) and name[0] == "elem":     # arr[i] = ...
+            arr = self.env.get(name[1])
+            if not arr or arr[0] != "a":
+                self.fail(f"{name[1]}: not an array")
+            elems = list(arr[1])
+            idx = self.ev(name[2])
+            if idx[0] == "k":
+                i = int(idx[1])
+                if not 0 <= i < len(elems):
+                    self.fail(f"an array written past its end ({i} of {len(elems)})")
+                elems[i] = self.select(cond, val, elems[i]) if cond is not None else val
+            else:
+                for k in range(len(elems)):                   # a live index: each element the one it names, or itself
+                    here = self.cand(cond, self.f2("EQ", idx, ("k", float(k))))
+                    elems[k] = self.select(here, val, elems[k])
+            self.env[name[1]] = ("a", elems)
+            return
         if isinstance(name, tuple):                           # vec.x = ...
             base, comp = name
             cur = self.env.get(base)
@@ -725,14 +988,26 @@ class Lower:
             val = self.select(first, self.ev(init) if init is not None else ("k", 0.0), ("f", loaded))
             self.store(name, val, None)
             self.statics.append((name, slot))
+        elif kind == "arr":
+            # an array: its elements, each a value (a constant stays one, so an index folds); unset ones are 0
+            name, size, init = st[1], st[2], st[3] or []
+            n = len(init)
+            if size is not None:
+                sz = self.ev(size)
+                if sz[0] != "k":
+                    self.fail("an array of a live size")
+                n = int(sz[1])
+            if not 0 < n <= LOOP_MAX or len(init) > n:
+                self.fail(f"an array of {n}")
+            self.env[name] = ("a", [self.ev(e) for e in init] + [("k", 0)] * (n - len(init)))
         elif kind == "assign":
             op, target, rhs = st[1], self.assign_target(st[2]), self.ev(st[3])
             if op != "=":
-                cur = self.env.get(target) if not isinstance(target, tuple) else ("f", self.env[target[0]][1]["xyz".index(target[1])])
+                cur = self.target_value(target)
                 if cur is None:
                     self.fail(f"{target} used before it is set")
                 rhs = self.binop(op[0], cur, rhs)
-            self.store(target, rhs, cond)
+            self.store(target, rhs, self.eff(cond))
         elif kind == "if":
             c = self.ev(st[1])
             if c[0] == "k":
@@ -740,13 +1015,79 @@ class Lower:
                 if branch is not None:
                     self.run(branch, cond)
                 return
-            both = c if cond is None else self.f2("AND", cond, c)
-            self.run(st[2], both)
+            self.run(st[2], self.cand(cond, c))
             if st[3] is not None:
-                notc = self.f1("NOT", c)
-                self.run(st[3], notc if cond is None else self.f2("AND", cond, notc))
+                self.run(st[3], self.cand(cond, self.cnot(c)))
+        elif kind == "for":
+            self.loop(st, cond)
+        elif kind in ("continue", "break"):
+            if not self.loops:
+                self.fail(f"{kind} outside a loop")
+            # the rest of this turn runs only where this was not reached; a break's reach ends the turns after too
+            here = self.eff(cond)
+            self.alive = self.cand(self.alive, self.cnot(cond))
+            if kind == "break":
+                self.broken = self.cor(self.broken, here if here is not None else ("k", 1.0))
         elif kind == "expr":
             self.ev(st[1])
+
+    def loop(self, st, cond):
+        """A for loop unrolled: its variable a constant from turn to turn, so the
+        bound folds and the body's indexes are constants. Each turn runs where
+        the loop runs and no break has ended it; a live condition's continue or
+        break masks what follows (the ops run, the stores are selects)."""
+        _, init, test, step, body = st
+        outer_alive, outer_broken = self.alive, self.broken
+        if init is not None:
+            self.loopvar(init)
+        self.loops += 1
+        self.broken = None
+        try:
+            for turn in range(LOOP_MAX + 1):
+                t = self.ev(test) if test is not None else ("k", 1)
+                if t[0] != "k":
+                    self.fail("a loop whose bound is not a constant")
+                if not t[1]:
+                    break
+                if turn == LOOP_MAX:
+                    self.fail(f"a loop of more than {LOOP_MAX} turns")
+                self.alive = self.cand(outer_alive, self.cnot(self.broken)) if self.broken is not None else outer_alive
+                if self.alive is not None and self.alive[0] == "k" and not self.alive[1]:
+                    break                                     # a constant break: the turns after never run
+                self.run(body, cond)
+                if step is not None:
+                    self.loopvar(step)
+        finally:
+            self.loops -= 1
+            self.alive, self.broken = outer_alive, outer_broken
+
+    def loopvar(self, st):
+        """A for loop's start or step, its variable kept a constant."""
+        if st[0] == "block":
+            for s in st[1]:
+                self.loopvar(s)
+            return
+        if st[0] == "decl":
+            v = self.ev(st[2]) if st[2] is not None else ("k", 0)
+            if v[0] != "k":
+                self.fail("a loop that does not start at a constant")
+            self.env[st[1]] = v
+            return
+        if st[0] == "assign":
+            target = self.assign_target(st[2])
+            if not isinstance(target, str):
+                self.fail("a loop that steps something other than its variable")
+            rhs = self.ev(st[3])
+            if st[1] != "=":
+                cur = self.env.get(target)
+                if cur is None:
+                    self.fail(f"{target} used before it is set")
+                rhs = self.binop(st[1][0], cur, rhs)
+            if rhs[0] != "k":
+                self.fail("a loop whose step is not a constant")
+            self.env[target] = rhs
+            return
+        self.fail("a loop the script cannot follow")
 
 
 # --- the graph ------------------------------------------------------------------------
@@ -820,6 +1161,11 @@ def compile_script(graph):
     for k, name, scale in (("sx", "SEGMENT.speed", 255.0), ("ix", "SEGMENT.intensity", 255.0), ("c1", "SEGMENT.custom1", 255.0),
                            ("c2", "SEGMENT.custom2", 255.0), ("c3", "SEGMENT.custom3", 31.0), ("t", "strip.now", 1000.0)):
         r = asm.freg(); asm.emit("MUL", r, FIXED_INDEX[k], asm.const(scale)); shared[name] = ("f", r)
+    r = asm.freg(); asm.emit("GT", r, FIXED_INDEX["H"], asm.const(1.0)); shared["is2d"] = ("f", r)   # a 2-D segment: H over 1
+
+    def safe(name):
+        """A pin's or state's name as a C name - "layer 1" is two tokens otherwise."""
+        return re.sub(r"[^A-Za-z0-9_]", "_", name)
 
     for nid in order:
         n, d = graph.nodes[nid], defs[nid]
@@ -844,11 +1190,26 @@ def compile_script(graph):
             continue
         if d.get("codegen") or d.get("field") or d.get("fields"):
             raise ScriptError(f"{label}: not scriptable ({'per-pixel fields' if not d.get('codegen') else 'a table the device cannot hold'})")
-        if n["type"] in ("Expression", "Colour expression"):
-            raise ScriptError(f"{label}: hand-written C++ cannot run as a script")
+        # (Expression and Colour expression go through like any node since 1.4.0: their text is C, and what
+        # of it the subset cannot express is named as for a template)
         asm.stream = asm.frame if scope[nid] == "frame" else asm.pixel
         env = dict(shared)
         code = _preprocess(d["code"])
+        # an FFT bin reads the usermod's buckets straight: the VM has them, the sixteen band registers
+        if n["type"] == "FFT bin":
+            values[(nid, "level")] = ("f", BAND0 + max(0, min(15, int(n["params"].get("bin", 0)))))
+            continue
+        # a Sparkle's hash is 32-bit integer arithmetic a float register cannot carry: the second VM's op does it
+        if n["type"] == "Sparkle":
+            L = Lower(asm, env, label)
+            ins = {}
+            for i in d["inputs"]:
+                src = src_of.get((nid, i["name"]))
+                ins[i["name"]] = values[src] if src and src in values else _lit(i["type"], n.get("inputs", {}).get(i["name"], i.get("default", 0)))
+            r = asm.freg()
+            asm.emit("SPARKLE", r, FIXED_INDEX["px"], FIXED_INDEX["py"], L.to_f(ins["density"]), L.to_f(ins["seed"]))
+            values[(nid, "value")] = ("f", r)
+            continue
         # the Audio node reads the usermod's data straight; it gets the VM's registers instead
         if n["type"] == "Audio":
             for o in d["outputs"]:
@@ -891,7 +1252,7 @@ def compile_script(graph):
             else:
                 v = n.get("inputs", {}).get(i["name"], i.get("default", 0))
                 val = _lit(i["type"], v)
-            name = f"__in_{i['name']}"
+            name = f"__in_{safe(i['name'])}"
             if val[0] == "k3":
                 if i["type"] == "color":
                     r = asm.creg(); asm.emit("RGB", r, *[asm.const(c) for c in val[1]]); val = ("c", r)
@@ -914,7 +1275,7 @@ def compile_script(graph):
             env[name] = val
             subst = re.sub(r"\$in\." + re.escape(i["name"]) + r"(?![A-Za-z0-9_])", name, subst)
         for o in d["outputs"]:
-            subst = re.sub(r"\$out\." + re.escape(o["name"]) + r"(?![A-Za-z0-9_])", f"__out_{o['name']}", subst)
+            subst = re.sub(r"\$out\." + re.escape(o["name"]) + r"(?![A-Za-z0-9_])", f"__out_{safe(o['name'])}", subst)
         for p in d["params"]:
             v = n["params"].get(p["name"], p["default"])
             if p["type"] == "color":
@@ -937,8 +1298,8 @@ def compile_script(graph):
                 raise ScriptError(f"{label}: keeps a block of state the script cannot address")
             for k, sname in enumerate(names):
                 r = asm.freg(); asm.emit("STLD", r, base + k)
-                env[f"__st_{sname}"] = ("f", r)
-                subst = re.sub(r"\$st\." + re.escape(sname) + r"(?![A-Za-z0-9_])", f"__st_{sname}", subst)
+                env[f"__st_{safe(sname)}"] = ("f", r)
+                subst = re.sub(r"\$st\." + re.escape(sname) + r"(?![A-Za-z0-9_])", f"__st_{safe(sname)}", subst)
         subst = subst.replace("$first", "gc_first").replace("$$", "$")
         if "$" in subst:
             m = re.search(r"\$\w+\.?\w*", subst)
@@ -949,7 +1310,7 @@ def compile_script(graph):
             for o in d["outputs"]:
                 src = next((i for i in d["inputs"] if i["type"] == o["type"]), None)
                 if src:
-                    subst += f"__out_{o['name']} = __in_{src['name']};"
+                    subst += f"__out_{safe(o['name'])} = __in_{safe(src['name'])};"
         try:
             tokens = tokenize(subst)
             tree = Parser(tokens).block()
@@ -960,7 +1321,7 @@ def compile_script(graph):
         except ScriptError as e:
             raise ScriptError(str(e) if str(e).startswith(label) else f"{label}: {e}")
         for o in d["outputs"]:
-            val = env.get(f"__out_{o['name']}")
+            val = env.get(f"__out_{safe(o['name'])}")
             if val is None:
                 val = ("k", 0.0)
             if o["type"] == "color" and val[0] != "c":
@@ -974,7 +1335,7 @@ def compile_script(graph):
             values[(nid, o["name"])] = val
         if st:
             for k, sname in enumerate(names):
-                v = env.get(f"__st_{sname}")
+                v = env.get(f"__st_{safe(sname)}")
                 asm.emit("STST", base + k, L.to_f(v))
     return asm.encode(extra[0])
 

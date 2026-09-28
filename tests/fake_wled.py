@@ -79,6 +79,7 @@ class FakeWled:
         self.audio_level = 0.0                           # what /json/info reports as the input level (a test sets it)
         self.reboots = 0                                 # /json/state {"rb": true} counted
         self.reboot_needed = False                       # a new audio type or new pins were written
+        self.script_vm = 2                               # the Studio Script VM it reports (1: firmware before 1.4.0)
         self.pmt = int(time.time()) - 100                # presets file modified time: whole seconds by the device's clock
         self.t0 = time.time()
         self.pending = None                              # (id, object, is_api_call)
@@ -164,7 +165,10 @@ class FakeWled:
         fx = self.state["seg"][self.state["mainseg"]]["fx"]
         ar = self.cfg["um"]["AudioReactive"]
         t = ar["digitalmic"]["type"]
-        u = {"Studio Script": ["running" if EFFECTS[fx] == "Studio Script" else "idle"],
+        sc = ["running" if EFFECTS[fx] == "Studio Script" else "idle"]
+        if self.script_vm > 1:
+            sc.append(f" - script VM {self.script_vm}")        # firmware from 1.4.0 says which programs it runs
+        u = {"Studio Script": sc,
              "AudioReactive": {"Audio Source": ["I2S digital" if t < 254 else "network only",
                                                 f" - peak {int(self.audio_level / 2.55):3d}%" if self.audio_level > 1 else " - quiet"],
                                "Input level": [round(self.audio_level), "/255"],

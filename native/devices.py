@@ -26,6 +26,7 @@ it always was.
 """
 import json
 import queue
+import re
 import socket
 import struct
 import threading
@@ -52,6 +53,15 @@ def _get(host, path, timeout):
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
+def script_vm(line):
+    """The Studio Script VM a device runs, from its /json/info line ("... - script VM 2"): 1 for firmware
+    from before the VM said (it runs the first version's programs), None when it has no Script effect."""
+    if not isinstance(line, list) or not line:
+        return None
+    m = re.search(r"script VM (\d+)", " ".join(str(x) for x in line))
+    return int(m.group(1)) if m else 1
+
+
 def probe(host, timeout=3.0, effects=True):
     """What a device is, from /json/info (and whether it has the Studio
     Script effect, from /json/effects); None if it does not answer."""
@@ -66,6 +76,7 @@ def probe(host, timeout=3.0, effects=True):
          "seen": time.strftime("%Y-%m-%d %H:%M"), "reachable": True}
     st = (i.get("u") or {}).get("Studio Script")
     d["script_state"] = st[0] if isinstance(st, list) and st else ""
+    d["script_vm"] = script_vm(st)
     if effects:
         try:
             names = _get(host, "/json/effects", timeout)

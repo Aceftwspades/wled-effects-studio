@@ -114,6 +114,28 @@ def test_sizes_in_the_prefs_are_kept_at_100():
     assert 'self.prefs["side_w"] = int(round(self.side_w / typeface.scale()))' in src_app
 
 
+def test_a_face_that_fails_to_measure_falls_back():
+    """A face whose hinting divides by zero at a small size (macOS's Helvetica, the graph zoomed out: the
+    macOS run's smoke test) measures at four times the size scaled down, or estimates - never raises."""
+    class Bad:
+        def getlength(self, text):
+            raise OSError("division by zero")
+
+    class Good:
+        def getlength(self, text):
+            return 40.0 * len(text)
+    saved = dict(typeface._metrics)
+    try:
+        typeface._metrics[("body", 6)] = Bad()
+        typeface._metrics[("body", 24)] = Good()
+        assert typeface.measure("ab", "body", 6) == 20.0          # 80 at 24 px, a quarter
+        typeface._metrics[("body", 24)] = Bad()
+        assert typeface.measure("ab", "body", 6) == 6.0           # the estimate: 2 characters x 6 x 0.5
+    finally:
+        typeface._metrics.clear()
+        typeface._metrics.update(saved)
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

@@ -54,7 +54,7 @@ TIP = {"effect": "EFFECT: the project, the effect and its palette",
        "colours": "COLOURS: the segment's three colours",
        "parameters": "PARAMETERS: the effect's sliders and checkboxes",
        "audio": "AUDIO: the synthetic audio's levels",
-       "live": "LIVE: audio from a line in, a microphone or a WAV file"}
+       "live": "LIVE: audio from a line in, a microphone or an audio file"}
 
 
 class _State:

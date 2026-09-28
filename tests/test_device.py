@@ -42,6 +42,28 @@ def test_probe_and_state():
     assert d and d["name"] == "Fake WLED" and d["fx"] == len(EFFECTS) and d["script"] is True and d["arch"] == "ESP32-S3"
     st = devices.state(DEV.host)
     assert st and st["effect"] == "Solid" and st["on"] is False
+    # the Studio Script VM it runs: said since 1.4.0's firmware, the first version before it
+    assert d["script_vm"] == 2
+    DEV.script_vm = 1
+    assert devices.probe(DEV.host)["script_vm"] == 1
+    DEV.script_vm = 2
+    assert devices.script_vm(["idle", " - script VM 3"]) == 3 and devices.script_vm(None) is None
+
+
+def test_a_program_says_which_vm_it_needs():
+    """A graph of the first VM's nodes compiles to a version 1 program, which every firmware runs; one with a
+    node of the second (a Voronoi) to version 2, which a device of the first would refuse."""
+    from native import graph as G, script
+    from native.nodedefs import library
+    lib = library()
+    g = G.Graph({"name": "v1"}, lib=lib)
+    c = g.add("Coords", (0, 0)); p = g.add("Palette", (100, 0)); o = g.add("Output", (200, 0))
+    g.link(c, "u", p, "index"); g.link(p, "color", o, "color")
+    assert script.program_version(script.compile_script(g)) == 1
+    v = g.add("Voronoi", (0, 100)); pos = g.add("Position", (0, 200))
+    g.link(pos, "pos", v, "pos"); g.link(v, "distance", p, "index")
+    assert script.program_version(script.compile_script(g)) == 2
+    assert "Voronoi" in script.V2_NODES
 
 
 def test_send_script_and_push_settings():

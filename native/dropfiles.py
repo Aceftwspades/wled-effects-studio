@@ -79,14 +79,15 @@ class DropFiles:
 
 def classify(path):
     """What a dropped file is, by its name and a look inside: graph, code,
-    image, xyz, ledmap, wav, or None."""
+    image, xyz, ledmap, audio, or None."""
     ext = os.path.splitext(path)[1].lower()
     if ext == ".cpp":
         return "code"
     if ext in (".png", ".jpg", ".jpeg", ".bmp", ".gif"):
         return "image"
-    if ext == ".wav":
-        return "wav"
+    from native.audio import AUDIO_EXTS
+    if ext in AUDIO_EXTS:
+        return "audio"                      # a WAV as it is, the rest through ffmpeg (audio.load)
     if ext in (".csv", ".txt", ".xyz"):
         return "xyz"
     if ext == ".json":

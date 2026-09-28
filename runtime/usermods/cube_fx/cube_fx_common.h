@@ -352,6 +352,10 @@ static inline bool cfx_isCube(int cols, int rows) {
 extern bool cfx_sixFaces;
 extern uint8_t cfx_scriptStride;   // the Studio Script effect's frame-budget stride: 1 full, 2 half, 4 quarter width
 extern uint32_t cfx_scriptTook;    // its last frame's pixel loop, microseconds
+// The newest program version the Studio Script VM runs (a program's header says the one it needs): 2 adds
+// the node library's helpers (Voronoi, Vector rotate, Adjust, Blackbody, Palette source, the previous
+// picture, Sparkle). The bank reports it in /json/info, so the studio can tell a flash is needed first.
+#define CFX_SCRIPT_VM 2
 static inline int  cfx_faces() { return cfx_sixFaces ? 6 : 5; }
 static inline bool cfx_gapBlock(int bx, int by) {
   return bx != 1 && by != 1 && !(cfx_sixFaces && bx == 2 && by == 2);

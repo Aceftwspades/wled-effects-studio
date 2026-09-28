@@ -82,7 +82,7 @@ def build(app):
             c.tip("the sim shows the selected step")
             c.info("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a playlist. "
                    "The timeline under the list: click a step to select it, drag the line between two to retime the one on the left; "
-                   "the faint lines are the bpm's bars, the ticks the beats found in the WAV, the wave the WAV itself.")
+                   "the faint lines are the bpm's bars, the ticks the beats found in the audio file, the wave the file itself.")
         with dpg.child_window(tag="seq_rows", height=px(130), border=True):
             pass
         # the timeline: the steps as blocks along the time, the playhead, bars, the WAV
@@ -144,8 +144,8 @@ def build(app):
             c.tip("tap tempo: tap on the beat, the bpm from the gaps")
             dpg.add_button(label="Synth's", small=True, callback=lambda: dpg.set_value("seq_bpm", float(getattr(app.syn, "bpm", 120))))
             c.tip("the bpm of the sim's synthetic beat")
-            dpg.add_button(label="WAV's", small=True, callback=lambda: beats_from_wav(app))
-            c.tip("the tempo and the beats found in the WAV playing as live audio (AUDIO > play a WAV file)")
+            dpg.add_button(label="the file's", small=True, callback=lambda: beats_from_wav(app))
+            c.tip("the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file)")
             form.inline("beats a bar")
             typeface.mono(dpg.add_input_int(tag="seq_bar", width=px(40), step=0, default_value=4, min_value=1, max_value=16, min_clamped=True, max_clamped=True,
                                             callback=lambda: setattr(app, "_tl_dirty", True)))
@@ -552,11 +552,11 @@ def set_field(app, key, value):
 
 # --- beats: the steps on the music's bars --------------------------------------------------------
 def beats_from_wav(app):
-    """The bpm and the beat marks from the WAV the sim plays as live audio."""
+    """The bpm and the beat marks from the audio file the sim plays as live audio."""
     from native import audio
     live = getattr(app, "live", None)
     if not isinstance(live, audio.FileAudio):
-        app.gp.status("play a WAV file first: AUDIO > play a WAV file..."); return
+        app.gp.status("play an audio file first: AUDIO > play an audio file..."); return
     got = audio.beats_of(live.samples, live.rate)
     if not got:
         app.gp.status("no beat found in the file"); return

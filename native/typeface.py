@@ -193,7 +193,17 @@ def measure(text, face="body", size=None):
     f = _measurer(face, size)
     if f is None:
         return len(text) * size * (0.6 if face == "mono" else 0.5)
-    return float(f.getlength(text))
+    try:
+        return float(f.getlength(text))
+    except OSError:
+        # a face's hinting program can divide by zero at a small size - macOS's Helvetica at 6 px, the graph
+        # zoomed out (FreeType's TrueType interpreter; the macOS run's smoke test): measured at four times the
+        # size and scaled down, the advances being near linear, else estimated
+        big = _measurer(face, size * 4)
+        try:
+            return float(big.getlength(text)) / 4.0 if big is not None else len(text) * size * 0.5
+        except OSError:
+            return len(text) * size * (0.6 if face == "mono" else 0.5)
 
 
 def advance(face="body", size=None):

@@ -256,6 +256,50 @@ def test_beats_of_a_click_track():
     assert abs(found - bpm) < 1.0 and abs(first - 0.25) < 0.05 and len(beats) > 30
 
 
+def test_audio_files_of_every_kind():
+    """A 16-bit WAV read as it is; a float WAV (which Python's wave module
+    refuses) and an MP3 and a FLAC made from it through ffmpeg, each the same
+    tone at the same pace - and a clear refusal of the rest without ffmpeg."""
+    import shutil, subprocess, tempfile, wave
+    from native import audio
+    tmp = tempfile.mkdtemp()
+    try:
+        rate = 22050
+        t = np.arange(rate * 2) / rate
+        x = (0.5 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
+        pcm = os.path.join(tmp, "tone.wav")
+        with wave.open(pcm, "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+            w.writeframes((x * 32767).astype(np.int16).tobytes())
+        a, r = audio.load(pcm)
+        assert r == rate and len(a) == len(x) and abs(float(np.abs(a).max()) - 0.5) < 0.01
+        assert audio.FileAudio(pcm).seconds == 2.0
+        ff = shutil.which("ffmpeg")
+        if not ff:
+            try:
+                audio.decode(pcm.replace(".wav", ".mp3"), ffmpeg=None)
+                assert False, "decoded with no ffmpeg"
+            except RuntimeError as e:
+                assert "ffmpeg" in str(e)
+            print("  (no ffmpeg: the MP3, FLAC and float WAV left out)")
+            return
+        for name, args in (("tone_f32.wav", ["-c:a", "pcm_f32le"]), ("tone.mp3", ["-b:a", "128k"]), ("tone.flac", [])):
+            out = os.path.join(tmp, name)
+            subprocess.run([ff, "-v", "error", "-y", "-i", pcm] + args + [out], check=True)
+            a, r = audio.load(out)
+            secs = len(a) / r
+            # the same two seconds (an MP3 carries a little padding) at the same loudness
+            assert abs(secs - 2.0) < 0.1 and abs(float(np.abs(a).max()) - 0.5) < 0.03, (name, secs, float(np.abs(a).max()))
+            assert audio.FileAudio(out).seconds > 1.9
+        try:
+            wave.open(os.path.join(tmp, "tone_f32.wav")).close()
+            assert False, "the wave module read a float WAV after all"
+        except wave.Error:
+            pass                                        # which is why load takes those through ffmpeg
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_ramps_become_sub_steps():
     """A step with a slider ramp: the device gets a sub-step a second, the
     slider stepping from the step's value to the end; without a ramp the

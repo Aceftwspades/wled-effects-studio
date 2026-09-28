@@ -583,8 +583,8 @@ class App(Features):
             dpg.set_value("live_msg", f"could not start: {e}")
 
     def start_file_audio(self, path):
-        """A WAV file as the audio source, looping, in place of the synth or
-        a capture."""
+        """An audio file as the audio source, looping, in place of the synth or
+        a capture: a WAV as it is, MP3, FLAC, OGG, M4A... through ffmpeg."""
         try:
             from native.audio import FileAudio
             self.stop_live()
@@ -3857,10 +3857,13 @@ def build(app):
                     with form.under():
                         dpg.add_button(label="use live audio", tag="live_btn",
                                        callback=lambda: app.toggle_live())
-                        dpg.add_button(label="play a WAV file...", callback=lambda: dpg.show_item("wav_dialog"))
+                        dpg.add_button(label="play an audio file...", callback=lambda: dpg.show_item("wav_dialog"))
                     with dpg.file_dialog(directory_selector=False, show=False, tag="wav_dialog", width=px(620), height=px(420),
                                          callback=lambda s, a: app.start_file_audio(a.get("file_path_name", ""))):
-                        dpg.add_file_extension(".wav", color=(120, 200, 120))
+                        from native.audio import AUDIO_EXTS
+                        dpg.add_file_extension("{" + ",".join(AUDIO_EXTS) + "}", color=(120, 200, 120))   # every kind, one filter
+                        for _ext in AUDIO_EXTS:
+                            dpg.add_file_extension(_ext, color=(120, 200, 120))
                         dpg.add_file_extension(".*")
                     dpg.add_group(tag="gain_row")
                     app.pair("gain_row", "live_gain", "live gain", 3.0, 0.2, 12.0,

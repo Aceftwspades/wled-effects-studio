@@ -235,30 +235,73 @@ class LiveInput:
             pass
 
 
+AUDIO_EXTS = (".wav", ".mp3", ".flac", ".ogg", ".oga", ".opus", ".m4a", ".aac", ".wma", ".aiff", ".aif")
+DECODE_RATE = 44100                              # what ffmpeg is asked for: the analyser takes any rate
+
+
+def read_wav(path):
+    """(mono float32 samples, rate) of a PCM WAV - 8 / 16 / 24 / 32-bit,
+    any rate - by Python's wave module; raises for anything else (a float
+    WAV's format 3 among them)."""
+    import wave
+    with wave.open(path, "rb") as w:
+        rate = w.getframerate()
+        ch, sw, n = w.getnchannels(), w.getsampwidth(), w.getnframes()
+        raw = w.readframes(n)
+    if sw == 1:
+        a = (np.frombuffer(raw, np.uint8).astype(np.float32) - 128.0) / 128.0
+    elif sw == 2:
+        a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
+    elif sw == 3:
+        b = np.frombuffer(raw, np.uint8).reshape(-1, 3).astype(np.int32)
+        a = ((b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)) ^ 0x800000) - 0x800000
+        a = a.astype(np.float32) / 8388608.0
+    else:
+        a = np.frombuffer(raw, np.int32).astype(np.float32) / 2147483648.0
+    if ch > 1:
+        a = a.reshape(-1, ch).mean(axis=1)
+    return np.ascontiguousarray(a, dtype=np.float32), rate
+
+
+def decode(path, ffmpeg=None):
+    """(mono float32 samples, rate) of any audio file ffmpeg reads - MP3,
+    FLAC, OGG, M4A, a float WAV - decoded and mixed down by it (the same
+    ffmpeg that writes the videos), with no window of its own."""
+    import shutil
+    from native import procs
+    ff = ffmpeg or shutil.which("ffmpeg")
+    if not ff:
+        raise RuntimeError(f"{os.path.basename(path)}: a WAV plays as it is; this needs ffmpeg on the path to be read")
+    r = procs.run([ff, "-v", "error", "-nostdin", "-i", path, "-vn", "-ac", "1", "-ar", str(DECODE_RATE), "-f", "f32le", "-"],
+                  capture_output=True, timeout=300)
+    if r.returncode != 0 or not r.stdout:
+        why = (r.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+        raise RuntimeError(f"{os.path.basename(path)}: ffmpeg could not read it" + (f" ({why[-1][:120]})" if why else ""))
+    return np.frombuffer(r.stdout, np.float32).copy(), DECODE_RATE
+
+
+def load(path, ffmpeg=None):
+    """(samples, rate) of an audio file: a PCM WAV read here, anything else
+    (or a WAV the wave module refuses) through ffmpeg."""
+    if os.path.splitext(path)[1].lower() == ".wav":
+        try:
+            return read_wav(path)
+        except Exception:
+            pass                                       # a float or extensible WAV: ffmpeg reads those
+    return decode(path, ffmpeg)
+
+
 class FileAudio:
-    """A WAV file through the same analyser as the live sources, at real
+    """An audio file through the same analyser as the live sources, at real
     time and looping: the same passage every run, so a beat response can be
-    judged twice and compared. 8 / 16 / 24 / 32-bit PCM, any rate."""
+    judged twice and compared. A PCM WAV as it is; MP3, FLAC, OGG, M4A, a
+    float WAV through ffmpeg (load)."""
     LO, HI, BANDS = LiveAudio.LO, LiveAudio.HI, LiveAudio.BANDS
 
     def __init__(self, path, gain=3.0, chunk=2048):
-        import wave
-        with wave.open(path, "rb") as w:
-            self.rate = w.getframerate()
-            ch, sw, n = w.getnchannels(), w.getsampwidth(), w.getnframes()
-            raw = w.readframes(n)
-        if sw == 1:
-            a = (np.frombuffer(raw, np.uint8).astype(np.float32) - 128.0) / 128.0
-        elif sw == 2:
-            a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
-        elif sw == 3:
-            b = np.frombuffer(raw, np.uint8).reshape(-1, 3).astype(np.int32)
-            a = ((b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)) ^ 0x800000) - 0x800000
-            a = a.astype(np.float32) / 8388608.0
-        else:
-            a = np.frombuffer(raw, np.int32).astype(np.float32) / 2147483648.0
-        if ch > 1:
-            a = a.reshape(-1, ch).mean(axis=1)
+        a, self.rate = load(path)
+        if not len(a):
+            raise RuntimeError(f"{os.path.basename(path)}: no sound in it")
         self.samples = np.ascontiguousarray(a, dtype=np.float32)
         self.name = os.path.basename(path)
         self.seconds = len(self.samples) / float(self.rate)

@@ -142,6 +142,8 @@ class CubeFxBankUsermod : public Usermod {
     if (cfx_scriptStride <= 1) snprintf_P(fb, sizeof(fb), PSTR("full resolution, %u.%u ms a frame"), (unsigned)(cfx_scriptTook / 1000), (unsigned)(cfx_scriptTook / 100 % 10));
     else snprintf_P(fb, sizeof(fb), PSTR("1/%u width - over the frame budget, %u.%u ms a frame"), (unsigned)cfx_scriptStride, (unsigned)(cfx_scriptTook / 1000), (unsigned)(cfx_scriptTook / 100 % 10));
     sc.add(fb);
+    snprintf_P(fb, sizeof(fb), PSTR(" - script VM %u"), (unsigned)CFX_SCRIPT_VM);   // the programs it runs (script.py)
+    sc.add(fb);
   }
 
   void appendConfigData(Print &s) override {

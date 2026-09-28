@@ -159,10 +159,10 @@ class Features:
             self.on_xyz_file(None, {"file_path_name": path})
         elif kind == "ledmap":
             self.import_ledmap(path=path)
-        elif kind == "wav":
+        elif kind == "audio":
             self.start_file_audio(path)
         else:
-            self.gp.status(f"{name}: not a graph, .cpp, image, XYZ, ledmap or WAV")
+            self.gp.status(f"{name}: not a graph, .cpp, image, XYZ, ledmap or audio file")
             return
         self.gp.status(f"{name}: {kind}")
     # --- segments ----------------------------------------------------------------
@@ -456,6 +456,23 @@ class Features:
         prog = self.compile_current_script()
         if prog is None:
             return
+        # a program with the second VM's ops needs firmware from 1.4.0: an older VM refuses it and shows its
+        # breathing dot, with nothing to say why - so the device is asked first, and a flash suggested
+        from native import script
+        from native.graph import SUB
+        need = script.program_version(prog)
+        if need > 1:
+            dev = devices.probe(host, timeout=3.0, effects=False)
+            have = (dev or {}).get("script_vm") or 1
+            if dev is not None and have < need:
+                g = self.gp.graph
+                nodes = g.flatten().nodes if any(n["type"].startswith(SUB) for n in g.nodes.values()) else g.nodes
+                used = sorted({n["type"] for n in nodes.values() if n["type"] in script.V2_NODES})
+                msg = (f"not sent: {', '.join(used) or 'some of its nodes'} need the device's Studio Script to be version "
+                       f"{need} (firmware from studio 1.4.0), and it runs version {have} - flash the firmware once "
+                       "(Build > Flash firmware), then send the script")
+                self.gp.status(msg, "warning"); device_ui.send_log(self, msg)
+                return
         ok, msg = flash.send_script(host, prog)
         self.gp.status(msg)
         if not ok:
