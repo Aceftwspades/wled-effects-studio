@@ -15,10 +15,19 @@ mappings live in the project's options under "midi":
 
 Learn: the app asks for the next control moved; the first message binds
 that control to the target asked for (midi_ui.py does the asking).
+
+A MIDI clock on the port - a drum machine's, a DAW's: 24 ticks a beat,
+with start, continue and stop - is followed apart from the controls: its
+tempo from the ticks' spacing and a beat at every 24th tick from the
+start, which midi_ui gives the synth (its beat fired by the clock, not its
+own period), when the project's "clock" setting is on.
 """
 import threading
 import time
 from collections import deque
+
+CLOCK_PPQN = 24                  # MIDI clock ticks a beat (a quarter note)
+CLOCK_GONE_S = 0.5               # no tick for this long: the clock has stopped, stop message or not
 
 try:
     import rtmidi
@@ -70,8 +79,60 @@ def ctl_label(ctl):
 def state(project):
     """The project's MIDI settings, made if missing."""
     st = project.options.setdefault("midi", {})
-    st.setdefault("port", ""); st.setdefault("maps", [])
+    st.setdefault("port", ""); st.setdefault("maps", []); st.setdefault("clock", True)
     return st
+
+
+class Clock:
+    """A MIDI clock followed, fed its realtime bytes as they arrive: 0xF8 a
+    tick, 0xFA start (the next tick is the first beat), 0xFB continue, 0xFC
+    stop. The tempo is the ticks' mean spacing over the last beat; a beat
+    is every 24th tick counted from the start - or, for a clock that never
+    says start or stop, from the first tick heard. Many clocks tick on
+    while stopped (so what follows knows the tempo): no beats then."""
+
+    def __init__(self):
+        self.times = deque(maxlen=CLOCK_PPQN + 1)
+        self.ticks = 0                   # since the start: the next tick's number
+        self.transport = None            # None: never told (a free-running clock); True playing; False stopped
+        self.last = -1e9                 # when the newest tick came
+        self.beats = 0                   # beats not yet taken by the main thread
+
+    def feed(self, status, now):
+        if status == 0xFA:               # start: from the top
+            self.transport, self.ticks = True, 0
+        elif status == 0xFB:             # continue: where it stopped
+            self.transport = True
+        elif status == 0xFC:             # stop
+            self.transport = False
+        elif status == 0xF8:
+            if now - self.last > CLOCK_GONE_S:
+                self.times.clear()       # a gap: the spacing starts again
+                if self.transport is None:
+                    self.ticks = 0       # a free-running clock heard anew: its next beat is ours
+            self.times.append(now)
+            self.last = now
+            if self.transport is not False:
+                if self.ticks % CLOCK_PPQN == 0:
+                    self.beats += 1
+                self.ticks += 1
+
+    def ticking(self, now):
+        return now - self.last <= CLOCK_GONE_S
+
+    def bpm(self):
+        """The tempo from the last beat's ticks, or None before there are a few."""
+        if len(self.times) < 4:
+            return None
+        span = (self.times[-1] - self.times[0]) / (len(self.times) - 1)
+        return 60.0 / (span * CLOCK_PPQN) if span > 0 else None
+
+    def take(self, now):
+        """(beats since the last call, bpm or None, playing) - the main
+        thread's, once a frame. Playing: ticking, and not stopped."""
+        n, self.beats = self.beats, 0
+        tick = self.ticking(now)
+        return n, (self.bpm() if tick else None), tick and self.transport is not False
 
 
 def bind(st, ctl, target):
@@ -114,6 +175,7 @@ class MidiIn:
         self._q = deque(maxlen=4096)
         self._lock = threading.Lock()
         self.last = None            # (ctl, value, time): the newest seen, for the window
+        self.clock = Clock()        # the port's MIDI clock, if it sends one
 
     def open(self, name):
         self.close()
@@ -124,19 +186,31 @@ class MidiIn:
         if name not in names:
             raise RuntimeError(f"no MIDI input named {name!r}")
         mi.open_port(names.index(name))
+        mi.ignore_types(sysex=True, timing=False, active_sense=True)     # the clock's ticks let through
         mi.set_callback(self._on)
         self._in, self.port = mi, name
+        self.clock = Clock()
 
-    def _on(self, event, data=None):
+    def _on(self, event, data=None, now=None):
         msg, _dt = event
+        if msg and msg[0] in (0xF8, 0xFA, 0xFB, 0xFC):                    # the clock: kept apart from the controls
+            with self._lock:
+                self.clock.feed(msg[0], time.perf_counter() if now is None else now)
+            return
         p = parse(list(msg))
         if p:
             with self._lock:
                 self._q.append(p)
 
-    def inject(self, msg):
-        """A message as if the port sent it: the tests', and a hook's."""
-        self._on((list(msg), 0.0))
+    def inject(self, msg, now=None):
+        """A message as if the port sent it: the tests', and a hook's
+        (`now` the time it came, for a clock's ticks)."""
+        self._on((list(msg), 0.0), now=now)
+
+    def take_clock(self, now=None):
+        """(beats since the last call, bpm or None, running) of the port's clock."""
+        with self._lock:
+            return self.clock.take(time.perf_counter() if now is None else now)
 
     def drain(self):
         """Everything since the last call, oldest first: [(ctl, value)]."""

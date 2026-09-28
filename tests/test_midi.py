@@ -1,6 +1,8 @@
 """MIDI learn without a controller: the messages parsed, a mapping bound
 and unbound, a control's value as each target wants it, and the port
-list (empty or not) with or without python-rtmidi. Run with
+list (empty or not) with or without python-rtmidi. A MIDI clock
+followed: its tempo, its beats, none while stopped, and the synth's own
+beat quiet while it plays. Run with
 python tests/test_midi.py  or through pytest.
 """
 import os
@@ -42,7 +44,7 @@ def test_maps_bind_once_and_unbind():
     class P:
         options = {}
     st = midi.state(P)
-    assert st == {"port": "", "maps": []} and P.options["midi"] is st
+    assert st == {"port": "", "maps": [], "clock": True} and P.options["midi"] is st    # a port's clock followed
     midi.bind(st, ("cc", 0, 7), {"kind": "fx", "key": "sx"})
     midi.bind(st, ("cc", 0, 7), {"kind": "fx", "key": "sx"})             # the same pair once
     midi.bind(st, ("cc", 0, 7), {"kind": "fx", "key": "ix"})             # one knob, two targets
@@ -63,6 +65,57 @@ def test_values_as_the_targets_want_them():
     assert midi.value_for({"kind": "pin", "bool": True}, 100) is True
     assert abs(midi.value_for({"kind": "palette"}, 127) - 1.0) < 1e-9
     assert midi.value_for({"kind": "effect"}, 200) == 1.0                  # clamped
+
+
+def test_a_clock_is_followed():
+    m = midi.MidiIn()
+    t, dt = 100.0, 60.0 / (125.0 * midi.CLOCK_PPQN)           # 125 bpm
+    m.inject([0xFA], now=t)                                    # start: the next tick is beat one
+    for k in range(48):
+        m.inject([0xF8], now=t + k * dt)
+    n, bpm, playing = m.take_clock(now=t + 47 * dt)
+    assert n == 2 and playing and abs(bpm - 125.0) < 0.5, (n, bpm, playing)
+    assert m.drain() == []                                     # ticks are not controls: Learn never binds one
+    m.inject([0xFC], now=t + 48 * dt)                          # stop: the ticks go on, the beats do not
+    for k in range(48, 96):
+        m.inject([0xF8], now=t + k * dt)
+    n, bpm, playing = m.take_clock(now=t + 95 * dt)
+    assert n == 0 and not playing and abs(bpm - 125.0) < 0.5, (n, bpm, playing)
+    m.inject([0xFB], now=t + 96 * dt)                          # continue: on the beat where it stopped
+    m.inject([0xF8], now=t + 96 * dt)
+    assert m.take_clock(now=t + 96 * dt)[:1] == (1,)
+    n, bpm, playing = m.take_clock(now=t + 96 * dt + 0.6)      # half a second without a tick: gone
+    assert n == 0 and bpm is None and not playing
+    # a clock that never says start: its beats counted from the first tick heard
+    f = midi.MidiIn()
+    for k in range(25):
+        f.inject([0xF8], now=200.0 + k * dt)
+    assert f.take_clock(now=200.0 + 24 * dt)[0] == 2
+
+
+def test_the_synth_beat_follows_the_clock():
+    import numpy as np
+    from native.synth import Synth
+
+    class Eng:
+        sim_ms = 0
+        fft = np.zeros(16, np.uint8)
+
+        def audio(self, v, peak):
+            pass
+    e, s = Eng(), Synth(bpm=120)
+    fired = []
+    for k in range(200):                                       # 5 s at 25 ms: its own beat, 120 bpm
+        e.sim_ms = k * 25
+        fired.append(s.push(e))
+    assert sum(fired) >= 9
+    s.external, fired = True, []                               # the clock's: quiet but for its beats
+    for k in range(200, 400):
+        e.sim_ms = k * 25
+        if k == 300:
+            s.kick_req = True
+        fired.append(s.push(e))
+    assert sum(fired) == 1 and fired[100] == 1
 
 
 if __name__ == "__main__":

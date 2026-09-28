@@ -229,6 +229,49 @@ def test_tempo_follows_the_synth():
     assert min(bars[-100:]) < 0.1 and max(bars[-100:]) > 0.9         # the bar phase sweeps 0..1
 
 
+def test_text_in_a_face_of_this_machine():
+    """The Text node in the 5x7 font and in a face of this machine's at a
+    height: white scaled by its level on a 64 x 16 matrix - the 5x7 all
+    or nothing on its 7 centred rows, the face with smooth edges (levels
+    between) inside its 12; with no face to draw with, the 5x7 again."""
+    import numpy as np
+    from native.engine import Engine
+    from native.geometry import Geometry
+    from native import nodedefs
+    gs = {}
+    for font in ("5x7", "sans"):
+        g = G.Graph({"name": f"Census text {font}"}, lib=LIB)
+        c = g.add("Coords", (0, 0)); t = g.add("Text", (200, 0)); w = g.add("Colour", (200, 200))
+        s = g.add("Scale", (400, 0)); o = g.add("Output", (600, 0))
+        g.nodes[t]["params"].update(text="Hi!", font=font, height=12, loop=False, row=-1)
+        g.nodes[w]["params"]["rgb"] = [255, 255, 255]
+        g.link(c, "u", t, "u"); g.link(c, "v", t, "v"); g.link(w, "color", s, "color"); g.link(t, "level", s, "by")
+        g.link(s, "color", o, "color")
+        gs[font] = g
+    if nodedefs.text_drawn("Hi!", "body", 12) is None:
+        print("  no face to draw with here: the 5x7 alone")
+        gs.pop("sans")
+    _, rep = _build(gs)
+    assert rep.ok, rep.link_output[-600:]
+    e = Engine(); e.load(rep.library)
+    e.set_geometry(Geometry("matrix", w=64, h=16))
+    lit = {}
+    for font, g in gs.items():
+        e.select(e.names.index(g.name))
+        e.frame()
+        m = np.asarray(e.rgb()).reshape(16, 64, 3).max(axis=2)
+        rows = np.nonzero(m.max(axis=1) > 0)[0]
+        lit[font] = (m, rows)
+    m, rows = lit["5x7"]
+    assert set(np.unique(m)) <= {0, 255} and rows.min() >= 4 and rows.max() <= 10, (np.unique(m), rows)
+    if "sans" in lit:
+        m, rows = lit["sans"]
+        mid = ((m > 0) & (m < 255)).sum()
+        assert mid > 0 and rows.min() >= 2 and rows.max() <= 13 and (m == 255).sum() > 0, (mid, rows)
+    fallback = nodedefs.codegen_text({"params": {"text": "Hi", "font": "no such face"}})
+    assert "tx_[10]" in fallback                                       # an unknown font: the 5x7's two glyphs
+
+
 def test_every_node_scripts_or_says_why():
     """The script compiler takes each graph or refuses it as a ScriptError
     (never anything else); what it takes runs in the Script effect."""

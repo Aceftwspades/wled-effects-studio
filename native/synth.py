@@ -21,6 +21,9 @@ class Synth:
     def __init__(self, vol=90, bass=45, mid=50, treb=35, bpm=120, auto_beat=True):
         self.vol, self.bass, self.mid, self.treb = vol, bass, mid, treb
         self.bpm, self.auto_beat = bpm, auto_beat
+        # a MIDI clock being followed (midi_ui): its beats come in as kick_req and its tempo as bpm,
+        # and the synth's own period stays quiet so the two cannot double up
+        self.external = False
         self.muted = False
         self.last_beat = -1e9
         self._last_fft = None
@@ -74,7 +77,7 @@ class Synth:
         if eng.sim_ms < self.last_beat:
             self.last_beat = eng.sim_ms - period
         fire = self.kick_req
-        if self.auto_beat and (eng.sim_ms - self.last_beat) >= period:
+        if self.auto_beat and not self.external and (eng.sim_ms - self.last_beat) >= period:
             fire = True
         if fire:
             self.last_beat = eng.sim_ms

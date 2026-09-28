@@ -386,6 +386,7 @@ class App(Features):
         self.frames = None           # (glow.Frames) - set in build()
         self.history_frames = []     # the last seconds of net frames, for scrubbing while paused
         self.history_rgb = []        # and every LED's colour for the same frames (the point cloud draws from these)
+        self.history_t = []          # and when each was kept (perf_counter), for the seconds the scrub reaches
         self.scrub = None            # an index into history_frames while paused, or None
         self.frame_ms = 0.0          # the engine's cost per frame on this machine, smoothed
         self.loop_ms = 0.0           # the whole app's, frame to frame
@@ -3546,7 +3547,9 @@ class App(Features):
             n += 1
 
 
-    SCRUB_FRAMES = 300           # ~10 s at the simulated frame rate
+    SCRUB_SECONDS = 30.0         # how far back a pause can scrub
+    SCRUB_EVERY = 1.0 / 60.0     # one frame kept a sixtieth of a second at most, however fast the view draws
+    SCRUB_BYTES = 96 << 20       # and no more memory than this: a big matrix keeps fewer seconds (two at the least)
     CUBE_SRC_SCALE = 4           # the net's upscale for the GPU cube's texture
 
     def draw(self):
@@ -3555,13 +3558,22 @@ class App(Features):
         # scrub slider picks one of them to show instead of the live one
         rgb = None
         if self.playing:
-            self.history_frames.append(net)
-            del self.history_frames[:-self.SCRUB_FRAMES]
-            if self.point_quads is not None and self.cube_on():
-                self.history_rgb.append(self.frame_rgb(self.eng).copy())
-                del self.history_rgb[:-self.SCRUB_FRAMES]
-            elif self.history_rgb:
-                self.history_rgb = []
+            now = time.perf_counter()
+            if now - getattr(self, "_scrub_at", 0.0) >= self.SCRUB_EVERY:
+                self._scrub_at = now
+                self.history_frames.append(net)
+                self.history_t.append(now)
+                if self.point_quads is not None and self.cube_on():
+                    self.history_rgb.append(self.frame_rgb(self.eng).copy())
+                elif self.history_rgb:
+                    self.history_rgb = []
+                each = net.nbytes + (self.history_rgb[-1].nbytes if self.history_rgb else 0)
+                keep = int(min(self.SCRUB_SECONDS / self.SCRUB_EVERY,
+                               max(2.0 / self.SCRUB_EVERY, self.SCRUB_BYTES // max(1, each))))
+                del self.history_frames[:-keep]
+                del self.history_t[:-keep]
+                if self.history_rgb:
+                    del self.history_rgb[:-keep]
         elif self.scrub is not None and self.history_frames:
             k = max(0, min(len(self.history_frames) - 1, self.scrub))
             net = self.history_frames[k]
@@ -3646,6 +3658,9 @@ class App(Features):
                 if show:
                     num.configure("scrub", hi=len(self.history_frames) - 1)
                     num.set("scrub", len(self.history_frames) - 1)
+                    secs = (self.history_t[-1] - self.history_t[0]) if len(self.history_t) > 1 else 0.0
+                    dpg.set_value("scrub_note", f"paused - scrub the last {secs:.0f} s" if secs >= 1.5
+                                  else "paused - scrub the last moment")
         lvl = self.live.level if self.live else 0.0
         dpg.set_value("lvl_bar", min(1.0, lvl / 220.0))
         if self.beat_flash:
@@ -3822,7 +3837,7 @@ def build(app):
                                     lambda c, i=_ci: app.on_color(i, c))
                 with Section(app, "parameters", "PARAMETERS"):
                     with dpg.group(tag="scrub_row", show=False):
-                        form.note("paused - scrub the last seconds", color=SECTION)
+                        form.note("paused - scrub the last seconds", color=SECTION, tag="scrub_note")
                         with form.row("frame"):
                             num.add("scrub", 0, 0, 1, integer=True, width=-1,
                                     callback=lambda s, v: setattr(self_app[0], "scrub", int(v)))

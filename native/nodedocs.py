@@ -228,15 +228,20 @@ DOCS = {
         "out": {"pos": "the position as one vector wire", "x": "-1 (west) .. 1 (east)", "y": "-1 (south) .. 1 (north)",
                 "z": "-1 (bottom) .. 1 (the lid)"}},
     "Text": {
-        "doc": "Words in a 5x7 pixel font, baked into the effect (only the letters used go in). Wire Coords u, v; "
-               "colour the 'on' pixels with a Palette, a Colour, anything - 'i' runs 0..1 along the text so each "
-               "letter can take its own colour. To scroll, wire Time x speed into offset: the text moves left, "
-               "and with loop on it comes round again after a gap of the matrix's width. size 2 doubles the "
-               "pixels; row places the top of the letters (-1 centres them).",
+        "doc": "Words baked into the effect: in the 5x7 pixel font (only the letters used go in), or drawn in one of "
+               "this machine's faces - sans, bold or mono (Segoe UI and Consolas on Windows, Helvetica and Menlo on "
+               "macOS, DejaVu on Linux) - at a height in pixels, when the graph compiles. Wire Coords u, v; colour "
+               "the 'on' pixels with a Palette, a Colour, anything, or scale a colour by 'level' for the face's "
+               "smooth edges - 'i' runs 0..1 along the text so each letter can take its own colour. To scroll, wire "
+               "Time x speed into offset: the text moves left, and with loop on it comes round again after a gap of "
+               "the matrix's width. row places the top of the letters (-1 centres them).",
         "in": {"u": "across, 0..1 (Coords u)", "v": "down, 0..1 (Coords v)", "offset": "scroll, in pixels - Time x speed"},
-        "out": {"on": "true on a letter's pixel", "i": "which letter, 0..1 along the text"},
-        "params": {"text": "the words (ASCII; only their letters are baked in)", "size": "pixels per font pixel, 1..4",
-                   "row": "the top row of the letters; -1 centres them", "loop": "scroll round again after a gap of the width"}},
+        "out": {"on": "true on a letter's pixel (half covered or more, in a face)", "i": "which letter, 0..1 along the text",
+                "level": "how much of the pixel the letter covers, 0..1 - smooth edges in a face; 0 or 1 in the 5x7"},
+        "params": {"text": "the words (ASCII in the 5x7; a face draws what it has)", "size": "the 5x7's pixels per font pixel, 1..4",
+                   "row": "the top row of the letters; -1 centres them", "loop": "scroll round again after a gap of the width",
+                   "font": "5x7 (the same everywhere), or sans, bold or mono: this machine's face, drawn when the graph compiles",
+                   "height": "a face's line in pixels, 6..32 - its capitals take about three fifths of it"}},
     "Shape part": {
         "doc": "A shape (GEOMETRY > shape) is parts in wiring order - strips, rings, panels, a cube... This says which "
                "part the pixel belongs to and where along that part it sits, so one graph can treat the parts "

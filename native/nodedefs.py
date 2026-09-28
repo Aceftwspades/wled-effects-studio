@@ -41,6 +41,10 @@ in at start; a user node with a library node's name replaces it.
 
 F, C, B, V = "float", "color", "bool", "vector"
 
+# the Text node's fonts: the classic 5x7 (built in, the same everywhere), or one of this machine's
+# faces (typeface.py's: Segoe UI, Helvetica, DejaVu...) drawn at a height in pixels when the graph compiles
+TEXT_FONTS = {"5x7": None, "sans": "body", "bold": "bold", "mono": "mono"}
+
 
 def _n(name, cat, scope, inputs, outputs, params, code, doc=""):
     return dict(name=name, cat=cat, scope=scope,
@@ -448,11 +452,13 @@ LIBRARY = [
              _p("colours", "int", 8, 2, 16), _p("alpha_clear", "bool", True)],
             "", "an image file (png, jpg, gif...) resized and quantised into the effect: its colour at u, v, the palette slot, and whether the pixel is opaque"),
          codegen="image"),
-    # Text in a 5x7 font, baked into the effect: only the glyphs of the text
-    # go into the table. `offset` scrolls it (pixels; wire Time x speed).
-    dict(_n("Text", "generate", "pixel", [("u", F, 0.0), ("v", F, 0.0), ("offset", F, 0.0)], [("on", B), ("i", F)],
-            [_p("text", "text", "WLED"), _p("size", "int", 1, 1, 4), _p("row", "int", -1, -1, 255), _p("loop", "bool", True)],
-            "", "the text in a 5x7 font at u, v: on where a letter's pixel is, i which letter (0..1 along the text); offset scrolls it left in pixels, looping round the width when set; row -1 centres it"),
+    # Text baked into the effect: the 5x7 font's glyphs of the text, or the
+    # text drawn in one of this machine's faces at a height in pixels (its
+    # edges' coverage as `level`). `offset` scrolls it (pixels; wire Time x speed).
+    dict(_n("Text", "generate", "pixel", [("u", F, 0.0), ("v", F, 0.0), ("offset", F, 0.0)], [("on", B), ("i", F), ("level", F)],
+            [_p("text", "text", "WLED"), _p("size", "int", 1, 1, 4), _p("row", "int", -1, -1, 255), _p("loop", "bool", True),
+             _p("font", "choice", "5x7", choices=list(TEXT_FONTS)), _p("height", "int", 12, 6, 32)],
+            "", "the text at u, v - the 5x7 font, or a face of this machine's at a height: on where a letter's pixel is, level how much of it (smooth edges), i which letter (0..1 along the text); offset scrolls it left in pixels, looping round the width when set; row -1 centres it"),
          codegen="text"),
     _n("Bitmap", "generate", "pixel", [("u", F, 0.0), ("v", F, 0.0)], [("slot", F), ("on", B)],
        [dict(_p("rows", "text", "0110/1001/1001/0110"), lines=True)],
@@ -1405,24 +1411,68 @@ def text_glyphs(text):
     return out
 
 
+def text_drawn(text, face, height):
+    """The text drawn in one of this machine's faces with a line `height`
+    pixels tall: (coverage rows - height lists of 0..255, one per column -,
+    which letter each column belongs to), or None when the face or Pillow
+    is missing (the 5x7 font is used then)."""
+    from native import typeface
+    try:
+        from PIL import Image, ImageDraw
+        f = typeface._measurer(face, height)
+        if f is None:
+            return None
+        starts = [int(round(f.getlength(text[:k]))) for k in range(len(text) + 1)]
+        w = max(1, starts[-1])
+        img = Image.new("L", (w, height), 0)
+        ImageDraw.Draw(img).text((0, 0), text, font=f, fill=255)
+    except Exception:
+        return None
+    px = img.load()
+    rows = [[px[x, y] for x in range(w)] for y in range(height)]
+    letter = [0] * w
+    for k in range(len(text)):
+        for x in range(max(0, starts[k]), min(w, starts[k + 1])):
+            letter[x] = k
+    return rows, letter
+
+
 def codegen_text(n, project_dir=None):
     p = n["params"]
     text = str(p.get("text", "")) or " "
     sz = max(1, min(4, int(p.get("size", 1))))
     row = int(p.get("row", -1))
     loop = bool(p.get("loop", True))
-    g = text_glyphs(text)
+    face = TEXT_FONTS.get(str(p.get("font", "5x7")))
+    drawn = text_drawn(text, face, max(6, min(32, int(p.get("height", 12))))) if face else None
     N = len(text)
+    if drawn:
+        # the text as this face draws it: a byte of coverage a pixel, row by row, and each column's letter
+        rows, letter = drawn
+        th, tw = len(rows), len(letter)
+        cover = ",".join(str(v) for r in rows for v in r)
+        y0 = f"{row}" if row >= 0 else f"((H - {th}) / 2)"
+        return (f"{{ static const uint8_t tx_[{th * tw}] = {{{cover}}}; static const uint8_t tl_[{tw}] = {{{','.join(map(str, letter))}}};\n"
+                f"  const int tw_ = {tw};\n"
+                f"  int px_ = (int)floorf(gc_sat($in.u) * (float)(W - 1) + 0.5f) - (int)floorf($in.offset);\n"
+                + ("  { const int span_ = tw_ + W; px_ = ((px_ % span_) + span_) % span_; }\n" if loop else "")
+                + f"  const int py_ = (int)floorf(gc_sat($in.v) * (float)(H - 1) + 0.5f) - {y0};\n"
+                f"  $out.on = false; $out.i = 0.0f; $out.level = 0.0f;\n"
+                f"  if (px_ >= 0 && px_ < tw_ && py_ >= 0 && py_ < {th}) {{\n"
+                f"    const uint8_t c_ = tx_[py_ * tw_ + px_]; $out.level = (float)c_ * (1.0f / 255.0f); $out.on = c_ >= 128;\n"
+                f"    $out.i = (float)tl_[px_] / {N}.0f; }} }}")
+    g = text_glyphs(text)
     table = ",".join(str(b) for b in g)
     y0 = f"{row}" if row >= 0 else f"((H - {7 * sz}) / 2)"
     return (f"{{ static const uint8_t tx_[{N * 5}] = {{{table}}}; const int cw_ = {6 * sz}, tw_ = {N * 6 * sz};\n"
             f"  int px_ = (int)floorf(gc_sat($in.u) * (float)(W - 1) + 0.5f) - (int)floorf($in.offset);\n"
             + ("  { const int span_ = tw_ + W; px_ = ((px_ % span_) + span_) % span_; }\n" if loop else "")
             + f"  const int py_ = (int)floorf(gc_sat($in.v) * (float)(H - 1) + 0.5f) - {y0};\n"
-            f"  $out.on = false; $out.i = 0.0f;\n"
+            f"  $out.on = false; $out.i = 0.0f; $out.level = 0.0f;\n"
             f"  if (px_ >= 0 && px_ < tw_ && py_ >= 0 && py_ < {7 * sz}) {{\n"
             f"    const int ci_ = px_ / cw_, cx_ = (px_ % cw_) / {sz}, cy_ = py_ / {sz};\n"
-            f"    if (cx_ < 5) $out.on = ((tx_[ci_ * 5 + cx_] >> cy_) & 1) != 0; $out.i = (float)ci_ / {N}.0f; }} }}")
+            f"    if (cx_ < 5) $out.on = ((tx_[ci_ * 5 + cx_] >> cy_) & 1) != 0; $out.i = (float)ci_ / {N}.0f;\n"
+            f"    $out.level = $out.on ? 1.0f : 0.0f; }} }}")
 
 
 def codegen_states(n, project_dir=None):

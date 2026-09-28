@@ -381,7 +381,10 @@ index, a typed value on a pin of the open graph - press "Learn" and move
 the knob; a right-click on a parameter slider, or a pin's menu, offers
 the same. A mapping moves the slider, the picture and, with the sim
 streamed, the device; a pin's mapping has a range to edit and belongs to
-that graph. The mappings are the project's. It needs the optional
+that graph. The mappings are the project's. A drum machine's or a DAW's
+**MIDI clock** on the port is followed while it plays (the window's CLOCK
+row turns it off): each of its beats fires the synth's, and its tempo is
+the synth's; stopped, the synth keeps its own beat again. It needs the optional
 python-rtmidi (`pip install python-rtmidi`); without it the window says
 so. Segments (+ in
 the panel) layer several effects with WLED's blend modes and opacity, and

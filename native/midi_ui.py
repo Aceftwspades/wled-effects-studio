@@ -49,6 +49,13 @@ def build(app):
             c.info("A target is a parameter slider, a check, the palette or the effect by index, or a typed value "
                    "on a pin of the graph open now (a pin's mapping belongs to that graph). A right-click on a "
                    "parameter slider, or a pin's menu, offers Learn there. One knob may drive several targets.")
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("CLOCK", color=c.ACCENT))
+            dpg.add_checkbox(label="the synth's beat follows it", tag="midi_clock_on", default_value=True,
+                             callback=lambda s, v: _clock_setting(app, v))
+            c.tip("a drum machine's or a DAW's MIDI clock on the port: each beat of it fires the synth's, and its "
+                  "tempo is the synth's - while it plays; stopped, the synth keeps its own beat again")
+            dpg.add_text("", tag="midi_clock", color=c.DIM)
         typeface.label(dpg.add_text("MAPPINGS", color=c.ACCENT))
         with dpg.child_window(tag="midi_rows", height=-1, border=True):
             pass
@@ -179,6 +186,7 @@ def refresh(app):
     if dpg.get_value("midi_target") not in items:
         dpg.set_value("midi_target", items[0] if items else "")
     dpg.configure_item("midi_learn_btn", label="cancel" if app._midi_learn else "Learn")
+    dpg.set_value("midi_clock_on", bool(st.get("clock", True)))
     dpg.delete_item("midi_rows", children_only=True)
     for k, m in enumerate(st["maps"]):
         t = m["target"]
@@ -280,6 +288,42 @@ def hovered_slider():
     return None
 
 
+# --- the port's clock ---------------------------------------------------------------------
+def _clock_setting(app, on):
+    _st(app)["clock"] = bool(on)
+    app.project.save()
+
+
+def _clock(app, st):
+    """The port's MIDI clock onto the synth, while it plays and the setting
+    is on: its beats fire the synth's, its tempo is the synth's (the tempo
+    slider follows). Stopped or gone, the synth's own beat again."""
+    n, bpm, playing = app.midi.take_clock()
+    syn = getattr(app, "syn", None)
+    if syn is None:
+        return
+    follow = bool(playing and st.get("clock", True))
+    if follow != syn.external:
+        syn.external = follow
+        app.gp.status("MIDI clock: the synth's beat follows it" if follow
+                      else "MIDI clock stopped: the synth keeps its own beat again")
+    if follow:
+        if bpm:
+            b = int(round(max(30.0, min(200.0, bpm))))              # the tempo slider's range
+            if b != syn.bpm:
+                syn.bpm = b
+                num.set("inp_bpm", b)
+        if n:
+            syn.kick_req = True
+    if dpg.does_item_exist("midi_clock") and dpg.is_item_shown(TAG):
+        if bpm is None:
+            words = "a clock, finding its tempo..." if playing else ""
+        else:
+            words = f"{bpm:.1f} bpm, " + ("playing - the beat follows it" if follow else "playing" if playing else "stopped")
+        if dpg.get_value("midi_clock") != words:
+            dpg.set_value("midi_clock", words)
+
+
 # --- each frame ---------------------------------------------------------------------------
 def poll(app):
     m = getattr(app, "midi", None)
@@ -294,6 +338,7 @@ def poll(app):
                 m.open(st["port"])
             except Exception:
                 pass
+    _clock(app, st)
     evs = m.drain()
     if not evs:
         return

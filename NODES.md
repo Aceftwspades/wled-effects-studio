@@ -838,7 +838,7 @@ Hard-edged bands along a coordinate. count is how many, duty how wide the bright
 
 ### Text
 
-Words in a 5x7 pixel font, baked into the effect (only the letters used go in). Wire Coords u, v; colour the 'on' pixels with a Palette, a Colour, anything - 'i' runs 0..1 along the text so each letter can take its own colour. To scroll, wire Time x speed into offset: the text moves left, and with loop on it comes round again after a gap of the matrix's width. size 2 doubles the pixels; row places the top of the letters (-1 centres them).
+Words baked into the effect: in the 5x7 pixel font (only the letters used go in), or drawn in one of this machine's faces - sans, bold or mono (Segoe UI and Consolas on Windows, Helvetica and Menlo on macOS, DejaVu on Linux) - at a height in pixels, when the graph compiles. Wire Coords u, v; colour the 'on' pixels with a Palette, a Colour, anything, or scale a colour by 'level' for the face's smooth edges - 'i' runs 0..1 along the text so each letter can take its own colour. To scroll, wire Time x speed into offset: the text moves left, and with loop on it comes round again after a gap of the matrix's width. row places the top of the letters (-1 centres them).
 
 **Inputs**
 - **u** *(float)*: across, 0..1 (Coords u)
@@ -846,14 +846,17 @@ Words in a 5x7 pixel font, baked into the effect (only the letters used go in). 
 - **offset** *(float)*: scroll, in pixels - Time x speed
 
 **Outputs**
-- **on** *(bool)*: true on a letter's pixel
+- **on** *(bool)*: true on a letter's pixel (half covered or more, in a face)
 - **letter** `i` *(float)*: which letter, 0..1 along the text
+- **level** *(float)*: how much of the pixel the letter covers, 0..1 - smooth edges in a face; 0 or 1 in the 5x7
 
 **Settings**
-- **text** *(text)*: the words (ASCII; only their letters are baked in)
-- **size** *(int)*: pixels per font pixel, 1..4
+- **text** *(text)*: the words (ASCII in the 5x7; a face draws what it has)
+- **size** *(int)*: the 5x7's pixels per font pixel, 1..4
 - **row** *(int)*: the top row of the letters; -1 centres them
 - **loop** *(bool)*: scroll round again after a gap of the width
+- **font** *(choice)*: 5x7 (the same everywhere), or sans, bold or mono: this machine's face, drawn when the graph compiles
+- **height** *(int)*: a face's line in pixels, 6..32 - its capitals take about three fifths of it
 
 ### Torus knot
 

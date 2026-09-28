@@ -214,6 +214,14 @@ STEPS = [
     ([{"expect": ["messages", "CC 8 ch 2 -> Noise #12 . scale"]}, {"py": "app.gp.graph.nodes[12]['inputs']['scale']"},
       {"py": "(num.set('inp_sx', 0), app.eng.fx.__setitem__('sx', 0))"}, {"midi": [176, 7, 100]}], 0.6),
     ([{"expect": ["inp_sx", "201"]}, {"py": "midi_ui.slider_menu(app, 'sx') or dpg.is_item_shown('midi_ctx')"}], 0.6),
+    # a MIDI clock on the port: started, it takes the synth's beat (a beat at its first tick); stopped, the synth's
+    # own again - its tempo put back after (the ticks came faster than any tempo: the slider's top)
+    ([{"py": "app.syn.__setattr__('kick_req', False)"}, {"midi": [0xFA]}, {"midi": [0xF8]}, {"midi": [0xF8]},
+      {"midi": [0xF8]}, {"midi": [0xF8]}], 0.2),
+    ([{"midi": [0xF8]}, {"check": "app.syn.external and app.syn.bpm in (120, 200)"},       # within the half second a clock may pause
+      {"expect": ["messages", "MIDI clock: the synth's beat follows it"]}, {"midi": [0xFC]}], 0.4),
+    ([{"check": "not app.syn.external"}, {"expect": ["messages", "the synth keeps its own beat again"]},
+      {"py": "(setattr(app.syn, 'bpm', 120), num.set('inp_bpm', 120))"}], 0.3),
     ([{"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
       {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),
     # the help: the guide in its window, a search that marks the words and scrolls to them, F1 with a node
