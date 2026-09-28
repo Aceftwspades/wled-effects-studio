@@ -1168,6 +1168,23 @@ static inline uint32_t gc_blend_screen(uint32_t u, uint32_t o, float a) {
 # graph already using one is marked. They still compile - each has a fallback.
 NEEDS = {"Gravity": "imu",
          "Audio": "audio", "FFT bin": "audio", "Beat kick": "audio", "Spectrum": "audio", "Loudest bin": "audio"}
+# Unwired coordinates read the pixel, as Blender's texture nodes read their own coordinates when
+# nothing is plugged in: an input listed here, with no wire and no value typed on it, is what Coords
+# or Position would give it - so a pattern dropped in shows at once, and wiring the node it names
+# changes nothing. A typed value stands in for it; resetting the pin brings it back. A graph saved
+# before this keeps the zero it had (graph.py, Graph's `implicit`). {node: {pin: source}}
+IMPLICIT = {
+    "Noise": {"x": "x", "y": "y", "z": "z"}, "Voronoi": {"pos": "pos"}, "Path": {"pos": "pos"},
+    "Checker": {"x": "u", "y": "v"}, "Brick": {"x": "u", "y": "v"}, "Stripes": {"x": "u"},
+    "Gradient": {"x": "u", "y": "v"}, "Wave": {"x": "u"}, "Mandelbrot": {"x": "cx", "y": "cy"},
+    **{name: {"u": "u", "v": "v"} for name in ("Bitmap", "Image", "States", "Text", "Field", "Previous at",
+                                               "Transform", "Flip", "Bifurcation")},
+}
+# a source: the per-pixel C++ it stands for (the names the prologue gives - the script VM's
+# registers too), and the words on the pin
+IMPLICIT_SOURCES = {"u": ("u", "u"), "v": ("v", "v"), "cx": ("cx", "cx"), "cy": ("cy", "cy"),
+                    "x": ("X3", "position x"), "y": ("Y3", "position y"), "z": ("Z3", "position z"),
+                    "pos": ("gc_v3(X3, Y3, Z3)", "position")}
 # an input that must be wired, and from what: the node reads another's state through it
 WIRED = {"Sprites": ("slots", "Particles or Emitters"), "Shells": ("slots", "Emitters or Particles")}
 # Units, ranges and scales for the numbers on the nodes (a synth's knob says
@@ -1240,6 +1257,8 @@ def library(extra=()):
             lib[d["name"]]["wired"] = WIRED[d["name"]]
         if d["name"] in PADS:
             lib[d["name"]]["pads"] = PADS[d["name"]]
+        if d["name"] in IMPLICIT:
+            lib[d["name"]]["implicit"] = dict(IMPLICIT[d["name"]])
         for pin, spec in (UNITS.get(d["name"]) or {}).items():
             if spec is None:
                 continue

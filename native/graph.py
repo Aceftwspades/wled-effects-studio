@@ -37,7 +37,7 @@ else the definition's default.
 import json
 import re
 
-from native.nodedefs import library, HELPERS, CODEGEN
+from native.nodedefs import library, HELPERS, CODEGEN, IMPLICIT_SOURCES
 
 PIXEL_NAMES = re.compile(r"\b(px|py|u|v|cx|cy|r|ang|nx|ny|nz|X3|Y3|Z3|W|H|N|gc_out|part|along|nparts)\b")
 TYPES = {"float": "float", "color": "uint32_t", "bool": "bool", "vector": "GcVec"}
@@ -235,6 +235,32 @@ class Graph:
         self._next = max(self.nodes.keys(), default=0) + 1
         self.snapshots = dict(d.get("snapshots") or {})    # name -> {nid: {"params": {...}, "inputs": {...}}}: the whole graph's settings, kept
         self.stray = self.prune_links()
+        # Unwired coordinates read the pixel (nodedefs.IMPLICIT). A graph saved before that read
+        # them as their default: it keeps that, typed in, so an effect already out there does
+        # not change when its graph is opened again. Saved from here on, it says so.
+        if not d.get("implicit"):
+            wired = {(b, i) for _, _, b, i in self.links}
+            for nid, n in self.nodes.items():
+                d_ = self.lib.get(n.get("type"))
+                for pin in ((d_ or {}).get("implicit") or {}):
+                    ins = n.setdefault("inputs", {})
+                    if (nid, pin) not in wired and pin not in ins:
+                        ins[pin] = next((i.get("default", 0.0) for i in d_["inputs"] if i["name"] == pin), 0.0)
+
+    def implicit_pins(self, nid, src_of=None):
+        """{pin: source} of a node's inputs that read the pixel now: listed in its definition's
+        `implicit`, with no wire and no typed value (nodedefs.IMPLICIT)."""
+        n = self.nodes.get(nid)
+        try:
+            imp = self.node_def(n).get("implicit") if n else None
+        except GraphError:
+            imp = None
+        if not imp:
+            return {}
+        ins = n.get("inputs") or {}
+        if src_of is None:
+            src_of = {(b, i) for _, _, b, i in self.links}
+        return {pin: src for pin, src in imp.items() if (nid, pin) not in src_of and pin not in ins}
 
     def prune_links(self):
         """Wires with an end that is not there - a node or a pin missing,
@@ -530,7 +556,8 @@ class Graph:
             links.append(list(l) + ([m] if m else []))
         out = {"name": self.name,
                "nodes": [dict(n) for n in self.nodes.values()],
-               "links": links}
+               "links": links,
+               "implicit": 1}                    # unwired coordinates read the pixel (__init__)
         if self.snapshots:
             out["snapshots"] = self.snapshots
         return out
@@ -883,6 +910,7 @@ class Graph:
             d = defs[nid]
             ups = [src_of[(nid, i["name"])][0] for i in d["inputs"] if (nid, i["name"]) in src_of]
             per_pixel_in = any(scope.get(u) == "pixel" for u in ups)
+            per_pixel_in = per_pixel_in or bool(self.implicit_pins(nid, src_of))    # an unwired coordinate reads the pixel
             if d.get("late") and per_pixel_in:
                 raise GraphError(f"{d['name']} #{nid} remembers one value for the next frame, so its input "
                                  f"cannot come from a per-pixel node")
@@ -957,6 +985,7 @@ class Graph:
             d = defs[nid]
             ups = [src_of[(nid, i["name"])][0] for i in d["inputs"] if (nid, i["name"]) in src_of]
             per_pixel_in = any(scope.get(u) == "pixel" for u in ups)
+            per_pixel_in = per_pixel_in or bool(self.implicit_pins(nid, src_of))    # an unwired coordinate reads the pixel
             if d.get("late") and per_pixel_in:
                 raise GraphError(f"{d['name']} #{nid} remembers one value for the next frame, so its input "
                                  f"cannot come from a per-pixel node")
@@ -1047,6 +1076,7 @@ class Graph:
                 except Exception as e:
                     raise GraphError(f"{d['name']} #{nid}: {e}")
             # inputs
+            implicit = self.implicit_pins(nid, src_of) if not late else {}
             for i in d["inputs"]:
                 key = (nid, i["name"])
                 if key in src_of:
@@ -1059,6 +1089,8 @@ class Graph:
                         expr = _coerce(var(a, out), at, i["type"])
                     except GraphError:
                         raise GraphError(f"{d['name']} #{nid}: {i['name']} cannot take a {at} (from {ad['name']} #{a})")
+                elif i["name"] in implicit:
+                    expr = f"({IMPLICIT_SOURCES[implicit[i['name']]][0]})"      # nothing wired or typed: the pixel's own
                 else:
                     # the value typed on the node stands in for the wire - through the
                     # parameter table where the type allows, so a drag needs no rebuild

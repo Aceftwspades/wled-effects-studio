@@ -201,6 +201,19 @@ STEPS = [
     # a bool output's light, the Audio node's beat: framed in the top left first - in the whole graph at macOS's
     # 1280 x 646 it sat under the minimap, where no readout is drawn
     ([{"check": "any(dpg.get_item_type(i).endswith('DrawCircle') for i in app.gp._readout_items)"}], 0.5),
+    # an unwired coordinate reads the pixel: a Noise dropped in says "position x" on its field and compiles per
+    # pixel; a number typed makes it a number again, a reset brings the words back; a vector pin (Voronoi's) is
+    # a button that gives it a typed value
+    ([{"py": "app.gp.new('implicit_smoke')"}, {"py": "setattr(app, '_nz', app.gp.graph.add('Noise', (460, 380)))"},
+      {"py": "setattr(app, '_vz', app.gp.graph.add('Voronoi', (460, 620)))"}, {"py": "app.gp.rebuild()"}, {"graph_zoom": 1.0}], 0.6),
+    ([{"check": "dpg.get_item_configuration(f'gin_{app._nz}_x_w')['format'] == 'position x'"},
+      {"check": "'(X3)' in app.gp.graph.compile() and dpg.get_item_type(f'gin_{app._vz}_pos_w').endswith('Button')"},
+      {"py": "app.gp._on_input(f'gin_{app._nz}_x_w', 0.25)"}], 0.4),
+    ([{"check": "'%' in dpg.get_item_configuration(f'gin_{app._nz}_x_w')['format'] and app.gp.graph.nodes[app._nz]['inputs'].get('x') == 0.25"},
+      {"py": "app.gp._reset_input(app._nz, 'x', None)"},
+      {"py": "app.gp._implicit_to_typed(None, None, (app._vz, 'pos'))"}], 0.6),
+    ([{"check": "dpg.get_item_configuration(f'gin_{app._nz}_x_w')['format'] == 'position x'"},
+      {"check": "not dpg.get_item_type(f'gin_{app._vz}_pos_w').endswith('Button') and 'pos' in app.gp.graph.nodes[app._vz]['inputs']"}], 0.2),
     # a wire that closes a loop (the Multiply of the time back into its own b) gets a Delay; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.on_link(None, (app.gp._pins[(11, 'out', 'result')], app.gp._pins[(11, 'in', 'b')]))"}], 1.0),
     ([{"expect": ["messages", "closed a loop"]}, {"py": "[n['type'] for n in app.gp.graph.nodes.values()].count('Delay')"}, {"graph_undo": True}], 0.5),

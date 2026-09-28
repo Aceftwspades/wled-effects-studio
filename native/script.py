@@ -32,6 +32,7 @@ import re
 import struct
 
 from native.graph import GraphError, SUB
+from native.nodedefs import IMPLICIT_SOURCES
 
 
 class ScriptError(GraphError):
@@ -1132,6 +1133,10 @@ def compile_script(graph):
     the first node the subset cannot express."""
     if any(n["type"].startswith(SUB) for n in graph.nodes.values()):
         return compile_script(graph.flatten())
+    if graph.has_sends():
+        # joined first, as the C++ is: the nodes read below are the joined graph's, so a
+        # Send's typed value reaches its readers (the plan alone joined them, the values did not)
+        return compile_script(graph.resolve_sends())
     outs = [n for n in graph.nodes.values() if n["type"] == "Output"]
     if len(outs) != 1:
         raise ScriptError("the graph needs exactly one Output node")
@@ -1166,6 +1171,13 @@ def compile_script(graph):
     def safe(name):
         """A pin's or state's name as a C name - "layer 1" is two tokens otherwise."""
         return re.sub(r"[^A-Za-z0-9_]", "_", name)
+
+    def implicit_value(src):
+        """An unwired coordinate (nodedefs.IMPLICIT): the pixel's own register, or three for a vector."""
+        expr = IMPLICIT_SOURCES[src][0]
+        if expr.startswith("gc_v3("):
+            return ("v", tuple(FIXED_INDEX[x.strip()] for x in expr[len("gc_v3("):-1].split(",")))
+        return shared[expr]
 
     for nid in order:
         n, d = graph.nodes[nid], defs[nid]
@@ -1245,10 +1257,13 @@ def compile_script(graph):
             continue
         # inputs, params and state into the environment under the template's names
         subst = code
+        implicit = graph.implicit_pins(nid, src_of)
         for i in d["inputs"]:
             key = (nid, i["name"])
             if key in src_of and src_of[key] in values:
                 val = values[src_of[key]]
+            elif i["name"] in implicit:
+                val = implicit_value(implicit[i["name"]])        # nothing wired or typed: the pixel's own
             else:
                 v = n.get("inputs", {}).get(i["name"], i.get("default", 0))
                 val = _lit(i["type"], v)

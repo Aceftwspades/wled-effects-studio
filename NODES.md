@@ -487,8 +487,8 @@ On a cube, the direction from the middle of the cube out through this pixel (a u
 u and v turned round: left for right, top for bottom, or swapped so the picture lies on its diagonal. Between Coords and the nodes that draw, to mirror a whole effect without touching it.
 
 **Inputs**
-- **u** *(float)*: across, 0..1
-- **v** *(float)*: down, 0..1
+- **u** *(float)*: across, 0..1 - unwired, the pixel's u
+- **v** *(float)*: down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **u** *(float)*: across, flipped as asked
@@ -559,8 +559,8 @@ A shape (GEOMETRY > shape) is parts in wiring order - strips, rings, panels, a c
 Moves, turns and zooms a pair of coordinates about a pivot - feed Coords' u, v through it and anything drawn from the result pans, spins or scales. A clock into turns spins the whole picture.
 
 **Inputs**
-- **u** *(float)*: the coordinate across
-- **v** *(float)*: the coordinate down
+- **u** *(float)*: the coordinate across - unwired, the pixel's u
+- **v** *(float)*: the coordinate down - unwired, the pixel's v
 - **move across** `move_u` *(float)*: shift across
 - **move down** `move_v` *(float)*: shift down
 - **turns** *(float)*: spin, 1 = a full circle
@@ -579,8 +579,8 @@ Moves, turns and zooms a pair of coordinates about a pivot - feed Coords' u, v t
 The famous fig-tree diagram of chaos: for each value of c across the picture, where the sequence x -> x*x + c ends up. Read it with u (the c axis) and v (the x axis); narrow the windows to zoom in. Brightness is how often the sequence lands there.
 
 **Inputs**
-- **u** *(float)*: across: which c, 0..1 of the window
-- **v** *(float)*: down: which x, 0..1 of the window
+- **u** *(float)*: across: which c, 0..1 of the window - unwired, the pixel's u
+- **v** *(float)*: down: which x, 0..1 of the window - unwired, the pixel's v
 - **c from** `c_lo` *(float)*: the c window's left edge
 - **c to** `c_hi` *(float)*: its right edge
 - **x from** `x_lo` *(float)*: the x window's bottom
@@ -598,8 +598,8 @@ The famous fig-tree diagram of chaos: for each value of c across the picture, wh
 Pixel art you type: one line per row, a digit for a coloured pixel, a dot for an empty one. Read it with a coordinate and send slot to Colour pick to give each digit a colour.
 
 **Inputs**
-- **u** *(float)*: where to read, across, 0..1
-- **v** *(float)*: where to read, down, 0..1
+- **u** *(float)*: where to read, across, 0..1 - unwired, the pixel's u
+- **v** *(float)*: where to read, down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **slot** *(float)*: the digit there (0..9)
@@ -613,8 +613,8 @@ Pixel art you type: one line per row, a digit for a coloured pixel, a dot for an
 A brick wall, alternate rows offset by half a brick, with a mortar gap you can size.
 
 **Inputs**
-- **x** *(float)*: across
-- **y** *(float)*: down
+- **x** *(float)*: across - unwired, the pixel's u
+- **y** *(float)*: down - unwired, the pixel's v
 - **scale** *(float)*: rows of bricks per unit
 - **mortar** *(float)*: how wide the gaps are, 0..0.5
 
@@ -628,8 +628,8 @@ A brick wall, alternate rows offset by half a brick, with a mortar gap you can s
 A chessboard of 1s and 0s.
 
 **Inputs**
-- **x** *(float)*: across
-- **y** *(float)*: down
+- **x** *(float)*: across - unwired, the pixel's u
+- **y** *(float)*: down - unwired, the pixel's v
 - **scale** *(float)*: squares per unit
 
 **Outputs**
@@ -640,8 +640,8 @@ A chessboard of 1s and 0s.
 A smooth ramp in the shape you pick: along x, curved, round the centre, from the centre, or diagonal. Feed Coords' cx, cy for the round ones.
 
 **Inputs**
-- **x** *(float)*: across (cx for radial and spherical)
-- **y** *(float)*: down (cy)
+- **x** *(float)*: across (cx for radial and spherical) - unwired, the pixel's u
+- **y** *(float)*: down (cy) - unwired, the pixel's v
 
 **Outputs**
 - **value** *(float)*: 0..1
@@ -666,8 +666,8 @@ A random number that is always the same for the same inputs. Feed it a cell numb
 A picture file, baked into the effect. Pick the file, choose how many pixels across and down and how many colours, and read it with any coordinate - Cube face's a, b puts it on every face. The device needs no file. Right-click the node to turn it into editable pixel art.
 
 **Inputs**
-- **u** *(float)*: where to read, across, 0..1
-- **v** *(float)*: where to read, down, 0..1
+- **u** *(float)*: where to read, across, 0..1 - unwired, the pixel's u
+- **v** *(float)*: where to read, down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **color** *(color)*: the picture's colour there
@@ -686,8 +686,8 @@ A picture file, baked into the effect. Pick the file, choose how many pixels acr
 The Mandelbrot set. Give it a point x, y and it says how quickly that point escapes (0 = at once, 1 = never, it is inside). Scale and offset a coordinate to zoom around the edge. Julia mode draws a Julia set instead, with jx, jy as its constant.
 
 **Inputs**
-- **x** *(float)*: the point's x (real part)
-- **y** *(float)*: the point's y (imaginary part)
+- **x** *(float)*: the point's x (real part) - unwired, the pixel's cx
+- **y** *(float)*: the point's y (imaginary part) - unwired, the pixel's cy
 - **julia x** `jx` *(float)*: the Julia constant's x (Julia mode)
 - **julia y** `jy` *(float)*: the Julia constant's y (Julia mode)
 
@@ -703,9 +703,9 @@ The Mandelbrot set. Give it a point x, y and it says how quickly that point esca
 Smooth random blobs - clouds, plasma, flames. Give it a point (Direction's nx, ny, nz for a seamless cube, or Coords) and it returns 0..1 that varies smoothly from place to place. Plug Time into z to make the blobs drift; raise scale for smaller blobs.
 
 **Inputs**
-- **x** *(float)*: where to sample
-- **y** *(float)*: where to sample
-- **z** *(float)*: where to sample - Time makes it move
+- **x** *(float)*: where to sample - unwired, the pixel's position x
+- **y** *(float)*: where to sample - unwired, the pixel's position y
+- **z** *(float)*: where to sample - Time makes it move - unwired, the pixel's position z
 - **scale** *(float)*: how many blobs across: bigger = finer
 
 **Outputs**
@@ -720,7 +720,7 @@ Smooth random blobs - clouds, plasma, flames. Give it a point (Direction's nx, n
 A route through the cube, from points you type (x, y, z in the -1..1 box, one point per ';'). For each pixel: how far it is from the route, and how far along the route the nearest point is - a light running along a track (Band on `along` plus a clock), a glowing wire, a shape's outline.
 
 **Inputs**
-- **pos** *(vector)*: this pixel's position (Position)
+- **pos** *(vector)*: this pixel's position (Position) - unwired, the pixel's position
 
 **Outputs**
 - **distance** *(float)*: how far from the route
@@ -811,8 +811,8 @@ Draws Particles as dots. At each pixel: how much particle is here (a soft dot `s
 Several bitmaps, one shown at a time: the states are separated by '|', each is rows of digits separated by '/' ('.' transparent) like Bitmap. The state at index is read at u, v - wire a beat counter, a Random hold or a slider into index for a face that changes, a sprite that animates. The digit is a colour slot for Colour pick; count says how many states there are.
 
 **Inputs**
-- **u** *(float)*: across, 0..1
-- **v** *(float)*: down, 0..1
+- **u** *(float)*: across, 0..1 - unwired, the pixel's u
+- **v** *(float)*: down, 0..1 - unwired, the pixel's v
 - **index** *(float)*: which state, 0, 1, 2... (rounded down, clamped)
 
 **Outputs**
@@ -828,7 +828,7 @@ Several bitmaps, one shown at a time: the states are separated by '|', each is r
 Hard-edged bands along a coordinate. count is how many, duty how wide the bright ones are, phase scrolls them.
 
 **Inputs**
-- **x** *(float)*: the coordinate to stripe along
+- **x** *(float)*: the coordinate to stripe along - unwired, the pixel's u
 - **count** *(float)*: how many stripes
 - **phase** *(float)*: slides the stripes
 - **duty** *(float)*: how much of each stripe is bright, 0..1
@@ -841,8 +841,8 @@ Hard-edged bands along a coordinate. count is how many, duty how wide the bright
 Words baked into the effect: in the 5x7 pixel font (only the letters used go in), or drawn in one of this machine's faces - sans, bold or mono (Segoe UI and Consolas on Windows, Helvetica and Menlo on macOS, DejaVu on Linux) - at a height in pixels, when the graph compiles. Wire Coords u, v; colour the 'on' pixels with a Palette, a Colour, anything, or scale a colour by 'level' for the face's smooth edges - 'i' runs 0..1 along the text so each letter can take its own colour. To scroll, wire Time x speed into offset: the text moves left, and with loop on it comes round again after a gap of the matrix's width. row places the top of the letters (-1 centres them).
 
 **Inputs**
-- **u** *(float)*: across, 0..1 (Coords u)
-- **v** *(float)*: down, 0..1 (Coords v)
+- **u** *(float)*: across, 0..1 (Coords u) - unwired, the pixel's u
+- **v** *(float)*: down, 0..1 (Coords v) - unwired, the pixel's v
 - **offset** *(float)*: scroll, in pixels - Time x speed
 
 **Outputs**
@@ -886,7 +886,7 @@ A looping, twisted tube floating inside the cube, seen from the middle. Feed it 
 Cells. Random points are scattered through space and every pixel belongs to the nearest one - the pattern of a giraffe, dried mud, stained glass. Feed Position (seamless on the cube) and use distance for soft cells, edge for the cracks between them, id to colour each cell.
 
 **Inputs**
-- **pos** *(vector)*: where to sample (Position)
+- **pos** *(vector)*: where to sample (Position) - unwired, the pixel's position
 - **scale** *(float)*: how many cells per unit: bigger = smaller cells
 - **seed** *(float)*: a different seed, different cells
 
@@ -901,7 +901,7 @@ Cells. Random points are scattered through space and every pixel belongs to the 
 A repeating wave along its input: sine, triangle, square or saw. Feed a coordinate into x for stripes and a phase (Integrate, or Time times a speed) to scroll them. cycles is how many waves fit in one unit of x.
 
 **Inputs**
-- **x** *(float)*: what to wave along - a coordinate
+- **x** *(float)*: what to wave along - a coordinate - unwired, the pixel's u
 - **phase** *(float)*: slides the wave along; a clock scrolls it
 - **cycles** *(float)*: waves per unit of x
 - **distort** *(float)*: bends the wave with noise, 0 = straight
@@ -1460,8 +1460,8 @@ Dims a colour by keep - the same as Scale, named for what it does after Previous
 A hidden number stored per pixel between frames - a simulation's memory (heat, water, sand) kept separate from the colour. This reads last frame's value at any pixel; Field write stores this pixel's new value. Two fields per graph, 0 and 1.
 
 **Inputs**
-- **u** *(float)*: which pixel, across, 0..1
-- **v** *(float)*: which pixel, down, 0..1
+- **u** *(float)*: which pixel, across, 0..1 - unwired, the pixel's u
+- **v** *(float)*: which pixel, down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **value** *(float)*: the stored number there, from last frame
@@ -1587,8 +1587,8 @@ This pixel's own colour last frame. Fade it a little and Blend the new picture o
 What another pixel showed last frame. Give it a u, v and you read that pixel's colour from the frame before - read the pixel below to make things rise, beside to smear, and feed the result back into the output (through a Fade) for trails.
 
 **Inputs**
-- **u** *(float)*: which pixel, across, 0..1
-- **v** *(float)*: which pixel, down, 0..1
+- **u** *(float)*: which pixel, across, 0..1 - unwired, the pixel's u
+- **v** *(float)*: which pixel, down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **color** *(color)*: that pixel's colour last frame

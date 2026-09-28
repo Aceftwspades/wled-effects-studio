@@ -66,8 +66,15 @@ def values(n, d, wired):
     the pin's name when a wire feeds it (the wire says what it is)."""
     out = {}
     ins = n.get("inputs", {}) if isinstance(n.get("inputs"), dict) else {}
+    imp = d.get("implicit") or {}
+    from native.nodedefs import IMPLICIT_SOURCES
     for i in d["inputs"]:
-        out[i["name"]] = i["name"] if i["name"] in wired else ins.get(i["name"], i.get("default"))
+        if i["name"] in wired:
+            out[i["name"]] = i["name"]
+        elif i["name"] in imp and i["name"] not in ins:
+            out[i["name"]] = IMPLICIT_SOURCES[imp[i["name"]]][1]     # it reads the pixel: where from, in words
+        else:
+            out[i["name"]] = ins.get(i["name"], i.get("default"))
     for p in d["params"]:
         out[p["name"]] = n.get("params", {}).get(p["name"], p.get("default"))
     return out
@@ -705,8 +712,8 @@ def pattern(n, d, wired=(), N=32, live=None):
     V = values(n, d, wired)
     for k, v in (live or {}).items():
         V[k] = v
-    for i in d["inputs"]:                                   # a wired pin: the default stands in
-        if isinstance(V.get(i["name"]), str) and V[i["name"]] == i["name"]:
+    for i in d["inputs"]:                                   # a wired pin, or one that reads the pixel: the default stands in
+        if isinstance(V.get(i["name"]), str):
             V[i["name"]] = i.get("default", 0.0)
     try:
         a = np.asarray(f(N, V), dtype=float)

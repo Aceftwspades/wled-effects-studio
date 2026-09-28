@@ -24,7 +24,7 @@ import numpy as np
 from native import graph as G
 from native import nodeface
 from native.glyphs import Glyphs
-from native.nodedefs import library
+from native.nodedefs import library, IMPLICIT_SOURCES
 
 DIM = (139, 147, 163)
 PIN_COL = {"vector": (190, 120, 235),"float": (110, 190, 250), "color": (250, 170, 90), "bool": (170, 230, 120)}
@@ -591,6 +591,8 @@ class GraphPanel(Glyphs):
         n = self.graph.nodes.get(nid) if self.graph else None
         spec = next((p for p in self.graph.node_def(n)["params"] if p["name"] == name), None) if n else None
         shown = val.replace("/", "\n") if spec and spec.get("lines") and isinstance(val, str) else val
+        if n and name in (n.get("inputs") or {}) and name in ((self.graph.node_def(n).get("implicit")) or {}):
+            self._typed_fields(nid, name)               # it read the pixel until now (the one edited too)
         for w in list(self._widgets):
             if w != sender and dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (nid, name):
                 self._show_value(w, shown)
@@ -644,7 +646,9 @@ class GraphPanel(Glyphs):
         if t == "bool":
             w = dpg.add_checkbox(default_value=bool(v), user_data=ud, callback=cb)
         elif kind == "input" and t == "float":
-            w = self._number_widget(s, float(v), None, ud, cb, True, fw)
+            w = self._number_widget(s, float(v), None, ud, cb, True, fw, words=self._implicit_words(nid, s["name"]))
+        elif kind == "input" and t == "vector" and self._implicit_words(nid, s["name"]):
+            w = self._implicit_button(self._implicit_words(nid, s["name"]), None, ud, fw, True)
         elif kind == "input" and t == "vector":
             vv = [float(c) for c in (list(v) + [0, 0, 0])[:3]] if isinstance(v, (list, tuple)) else [float(v)] * 3
             w = dpg.add_input_floatx(width=fw, size=3, default_value=vv + [0.0], format="%.2f", user_data=ud, callback=cb)
@@ -2825,8 +2829,11 @@ class GraphPanel(Glyphs):
         v = n["inputs"].get(i["name"], i.get("default", 0))
         ud = (nid, i["name"])
         fw = width or self.px(96)
+        words = self._implicit_words(nid, i["name"])        # the pin reads the pixel: its field says from where
         if i["type"] == "float":
-            w = self._number_widget(i, float(v), tag, ud, self._on_input, show, fw)
+            w = self._number_widget(i, float(v), tag, ud, self._on_input, show, fw, words=words)
+        elif i["type"] == "vector" and words:
+            w = self._implicit_button(words, tag, ud, fw, show)
         elif i["type"] == "bool":
             w = dpg.add_checkbox(label=nodeface.label(n["type"], i["name"]), tag=tag, default_value=bool(v), user_data=ud,
                              callback=self._on_input, show=show)
@@ -2955,6 +2962,9 @@ class GraphPanel(Glyphs):
         dpg.configure_item(f"{w}__num" if dpg.does_item_exist(f"{w}__num") else w, show=not linked)
         if dpg.get_item_type(w).endswith("Checkbox") and dpg.does_item_exist(tag + "_t"):
             dpg.configure_item(tag + "_t", show=linked)
+        words = None if linked or not num.is_num(w) else self._implicit_words(b, inp)
+        if words:                                           # unwired and nothing typed: it reads the pixel again
+            dpg.configure_item(w, format=words.replace("%", "%%"))
 
     def _hovered_field(self):
         """(widget, nid, name, kind) for the value box under the pointer."""
@@ -3305,7 +3315,7 @@ class GraphPanel(Glyphs):
             self._field_themes[key] = th
         return th
 
-    def _number_widget(self, spec, v, tag, ud, cb, show, width=None, integer=False):
+    def _number_widget(self, spec, v, tag, ud, cb, show, width=None, integer=False, words=None):
         """A number on a node: the one control (num.py) - the value and its
         unit on the track in the monospace, drag it, click it to type, a
         thin fill for where it sits in the definition's range (along the
@@ -3324,9 +3334,51 @@ class GraphPanel(Glyphs):
             pace = abs(float(spec.get("default") or 0.0))
         except (TypeError, ValueError):
             pace = None
+        # an unwired coordinate that reads the pixel shows where from ("position x") until a number
+        # is dragged or typed into it (_mirror turns it back into a number then)
         w = num.add(tag, int(v) if integer else float(v), lo, hi, integer=integer, log=log, unit=unit, width=width or self.px(96),
-                    callback=cb, user_data=ud, show=show, fill_h=max(1, self.px(2)), wide=wide, pace=pace)
+                    callback=cb, user_data=ud, show=show, fill_h=max(1, self.px(2)), wide=wide, pace=pace,
+                    fmt=words.replace("%", "%%") if words else None, fill=not words)
         return w
+
+    def _implicit_words(self, nid, name):
+        """What an unwired, untyped coordinate pin reads (nodedefs.IMPLICIT): "position x", "u" - or None."""
+        src = self.graph.implicit_pins(nid).get(name) if self.graph else None
+        return IMPLICIT_SOURCES[src][1] if src else None
+
+    def _implicit_button(self, words, tag, ud, width, show):
+        """A vector pin that reads the pixel: its words on a button, which gives it a typed value."""
+        kw = {"tag": tag} if tag else {}
+        w = dpg.add_button(label=words, width=width, user_data=ud, show=show, callback=self._implicit_to_typed, **kw)
+        with dpg.tooltip(w):
+            dpg.add_text(f"unwired: the pixel's {words}, as the Position node gives it - click to type a value "
+                         "instead (reset the pin to read the pixel again)", wrap=px(300))
+        return w
+
+    def _implicit_to_typed(self, sender, app_data, ud):
+        """The implicit button pressed: the pin takes its default as a typed value, drawn as fields."""
+        nid, name = ud
+        n = self.graph.nodes.get(nid) if self.graph else None
+        if not n:
+            return
+        self.snapshot(("in", nid, name))
+        spec = next((i for i in self.graph.node_def(n)["inputs"] if i["name"] == name), {})
+        n.setdefault("inputs", {})[name] = list(spec.get("default") or [0.0, 0.0, 0.0])
+        self.touch()
+        self.rebuild()
+
+    def _typed_fields(self, nid, name):
+        """A pin that read the pixel has a value typed on it now: its fields show the number again."""
+        n = self.graph.nodes.get(nid) if self.graph else None
+        spec = next((i for i in self.graph.node_def(n)["inputs"] if i["name"] == name), None) if n else None
+        if not spec or spec["type"] != "float":
+            return
+        unit = spec.get("unit") or ""
+        if unit.lower() == spec["name"].lower():
+            unit = ""
+        for w in list(self._widgets):
+            if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (nid, name) and num.is_num(w):
+                dpg.configure_item(w, format=num.fmt_for(unit))
 
     def _palette_names(self):
         """[(name, id)] the sim knows, for the Effect settings' palette."""
@@ -4273,7 +4325,9 @@ class GraphPanel(Glyphs):
             i = next(x for x in d["inputs"] if x["name"] == name)
             if linked:
                 row("disconnect", lambda: self._disconnect_in(nid, name))
-            row("reset to default", lambda: self._reset_input(nid, name, i), "Backspace")
+            src = (d.get("implicit") or {}).get(name)
+            row(f"reset: the pixel's {IMPLICIT_SOURCES[src][1]}" if src and not linked else "reset to default",
+                lambda: self._reset_input(nid, name, i), "Backspace")
             if i["type"] == "float" and not linked:
                 row("type an expression...", lambda: self.expr_for(nid, name, "input"), "expr")
             if linked:

@@ -252,7 +252,12 @@ reads it from a small table, and dragging the field (or the XY pad)
 pokes the running engine, so the picture follows the drag at once -
 as a synth follows a knob; a colour typed on a pin too (its red, green
 and blue each a slot of the table). Adding or wiring nodes, or a
-setting on a node, still rebuilds.
+setting on a node, still rebuilds. A pattern's coordinates read the
+pixel while nothing is wired or typed on them - a Noise dropped in says
+**position x** on its field and draws at once, as wiring Position into
+it would; a Checker, Wave or Bitmap reads Coords' u and v. Type a number
+to fix one; reset the pin (Backspace, or its menu) and it reads the
+pixel again.
 Sub-graphs (select nodes, Ctrl+G) fold a cluster into one node you can
 reuse. File > History keeps a copy at every save; **changes** beside a
 copy shows what is different now (the code as a diff; a graph as the

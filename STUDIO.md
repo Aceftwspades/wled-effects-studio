@@ -2860,9 +2860,27 @@ most valuable first:
       blamed on the nodes. Tested: `test_each_line_knows_its_node`, and the
       smoke builds a graph whose Expression calls `frobnicate`, finds the
       error on it, mends it and finds it clear.
-- [ ] **Unwired coordinates read the pixel** (Blender's texture nodes read
+- [x] **Unwired coordinates read the pixel** (Blender's texture nodes read
       their own coordinates when nothing is plugged in). A Noise, Wave or
-      Checker dropped in was one flat colour until Coords was wired.
+      Checker dropped in was one flat colour until Coords was wired. Now a
+      pattern's coordinate pin with no wire and no typed value is what
+      wiring Coords or Position would give it (`nodedefs.IMPLICIT`): Noise's
+      x, y, z and Voronoi's and Path's pos the Position node's (the 3-D box,
+      so a Noise is seamless round a cube), Checker, Brick, Stripes,
+      Gradient and Wave Coords' u and v, Mandelbrot the centred cx and cy,
+      and Bitmap, Image, States, Text, Field, Previous at, Transform, Flip
+      and Bifurcation the pixel's u and v. The field says where from
+      ("position x"); a number dragged or typed into it replaces it, and
+      resetting the pin brings it back (its menu says to what). A vector
+      pin shows a button. Such a node is per pixel; the script reads the
+      same registers. A graph saved before keeps the zero its pins had, typed
+      in, so an effect already flashed does not change when its graph is
+      opened (graphs are saved with `"implicit": 1` from now on). On the
+      way, the script compiler joins Send / Receive pairs before reading
+      the nodes, as the C++ does: a Send's typed value did not reach its
+      readers in the script. Tested: `test_unwired_coordinates_read_the_pixel`
+      (the C++ and the script, typed and wired, a saved graph), and the
+      smoke's Noise field saying "position x", a number and back.
 - [ ] **The control nodes a music effect is made of** (wled-toy's signal
       set; TouchDesigner's Trigger, Count, Hold and Lag): an attack / decay /
       sustain / release envelope fired by a trigger, Threshold with

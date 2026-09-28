@@ -171,6 +171,48 @@ def test_each_line_knows_its_node():
     assert at3 and all(g3.line_nodes[k] == e3 for k in at3) and set(g3.line_nodes.values()) <= set(g3.nodes)
 
 
+def test_unwired_coordinates_read_the_pixel():
+    """nodedefs.IMPLICIT: a Noise with nothing wired or typed reads the pixel's position
+    (per pixel), a typed value is a constant (hoisted), a wire is the wire; a vector pin
+    reads the whole position; a graph saved before this keeps its zeros, typed in."""
+    import re
+    from native import script as S
+    def block(src, nid):
+        m = re.search(rf"// \w[\w ]* #{nid}\n(.*?)(?=\n      // |\n  // ---|\Z)", src, re.S)
+        return m.group(1) if m else ""
+    g = starter()
+    n = g.add("Noise", (100, 0)); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+    g.link(n, "value", p, "index"); g.link(p, "color", o, "color")
+    assert g.implicit_pins(n) == {"x": "x", "y": "y", "z": "z"}
+    src = g.compile()
+    assert "(X3)" in block(src, n) and "(Y3)" in block(src, n) and "(Z3)" in block(src, n)
+    assert g.last_scope[n] == "pixel"
+    S.compile_script(g)                                  # the script reads the same registers
+    g.nodes[n]["inputs"] = {"x": 0.25, "y": 0.5, "z": 0.0}
+    src = g.compile()
+    assert "X3" not in block(src, n) and g.last_scope[n] == "frame" and g.implicit_pins(n) == {}
+    g.nodes[n]["inputs"] = {}
+    c = g.add("Position", (0, 0)); g.link(c, "x", n, "x")
+    assert g.implicit_pins(n) == {"y": "y", "z": "z"}
+    # a vector pin, and a u, v one
+    v = g.add("Voronoi", (100, 200)); b = g.add("Bitmap", (100, 400))
+    assert g.implicit_pins(v) == {"pos": "pos"} and g.implicit_pins(b) == {"u": "u", "v": "v"}
+    src = g.compile()
+    assert "(gc_v3(X3, Y3, Z3))" in block(src, v) and "(u)" in block(src, b)
+    g.remove(b)                                          # a Bitmap is not scriptable at all; the Voronoi is
+    S.compile_script(g)
+    # saved before: the pins read their default, so they keep it, typed in; saved again, it says so
+    old = {"name": "old", "nodes": [{"id": 1, "type": "Noise", "pos": [0, 0], "params": {}, "inputs": {"z": 0.7}},
+                                    {"id": 2, "type": "Palette", "pos": [0, 0], "params": {}, "inputs": {}},
+                                    {"id": 3, "type": "Output", "pos": [0, 0], "params": {}, "inputs": {}}],
+           "links": [[1, "value", 2, "index"], [2, "color", 3, "color"]]}
+    g2 = G.Graph(old, lib=LIB)
+    assert g2.nodes[1]["inputs"] == {"x": 0.0, "y": 0.0, "z": 0.7} and g2.implicit_pins(1) == {}
+    assert g2.to_json()["implicit"] == 1
+    g3 = G.Graph(g2.to_json(), lib=LIB)
+    assert g3.nodes[1]["inputs"] == g2.nodes[1]["inputs"] and g3.compile() == g2.compile()
+
+
 def test_unfold_a_sub_graph():
     """A sub-graph made from a selection, then unfolded: the same nodes and
     wires as before, the sub node gone, the C++ the same."""

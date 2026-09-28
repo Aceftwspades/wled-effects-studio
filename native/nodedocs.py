@@ -737,6 +737,13 @@ def apply(lib):
             for p in pins:
                 if docs.get(p["name"]):
                     p["doc"] = docs[p["name"]]
+    # a coordinate that reads the pixel when nothing is wired or typed (nodedefs.IMPLICIT) says so
+    from native.nodedefs import IMPLICIT_SOURCES
+    for d in lib.values():
+        for p in d["inputs"]:
+            src = (d.get("implicit") or {}).get(p["name"])
+            if src and p.get("doc") and "unwired" not in p["doc"]:
+                p["doc"] = p["doc"].rstrip().rstrip(".") + f" - unwired, the pixel's {IMPLICIT_SOURCES[src][1]}"
     return lib
 
 
