@@ -187,6 +187,7 @@ class GraphPanel(Glyphs):
         self._mini_at = 0.0
         self._label_items = []   # the wire labels drawn last frame
         self._readout_items = [] # the live readouts drawn last frame, on the frame-scope output pins
+        self._depth = []         # node ids in imnodes' drawing order, the last on top (_raise, _covered)
         self._scope_cache = None # (edits, {nid: scope}) - the plan's scopes for the graph as it is now
         self._mark_themes = {}   # "error"/"warn" -> outline theme
         self.problems = {}       # node id -> message, from the last rebuild
@@ -1795,6 +1796,7 @@ class GraphPanel(Glyphs):
         dpg.bind_item_theme("node_editor", self._zoom_theme())
         # frames first: nodes draw in creation order, so a frame made first
         # sits behind the nodes inside it
+        self._depth = []
         for nid, n in sorted(self.graph.nodes.items(), key=lambda kv: kv[1]["type"] != "Frame"):
             self._make_node(nid, n)
         self._frame_last = {nid: tuple(self._disp(n["pos"])) for nid, n in self.graph.nodes.items() if n["type"] == "Frame"}
@@ -1885,6 +1887,7 @@ class GraphPanel(Glyphs):
             d = self.graph.node_def(n)
         except G.GraphError as e:
             self.status(str(e)); return
+        self._raise(nid)                                 # imnodes draws a node new to it last: on top
         th = self.themes()
         linked = {(b, inp) for _, _, b, inp in self.graph.links}
         n.setdefault("inputs", {})
@@ -2393,6 +2396,54 @@ class GraphPanel(Glyphs):
         x = nd["rect_max"][0] + pad if kind == "out" else nd["rect_min"][0] - pad
         return (x, y)
 
+    # --- what covers an overlay --------------------------------------------------------
+    # The readouts, the range bars and the wire labels are drawn on a viewport drawlist in
+    # front of everything, clipped to the pane only - so the numbers of a pin under another
+    # node, or under the 3-D view in the graph's corner, showed through it. imnodes draws the
+    # nodes in an order of its own - the order they were made (a rebuild makes the frames
+    # first), a node new to it last, and a node clicked on brought to the front - which the
+    # panel keeps as _depth; an overlay is left out where a node above its own covers it, or
+    # a window floating over the pane (App.overlay_holes), or the minimap.
+    def _raise(self, nid):
+        if nid in self._depth:
+            self._depth.remove(nid)
+        self._depth.append(nid)
+
+    def _cover(self):
+        """This frame's covers: {node: its rectangle} (frames left out: a frame is a
+        wash the nodes and wires show through), {node: its place in the drawing order},
+        and the rectangles drawn over the whole editor."""
+        pad = self.px(8)                               # the node's body is its content rect padded
+        rects = {}
+        for nid, n in self.graph.nodes.items():
+            tag = f"gnode_{nid}"
+            if n.get("type") == "Frame" or not dpg.does_item_exist(tag):
+                continue
+            st = dpg.get_item_state(tag)
+            (x0, y0), (x1, y1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
+            if x1 > x0 and y1 > y0:
+                rects[nid] = (x0 - pad, y0 - pad, x1 + pad, y1 + pad)
+        order = {nid: k for k, nid in enumerate(self._depth)}
+        over = list(self.app.overlay_holes()) if hasattr(self.app, "overlay_holes") else []
+        mini = self.minimap_rect()
+        if mini:
+            over.append(mini)
+        return rects, order, over
+
+    def _covered(self, box, cover, nid=None, nodes=True):
+        """Is `box` (x0, y0, x1, y1) covered: by a window, the minimap - or, with `nodes`,
+        a node drawn above `nid`'s (any node, when nid is None: a wire is under them all)."""
+        rects, order, over = cover
+
+        def meets(r):
+            return box[0] < r[2] and r[0] < box[2] and box[1] < r[3] and r[1] < box[3]
+        if any(meets(r) for r in over):
+            return True
+        if not nodes:
+            return False
+        mine = order.get(nid, -1) if nid is not None else -1
+        return any(m != nid and (nid is None or order.get(m, -1) > mine) and meets(r) for m, r in rects.items())
+
     def _poll_readouts(self):
         """The live value on every frame-scope output pin of the effect on
         screen - one number a frame each, read from the probes the build
@@ -2411,6 +2462,7 @@ class GraphPanel(Glyphs):
         eh = dpg.get_item_rect_size("node_editor")[1]
         x0, y0, x1, y1 = pane[0] + 9, pane[3] - 9 - eh, pane[2] - 9, pane[3] - 9
         size = max(9, int(11 * self.zoom))
+        self._cover_now = cover = self._cover()          # the range bars and the hover plot use it too
         probes = getattr(self, "_probes", None) or {}
         eng = self.app.eng
         live = bool(probes) and bool(getattr(self, "_probes_for", None)) and bool(eng.names)             and eng.names[eng.idx] == self.app.project.effect_title(self._probes_for or "")
@@ -2442,6 +2494,8 @@ class GraphPanel(Glyphs):
                 cx, cy = ax - 10 - self.text_w(name) - 6 - r, ay
                 if cx - r < x0 or cx + r > x1 or cy - r < y0 or cy + r > y1:
                     continue
+                if self._covered((cx - 1.8 * r, cy - 1.8 * r, cx + 1.8 * r, cy + 1.8 * r), cover, nid):
+                    continue
                 fill = (int(70 + 100 * lvl), int(76 + 154 * lvl), int(88 + 32 * lvl), 255)
                 self._readout_items.append(dpg.draw_circle((cx, cy), r, parent="wire_labels", color=(30, 33, 40, 255), fill=fill))
                 if lvl > 0.02:
@@ -2455,13 +2509,15 @@ class GraphPanel(Glyphs):
             ry = ay - size * 0.55
             if rx < x0 or rx + w > x1 or ry < y0 or ry + size > y1:
                 continue
-            self._readout_items.append(self._draw_text((rx, ry), text, parent="wire_labels", color=self.pal()["live"], size=size))
             rng = nodeface.out_range(n, d, name) if d else None
+            mw = max(w, 24 * self.zoom)
+            if self._covered((min(rx, rx + w - mw), ry, rx + w, ry + size + (3 if rng else 0)), cover, nid):
+                continue                                 # under a node above this one, a window, the minimap
+            self._readout_items.append(self._draw_text((rx, ry), text, parent="wire_labels", color=self.pal()["live"], size=size))
             if rng and ry + size + 3 < y1:
                 # a meter under the number: how far along its range the value is
                 lo, hi = rng
                 f = max(0.0, min(1.0, (v - lo) / (hi - lo))) if hi > lo else 0.0
-                mw = max(w, 24 * self.zoom)
                 mx = rx + w - mw
                 self._readout_items.append(dpg.draw_rectangle((mx, ry + size + 1), (mx + mw, ry + size + 3), parent="wire_labels",
                                                               color=(0, 0, 0, 0), fill=self.pal()["meter_bg"]))
@@ -2490,6 +2546,7 @@ class GraphPanel(Glyphs):
         eh = dpg.get_item_rect_size("node_editor")[1]
         x0, y0, x1, y1 = pane[0] + 9, pane[3] - 9 - eh, pane[2] - 9, pane[3] - 9
         ends = {(l[2], l[3]): (l[0], l[1]) for l in self.graph.links}
+        cover = self._cover()
         for (b, inp), text in labelled:
             src = ends.get((b, inp))
             if not src:
@@ -2503,6 +2560,8 @@ class GraphPanel(Glyphs):
             w, hh = typeface.measure(text, "body", size) + px(10), size / 2 + px(2)
             if mx - w / 2 < x0 or mx + w / 2 > x1 or my - hh < y0 or my + hh > y1:
                 continue
+            if self._covered((mx - w / 2, my - hh, mx + w / 2, my + hh), cover):
+                continue                                 # a wire runs under every node: so does its label
             edge, fill, ink = self.pal()["popup_edge"], self.pal()["popup"], self.pal()["text"]
             if self.wire_state(b, inp) == "faded":         # its wire faded while another node's are lit: it fades too
                 edge, fill, ink = edge[:3] + (60,), fill[:3] + (80,), ink[:3] + (90,)
@@ -3005,6 +3064,9 @@ class GraphPanel(Glyphs):
             bx, by = pt[0] + 12, pt[1] + size * 0.75
             if bx < x0 or bx + mw > x1 or by < y0 or by + small + 4 > y1:
                 continue
+            cover = getattr(self, "_cover_now", None)
+            if cover and self._covered((bx, by, bx + mw, by + small + 4), cover, b):
+                continue                                 # its node is under another, a window, the minimap
             k = self._probe_k(r, "out", "result")
             v = self._probe_now(k)
             f = None if v is None or hi == lo else max(0.0, min(1.0, (v - min(lo, hi)) / abs(hi - lo)))
@@ -3672,6 +3734,8 @@ class GraphPanel(Glyphs):
         # where every node is now: a node dragged onto a wire is spliced in on release
         self._press_pos = {nid: tuple(dpg.get_item_pos(f"gnode_{nid}")) for nid in self.graph.nodes if dpg.does_item_exist(f"gnode_{nid}")}
         self._node_press = over is not None          # a press on a node: the drag that follows moves the selection
+        if over is not None and dpg.is_item_hovered(f"gnode_{over}"):
+            self._raise(over)                        # imnodes brings a node clicked on (not on one of its fields) to the front
         self._drag_kind = None
         # The pin pressed: its attribute hovered (the label), or the pointer
         # within imnodes' hover radius of the circle itself, which sits just
@@ -3794,10 +3858,13 @@ class GraphPanel(Glyphs):
         return x0 - 2 <= mp[0] <= x1 + 2 and y0 - 2 <= mp[1] <= y1 + 2
 
     def _node_at(self, mp):
-        """The node whose rectangle holds the point, or None."""
+        """The node whose rectangle holds the point - the one drawn on top
+        where nodes overlap (it took the first made, the one underneath) -
+        or None."""
         if not self.graph:
             return None
-        for nid in self.graph.nodes:
+        order = [n for n in reversed(self._depth) if n in self.graph.nodes]
+        for nid in order + [n for n in self.graph.nodes if n not in self._depth]:
             tag = f"gnode_{nid}"
             if not dpg.does_item_exist(tag):
                 continue

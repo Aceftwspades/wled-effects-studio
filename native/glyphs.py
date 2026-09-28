@@ -574,6 +574,9 @@ class Glyphs:
         if bx + W > x1:
             bx = pt[0] - self.px(14) - W - self.px(60)
         by = min(max(y0, pt[1] - H / 2), y1 - H)
+        cover = getattr(self, "_cover_now", None)
+        if cover and self._covered((bx, by, bx + W, by + H), cover, nodes=False):
+            return                                       # a tooltip over the nodes, but never over a window on the pane
         ys = self._series(k, nodeface.SPARK_SECONDS * 60.0)
         if len(ys) > 150:
             ys = ys[:: max(1, len(ys) // 150)]

@@ -2800,6 +2800,33 @@ audioreactive does not fit a classic ESP32's 1.5 MB app partition
 Released as 1.4.0 - the first release with the Linux tarball beside the zip,
 every platform's tests and app runs green on its tag.
 
+### After 1.4.0: the readouts through what covers them (September 2026)
+
+Seen in the promo film, 12 s in: numbers showing through a node, and one on the
+3-D view in the graph's corner.
+
+- [x] **A pin's live readout showed through whatever covered it.** The readouts
+      (the number and meter on a frame-scope output, a bool's light), the range
+      bars under a modulated input, the hover plot and the wire labels are drawn
+      on a viewport drawlist in front of everything, clipped to the pane alone:
+      a pin under the next node down the graph (Maelstrom's Remaps overlap in a
+      chain) or under the 3-D view had its number drawn over them. The panel
+      keeps imnodes' drawing order (`GraphPanel._depth`: the order a rebuild
+      makes the nodes, frames first; a node made later on top; a node clicked on
+      - not on one of its fields - brought to the front, as imnodes does it),
+      and each of those overlays is left out where a node above its own covers
+      it (any node, for a wire's label: wires run under them all; a frame is a
+      wash, not a cover), or a window floating over the pane (`overlay_holes`:
+      the 3-D view, the properties, a dialog, a menu, a tooltip), or the
+      minimap. The hover plot, a tooltip itself, stays over the nodes and only
+      keeps off the windows. On the way: `_node_at` - the press's fallback, a
+      wire dropped on a node - took the first node whose rectangle held the
+      point, the one underneath where two overlap; it takes the one on top.
+      `tests/pointer_app.py` has it: in Maelstrom's graph, a frame-scope output
+      under the node above shows no number; its node clicked to the front, it
+      does (the check fails with the covering switched off: node 10's result
+      drawn through node 29, the promo's frame).
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every

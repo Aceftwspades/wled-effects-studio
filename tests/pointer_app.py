@@ -21,7 +21,9 @@ node; the Bitmap painter left alone by a drag from the canvas, painting at
 a press; a number dragged in a plain node's properties, the node's own
 field following; a node clicked after another and a zoom, selected; the
 focus frame drawn where the 3-D view is in every frame while it is moved
-and sized. It works in a project of its own, deleted after.
+and sized; the live readouts kept off the 3-D view and hidden under a node
+drawn above theirs, back once their node is clicked to the front. It
+works in a project of its own, deleted after.
 """
 import ctypes
 import json
@@ -370,6 +372,47 @@ def check_zoom_select(app, bad):
     app.send([{"graph_zoom": 1.0}], 0.3)
 
 
+READOUTS = ("[(round(dpg.get_item_configuration(i)['pos'][0]), round(dpg.get_item_configuration(i)['pos'][1])) "
+            "for i in app.gp._readout_items if dpg.does_item_exist(i) and dpg.get_item_type(i).endswith('mvDrawText')]")
+
+
+def check_readouts(app, bad):
+    """The live readouts on the output pins are drawn over everything (a viewport drawlist), and showed through what
+    covers their pin - another node over it, the 3-D view in the graph's corner. Now: none under a window; a pin under
+    a node drawn above its own shows no number; its node clicked (imnodes brings it to the front), it does."""
+    app.send([{"layout": "graph"}, {"graph_open": "maelstrom.json"}, {"py": "app.gp.compile()"}], 3.0)
+    app.send([{"wait_build": True}, {"py": "room.fold_panel(app)"}, {"action": "select_none"}, {"graph_zoom": 1.0}], 2.0)
+    inside = app.ask(f"[p for p in {READOUTS} if any(h[0] <= p[0] <= h[2] and h[1] <= p[1] <= h[3] for h in app.overlay_holes())]")
+    if inside:
+        bad.append(f"readouts drawn under a window over the graph (the 3-D view's): {inside}")
+    # a frame-scope output whose pin is under a node drawn above its own
+    probes = app.ask("[(v[0], v[1]) for k, v in (app.gp._probes or {}).items() if (app.gp._probe_scope or {}).get(v[0]) == 'frame']")
+    depth = app.ask("list(app.gp._depth)")
+    rects = {n: node_rect(app, n) for n in {p[0] for p in probes} | set(depth[-60:])}
+    buried = None
+    for nid, name in probes:
+        ax, ay = app.ask(f"[round(v) for v in app.gp._pin_point({nid}, 'out', {name!r})]")
+        over = [m for m in depth[depth.index(nid) + 1:] if m in rects and rects[m][0] <= ax - 30 <= rects[m][0] + rects[m][2]
+                and rects[m][1] <= ay <= rects[m][1] + rects[m][3]]
+        if over and title_point(app, nid):
+            buried = (nid, name, ax, ay)
+            break
+    if buried is None:
+        bad.append("no frame-scope output under another node in Maelstrom's graph to try"); return
+    nid, name, ax, ay = buried
+    row = lambda pts: [p for p in pts if p[0] < ax and abs(p[1] - ay) < 12]
+    if row(app.ask(READOUTS)):
+        bad.append(f"node {nid}'s {name} readout drawn through the node over it: {row(app.ask(READOUTS))}")
+    app.click(*title_point(app, nid))
+    app.hold(*empty_spot(app))                                     # away: its tooltip would cover the pin
+    time.sleep(1.0)
+    if app.ask("app.gp._depth[-1]") != nid:
+        bad.append(f"node {nid} clicked: not on top in the panel's drawing order ({app.ask('app.gp._depth[-3:]')})")
+    if not row(app.ask(READOUTS)):
+        bad.append(f"node {nid} clicked to the front: its {name} readout still hidden")
+    app.send([{"action": "select_none"}], 0.3)
+
+
 FRAME_REC = "\n".join([
     "orig = app.poll_glow",
     "app._frame_rec = []",
@@ -482,7 +525,8 @@ def main():
                          ("3-D view", lambda: check_pip_drag(app, bad)), ("painter", lambda: check_painter(app, bad)),
                          ("a plain node's properties", lambda: check_props_field(app, bad)),
                          ("a click after a zoom", lambda: check_zoom_select(app, bad)),
-                         ("the frame round a moving 3-D view", lambda: check_frame_follows(app, bad))):
+                         ("the frame round a moving 3-D view", lambda: check_frame_follows(app, bad)),
+                         ("readouts under what covers them", lambda: check_readouts(app, bad))):
             n = len(bad)
             try:
                 fn()
