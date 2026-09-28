@@ -1,10 +1,17 @@
 """The studio's entry point - what the packaged app runs, and  python studio.py
 from the tree. A popout view is the same exe told to be one (--popout view
 block pid), which is how the frozen app opens its second window."""
+import multiprocessing
 import sys
 
 
 def main():
+    # multiprocessing starts its helpers by running sys.executable - in the packaged app, the studio itself:
+    # the popouts' shared memory has a resource tracker on Linux and macOS, run as `<exe> -c "from
+    # multiprocessing.resource_tracker import main..."`, and without this the helper came up as a second whole
+    # studio (reading the tests' command file too). PyInstaller's freeze_support does the helper's job and exits;
+    # anywhere else it does nothing. First, before anything else starts.
+    multiprocessing.freeze_support()
     # the packaged app on Linux: the library path its children get, as it was before the bootloader
     from native import procs
     procs.restore_library_path()

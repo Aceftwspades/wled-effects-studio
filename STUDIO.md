@@ -2780,7 +2780,13 @@ it, and three smaller ones, in the order they were done.
       large and scales down); a dialog grown past the window's edge comes
       back inside it; the smoke test's checks say the geometry when a
       dialog's contents are out of view (macOS's runner has a 1280 x 646
-      screen).
+      screen); and the Linux tarball's first smoke run found that opening a
+      popout started a **second studio**: the popouts' shared memory has
+      multiprocessing's resource tracker on Linux and macOS, which it runs
+      as `sys.executable -c ...` - the packaged app itself - and studio.py
+      never called `multiprocessing.freeze_support()`, PyInstaller's hook
+      that does the helper's job and exits (Windows' shared memory needs
+      no tracker).
 
 Still to try on the hardware (not on this PC): a real MIDI controller and
 a clock from a drum machine or DAW; the line-in boards; the camera mapping
