@@ -397,7 +397,12 @@ STEPS = [
     ([{"check": "not dpg.does_item_exist('frames_win') and dpg.get_value('app_tabs') in ('app_tab_colours', dpg.get_alias_id('app_tab_colours'))"},
       {"check": "dpg.is_item_visible('app_cat_colours') and dpg.is_item_visible('app_col_accent')"},
       {"py": "chrome.show_frames(app)"}], 0.8),
-    ([{"check": "dpg.get_value('app_tabs') in ('app_tab_frames', dpg.get_alias_id('app_tab_frames')) and dpg.is_item_visible('gc_status') and dpg.is_item_visible('frames_style')"},
+    ([{"check": "dpg.get_value('app_tabs') in ('app_tab_frames', dpg.get_alias_id('app_tab_frames'))"},
+      # when not, the geometry says why (a short screen, taller lines in another typeface)
+      {"check": "(dpg.is_item_visible('gc_status') and dpg.is_item_visible('frames_style')) or "
+                "f\"view {dpg.get_viewport_client_width()}x{dpg.get_viewport_client_height()} "
+                "win {dpg.get_item_pos('appearance_win')} {dpg.get_item_rect_size('appearance_win')} "
+                "status {dpg.get_item_rect_min('gc_status')} {dpg.is_item_visible('frames_style')}\""},
       {"py": "chrome.show_appearance(app, 'size')"}], 0.8),
     ([{"check": "dpg.is_item_visible('app_ui_scale')"}, {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
     # the footer (C18): power and the device's fps; the stats popover live while open, above its button; Esc closes it
@@ -669,7 +674,12 @@ STEPS = [
     ([{"layout": "both"}, {"py": "chrome.show_history(app, 'project')"}], 0.5),
     ([{"check": "dpg.is_item_shown('history_win') and dpg.get_value('history_what').startswith(\"The project's settings\")"},
       {"py": "setattr(app, '_kept', __import__('native.history', fromlist=['versions']).versions(app.project, 'project', 'project'))"},
-      {"check": "len(app._kept) >= 1"}, {"py": "chrome._restore(app, 'project', 'project', '.json', app._kept[0][0])"}], 1.0),
+      {"check": "len(app._kept) >= 1"}, {"py": "chrome.show_history_changes(app, 'project', 'project', '.json', app._kept[0][0])"}], 0.5),
+    # what changed since it, before it is put back (the saved time left out)
+    ([{"check": "dpg.is_item_shown('history_diff_win') and dpg.get_value('history_diff_what').startswith(\"the project's settings\")"},
+      {"check": "len(dpg.get_item_children('history_diff_rows', 1)) >= 1 and "
+                "not any('saved' in str(dpg.get_value(t)) for t in dpg.get_item_children('history_diff_rows', 1))"},
+      {"py": "dpg.hide_item('history_diff_win')"}, {"py": "chrome._restore(app, 'project', 'project', '.json', app._kept[0][0])"}], 1.0),
     ([{"check": f"app.project.path.endswith({SMOKE!r}) and not dpg.is_item_shown('history_win')"},
       {"expect": ["messages", "settings restored"]}], 0.5),
     # a project.json that does not read (issue #5): kept aside as project.json.bad-<time>, said in a dialog and a held

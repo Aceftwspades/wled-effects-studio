@@ -248,10 +248,14 @@ bolt on the toolbar (**L**) rebuilds as you edit; F5 rebuilds on demand.
 A typed value on a pin needs no rebuild at all: the compiled effect
 reads it from a small table, and dragging the field (or the XY pad)
 pokes the running engine, so the picture follows the drag at once -
-as a synth follows a knob. Adding or wiring nodes, a setting on a node
-or a colour still rebuilds.
+as a synth follows a knob; a colour typed on a pin too (its red, green
+and blue each a slot of the table). Adding or wiring nodes, or a
+setting on a node, still rebuilds.
 Sub-graphs (select nodes, Ctrl+G) fold a cluster into one node you can
-reuse. File > History keeps a copy at every save. The editor has the
+reuse. File > History keeps a copy at every save; **changes** beside a
+copy shows what is different now (the code as a diff; a graph as the
+nodes added and gone, the settings and values changed, the wires) before
+you restore it. The editor has the
 Blender habits: A selects all, Ctrl+[ / Ctrl+] grow the selection up or
 down the wires, Shift+Home frames it, Ctrl+Delete deletes a node and
 joins the wires across it, a node dropped on a wire is spliced in, a
@@ -847,7 +851,8 @@ on and install what it carries.
   cut short) is kept as `project.json.bad-<time>` before anything is saved
   over it, and the studio says so; the settings are saved whole (to a
   temporary file, then moved over), and File > History keeps copies of them
-  too (**The project's settings**, at most one every five minutes).
+  too (**The project's settings**, at most one every five minutes; their
+  **changes** name the settings that differ).
 - Settings > Appearance, in three tabs: **Colours** (dark, light, soft
   light or slate, and every one of the theme's seven colours editable;
   the nodes' category colours), **Selection frames** (the frames' look
@@ -1210,6 +1215,8 @@ Every button, with what its tooltip says.
 **Appearance**: `close` — close (Esc while it has the focus); `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped; `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`; `The monitor's` — the size the monitor is set to in the system's display settings; `Restart now` — the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first
 
 **History**: `close` — close (Esc while it has the focus); `The project's settings` — The copies kept of the project's settings (project.json: the geometry, palettes, segments, sequence, outputs), or back to those of the graph or code open
+
+**Changes since a version**: `close` — close (Esc while it has the focus); `Restore this version` — this version back in place of what is there now (which is kept first, as any restore keeps it)
 
 **Undo history**: `close` — close (Esc while it has the focus)
 

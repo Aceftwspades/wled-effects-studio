@@ -3266,7 +3266,7 @@ class App(Features):
                 x, y = x + ox, y + oy
         return (x, y, x + w, y + h)
 
-    FLOATING = ("keys_win", "flash_win", "where_win", "history_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "expr_win", "reader_win", "welcome_win", "reader_pic",
+    FLOATING = ("keys_win", "flash_win", "where_win", "history_win", "history_diff_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "expr_win", "reader_win", "welcome_win", "reader_pic",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -4847,7 +4847,7 @@ def write_uiref(app, path=None):
         return out
     roots = [(device_ui.FRAMES[w][1] + " frame", device_ui.FRAMES[w][0]) for w in device_ui.FRAMES]
     roots += [("Keyboard shortcuts", "keys_win"), ("Appearance", "appearance_win"),
-              ("History", "history_win"), ("Undo history", "undo_win"), ("About", "about_win"), ("Usermods and features", "usermods_win"),
+              ("History", "history_win"), ("Changes since a version", "history_diff_win"), ("Undo history", "undo_win"), ("About", "about_win"), ("Usermods and features", "usermods_win"),
               ("Update", "update_win"), ("A WLED checkout", "wled_dialog"), ("Report a problem", "report_win"),
               ("Map lights by camera", "map_win"),
               ("Message log", "log_win"), ("The panes and the toolbar", "root")]

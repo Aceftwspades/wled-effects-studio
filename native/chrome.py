@@ -757,6 +757,16 @@ def build_dialogs(app):
                          "sequence, outputs), or back to those of the graph or code open", wrap=px(320))
         with dpg.child_window(tag="history_rows", height=-1, border=False):
             pass
+    # what changed since a kept version, before it is restored (history.changes)
+    with dpg.window(tag="history_diff_win", label="Changes", no_title_bar=True, show=False, width=px(640), height=px(460),
+                    no_collapse=True):
+        dialog_header("history_diff_win", "Changes")
+        dpg.add_text("", tag="history_diff_what", color=DIM, wrap=px(620))
+        dpg.add_button(tag="history_diff_restore", label="Restore this version", callback=lambda: None)
+        weight.primary(dpg.last_item())
+        tip("this version back in place of what is there now (which is kept first, as any restore keeps it)")
+        with dpg.child_window(tag="history_diff_rows", height=-1, border=True):
+            pass
     # the command palette: every action and menu command by name, Enter runs the first hit
     with dpg.window(tag="palette_win", show=False, no_title_bar=True, no_resize=True, no_move=True, width=px(460), height=px(380),
                     no_collapse=True):
@@ -1389,6 +1399,9 @@ def show_history(app, which=None):
         with dpg.group(horizontal=True, parent="history_rows"):
             dpg.add_button(label="restore", small=True, user_data=(kind, stem, ext, p),
                            callback=lambda s, a, u: _restore(app, *u))
+            dpg.add_button(label="changes", small=True, user_data=(kind, stem, ext, p),
+                           callback=lambda s, a, u: show_history_changes(app, *u))
+            tip("what has changed since this version - to judge it before restoring")
             dpg.add_text(_t.strftime("%Y-%m-%d %H:%M:%S", _t.localtime(t)))
             typeface.small(dpg.add_text(f"{size / 1024:.1f} KB", color=DIM))
             if kind != "effects":
@@ -1554,6 +1567,61 @@ def show_undo_history(app):
         dpg.add_text("nothing to undo", parent="undo_rows", color=DIM)
     _centre("undo_win", 420, 380)
     dpg.show_item("undo_win")
+
+
+def _current_text(app, kind, stem, ext):
+    """What a kept version is compared with: the code in the editor, the graph as it stands (both unsaved
+    edits included), or the project's settings file."""
+    import json
+    if kind == "effects":
+        if app.edit_file == stem + ext and dpg.does_item_exist("code"):
+            return dpg.get_value("code")
+        try:
+            return app.project.read_effect(stem + ext)
+        except Exception:
+            return ""
+    if kind == "project":
+        try:
+            return open(app.project.file, encoding="utf-8").read()
+        except OSError:
+            return ""
+    sub = kind == "subgraphs"
+    if app.gp.graph and app.gp.file == stem + ext and (app.gp.cur_dir == app.gp.sub_dir) == sub:
+        return json.dumps(app.gp.graph.to_json(), indent=1)
+    d = app.gp.sub_dir if sub else app.gp.dir
+    try:
+        return open(os.path.join(d, stem + ext), encoding="utf-8").read()
+    except OSError:
+        return ""
+
+
+def show_history_changes(app, kind, stem, ext, path):
+    """What has changed since a kept version (history.changes): code as a
+    diff, a graph as its nodes, wires and settings, the project's settings as
+    the keys that differ - with the restore beside it."""
+    from native import history
+    import time as _t
+    try:
+        old = open(path, encoding="utf-8").read()
+    except OSError:
+        app.gp.status("that version is no longer kept - the list is shown again")
+        show_history(app, "project" if kind == "project" else None)
+        return
+    rows = history.changes(kind, old, _current_text(app, kind, stem, ext))
+    what = "the project's settings" if kind == "project" else f"{stem}{ext}"
+    dpg.set_value("history_diff_what", f"{what}: since the version of "
+                  f"{_t.strftime('%Y-%m-%d %H:%M:%S', _t.localtime(os.path.getmtime(path)))} - "
+                  "green is there now and was not, red was there and is gone")
+    dpg.configure_item("history_diff_restore", user_data=(kind, stem, ext, path),
+                       callback=lambda s, a, u: (dpg.hide_item("history_diff_win"), _restore(app, *u)))
+    dpg.delete_item("history_diff_rows", children_only=True)
+    colour = {"+": (110, 200, 120), "-": (230, 110, 100), "~": ACCENT, "@": DIM}
+    for tag, line in rows:
+        t = dpg.add_text(line, parent="history_diff_rows", color=colour.get(tag, TEXT))
+        if kind == "effects":
+            typeface.mono(t)
+    _centre("history_diff_win", 640, 460)
+    dpg.show_item("history_diff_win")
 
 
 def _restore(app, kind, stem, ext, path):
@@ -1758,12 +1826,23 @@ def focused_dialog():
 
 
 def poll_dialogs():
-    """Each dialog's close at its top right for its width."""
+    """Each dialog's close at its top right for its width; one that has
+    grown past the window's bottom or right edge (an autosized dialog at a
+    taller tab, a short screen, another typeface's taller lines) brought
+    back inside it - not while the mouse holds it."""
+    vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+    held = dpg.is_mouse_button_down(dpg.mvMouseButton_Left)
     for tag in DIALOGS:
         if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.does_item_exist(f"{tag}_x"):
-            w = dpg.get_item_rect_size(tag)[0] or dpg.get_item_configuration(tag).get("width") or 0
+            rw, rh = dpg.get_item_rect_size(tag)
+            w = rw or dpg.get_item_configuration(tag).get("width") or 0
             if w:
                 dpg.set_item_pos(f"{tag}_x", [w - px(30), px(8)])
+            if rw and rh and vw > 0 and vh > 0 and not held:
+                x, y = dpg.get_item_pos(tag)
+                nx, ny = max(0, min(x, vw - rw)), max(0, min(y, vh - rh))
+                if (nx, ny) != (x, y):
+                    dpg.set_item_pos(tag, [nx, ny])
 
 
 def tip(text, item=None, wrap=None):

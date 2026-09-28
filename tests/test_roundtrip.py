@@ -381,6 +381,42 @@ def test_history_versions_still_open():
     assert not bad, "\n".join(bad[:20])
 
 
+def test_history_says_what_changed():
+    """File > History's changes: a code effect as a diff, a graph as its
+    nodes, wires and settings, the project's settings as the keys that
+    differ (not the time it was saved)."""
+    from native import history
+    rows = history.changes("effects", "a\nb\nc\n", "a\nB\nc\nd\n")
+    assert ("-", "-b") in rows and ("+", "+B") in rows and ("+", "+d") in rows, rows
+    assert any(t == "@" for t, _ in rows), rows
+    assert history.changes("effects", "x\n", "x\n")[0][1].startswith("no change")
+
+    old = {"name": "g", "nodes": [{"id": 1, "type": "Time", "params": {"speed": 1.0}, "pos": [0, 0]},
+                                  {"id": 2, "type": "Output", "pos": [200, 0]},
+                                  {"id": 3, "type": "Noise", "pos": [100, 90]}],
+           "links": [[1, "t", 2, "hue"], [3, "value", 2, "bri"]]}
+    new = json.loads(json.dumps(old))
+    new["nodes"][0]["params"]["speed"] = 2.5                    # a setting
+    new["nodes"][1]["pos"] = [240, 10]                          # moved only
+    new["nodes"] = [n for n in new["nodes"] if n["id"] != 3]    # a node gone, and its wire
+    new["nodes"].append({"id": 4, "type": "Sparkle", "label": "glints", "pos": [100, 90]})
+    new["links"] = [[1, "t", 2, "hue"], [4, "value", 2, "bri"]]
+    rows = history.changes("graphs", json.dumps(old), json.dumps(new))
+    text = "\n".join(f"{t} {l}" for t, l in rows)
+    assert "~ Time #1 speed: 1.0 -> 2.5" in text, text
+    assert "+ glints #4 added" in text and "- Noise #3 gone" in text, text
+    assert "+ wire glints #4 value -> Output #2 bri" in text and "- wire Noise #3 value -> Output #2 bri" in text, text
+    assert "1 node(s) moved" in text, text
+
+    p_old = {"geometry": {"kind": "cube", "B": 16}, "options": {"fps": 40}, "saved": "2026-09-27 10:00:00"}
+    p_new = {"geometry": {"kind": "cube", "B": 16}, "options": {"fps": 60, "gamma": 2.2}, "saved": "2026-09-27 11:00:00"}
+    rows = history.changes("project", json.dumps(p_old), json.dumps(p_new))
+    assert ("~", "options.fps: 40 -> 60") in rows and ("+", "options.gamma: 2.2") in rows, rows
+    assert not any("saved" in l for _, l in rows), rows
+    p_new = dict(p_old, saved="2026-09-27 12:00:00")
+    assert history.changes("project", json.dumps(p_old), json.dumps(p_new))[0][1].startswith("no change")
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0
