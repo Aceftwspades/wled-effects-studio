@@ -2837,6 +2837,73 @@ Seen in the promo film, 12 s in: numbers showing through a node, and one on the
       save takes the file's new mtime; the smoke saves, waits past two looks,
       and expects "saved" ("reloaded from disk" with the old behaviour).
 
+### From wled-toy and its inspirations (September 2026)
+
+[wled-toy](https://github.com/Music-Engine/wled-toy) (Music Engine, first
+release 21 September 2026) does this studio's job the other way round: a
+graph or GLSL compiled to a GPU shader on the PC and streamed to WLED over
+DDP, DNRGB, Art-Net or sACN - WLED is its display, where here the effect is
+C++ that runs on the ESP32 by itself. It names ShaderToy, TouchDesigner and
+Blender's shader editor as its influences. Its repository has no licence:
+ideas only, nothing copied. What it (or they) do that is worth having here,
+most valuable first:
+
+- [x] **A build error on the node that wrote the line.** An Expression pastes
+      its typed C++ into the generated file; a typo was an error at a line of
+      a file nobody wrote by hand. The compiler keeps which node wrote each
+      line (`Graph.line_nodes`, through sub-graphs - to the sub-graph's node
+      on screen - and Send / Receive); a failed build puts each error on its
+      line's node (`GraphPanel.build_failed`): its outline, its menu, the
+      problem held in the log, the build's message and the code pane's row
+      going to the node. A build that goes through, or the graph compiled
+      again, clears them; a file edited by hand since it was written is not
+      blamed on the nodes. Tested: `test_each_line_knows_its_node`, and the
+      smoke builds a graph whose Expression calls `frobnicate`, finds the
+      error on it, mends it and finds it clear.
+- [ ] **Unwired coordinates read the pixel** (Blender's texture nodes read
+      their own coordinates when nothing is plugged in). A Noise, Wave or
+      Checker dropped in was one flat colour until Coords was wired.
+- [ ] **The control nodes a music effect is made of** (wled-toy's signal
+      set; TouchDesigner's Trigger, Count, Hold and Lag): an attack / decay /
+      sustain / release envelope fired by a trigger, Threshold with
+      hysteresis, a counter that fires every Nth beat with the phase between,
+      a toggle that flips on each trigger, sample and hold of any value, peak
+      hold and a slew limiter.
+- [ ] **More from the audio.** From the sixteen bands, in any build: an
+      onset from the spectrum's change (WLED's beat is a volume peak),
+      brightness (the spectral centroid), noisiness (flatness), a silence
+      gate with a hold, and an age on Spectrum for waterfalls. From the
+      studio's audioreactive patch, which has the PCM: the waveform (the
+      PCM slot is the last batch, 256 points of ~23 ms; the sim's copy took
+      10.7 ms of 48 kHz audio and must take the device's span), and the
+      pitch classes - a longer window than the 512-sample batch (43 Hz
+      bins cannot tell semitones apart under ~700 Hz): a ring of ~190 ms,
+      one filter a note C3..B6, folded to twelve, a new slot beside the
+      PCM's; the sim, and so a stream from the live audio, the same.
+- [ ] **What each node costs** (TouchDesigner's cook times; wled-toy only
+      has the whole frame's): a profiling build times each node, scaled by
+      the calibrated device factor - the ESP32's frame time is the limit.
+- [ ] **sACN and Art-Net out beside DDP, and the stream's health**: sent
+      against target fps, kbit/s, the device's reported fps, its latency,
+      frames dropped, each with a trace.
+- [ ] **Scenes with fades on the device**: the snapshots (which already
+      morph in the studio) compiled into the effect, one picked by a
+      signal - a verse look and a chorus look in one effect.
+- [ ] **A rewire seen at once**: the graph's bytecode run in the sim while
+      the native build compiles (the script and C++ already agree in
+      `test_parity`), swapped when it lands - then Live can be on by default.
+- [ ] **A node gallery layout test** (wled-toy's visual invariants): every
+      node in one graph, fields inside the node, pins on its edge, text cut
+      with an ellipsis.
+- [ ] **Smaller**: OSC in beside MIDI learn; Math's second pin hidden for a
+      one-input operation and its operations grouped (Blender); a macOS
+      build and ARM builds.
+
+Not taken: a GLSL mode and a GPU preview (the sim runs the device's own
+C++, which a shader would only imitate), wled-toy's strip / ring / matrix
+layouts (the geometry, ledmaps and camera mapping go further), and the
+"export to WLED JSON" its README names (its code exports standalone GLSL).
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every

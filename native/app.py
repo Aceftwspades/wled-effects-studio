@@ -1563,9 +1563,21 @@ class App(Features):
                     if e[2].startswith("error") or os.path.basename(e[0]) in mine]
             errs.sort(key=lambda e: 0 if e[2].startswith("error") else 1)
             dpg.set_value("edit_status", f"{len(errs)} problem(s)")
+            # a graph's own C++: an error on a line a node wrote is that node's (an Expression's
+            # typed C++, most often) - it goes to the node, and the message points there
+            placed = self.gp.build_failed(self.edit_file, errs) if self.edit_file else {}
+
+            def node_of(path, line):
+                nid = placed.get((os.path.basename(path), int(line)))
+                return (nid, f"{self.gp.graph.nodes[nid]['type']} #{nid}") if nid is not None and self.gp.graph else (None, "")
             first = errs[0] if errs else None
-            messages.post(self, f"{self.edit_file}: {len(errs)} problem(s) in the build" + (f" - {os.path.basename(first[0])}:{first[1]} {first[2]}" if first else ""),
-                          "error", key="build:", code=(os.path.basename(first[0]), int(first[1])) if first else None)
+            nid0, words0 = node_of(first[0], first[1]) if first else (None, "")
+            if nid0 is not None:
+                messages.post(self, f"{self.edit_file}: {len(errs)} problem(s) in the build - {words0}: {first[2]}",
+                              "error", key="build:", node=self.gp.where(nid0))
+            else:
+                messages.post(self, f"{self.edit_file}: {len(errs)} problem(s) in the build" + (f" - {os.path.basename(first[0])}:{first[1]} {first[2]}" if first else ""),
+                              "error", key="build:", code=(os.path.basename(first[0]), int(first[1])) if first else None)
             if self.code_ed is not None:
                 self.code_ed.err_lines = {int(line) - 1 for path, line, msg in errs
                                           if os.path.basename(path) == self.edit_file and msg.startswith("error")}
@@ -1573,9 +1585,15 @@ class App(Features):
             for path, line, msg in errs[:30]:
                 fn = os.path.basename(path)
                 mine_file = fn == self.edit_file
-                row = dpg.add_selectable(label=f"{fn}:{line}  {msg}"[:140], parent="edit_errors",
-                                         user_data=int(line) if mine_file else None,
-                                         callback=lambda s, a, u: self.goto_line(u) if u else None)
+                nid, words = node_of(path, line)
+                if nid is not None:                              # a node's line: the row names it and goes to it
+                    row = dpg.add_selectable(label=f"{fn}:{line}  {words}: {msg}"[:140], parent="edit_errors",
+                                             user_data=self.gp.where(nid),
+                                             callback=lambda s, a, u: messages.goto(self, {"node": u}))
+                else:
+                    row = dpg.add_selectable(label=f"{fn}:{line}  {msg}"[:140], parent="edit_errors",
+                                             user_data=int(line) if mine_file else None,
+                                             callback=lambda s, a, u: self.goto_line(u) if u else None)
                 with dpg.theme() as th:
                     with dpg.theme_component(dpg.mvSelectable):
                         dpg.add_theme_color(dpg.mvThemeCol_Text,
@@ -1596,6 +1614,8 @@ class App(Features):
         self.sync_palette_combo()
         dpg.set_value("edit_status", f"loaded {os.path.basename(rep.library)}  ({self.eng.count} effects)")
         messages.clear(self, "build:")                       # it builds: the build's problem is gone
+        if self.edit_file:
+            self.gp.build_ok(self.edit_file)                 # and the nodes it was on are clear
         messages.post(self, f"built: {self.eng.count} effects")
 
     def on_color(self, i, rgb):

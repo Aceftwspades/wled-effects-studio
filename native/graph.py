@@ -607,6 +607,7 @@ class Graph:
         A Receive with no Send of its name is an error."""
         r = Graph(self.to_json(), lib=self.lib, resolver=self.resolver)
         r.project_dir = getattr(self, "project_dir", None)
+        r.origin = dict(getattr(self, "origin", None) or {})          # the ids stay; where they came from goes along
         pairs = r._send_pairs()
         for nid, n in r.nodes.items():
             if n["type"] in RECEIVES and nid not in pairs:
@@ -782,12 +783,14 @@ class Graph:
         flat.project_dir = getattr(self, "project_dir", None)
         flat.nodes = {}
         flat.link_meta = dict(self.link_meta)
+        flat.origin = {}          # a node here -> the node of this graph it came from (a sub-graph's: its instance)
         idmap = {}
         # plain nodes first, keeping ids where possible
         for nid, n in self.nodes.items():
             if not n["type"].startswith(SUB):
                 flat.nodes[nid] = dict(n, id=nid, params=dict(n.get("params", {})), inputs=dict(n.get("inputs", {})))
                 idmap[nid] = nid
+                flat.origin[nid] = nid
         flat._next = max(flat.nodes.keys(), default=0) + 1
         links = list(self.links)
         for nid, n in self.nodes.items():
@@ -803,6 +806,7 @@ class Graph:
             for sid, sn in sub.nodes.items():
                 new = flat._next; flat._next += 1
                 smap[sid] = new
+                flat.origin[new] = nid
                 flat.nodes[new] = dict(sn, id=new, params=dict(sn.get("params", {})), inputs=dict(sn.get("inputs", {})),
                                        pos=[sn["pos"][0] + n["pos"][0], sn["pos"][1] + n["pos"][1]])
             inner = [(smap[a], o, smap[b], i) for a, o, b, i in sub.links]
@@ -908,6 +912,11 @@ class Graph:
         self.last_scope = dict(getattr(other, "last_scope", {}) or {})
         self.live = dict(getattr(other, "live", {}) or {})
         self.live_init = list(getattr(other, "live_init", []) or [])
+        # a line a sub-graph's node wrote is its instance's here; a node only the copy has
+        # (a preview's Output) is nobody's
+        org = getattr(other, "origin", None) or {}
+        self.line_nodes = {ln: org.get(nid, nid) for ln, nid in (getattr(other, "line_nodes", None) or {}).items()
+                           if org.get(nid, nid) in self.nodes}
         return src
 
     def compile(self, title=None):
@@ -1105,10 +1114,13 @@ class Graph:
                     out += f"      {guard}GC_PROBE({k}, (float)({var(nid, o['name'])}));\n"
             return out
 
-        frame = "".join(expand(nid) + probe(nid) for nid in order if scope[nid] == "frame")
-        frame += "".join(expand(nid, late=True) for nid in order if defs[nid].get("late"))
-        pixel = "".join(expand(nid) + probe(nid, "if (px == W / 2 && py == H / 2) ")
-                        for nid in order if scope[nid] == "pixel")
+        # each node's text kept with its id, so a line of the C++ can be traced to the node
+        # that wrote it (line_nodes, below): a build error lands on the node, not on a line
+        # of a file nobody wrote by hand
+        frame_blocks = [(nid, expand(nid) + probe(nid)) for nid in order if scope[nid] == "frame"]
+        frame_blocks += [(nid, expand(nid, late=True)) for nid in order if defs[nid].get("late")]
+        pixel_blocks = [(nid, expand(nid) + probe(nid, "if (px == W / 2 && py == H / 2) "))
+                        for nid in order if scope[nid] == "pixel"]
 
         # metadata: slider labels from the control nodes that are present
         labels = ["", "", "", "", "", "", "", ""]
@@ -1156,8 +1168,19 @@ class Graph:
             vals = ", ".join(f"{v}f" for v in self.live_init)
             state = (f"  GC_PARAM_TABLE float gc_param[{len(self.live_init)}] = {{{vals}}};   // the typed values (live in the sim)\n"
                      f"  GC_PARAMS(gc_param, {len(self.live_init)});\n") + state
-        return GENERATED.format(title=title, ident=ident, upper=ident.upper(), helpers=HELPERS,
-                                frame=frame, pixel=pixel, meta=meta, state=state)
+        # line_nodes: 1-based line of the text -> the node that wrote it. The blocks go in
+        # where markers stand, frame first, so each block's line is counted in the final text.
+        src = GENERATED.format(title=title, ident=ident, upper=ident.upper(), helpers=HELPERS,
+                               frame="\x00frame\x00", pixel="\x00pixel\x00", meta=meta, state=state)
+        self.line_nodes = {}
+        for mark, blocks in (("\x00frame\x00", frame_blocks), ("\x00pixel\x00", pixel_blocks)):
+            at = src.count("\n", 0, src.index(mark)) + 1
+            for nid, text in blocks:
+                n = text.count("\n")
+                self.line_nodes.update((at + k, nid) for k in range(n))
+                at += n
+            src = src.replace(mark, "".join(text for _, text in blocks))
+        return src
 
 
 GENERATED = r'''#include "wled.h"

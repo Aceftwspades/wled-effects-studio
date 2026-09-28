@@ -674,6 +674,18 @@ STEPS = [
     ([{"expect": ["edit_status", "problem"]}, {"action": "undo"}, {"action": "undo"}, {"layout": "graph"}, {"graph_open": "fan.json"},
       {"device": "127.0.0.1:1"}, {"py": "app.send_script()"}], 8.0),
     ([{"expect": ["messages", "failed"]}, {"device": "127.0.0.1:8770"}], 1.0),
+    # a build error on a line a node wrote is the node's (an Expression's typed C++): its problem, held in the
+    # log, and the build's message goes to it - not to a line of a file nobody wrote; mended and built, clear
+    ([{"layout": "graph"}, {"py": "app.gp.new('expr_smoke')"},
+      {"py": "setattr(app, '_xe', app.gp.graph.add('Expression', (460, 380), {'expr': 'a * frobnicate(b)'}))"},
+      {"py": "app.gp.rebuild()"}, {"py": "app.gp.compile()"}], 12.0),
+    ([{"check": "app.gp.problems.get(app._xe, '').startswith('error: does not build')"},
+      {"check": "f'problem:{app.gp._key()}:{app._xe}' in messages.HELD"},
+      {"check": "(messages.HELD.get('build:', {}).get('node') or (0, 0))[1] == app._xe"},
+      {"py": "app.gp.graph.nodes[app._xe]['params'].__setitem__('expr', 'a * b')"}, {"py": "app.gp.rebuild()"},
+      {"py": "app.gp.compile()"}], 12.0),
+    ([{"check": "not app.gp.problems.get(app._xe, '').startswith('error') and 'build:' not in messages.HELD"},
+      {"check": "f'problem:{app.gp._key()}:{app._xe}' not in messages.HELD"}], 0.3),
     # the messages (C10): the graph that did not compile held as a problem, counted in the footer; the log lists it;
     # go to from another layout opens the graph pane with the interface (it went to a full frame once)
     ([{"check": "'graph:sad_smoke.json' in messages.HELD and dpg.is_item_shown('msg_problems')"},

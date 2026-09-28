@@ -1837,10 +1837,63 @@ class GraphPanel(Glyphs):
             self._mark_themes[(kind, self.zoom)] = th
         return th
 
+    def build_failed(self, fname, errs):
+        """The build of `fname` failed with errs [(path, line, message)]: each error on a line
+        a node of this graph wrote goes to that node - its outline, its menu, the problems
+        held in the log - as well as to the code pane's list. Nothing when the file is not
+        this graph's, or has been edited by hand since it was written. Returns
+        {(file name, line): node id} for the errors placed."""
+        mf, lines, text = getattr(self, "_line_map", (None, {}, ""))
+        if not self.graph or not fname or fname != mf or not lines:
+            return {}
+        try:
+            if self.app.project.read_effect(fname) != text:
+                return {}
+        except OSError:
+            return {}
+        key, bad = getattr(self, "_build_problems", (None, {}))
+        if key != self._key():
+            key, bad = self._key(), {}
+        placed = {}
+        for path, line, msg in errs:
+            nid = lines.get(int(line)) if os.path.basename(path) == fname else None
+            if nid is None or nid not in self.graph.nodes:
+                continue
+            placed[(fname, int(line))] = nid
+            if msg.startswith("error") and nid not in bad:
+                bad[nid] = "error: does not build - " + msg.split(": ", 1)[-1]
+        self._build_problems = (key, bad)
+        if bad:
+            self._mark_problems()
+        return placed
+
+    def build_ok(self, fname):
+        """A build of `fname` went through: the nodes it blamed before are clear."""
+        if fname == getattr(self, "_line_map", (None,))[0] and self._clear_build_problems():
+            self._mark_problems()
+
+    def _clear_build_problems(self):
+        """Forget the last build's errors on this graph's nodes, their red outlines with them (the
+        caller marks what problems remain). True when there were any."""
+        key, bad = getattr(self, "_build_problems", (None, {}))
+        self._build_problems = (self._key(), {})
+        if key != self._key() or not bad:
+            return False
+        for nid in bad:
+            if self.graph and nid in self.graph.nodes and dpg.does_item_exist(f"gnode_{nid}"):
+                self._bind_node_theme(nid, self.graph.nodes[nid])
+        return True
+
     def _mark_problems(self):
         if not self.graph:
             return
         self.problems = self.graph.problems()
+        # a failed build's errors on the lines a node wrote (build_failed), while they last
+        key, bad = getattr(self, "_build_problems", (None, {}))
+        if key == self._key():
+            for nid, msg in bad.items():
+                if nid in self.graph.nodes and not self.problems.get(nid, "").startswith("error"):
+                    self.problems[nid] = msg
         # the errors held in the log while they last: judged again on every
         # change (a rebuild, a hover's dimming), each logged once
         messages.hold(self.app, f"problem:{self._key()}:",
@@ -5374,6 +5427,10 @@ class GraphPanel(Glyphs):
             self._probe_scope = dict(getattr(g or self.graph, "last_scope", {}) or {})
             self._probes_for = fname
             self._live = {v: k for k, v in (getattr(g or self.graph, "live", {}) or {}).items()}   # (nid, input, comp) -> slot
+            # which node wrote each line, for a build that fails (build_failed); the text too, so a
+            # file edited by hand since is not blamed on the nodes
+            self._line_map = (fname, dict(getattr(g or self.graph, "line_nodes", None) or {}), src)
+            self._clear_build_problems()                       # new text: the last build's word on it is old
         except G.GraphError as e:
             self._mark_problems()
             at = messages.held(f"problem:{self._key()}:")

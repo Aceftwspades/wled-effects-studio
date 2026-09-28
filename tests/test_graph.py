@@ -130,6 +130,47 @@ def test_merge_chains_operators():
         pass
 
 
+def test_each_line_knows_its_node():
+    """line_nodes: the C++ an Expression wrote traces back to the Expression - in a
+    plain graph, inside a sub-graph (to the sub-graph's node, the one on screen),
+    and through a Send / Receive pair; no line points at a node the graph lacks."""
+    def lines_with(src, text):
+        return [k + 1 for k, line in enumerate(src.split("\n")) if text in line]
+    g = starter()
+    c = g.add("Coords", (0, 0)); e = g.add("Expression", (100, 0)); h = g.add("HSV", (200, 0)); o = g.add("Output", (300, 0))
+    g.nodes[e]["params"]["expr"] = "a * b + frobnicate(c)"
+    g.link(c, "u", e, "a"); g.link(e, "result", h, "h"); g.link(h, "color", o, "color")
+    src = g.compile()
+    at = lines_with(src, "frobnicate")
+    assert at and all(g.line_nodes[k] == e for k in at)
+    assert set(g.line_nodes.values()) <= set(g.nodes)
+    import re
+    tags = {k + 1: int(m.group(1)) for k, line in enumerate(src.split("\n"))
+            for m in [re.match(r"^\s*// .+ #(\d+)( \(for next frame\))?$", line)] if m}
+    assert tags and all(g.line_nodes.get(k) == nid for k, nid in tags.items())      # each node's tag line is its own
+    # the Expression inside a sub-graph: its lines are the sub-graph node's
+    sub = G.Graph({"name": "inner"}, lib=LIB)
+    gi = sub.add("Graph input", (0, 0), {"name": "x", "type": "float"})
+    se = sub.add("Expression", (100, 0)); sub.nodes[se]["params"]["expr"] = "a + frobnicate(b)"
+    go = sub.add("Graph output", (300, 0), {"name": "result", "type": "float"})
+    sub.link(gi, "value", se, "a"); sub.link(se, "result", go, "value")
+    g2 = G.Graph({"name": "t"}, lib=LIB, resolver=lambda name: {"inner": sub}.get(name))
+    c2 = g2.add("Coords", (0, 0)); s2 = g2.add(G.SUB + "inner", (100, 0)); p2 = g2.add("Palette", (300, 0)); o2 = g2.add("Output", (400, 0))
+    g2.link(c2, "u", s2, "x"); g2.link(s2, "result", p2, "index"); g2.link(p2, "color", o2, "color")
+    src2 = g2.compile()
+    at2 = lines_with(src2, "frobnicate")
+    assert at2 and all(g2.line_nodes[k] == s2 for k in at2) and set(g2.line_nodes.values()) <= set(g2.nodes)
+    # through a Send / Receive pair: the ids are the graph's own
+    g3 = starter()
+    c3 = g3.add("Coords", (0, 0)); s3 = g3.add("Send", (100, 0), {"name": "u"}); r3 = g3.add("Receive", (0, 200), {"name": "u"})
+    e3 = g3.add("Expression", (100, 200)); g3.nodes[e3]["params"]["expr"] = "frobnicate(a)"
+    h3 = g3.add("HSV", (200, 200)); o3 = g3.add("Output", (300, 200))
+    g3.link(c3, "u", s3, "in"); g3.link(r3, "out", e3, "a"); g3.link(e3, "result", h3, "h"); g3.link(h3, "color", o3, "color")
+    src3 = g3.compile()
+    at3 = lines_with(src3, "frobnicate")
+    assert at3 and all(g3.line_nodes[k] == e3 for k in at3) and set(g3.line_nodes.values()) <= set(g3.nodes)
+
+
 def test_unfold_a_sub_graph():
     """A sub-graph made from a selection, then unfolded: the same nodes and
     wires as before, the sub node gone, the C++ the same."""
