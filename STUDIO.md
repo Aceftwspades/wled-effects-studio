@@ -2706,8 +2706,8 @@ it, and three smaller ones, in the order they were done.
       smoke test, the packaged app's and the pointer's are gating, each
       with one retry that leaves a warning; a newer push cancels the run of
       an older one (a tag's always finishes). A macOS job builds the engine
-      with Apple's clang, runs every unit test and drives the app (outside
-      the release's needs while it settles). The smoke test stops at a step
+      with Apple's clang, runs every unit test and drives the app - gating
+      since its first green run. The smoke test stops at a step
       the app never took and shows the app's last lines, and the app steps
       have time limits - a hung app kept a job going for an hour.
 - [x] **Every segment pushed.** "Send the current effect's settings" sent

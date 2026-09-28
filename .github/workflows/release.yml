@@ -1,7 +1,8 @@
-# Every push to main and every pull request: the tests on Linux and Windows,
-# the app driven on both (the smoke test, and on Windows the packaged app's
-# and the pointer's) - each of those gating, with one retry that leaves a
-# warning, so a push is never known good only on the machine it came from.
+# Every push to main and every pull request: the tests on Linux, Windows and
+# macOS, the app driven on each (the smoke test; on Linux and Windows the
+# packaged app's too, and on Windows the pointer's) - each of those gating,
+# with one retry that leaves a warning, so a push is never known good only
+# on the machine it came from.
 # A version tag (v1.2.3) does all that and the release: the engine built, a
 # MinGW-w64 fetched from winlibs and cut down, PyInstaller's folder made
 # and zipped by package.py, the zip attached to a DRAFT release for the
@@ -106,10 +107,10 @@ jobs:
           path: dist/WLED_Effects_Studio_linux.tar.gz
 
   # the roadmap's Linux / macOS pass, macOS half: the engine built with Apple's clang, every unit test, the app
-  # driven by the smoke test. Kept out of the release's needs until it has run green (continue-on-error below)
+  # driven by the smoke test (the runner's screen is 1280 x 646). Gating since it ran green (1.4.0); no macOS
+  # build is released - macOS runs from a checkout
   macos:
     runs-on: macos-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
 
@@ -242,7 +243,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, windows]
+    needs: [linux, windows, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

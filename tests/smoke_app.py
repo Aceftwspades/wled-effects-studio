@@ -831,10 +831,16 @@ def main():
             bad.append(f"the fake device never received {name}")
     if bad:
         print("smoke: FAILED")
-        i = text.find("Traceback")
-        print(text[i - 200:i + 1500] if i >= 0 else "\n".join(bad[:20]))
-        if early:                                             # what the app said last, for a run nobody watched
-            print("the app's last lines:\n" + "\n".join("  " + l for l in text.splitlines()[-40:]))
+        print("\n".join(bad[:30]))
+        # what the app did up to the first thing that went wrong, for a run nobody watched (a CI runner's log
+        # is all there is): its lines from 60 before that one
+        lines = text.splitlines()
+        first = next((k for k, l in enumerate(lines) if "EXPECT FAILED" in l or "Traceback" in l or l.startswith("command {")), None)
+        if first is not None:
+            print(f"the app's lines {max(0, first - 60) + 1}..{first + 25} of {len(lines)}:")
+            print("\n".join("  | " + l[:300] for l in lines[max(0, first - 60):first + 25]))
+        if early:                                             # what the app said last
+            print("the app's last lines:\n" + "\n".join("  " + l for l in lines[-40:]))
         return 1
     print(f"smoke: ok ({len(STEPS)} steps, log {LOG})")
     return 0
