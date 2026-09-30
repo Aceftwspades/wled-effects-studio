@@ -575,9 +575,14 @@ def main():
 
     # The bat's own output is kept on failure - suppressing it unconditionally
     # is what hid this for so long.
-    r = subprocess.run(f'"{EMSDK}" >nul 2>&1 && {line}', shell=True, cwd=HERE,
-                       capture_output=True, text=True, env=env)
-    if r.returncode != 0 and "is not recognized" in ((r.stdout or "") + (r.stderr or "")):
+    if os.name != "nt":
+        # Linux/macOS (CI, the Pages build): em++ is already on PATH, from
+        # emsdk_env.sh or a package - there is no bat to run first.
+        r = subprocess.run(line, shell=True, cwd=HERE, capture_output=True, text=True, env=env)
+    else:
+        r = subprocess.run(f'"{EMSDK}" >nul 2>&1 && {line}', shell=True, cwd=HERE,
+                           capture_output=True, text=True, env=env)
+    if os.name == "nt" and r.returncode != 0 and "is not recognized" in ((r.stdout or "") + (r.stderr or "")):
         probe = subprocess.run(f'"{EMSDK}" && where emcc', shell=True, cwd=HERE,
                                capture_output=True, text=True, env=env)
         print("  emcc not found; emsdk_env.bat said:")
