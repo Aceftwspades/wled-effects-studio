@@ -2932,9 +2932,29 @@ most valuable first:
       48000 Hz, silence, the PCM's span, the synth's chords),
       `test_the_sound_nodes_read_what_they_hear` (each node, built, fed
       through the engine's slots), the census and the parity.
-- [ ] **What each node costs** (TouchDesigner's cook times; wled-toy only
-      has the whole frame's): a profiling build times each node, scaled by
-      the calibrated device factor - the ESP32's frame time is the limit.
+- [x] **What each node costs** (TouchDesigner's cook times; wled-toy only
+      has the whole frame's). Node > What each node costs: the graph
+      compiled twice beside the sim - `compile(profile=True)`, each node's
+      code between two reads of the time-stamp counter (the steady clock
+      where there is none), summed with a count into its slot, a slot for
+      two reads with nothing between (their cost, off each node's), and
+      `profile="frame"`, its twin timing only the frame - built without
+      touching the app's engine (a side build, the build flag held so two
+      builds never share the generated sources), run 60 frames on the synth
+      (`native/costs.py`). A node's share is its time over the twin's frame:
+      taking the reads' cost off the instrumented frame instead took off
+      twice what they add (they overlap the work round them; box_fire's
+      frame came out at 0.125 ms against its twin's 0.194). Each node then
+      shows its share and its time on the device (the speed factor's
+      estimate) over its corner, a quarter or more in amber, kept off what
+      covers it; the status line says the frame, the top three and the
+      rest - each pixel's coordinates and the drawing, 68% of box_fire's
+      frame on a cube, its two Noises 11% each. A compile makes them old.
+      Tested: `test_a_profiling_build_times_each_node` (the slots, a sub-
+      graph's to its node, the ordinary compile unchanged),
+      `test_the_profile_finds_the_heavy_node` (a six-octave Noise over five
+      times an Add, the shares and the rest the whole frame, the twin's
+      frame under the instrumented one), the smoke's measurement of box_fire.
 - [ ] **sACN and Art-Net out beside DDP, and the stream's health**: sent
       against target fps, kbit/s, the device's reported fps, its latency,
       frames dropped, each with a trace.

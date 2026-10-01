@@ -502,6 +502,26 @@ class Engine:
         a = np.ascontiguousarray(np.clip(samples, -127, 127).astype(np.int8))
         f(a.ctypes.data_as(C.POINTER(C.c_int8)), int(a.size))
 
+    def prof(self, k):
+        """A profiling build's slot k (graph.compile(profile=True)): (ticks, runs) as the
+        effect last handed its sums over; (0, 0) from an engine without them."""
+        try:
+            ft, fn = self.lib.simProfTicks, self.lib.simProfCount
+        except AttributeError:
+            return 0.0, 0
+        ft.restype, ft.argtypes = C.c_double, [C.c_int]
+        fn.restype, fn.argtypes = C.c_int, [C.c_int]
+        return float(ft(int(k))), int(fn(int(k)))
+
+    def prof_clock(self):
+        """The profile's clock now, in its own ticks (the time-stamp counter where there is one)."""
+        try:
+            f = self.lib.simProfClock
+        except AttributeError:
+            return None
+        f.restype = C.c_double
+        return float(f())
+
     def chroma(self, pc, level=0.0):
         """The pitch-class slot (u_data[9]) for effects that follow the
         notes: twelve 0..1, C first, the strongest 1 (all 0 in silence),

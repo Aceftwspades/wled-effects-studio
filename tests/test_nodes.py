@@ -415,6 +415,38 @@ def test_the_sound_nodes_read_what_they_hear():
     assert abs(read("old", "level") - 40.0 / 255.0) < 0.03, read("old", "level")
 
 
+def test_the_profile_finds_the_heavy_node():
+    """A profiling build of a graph with a Noise of six octaves and an Add beside it, and its twin
+    timing only the frame, run in an engine of their own (costs.run): the Noise takes far more of
+    the frame than the Add, the shares and the rest make the whole frame, and the frame's own
+    time is the twin's - under the instrumented build's, which pays for every node's reads."""
+    import build as B
+    from native import costs
+    from native.toolchain import build_engine
+    from native.geometry import Geometry
+    g = G.Graph({"name": "Census profile"}, lib=LIB)
+    n = g.add("Noise", (0, 0), {"octaves": 6})
+    a = g.add("Add", (0, 200)); g.nodes[a]["inputs"] = {"b": 0.25}
+    c = g.add("Coords", (-200, 200)); g.link(c, "u", a, "a")
+    m = g.add("Add", (200, 0)); g.link(n, "value", m, "a"); g.link(a, "result", m, "b")
+    p = g.add("Palette", (400, 0)); o = g.add("Output", (600, 0)); g.link(m, "result", p, "index"); g.link(p, "color", o, "color")
+    os.makedirs(OUT, exist_ok=True)
+    paths = [os.path.join(OUT, "profile_census.cpp"), os.path.join(OUT, "profile_census_frame.cpp")]
+    open(paths[0], "w", encoding="utf-8", newline="\n").write(g.compile(profile=True))
+    slots = list(g.prof_nodes)
+    open(paths[1], "w", encoding="utf-8", newline="\n").write(g.compile(title=g.name + " frame", profile="frame"))
+    rep = build_engine(B.engine_sources(paths, log=lambda *x: None), B.include_dirs(), log=lambda *x: None, point_latest=False)
+    assert rep.ok, rep.link_output[-600:]
+    got = costs.run(rep.library, g.name, slots, geometry=Geometry("cube", B=16), frames=30, warm=5,
+                    frame_title=g.name + " frame")
+    share = {nid: s for nid, (s, ms) in got["nodes"].items()}
+    assert share[n] > 5 * share[a], share
+    assert share[n] > 0.2, share
+    assert abs(sum(share.values()) + got["rest"] - 1.0) < 1e-6 and got["frame_ms"] > 0.0, got
+    # the twin's frame is the effect's own: under the instrumented one's (the reads' cost and all)
+    assert 0.0 < got["frame_ms"] < got["instrumented_ms"], got
+
+
 def test_text_in_a_face_of_this_machine():
     """The Text node in the 5x7 font and in a face of this machine's at a
     height: white scaled by its level on a 64 x 16 matrix - the 5x7 all

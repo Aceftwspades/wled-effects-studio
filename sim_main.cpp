@@ -6,6 +6,11 @@
 // effect sources registered into the bank roster at static-init time, so it
 // cannot drift from what the firmware would register.
 // ===========================================================================
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__)
+#include <x86intrin.h>          // the profile clock: __rdtsc
+#else
+#include <chrono>
+#endif
 #include <stdio.h>
 #include "shim/wled.h"
 #include "cube_fx_bank.h"                 // usermods/cube_fx, on the include path
@@ -537,6 +542,23 @@ SIM_API uint8_t *simFftPtr() { return gFft; }
 static float gProbe[256];
 SIM_API void simProbeSet(int i, float v) { if ((unsigned)i < 256u) gProbe[i] = v; }
 SIM_API float simProbeGet(int i) { return ((unsigned)i < 256u) ? gProbe[i] : 0.0f; }
+
+// A profiling build's sums (graph.py, compile(profile=True)): per slot the ticks its node's code
+// took and how many times it ran, as the effect last handed them over; and the clock's ticks a
+// second, the same clock as the build's gc_tick (the time-stamp counter where there is one).
+static double gProf[512];
+static int gProfN[512];
+SIM_API void simProfSet(int k, double ticks, int n) { if ((unsigned)k < 512u) { gProf[k] = ticks; gProfN[k] = n; } }
+SIM_API double simProfTicks(int k) { return ((unsigned)k < 512u) ? gProf[k] : 0.0; }
+SIM_API int simProfCount(int k) { return ((unsigned)k < 512u) ? gProfN[k] : 0; }
+SIM_API void simProfClear() { for (int k = 0; k < 512; k++) { gProf[k] = 0.0; gProfN[k] = 0; } }
+SIM_API double simProfClock() {
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__)
+  return (double)__rdtsc();
+#else
+  return (double)std::chrono::steady_clock::now().time_since_epoch().count();
+#endif
+}
 
 SIM_API void simAudioSet(float vol, int peak) {
   gVolume = vol; gPeak = (uint8_t)peak;

@@ -934,11 +934,11 @@ class Graph:
                 nstate += len(st) if isinstance(st, (list, tuple)) else int(st)
         return order, defs, scope, src_of, slots, nstate
 
-    def _compile_as(self, other, title):
+    def _compile_as(self, other, title, profile=False):
         """Compile a derived graph (flattened, sends joined, an Output added
         for a preview) and keep what the panel reads back after a compile -
         the probes, the scopes, the live-parameter table - on this one."""
-        src = other.compile(title or self.name)
+        src = other.compile(title or self.name, profile=profile)
         self.probes = dict(getattr(other, "probes", {}) or {})
         self.last_scope = dict(getattr(other, "last_scope", {}) or {})
         self.live = dict(getattr(other, "live", {}) or {})
@@ -948,15 +948,18 @@ class Graph:
         org = getattr(other, "origin", None) or {}
         self.line_nodes = {ln: org.get(nid, nid) for ln, nid in (getattr(other, "line_nodes", None) or {}).items()
                            if org.get(nid, nid) in self.nodes}
+        # a profile's slots the same way: a sub-graph's nodes are its instance's (several slots may be one node)
+        self.prof_nodes = [org.get(nid, nid) if org.get(nid, nid) in self.nodes else None
+                           for nid in (getattr(other, "prof_nodes", None) or [])]
         return src
 
-    def compile(self, title=None):
+    def compile(self, title=None, profile=False):
         """The effect as C++ text. Raises GraphError with a message worth
         showing when the graph cannot be compiled."""
         if any(n["type"].startswith(SUB) for n in self.nodes.values()):
-            return self._compile_as(self.flatten(), title)
+            return self._compile_as(self.flatten(), title, profile)
         if self.has_sends():
-            return self._compile_as(self.resolve_sends(), title)
+            return self._compile_as(self.resolve_sends(), title, profile)
         title = title or self.name
         ident = _ident(title)
         outs = [n for n in self.nodes.values() if n["type"] == "Output"]
@@ -971,7 +974,7 @@ class Graph:
                     prev = Graph(self.to_json(), lib=self.lib, resolver=self.resolver)
                     o = prev.add("Output", gouts[0]["pos"])
                     prev.link(src[0], src[1], o, "color")
-                    return self._compile_as(prev, title)
+                    return self._compile_as(prev, title, profile)
         if len(outs) != 1:
             raise GraphError("the graph needs exactly one Output node" + (f" (it has {len(outs)})" if outs else ""))
         defs = {nid: self.node_def(n) for nid, n in self.nodes.items()}
@@ -1203,6 +1206,45 @@ class Graph:
             vals = ", ".join(f"{v}f" for v in self.live_init)
             state = (f"  GC_PARAM_TABLE float gc_param[{len(self.live_init)}] = {{{vals}}};   // the typed values (live in the sim)\n"
                      f"  GC_PARAMS(gc_param, {len(self.live_init)});\n") + state
+        # A profiling build (profile=True: the studio's "what each node costs" - never the
+        # firmware's): each node's code between two reads of a tick counter, the difference and
+        # a count summed into the node's slot; one more slot times two reads with nothing between
+        # (their own cost, taken off each node's), one the whole frame. Once a frame the sums go to
+        # the sim (simProfSet). prof_nodes: slot -> node id, the last two None. profile="frame"
+        # times the whole frame alone: two reads a frame, so its time is the effect's own (a
+        # node's reads overlap the work around them, so taking their cost off the instrumented
+        # frame took off about twice what they added).
+        self.prof_nodes = []
+        prof_head = prof_end = ""
+        if profile:
+            frame_only = profile == "frame"
+            slot_of, uses = {}, [0]
+
+            def timed(nid, text):
+                k = slot_of.setdefault(nid, len(slot_of))     # a node's late block shares its slot
+                uses[0] += 1
+                t = f"gc_pt{uses[0]}"
+                return (f"      const uint64_t {t} = gc_tick();\n" + text +
+                        f"      gc_prof[{k}] += gc_tick() - {t}; gc_prof_n[{k}]++;\n")
+            if not frame_only:
+                frame_blocks = [(nid, timed(nid, text)) for nid, text in frame_blocks]
+                pixel_blocks = [(nid, timed(nid, text)) for nid, text in pixel_blocks]
+            n = len(slot_of)
+            null, whole = n, n + 1
+            self.prof_nodes = [nid for nid, _ in sorted(slot_of.items(), key=lambda kv: kv[1])] + [None, None]
+
+            def nothing(tag):
+                return (f"      {{ const uint64_t gc_pn = gc_tick(); gc_prof[{null}] += gc_tick() - gc_pn; gc_prof_n[{null}]++; }}"
+                        f"   // {tag}: the reads' own cost\n")
+            if frame_blocks and not frame_only:
+                frame_blocks.insert(0, (None, nothing("once a frame")))
+            if pixel_blocks and not frame_only:
+                pixel_blocks.insert(0, (None, nothing("once a pixel")))
+            prof_head = (f"  static uint64_t gc_prof[{n + 2}]; static uint32_t gc_prof_n[{n + 2}];   // the profile's sums\n"
+                         f"  const uint64_t gc_pframe = gc_tick();\n")
+            prof_end = (f"  gc_prof[{whole}] += gc_tick() - gc_pframe; gc_prof_n[{whole}]++;\n"
+                        f"  for (int k_ = 0; k_ < {n + 2}; k_++) simProfSet(k_, (double)gc_prof[k_], (int)gc_prof_n[k_]);\n")
+
         # line_nodes: 1-based line of the text -> the node that wrote it. The blocks go in
         # where markers stand, frame first, so each block's line is counted in the final text.
         src = GENERATED.format(title=title, ident=ident, upper=ident.upper(), helpers=HELPERS,
@@ -1215,7 +1257,29 @@ class Graph:
                 self.line_nodes.update((at + k, nid) for k in range(n))
                 at += n
             src = src.replace(mark, "".join(text for _, text in blocks))
+        if profile:
+            # the profile's clock and sums around the effect's body (not in line_nodes: a
+            # profiling build is the studio's own, never shown for its errors)
+            src = src.replace("  (void)N; (void)dt; (void)t;\n", "  (void)N; (void)dt; (void)t;\n" + prof_head, 1)
+            end = "\n  FX_DONE;\n}\n\nstatic const char _data_FX_MODE_"
+            assert src.count(end) == 1
+            src = src.replace(end, "\n" + prof_end + "  FX_DONE;\n}\n\nstatic const char _data_FX_MODE_")
+            src = src.replace('#include "cube_fx_bank.h"\n', '#include "cube_fx_bank.h"\n' + PROFILE_HELPERS, 1)
         return src
+
+
+# A profiling build's clock and where its sums go (compile(profile=True)): the CPU's time-stamp
+# counter where there is one (a few cycles to read), else the steady clock; ticks, whatever their
+# unit - the studio takes shares of the frame, and the sim's simProfClock says ticks a second.
+PROFILE_HELPERS = r'''#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__)
+#include <x86intrin.h>
+static inline uint64_t gc_tick() { return __rdtsc(); }
+#else
+#include <chrono>
+static inline uint64_t gc_tick() { return (uint64_t)std::chrono::steady_clock::now().time_since_epoch().count(); }
+#endif
+extern "C" void simProfSet(int k, double ticks, int n);
+'''
 
 
 GENERATED = r'''#include "wled.h"

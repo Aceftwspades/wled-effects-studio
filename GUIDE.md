@@ -378,7 +378,15 @@ when it is working) and the frames a second on the device - and its
 brightness, contrast, unlit share and saturation; the effect's time, the
 device's (and how its speed factor was found) and the studio's own,
 split into its parts; the current asked for and allowed. The button
-again, or Esc, closes it. A **MIDI
+again, or Esc, closes it. Which node that time goes to: Node > **What each
+node costs** builds a timed copy of the graph beside the sim (the app's
+engine is left alone), runs it for a moment, and puts each node's share of
+the effect's own work and its time on the device (the speed factor's
+estimate) over its corner - a quarter or more in amber - until the graph is
+compiled again; the status line says the frame's and the top three, and how
+much is the rest (each pixel's coordinates, the drawing). The device's own
+proportions can differ (a division or a sine costs more there next to a
+multiply): read the shares as where the time goes. A **MIDI
 controller** (Window > MIDI controller...) puts its knobs on the
 sliders: pick the port ("Rescan" after plugging one in), pick what a knob
 should drive - a parameter slider, a check, the palette or the effect by
@@ -1002,6 +1010,7 @@ on and install what it carries.
 - **Node** › Connect selected `F`
 - **Node** › Swap the first two inputs `Alt+S`
 - **Node** › Label the node... `Shift+F2`
+- **Node** › What each node costs (on the device)
 - **Node › Show** › Collapse / expand `K`
 - **Node › Show** › Hide / show unwired pins `Ctrl+H`
 - **Node › Show** › Mute (pass through) `M`
@@ -1199,6 +1208,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Alt+S` | Swap a node's first two inputs | in the graph |
 | `Shift+F2` | Label the selected node | in the graph |
 | `Ctrl+J` | Put a Frame round the selection | in the graph |
+| `—` | Measure what each node costs, here and on the device | in the graph |
 | `Shift+R` | Repeat the last action | anywhere |
 | `Ctrl+P` | Command palette: every action and menu command by name | anywhere |
 | `Ctrl+Shift+K` | Snapshots: the graph's settings as named states | anywhere |

@@ -214,6 +214,14 @@ STEPS = [
       {"py": "app.gp._implicit_to_typed(None, None, (app._vz, 'pos'))"}], 0.6),
     ([{"check": "dpg.get_item_configuration(f'gin_{app._nz}_x_w')['format'] == 'position x'"},
       {"check": "not dpg.get_item_type(f'gin_{app._vz}_pos_w').endswith('Button') and 'pos' in app.gp.graph.nodes[app._vz]['inputs']"}], 0.2),
+    # what each node costs: a profiling build of the graph run in an engine of its own - each node then says its
+    # share of the frame and its time on the device, the status the frame's; compiled again, they are old
+    ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "app.gp.measure_costs()"}], 25.0),
+    ([{"check": "app.gp._costs and app.gp._costs['frame_ms'] > 0 and not app.building"},
+      {"check": "abs(sum(s for s, ms in app.gp._costs['nodes'].values()) + app.gp._costs['rest'] - 1.0) < 1e-6"},
+      {"check": "len(app.gp._cost_items) > 0"}, {"expect": ["messages", "on the device"]},
+      {"py": "app.gp.compile(False)"}], 0.5),
+    ([{"check": "app.gp._costs is None and not app.gp._cost_items"}], 0.3),
     # a wire that closes a loop (the Multiply of the time back into its own b) gets a Delay; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.on_link(None, (app.gp._pins[(11, 'out', 'result')], app.gp._pins[(11, 'in', 'b')]))"}], 1.0),
     ([{"expect": ["messages", "closed a loop"]}, {"py": "[n['type'] for n in app.gp.graph.nodes.values()].count('Delay')"}, {"graph_undo": True}], 0.5),

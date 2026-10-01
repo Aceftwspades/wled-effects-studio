@@ -213,6 +213,36 @@ def test_unwired_coordinates_read_the_pixel():
     assert g3.nodes[1]["inputs"] == g2.nodes[1]["inputs"] and g3.compile() == g2.compile()
 
 
+def test_a_profiling_build_times_each_node():
+    """compile(profile=True): every node's code between two tick reads summed into its slot,
+    a slot for the reads alone and one for the frame, handed to the sim once a frame; a
+    sub-graph's slots go to its node; the ordinary compile is the same text before and after."""
+    import re
+    g = G.starter("t", lib=LIB)
+    plain = g.compile()
+    src = g.compile(profile=True)
+    slots = list(g.prof_nodes)
+    assert g.compile() == plain and "gc_tick" not in plain and "simProfSet" not in plain and g.prof_nodes == []
+    n = len(slots) - 2
+    assert slots[-2:] == [None, None] and sorted(slots[:-2]) == sorted(
+        nid for nid, node in g.nodes.items() if not g.node_def(node).get("decor"))
+    for k in range(n):
+        assert f"gc_prof[{k}] += gc_tick() - gc_pt" in src
+    assert f"gc_prof[{n}] += gc_tick() - gc_pn" in src and f"gc_prof[{n + 1}] += gc_tick() - gc_pframe" in src
+    assert src.count("simProfSet(k_,") == 1 and "static uint64_t gc_prof[" in src
+    assert len(set(re.findall(r"const uint64_t (gc_pt\d+)", src))) == len(re.findall(r"const uint64_t gc_pt\d+", src))
+    # through a sub-graph: its nodes' slots are its node's
+    sub = G.Graph({"name": "inner"}, lib=LIB)
+    gi = sub.add("Graph input", (0, 0), {"name": "x", "type": "float"})
+    sn = sub.add("Noise", (100, 0)); go = sub.add("Graph output", (300, 0), {"name": "result", "type": "float"})
+    sub.link(gi, "value", sn, "x"); sub.link(sn, "value", go, "value")
+    g2 = G.Graph({"name": "t"}, lib=LIB, resolver=lambda name: {"inner": sub}.get(name))
+    c2 = g2.add("Coords", (0, 0)); s2 = g2.add(G.SUB + "inner", (100, 0)); p2 = g2.add("Palette", (300, 0)); o2 = g2.add("Output", (400, 0))
+    g2.link(c2, "u", s2, "x"); g2.link(s2, "result", p2, "index"); g2.link(p2, "color", o2, "color")
+    g2.compile(profile=True)
+    assert s2 in g2.prof_nodes and set(g2.prof_nodes[:-2]) <= set(g2.nodes)
+
+
 def test_unfold_a_sub_graph():
     """A sub-graph made from a selection, then unfolded: the same nodes and
     wires as before, the sub node gone, the C++ the same."""

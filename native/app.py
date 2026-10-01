@@ -3109,6 +3109,7 @@ class App(Features):
             "tutorial_tree": lambda: reader_ui.open_doc(self, "TUTORIAL.md", "Tutorial 2: a Christmas tree in 3-D"),
             "node_ref":     lambda: reader_ui.open_doc(self, "NODES.md"),
             "node_help":    gp.help_here,
+            "node_costs":   gp.measure_costs,
             "welcome":      lambda: reader_ui.show_welcome(self),
             "graph_room":   lambda: room.set_on(self, not room.on(self)),
             "graph_panel":  lambda: room.toggle_panel(self),

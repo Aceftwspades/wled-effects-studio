@@ -276,6 +276,7 @@ def build_menus(app):
             _mi(app, "Connect selected", "connect", callback=lambda: app.gp.connect_selected())
             _mi(app, "Swap the first two inputs", "swap_inputs", callback=lambda: app.gp.swap_inputs())
             _mi(app, "Label the node...", "label_node", callback=lambda: app.gp.label_selected())
+            _mi(app, "What each node costs (on the device)", "node_costs", callback=lambda: app.gp.measure_costs())
             with dpg.menu(label="Show"):
                 _mi(app, "Collapse / expand", "collapse", callback=lambda: app.gp.toggle_selected("collapsed"))
                 _mi(app, "Hide / show unwired pins", "hide_pins", callback=lambda: app.gp.toggle_selected("hide_pins"))
