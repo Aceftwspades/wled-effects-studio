@@ -175,14 +175,24 @@ def build(app):
         # LIVE: the sim's frames to the device as they are drawn, and the wiring test
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("LIVE", color=c.ACCENT))
-            dpg.add_checkbox(label="stream the sim to the device (DDP)", tag="live_on", default_value=False,
+            dpg.add_checkbox(label="stream the sim to the device", tag="live_on", default_value=False,
                              callback=lambda s, v: (app.stream_start(fps=int(dpg.get_value("live_fps").split()[0])) if v else app.stream_stop()))
             weight.need(dpg.last_item(), "stream")          # a device to stream to (or the stream running, to stop it)
             c.tip("whatever the sim shows - any effect, built or not - on the device as it is drawn; the device goes back to its own effect when this stops")
             form.inline("at")
             typeface.mono(dpg.add_combo(["15 fps", "30 fps", "60 fps"], tag="live_fps", width=px(96), default_value="30 fps",
                                         callback=lambda s, v: app.stream_start(fps=int(v.split()[0])) if getattr(app, "ddp", None) else None))
+            form.inline("over")
+            dpg.add_combo([p[1] for p in live_out.PROTOCOLS], tag="live_proto", width=px(120), default_value="DDP",
+                          callback=lambda s, v: app.set_stream_out(protocol=next(p[0] for p in live_out.PROTOCOLS if p[1] == v)))
+            c.tip("DDP: WLED takes it as it is. E1.31 (sACN) and Art-Net: 170 LEDs a universe from the first universe, for a "
+                  "WLED with that receiver on in its Sync settings (DMX mode Multiple RGB) or another pixel controller")
+            dpg.add_text("universe", tag="live_universe_label", color=form._dim())
+            typeface.mono(dpg.add_input_int(tag="live_universe", width=px(90), default_value=1, min_value=0, min_clamped=True,
+                                            callback=lambda s, v: app.set_stream_out(universe=int(v)), on_enter=True))
+        with dpg.group(horizontal=True):
             dpg.add_text("", tag="live_status", color=c.DIM)
+            dpg.add_simple_plot(tag="live_trace", default_value=[0.0], width=px(160), height=px(28), show=False)
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("WIRING TEST", color=c.ACCENT))
             dpg.add_combo(list(live_out.MODES), tag="wt_mode", width=px(120), default_value="off",
@@ -514,6 +524,17 @@ def refresh_live(app):
         dpg.set_value("live_on", on)
         if not on:
             dpg.set_value("live_status", "")
+            if dpg.does_item_exist("live_trace"):
+                dpg.configure_item("live_trace", show=False)
+    # the active device's protocol and first universe (a universe only where there are universes)
+    host = devices.clean_host(app.active_host()) if hasattr(app, "stream_out") else None
+    if host and dpg.does_item_exist("live_proto"):
+        proto, uni = app.stream_out(host)
+        dpg.set_value("live_proto", next(p[1] for p in live_out.PROTOCOLS if p[0] == proto))
+        dpg.set_value("live_universe", uni)
+        for tag in ("live_universe", "live_universe_label"):
+            if dpg.does_item_exist(tag):
+                dpg.configure_item(tag, show=proto != "ddp")
 
 
 def _wt_step(app, d):

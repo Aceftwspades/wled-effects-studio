@@ -4752,7 +4752,7 @@ SKIP_MENU = ("Quit", "Record 15 s GIF", "Record 15 s video", "Fullscreen", "Chec
              "Open the project folder", "Open the build folder",
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
-             "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device (DDP)",
+             "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device",
              "Import the device's ledmap", "Read the device's wiring")   # these reach a real device: not a test's to do (a read replaces the wiring)
 
 

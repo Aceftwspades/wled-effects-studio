@@ -85,6 +85,9 @@ class FakeWled:
         self.pending = None                              # (id, object, is_api_call)
         self.ddp_packets = self.ddp_frames = 0
         self.ddp_last = b""                              # the last whole frame streamed (its packets put together at their offsets)
+        # E1.31 (sACN) on 5568 and Art-Net on 6454: packets counted, each universe's latest data kept
+        self.e131_packets = self.artnet_packets = 0
+        self.e131_univ, self.artnet_univ = {}, {}
         self.live_until = 0.0
         self.log = []
         self._lock = threading.Lock()
@@ -256,7 +259,43 @@ class FakeWled:
         threading.Thread(target=self._srv.serve_forever, daemon=True).start()
         threading.Thread(target=self._loop, daemon=True).start()
         threading.Thread(target=self._ddp, daemon=True).start()
+        threading.Thread(target=self._udp, args=(5568, self._e131_packet), daemon=True).start()
+        threading.Thread(target=self._udp, args=(6454, self._artnet_packet), daemon=True).start()
         return self
+
+    def _udp(self, port, take):
+        """A listener on 127.0.0.1:port handing each packet to take() under the lock."""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", port)); s.settimeout(0.5)
+        except OSError:
+            return
+        while self._srv is not None:
+            try:
+                d, _ = s.recvfrom(4096)
+            except socket.timeout:
+                continue
+            with self._lock:
+                take(d)
+        s.close()
+
+    def _e131_packet(self, d):
+        """An E1.31 data packet: its root layer's ID, its universe (bytes 113-114) and its DMX data after
+        the start code (byte 125), as long as its property count says."""
+        if len(d) < 126 or d[4:16] != b"ASC-E1.17\x00\x00\x00":
+            return
+        n = int.from_bytes(d[123:125], "big") - 1
+        self.e131_packets += 1
+        self.e131_univ[int.from_bytes(d[113:115], "big")] = bytes(d[126:126 + n])
+        self.live_until = time.time() + 2.5
+
+    def _artnet_packet(self, d):
+        """An ArtDMX packet: "Art-Net", OpDmx (0x5000, low byte first), the port-address (SubUni, Net) and its data."""
+        if len(d) < 18 or d[:8] != b"Art-Net\x00" or d[8:10] != b"\x00P":
+            return
+        n = int.from_bytes(d[16:18], "big")
+        self.artnet_packets += 1
+        self.artnet_univ[d[14] | (d[15] << 8)] = bytes(d[18:18 + n])
+        self.live_until = time.time() + 2.5
 
     def _ddp(self):
         try:

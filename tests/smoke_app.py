@@ -621,6 +621,15 @@ STEPS = [
       {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),
     ([{"check": "app._stream_wiring is not None and app.stream_order() == 'logical'"},
       {"expect": ["messages", "in the device's own order"]}, {"stream": False}], 1.0),
+    # the stream in E1.31 (sACN) from universe 3, then Art-Net from 0, kept for the device - each restarts it, the
+    # health line names it and its rate (the fake keeps every universe: checked at the end), then back to DDP
+    ([{"device": "127.0.0.1:8770"}, {"py": "app.set_stream_out(protocol='e131', universe=3)"}, {"stream": "127.0.0.1:8770"}], 2.5),
+    ([{"check": "type(app.ddp).__name__ == 'E131Out' and app.ddp.universe == 3 and app.stream_out('127.0.0.1:8770') == ('e131', 3)"},
+      {"expect": ["live_status", "E1.31 (sACN):"]}, {"expect": ["live_status", "fps sent"]},
+      {"py": "app.set_stream_out(protocol='artnet')"}], 2.5),
+    ([{"check": "type(app.ddp).__name__ == 'ArtNetOut' and app.ddp.universe == 0"}, {"expect": ["live_status", "Art-Net:"]},
+      {"py": "app.set_stream_out(protocol='ddp')"}, {"stream": False}], 1.0),
+    ([{"check": "app.ddp is None and app.stream_out('127.0.0.1:8770')[0] == 'ddp'"}], 0.2),
     # every send to a device, against the fake WLED: the script, the settings, the shape, the ledmap
     ([{"frame": "devices"}, {"device": "127.0.0.1:8770"}, {"scan": "all"}], 6.0),
     ([{"layout": "graph"}, {"graph_open": "fan.json"}, {"py": "app.send_script()"}], 6.0),
@@ -839,6 +848,8 @@ def main():
         shutil.rmtree(os.path.join(ROOT, "projects", "smoke_bad"), ignore_errors=True)    # the one with the broken project.json
     text = open(LOG, encoding="utf-8", errors="replace").read()
     ddp.stop()
+    print(f"e1.31: {ddp.e131_packets} packets, universes {sorted(ddp.e131_univ)[:3]}...; "
+          f"art-net: {ddp.artnet_packets} packets, universes {sorted(ddp.artnet_univ)[:3]}...")
     print(f"ddp: {ddp.ddp_packets} packets, {ddp.ddp_frames} frames received from the stream; "
           f"the fake got {len(ddp.files)} file(s), {len(ddp.presets) - 1} preset(s), {len(ddp.cfg['timers']['ins'])} timer(s)")
     bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l
@@ -850,6 +861,12 @@ def main():
                    "a buffered stdout, the wrong exe, or STUDIO_REMOTE_CONTROL not reaching it")
     if ddp.ddp_frames < 10:
         bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
+    # the cube's net in logical order, 6912 bytes, is 14 universes of 510 (the last 282): from 3 in E1.31, from 0 in Art-Net
+    for name, univ, first in (("E1.31", ddp.e131_univ, 3), ("Art-Net", ddp.artnet_univ, 0)):
+        if sorted(univ) != list(range(first, first + 14)):
+            bad.append(f"the {name} stream's universes were {sorted(univ)}; {first}..{first + 13} expected")
+        elif sum(len(univ[u]) for u in univ) != 48 * 48 * 3:
+            bad.append(f"the {name} stream's universes held {sum(len(univ[u]) for u in univ)} bytes; {48 * 48 * 3} expected")
     if len(ddp.ddp_last) != 48 * 48 * 3:                 # the cube's whole net, in logical order - not its 1280 LEDs in wiring order
         bad.append(f"the last streamed frame was {len(ddp.ddp_last)} bytes; the 48 x 48 cube in logical order is {48 * 48 * 3}")
     bad += [l for l in text.splitlines() if "EXPECT FAILED" in l]

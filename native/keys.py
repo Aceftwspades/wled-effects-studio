@@ -67,7 +67,7 @@ ACTIONS = [
     ("push",          "Send the current effect's settings to the device",     "Ctrl+Shift+P", "global"),
     ("script_preview", "Run the graph as a script (what the device would run)", "Ctrl+Shift+R", "global"),
     ("script_send",   "Send the graph to the device as a script",             "Ctrl+Shift+D", "global"),
-    ("stream",        "Stream the sim to the device (DDP), on / off",         "Ctrl+Shift+T", "global"),
+    ("stream",        "Stream the sim to the device, on / off",               "Ctrl+Shift+T", "global"),
     # the frames (Device and View menus): each floats over the panes or docks into them
     ("devices",       "Devices on the network",                              "Ctrl+Shift+N", "global"),
     ("send_frame",    "Send to device: the effects, a script, the shape",    "Ctrl+Shift+S", "global"),

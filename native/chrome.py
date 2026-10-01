@@ -170,7 +170,7 @@ def build_menus(app):
                 pass
             dpg.add_menu_item(label="Scan the network for devices", callback=lambda: (device_ui.show(app, "devices"), app.scan_devices("all")))
             dpg.add_separator()
-            _mi(app, "Stream the sim to the device (DDP)", "stream", check=True, tag="menu_stream", default_value=False,
+            _mi(app, "Stream the sim to the device", "stream", check=True, tag="menu_stream", default_value=False,
                 callback=lambda s, a: app.stream_start() if a else app.stream_stop())
             _mi(app, "Send the graph as a script", "script_send", callback=lambda: app.send_script())
             _mi(app, "Send the current effect's settings", "push", callback=lambda: app.push_settings())
@@ -495,7 +495,7 @@ def build_toolbar(app):
 TOOLBAR_FRAMES = (("devices", "devices", "Devices", "Devices on the network", "devices"),
                   ("flash", "flash", "Flash", "Build the firmware and flash the device", "flash"),
                   ("send", "send", "Send", "Send to the device: the effects, a script, the shape", "send_frame"),
-                  (None, "stream", "Stream", "Stream the sim to the device (DDP)", "stream"),
+                  (None, "stream", "Stream", "Stream the sim to the device (DDP, E1.31 or Art-Net)", "stream"),
                   ("|", "", "", "", ""),
                   ("shape", "shape", "Shape", "Shape editor", "shape"),
                   ("sequence", "sequence", "Sequence", "Sequence: presets, a playlist and the schedule", "sequence"),

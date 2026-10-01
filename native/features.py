@@ -667,18 +667,70 @@ class Features:
             self._transition = None
 
     # --- live output: the sim's frames to the device, and the wiring test ------------
+    def stream_out(self, host):
+        """How the stream reaches this device: (protocol, first universe) - DDP unless the device
+        was set to E1.31 (sACN) or Art-Net (the LIVE row), kept with the app's settings by host."""
+        o = (self.prefs.get("stream_out") or {}).get(host) or {}
+        proto = o.get("protocol") if o.get("protocol") in [p[0] for p in live_out.PROTOCOLS] else "ddp"
+        start = next(p[2] for p in live_out.PROTOCOLS if p[0] == proto)
+        return proto, int(o.get("universe", start if start is not None else 0))
+
+    def set_stream_out(self, protocol=None, universe=None):
+        """The active device's stream protocol or first universe, kept; a running stream restarts on it."""
+        host = devices.clean_host(self.active_host())
+        if not host:
+            return
+        proto, uni = self.stream_out(host)
+        if protocol is not None and protocol != proto:
+            proto = protocol
+            start = next(p[2] for p in live_out.PROTOCOLS if p[0] == proto)
+            uni = start if start is not None else 0     # a new protocol starts where its universes do
+        if universe is not None:
+            uni = int(universe)
+        self.prefs.setdefault("stream_out", {})[host] = {"protocol": proto, "universe": uni}
+        save_prefs(self.prefs)
+        device_ui.refresh_live(self)
+        d = getattr(self, "ddp", None)
+        if d is not None:
+            self.stream_start(host, fps=self._ddp_fps)
+
     def stream_start(self, host=None, fps=30):
-        """The sim's frames to the device over DDP as they are drawn."""
+        """The sim's frames to the device as they are drawn, over DDP, E1.31 or Art-Net."""
         host = devices.clean_host(host or self.active_host())
         if not host:
             device_ui.show(self, "devices"); self.gp.status("choose a device first"); return False
         self.stream_stop()
-        self.ddp = live_out.DdpOut(host)
+        proto, uni = self.stream_out(host)
+        self.ddp = live_out.make_out(proto, host, uni)
         self._ddp_fps = max(1.0, float(fps))
         self._ddp_next = 0.0
+        self._stream_status_at = 0.0
+        self._stream_dev = None                         # (the device's fps, its answer in ms), every 2 s while this runs
+        self._stream_trace = []                         # a second at a time: the frames sent, the device's fps
         self._stream_wiring = None                     # until the device says: WLED's default, its own map applied (logical order)
-        self.gp.status(f"streaming to {host} over DDP at {int(fps)} fps - the device shows the sim while this runs")
+        if proto == "ddp":
+            self.gp.status(f"streaming to {host} over DDP at {int(fps)} fps - the device shows the sim while this runs")
+        else:
+            n = -(-len(live_out.stream_bytes(self.frame_rgb(), self.project.geometry, "logical")) // live_out.UNIVERSE_BYTES)
+            self.gp.status(f"streaming to {host} over {self.ddp.NAME}, universes {uni}..{uni + max(1, n) - 1}, at {int(fps)} fps - "
+                           f"the device needs {self.ddp.NAME.split()[0]} on in its Sync settings from universe {uni}, "
+                           "170 LEDs a universe (WLED: DMX mode Multiple RGB)")
         device_ui.refresh_live(self)
+        d = self.ddp
+
+        def watch():
+            """The device's own fps and how long it takes to answer, while this stream runs."""
+            while getattr(self, "ddp", None) is d:
+                t0 = time.perf_counter()
+                try:
+                    st = devices.state(host, timeout=2.0)
+                except Exception:
+                    st = None
+                if getattr(self, "ddp", None) is not d:
+                    break
+                self._stream_dev = ((st or {}).get("fps"), (time.perf_counter() - t0) * 1000.0 if st else None)
+                time.sleep(2.0)
+        threading.Thread(target=watch, daemon=True).start()
 
         def ask():
             from native import device_wiring
@@ -777,8 +829,26 @@ class Features:
         own = getattr(self, "_map_frame", None)      # mapping by camera: the plan's own frame, by the device's LED numbers
         d.send(self.stream_of_physical(own) if own is not None
                else live_out.stream_bytes(self.frame_rgb(), self.project.geometry, self.stream_order()))
-        if dpg.does_item_exist("live_status") and d.frames % 15 == 0:
-            dpg.set_value("live_status", f"{d.frames} frames, {d.bytes // 1024} KB sent" + (f"; {d.errors} send errors: {d.last_error}" if d.errors else ""))
+        if now - getattr(self, "_stream_status_at", 0.0) >= 1.0:
+            self._stream_status_at = now
+            fps, kbps = d.rate()
+            dev = getattr(self, "_stream_dev", None)
+            trace = getattr(self, "_stream_trace", [])
+            trace.append((fps, float(dev[0]) if dev and dev[0] is not None else 0.0))
+            del trace[:-60]
+            self._stream_trace = trace
+            if dpg.does_item_exist("live_status"):
+                words = f"{d.NAME}: {fps:.0f} of {self._ddp_fps:.0f} fps sent, {kbps:,.0f} kbit/s"
+                if dev and dev[0] is not None:
+                    words += f"; the device shows {dev[0]:.0f} fps, answers in {dev[1]:.0f} ms"
+                elif dev:
+                    words += "; the device does not answer"
+                if d.errors:
+                    words += f"; {d.errors} send errors: {d.last_error}"
+                dpg.set_value("live_status", words)
+            if dpg.does_item_exist("live_trace"):
+                dpg.set_value("live_trace", [t[0] for t in trace] or [0.0])
+                dpg.configure_item("live_trace", overlay=f"sent fps, last {len(trace)} s", show=True)
 
     def wiring_start(self, mode="chase"):
         """The wiring test: playback pauses and the pattern takes the buffer."""

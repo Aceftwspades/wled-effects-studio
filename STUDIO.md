@@ -2955,9 +2955,25 @@ most valuable first:
       `test_the_profile_finds_the_heavy_node` (a six-octave Noise over five
       times an Add, the shares and the rest the whole frame, the twin's
       frame under the instrumented one), the smoke's measurement of box_fire.
-- [ ] **sACN and Art-Net out beside DDP, and the stream's health**: sent
-      against target fps, kbit/s, the device's reported fps, its latency,
-      frames dropped, each with a trace.
+- [x] **sACN and Art-Net out beside DDP, and the stream's health.** The
+      LIVE row's **over** picks DDP, **E1.31 (sACN)** or **Art-Net** for the
+      device (kept by host in the app's settings), and a **universe**: 510
+      bytes of RGB, 170 LEDs, a universe from it up - a WLED with that
+      receiver on in its Sync settings (DMX mode Multiple RGB), or a Falcon,
+      ESPixelStick or FPP controller (`live_out.E131Out`: the three layers
+      as E1.31 lays them out, a sequence for each universe; `ArtNetOut`:
+      ArtDMX, the port-address in SubUni and Net, an even length). Changing
+      it restarts a running stream. Under the row, once a second: the
+      frames sent against the rate asked, the kbit/s, the device's own fps
+      and how long it takes to answer (asked every two seconds while the
+      stream runs), the send errors, and a trace of the rate. The labels lost
+      "(DDP)" - the menu walk's skip list with them, so it still never
+      streams to a device. Tested: `test_stream.py` (each packet field
+      against its standard, a 1200-pixel frame through eight universes and
+      back on a socket here, in all three, the sequences, the rate); the
+      fake WLED takes E1.31 and Art-Net too, and the smoke streams to it in
+      each and checks the 14 universes of the cube's net, from 3 and from 0,
+      held the frame's 6912 bytes.
 - [ ] **Scenes with fades on the device**: the snapshots (which already
       morph in the studio) compiled into the effect, one picked by a
       signal - a verse look and a chorus look in one effect.
