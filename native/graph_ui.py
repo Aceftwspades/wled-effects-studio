@@ -3115,17 +3115,21 @@ class GraphPanel(Glyphs):
             names.append(pair_words.get(p["name"]) or nodeface.label(type_, p["name"]))
         if not names:
             return 0
-        return min(int(width * 0.5), int(max(self.text_w(nm) for nm in names) + 0.999) + 2 * self._gap() + 1)
+        return min(int(width * 0.5), int(max(self.text_w(nm) for nm in names) + 0.999) + 2 * self._gap() + 1 + max(2, self.px(3)))   # _lead's margin
 
     def _lead(self, name, col, tag=None):
         """A field's name in the row open now, and the space that brings
         the field to the node's column."""
         import math
         g = self._gap()
-        shown = name if self.text_w(name) <= col - 2 * g - 1 else nodeface.fit_width(name, max(1, col - 2 * g - 1), self.text_w)
+        # a margin for the measure: a face on Linux or macOS draws a name a pixel or two wider than
+        # it measures, and the field after it was pushed past the node's edge (the gallery test)
+        m = min(max(2, self.px(3)), max(0, col - 2 * g - 1 - math.ceil(self.text_w(name))))   # never a name cut for it
+        room = col - 2 * g - 1 - m
+        shown = name if self.text_w(name) <= room else nodeface.fit_width(name, max(1, room), self.text_w)
         kw = {"tag": tag} if tag else {}
         t = dpg.add_text(shown, **kw)
-        pad = col - 2 * g - math.ceil(self.text_w(shown))
+        pad = col - 2 * g - m - math.ceil(self.text_w(shown))
         if pad >= 1:
             dpg.add_spacer(width=pad)
         return t
