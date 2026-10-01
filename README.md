@@ -14,7 +14,8 @@ script, as its settings, or flashed into the firmware.
 
 **[aceftwspades.github.io/wled-effects-studio](https://aceftwspades.github.io/wled-effects-studio/)**
 is the lightweight Cube FX Simulator: WLED's stock effects on a simulated
-cube, with palettes, parameters and synthetic audio. It is only the preview.
+cube, matrix, cylinder, sphere or torus (up to 192x192 pixels), with
+palettes, parameters and synthetic audio. It is only the preview.
 The node-graph composer, the C++ editor, the other geometries, usermod export
 and sending to a device are in the desktop app below.
 
