@@ -1200,6 +1200,8 @@ def compile_script(graph):
                 result = L.select(L.f2("GE", x, ("k", xa)), seg, result)
             values[(nid, "result")] = result
             continue
+        if d.get("noscript"):
+            raise ScriptError(f"{label}: not scriptable ({d['noscript']})")
         if d.get("codegen") or d.get("field") or d.get("fields"):
             raise ScriptError(f"{label}: not scriptable ({'per-pixel fields' if not d.get('codegen') else 'a table the device cannot hold'})")
         # (Expression and Colour expression go through like any node since 1.4.0: their text is C, and what

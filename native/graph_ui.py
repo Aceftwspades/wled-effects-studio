@@ -4771,7 +4771,11 @@ class GraphPanel(Glyphs):
         self.graph.take_snapshot(name)
         self.save()
         self.refresh_snapshots()
-        self.status(f"snapshot {name!r}: {len(self.graph.nodes)} node(s) kept")
+        scenes = any(n["type"] == "Scenes" for n in self.graph.nodes.values())
+        if scenes:
+            self.touch()                                 # the Scenes node's table is made when the graph compiles
+        self.status(f"snapshot {name!r}: {len(self.graph.nodes)} node(s) kept"
+                    + (" - build to put it in the Scenes node's table" if scenes else ""))
 
     def snapshot_apply(self, name, other=None, t=0.0, live=True):
         """A snapshot (or the morph between two) onto the graph: typed

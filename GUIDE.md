@@ -277,6 +277,12 @@ node's wires turns it off; focus mode, `/`, dims the other nodes too).
 **Snapshots**
 (Ctrl+Shift+K) keep the whole graph's settings as named states - save
 the look you have, bring one back, morph between two with a slider. A
+**Scenes** node takes them to the device: the snapshots' values for the
+pins (what a drag or a knob moves - a node's settings stay as built) go
+into the effect as a table, and its **index** picks one, faded to over
+its **fade** seconds - a Counter on the beat steps a verse look into a
+chorus look a bar at a time. Build after saving a snapshot: the table is
+made when the graph compiles. A
 node's menu can
 **change its type** (the wires stay where they fit), **reset its
 settings**, and **unfold** a sub-graph node back into its nodes; with

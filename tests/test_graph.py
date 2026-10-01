@@ -243,6 +243,55 @@ def test_a_profiling_build_times_each_node():
     assert s2 in g2.prof_nodes and set(g2.prof_nodes[:-2]) <= set(g2.nodes)
 
 
+def scenes_graph():
+    """Time over a Threshold at 1 s into a Scenes node's index; an Add of two typed values (0 and b)
+    into a Palette; snapshots "verse" (b 0) and "chorus" (b 1), then b typed to 0.7, neither."""
+    g = starter()
+    t = g.add("Time", (0, 0)); th = g.add("Threshold", (150, 0)); g.link(t, "t", th, "x"); g.nodes[th]["inputs"] = {"at": 1.0}
+    s = g.add("Scenes", (300, 0)); g.link(th, "value", s, "index"); g.nodes[s]["inputs"] = {"fade": 0.5}
+    a = g.add("Add", (0, 200)); p = g.add("Palette", (200, 200)); o = g.add("Output", (400, 200))
+    g.link(a, "result", p, "index"); g.link(p, "color", o, "color")
+    g.nodes[a]["inputs"] = {"a": 0.0, "b": 0.0}; g.take_snapshot("verse")
+    g.nodes[a]["inputs"] = {"a": 0.0, "b": 1.0}; g.take_snapshot("chorus")
+    g.nodes[a]["inputs"] = {"a": 0.0, "b": 0.7}
+    return g, {"s": s, "a": a}
+
+
+def test_scenes_are_the_snapshots_in_the_effect():
+    """The Scenes node's table holds each snapshot's value for every typed pin but its own (a scene
+    must not rewrite the index that picked it); the typed-value table is writable only then; one
+    Scenes node a graph; a sub-graph's copy keeps the snapshots; the script says why it cannot."""
+    from native.script import compile_script, ScriptError
+    import re
+    g, k = scenes_graph()
+    src = g.compile()
+    m = re.search(r"static const float sc_tab_\[2\]\[(\d+)\] = \{(.*?)\};", src)
+    assert m, src[src.index("Scenes"):][:400]
+    slots = [i for i, (nid, pin, comp) in g.live.items() if nid != k["s"]]
+    assert int(m.group(1)) == len(slots) and all(g.live[i][0] != k["s"] for i in slots)
+    b = next(i for i in slots if g.live[i][:2] == (k["a"], "b"))
+    rows = [[float(x.rstrip("f")) for x in r.strip("{} ").split(",")] for r in re.findall(r"\{[^{}]*\}", m.group(2))]
+    assert [r[slots.index(b)] for r in rows] == [0.0, 1.0]
+    assert "static float gc_param[" in src and "GC_PARAM_TABLE float gc_param" not in src
+    g.remove(k["s"])
+    assert "GC_PARAM_TABLE float gc_param" in g.compile() and "sc_tab_" not in g.compile()
+    g, k = scenes_graph()
+    g.nodes[k["s"]]["params"]["scenes"] = "chorus"
+    assert g.scene_names(g.nodes[k["s"]]) == ["chorus"] and "// Scenes: chorus" in g.compile()
+    two = g.add("Scenes", (500, 0))
+    try:
+        g.compile(); assert False, "two Scenes nodes compiled"
+    except G.GraphError as e:
+        assert "one Scenes node a graph" in str(e)
+    g.remove(two)
+    try:
+        compile_script(g); assert False, "the Scenes node scripted"
+    except ScriptError as e:
+        assert "writes the graph's own typed values" in str(e)
+    g.snapshots = {}
+    assert "// Scenes: no snapshots - nothing to fade" in g.compile()
+
+
 def test_unfold_a_sub_graph():
     """A sub-graph made from a selection, then unfolded: the same nodes and
     wires as before, the sub node gone, the C++ the same."""

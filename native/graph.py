@@ -814,6 +814,7 @@ class Graph:
         flat.nodes = {}
         flat.link_meta = dict(self.link_meta)
         flat.origin = {}          # a node here -> the node of this graph it came from (a sub-graph's: its instance)
+        flat.snapshots = dict(self.snapshots)    # a Scenes node's table: the plain nodes keep their ids
         idmap = {}
         # plain nodes first, keeping ids where possible
         for nid, n in self.nodes.items():
@@ -933,6 +934,50 @@ class Graph:
                 slots[nid] = nstate
                 nstate += len(st) if isinstance(st, (list, tuple)) else int(st)
         return order, defs, scope, src_of, slots, nstate
+
+    def scene_names(self, node=None):
+        """The snapshots a Scenes node fades between, in order: those its setting names (comma
+        separated), else every snapshot as they were made."""
+        want = str(((node or {}).get("params") or {}).get("scenes", "") or "").strip()
+        if want:
+            return [s.strip() for s in want.split(",") if s.strip() in self.snapshots]
+        return list(self.snapshots)
+
+    def _scenes_code(self, node):
+        """The Scenes node's body: a table of each scene's value for the slots of the typed-value
+        table (gc_param) - all but its own index and fade, which a scene must not rewrite - and the
+        fade to the scene the index picks: an S-curve over fade seconds from wherever the values
+        were, a switch (0 or 1) crossing at the middle; once there, the values are left alone, so a
+        drag or a knob in the sim holds until the next change."""
+        names = self.scene_names(node)
+        ks = [k for k in range(len(self.live_init)) if self.live[k][0] != node.get("id")]
+        if not names or not ks:
+            why = "no snapshots" if not names else "no typed values"
+            return f"// Scenes: {why} - nothing to fade"
+        rows = []
+        for name in names:
+            snap = self.snapshots.get(name) or {}
+            row = []
+            for k in ks:
+                nid, pin, comp = self.live[k]
+                v = ((snap.get(str(nid)) or {}).get("inputs") or {}).get(pin)
+                row.append(_scene_value(v, comp, self.live_init[k]))
+            rows.append("{" + ", ".join(f"{x}f" for x in row) + "}")
+        n, m = len(names), len(ks)
+        return (f"// Scenes: {', '.join(names)}\n"
+                f"static const float sc_tab_[{n}][{m}] = {{{', '.join(rows)}}};\n"
+                f"static const uint16_t sc_k_[{m}] = {{{', '.join(str(k) for k in ks)}}};   // the slots they fill\n"
+                f"static float sc_from_[{m}]; static float sc_tgt_ = -1.0f, sc_t_ = 1.0f; static bool sc_moving_ = false;\n"
+                f"{{ const float w_ = fminf(fmaxf(floorf(sc_index_ + 0.5f), 0.0f), {float(n - 1)}f);\n"
+                f"  if (SEGENV.call == 0 || sc_tgt_ < 0.0f) {{ sc_tgt_ = w_; sc_t_ = 1.0f; sc_moving_ = true; }}   // the start: at once\n"
+                f"  else if (w_ != sc_tgt_) {{ for (int m_ = 0; m_ < {m}; m_++) sc_from_[m_] = gc_param[sc_k_[m_]];\n"
+                f"    sc_tgt_ = w_; sc_t_ = 0.0f; sc_moving_ = true; }}\n"
+                f"  if (sc_moving_) {{\n"
+                f"    if (sc_t_ < 1.0f) {{ sc_t_ += (float)dt * 0.001f / fmaxf(sc_fade_, 0.001f); if (sc_t_ > 1.0f) sc_t_ = 1.0f; }}\n"
+                f"    const float e_ = sc_t_ * sc_t_ * (3.0f - 2.0f * sc_t_); const float *to_ = sc_tab_[(int)sc_tgt_];\n"
+                f"    for (int m_ = 0; m_ < {m}; m_++) gc_param[sc_k_[m_]] = sc_t_ >= 1.0f ? to_[m_] : sc_from_[m_] + (to_[m_] - sc_from_[m_]) * e_;\n"
+                f"    if (sc_t_ >= 1.0f) sc_moving_ = false; }}\n"
+                f"  sc_scene_ = sc_tgt_; sc_blend_ = sc_t_; }}")
 
     def _compile_as(self, other, title, profile=False):
         """Compile a derived graph (flattened, sends joined, an Output added
@@ -1152,6 +1197,10 @@ class Graph:
                     out += f"      {guard}GC_PROBE({k}, (float)({var(nid, o['name'])}));\n"
             return out
 
+        scenes = [nid for nid in order if self.nodes[nid]["type"] == "Scenes"]
+        if len(scenes) > 1:
+            raise GraphError(f"Scenes #{scenes[1]}: one Scenes node a graph (#{scenes[0]} is one)")
+
         # each node's text kept with its id, so a line of the C++ can be traced to the node
         # that wrote it (line_nodes, below): a build error lands on the node, not on a line
         # of a file nobody wrote by hand
@@ -1159,6 +1208,12 @@ class Graph:
         frame_blocks += [(nid, expand(nid, late=True)) for nid in order if defs[nid].get("late")]
         pixel_blocks = [(nid, expand(nid) + probe(nid, "if (px == W / 2 && py == H / 2) "))
                         for nid in order if scope[nid] == "pixel"]
+        if scenes:
+            # the table and the fade go where the Scenes node's marker is, now that every typed
+            # value has its slot in the table (live_slot, above)
+            code = self._scenes_code(self.nodes[scenes[0]])
+            frame_blocks = [(nid, t.replace("/*@@SCENES@@*/", code.replace("\n", "\n      "))) for nid, t in frame_blocks]
+            pixel_blocks = [(nid, t.replace("/*@@SCENES@@*/", code.replace("\n", "\n      "))) for nid, t in pixel_blocks]
 
         # metadata: slider labels from the control nodes that are present
         labels = ["", "", "", "", "", "", "", ""]
@@ -1204,7 +1259,8 @@ class Graph:
             state += "  (void)gc_first;\n"
         if self.live_init:
             vals = ", ".join(f"{v}f" for v in self.live_init)
-            state = (f"  GC_PARAM_TABLE float gc_param[{len(self.live_init)}] = {{{vals}}};   // the typed values (live in the sim)\n"
+            table = ("static float gc_param" if scenes else "GC_PARAM_TABLE float gc_param")   # the scenes write it: RAM
+            state = (f"  {table}[{len(self.live_init)}] = {{{vals}}};   // the typed values (live in the sim)\n"
                      f"  GC_PARAMS(gc_param, {len(self.live_init)});\n") + state
         # A profiling build (profile=True: the studio's "what each node costs" - never the
         # firmware's): each node's code between two reads of a tick counter, the difference and
@@ -1371,6 +1427,24 @@ for _t, _v, _pins in (("Dot 3", "a", ("ax", "ay", "az")), ("Dot 3", "b", ("bx", 
     for _c, _p in zip("xyz", _pins):
         MIGRATE[(_t, _p)] = (_v, _c)
 MIGRATE_OUT = {("Mirror fold", "x"): ("v", "x"), ("Mirror fold", "y"): ("v", "y"), ("Mirror fold", "z"): ("v", "z")}
+
+
+def _scene_value(v, comp, built):
+    """A snapshot's value for one slot of the typed-value table: a number, a switch's 1 or 0, a
+    vector's component or a colour's channel (0..255, from [r, g, b] or a packed 0xRRGGBB); what the
+    snapshot does not hold is the built value."""
+    try:
+        if v is None:
+            return float(built)
+        if isinstance(v, bool):
+            return 1.0 if v else 0.0
+        if comp is None:
+            return float(v)
+        if isinstance(v, (list, tuple)):
+            return float(v[comp])
+        return float((int(v) >> (16 - 8 * int(comp))) & 255)
+    except (TypeError, ValueError, IndexError):
+        return float(built)
 
 
 def migrate(g):

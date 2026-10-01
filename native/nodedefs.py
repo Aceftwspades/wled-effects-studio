@@ -227,6 +227,19 @@ LIBRARY = [
             "$out.value = $st.peak;",
             "up at once to each new peak, held for hold ms, then down fall a second - a VU meter's falling bar"),
          state=["peak", "age"]),
+    # Scenes on the device (wled-toy's Scene Switch, compiled in): the graph's snapshots (Snapshots,
+    # Ctrl+Shift+K) - the typed values of its pins, what a drag or a knob moves - kept in the effect as
+    # a table, and the one index picks faded to over fade seconds: a verse look and a chorus look in
+    # one effect, the beat's Counter or a slider choosing. Settings are the build's (they are
+    # compiled in); a snapshot without a pin's value leaves it as built. The compiler writes the
+    # table and the fade where the marker is (graph.py, _scenes_code).
+    dict(_n("Scenes", "signals", "frame", [("index", F, 0.0), ("fade", F, 1.0)], [("scene", F), ("blend", F)],
+            [_p("scenes", "text", "")],
+            "{ const float sc_index_ = $in.index, sc_fade_ = $in.fade; float sc_scene_ = 0.0f, sc_blend_ = 1.0f;\n"
+            "  /*@@SCENES@@*/\n"
+            "  $out.scene = sc_scene_; $out.blend = sc_blend_; }",
+            "the graph's snapshots as scenes: the one index picks, faded to over fade seconds"),
+         noscript="it writes the graph's own typed values, which the script cannot reach"),
     # A straight glide: x followed no faster than up a second rising and down a second falling (Ease and
     # Envelope glide in curves over a time; this one in lines, at a speed).
     dict(_n("Slew", "signals", "frame", [("x", F, 0.0), ("up", F, 2.0), ("down", F, 1.0)], [("value", F)], [],
@@ -302,18 +315,19 @@ LIBRARY = [
             "    S_[18] = flux_; $out.strength = gc_sat(flux_ * 4.0f); }\n"
             "}",
             "a hit anywhere in the sound - the bands' rise against its recent mean - true for a frame, and how big the rise is"),
-         state=20),
+         state=20, noscript="it reads the sound its own way; the script reads it only as the Audio and FFT bin nodes do"),
     # The sound's colour from the sixteen bands: brightness is where its weight sits, 0 all bass .. 1
     # all treble (the bands' centre of mass - they are log-spaced, so the spectral centroid on a log
     # axis); noisiness is how flat it is, 0 for a tone .. 1 for a hiss (the bands' geometric over
     # arithmetic mean, the spectral flatness). Both 0 in silence.
-    _n("Timbre", "signals", "frame", [], [("brightness", F), ("noisiness", F)], [],
+    dict(_n("Timbre", "signals", "frame", [], [("brightness", F), ("noisiness", F)], [],
        "{ um_data_t *um_ = cfx_getAudioData(); const uint8_t *fft_ = (const uint8_t *)um_->u_data[2];\n"
        "  float tot_ = 0.0f, w_ = 0.0f, lg_ = 0.0f;\n"
        "  for (int i_ = 0; i_ < 16; i_++) { const float p_ = (float)fft_[i_] * (1.0f / 255.0f); tot_ += p_; w_ += p_ * (float)i_; lg_ += logf(p_ + 0.001f); }\n"
        "  $out.brightness = tot_ > 0.05f ? w_ / tot_ * (1.0f / 15.0f) : 0.0f;\n"
        "  $out.noisiness = tot_ > 0.05f ? gc_sat(expf(lg_ * (1.0f / 16.0f)) / (tot_ * (1.0f / 16.0f))) : 0.0f; }",
        "where the sound's weight sits, 0 bass .. 1 treble, and how noisy it is, 0 a tone .. 1 a hiss"),
+         noscript="it reads the sound its own way; the script reads it only as the Audio and FFT bin nodes do"),
     # Whether there is sound at all: sound is on while the volume has passed threshold within the last
     # hold seconds; quiet counts the seconds since it last did; mix is 1 while there is sound and falls
     # to 0 over fade seconds after the hold - the music's look times mix, an idle look times 1 - mix.
@@ -325,7 +339,7 @@ LIBRARY = [
             "  $out.quiet = $st.q; $out.sound = $st.q <= $in.hold;\n"
             "  $out.mix = $st.q <= $in.hold ? 1.0f : gc_sat(1.0f - ($st.q - $in.hold) / fmaxf($in.fade, 0.001f)); }",
             "on while there is sound (the volume past threshold in the last hold s), the seconds quiet, and 1 falling to 0 after"),
-         state=["q"]),
+         state=["q"], noscript="it reads the sound its own way; the script reads it only as the Audio and FFT bin nodes do"),
     # The sixteen bands as they were: a row every 40 ms, 48 rows (~1.9 s) - read at index 0..1 across the
     # bands and age 0 (now) .. 1 (the oldest). Unwired, index is the pixel's u and age its v: the spectrum
     # across the picture, flowing down it - a waterfall.
@@ -1402,6 +1416,7 @@ UNITS = {
     "Silence":    {"threshold": ("", 0.0, 1.0, None), "hold": ("s", 0.0, 30.0, None), "fade": ("s", 0.0, 30.0, None)},
     "Spectrum history": {"index": ("", 0.0, 1.0, None), "age": ("", 0.0, 1.0, None)},
     "Counter":    {"steps": ("", 1.0, 64.0, None)},
+    "Scenes":     {"fade": ("s", 0.0, 30.0, None)},
     "Peak hold":  {"hold": ("ms", 0.0, 5000.0, None), "fall": ("/s", 0.0, 10.0, None)},
     "Slew":       {"up": ("/s", 0.0, 20.0, None), "down": ("/s", 0.0, 20.0, None)},
     "Spring":     {"hz": ("Hz", 0.05, 20.0, "log"), "damping": ("", 0.0, 1.0, None)},

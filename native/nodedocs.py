@@ -172,6 +172,17 @@ DOCS = {
                "release": "held: how long the fall to 0 takes once gate is off, in milliseconds"},
         "out": {"value": "the envelope, 0..1", "active": "true while it is anywhere but at rest"},
         "params": {"mode": "one shot (attack, decay on each rise) or held (attack, decay, sustain, release)"}},
+    "Scenes": {
+        "doc": "Scenes on the device: the graph's snapshots (Snapshots, Ctrl+Shift+K) kept in the effect, and the one "
+               "index picks faded to over fade seconds - every typed value on a pin moving from where it was to the "
+               "scene's, a switch crossing at the middle. A verse look and a chorus look in one effect: a Counter on "
+               "the beat into index steps through them a bar at a time, a slider picks one. A node's settings are "
+               "the build's (they are compiled in); a snapshot without a pin's value leaves it as built. Rebuild "
+               "after saving a snapshot: the table is made when the graph compiles.",
+        "in": {"index": "which scene: 0 the first, 1 the next... (rounded, held to the last)",
+               "fade": "seconds to fade to a newly picked scene (0: at once)"},
+        "out": {"scene": "the scene picked", "blend": "how far the fade to it is, 0..1"},
+        "params": {"scenes": "which snapshots, in order, comma separated (empty: every snapshot as they were made)"}},
     "Gate": {
         "doc": "A switch with a gap: it turns on when x reaches high and only turns off again when x falls to low. A "
                "level that wobbles about one point - a bass band, a noisy volume - would flicker a plain Threshold; "

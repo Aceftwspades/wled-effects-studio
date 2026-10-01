@@ -2974,9 +2974,27 @@ most valuable first:
       fake WLED takes E1.31 and Art-Net too, and the smoke streams to it in
       each and checks the 14 universes of the cube's net, from 3 and from 0,
       held the frame's 6912 bytes.
-- [ ] **Scenes with fades on the device**: the snapshots (which already
-      morph in the studio) compiled into the effect, one picked by a
-      signal - a verse look and a chorus look in one effect.
+- [x] **Scenes with fades on the device** (wled-toy's Knob and Scene
+      Switch, compiled in). The **Scenes** node: the graph's snapshots - the
+      typed values of its pins, the table a drag or a knob moves - kept in
+      the effect (`Graph._scenes_code`: a table of each scene's value for
+      every slot but the node's own index and fade, which a scene must not
+      rewrite), and the one its **index** picks faded to over **fade**
+      seconds: an S-curve from wherever the values were, a switch crossing
+      at the middle, left alone once there so a drag in the sim holds until
+      the next change; the effect starts on its scene at once. Settings are
+      the build's (compiled in); a snapshot without a pin's value leaves it
+      as built; a setting names which snapshots, in order. The typed-value
+      table is RAM on the device only in a graph with a Scenes node (it is
+      flash otherwise); one Scenes node a graph; a sub-graph's copy keeps
+      the snapshots. Saving a snapshot marks the graph changed. The script
+      says why it cannot (Timbre, Silence and Onset say why now too).
+      Tested: `test_scenes_are_the_snapshots_in_the_effect` (the table, the
+      node's own pins left out, the table writable only then, one a graph,
+      a named list, no snapshots), `test_the_scenes_fade_on_the_engine`
+      (built: the first scene from the start though 0.7 was typed, held,
+      faded to the chorus over the half second after the switch, rising all
+      the way, held).
 - [ ] **A rewire seen at once**: the graph's bytecode run in the sim while
       the native build compiles (the script and C++ already agree in
       `test_parity`), swapped when it lands - then Live can be on by default.

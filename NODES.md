@@ -419,6 +419,21 @@ Turns a switch into a tap: true for exactly one frame when its input goes from o
 **Outputs**
 - **pulse** *(bool)*: true for one frame when x turns on
 
+### Scenes
+
+Scenes on the device: the graph's snapshots (Snapshots, Ctrl+Shift+K) kept in the effect, and the one index picks faded to over fade seconds - every typed value on a pin moving from where it was to the scene's, a switch crossing at the middle. A verse look and a chorus look in one effect: a Counter on the beat into index steps through them a bar at a time, a slider picks one. A node's settings are the build's (they are compiled in); a snapshot without a pin's value leaves it as built. Rebuild after saving a snapshot: the table is made when the graph compiles.
+
+**Inputs**
+- **index** *(float)*: which scene: 0 the first, 1 the next... (rounded, held to the last)
+- **fade** *(float)*: seconds to fade to a newly picked scene (0: at once)
+
+**Outputs**
+- **scene** *(float)*: the scene picked
+- **blend** *(float)*: how far the fade to it is, 0..1
+
+**Settings**
+- **scenes** *(text)*: which snapshots, in order, comma separated (empty: every snapshot as they were made)
+
 ### Sequencer
 
 A timed cycle of up to four phases - a bump, a spin, a hold, a rest - each lasting the seconds you give it, started by the trigger (or straight away). It tells you which phase is on, how far through it is (0..1) and how long since the cycle began; loop makes it repeat.
