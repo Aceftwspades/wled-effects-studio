@@ -3029,9 +3029,34 @@ most valuable first:
       a narrow node now widens to its title, up to a whole node, and lays
       its pins out to that; a longer title, on any node, and an output's
       name too long are cut with "..." (`GraphPanel._fit_title`).
-- [ ] **Smaller**: OSC in beside MIDI learn; Math's second pin hidden for a
-      one-input operation and its operations grouped (Blender); a macOS
-      build and ARM builds.
+- [x] **Smaller.** **OSC in beside MIDI learn** (`native/osc.py`, nothing
+      to install): the MIDI window (now MIDI and OSC) has an OSC row - listen
+      on a UDP port, 9000 unless changed, off until turned on (OSC has no
+      password) and kept with the project; OSC 1.0 messages and bundles
+      parsed (ints, floats, doubles, true / false; strings and blobs stepped
+      over; nesting bounded); each number of a message is a control
+      ("OSC /1/fader1", an XY pad's second "#2"), learnt and mapped as a
+      knob is, a fader's 0..1 kept that fine (`midi.value_for(full=1.0)`),
+      an int 0..127 taken as MIDI's. **Math's second pin** is on the node
+      only while its operation takes two - sqrt, sin and the twelve other
+      one-input ones leave it off, unless a wire is on it - and its
+      operations are **grouped** in the dropdown (arithmetic, compare,
+      rounding, trigonometry: a group's name a row of its own, picking it
+      changes nothing); Vector math shows b and scale only for the
+      operations that read them (`nodedefs.SHOWN_WHEN`, `CHOICE_GROUPS`,
+      `GraphPanel.pin_read`). **A macOS build and an ARM build**: CI makes
+      and drives `WLED_Effects_Studio_macos_arm64.tar.gz` (Apple silicon,
+      Apple's clang building the effects) and `WLED_Effects_Studio_aarch64.tar.gz`
+      (64-bit ARM Linux - a Raspberry Pi 4 or 5 - on GitHub's ARM runner,
+      every unit test there too), and the draft release carries them; the
+      update check takes this machine's file (`update.asset_for` by system
+      and processor - the ARM tarball has no "linux" in its name, as a
+      studio up to 1.4.0 took the first tarball that had). Tested:
+      `test_osc.py` (packets and bundles, junk refused, a datagram through
+      a loopback port, a fader mapped), `test_update.py` (each machine its
+      file, an old studio still the x64 one); the smoke learns a fader by
+      injection and moves it by a real datagram, and hides, keeps and
+      groups Math's pin and operations.
 
 Not taken: a GLSL mode and a GPU preview (the sim runs the device's own
 C++, which a shader would only imitate), wled-toy's strip / ring / matrix

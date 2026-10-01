@@ -590,7 +590,8 @@ class GraphPanel(Glyphs):
         d = self.graph.node_def(n)
         wired = {l[3] for l in self.graph.links if l[2] == nid}
         params = [p for p in d.get("params", []) if p["type"] in self.PROP_KINDS]
-        inputs = [i for i in d.get("inputs", []) if i["name"] not in wired and i["type"] in ("float", "bool", "vector", "color")]
+        inputs = [i for i in d.get("inputs", []) if i["name"] not in wired and i["type"] in ("float", "bool", "vector", "color")
+                  and self.pin_read(n, i)]                 # not one the operation leaves unread (Math's b for sqrt)
         return params, inputs
 
     def _mirror(self, sender, nid, name, val, pads=True):
@@ -2134,6 +2135,8 @@ class GraphPanel(Glyphs):
             for i in d["inputs"]:
                 if hide and (nid, i["name"]) not in linked:
                     continue
+                if not self.pin_read(n, i) and (nid, i["name"]) not in linked:
+                    continue                              # an operation that does not read it (Math's b for sqrt)
                 tag = f"gin_{nid}_{i['name']}"
                 with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Input, tag=tag,
                                         user_data=(nid, i["name"]), shape=dpg.mvNode_PinShape_CircleFilled):
@@ -2199,6 +2202,38 @@ class GraphPanel(Glyphs):
                 self._pins[(nid, "out", o["name"])] = tag
                 self._ptype[tag] = o["type"]
         self._bind_node_theme(nid, n)
+
+    @staticmethod
+    def pin_read(n, i):
+        """Whether the node's settings read input `i`: a pin shown only for
+        some operations (nodedefs.SHOWN_WHEN) is not, under any other."""
+        w = i.get("when")
+        return not w or n.get("params", {}).get(w["param"], w.get("default")) in w["values"]
+
+    GROUP_MARK = "--"
+
+    def _choice_items(self, p):
+        """A choice's dropdown rows: its values, or - grouped
+        (nodedefs.CHOICE_GROUPS) - each group's name, a row of its own,
+        above its values."""
+        if not p.get("groups"):
+            return list(p["choices"])
+        out = []
+        for name, vals in p["groups"]:
+            out.append(f"{self.GROUP_MARK} {name} {self.GROUP_MARK}")
+            out += list(vals)
+        return out
+
+    def _choice_cb(self, nid, p, cb):
+        """A grouped choice's callback: a group's name picked changes nothing
+        (the field goes back to the value)."""
+        def pick(sender, val):
+            if isinstance(val, str) and val.startswith(self.GROUP_MARK + " "):
+                n = self.graph.nodes.get(nid) if self.graph else None
+                dpg.set_value(sender, str((n or {}).get("params", {}).get(p["name"], p["default"])))
+                return
+            cb(sender, val)
+        return pick
 
     def _fit_title(self, label, width):
         """A title within its node, and the width the node is laid out to: a
@@ -3568,7 +3603,8 @@ class GraphPanel(Glyphs):
         elif p["type"] == "int":
             w = self._number_widget(p, int(v), None, ud, cb, True, fw, integer=True)
         elif p["type"] == "choice":
-            w = dpg.add_combo(p["choices"], width=fw, default_value=str(v), user_data=ud, callback=cb)
+            w = dpg.add_combo(self._choice_items(p), width=fw, default_value=str(v), user_data=ud,
+                              callback=self._choice_cb(nid, p, cb) if p.get("groups") else cb)
         elif p["type"] == "color":
             rgb = list(v)[:3] if isinstance(v, (list, tuple)) else [255, 255, 255]
             # the swatch alone, as a colour input's is: its picker has the hex and R, G and B
@@ -3983,6 +4019,9 @@ class GraphPanel(Glyphs):
             self._refresh_summary(k)
         if self.graph.nodes[nid]["type"] == "Frame" and name in ("title", "colour"):
             self._sync_pos(); self.rebuild()
+        elif any((i.get("when") or {}).get("param") == name
+                 for k in [nid] + list(self._same_type_selected(nid)) for i in self.graph.node_def(self.graph.nodes[k])["inputs"]):
+            self._sync_pos(); self.rebuild()                # a pin it reads comes or goes (Math's b)
         if self.graph.nodes[nid]["type"] in ("Graph input", "Graph output") and name in ("name", "type"):
             if name == "type":
                 # the pin changed type: its wires no longer fit
@@ -4655,7 +4694,7 @@ class GraphPanel(Glyphs):
                     for label, src in self.MODULATORS:
                         row(f"  {label}", lambda src=src: self.modulate(nid, name, src))
             if i["type"] in ("float", "bool") and not linked and self.file:
-                # a controller's knob onto this typed value (Window > MIDI controller lists the rest)
+                # a controller's knob onto this typed value (Window > MIDI and OSC lists the rest)
                 from native import midi_ui, midi
                 t = midi_ui.pin_target(self.app, nid, name)
                 row("MIDI learn: move a knob", lambda: midi_ui.learn(self.app, t))

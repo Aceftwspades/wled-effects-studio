@@ -4608,6 +4608,8 @@ def service_command(app):
                 print("expr", app.gp.apply_expr(int(nid), name, kind, text))
             if "midi" in c:                             # test hook: a MIDI message's bytes, as if the port sent them
                 app.midi.inject([int(b) for b in c["midi"]])
+            if "osc" in c:                              # test hook: [address, value...] as if a sender sent it
+                app.osc.inject(*c["osc"])
             if "midi_learn" in c:                       # test hook: a target to learn next (see midi_ui.targets), or null to cancel
                 midi_ui.learn(app, c["midi_learn"])
             if "snap" in c:                             # test hook: ["save", name] | ["apply", name] | ["morph", a, b, t] | ["del", name]

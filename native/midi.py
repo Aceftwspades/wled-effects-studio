@@ -73,13 +73,21 @@ def parse(msg):
 
 def ctl_label(ctl):
     kind, ch, n = ctl
+    if kind == "osc":                                     # osc.py: ("osc", address, the number's place in it)
+        return f"OSC {ch}" + (f" #{int(n) + 1}" if n else "")
     return {"cc": f"CC {n}", "note": f"note {n}", "bend": "pitch bend"}.get(kind, kind) + f" ch {int(ch) + 1}"
 
 
 def state(project):
-    """The project's MIDI settings, made if missing."""
+    """The project's MIDI settings, made if missing - OSC's beside them
+    (osc.py: off until turned on, and the UDP port), its faders in the same
+    maps as the knobs."""
     st = project.options.setdefault("midi", {})
     st.setdefault("port", ""); st.setdefault("maps", []); st.setdefault("clock", True)
+    o = st.setdefault("osc", {})
+    if not isinstance(o, dict):
+        o = st["osc"] = {}
+    o.setdefault("on", False); o.setdefault("port", 9000)
     return st
 
 
@@ -148,19 +156,20 @@ def unbind(st, k):
         st["maps"].pop(k)
 
 
-def value_for(target, v):
-    """A control's 0..127 as the target wants it: a slider's integer, a
-    check's on/off, a pin's number in its range (a bool pin on/off)."""
+def value_for(target, v, full=127.0):
+    """A control's 0..127 (0..`full`: an OSC fader's 0..1 is 1.0) as the
+    target wants it: a slider's integer, a check's on/off, a pin's number
+    in its range (a bool pin on/off)."""
     kind = target.get("kind")
-    f = max(0.0, min(1.0, v / 127.0))
+    f = max(0.0, min(1.0, v / float(full)))
     if kind == "fx":
         hi = 31 if target.get("key") == "c3" else 255
         return int(round(f * hi))
     if kind == "check":
-        return v >= 64
+        return f >= 0.5
     if kind == "pin":
         if target.get("bool"):
-            return v >= 64
+            return f >= 0.5
         lo, hi = float(target.get("lo", 0.0)), float(target.get("hi", 1.0))
         return lo + f * (hi - lo)
     return f                                              # palette, effect: a fraction of the list

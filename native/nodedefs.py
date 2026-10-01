@@ -1462,6 +1462,24 @@ UNITS = {
 }
 # two inputs that are one point: an XY pad on the node sets both while neither is wired
 # (name, name, low, high - the pad's range on both axes)
+# A pin shown only while a setting picks an operation that reads it (Blender's Math hides its second
+# socket for a one-input operation): {node: {pin: (setting, [the values that read it])}}. A wire on it
+# keeps it shown, so nothing hangs loose; the code reads it whatever the operation (a constant then).
+MATH_UNARY = ("sqrt", "abs", "sign", "round", "ceil", "floor", "fract", "sin", "cos", "tan", "asin", "acos", "log", "exp")
+VECTOR_BINARY = ("add", "subtract", "multiply", "cross", "dot", "distance", "reflect", "project", "min", "max")
+SHOWN_WHEN = {
+    "Math": {"b": ("op", None)},                                   # None: every operation but MATH_UNARY (filled below)
+    "Vector math": {"b": ("op", VECTOR_BINARY), "scale": ("op", ("scale",))},
+}
+# A choice's values in groups, for its dropdown (each group's name a row of its own above its values):
+# {node: {setting: [(group, [values])]}} - every value in one group, in the order the dropdown lists them
+CHOICE_GROUPS = {
+    "Math": {"op": [("arithmetic", ["add", "subtract", "multiply", "divide", "power", "sqrt", "log", "exp", "abs"]),
+                    ("compare", ["min", "max", "smooth min", "smooth max", "less", "greater", "equal", "sign"]),
+                    ("rounding", ["round", "floor", "ceil", "fract", "modulo", "wrap", "snap", "pingpong"]),
+                    ("trigonometry, in turns", ["sin", "cos", "tan", "asin", "acos", "atan2"])]},
+}
+
 PADS = {"Transform": [("pivot_u", "pivot_v", 0.0, 1.0), ("move_u", "move_v", -1.0, 1.0)],
         "Gravity": [("tilt_x", "tilt_y", -1.0, 1.0)],
         "Mandelbrot": [("jx", "jy", -2.0, 2.0)]}
@@ -1482,6 +1500,17 @@ def library(extra=()):
             lib[d["name"]]["pads"] = PADS[d["name"]]
         if d["name"] in IMPLICIT:
             lib[d["name"]]["implicit"] = dict(IMPLICIT[d["name"]])
+        for pin, (param, vals) in (SHOWN_WHEN.get(d["name"]) or {}).items():
+            spec = next(p for p in lib[d["name"]]["params"] if p["name"] == param)
+            if vals is None:                                     # Math: what the one-input list leaves
+                vals = [c for c in spec["choices"] if c not in MATH_UNARY]
+            for q in lib[d["name"]]["inputs"]:
+                if q["name"] == pin:
+                    q["when"] = {"param": param, "values": list(vals), "default": spec["default"]}
+        for param, groups in (CHOICE_GROUPS.get(d["name"]) or {}).items():
+            for p in lib[d["name"]]["params"]:
+                if p["name"] == param:
+                    p["groups"] = [(g, list(vs)) for g, vs in groups]
         for pin, spec in (UNITS.get(d["name"]) or {}).items():
             if spec is None:
                 continue

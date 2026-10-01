@@ -1270,13 +1270,13 @@ One node for every sum: pick the operation from the dropdown. Covers what Add, M
 
 **Inputs**
 - **a** *(float)*: the first number
-- **b** *(float)*: the second number, where the op needs one
+- **b** *(float)*: the second number - on the node only while the operation takes two (a one-input one: sqrt, abs, sign, round, ceil, floor, fract, sin, cos, tan, asin, acos, log, exp - leaves it off, unless wired)
 
 **Outputs**
 - **result** *(float)*: the answer
 
 **Settings**
-- **operation** `op` *(choice)*: which operation
+- **operation** `op` *(choice)*: which operation - the dropdown in groups: arithmetic, compare, rounding, trigonometry
 
 ### Max
 
@@ -1474,8 +1474,8 @@ Arithmetic on vectors, chosen by the dropdown. add / subtract / multiply / min /
 
 **Inputs**
 - **a** *(vector)*: the first vector
-- **b** *(vector)*: the second vector (where the op needs one)
-- **scale** *(float)*: the number, for scale
+- **b** *(vector)*: the second vector - on the node only while the operation takes one, unless wired
+- **scale** *(float)*: the number - on the node only for scale, unless wired
 
 **Outputs**
 - **v** *(vector)*: the vector result

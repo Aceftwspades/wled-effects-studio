@@ -146,7 +146,7 @@ ACTIONS = [
     ("repeat",        "Repeat the last action",                              "Shift+R", "global"),
     ("palette",       "Command palette: every action and menu command by name", "Ctrl+P", "global"),
     ("snapshots",     "Snapshots: the graph's settings as named states",     "Ctrl+Shift+K", "global"),
-    ("midi",          "MIDI controller: knobs onto the sliders",            "",             "global"),
+    ("midi",          "MIDI and OSC: knobs and faders onto the sliders",    "",             "global"),
     ("undo_history",  "Undo history",                                        "Ctrl+Alt+Z", "global"),
     ("history",       "History of the current graph or code",                "Ctrl+Shift+Y", "global"),
 ]

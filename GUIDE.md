@@ -242,7 +242,11 @@ reference gives both. Likewise a slider is its effect's own name
 everywhere (MIDI learn, Sweep, a sequence's ramp), not its key. Two
 inputs that make one point - Transform's pivot and move, Gravity's
 tilt, Mandelbrot's Julia constant - also get an **XY pad**: drag the dot
-and both fields follow. Effect settings' palette is picked by name. Every
+and both fields follow. Effect settings' palette is picked by name. A
+Math node shows its second pin only while its operation takes two - sqrt,
+sin and the other one-input ones leave it off, unless a wire is on it -
+and its dropdown lists the operations in groups (arithmetic, compare,
+rounding, trigonometry); Vector math does the same with b and scale. Every
 node and pin explains itself at the pointer when hovered (or in the box
 above the graph, as panes), and while the effect is on the cube that
 shows the pin's live value. The
@@ -401,7 +405,7 @@ compiled again; the status line says the frame's and the top three, and how
 much is the rest (each pixel's coordinates, the drawing). The device's own
 proportions can differ (a division or a sine costs more there next to a
 multiply): read the shares as where the time goes. A **MIDI
-controller** (Window > MIDI controller...) puts its knobs on the
+controller** (Window > MIDI and OSC...) puts its knobs on the
 sliders: pick the port ("Rescan" after plugging one in), pick what a knob
 should drive - a parameter slider, a check, the palette or the effect by
 index, a typed value on a pin of the open graph - press "Learn" and move
@@ -413,7 +417,15 @@ that graph. The mappings are the project's. A drum machine's or a DAW's
 row turns it off): each of its beats fires the synth's, and its tempo is
 the synth's; stopped, the synth keeps its own beat again. It needs the optional
 python-rtmidi (`pip install python-rtmidi`); without it the window says
-so. Segments (+ in
+so. **OSC** comes in beside it, with nothing to install: tick the OSC
+row's "listen on UDP port" (9000 unless changed) and point a phone's or a
+tablet's OSC app - TouchOSC, Open Stage Control, a DAW's OSC out - at this
+machine and that port; Learn then takes a fader as it takes a knob, and a
+mapping moves things the same way. A fader sends 0..1 (finer than MIDI's
+128 steps), an int 0..127 is taken as MIDI's, an XY pad's two numbers are
+two controls. OSC has no password - anyone on the network who reaches the
+port can move what is mapped - so it stays off until turned on, and it
+only ever moves the sim's sliders and pins. Segments (+ in
 the panel) layer several effects with WLED's blend modes and opacity, and
 carry WLED's segment options - reverse, mirror (and Y, and swap XY on a
 matrix), group, space, offset - which the sim lays out the way the device
@@ -1079,7 +1091,7 @@ on and install what it carries.
 - **Window** › LED outputs and power `Ctrl+Shift+O`
 - **Window** › Audio input (mic / line-in) `Ctrl+Shift+M`
 - **Window** › Snapshots... `Ctrl+Shift+K`
-- **Window** › MIDI controller...
+- **Window** › MIDI and OSC...
 - **Window** › Message log...
 - **Window** › Close every frame
 - **Settings** › Keyboard shortcuts... `Shift+F1`
@@ -1233,7 +1245,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Shift+R` | Repeat the last action | anywhere |
 | `Ctrl+P` | Command palette: every action and menu command by name | anywhere |
 | `Ctrl+Shift+K` | Snapshots: the graph's settings as named states | anywhere |
-| `—` | MIDI controller: knobs onto the sliders | anywhere |
+| `—` | MIDI and OSC: knobs and faders onto the sliders | anywhere |
 | `Ctrl+Alt+Z` | Undo history | anywhere |
 | `Ctrl+Shift+Y` | History of the current graph or code | anywhere |
 

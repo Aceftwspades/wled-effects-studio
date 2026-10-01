@@ -1,6 +1,7 @@
 """The update check without the network (native/update.py): a release's
-file for this platform - the Windows zip, the Linux tarball, nothing for
-macOS - and the check read from a releases JSON on disk
+file for this machine - the Windows zip, the Linux tarball for an x64 or a
+64-bit ARM, macOS's for Apple silicon (none for an Intel Mac, none from a
+release made before) - and the check read from a releases JSON on disk
 (STUDIO_UPDATE_URL, as a test points it anywhere). And the packaged Linux
 app's children: the library path they get (native/procs.py).
 """
@@ -23,11 +24,22 @@ ASSETS = [{"name": "WLED_Effects_Studio_linux.tar.gz", "browser_download_url": B
 
 
 def test_each_platform_gets_its_own_file():
-    assert update.asset_for(ASSETS, "win32") == BASE + "WLED_Effects_Studio.zip"          # not the tarball listed first
-    assert update.asset_for(ASSETS, "linux") == BASE + "WLED_Effects_Studio_linux.tar.gz"
-    assert update.asset_for(ASSETS, "darwin") is None                                       # macOS: from a checkout
-    assert update.asset_for(ASSETS[1:], "linux") is None                                   # an older release: Windows only
+    assert update.asset_for(ASSETS, "win32", "AMD64") == BASE + "WLED_Effects_Studio.zip"          # not the tarball listed first
+    assert update.asset_for(ASSETS, "linux", "x86_64") == BASE + "WLED_Effects_Studio_linux.tar.gz"
+    assert update.asset_for(ASSETS, "darwin", "arm64") is None                                      # a release up to 1.4.0: from a checkout
+    assert update.asset_for(ASSETS[1:], "linux", "x86_64") is None                                 # an older release: Windows only
     assert update.asset_for([], "win32") is None and update.asset_for(None, "linux") is None
+    # a release with every build, the ARM ones listed first: each machine its own
+    every = [{"name": n, "browser_download_url": BASE + n} for n in
+             ("WLED_Effects_Studio_aarch64.tar.gz", "WLED_Effects_Studio_macos_arm64.tar.gz")] + ASSETS
+    assert update.asset_for(every, "linux", "aarch64") == BASE + "WLED_Effects_Studio_aarch64.tar.gz"
+    assert update.asset_for(every, "linux", "x86_64") == BASE + "WLED_Effects_Studio_linux.tar.gz"
+    assert update.asset_for(every, "darwin", "arm64") == BASE + "WLED_Effects_Studio_macos_arm64.tar.gz"
+    assert update.asset_for(every, "darwin", "x86_64") is None                                     # an Intel Mac: no build
+    assert update.asset_for(every, "win32", "AMD64") == BASE + "WLED_Effects_Studio.zip"
+    # what a studio from before took (the first tarball with "linux" in its name): still the x64 one
+    assert next(e["browser_download_url"] for e in every if "linux" in e["name"].lower()
+                and e["name"].endswith(".tar.gz")) == BASE + "WLED_Effects_Studio_linux.tar.gz"
 
 
 def test_the_check_reads_a_release():

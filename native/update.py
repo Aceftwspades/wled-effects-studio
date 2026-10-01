@@ -2,7 +2,7 @@
 
     check()            -> {"tag", "notes", "url", "asset", "newer"} or None (offline, no releases)
     download(asset)    -> the file's path in HOME/updates, called on a thread
-    asset_for(assets)  -> this platform's file among a release's (Windows zip, Linux tarball)
+    asset_for(assets)  -> this machine's file among a release's (Windows zip, Linux and macOS tarballs)
     apply(zip_path)    -> the packaged app replaced by the zip's contents and restarted
 
 The check reads GitHub's releases API for version.REPO (no token; sixty
@@ -11,8 +11,8 @@ version.__version__. Applying is Windows and the packaged app only: a
 script beside the zip waits for the app to close, unpacks the zip, copies
 it over the app's folder - projects, captures and the toolchain left
 alone - and starts the app again. From a checkout the answer is git pull;
-elsewhere (the Linux build) its tarball is downloaded and the folder is
-opened for a copy by hand. STUDIO_UPDATE_URL points the check at another releases JSON (a
+elsewhere (the Linux and macOS builds) its tarball is downloaded and the
+folder is opened for a copy by hand. STUDIO_UPDATE_URL points the check at another releases JSON (a
 test's).
 """
 import json
@@ -45,16 +45,32 @@ def check():
             "asset": asset_for(d.get("assets")), "newer": version.newer(tag), "name": d.get("name") or tag}
 
 
-def asset_for(assets, platform=None):
-    """This platform's file among a release's: the Windows zip, the Linux
-    tarball (WLED_Effects_Studio_linux.tar.gz); None elsewhere (macOS runs
-    from a checkout)."""
+def arm(machine=None):
+    """This machine's processor is a 64-bit ARM (a Raspberry Pi's, an Apple
+    silicon Mac's)."""
+    import platform as _pf
+    return (machine or _pf.machine() or "").lower() in ("arm64", "aarch64")
+
+
+def asset_for(assets, platform=None, machine=None):
+    """This machine's file among a release's: the Windows zip; Linux's
+    tarball - WLED_Effects_Studio_linux.tar.gz on an x64,
+    WLED_Effects_Studio_aarch64.tar.gz on a 64-bit ARM (no "linux" in its
+    name: an older studio took the first tarball that had it); macOS's,
+    WLED_Effects_Studio_macos_arm64.tar.gz on Apple silicon. None when the
+    release has none for it (an Intel Mac: run from a checkout)."""
     plat = platform or sys.platform
+    on_arm = arm(machine)
     rows = [(str(a.get("name", "")).lower(), a.get("browser_download_url")) for a in assets or []]
+    tars = [(n, u) for n, u in rows if n.endswith((".tar.gz", ".tgz"))]
     if plat.startswith("win"):
         return next((u for n, u in rows if n.endswith(".zip") and "linux" not in n and "mac" not in n), None)
     if plat.startswith("linux"):
-        return next((u for n, u in rows if "linux" in n and n.endswith((".tar.gz", ".tgz"))), None)
+        if on_arm:
+            return next((u for n, u in tars if ("aarch64" in n or "arm64" in n) and "mac" not in n), None)
+        return next((u for n, u in tars if "linux" in n and "aarch64" not in n and "arm64" not in n), None)
+    if plat == "darwin":
+        return next((u for n, u in tars if "mac" in n and (("arm64" in n) == on_arm)), None)
     return None
 
 

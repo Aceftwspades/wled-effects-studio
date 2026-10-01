@@ -597,7 +597,8 @@ DOCS = {
                "scale multiplies by the number; normalize makes the length 1; cross gives the direction at right "
                "angles to both; dot, distance and length give a number (on the value pin); reflect bounces a off b; "
                "project drops a onto b.",
-        "in": {"a": "the first vector", "b": "the second vector (where the op needs one)", "scale": "the number, for scale"},
+        "in": {"a": "the first vector", "b": "the second vector - on the node only while the operation takes one, unless wired",
+               "scale": "the number - on the node only for scale, unless wired"},
         "out": {"v": "the vector result", "value": "the number result (dot, distance, length; else the result's length)"},
         "params": {"op": "which operation"}},
     "Vector rotate": {
@@ -608,9 +609,11 @@ DOCS = {
         "doc": "One node for every sum: pick the operation from the dropdown. Covers what Add, Multiply and the rest do, "
                "plus sqrt, sign, round, ceil, snap (round to a step of b), ping-pong (bounce between 0 and b), wrap, "
                "less / greater / equal (1 or 0), sin / cos / tan in turns, log and exp.",
-        "in": {"a": "the first number", "b": "the second number, where the op needs one"},
+        "in": {"a": "the first number",
+               "b": "the second number - on the node only while the operation takes two (a one-input one: sqrt, abs, "
+                    "sign, round, ceil, floor, fract, sin, cos, tan, asin, acos, log, exp - leaves it off, unless wired)"},
         "out": {"result": "the answer"},
-        "params": {"op": "which operation"}},
+        "params": {"op": "which operation - the dropdown in groups: arithmetic, compare, rounding, trigonometry"}},
     "Rotate": {"doc": "Turns a pair of coordinates round the origin. Feed a clock into turns and a pattern spins; three "
                       "of these on x, y, z tumble the whole cube.",
                "in": {"x": "the point's x", "y": "the point's y", "turns": "how far to turn: 1 = a full circle"}, "out": {"x": "the turned x", "y": "the turned y"}},

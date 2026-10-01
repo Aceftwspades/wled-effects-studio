@@ -238,6 +238,16 @@ STEPS = [
       {"py": "app.gp._implicit_to_typed(None, None, (app._vz, 'pos'))"}], 0.6),
     ([{"check": "dpg.get_item_configuration(f'gin_{app._nz}_x_w')['format'] == 'position x'"},
       {"check": "not dpg.get_item_type(f'gin_{app._vz}_pos_w').endswith('Button') and 'pos' in app.gp.graph.nodes[app._vz]['inputs']"}], 0.2),
+    # Math's second pin only for the operations that read it - sqrt has one input - and kept while a wire is on it;
+    # its operations grouped in the dropdown, a group's name picked changing nothing
+    ([{"graph_open": "box_fire.json"}, {"py": "setattr(app, '_mz', app.gp.graph.add('Math', (60, 900)))"}, {"py": "app.gp.rebuild()"}], 0.5),
+    ([{"check": "dpg.does_item_exist(f'gin_{app._mz}_b') and '-- compare --' in dpg.get_item_configuration(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')))['items']"},
+      {"py": "dpg.get_item_callback(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')))(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')), 'sqrt')"}], 0.5),
+    ([{"check": "not dpg.does_item_exist(f'gin_{app._mz}_b') and app.gp.graph.nodes[app._mz]['params']['op'] == 'sqrt'"},
+      {"py": "dpg.get_item_callback(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')))(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')), '-- compare --')"}], 0.3),
+    ([{"check": "app.gp.graph.nodes[app._mz]['params']['op'] == 'sqrt' and dpg.get_value(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op'))) == 'sqrt'"},
+      {"py": "(app.gp.graph.link(13, 'result', app._mz, 'b'), app.gp.rebuild())"}], 0.4),
+    ([{"check": "dpg.does_item_exist(f'gin_{app._mz}_b')"}, {"py": "(app.gp.graph.remove(app._mz), app.gp.rebuild())"}], 0.3),
     # what each node costs: a profiling build of the graph run in an engine of its own - each node then says its
     # share of the frame and its time on the device, the status the frame's; compiled again, they are old
     ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "app.gp.measure_costs()"}], 25.0),
@@ -271,7 +281,18 @@ STEPS = [
       {"expect": ["messages", "MIDI clock: the synth's beat follows it"]}, {"midi": [0xFC]}], 0.4),
     ([{"check": "not app.syn.external"}, {"expect": ["messages", "the synth keeps its own beat again"]},
       {"py": "(setattr(app.syn, 'bpm', 120), num.set('inp_bpm', 120))"}], 0.3),
-    ([{"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
+    # OSC beside MIDI: on a port (any free one), a fader learnt as a knob is - its 0..1 finer than MIDI's 128 steps -
+    # then a real datagram to that port, sent from inside the app, moves the slider; off again
+    ([{"py": "midi_ui._st(app)['osc'].__setitem__('host', '127.0.0.1')"},
+      {"py": "midi_ui.set_osc(app, on=True, port=0)"}, {"midi_learn": {"kind": "fx", "key": "ix"}},
+      {"osc": ["/1/fader1", 0.5]}], 0.6),
+    ([{"expect": ["messages", "MIDI: OSC /1/fader1 -> "]}, {"check": "app.eng.fx['ix'] == 128 and app.osc.port > 0"},
+      {"expect": ["osc_state", "listening on"]},
+      {"py": "__import__('socket').socket(2, 2).sendto(__import__('native.osc', fromlist=['osc']).message('/1/fader1', 0.2), "
+             "('127.0.0.1', app.osc.port))"}], 0.8),
+    ([{"check": "app.eng.fx['ix'] == 51"}, {"py": "midi_ui.set_osc(app, on=False)"}], 0.3),
+    ([{"check": "app.osc.port is None and dpg.get_value('osc_state') == ''"},
+      {"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
       {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),
     # the help: the guide in its window, a search that marks the words and scrolls to them, F1 with a node
     # selected landing on that node's entry, Back to where the guide was, the node's menu with its keys and
