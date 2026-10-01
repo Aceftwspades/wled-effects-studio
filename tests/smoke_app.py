@@ -74,10 +74,25 @@ MAP_STEPS = [
 STEPS = [
     # the run's own project, from the examples; Maelstrom's graph compiled, built and put on the effects list
     # (a batch that starts with wait_build is taken once the build in hand is loaded, however long that is here)
-    ([{"project": SMOKE}], 3.0),
+    # Live (rebuild as the graph changes) off for the steps that build by hand - it is on by default; the
+    # steps that are about it turn it on
+    ([{"project": SMOKE}, {"graph_auto": False}], 3.0),
     ([{"wait_build": True}, {"check": f"app.project.path.endswith({SMOKE!r})"}, {"layout": "graph"},
       {"graph_open": "maelstrom.json"}, {"py": "app.gp.compile()"}, {"py": "app.project.set_imported('maelstrom.cpp', True)"}], 5.0),
     ([{"wait_build": True}, {"expect": ["edit_status", "loaded cubefx_"]}, {"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
+    # a rewire seen at once: with Live on, the edit runs as bytecode in the sim's Studio Script effect a moment
+    # after it is made - under the graph's own name - while its C++ builds; the build takes over at the same clock
+    ([{"check": "app.eng.names[app.eng.idx] == 'Maelstrom'"}, {"layout": "graph"}, {"graph_open": "maelstrom.json"},
+      {"py": "app.eng.set_now(50000)"}, {"graph_auto": True}, {"graph_link": [4, "value", 23, "b"]}], 0.7),
+    ([{"check": "app.gp.standin_on() and 'Studio Script' in app.eng.names[app.eng.idx]"},
+      {"check": "dpg.get_value('fx_combo') == 'Maelstrom' and app.eng.clock()[0] >= 50000"},
+      {"expect": ["messages", "runs it as a script until its build lands"]}], 0.3),
+    ([{"wait_build": True}, {"check": "app.eng.names[app.eng.idx] == 'Maelstrom' and not app.gp.standin_on()"},
+      {"check": "app.eng.clock()[0] >= 50000 and app.gp._shown is not None"},
+      {"py": "setattr(app, '_lib_live', app.eng.library)"}, {"graph_zoom": 0.85}], 0.9),
+    # an edit that changes no code (a zoom rebuilds the editor) builds nothing, Live or not
+    ([{"check": "not app.building and app.eng.library == app._lib_live and not app.gp.standin_on()"},
+      {"graph_zoom": 1.0}, {"graph_auto": False}, {"graph_undo": True}, {"layout": "both"}], 0.5),
     # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
     ([{"check": "app.eng.names[app.eng.idx] == 'Maelstrom'"}, {"layout": "graph"}, {"graph_open": "box_fire.json"},
       {"py": "app.gp.compile()"}], 5.0),

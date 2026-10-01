@@ -2995,9 +2995,25 @@ most valuable first:
       (built: the first scene from the start though 0.7 was typed, held,
       faded to the chorus over the half second after the switch, rising all
       the way, held).
-- [ ] **A rewire seen at once**: the graph's bytecode run in the sim while
-      the native build compiles (the script and C++ already agree in
-      `test_parity`), swapped when it lands - then Live can be on by default.
+- [x] **A rewire seen at once.** An edit to be built - Live's, a moment
+      after it is made, or F5's - is on the cube at once: the graph compiled
+      to bytecode (a few ms; the script and C++ agree in `test_parity`) and
+      run by the sim's Studio Script effect under the graph's own name,
+      sliders and palette (`GraphPanel.standin`), while the C++ compiles;
+      when the build lands it takes the stand-in's place at the same clock
+      (`Engine.clock` / `set_clock`, strip.now kept across the reload), so
+      the swap is not seen. Edits made while it compiles stay on the cube -
+      the build that lands without them leaves the stand-in, in the new
+      library, until theirs does - and an edit undone before its build puts
+      the build back. A graph with a node the script does not have waits
+      for its build, as before; so does a comparison (A/B). A build asked
+      for while one runs is made when it lands (it was dropped). **Live is
+      on by default** now, and remembered: an edit that changes no code (a
+      zoom, a label, the graph opened) writes and builds nothing - with
+      Live on, a zoom used to rebuild the effect. Tested: the smoke rewires
+      Maelstrom with Live on and finds the Studio Script on the cube under
+      Maelstrom's name with the clock carried, the build in its place at
+      the same clock after, and a zoom building nothing.
 - [ ] **A node gallery layout test** (wled-toy's visual invariants): every
       node in one graph, fields inside the node, pins on its edge, text cut
       with an ellipsis.

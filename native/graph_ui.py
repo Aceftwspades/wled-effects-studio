@@ -205,9 +205,18 @@ class GraphPanel(Glyphs):
         self._menu_entries_cache = None
         self._press_pos = {}     # node -> position at the last press (a drop onto a wire)
         self._undo_desc = []     # what each undo snapshot precedes
-        self.auto = False        # live preview: rebuild after every edit
+        self.auto = bool(app.prefs.get("live", True))    # Live: rebuild after every edit - on unless turned off (kept)
         self._dirty = 0.0        # time of the last edit not yet built, 0 when clean
-        self._queued = False     # an edit landed while a build was running
+        self._queued = False     # a build asked for while one was running: made when it lands (poll)
+        # the edit at once (standin): the effect file the script stands in for, its bytecode, the
+        # edit it was tried at and the one it shows, the edit the build in hand was made from, and
+        # (file, bytecode) of what is on screen when that is known - a build that took the stand-in's place
+        self._standin_for = None
+        self._standin_prog = b""
+        self._standin_at = -1
+        self._standin_shows = -1
+        self._built_at = -1
+        self._shown = None
         self._drag_type = None   # type of the output being dragged, if any
         self._drag_from = None   # (node, output) being dragged, for a drop on empty space
         self._press_at = (0, 0)
@@ -1739,6 +1748,10 @@ class GraphPanel(Glyphs):
 
     def set_auto(self, on):
         self.auto = bool(on)
+        if self.app.prefs.get("live", True) != self.auto:
+            self.app.prefs["live"] = self.auto               # the next session starts so
+            from native.project import save_prefs
+            save_prefs(self.app.prefs)
         if self.auto:
             self.touch()
 
@@ -1761,14 +1774,152 @@ class GraphPanel(Glyphs):
         self._poll_cost_job()
         self._poll_costs_draw()
         self._poll_glyphs()
+        if self._queued and not self.app.building:
+            self._queued = False                     # a build asked for during the last one
+            self.compile()
+            return
         if not self.auto or not self._dirty or not self.graph:
             return
-        if time.time() - self._dirty < self.AUTO_DELAY:
+        quiet = time.time() - self._dirty
+        if quiet >= self.SCRIPT_DELAY and self._standin_at != self.edits:
+            self.standin()                           # the edit on the cube now; its build follows
+        if quiet < self.AUTO_DELAY:
             return
         if self.app.building:
             return                    # tried again next frame; the last edit wins
         self._dirty = 0.0
-        self.compile()
+        self.compile(auto=True)
+
+    # --- the edit at once ----------------------------------------------------------------
+    # A native build takes a second or three; the script VM (native/script.py) runs the same
+    # graph from bytecode compiled in a few milliseconds. So an edit that is to be built shows
+    # at once: the sim's Studio Script effect runs it under the graph's own name, sliders and
+    # palette, and the build, when it lands, takes its place at the same clock
+    # (app.poll_build) - the swap is not seen. A graph the script cannot run (a node it does
+    # not have) waits for its build, as before; so does a comparison (A/B), which is of builds.
+    SCRIPT_DELAY = 0.15
+
+    def _build_target(self):
+        """(graph, effect file) a build from the pane makes: the graph, or the pin preview's copy."""
+        if not self.graph:
+            return None, None
+        if self.preview:
+            g = self._preview_graph()
+            if g is not None:
+                return g, self.PREVIEW_FILE
+        return self.graph, os.path.splitext(self.file)[0] + ".cpp"
+
+    def standin(self, g=None, fname=None):
+        """The graph (or `g`, for effect file `fname`) run as a script in place of its build
+        until that lands; True when it is on the cube. Quietly False when it cannot be, or
+        when what is on the cube runs this graph already (an edit that changed no code)."""
+        app = self.app
+        self._standin_at = self.edits
+        if g is None:
+            g, fname = self._build_target()
+        eng = app.eng
+        if g is None or getattr(app, "ab", None) is not None or not eng.names:
+            return False
+        si = eng.script_effect()
+        if si is None:
+            return False
+        from native.script import compile_script, settings_of
+        try:
+            if self._engine_has(fname, g.compile()):
+                if self.standin_on():
+                    self._standin_back()             # an edit undone before its build: the build is the graph again
+                return False                         # the engine runs this code already (a zoom, a label, an open)
+            prog = compile_script(g)
+        except Exception:                            # a node the script does not have: the build alone shows it
+            return False
+        title = app.project.effect_title(fname)
+        on = eng.idx == si and self._standin_for == fname
+        if self._shown == (fname, prog) and (on or eng.names[eng.idx] == title):
+            if on:
+                self._standin_shows = self.edits     # running it: a reload would only start it again
+            return on                                # the cube shows this graph already
+        if not eng.script(prog):
+            return False
+        self._standin_for, self._standin_prog, self._standin_shows = fname, prog, self.edits
+        self._shown = (fname, prog)
+        if not on:                                   # running already, the VM starts a new program itself
+            st = settings_of(g)                      # what the build will start with (its metadata's defaults)
+            pal = st.pop("pal")
+            clock = eng.clock()
+            eng.select(si, params=dict(st, pal=pal))
+            eng.set_clock(clock)                     # a pattern that follows the time carries on
+            self._standin_ui()
+        return True
+
+    def _standin_ui(self):
+        """The effect list and the sliders name the graph's effect, not the Studio Script running it:
+        the build's own labels when the engine has one, the script's until then."""
+        app, eng = self.app, self.app.eng
+        title = app.project.effect_title(self._standin_for)
+        own = eng.meta[eng.names.index(title)] if title in eng.names else None
+        dpg.set_value("fx_combo", title if own else eng.names[eng.idx])
+        app.rebuild_params(meta=own)
+        app.sync_palette_combo()
+
+    def standin_on(self):
+        """The stand-in is what the cube shows."""
+        eng = self.app.eng
+        return self._standin_for is not None and bool(eng.names) and eng.idx == eng.script_effect()
+
+    def standin_stays(self, want, names):
+        """When a build lands under the stand-in: True if the stand-in keeps the cube - it shows
+        edits made while the build compiled, or the build has no effect of the graph's to show."""
+        if want != self.app.project.effect_title(self._standin_for):
+            return False                             # another effect was built: it is the one to show
+        return self._standin_shows > self._built_at or want not in names
+
+    def standin_reload(self, clock):
+        """The stand-in into the engine's new library (a build landed under it and it stays)."""
+        eng = self.app.eng
+        si = eng.script_effect()
+        if si is None or not eng.script(self._standin_prog):
+            self._standin_for = None
+            return False
+        if eng.idx != si:
+            eng.select(si, params=dict(eng.fx, pal=eng.pal))
+        eng.set_clock(clock)
+        self._standin_ui()
+        return True
+
+    def _engine_has(self, fname, src):
+        """The engine runs this very code for `fname`: the file holds it, the engine has the
+        effect, and its library was built after the file was written. An edit that changed no
+        code - a zoom, a move, a label, opening the graph - has nothing to build or stand in for."""
+        eng, proj = self.app.eng, self.app.project
+        lib = getattr(eng, "library", None)
+        if not lib or not fname or proj.effect_title(fname) not in (eng.names or []):
+            return False
+        try:
+            if proj.read_effect(fname) != src:
+                return False
+            return os.path.getmtime(lib) >= os.path.getmtime(proj.effect_path(fname))
+        except OSError:
+            return False
+
+    def _standin_back(self):
+        """The stand-in off the cube for the build the engine has, at the same clock."""
+        app, eng = self.app, self.app.eng
+        title = app.project.effect_title(self._standin_for)
+        if title in eng.names:
+            clock = eng.clock()
+            eng.select(eng.names.index(title))
+            eng.set_clock(clock)
+            dpg.set_value("fx_combo", title)
+            app.rebuild_params()
+            app.sync_palette_combo()
+        self.standin_done(False)
+
+    def standin_done(self, replaced=True):
+        """A build landed and took the stand-in's place (replaced), or landed with something else
+        on the cube: either way the cube shows a build now - the stand-in's edit when they match."""
+        same = replaced and self._standin_for is not None and self._standin_shows == self._built_at
+        self._shown = (self._standin_for, self._standin_prog) if same else None
+        self._standin_for = None
 
     def rebuild(self):
         self.touch()
@@ -5590,8 +5741,10 @@ class GraphPanel(Glyphs):
         g.name = "Preview"
         return g
 
-    def compile(self, and_build=True):
-        """Graph -> effects/<graph>.cpp -> the normal build and reload."""
+    def compile(self, and_build=True, auto=False):
+        """Graph -> effects/<graph>.cpp -> the normal build and reload. `auto`:
+        Live's - nothing is written or built when the engine runs this code
+        already (an edit that changed none: a zoom, a label, the graph opened)."""
         if not self.graph:
             return
         self.save()
@@ -5603,6 +5756,7 @@ class GraphPanel(Glyphs):
                 fname = self.PREVIEW_FILE
         try:
             src = (g or self.graph).compile()
+            same = auto and and_build and not self.preview and self._engine_has(fname, src)
             self._probes = dict(getattr(g or self.graph, "probes", {}) or {})
             self._probe_scope = dict(getattr(g or self.graph, "last_scope", {}) or {})
             self._probes_for = fname
@@ -5610,8 +5764,9 @@ class GraphPanel(Glyphs):
             # which node wrote each line, for a build that fails (build_failed); the text too, so a
             # file edited by hand since is not blamed on the nodes
             self._line_map = (fname, dict(getattr(g or self.graph, "line_nodes", None) or {}), src)
-            self._clear_build_problems()                       # new text: the last build's word on it is old
-            self._costs = None                                 # and what each node cost was measured on the old
+            if not same:
+                self._clear_build_problems()                   # new text: the last build's word on it is old
+                self._costs = None                             # and what each node cost was measured on the old
         except G.GraphError as e:
             self._mark_problems()
             at = messages.held(f"problem:{self._key()}:")
@@ -5624,9 +5779,20 @@ class GraphPanel(Glyphs):
             return None
         messages.clear(self.app, f"graph:{self._key()}")
         self._mark_problems()
+        if same:
+            if self.standin_on():
+                self._standin_back()                             # an edit undone before its build: the build is the graph
+            return fname                                         # the engine runs this code: nothing to write or build
         self.app.project.write_effect(fname, src)
-        self.status(f"wrote {fname}" + (f" (previewing {self.preview[1]} of #{self.preview[0]})" if self.preview else ""))
+        if and_build and self._standin_at != self.edits:
+            self.standin(g or self.graph, fname)                 # the edit on the cube while it builds
+        self.status(f"wrote {fname}" + (f" (previewing {self.preview[1]} of #{self.preview[0]})" if self.preview else "")
+                    + (" - the sim runs it as a script until its build lands" if and_build and self.standin_on() else ""))
         if and_build:
+            if self.app.building:
+                self._queued = True                              # made when the build in hand lands (poll)
+            else:
+                self._built_at = self.edits                      # the graph as this build has it
             # the code pane follows: edit_build saves what the pane holds, and
             # that must be this file, not whatever was open before
             self.app.edit_open(fname)

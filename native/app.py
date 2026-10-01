@@ -1606,14 +1606,20 @@ class App(Features):
             return
         # success: swap the engine, keep everything the user had
         want = self.project.effect_title(self.edit_file) if self.edit_file else self.project.selected
+        sub = self.gp.standin_on()                       # the edit shown at once as a script (graph_ui.standin)
+        clock = self.eng.clock()
         self.eng.reload(rep.library)
         self._ab_reloaded(rep.library)
         dpg.configure_item("fx_combo", items=self.eng.names)
-        if want in self.eng.names:
-            self.eng.select(self.eng.names.index(want))
-        dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
-        self.rebuild_params()
-        self.sync_palette_combo()
+        if not (sub and self.gp.standin_stays(want, self.eng.names) and self.gp.standin_reload(clock)):
+            if want in self.eng.names:
+                self.eng.select(self.eng.names.index(want))
+            if sub:
+                self.eng.set_clock(clock)                # the build takes the stand-in's place at the same moment
+            self.gp.standin_done(sub)
+            dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
+            self.rebuild_params()
+            self.sync_palette_combo()
         dpg.set_value("edit_status", f"loaded {os.path.basename(rep.library)}  ({self.eng.count} effects)")
         messages.clear(self, "build:")                       # it builds: the build's problem is gone
         if self.edit_file:
@@ -1656,7 +1662,7 @@ class App(Features):
             num.add(it, value, lo, hi, integer=not is_float, digits=1 if is_float else None, unit=unit, width=-1,
                     callback=lambda s, v: setter(max(lo, min(hi, v))))
 
-    def fx_fit(self):
+    def fx_fit(self, meta=None):
         """A word under the effect when it cannot show on this geometry: an
         effect written for a matrix alone, on LEDs laid out as one row (a
         strip, a ring, a shape's strip layout), runs as a solid colour."""
@@ -1664,7 +1670,7 @@ class App(Features):
             return
         from native.engine import matrix_only
         g = self.project.geometry
-        bad = bool(self.eng.meta) and not g.is2d and matrix_only(self.eng.meta[self.eng.idx])
+        bad = bool(self.eng.meta) and not g.is2d and matrix_only(meta or self.eng.meta[self.eng.idx])
         if bad:
             dpg.set_value("fx_fit_note", "an effect for a matrix: on this shape's one-row (strip) layout it shows one colour - "
                                          "pick one made for any shape (the project's own, a 1-D one), or lay the shape out as a "
@@ -1672,11 +1678,13 @@ class App(Features):
                           "an effect for a matrix: on a single row of LEDs it shows one colour - pick a 1-D effect, or one for both")
         dpg.configure_item("fx_fit_note", show=bad)
 
-    def rebuild_params(self):
-        """Sliders are labelled from the effect's own metadata, as the web UI is."""
-        self.fx_fit()                                    # the effect or the geometry changed: whether it can show here
+    def rebuild_params(self, meta=None):
+        """Sliders are labelled from the effect's own metadata, as the web UI is
+        - or from `meta`, an effect another stands in for (the script running a
+        graph's edit until its build lands)."""
+        self.fx_fit(meta)                                # the effect or the geometry changed: whether it can show here
         dpg.delete_item("params", children_only=True)
-        m = self.eng.meta[self.eng.idx]
+        m = meta or self.eng.meta[self.eng.idx]
         generic = {"sx": "Speed", "ix": "Intensity", "c1": "Custom 1",
                    "c2": "Custom 2", "c3": "Custom 3"}
         for i, k in enumerate(("sx", "ix", "c1", "c2", "c3")):

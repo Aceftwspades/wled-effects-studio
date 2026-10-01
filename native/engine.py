@@ -111,7 +111,8 @@ class Engine:
         self.idx = 0
         self.pal = 1
         self.fx = {}
-        self.sim_ms = 0
+        self.sim_ms = 0              # ms since the effect was picked (the synth's beat counts from it)
+        self.now_ms = 0              # the engine's clock, strip.now: from the start, through every pick
         self.B = 16
         self.geom = None
         self.map1d2d = 0
@@ -207,6 +208,7 @@ class Engine:
         self._px = self.lib.simPixels()
         self._fft = self.lib.simFftPtr()
         self.sim_ms = 0
+        self.now_ms = 0                                  # simInit starts strip.now again
         self.seg = 0
         self._segstate.clear()
         self.select(self.idx)
@@ -567,6 +569,7 @@ class Engine:
 
     def frame(self, dt=23):
         self.sim_ms += dt
+        self.now_ms += dt
         self.lib.simFrame(self.idx, dt)
 
     def set_now(self, ms=0):
@@ -575,8 +578,23 @@ class Engine:
         self.sim_ms = int(ms)
         try:
             self.lib.simNowSet(C.c_uint32(int(ms)))
+            self.now_ms = int(ms)
         except AttributeError:
             pass
+
+    def clock(self):
+        """Both clocks, (strip.now, ms since the effect was picked), to hand
+        to set_clock after a pick or a reload that would start them again."""
+        return self.now_ms, self.sim_ms
+
+    def set_clock(self, c):
+        """The clocks from clock() put back: an effect that stands in for
+        another (the script preview, then the build it stood in for) takes
+        over at the same moment, so a pattern that follows the time does not
+        jump back to its start."""
+        now, since = c
+        self.set_now(now)
+        self.sim_ms = int(since)
 
     def pixels(self):
         """(rows, cols) uint32 0x00RRGGBB, a live view of the engine's buffer."""

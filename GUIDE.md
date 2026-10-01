@@ -246,13 +246,21 @@ and both fields follow. Effect settings' palette is picked by name. Every
 node and pin explains itself at the pointer when hovered (or in the box
 above the graph, as panes), and while the effect is on the cube that
 shows the pin's live value. The
-bolt on the toolbar (**L**) rebuilds as you edit; F5 rebuilds on demand.
+bolt on the toolbar (**L**) - Live - rebuilds as you edit (on unless
+turned off, and remembered; an edit that changes no code, a zoom or a
+label, builds nothing); F5 rebuilds on demand.
 A typed value on a pin needs no rebuild at all: the compiled effect
 reads it from a small table, and dragging the field (or the XY pad)
 pokes the running engine, so the picture follows the drag at once -
 as a synth follows a knob; a colour typed on a pin too (its red, green
 and blue each a slot of the table). Adding or wiring nodes, or a
-setting on a node, still rebuilds. A pattern's coordinates read the
+setting on a node, still rebuilds - but the edit shows at once all the
+same: while the C++ compiles, the sim's Studio Script effect runs the
+graph from bytecode (compiled in a few milliseconds), under the graph's
+own name and sliders, and the build takes its place at the same moment
+when it lands, so the swap is not seen. A graph with a node the script
+does not have (a Bitmap, a Field, a particle system) waits for its
+build, as before. A pattern's coordinates read the
 pixel while nothing is wired or typed on them - a Noise dropped in says
 **position x** on its field and draws at once, as wiring Position into
 it would; a Checker, Wave or Bitmap reads Coords' u and v. Type a number

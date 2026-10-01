@@ -442,6 +442,7 @@ class Features:
         st = settings_of(self.gp.graph)
         pal = st.pop("pal")
         self.eng.select(si, params=dict(st, pal=pal))
+        self.gp.standin_done(False)                      # asked for: not a stand-in a build takes over from
         dpg.set_value("fx_combo", self.eng.names[si])
         self.rebuild_params(); self.sync_palette_combo()
         self.gp.status(f"running as a script: {len(prog)} bytes")
