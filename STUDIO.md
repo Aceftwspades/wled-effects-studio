@@ -3014,9 +3014,21 @@ most valuable first:
       Maelstrom with Live on and finds the Studio Script on the cube under
       Maelstrom's name with the clock carried, the build in its place at
       the same clock after, and a zoom building nothing.
-- [ ] **A node gallery layout test** (wled-toy's visual invariants): every
-      node in one graph, fields inside the node, pins on its edge, text cut
-      with an ellipsis.
+- [x] **A node gallery layout test** (wled-toy's visual invariants).
+      `tests/node_gallery.py` puts every node of the library on one graph,
+      and `check(app)` reads what Dear PyGui drew: a node's box is its
+      content, so nothing in it - a name, a field, a face - may reach past
+      the width it is laid out to, nor a title push the box wider; a name
+      cut short ends in "..."; an output's name ends at its pin, an input's
+      row starts at its. The smoke opens it at 100%, 70% and 140%. It found
+      a Note's, a Bitmap's and States' text box 220 wide on a 150 node, the
+      Colour ramp's gradient 220 and the Float curve's 160 (all the node's
+      width now; the properties keep their wider ramp), and the narrow
+      nodes - Knot colour, Send colour, Receive and Receive colour - pushed
+      wider by their titles with their pins' names left short of the edge:
+      a narrow node now widens to its title, up to a whole node, and lays
+      its pins out to that; a longer title, on any node, and an output's
+      name too long are cut with "..." (`GraphPanel._fit_title`).
 - [ ] **Smaller**: OSC in beside MIDI learn; Math's second pin hidden for a
       one-input operation and its operations grouped (Blender); a macOS
       build and ARM builds.

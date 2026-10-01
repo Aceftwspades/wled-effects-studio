@@ -216,6 +216,15 @@ STEPS = [
     # a bool output's light, the Audio node's beat: framed in the top left first - in the whole graph at macOS's
     # 1280 x 646 it sat under the minimap, where no readout is drawn
     ([{"check": "any(dpg.get_item_type(i).endswith('DrawCircle') for i in app.gp._readout_items)"}], 0.5),
+    # every node in the library on one graph (tests/node_gallery.py, the tree's): what is drawn in a node lies
+    # within the width it is laid out to - a title, a field, a face - a name too long is cut with "...", an
+    # output's name ends at its pin and an input's row starts at its - at 100%, 70% and 140%
+    ([{"py": f"setattr(app, '_gal', __import__('runpy').run_path({os.path.join(HERE, 'node_gallery.py')!r}, run_name='x'))"},
+      {"py": "app._gal['write'](app.project.path)[0]"}, {"layout": "graph"}, {"graph_open": "node_gallery.json"},
+      {"graph_zoom": 1.0}], 2.5),
+    ([{"py": "app._gal['check'](app)"}, {"check": "not app._gal['check'](app)"}, {"graph_zoom": 0.7}], 2.0),
+    ([{"py": "app._gal['check'](app)"}, {"check": "not app._gal['check'](app)"}, {"graph_zoom": 1.4}], 2.0),
+    ([{"py": "app._gal['check'](app)"}, {"check": "not app._gal['check'](app)"}, {"graph_zoom": 1.0}], 0.5),
     # an unwired coordinate reads the pixel: a Noise dropped in says "position x" on its field and compiles per
     # pixel; a number typed makes it a number again, a reset brings the words back; a vector pin (Voronoi's) is
     # a button that gives it a typed value

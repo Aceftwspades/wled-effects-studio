@@ -170,6 +170,7 @@ class GraphPanel(Glyphs):
         self._node_font = None   # the node's words at this zoom, bound to each node as it is made
         self._val_font = None    # a field's value at this zoom (the monospace)
         self._standin_line = {}  # nid -> the height a stand-in gives its summary line (0: none)
+        self._node_w = {}        # nid -> the width its node is laid out to at this zoom (_fit_title)
         self._font_file = _font_file()
         self._zoom_themes = {}   # zoom -> node-editor style theme
         self._node_themes = {}   # (r,g,b) -> a node theme with that title bar
@@ -2106,6 +2107,9 @@ class GraphPanel(Glyphs):
         collapsed = bool(n.get("collapsed"))
         hide = bool(n.get("hide_pins"))
         width = self.px(NARROW_W if d.get("narrow") else NODE_W)
+        if n["type"] != "Frame":
+            label, width = self._fit_title(label, width)
+        self._node_w[nid] = width
         if self.overview() and n["type"] != "Frame":
             self._make_standin(nid, n, d, label, width)
             return
@@ -2188,11 +2192,28 @@ class GraphPanel(Glyphs):
                 with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Output, tag=tag,
                                         user_data=(nid, o["name"]), shape=dpg.mvNode_PinShape_CircleFilled):
                     shown = nodeface.label(n["type"], o["name"])
+                    if self.text_w(shown) > width:
+                        shown = nodeface.fit_width(shown, width, self.text_w)     # cut, not the node pushed wider
                     dpg.add_text(shown, indent=_right(self.text_w(shown), width))
                 dpg.bind_item_theme(tag, th.pin[o["type"]])
                 self._pins[(nid, "out", o["name"])] = tag
                 self._ptype[tag] = o["type"]
         self._bind_node_theme(nid, n)
+
+    def _fit_title(self, label, width):
+        """A title within its node, and the width the node is laid out to: a
+        narrow node (a knot, a send, a receive) widens to its title, up to a
+        whole node's width; a title longer than that is cut with "..." - a
+        node never grows past its width for its words (the help line and the
+        properties have the title whole)."""
+        import math
+        tw = math.ceil(self.text_w(label))
+        full = self.px(NODE_W)
+        if width < tw and width < full:
+            width = min(full, tw)
+        if tw > width:
+            label = nodeface.fit_width(label, width, self.text_w)
+        return label, width
 
     def node_title(self, n, d):
         """A node's title: the name it was given, else its definition's; a
@@ -3500,17 +3521,17 @@ class GraphPanel(Glyphs):
         if p["type"] == "text" and (multiline or p.get("lines")):
             # rows of a bitmap are '/'-separated in the param and shown as lines
             shown = str(v).replace("/", "\n") if p.get("lines") else str(v)
-            w = dpg.add_input_text(width=self.px(220), height=self.px(90 if not p.get("lines") else 150), multiline=True,
+            w = dpg.add_input_text(width=width, height=self.px(90 if not p.get("lines") else 150), multiline=True,
                                    default_value=shown, user_data=ud, callback=cb)
             self._widgets.add(w)
             return
         if p["type"] == "bool":
             w = dpg.add_checkbox(label=nodeface.label(n["type"], p["name"]), default_value=bool(v), user_data=ud, callback=cb)
         elif p["type"] == "ramp":
-            self._ramp_widget(nid, n, p, v)
+            self._ramp_widget(nid, n, p, v, width)
             return
         elif p["type"] == "curve":
-            self._curve_widget(nid, n, p, v)
+            self._curve_widget(nid, n, p, v, width)
             return
         else:
             return
@@ -3825,9 +3846,10 @@ class GraphPanel(Glyphs):
         self.status(f"image -> Bitmap ({w} x {h}, {len(palette)} colours) + Colour pick")
 
     # --- a colour ramp on the node: the gradient drawn, then a row per stop -----------
-    def _ramp_widget(self, nid, n, p, stops):
+    def _ramp_widget(self, nid, n, p, stops, width=None):
+        """`width`: the node's (in the properties, 220 at this zoom)."""
         stops = [list(st) for st in (stops or p["default"])]
-        W, H = self.px(220), self.px(14)
+        W, H = int(width or self.px(220)), self.px(14)
         with dpg.drawlist(width=W, height=H):
             srt = sorted(stops, key=lambda st: st[0])
             for x in range(0, W, 2):
@@ -3846,9 +3868,9 @@ class GraphPanel(Glyphs):
                     dpg.add_button(label="-", small=True, user_data=(nid, p["name"], k, "del"), callback=self._on_ramp)
         dpg.add_button(label="+ stop", small=True, user_data=(nid, p["name"], -1, "add"), callback=self._on_ramp)
 
-    def _curve_widget(self, nid, n, p, pts):
+    def _curve_widget(self, nid, n, p, pts, width=None):
         pts = sorted([list(q) for q in (pts or p["default"])], key=lambda q: q[0])
-        W, H = self.px(160), self.px(80)
+        W, H = int(width or self.px(NODE_W)), self.px(80)
         with dpg.drawlist(width=W, height=H):
             P = self.pal()
             dpg.draw_rectangle((0, 0), (W - 1, H - 1), color=P["plot_edge"])
