@@ -3208,10 +3208,47 @@ a **Try it** that opens the graph live.
       written first. The smoke opens Slew's page, sees its picture play,
       tries it, changes an input and another lesson's setting, resets and
       copies.
-- [ ] **Phase 2** - generate (21). **Phase 3** - coords (11), colour (22).
-      **Phase 4** - signals and audio (37). **Phase 5** - maths (35),
-      controls, custom and output (15). **Phase 6** - graph tools (11);
-      then ALL_REQUIRED.
+- [x] **Phase 2 - generate** (all 21). Cube lessons are drawn in 3-D,
+      swaying either side of the three-quarter view so the loop has no
+      jump; a lesson can bring files from examples/ (Image's picture: read
+      there by the generator, copied into the tutorials project by Try it).
+      Found on the way: a lesson's graph lacked `"implicit": 1`, so its
+      unwired coordinates were fixed instead of reading the pixel (every
+      LED one colour - the test now fails a picture like that); links name
+      a node by its file stem (`studio:try/reaction_diffusion`: a Markdown
+      target has no spaces); a lesson must name each input and setting as
+      the node shows it ("transparent is off", not alpha_clear). And a bug in
+      **Bifurcation**: each pixel read one of its 64 x 48 bins, so on a
+      picture smaller than that most of the tree fell between the pixels
+      that read (a 32 x 16 matrix showed a third of it, and trail and orbits
+      seemed to do nothing) - a pixel now reads the brightest of the bins it
+      covers; at 64 x 48 and over, one, as before.
+- [x] **Phase 3 - coords (11) and colour (22).** A shape that is neither
+      a matrix nor a cube is drawn as a cloud of LEDs from the lesson's
+      `view` (Shape part's three rings, from above). Notes for the lessons
+      to come: noise sits near the middle of 0..1, so a lesson that colours
+      by it stretches it first (a Smoothstep) or the picture is one flat
+      colour; the sim's Lava is FastLED's LavaColors, white at 0.75; a
+      Blackbody above about 3000 K is pale, so fire stays below it.
+- [x] **Phase 4 - signals and audio (37)** and **maths (35).** A signal is
+      one number a frame, so its lesson shows it as a level meter on the
+      matrix - or two meters, input against output - and as a trace. Found
+      on the way: `Synth.push` gave the engine the levels but not the
+      waveform or the notes (the app added them itself), so Waveform and
+      Notes were flat in the Library's thumbnails and here; the synth now
+      gives all of it. Scenes' lesson carries its two snapshots in the
+      graph. A one-frame pulse falls between a picture's samples, so a
+      lesson traces what the pulse drives instead (Rising edge: its Counter).
+- [x] **Phase 5 - controls, custom and output (15)** and **Phase 6 - the
+      graph tools (11)**: every node of the 152 has its tutorial, and
+      `ALL_REQUIRED` is on - a new node is not finished without one. A
+      control's "Try this" can only say where its slider is (a rebuild keeps
+      the slider where the person left it); a lesson about the colour
+      pickers brings its own three colours (`colours`: the generator's, and
+      Try it's in the tutorials project). With a picture on nearly every
+      node, opening the reference took a second (F1 on a node): a GIF's
+      texture is now made only when it comes into view, a one-pixel stand-in
+      of its size until then - 0.25 s.
 
 ### Deferred from earlier lists
 

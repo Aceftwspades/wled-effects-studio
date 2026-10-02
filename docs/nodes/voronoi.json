@@ -1,0 +1,155 @@
+{
+ "node": "Voronoi",
+ "star": 1,
+ "caption": "Voronoi: cells like stained glass over the cube, dark cracks between, each cell its own colour",
+ "why": [
+  "Scatter points through space and give every place to its nearest point: you get cells - the pattern of a giraffe's coat, dried mud, foam, stained glass. Voronoi does that for every pixel, in the cube's real space, so the cells run over the edges without a seam.",
+  "It answers three ways: the distance to the nearest point (soft round cells), how far from the edge between two cells (the cracks), and a random number per cell (its own colour). Its neighbours: Brick and Checker are regular grids; Noise has no cells; Voronoi is irregular cells."
+ ],
+ "steps": [
+  "**pos** is unwired, so it is the pixel's own place in the cube: the cells are three-dimensional and flow over the edges.",
+  "**scale** is 1.2: about one cell per unit of the cube's -1..1 box, so two or three cells to a face. **seed** picks the scatter of points - another seed, other cells.",
+  "`edge` - 0 on the boundary between cells, larger toward the middle - goes into a **Smoothstep** whose edges are 0 and 0.15: dark on the cracks, lit inside. That is the **Palette**'s brightness.",
+  "`id` - one random number for the whole cell - plus a slow clock (**Time** times 0.1) is the palette's index: each cell its own colour, all of them shifting slowly together."
+ ],
+ "try": [
+  {
+   "label": "Smaller cells",
+   "text": "scale 3 (the node's own default): two and a half times the cells each way - a fine mosaic, each cell a few LEDs.",
+   "set": [
+    [
+     1,
+     "scale",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Different cells",
+   "text": "seed 7: the points are scattered differently, so every cell changes shape and place.",
+   "set": [
+    [
+     1,
+     "seed",
+     7.0
+    ]
+   ]
+  },
+  {
+   "label": "Wide cracks",
+   "text": "the Smoothstep's second edge at 0.45: the dark spreads far in from each edge, leaving glowing islands in the middle of the cells.",
+   "set": [
+    [
+     2,
+     "e1",
+     0.45
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Voronoi",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Voronoi",
+    "params": {},
+    "inputs": {
+     "scale": 1.2,
+     "seed": 0.0
+    }
+   },
+   {
+    "id": 2,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.0,
+     "e1": 0.15
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.1
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "edge",
+    2,
+    "x"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    1,
+    "id",
+    5,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "index"
+   ],
+   [
+    2,
+    "result",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

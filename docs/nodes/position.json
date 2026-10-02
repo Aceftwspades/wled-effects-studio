@@ -1,0 +1,142 @@
+{
+ "node": "Position",
+ "star": 1,
+ "caption": "Position: level bands sliding down through the cube - straight across every face",
+ "why": [
+  "On a cube, a straight line through the box - a level, a tilted plane, a slab - crosses several faces, and on the unfolded net it comes out broken and bent. Position gives each pixel its real place in the cube's box, x, y and z each -1..1 with z up, so straight things come out straight.",
+  "Use it for anything about height or a direction through the box: water filling up, a scan sweeping across, gravity, slabs. Its neighbours: Direction is the angle from the middle (for things that flow round); Cube ring is the lid and walls as a well; Position is straight lines and planes."
+ ],
+ "steps": [
+  "Position has no inputs or settings. `x` runs west to east, `y` south to north, `z` bottom to lid; `pos` is all three as one vector, for nodes that take a point.",
+  "`z` goes into a **Wave**'s x (2 cycles, triangle), with a clock (**Time** times 0.3) as its phase: level bands of light that slide down through the cube.",
+  "`x` is the **Palette**'s index, so the colour changes from west to east; the wave is the brightness.",
+  "Watch a band cross from one face to the next: it stays perfectly level all the way round."
+ ],
+ "try": [
+  {
+   "label": "Square bands",
+   "text": "the Wave's shape square: hard-edged slabs - water levels in a tank.",
+   "set": [
+    [
+     2,
+     "shape",
+     "square"
+    ]
+   ]
+  },
+  {
+   "label": "More bands",
+   "text": "the Wave's cycles at 4: twice as many bands, half as thick.",
+   "set": [
+    [
+     2,
+     "cycles",
+     4.0
+    ]
+   ]
+  },
+  {
+   "label": "Rising",
+   "text": "the clock's Multiply at -0.3: the bands rise through the cube instead of sinking.",
+   "set": [
+    [
+     4,
+     "b",
+     -0.3
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Position",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 2,
+    "type": "Wave",
+    "params": {
+     "shape": "triangle"
+    },
+    "inputs": {
+     "cycles": 2.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "z",
+    2,
+    "x"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    2,
+    "phase"
+   ],
+   [
+    1,
+    "x",
+    5,
+    "index"
+   ],
+   [
+    2,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

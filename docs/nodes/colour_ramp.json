@@ -1,0 +1,222 @@
+{
+ "node": "Colour ramp",
+ "star": 1,
+ "caption": "Colour ramp: rising noise read through a fire gradient drawn on the node",
+ "why": [
+  "The WLED palettes are a fixed set; sometimes the colours an effect needs are its own - a particular fire, a brand's colours, an ocean. Colour ramp is a gradient you draw on the node: stops at positions 0..1, each with a colour, and it gives the colour at any point along it.",
+  "Because it is part of the effect, the colours are the same whatever palette the person picks on the WLED page. Its neighbours: Palette follows that choice; Colour pick gives exact colours by number with no blending; Blackbody is the real colours of heat; Colour ramp is any gradient you like."
+ ],
+ "steps": [
+  "A **Noise** reads **Coords** `u`, and `v` plus a clock (**Time** times 0.5): blobs rising up the matrix.",
+  "The noise stays near the middle, so a **Smoothstep** (edges 0.3 and 0.7) stretches it to 0..1 before it goes into the ramp's **t**: where along the gradient to read.",
+  "**stops** are black at 0, deep red at 0.35, orange at 0.6, yellow at 0.85 and near-white at 1 - a fire. **mode** is linear: colours blend straight from each stop to the next.",
+  "The ramp's `color` goes to the **Output**: low noise is dark, high noise burns white."
+ ],
+ "try": [
+  {
+   "label": "Bands",
+   "text": "mode constant: no blending - each stop's colour holds until the next, so the fire becomes hard bands like a contour map.",
+   "set": [
+    [
+     1,
+     "mode",
+     "constant"
+    ]
+   ]
+  },
+  {
+   "label": "Soft",
+   "text": "mode ease: each blend eases in and out, so the stops' own colours spread wider and the changes are gentler.",
+   "set": [
+    [
+     1,
+     "mode",
+     "ease"
+    ]
+   ]
+  },
+  {
+   "label": "Ocean",
+   "text": "stops from deep blue through teal to white foam: the same noise, an ocean instead of a fire.",
+   "set": [
+    [
+     1,
+     "stops",
+     [
+      [
+       0.0,
+       0,
+       0,
+       20
+      ],
+      [
+       0.4,
+       0,
+       40,
+       140
+      ],
+      [
+       0.7,
+       0,
+       170,
+       200
+      ],
+      [
+       1.0,
+       230,
+       255,
+       255
+      ]
+     ]
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Colour ramp",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Noise",
+    "params": {
+     "octaves": 2,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0
+    }
+   },
+   {
+    "id": 8,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.3,
+     "e1": 0.7
+    },
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Colour ramp",
+    "params": {
+     "stops": [
+      [
+       0.0,
+       0,
+       0,
+       0
+      ],
+      [
+       0.35,
+       200,
+       20,
+       0
+      ],
+      [
+       0.6,
+       255,
+       120,
+       0
+      ],
+      [
+       0.85,
+       255,
+       220,
+       60
+      ],
+      [
+       1.0,
+       255,
+       255,
+       230
+      ]
+     ],
+     "mode": "linear"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    6,
+    "x"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    2,
+    "v",
+    5,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "y"
+   ],
+   [
+    6,
+    "value",
+    8,
+    "x"
+   ],
+   [
+    8,
+    "result",
+    1,
+    "t"
+   ],
+   [
+    1,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,162 @@
+{
+ "node": "Receive",
+ "star": 2,
+ "caption": "Receive: the clock from a Send of the same name, arriving at the wave without a wire",
+ "why": [
+  "A value used all over a big graph - the beat, the clock, a master speed - means wires from one node crossing everything to reach the others. Send and Receive carry it without a wire: whatever feeds a Send named clock comes out of every Receive named clock, wherever they sit.",
+  "Its neighbours: Knot routes a wire neatly; sub-graphs hide wiring inside a node; Send and Receive remove the wire. Send colour and Receive colour do the same for colours."
+ ],
+ "steps": [
+  "A Send named clock carries **Time** times 0.3.",
+  "This Receive's **name** is clock, so its `out` is that value: it is the **Wave**'s phase. A second Receive of the same name feeds the palette's scroll.",
+  "A Receive whose name no Send has is an error, shown on the node.",
+  "When the graph compiles, each Receive is joined to its Send and both vanish."
+ ],
+ "try": [
+  {
+   "label": "Lose the Send",
+   "text": "name ticks: no Send has that name - the node says so, and the build waits until it matches again.",
+   "set": [
+    [
+     2,
+     "name",
+     "ticks"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Receive",
+  "nodes": [
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 1,
+    "type": "Send",
+    "params": {
+     "name": "clock"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Receive",
+    "params": {
+     "name": "clock"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Receive",
+    "params": {
+     "name": "clock"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 25,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 27,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    21,
+    "t",
+    22,
+    "a"
+   ],
+   [
+    22,
+    "result",
+    1,
+    "in"
+   ],
+   [
+    20,
+    "u",
+    24,
+    "x"
+   ],
+   [
+    2,
+    "out",
+    24,
+    "phase"
+   ],
+   [
+    20,
+    "u",
+    25,
+    "a"
+   ],
+   [
+    3,
+    "out",
+    25,
+    "b"
+   ],
+   [
+    25,
+    "result",
+    26,
+    "index"
+   ],
+   [
+    24,
+    "value",
+    26,
+    "brightness"
+   ],
+   [
+    26,
+    "color",
+    27,
+    "color"
+   ]
+  ]
+ }
+}

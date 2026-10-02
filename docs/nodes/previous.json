@@ -1,0 +1,170 @@
+{
+ "node": "Previous",
+ "star": 2,
+ "caption": "Previous: a bar sweeping across, leaving a trail of last frames fading behind it",
+ "why": [
+  "The most basic memory an effect has is its own last frame. Previous gives this pixel's colour from the frame before - fade it a little and draw the new frame over it, and anything that moves leaves a trail.",
+  "Trails, smears, afterglow, motion blur all start here. Its neighbours: Previous at reads another pixel's last colour (for things that move or spread); Blur reads it softened; Field remembers numbers rather than colours; Previous is this pixel, as it was."
+ ],
+ "steps": [
+  "Previous has no inputs or settings: it is this pixel's colour from last frame. It goes into a **Fade** (keep 0.85), dimming it.",
+  "New: one narrow bar from **Stripes** (count 1, duty 0.06) sweeping across with a clock (**Time** times 0.5), in the **Palette**'s colour for its place.",
+  "A **Blend** in max mode keeps the brighter of the faded last frame and the new bar.",
+  "The bar leaves a fading tail behind it - each frame's picture is last frame's, dimmed, with the bar drawn on top."
+ ],
+ "try": [
+  {
+   "label": "Long tail",
+   "text": "the Fade's keep at 0.97: the tail fades slowly and stretches across the matrix.",
+   "set": [
+    [
+     3,
+     "keep",
+     0.97
+    ]
+   ]
+  },
+  {
+   "label": "Short tail",
+   "text": "the Fade's keep at 0.5: only a short smear behind the bar.",
+   "set": [
+    [
+     3,
+     "keep",
+     0.5
+    ]
+   ]
+  },
+  {
+   "label": "Add up",
+   "text": "the Blend's mode add: old and new light add, so where the bar passes over its own tail it flares.",
+   "set": [
+    [
+     6,
+     "mode",
+     "add"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Previous",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Previous",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Fade",
+    "params": {},
+    "inputs": {
+     "keep": 0.85
+    }
+   },
+   {
+    "id": 4,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 7,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 1.0,
+     "duty": 0.06
+    }
+   },
+   {
+    "id": 8,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Blend",
+    "params": {
+     "mode": "max"
+    },
+    "inputs": {
+     "amount": 1.0
+    }
+   },
+   {
+    "id": 10,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "color",
+    3,
+    "color"
+   ],
+   [
+    4,
+    "t",
+    5,
+    "a"
+   ],
+   [
+    5,
+    "result",
+    7,
+    "phase"
+   ],
+   [
+    8,
+    "u",
+    9,
+    "index"
+   ],
+   [
+    7,
+    "value",
+    9,
+    "brightness"
+   ],
+   [
+    3,
+    "color",
+    6,
+    "under"
+   ],
+   [
+    9,
+    "color",
+    6,
+    "over"
+   ],
+   [
+    6,
+    "color",
+    10,
+    "color"
+   ]
+  ]
+ }
+}

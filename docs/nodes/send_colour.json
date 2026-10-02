@@ -1,0 +1,168 @@
+{
+ "node": "Send colour",
+ "star": 1,
+ "caption": "Send colour: the palette's colour sent by name to the far side of the graph, where the wave masks it",
+ "why": [
+  "Colour wires cross a graph as much as number wires do. Send colour and Receive colour carry a colour by name instead: whatever feeds a Send colour named paint comes out of every Receive colour named paint.",
+  "Its neighbours: Send and Receive for numbers; Knot colour to route a colour wire; sub-graphs to hide wiring."
+ ],
+ "steps": [
+  "A scrolling **Palette** colour goes into the Send colour's **in**.",
+  "**name** is paint: the Receive colour named paint gives that colour.",
+  "There it is masked by a **Wave** (a **Mask**) and goes to the **Output** - one colour wire that is never drawn.",
+  "Both nodes vanish when the graph compiles."
+ ],
+ "try": [
+  {
+   "label": "Another name",
+   "text": "name brush: the Receive colour is still called paint and no longer finds it - the node says so and the build waits.",
+   "set": [
+    [
+     1,
+     "name",
+     "brush"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Send colour",
+  "nodes": [
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 23,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Send colour",
+    "params": {
+     "name": "paint"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Receive colour",
+    "params": {
+     "name": "paint"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 25,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 26,
+    "type": "Mask",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 27,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    21,
+    "t",
+    22,
+    "a"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "a"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "b"
+   ],
+   [
+    23,
+    "result",
+    24,
+    "index"
+   ],
+   [
+    24,
+    "color",
+    1,
+    "in"
+   ],
+   [
+    2,
+    "out",
+    26,
+    "color"
+   ],
+   [
+    20,
+    "u",
+    25,
+    "x"
+   ],
+   [
+    22,
+    "result",
+    25,
+    "phase"
+   ],
+   [
+    25,
+    "value",
+    26,
+    "mask"
+   ],
+   [
+    26,
+    "color",
+    27,
+    "color"
+   ]
+  ]
+ }
+}

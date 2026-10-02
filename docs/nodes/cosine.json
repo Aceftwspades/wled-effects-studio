@@ -1,0 +1,152 @@
+{
+ "node": "Cosine",
+ "star": 1,
+ "caption": "Cosine: a smooth hump of light on every whole number, scrolling - bright at 0, dark at a half",
+ "why": [
+  "A smooth repeating swell, bright at whole numbers and dark halfway between, is one of the commonest shapes in lighting. Cosine gives exactly that, already as 0..1 - no rescaling needed.",
+  "Its neighbours: Sine is the raw -1..1 sine (one wave per turn); Wave gives 0..1 with more shapes and a cycles input; Band is a narrower bright line; Cosine is the simple smooth hump."
+ ],
+ "steps": [
+  "**Coords** `u` times 3 (a **Multiply**) plus a clock (**Time** times 0.4, an **Add**) is the **x** input.",
+  "Cosine is 1 wherever x is a whole number and 0 halfway between: three smooth humps across the matrix, moving.",
+  "The result is the **Palette**'s brightness; `u` picks the colour.",
+  "The trace shows the value at the centre pixel - a smooth wave between 0 and 1."
+ ],
+ "try": [
+  {
+   "label": "More humps",
+   "text": "the Multiply at 8: eight humps across.",
+   "set": [
+    [
+     2,
+     "b",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "Faster",
+   "text": "the clock's Multiply at 1.5: the humps sweep across quickly.",
+   "set": [
+    [
+     11,
+     "b",
+     1.5
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Cosine",
+  "nodes": [
+   {
+    "id": 3,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 3.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Cosine",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   }
+  ],
+  "links": [
+   [
+    3,
+    "u",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    4,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    4,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    3,
+    "u",
+    5,
+    "index"
+   ],
+   [
+    1,
+    "result",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

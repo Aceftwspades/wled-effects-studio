@@ -1,0 +1,169 @@
+{
+ "node": "Sine",
+ "star": 1,
+ "caption": "Sine: the raw sine, -1..1, remapped into 0..1 for brightness - smooth bands rolling across",
+ "why": [
+  "The sine is the shape of every smooth swing: a pendulum, a wave, a breath. Sine gives it raw: -1..1, one full wave for each turn of its input - the building block the other wave nodes are made from.",
+  "Because it goes negative, it needs remapping before it lights anything. Its neighbours: Cosine gives a 0..1 hump directly; Wave gives 0..1 with cycles and other shapes; Math has sin, cos and tan in turns; Sine is the raw function."
+ ],
+ "steps": [
+  "**Coords** `u` times 2 (a **Multiply**) plus a clock (**Time** times 0.3, an **Add**) is the **x** input: two turns across the matrix.",
+  "Sine of it swings from -1 to 1 and back twice across.",
+  "A **Remap** (in low -1, in high 1, out low 0, out high 1) moves that into 0..1 for the **Palette**'s brightness.",
+  "The trace shows the raw sine at the centre pixel - going below 0, which is why the Remap is there."
+ ],
+ "try": [
+  {
+   "label": "Only the top half",
+   "text": "the Remap's in low at 0: the negative half all maps below 0 and goes dark - only the tops of the waves show, with long gaps.",
+   "set": [
+    [
+     4,
+     "in_lo",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "More waves",
+   "text": "the Multiply at 5: five waves across.",
+   "set": [
+    [
+     2,
+     "b",
+     5.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Sine",
+  "nodes": [
+   {
+    "id": 3,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 2.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Sine",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Remap",
+    "params": {
+     "in_lo": -1.0,
+     "in_hi": 1.0,
+     "out_lo": 0.0,
+     "out_hi": 1.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    3,
+    "u",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    5,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    1,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    3,
+    "u",
+    6,
+    "index"
+   ],
+   [
+    4,
+    "result",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

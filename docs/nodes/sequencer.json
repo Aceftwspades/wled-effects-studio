@@ -1,0 +1,137 @@
+{
+ "node": "Sequencer",
+ "star": 1,
+ "caption": "Sequencer: four timed phases started by each beat - each its own colour, its brightness its progress",
+ "why": [
+  "Some effects are routines: a burst, a spin, a hold, a rest. Sequencer runs a cycle of up to four phases, each lasting the time you give it, started by a trigger or straight away, and tells you which phase is on and how far through it is.",
+  "Drive different parts of the effect from which phase it is, and their speed from the progress. Its neighbours: Steps plays a value per trigger; Counter counts triggers; Scenes fades between looks; Sequencer is timed phases."
+ ],
+ "steps": [
+  "**Audio**'s `beat` is the **trigger**: each kick starts the cycle again.",
+  "**phase 1** is 0.15 seconds, **phase 2** 0.3, **phase 3** 0.15 and **phase 4** 0.6. **loop** is off, so after phase 4 it stops until the next trigger; **run at start** is on, so it starts once when the effect does.",
+  "`phase` (1..4 while running, 0 when finished) times 0.25 is the **Palette**'s index - each phase its colour; `progress` (0..1 through the phase) is the brightness, so each phase ramps up.",
+  "`since` is the seconds since the cycle began and `running` whether it is. The trace shows the phase stepping 1, 2, 3, 4 after each kick."
+ ],
+ "try": [
+  {
+   "label": "Loop",
+   "text": "loop on: when phase 4 ends it starts again at phase 1 by itself, between beats too.",
+   "set": [
+    [
+     1,
+     "loop",
+     true
+    ]
+   ]
+  },
+  {
+   "label": "Long first phase",
+   "text": "phase 1 at 0.8: the first phase takes most of the gap between kicks.",
+   "set": [
+    [
+     1,
+     "t1",
+     0.8
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "progress"
+  ],
+  [
+   1,
+   "phase"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Sequencer",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Sequencer",
+    "params": {
+     "loop": false,
+     "start_running": true
+    },
+    "inputs": {
+     "t1": 0.15,
+     "t2": 0.3,
+     "t3": 0.15,
+     "t4": 0.6
+    }
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.25
+    }
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "beat",
+    1,
+    "trigger"
+   ],
+   [
+    1,
+    "phase",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "index"
+   ],
+   [
+    1,
+    "progress",
+    4,
+    "brightness"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ]
+  ]
+ }
+}

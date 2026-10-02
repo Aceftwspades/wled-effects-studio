@@ -1,0 +1,174 @@
+{
+ "node": "Random hold",
+ "star": 1,
+ "caption": "Random hold: a new random place on every beat - the ripples jump there and spread",
+ "why": [
+  "Variety on the beat: a new colour, a new place, a new direction with every kick, and steady in between. Random hold picks a random number when its trigger fires and keeps it until the next one.",
+  "Its neighbours: Hash is a random per thing, steady for ever; Sparkle is random pixels; Hold samples a value you give it; Random hold is a new random each trigger, the same for every pixel."
+ ],
+ "steps": [
+  "**Audio**'s `beat` is the **trigger**: on each kick a new random number, 0..1. `changed` is true on that frame.",
+  "A **Remap** turns it into -0.8..0.8 - the centre x of a **Ripple** - so the rings jump to a new place across the matrix on every kick.",
+  "The same random is the **Palette**'s index, so each place has its own colour.",
+  "The trace shows the random: a new level on each beat, flat between."
+ ],
+ "try": [
+  {
+   "label": "Closer to the middle",
+   "text": "the Remap's out range at -0.2..0.2: the centre only moves a little each beat.",
+   "set": [
+    [
+     2,
+     "out_lo",
+     -0.2
+    ],
+    [
+     2,
+     "out_hi",
+     0.2
+    ]
+   ]
+  },
+  {
+   "label": "More rings",
+   "text": "the Ripple's rings at 10: finer rings from each new centre.",
+   "set": [
+    [
+     3,
+     "rings",
+     10.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Random hold",
+  "nodes": [
+   {
+    "id": 4,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Random hold",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Remap",
+    "params": {
+     "in_lo": 0.0,
+     "in_hi": 1.0,
+     "out_lo": -0.8,
+     "out_hi": 0.8
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.6
+    }
+   },
+   {
+    "id": 3,
+    "type": "Ripple",
+    "params": {},
+    "inputs": {
+     "cy": 0.0,
+     "rings": 4.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    4,
+    "beat",
+    1,
+    "trigger"
+   ],
+   [
+    1,
+    "value",
+    2,
+    "x"
+   ],
+   [
+    2,
+    "result",
+    3,
+    "cx"
+   ],
+   [
+    5,
+    "t",
+    6,
+    "a"
+   ],
+   [
+    6,
+    "result",
+    3,
+    "phase"
+   ],
+   [
+    1,
+    "value",
+    7,
+    "index"
+   ],
+   [
+    3,
+    "value",
+    7,
+    "brightness"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,279 @@
+{
+ "node": "Field write",
+ "star": 2,
+ "caption": "Field write: each pixel's heat stored for the next frame - flames that rise because each frame builds on the last",
+ "why": [
+  "Field reads numbers remembered from the frame before; Field write is what remembers them. Every frame each pixel works out its new number - heat, water, how much sand - and Field write stores it, to be read back by a Field next frame.",
+  "Without it there is no memory and no simulation: each frame would start from nothing. Its neighbours: the Output stores the colour (which Previous reads back); Field write stores a number of your own, invisible until you choose to show it."
+ ],
+ "steps": [
+  "**value** is this pixel's new heat: the heat read from the pixel below last frame (a **Field** at `v` plus 0.07), cooled by a **Multiply** at 0.86, with new sparks in the bottom row added by a **Max**.",
+  "**field** is 0: the same field the Field node reads, so next frame's read finds what is written now.",
+  "The same number also goes to a **Colour ramp** (a fire) and the **Output**, so what is stored and what is shown agree.",
+  "Each frame builds on the one before: the bottom row's sparks are written, read one row higher next frame, written there, and so on - the heat climbs."
+ ],
+ "try": [
+  {
+   "label": "Another field",
+   "text": "field 1: the heat is now written somewhere the Field node does not read, so nothing rises - write and read must use the same field.",
+   "set": [
+    [
+     2,
+     "field",
+     1
+    ]
+   ]
+  },
+  {
+   "label": "Taller flames",
+   "text": "the cooling Multiply at 0.95: less is lost per row, so more of the heat that is written survives to be read further up.",
+   "set": [
+    [
+     22,
+     "b",
+     0.95
+    ]
+   ]
+  },
+  {
+   "label": "More sparks",
+   "text": "the Sparkle's density at 0.8: nearly the whole bottom row is lit each frame, so a solid wall of flame rises.",
+   "set": [
+    [
+     33,
+     "density",
+     0.8
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Field write",
+  "nodes": [
+   {
+    "id": 30,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 31,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 15.0
+    }
+   },
+   {
+    "id": 32,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 33,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.4
+    }
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {
+     "b": 0.07
+    }
+   },
+   {
+    "id": 1,
+    "type": "Field",
+    "params": {
+     "field": 0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.86
+    }
+   },
+   {
+    "id": 23,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.94
+    }
+   },
+   {
+    "id": 24,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 25,
+    "type": "Max",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Field write",
+    "params": {
+     "field": 0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Colour ramp",
+    "params": {
+     "stops": [
+      [
+       0.0,
+       0,
+       0,
+       0
+      ],
+      [
+       0.35,
+       200,
+       20,
+       0
+      ],
+      [
+       0.6,
+       255,
+       120,
+       0
+      ],
+      [
+       0.85,
+       255,
+       220,
+       60
+      ],
+      [
+       1.0,
+       255,
+       255,
+       230
+      ]
+     ],
+     "mode": "linear"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 27,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    30,
+    "t",
+    31,
+    "a"
+   ],
+   [
+    31,
+    "result",
+    32,
+    "x"
+   ],
+   [
+    32,
+    "result",
+    33,
+    "seed"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "u",
+    1,
+    "u"
+   ],
+   [
+    21,
+    "result",
+    1,
+    "v"
+   ],
+   [
+    1,
+    "value",
+    22,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    23,
+    "x"
+   ],
+   [
+    33,
+    "value",
+    24,
+    "a"
+   ],
+   [
+    23,
+    "value",
+    24,
+    "b"
+   ],
+   [
+    22,
+    "result",
+    25,
+    "a"
+   ],
+   [
+    24,
+    "result",
+    25,
+    "b"
+   ],
+   [
+    25,
+    "result",
+    2,
+    "value"
+   ],
+   [
+    25,
+    "result",
+    26,
+    "t"
+   ],
+   [
+    26,
+    "color",
+    27,
+    "color"
+   ]
+  ]
+ }
+}

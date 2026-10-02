@@ -1,0 +1,279 @@
+{
+ "node": "Field",
+ "star": 1,
+ "caption": "Field: heat stored per pixel between frames, rising from sparks at the bottom, read through a fire ramp",
+ "why": [
+  "A simulation - heat, water, sand, a growing pattern - needs to remember a number for every pixel from one frame to the next, separately from the colour shown. Field is that memory: it reads last frame's stored number at any pixel. Field write stores this pixel's new number for the next frame.",
+  "Reading a neighbour's value, not just your own, is what makes things move and spread. Its neighbours: Previous and Previous at remember colours, not numbers; Reaction diffusion keeps its own hidden grid; Field is the general memory to build your own simulation."
+ ],
+ "steps": [
+  "**field** is 0: which of the stored numbers to read (a graph has four, 0 to 3).",
+  "Field's **u** is **Coords** `u`, and its **v** is `v` plus 0.07 (an **Add**): it reads the stored heat of the pixel just below this one. Times 0.86 (a **Multiply**), that is heat rising one row, cooling as it goes.",
+  "New heat: a **Sparkle** (density 0.4, reseeded fifteen times a second) only in the bottom row (a **Threshold** on `v` at 0.94, multiplied in). A **Max** keeps the larger of the rising heat and the new sparks.",
+  "**Field write** stores that for next frame in field 0, and a **Colour ramp** (a fire) shows it: the heat rises from the bottom in flickering flames."
+ ],
+ "try": [
+  {
+   "label": "Taller flames",
+   "text": "the cooling Multiply at 0.95: heat loses less each row, so the flames reach the top.",
+   "set": [
+    [
+     22,
+     "b",
+     0.95
+    ]
+   ]
+  },
+  {
+   "label": "Faster rise",
+   "text": "the Add at 0.14: each pixel reads two rows down, so the heat rises twice as fast in steps.",
+   "set": [
+    [
+     21,
+     "b",
+     0.14
+    ]
+   ]
+  },
+  {
+   "label": "Read in place",
+   "text": "the Add at 0: each pixel reads its own stored heat, so nothing rises - the bottom row glows and the rest stays dark.",
+   "set": [
+    [
+     21,
+     "b",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Field",
+  "nodes": [
+   {
+    "id": 30,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 31,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 15.0
+    }
+   },
+   {
+    "id": 32,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 33,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.4
+    }
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {
+     "b": 0.07
+    }
+   },
+   {
+    "id": 1,
+    "type": "Field",
+    "params": {
+     "field": 0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.86
+    }
+   },
+   {
+    "id": 23,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.94
+    }
+   },
+   {
+    "id": 24,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 25,
+    "type": "Max",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Field write",
+    "params": {
+     "field": 0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Colour ramp",
+    "params": {
+     "stops": [
+      [
+       0.0,
+       0,
+       0,
+       0
+      ],
+      [
+       0.35,
+       200,
+       20,
+       0
+      ],
+      [
+       0.6,
+       255,
+       120,
+       0
+      ],
+      [
+       0.85,
+       255,
+       220,
+       60
+      ],
+      [
+       1.0,
+       255,
+       255,
+       230
+      ]
+     ],
+     "mode": "linear"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 27,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    30,
+    "t",
+    31,
+    "a"
+   ],
+   [
+    31,
+    "result",
+    32,
+    "x"
+   ],
+   [
+    32,
+    "result",
+    33,
+    "seed"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "u",
+    1,
+    "u"
+   ],
+   [
+    21,
+    "result",
+    1,
+    "v"
+   ],
+   [
+    1,
+    "value",
+    22,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    23,
+    "x"
+   ],
+   [
+    33,
+    "value",
+    24,
+    "a"
+   ],
+   [
+    23,
+    "value",
+    24,
+    "b"
+   ],
+   [
+    22,
+    "result",
+    25,
+    "a"
+   ],
+   [
+    24,
+    "result",
+    25,
+    "b"
+   ],
+   [
+    25,
+    "result",
+    2,
+    "value"
+   ],
+   [
+    25,
+    "result",
+    26,
+    "t"
+   ],
+   [
+    26,
+    "color",
+    27,
+    "color"
+   ]
+  ]
+ }
+}

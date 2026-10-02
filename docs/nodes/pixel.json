@@ -1,0 +1,175 @@
+{
+ "node": "Pixel",
+ "star": 1,
+ "caption": "Pixel: every seventh pixel in the count lit - the dots fall into diagonals because each row carries the count on",
+ "why": [
+  "Most coordinates are measured, 0..1, so a pattern stretches to fit any size. Sometimes you want to count instead: every third LED, the fifth column, a pixel at a time. Pixel gives each pixel's whole-number column, row and index.",
+  "`index` counts the pixels the way the picture is laid out, row by row, so a pattern built on it runs along the rows like a strip. Its neighbours: Coords measures 0..1, so a pattern scales with the panel; Pixel counts, so a pattern keeps its spacing in LEDs."
+ ],
+ "steps": [
+  "Pixel has no inputs or settings. `x` is the column (0 .. width-1), `y` the row, and `index` is row times width plus column.",
+  "`index` plus a clock (**Time** times 20, added) goes into a **Modulo** with m 7: a number that runs 0..7 and starts again every seven pixels, and creeps along twenty pixels a second.",
+  "A **Smoothstep** with edges 1 and 0 turns that into 1 where the remainder is near 0, fading by 1: one bright pixel in every seven. That is the **Palette**'s brightness.",
+  "The matrix is 32 wide, not a multiple of 7, so each row starts at a different point in the count: the dots line up in diagonals. That is the index carrying on from the end of one row to the start of the next.",
+  "`y` times 1/16 picks the colour, so each row has its own."
+ ],
+ "try": [
+  {
+   "label": "Every eighth",
+   "text": "the Modulo's m at 8: 32 is a multiple of 8, so every row starts at the same point in the count and the dots stack into straight columns.",
+   "set": [
+    [
+     4,
+     "m",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "Faster",
+   "text": "the clock's Multiply at 80: the dots race along the rows four times as fast.",
+   "set": [
+    [
+     3,
+     "b",
+     80.0
+    ]
+   ]
+  },
+  {
+   "label": "Sparse",
+   "text": "the Modulo's m at 32: one pixel in each row of 32 - a single dot running along every row, each row a step behind the last.",
+   "set": [
+    [
+     4,
+     "m",
+     32.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Pixel",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Pixel",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 20.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Modulo",
+    "params": {},
+    "inputs": {
+     "m": 7.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 1.0,
+     "e1": 0.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.0625
+    }
+   },
+   {
+    "id": 8,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    1,
+    "i",
+    5,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    4,
+    "result",
+    6,
+    "x"
+   ],
+   [
+    1,
+    "y",
+    7,
+    "a"
+   ],
+   [
+    7,
+    "result",
+    8,
+    "index"
+   ],
+   [
+    6,
+    "result",
+    8,
+    "brightness"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "color"
+   ]
+  ]
+ }
+}

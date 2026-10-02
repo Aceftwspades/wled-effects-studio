@@ -1,0 +1,161 @@
+{
+ "node": "Steps",
+ "star": 1,
+ "caption": "Steps: an eight-step pattern of levels, one step per beat - a drum machine for light",
+ "why": [
+  "A drum machine plays a pattern of eight steps, one per beat, round and round. Steps does the same with values: eight sliders on the node, one played on each trigger, so a brightness, a colour or a size follows a pattern you set rather than the music's own levels.",
+  "Its neighbours: Counter counts (the steps are its numbers); Sequencer runs timed phases; States shows drawings by index; Steps plays a pattern of your values."
+ ],
+ "steps": [
+  "**Audio**'s `beat` is the **trigger**: each kick moves to the next step. **reset** would go back to step 1.",
+  "**length** is 8. **step 1** is 1, **step 2** 0, **step 3** 0.5, **step 4** 0, **step 5** 1, **step 6** 0, **step 7** 0.5 and **step 8** 0: full, off, half, off - a rhythm.",
+  "`value` is the step's level and drives a level meter: the value plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the value, so a column is lit from the bottom as high as the value, in the **Palette**'s colours across. `step` is which step it is on, `changed` true on the frame it moves.",
+  "The trace shows the pattern stepping with the beat."
+ ],
+ "try": [
+  {
+   "label": "Four steps",
+   "text": "length 4: only the first four steps play - full, off, half, off, again.",
+   "set": [
+    [
+     1,
+     "length",
+     4
+    ]
+   ]
+  },
+  {
+   "label": "Rewrite a step",
+   "text": "step 2 at 0.8: the second step, silent before, now plays nearly full.",
+   "set": [
+    [
+     1,
+     "s2",
+     0.8
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Steps",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Steps",
+    "params": {
+     "length": 8,
+     "s1": 1.0,
+     "s2": 0.0,
+     "s3": 0.5,
+     "s4": 0.0,
+     "s5": 1.0,
+     "s6": 0.0,
+     "s7": 0.5,
+     "s8": 0.0
+    },
+    "inputs": {
+     "reset": false
+    }
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "beat",
+    1,
+    "trigger"
+   ],
+   [
+    1,
+    "value",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "b"
+   ],
+   [
+    21,
+    "result",
+    22,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "index"
+   ],
+   [
+    22,
+    "value",
+    23,
+    "brightness"
+   ],
+   [
+    23,
+    "color",
+    24,
+    "color"
+   ]
+  ]
+ }
+}

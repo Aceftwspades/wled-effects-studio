@@ -1,0 +1,165 @@
+{
+ "node": "Transform",
+ "star": 1,
+ "caption": "Transform: a checkerboard turning slowly about the middle of the matrix, zoomed in",
+ "why": [
+  "Anything drawn from coordinates can be moved, spun or zoomed by changing the coordinates first. Transform does that in one node: give it a u and a v, and it hands back the same point moved, turned about a pivot, and scaled - so whatever reads its output pans, spins or zooms, without the drawing nodes knowing.",
+  "A clock into its turns spins the whole picture; a beat into its zoom pulses it. Its neighbours: Flip mirrors or swaps the axes; Rotate (maths) turns one pair of numbers; Transform is move, turn and zoom with a pivot, all at once."
+ ],
+ "steps": [
+  "**u** and **v** are unwired, so they are the pixel's own place.",
+  "**turns** comes from a clock (**Time** times 0.05): one full turn every twenty seconds. **zoom** is 1.5, so the picture is half as big again. **pivot across** and **pivot down** are 0.5, 0.5: it turns and zooms about the middle.",
+  "**move across** and **move down** are 0 - no shift.",
+  "The new `u` and `v` go into a **Checker** (scale 4), halved by a **Multiply** into the **Palette**'s index: a two-colour board turning slowly."
+ ],
+ "try": [
+  {
+   "label": "Zoom in",
+   "text": "zoom 3: twice as close - the squares are twice as big and only a few fit.",
+   "set": [
+    [
+     1,
+     "zoom",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Spin about a corner",
+   "text": "pivot across 0 and pivot down 0: the board turns about the top-left corner instead of the middle, sweeping across the matrix.",
+   "set": [
+    [
+     1,
+     "pivot_u",
+     0.0
+    ],
+    [
+     1,
+     "pivot_v",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Shift it",
+   "text": "move across 0.125 and move down 0.125: the whole board slides by half a square each way.",
+   "set": [
+    [
+     1,
+     "move_u",
+     0.125
+    ],
+    [
+     1,
+     "move_v",
+     0.125
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Transform",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.05
+    }
+   },
+   {
+    "id": 1,
+    "type": "Transform",
+    "params": {},
+    "inputs": {
+     "move_u": 0.0,
+     "move_v": 0.0,
+     "zoom": 1.5,
+     "pivot_u": 0.5,
+     "pivot_v": 0.5
+    }
+   },
+   {
+    "id": 4,
+    "type": "Checker",
+    "params": {},
+    "inputs": {
+     "scale": 4.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "turns"
+   ],
+   [
+    1,
+    "u",
+    4,
+    "x"
+   ],
+   [
+    1,
+    "v",
+    4,
+    "y"
+   ],
+   [
+    4,
+    "value",
+    5,
+    "a"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "index"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

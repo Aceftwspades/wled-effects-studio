@@ -1,0 +1,153 @@
+{
+ "node": "Check 1",
+ "star": 1,
+ "caption": "Check 1: a checkbox choosing between two looks - a plain sweep, or drifting noise",
+ "why": [
+  "An effect with an option - two looks, a direction, a feature on or off - needs a switch on the WLED page. Check 1 is the first checkbox there, true when ticked.",
+  "Plug it into a Select to choose between two values, or into a mask to turn a layer on and off. Its neighbours: Check 2 and Check 3 are the next two (Check 3 is taken by Flat mode on a cube); Toggle flips by itself on a trigger."
+ ],
+ "steps": [
+  "Check 1 has no inputs. Its `on` is true while the box is ticked.",
+  "**label** is Noise, its name on the WLED page; **default** is off.",
+  "`on` switches a **Select**: off, the **Palette**'s index is **Coords** `u` (a plain sweep); on, a drifting **Noise**."
+ ],
+ "try": [
+  {
+   "label": "Tick it",
+   "text": "In the side panel's PARAMETERS section, tick Noise (Check 1): the sweep gives way to the noise at once; untick it to go back.",
+   "set": []
+  },
+  {
+   "label": "Rename it",
+   "text": "label Clouds: the slider is called Clouds on the WLED page (and in PARAMETERS) - the effect is rebuilt with the new name.",
+   "set": [
+    [
+     1,
+     "label",
+     "Clouds"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Check 1",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Check 1",
+    "params": {
+     "label": "Noise",
+     "default": false
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 5,
+    "type": "Noise",
+    "params": {
+     "octaves": 1,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    2,
+    "u",
+    5,
+    "x"
+   ],
+   [
+    2,
+    "v",
+    5,
+    "y"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "z"
+   ],
+   [
+    1,
+    "on",
+    6,
+    "on"
+   ],
+   [
+    2,
+    "u",
+    6,
+    "a"
+   ],
+   [
+    5,
+    "value",
+    6,
+    "b"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "index"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ]
+  ]
+ }
+}

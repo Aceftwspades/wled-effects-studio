@@ -4,14 +4,14 @@
  "caption": "Coords: the palette laid across the matrix by u, dimmed away from the centre by r",
  "why": [
   "A graph runs once for every pixel, every frame. Without knowing which pixel it is working on, it can only make every pixel the same colour. Coords is how a graph knows where it is - and so how anything comes to vary across the strip or panel.",
-  "It gives the place several ways, for different jobs: `u` and `v` run 0..1 across and down (for things laid out in rows and columns); `cx` and `cy` are the same centred, -1..1 (for things symmetric about the middle); `r` and `angle` are polar about the centre (for rings, spirals and anything round). Position is the neighbour for real 3-D places on a shape; Coords is the picture's own grid."
+  "It gives the place several ways, for different jobs: `u` and `v` run 0..1 across and down (for things laid out in rows and columns); `centred x` and `centred y` (cx, cy) are the same centred, -1..1 (for things symmetric about the middle); `r` and `angle` are polar about the centre (for rings, spirals and anything round). Position is the neighbour for real 3-D places on a shape; Coords is the picture's own grid."
  ],
  "steps": [
   "Coords has no inputs or settings - it only answers. Its six outputs are six ways of saying where this pixel is.",
   "`u` goes into a **Mix**'s a, and the Mix's result into the **Palette**'s index: with the Mix's t at 0 it passes a straight through, so the colours run left to right across the matrix.",
   "`angle` waits in the Mix's b - the angle round the centre, 0..1 for a full turn. The Mix chooses between u and angle, so one change shows the other.",
   "`r` - the distance from the centre - goes into a **Smoothstep** whose edges are 1.2 and 0: bright where r is 0, fading to dark by r 1.2. That is the Palette's brightness, so the corners fall away.",
-  "`v`, `cx` and `cy` are left unwired here; v is u's partner down the matrix, cx and cy are u and v moved so the centre is 0."
+  "`v`, `centred x` and `centred y` are left unwired here; v is u's partner down the matrix, centred x and y are u and v moved so the centre is 0."
  ],
  "try": [
   {"label": "Colour by angle", "text": "the Mix's t at 1: the palette's index comes from angle instead of u, so the colours go round the centre - a colour wheel, the start of every spinner.", "set": [[2, "t", 1.0]]},

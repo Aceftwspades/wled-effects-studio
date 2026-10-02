@@ -1,0 +1,128 @@
+{
+ "node": "Scope",
+ "star": 1,
+ "caption": "Scope: a plot of the wave's value drawn inside the node, while the LEDs show the wave itself",
+ "why": [
+  "Numbers in a graph are invisible while it runs: is that signal really reaching 1? is that envelope too slow? Scope is a little oscilloscope you leave on a wire: it plots the last seconds of whatever is wired in, with its least and most written beside it.",
+  "The compiler skips it, so it costs the effect nothing on the device. Its neighbours: hovering a wire shows its value now; the pins' live values (the build's probes) show numbers; Scope shows the shape over time. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph."
+ ],
+ "steps": [
+  "The **Wave**'s `value` goes into the Scope's **x** as well as on to the **Palette**.",
+  "**seconds** is 3: the plot shows the last three seconds.",
+  "A per-pixel value like this one is plotted at the centre pixel; a frame value (Audio, an envelope) as it is.",
+  "Watch the node in the graph pane: a sine wave scrolling through it."
+ ],
+ "try": [
+  {
+   "label": "Longer view",
+   "text": "seconds 8: the plot covers eight seconds - more waves, squeezed together.",
+   "set": [
+    [
+     1,
+     "seconds",
+     8.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Scope",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Scope",
+    "params": {
+     "seconds": 3.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 23,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 24,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 25,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    21,
+    "t",
+    22,
+    "a"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "x"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "phase"
+   ],
+   [
+    20,
+    "u",
+    24,
+    "index"
+   ],
+   [
+    24,
+    "color",
+    25,
+    "color"
+   ],
+   [
+    23,
+    "value",
+    1,
+    "x"
+   ],
+   [
+    23,
+    "value",
+    24,
+    "brightness"
+   ]
+  ]
+ }
+}

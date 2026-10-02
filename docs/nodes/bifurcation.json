@@ -1,0 +1,112 @@
+{
+ "node": "Bifurcation",
+ "star": 1,
+ "caption": "Bifurcation: the fig-tree diagram of chaos filling in, coloured across by the palette",
+ "why": [
+  "Some of the most beautiful pictures in mathematics come from a single rule repeated: here, x becomes x times x plus c. For some values of c the sequence settles on one number, for others it flips between two, four, eight - and then into chaos. Plotting where it lands, for every c across the picture, draws the famous branching fig tree.",
+  "Use it for a slow, hypnotic, structured texture that keeps glowing as the sequence wanders - ambient pieces, something to stare at. Its neighbours: Mandelbrot draws a still picture of which points escape; Reaction diffusion grows organic shapes; Bifurcation draws where a chaotic orbit lives, and keeps sparkling as it moves."
+ ],
+ "steps": [
+  "**Bifurcation** reads the pixel's place itself: **u** (across) picks a value of c inside the window **c from** .. **c to** (-1.6 to 0.3), and **v** (down) picks a value of x inside **x from** .. **x to** (-1.5 to 1.5). Both are unwired, so they are the pixel's own u and v.",
+  "Every frame it runs the sequence **orbits** (24) more steps for each column, and lights the pixels it lands on. Its `density` output is how often a pixel has been visited lately.",
+  "**trail** is 0.97: a visit fades slowly, so the branches build up into lines instead of flickering dots.",
+  "The density lights the **Palette**: its brightness is the density, its index runs across with **Coords** `u`, so the stable left side, the forking middle and the chaotic right take different colours."
+ ],
+ "try": [
+  {
+   "label": "Zoom into the chaos",
+   "text": "c from -1.45 and c to -1.3: the window is narrowed to the chaotic stretch, so the picture is all fine forks and windows of order inside the noise.",
+   "set": [
+    [
+     1,
+     "c_lo",
+     -1.45
+    ],
+    [
+     1,
+     "c_hi",
+     -1.3
+    ]
+   ]
+  },
+  {
+   "label": "Short memory",
+   "text": "trail 0.4: visits fade almost at once, so the picture is a sparkle of where the orbits are right now rather than the whole tree.",
+   "set": [
+    [
+     1,
+     "trail",
+     0.4
+    ]
+   ]
+  },
+  {
+   "label": "Fewer steps",
+   "text": "orbits 4: a sixth of the work a frame, so only the brightest branches build up and the rest is a faint scatter.",
+   "set": [
+    [
+     1,
+     "orbits",
+     4
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Bifurcation",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Bifurcation",
+    "params": {
+     "trail": 0.97,
+     "orbits": 24
+    },
+    "inputs": {
+     "c_lo": -1.6,
+     "c_hi": 0.3,
+     "x_lo": -1.5,
+     "x_hi": 1.5
+    }
+   },
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "index"
+   ],
+   [
+    1,
+    "density",
+    3,
+    "brightness"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ]
+  ]
+ }
+}

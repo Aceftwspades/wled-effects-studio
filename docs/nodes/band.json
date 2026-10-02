@@ -1,0 +1,148 @@
+{
+ "node": "Band",
+ "star": 1,
+ "caption": "Band: soft bright rings round every whole number of the distance from the centre, expanding",
+ "why": [
+  "Many patterns are bright lines at regular places - rings round a point, bars across, slabs through a cube. Band makes them: a soft bright band around every whole number of its input, dark between. Feed it a distance and you get rings; a coordinate and you get bars.",
+  "Its neighbours: Stripes are hard-edged; Wave is a smooth wave with bright and dark equal; Band is a narrow bright line with a soft edge, as sharp as you like."
+ ],
+ "steps": [
+  "**Coords** `r` (the distance from the centre) times 4, minus a clock (**Time** times 0.5, a **Subtract**), is the **x** input: four whole numbers from the centre to the edge, moving outward.",
+  "**sharp** is 2: how narrow each band is. Higher, thinner lines; lower, broader glows.",
+  "The result - 1 on each whole number, fading off either side - is the **Palette**'s brightness; `r` picks the colour.",
+  "So: rings of light expanding from the middle."
+ ],
+ "try": [
+  {
+   "label": "Thin rings",
+   "text": "sharp 8: each ring is a thin bright line.",
+   "set": [
+    [
+     1,
+     "sharp",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "Broad glow",
+   "text": "sharp 0.6: the rings are so wide they nearly merge - a soft pulse outward.",
+   "set": [
+    [
+     1,
+     "sharp",
+     0.6
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Band",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 4.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Band",
+    "params": {},
+    "inputs": {
+     "sharp": 2.0
+    }
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "r",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    4,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "r",
+    5,
+    "index"
+   ],
+   [
+    1,
+    "result",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

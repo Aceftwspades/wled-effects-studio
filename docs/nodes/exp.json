@@ -1,0 +1,131 @@
+{
+ "node": "Exp",
+ "star": 1,
+ "caption": "Exp: brightness rising exponentially across the matrix - nearly dark for most of the way, then climbing steeply",
+ "why": [
+  "Many things in light and sound grow by proportion rather than by steps: a zoom that doubles every second, a fade that halves each beat, how the eye sees brightness. Exp - e to the power of x - turns an even ramp into that kind of growth: slow at first, then faster and faster.",
+  "Its neighbours: Log is the reverse; Power raises to a fixed power; Exp grows by proportion."
+ ],
+ "steps": [
+  "**Coords** `u` times 3 (a **Multiply**) minus 3 (an **Add** of -3) runs -3 at the left edge to 0 at the right: the **x** input.",
+  "Exp of that runs from e to the -3 (0.05) up to 1: barely lit across most of the matrix, then climbing steeply near the right edge.",
+  "The result is the **Palette**'s brightness, with `u` picking the colour - compare a straight ramp, which would be half bright in the middle."
+ ],
+ "try": [
+  {
+   "label": "Steeper",
+   "text": "the Multiply at 6 and the Add at -6: the curve is so steep only the last few columns are lit.",
+   "set": [
+    [
+     2,
+     "b",
+     6.0
+    ],
+    [
+     3,
+     "b",
+     -6.0
+    ]
+   ]
+  },
+  {
+   "label": "Gentle",
+   "text": "the Multiply at 1 and the Add at -1: nearly a straight ramp from a third bright to full.",
+   "set": [
+    [
+     2,
+     "b",
+     1.0
+    ],
+    [
+     3,
+     "b",
+     -1.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Exp",
+  "nodes": [
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 3.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {
+     "b": -3.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Exp",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    4,
+    "u",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    4,
+    "u",
+    5,
+    "index"
+   ],
+   [
+    1,
+    "result",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

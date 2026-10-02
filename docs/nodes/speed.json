@@ -1,0 +1,129 @@
+{
+ "node": "Speed",
+ "star": 1,
+ "caption": "Speed: the WLED Speed slider setting how fast the palette scrolls",
+ "why": [
+  "Every WLED effect has a Speed slider, and people expect it to set how fast things move. The Speed node is that slider: its value is 0 at the left, 1 at the right - multiply it into a rate and the slider controls the speed.",
+  "Its neighbours: Intensity is the other standard slider (how much); Custom 1, 2 and 3 are the extra sliders, named as you like; Number is a fixed value; Speed is what people reach for first."
+ ],
+ "steps": [
+  "Speed has no inputs. Its `value` is the slider, 0..1 (it starts at the middle, 0.5).",
+  "**label** is Speed: the name the slider shows on the WLED page. **default** is 128: where it starts, 0..255.",
+  "The value times **Time**'s `t` (a **Multiply**) is a phase that grows faster with the slider higher; added to **Coords** `u` it is the **Palette**'s index - the colours scroll at the slider's speed.",
+  "This is the graph a new graph starts as."
+ ],
+ "try": [
+  {
+   "label": "Move the slider",
+   "text": "In the side panel's PARAMETERS section, drag the Speed slider: to the right the colours race, to the left they creep, at 0 they stop. Nothing is rebuilt: the effect reads the slider every frame.",
+   "set": []
+  },
+  {
+   "label": "Rename it",
+   "text": "label Drift: the slider is called Drift on the WLED page (and in PARAMETERS) - the effect is rebuilt with the new name.",
+   "set": [
+    [
+     1,
+     "label",
+     "Drift"
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Speed",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Speed",
+    "params": {
+     "label": "Speed",
+     "default": 128
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "value",
+    3,
+    "a"
+   ],
+   [
+    2,
+    "t",
+    3,
+    "b"
+   ],
+   [
+    4,
+    "u",
+    5,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "index"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

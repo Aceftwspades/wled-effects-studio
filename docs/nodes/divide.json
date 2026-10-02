@@ -1,0 +1,151 @@
+{
+ "node": "Divide",
+ "star": 1,
+ "caption": "Divide: 0.3 divided by the distance from the centre - rings that crowd toward the middle, a tunnel",
+ "why": [
+  "a divided by b scales a value down by another (a size by a count, a distance by a speed), and one over a distance gives a value that rushes up near the middle - the perspective of a tunnel. Divide gives 0 rather than an error when b is 0, so it is safe on the centre pixel.",
+  "Its neighbours: Multiply scales up; Modulo gives the remainder; Divide makes ratios and perspective."
+ ],
+ "steps": [
+  "**a** is 0.3. **b** is **Coords** `r`, the distance from the centre.",
+  "a over b is small at the edges and grows fast toward the middle.",
+  "Plus a clock (**Time** times 0.3, an **Add**) it is a **Wave**'s x (1 cycle): rings that are wide at the edge and crowd together toward the middle, moving - looking down a tunnel.",
+  "The wave is the **Palette**'s brightness; the same sum picks the colour."
+ ],
+ "try": [
+  {
+   "label": "Deeper",
+   "text": "a 0.8: the rings crowd much more toward the centre - a deeper tunnel.",
+   "set": [
+    [
+     1,
+     "a",
+     0.8
+    ]
+   ]
+  },
+  {
+   "label": "Shallow",
+   "text": "a 0.1: the rings are wide nearly everywhere, crowding only at the very centre.",
+   "set": [
+    [
+     1,
+     "a",
+     0.1
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Divide",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Divide",
+    "params": {},
+    "inputs": {
+     "a": 0.3
+    }
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 1.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "r",
+    1,
+    "b"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "b"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    3,
+    "result",
+    5,
+    "index"
+   ],
+   [
+    4,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

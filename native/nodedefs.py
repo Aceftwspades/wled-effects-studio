@@ -629,8 +629,13 @@ LIBRARY = [
             "        const int b_ = (int)(((x_ - $in.x_lo) / ($in.x_hi - $in.x_lo)) * NX_); if (b_ >= 0 && b_ < NX_) col_[b_] += 1.0f / (float)$p.orbits; }\n"
             "      X_[j_] = x_; }\n"
             "    S_[0] = (float)(SEGENV.call & 0xFFFF); }\n"
-            "  int j_ = (int)(gc_sat($in.u) * NC_); if (j_ >= NC_) j_ = NC_ - 1; int b_ = (int)(gc_sat($in.v) * NX_); if (b_ >= NX_) b_ = NX_ - 1;\n"
-            "  $out.density = gc_sat(D_[j_ * NX_ + b_]); }",
+            # a picture smaller than the 64 x 48 bins: a pixel covers several, and reads the brightest of them -
+            # reading one, a branch between the pixels that read was never seen (a 32 x 16 matrix showed a third)
+            "  const int sj_ = W < NC_ ? (NC_ + W - 1) / W : 1, sb_ = H < NX_ ? (NX_ + H - 1) / H : 1;\n"
+            "  const int j0_ = (int)(gc_sat($in.u) * NC_) - sj_ / 2, b0_ = (int)(gc_sat($in.v) * NX_) - sb_ / 2; float m_ = 0.0f;\n"
+            "  for (int jj_ = j0_; jj_ < j0_ + sj_; jj_++) for (int bb_ = b0_; bb_ < b0_ + sb_; bb_++)\n"
+            "    if (jj_ >= 0 && jj_ < NC_ && bb_ >= 0 && bb_ < NX_ && D_[jj_ * NX_ + bb_] > m_) m_ = D_[jj_ * NX_ + bb_];\n"
+            "  $out.density = gc_sat(m_); }",
             "the fig tree: the bifurcation diagram of x -> x^2 + c between c_lo..c_hi (u) and x_lo..x_hi (v), as orbit density with a trail - zoom the windows toward -1.401155 to fly into it"),
          state=1 + 64 + 64 * 48),
     # An image file, baked into the effect at compile time: resized to the

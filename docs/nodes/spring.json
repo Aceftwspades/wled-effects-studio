@@ -1,0 +1,165 @@
+{
+ "node": "Spring",
+ "star": 1,
+ "caption": "Spring: each kick knocks a weight on a spring - it swings past its rest, back, and settles",
+ "why": [
+  "Things in the real world do not stop dead: a knocked weight on a spring overshoots, swings back and settles. Spring gives a value that behaves that way - pulled toward a target, knocked by a kick - so a bounce or a tilt on the beat sloshes like liquid instead of snapping.",
+  "Its neighbours: Beat kick moves onward and settles without swinging back; Ease glides; Slew moves at a pace; Spring overshoots and wobbles."
+ ],
+ "steps": [
+  "**target** is 0.4: where the weight rests.",
+  "**kick** is **Audio**'s `hit`: on each kick it is knocked by how hard the kick landed.",
+  "**swings a second** is 1.2: how fast it wobbles. **damping** is 0.15: how quickly the wobble dies away.",
+  "`value` drives a level meter: the value plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the value, so a column is lit from the bottom as high as the value, in the **Palette**'s colours across. `velocity` is how fast it is moving. The trace shows the value: a knock up, a swing below the rest, smaller swings, settling."
+ ],
+ "try": [
+  {
+   "label": "Stiff spring",
+   "text": "swings a second 3: quick little wobbles after each kick.",
+   "set": [
+    [
+     1,
+     "hz",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Heavily damped",
+   "text": "damping 0.6: it barely overshoots - a soft bump on each kick.",
+   "set": [
+    [
+     1,
+     "damping",
+     0.6
+    ]
+   ]
+  },
+  {
+   "label": "Higher rest",
+   "text": "target 0.7: the weight rests higher, and swings about that.",
+   "set": [
+    [
+     1,
+     "target",
+     0.7
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Spring",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Spring",
+    "params": {
+     "hz": 1.2,
+     "damping": 0.15
+    },
+    "inputs": {
+     "target": 0.4
+    }
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "hit",
+    1,
+    "kick"
+   ],
+   [
+    1,
+    "value",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "b"
+   ],
+   [
+    21,
+    "result",
+    22,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "index"
+   ],
+   [
+    22,
+    "value",
+    23,
+    "brightness"
+   ],
+   [
+    23,
+    "color",
+    24,
+    "color"
+   ]
+  ]
+ }
+}

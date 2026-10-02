@@ -31,12 +31,21 @@ from native import paths
 DIR = os.path.join(paths.RES, "docs", "nodes")
 TUTORIALS = "Node tutorials"                 # the project the lessons run in
 SHAPE = {"kind": "matrix", "params": {"w": 32, "h": 16}}
-SCHEME = "studio:try/"                       # a link the reader runs: studio:try/<node>[/<n>], studio:tutorial/<what>
+SCHEME = "studio:try/"                       # a link the reader runs: studio:try/<ident>[/<n>], studio:tutorial/<what>
 
 
 def ident(node):
     """A node's file stem: "Beat kick" -> beat_kick."""
     return re.sub(r"[^a-z0-9]+", "_", node.lower()).strip("_")
+
+
+def by_ident(stem):
+    """The node a file stem (or a name) is for: "reaction_diffusion" -> "Reaction diffusion"."""
+    p = os.path.join(DIR, ident(stem) + ".json")
+    if os.path.exists(p):
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)["node"]
+    return stem
 
 
 def path(node, ext=".json"):
@@ -77,13 +86,29 @@ def graph_of(lesson, lib=None, name=None):
     from native import graph as G
     d = json.loads(json.dumps(lesson["graph"]))
     d["name"] = name or d.get("name") or ("Tutorial " + lesson["node"])
+    d["implicit"] = 1                             # written now: an unwired coordinate reads the pixel (graph.Graph)
     placed = all("pos" in n for n in d["nodes"])
     for n in d["nodes"]:
         n.setdefault("pos", [0, 0])
     g = G.migrate(G.Graph(d, lib=lib))
     if not placed:
         g.arrange(col_w=220)                      # a lesson is written without places: laid out left to right, close
+    if lesson.get("assets"):
+        g.project_dir = EXAMPLES                  # its files (an Image's picture) as the examples have them
     return g
+
+
+EXAMPLES = os.path.join(paths.RES, "examples")
+
+
+def copy_assets(lesson, project_dir):
+    """A lesson's files ("assets": paths under examples/) into a project, where its graph reads them."""
+    import shutil
+    for rel in lesson.get("assets", []):
+        dst = os.path.join(project_dir, rel)
+        if not os.path.exists(dst):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copyfile(os.path.join(EXAMPLES, rel), dst)
 
 
 def used_in(node):
@@ -141,7 +166,7 @@ def problems(lesson, lib):
     d = lib[node]
     for p in d["inputs"] + d["params"]:
         shown = label(node, p["name"]).lower()
-        if shown not in words and p["name"].lower() not in words:
+        if shown not in words:                        # by the name the node shows, not its key
             out.append(f"{node}: the lesson never says what {shown!r} does")
     for key in ("why", "steps"):
         if not lesson.get(key):
@@ -161,12 +186,12 @@ def markdown(node, lesson):
         out += [f"![{cap}](docs/nodes/{os.path.basename(pic)})", ""]
     for k, s in enumerate(lesson["steps"], 1):
         out.append(f"{k}. {s}")
-    out += ["", f"[Try it in the studio]({SCHEME}{node}): the graph opens live in the {TUTORIALS} project; "
+    out += ["", f"[Try it in the studio]({SCHEME}{ident(node)}): the graph opens live in the {TUTORIALS} project; "
                 "your own project is saved and comes back with **Back to my project**.", ""]
     if lesson["try"]:
         out += ["**Try this**", ""]
         for k, t in enumerate(lesson["try"], 1):
-            out.append(f"- [{t['label']}]({SCHEME}{node}/{k}): {t['text']}")
+            out.append(f"- [{t['label']}]({SCHEME}{ident(node)}/{k}): {t['text']}")
         out.append("")
     used = used_in(node)
     if used:
@@ -281,6 +306,11 @@ def try_it(app, node, change=None):
         geom = Geometry.from_json(lesson["shape"])
         if app.project.geometry.to_json() != geom.to_json():
             app.apply_geometry(geom)
+        copy_assets(lesson, app.project.path)
+        if lesson.get("colours"):                 # the three pickers a lesson about them is shown with
+            for i, c in enumerate(lesson["colours"][:3]):
+                app.on_color(i, ((c >> 16) & 255, (c >> 8) & 255, c & 255))
+            app.refresh_colours()
         fname = _write(app, lesson)
         dpg_refresh_files(app)
         app.gp.open(fname)
@@ -386,7 +416,8 @@ def follow(app, target):
     """A studio: link from the reader. True when it was one."""
     if target.startswith(SCHEME):
         rest = target[len(SCHEME):]
-        node, _, k = rest.partition("/")
+        stem, _, k = rest.partition("/")
+        node = by_ident(stem)                # a link names the node by its file stem: Markdown targets have no spaces
         try_it(app, node, int(k) if k else None)
         return True
     if target == "studio:tutorial/back":

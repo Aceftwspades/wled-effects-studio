@@ -1,0 +1,123 @@
+{
+ "node": "Expression",
+ "star": 1,
+ "caption": "Expression: one line of C++ - a sine of a times three turns plus b, made 0..1 - lighting the matrix",
+ "why": [
+  "Sometimes the sum you need has no node, or would take five nodes to build. Expression is a node you write yourself: one line of C++ giving a number, from its three inputs a, b and c, and the pixel's coordinates by name (u, v, cx, cy, r, ang, nx, ny, nz, t).",
+  "It compiles into the effect like any node. Its neighbours: Math has a list of operations to pick from; Colour expression gives a colour instead of a number; Expression is anything C++ can say in one line."
+ ],
+ "steps": [
+  "**a** is **Coords** `u`; **b** is a clock (**Time** times 1); **c** is 0.5.",
+  "**expr** is `sinf((a * 3.0f + b * 0.3f) * 6.283f) * c + 0.5f`: a sine wave three times across, moving with the clock, scaled by c and lifted to sit around 0.5 - 0..1.",
+  "The result is the **Palette**'s brightness. Edit the expression in the Properties pane (or on the node) and the effect is rebuilt with it; a typo is reported on the node."
+ ],
+ "try": [
+  {
+   "label": "Rings",
+   "text": "expr `fabsf(sinf((r * 4.0f - b * 0.4f) * 3.1416f))`: rings from the centre, using the pixel's r directly - no Coords node needed for it.",
+   "set": [
+    [
+     1,
+     "expr",
+     "fabsf(sinf((r * 4.0f - b * 0.4f) * 3.1416f))"
+    ]
+   ]
+  },
+  {
+   "label": "Swing less",
+   "text": "c at 0.2: the wave only swings 0.3..0.7 - soft, low-contrast bands.",
+   "set": [
+    [
+     1,
+     "c",
+     0.2
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Expression",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Expression",
+    "params": {
+     "expr": "sinf((a * 3.0f + b * 0.3f) * 6.283f) * c + 0.5f"
+    },
+    "inputs": {
+     "c": 0.5
+    }
+   },
+   {
+    "id": 3,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 1.0
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    1,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    1,
+    "b"
+   ],
+   [
+    2,
+    "u",
+    3,
+    "index"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "brightness"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

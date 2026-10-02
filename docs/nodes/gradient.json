@@ -1,0 +1,147 @@
+{
+ "node": "Gradient",
+ "star": 1,
+ "caption": "Gradient: the angle round the centre, plus a clock, as a turning colour wheel",
+ "why": [
+  "A ramp from 0 to 1 is the start of most colour layouts: a fade across, a glow from the middle, a wheel. Gradient makes the common shapes of ramp in one node, so you do not have to build them from coordinates and maths.",
+  "Pick the shape with a setting: linear and quadratic run along x, diagonal across both, radial goes round the centre and spherical out from it. Its neighbours: Coords gives the raw coordinates the ramps are made from (u is the linear ramp itself); Colour ramp turns a 0..1 into your own colours; Gradient is the 0..1."
+ ],
+ "steps": [
+  "**Coords** `centred x` and `centred y` - the place measured from the centre, -1..1 - go into **x** and **y**. The round shapes need the centred coordinates; the straight ones read x as a plain ramp.",
+  "**shape** is radial: the value is the angle round the centre, 0..1 for a full turn.",
+  "A clock (**Time** times 0.2) is added to it, and the sum is the **Palette**'s index: the palette goes once round the wheel, and the clock turns it.",
+  "Change the shape and the same clock does something different - see below."
+ ],
+ "try": [
+  {
+   "label": "Spherical",
+   "text": "shape spherical: bright at the centre falling to the edge - with the clock added, rings of colour pour outward from the middle.",
+   "set": [
+    [
+     1,
+     "shape",
+     "spherical"
+    ]
+   ]
+  },
+  {
+   "label": "Diagonal",
+   "text": "shape diagonal: a ramp from one corner to the other, so the colours scroll across at an angle.",
+   "set": [
+    [
+     1,
+     "shape",
+     "diagonal"
+    ]
+   ]
+  },
+  {
+   "label": "Quadratic",
+   "text": "shape quadratic: a curved ramp along x - the colours bunch together at one side and spread out at the other.",
+   "set": [
+    [
+     1,
+     "shape",
+     "quadratic"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Gradient",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Gradient",
+    "params": {
+     "shape": "radial"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "cx",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "cy",
+    1,
+    "y"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    5,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "index"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

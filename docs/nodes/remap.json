@@ -1,0 +1,159 @@
+{
+ "node": "Remap",
+ "star": 1,
+ "caption": "Remap: the Speed slider's 0..1 turned into between 2 and 8 stripes",
+ "why": [
+  "Sliders on the WLED page give 0..1; what an effect needs is a number of stripes from 2 to 8, a speed from 0.1 to 3, a size from a few pixels to half the matrix. Remap turns one range into another: what was in low..in high becomes out low..out high.",
+  "It is the everyday node between controls and the things they control. Its neighbours: Map range is the same with everything on pins, steps and easing; Clamp only cuts; Multiply and Add do part of it; Remap is the whole job in one."
+ ],
+ "steps": [
+  "**x** is the **Speed** slider's `value`, 0..1 (the slider starts at the middle, so 0.5).",
+  "**in low** 0 and **in high** 1 is the slider's range; **out low** 2 and **out high** 8 is the range of stripes: the slider at the left gives 2, at the right 8, in the middle 5.",
+  "The result is the **count** of a **Stripes** node, scrolling with a clock; the **Palette** colours them.",
+  "Move the Speed slider in the side panel's PARAMETERS and the number of stripes follows."
+ ],
+ "try": [
+  {
+   "label": "Up to sixteen",
+   "text": "out high 16: the same slider now spans 2 to 16 stripes - at the middle, 9.",
+   "set": [
+    [
+     1,
+     "out_hi",
+     16.0
+    ]
+   ]
+  },
+  {
+   "label": "Reverse",
+   "text": "out low 8 and out high 2: the slider runs the other way - more stripes at the left.",
+   "set": [
+    [
+     1,
+     "out_lo",
+     8.0
+    ],
+    [
+     1,
+     "out_hi",
+     2.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Remap",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Speed",
+    "params": {
+     "label": "Speed",
+     "default": 128
+    },
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Remap",
+    "params": {
+     "in_lo": 0.0,
+     "in_hi": 1.0,
+     "out_lo": 2.0,
+     "out_hi": 8.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "duty": 0.5
+    }
+   },
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "value",
+    1,
+    "x"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "count"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "phase"
+   ],
+   [
+    4,
+    "u",
+    5,
+    "index"
+   ],
+   [
+    3,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

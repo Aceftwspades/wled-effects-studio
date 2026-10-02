@@ -1,0 +1,172 @@
+{
+ "node": "Brick",
+ "star": 1,
+ "caption": "Brick: a brick wall sliding left, each brick its own colour from Hash",
+ "why": [
+  "Plenty of effects want a grid that is not a plain grid - tiles, bricks, panels - and want to treat each tile as a thing of its own. Brick lays out a wall, alternate rows offset by half a brick, and tells you for every pixel whether it is on a brick or in the mortar, and which brick it is.",
+  "That last part is what makes it useful: `row` and `column` number the bricks, so anything keyed on them (a Hash for a random colour, a delay per brick) treats each brick separately. Its neighbours: Checker is a plain grid of two values; Voronoi makes irregular cells; Brick is the regular, offset kind."
+ ],
+ "steps": [
+  "**Coords** `u` plus a slow clock (**Time** times 0.1, added) goes into **x**, so the wall slides to the left; `v` goes into **y**.",
+  "**scale** is 4: four rows of bricks down the matrix. **mortar** is 0.1: the gaps take a tenth of each brick's height and width.",
+  "`value` is 1 on a brick and 0 in the mortar - the **Palette**'s brightness, so the mortar is dark.",
+  "`row` and `column` go into a **Hash**, which gives every brick a fixed random number - the Palette's index, so each brick keeps its own colour as it slides."
+ ],
+ "try": [
+  {
+   "label": "Smaller bricks",
+   "text": "scale 8: twice the rows, so the bricks are half the size and there are four times as many.",
+   "set": [
+    [
+     1,
+     "scale",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "Thick mortar",
+   "text": "mortar 0.3: the gaps take nearly a third of each brick, so the bricks become separate tiles on a dark ground.",
+   "set": [
+    [
+     1,
+     "mortar",
+     0.3
+    ]
+   ]
+  },
+  {
+   "label": "No mortar",
+   "text": "mortar 0: the bricks touch; only their different colours show where one ends and the next begins.",
+   "set": [
+    [
+     1,
+     "mortar",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Brick",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.1
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Brick",
+    "params": {},
+    "inputs": {
+     "scale": 4.0,
+     "mortar": 0.1
+    }
+   },
+   {
+    "id": 6,
+    "type": "Hash",
+    "params": {},
+    "inputs": {
+     "seed": 0.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    2,
+    "u",
+    5,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "v",
+    1,
+    "y"
+   ],
+   [
+    1,
+    "row",
+    6,
+    "x"
+   ],
+   [
+    1,
+    "column",
+    6,
+    "y"
+   ],
+   [
+    6,
+    "value",
+    7,
+    "index"
+   ],
+   [
+    1,
+    "value",
+    7,
+    "brightness"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ]
+  ]
+ }
+}

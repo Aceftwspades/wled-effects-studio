@@ -1,0 +1,117 @@
+{
+ "node": "Timbre",
+ "star": 1,
+ "caption": "Timbre: the colour of the sound - the matrix's colour follows how bright the mix is, the meter how noisy",
+ "why": [
+  "Two sounds at the same loudness can sound completely different: a bass synth and a cymbal. Timbre describes that difference in two numbers - brightness (is the weight in the bass or the treble?) and noisiness (a pure tone, or a hiss?) - so an effect can change with the character of the music, not just its level.",
+  "Its neighbours: Audio gives the levels; Loudest bin gives the strongest band; Notes gives the harmony; Timbre gives the tone colour."
+ ],
+ "steps": [
+  "Timbre has no inputs or settings. `brightness` is 0 when all the sound is bass and 1 when it is all treble; `noisiness` is 0 for a pure tone and 1 for a hiss. Both are 0 in silence.",
+  "`noisiness` drives a level meter: the value plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the value, so a column is lit from the bottom as high as the value, in the **Palette**'s colours across - but the **Palette**'s index is `brightness`, so the whole meter changes colour as the mix tilts between bass and treble.",
+  "The trace shows brightness (grey) and noisiness (orange): both jump on the kicks and hats."
+ ],
+ "try": [],
+ "trace": [
+  [
+   1,
+   "brightness"
+  ],
+  [
+   1,
+   "noisiness"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Timbre",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Timbre",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "noisiness",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "b"
+   ],
+   [
+    21,
+    "result",
+    22,
+    "x"
+   ],
+   [
+    22,
+    "value",
+    23,
+    "brightness"
+   ],
+   [
+    23,
+    "color",
+    24,
+    "color"
+   ],
+   [
+    1,
+    "brightness",
+    23,
+    "index"
+   ]
+  ]
+ }
+}

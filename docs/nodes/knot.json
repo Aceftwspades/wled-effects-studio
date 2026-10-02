@@ -1,0 +1,113 @@
+{
+ "node": "Knot",
+ "star": 1,
+ "caption": "Knot: a bend in the wave's wire on its way to the palette - the effect unchanged",
+ "why": [
+  "Wires in a busy graph cross and tangle. Knot is a bend you can put in a number wire, to route it round other nodes - the value passes straight through.",
+  "Its neighbours: Knot colour does the same for a colour wire; Send and Receive skip the wire altogether; Knot keeps the wire but steers it. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph."
+ ],
+ "steps": [
+  "The **Wave**'s `value` goes into the Knot's **in**, and its `out` on to the **Palette**'s brightness - exactly the same value.",
+  "Drag the knot and the wire bends round it.",
+  "Double-click a wire in the editor to drop a knot on it."
+ ],
+ "try": [],
+ "graph": {
+  "name": "Tutorial Knot",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Knot",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 23,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 24,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 25,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    21,
+    "t",
+    22,
+    "a"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "x"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "phase"
+   ],
+   [
+    20,
+    "u",
+    24,
+    "index"
+   ],
+   [
+    24,
+    "color",
+    25,
+    "color"
+   ],
+   [
+    23,
+    "value",
+    1,
+    "in"
+   ],
+   [
+    1,
+    "out",
+    24,
+    "brightness"
+   ]
+  ]
+ }
+}

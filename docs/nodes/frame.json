@@ -1,0 +1,144 @@
+{
+ "node": "Frame",
+ "star": 1,
+ "caption": "Frame: a titled box round the nodes that make the motion - the graph tidied, the effect unchanged",
+ "why": [
+  "A graph of twenty nodes is hard to read when it is just nodes: which ones make the colour, which the motion, which the audio? Frame is a titled, coloured box you draw round a group of nodes - drag it and the nodes inside move with it.",
+  "Its neighbours: Note is text on the graph; sub-graphs (Node > Fold into a sub-graph) turn a group into a single node; Frame keeps the nodes visible but grouped. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph."
+ ],
+ "steps": [
+  "**title** is Motion: the words on the box's top edge.",
+  "**width** and **height** are its size in the graph (here 520 by 240), and **colour** its tint.",
+  "Inside it sit the **Time**, the **Multiply** and the **Wave** - the part of this graph that moves; the **Palette** and **Output** sit outside.",
+  "In the editor: drag the frame's title and the three nodes come along; select a few nodes and Node > Frame the selection draws one round them."
+ ],
+ "try": [
+  {
+   "label": "Rename",
+   "text": "title Scrolling: the box's words change - and nothing else does.",
+   "set": [
+    [
+     1,
+     "title",
+     "Scrolling"
+    ]
+   ]
+  },
+  {
+   "label": "Recolour",
+   "text": "colour at a warm orange: a different tint, to tell groups apart at a glance.",
+   "set": [
+    [
+     1,
+     "colour",
+     [
+      200,
+      120,
+      60
+     ]
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Frame",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Frame",
+    "params": {
+     "title": "Motion",
+     "w": 520,
+     "h": 240,
+     "colour": [
+      90,
+      110,
+      160
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 23,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 24,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 25,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    21,
+    "t",
+    22,
+    "a"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "x"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "phase"
+   ],
+   [
+    20,
+    "u",
+    24,
+    "index"
+   ],
+   [
+    24,
+    "color",
+    25,
+    "color"
+   ],
+   [
+    23,
+    "value",
+    24,
+    "brightness"
+   ]
+  ]
+ }
+}

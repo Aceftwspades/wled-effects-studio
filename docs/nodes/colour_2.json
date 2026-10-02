@@ -1,0 +1,130 @@
+{
+ "node": "Colour 2",
+ "star": 2,
+ "caption": "Colour 2: the secondary colour as the background, under stripes of the primary",
+ "why": [
+  "Colour 2 is the second colour picker on the WLED page. Two picked colours make a simple two-colour effect: one for the pattern, one for what is between.",
+  "Its neighbours: Colour 1 and Colour 3; Colour pick has eight colours fixed in the effect; Palette blends a whole range."
+ ],
+ "steps": [
+  "Colour 2 has no inputs or settings: its `color` is the second colour picked on the WLED page.",
+  "It is the **under** of a **Blend**; Colour 1 is the **over**, shown by scrolling **Stripes** as the amount.",
+  "So the stripes are the primary colour and the gaps between them the secondary: a two-colour effect the person colours on the page.",
+  "**Effect settings** names the pickers Stripes, Background and Accent."
+ ],
+ "try": [
+  {
+   "label": "Pick another background",
+   "text": "In the side panel's COLOURS section, pick another colour for Background (Colour 2): the background between the stripes changes at once - the effect reads the picker every frame.",
+   "set": []
+  }
+ ],
+ "colours": [
+  16738816,
+  1056842,
+  15790335
+ ],
+ "graph": {
+  "name": "Tutorial Colour 2",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Colour 1",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Colour 2",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 4.0,
+     "duty": 0.5
+    }
+   },
+   {
+    "id": 4,
+    "type": "Blend",
+    "params": {
+     "mode": "over"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "none",
+     "colours": "Stripes,Background,Accent"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   }
+  ],
+  "links": [
+   [
+    11,
+    "result",
+    3,
+    "phase"
+   ],
+   [
+    2,
+    "color",
+    4,
+    "under"
+   ],
+   [
+    1,
+    "color",
+    4,
+    "over"
+   ],
+   [
+    3,
+    "value",
+    4,
+    "amount"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

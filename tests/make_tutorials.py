@@ -41,6 +41,38 @@ def leds(rgb, lit):
     return img
 
 
+CUBE_PX = 340
+
+
+def picture(eng, lesson, t):
+    """This frame as the lesson shows it, `t` 0..1 through the clip: a flat shape as LEDs; the cube
+    in 3-D, swaying a little either side of its usual three-quarter view so every face that matters
+    is seen and the loop has no jump."""
+    import math
+    rgb = eng.rgb().copy()
+    if lesson["shape"]["kind"] == "cube":
+        from native import render
+        lit = eng.lit_mask()
+        rgb[~lit] = 0
+        yaw = -0.6 + 0.35 * math.sin(2 * math.pi * t)
+        img = render.render(rgb, eng.B, CUBE_PX, yaw, 0.55, 4.4, unlit=(22, 22, 26),
+                            six=bool(lesson["shape"]["params"].get("six")))
+        img = img.copy()
+        img[(img == 0).all(axis=2)] = BG
+        return img
+    if lesson["shape"]["kind"] not in ("matrix", "strip"):
+        # any other shape as a cloud of LEDs, from the lesson's view (pitch: 0 level .. 1.5 from above)
+        from native import render
+        geom = eng.geom
+        view = lesson.get("view") or {}
+        yaw = view.get("yaw", -0.6) + 0.25 * math.sin(2 * math.pi * t)
+        img = render.render_points(geom.pos, rgb.reshape(-1, 3), CUBE_PX, yaw, view.get("pitch", 0.75),
+                                   view.get("dist", 4.4), unlit=(22, 22, 26)).copy()
+        img[(img == 0).all(axis=2)] = BG
+        return img
+    return leds(rgb, eng.lit_mask())
+
+
 def trace_panel(width, series, labels, lo, hi, now):
     """The traced values as lines, the last SECS seconds of each ending at `now` (a sample index)."""
     from PIL import Image, ImageDraw
@@ -76,6 +108,7 @@ def record(eng, lesson, g, title):
     from native.synth import Synth
     from native.nodeface import label
     eng.select(eng.names.index(title), params=lesson.get("fx") or None)
+    eng.colors(*(lesson.get("colours") or (0xFFA000, 0, 0)))     # the app's starting pickers, or the lesson's own
     eng.clear()
     syn = Synth()
     syn.gate_bass = syn.gate_mid = syn.gate_treb = True
@@ -96,7 +129,8 @@ def record(eng, lesson, g, title):
         for s, k in zip(series, keys):
             s.append(eng.probe(k) if k is not None else 0.0)
         if i >= total - int(SECS * FPS):
-            pics.append((i, leds(eng.rgb().copy(), eng.lit_mask())))
+            k = i - (total - int(SECS * FPS))
+            pics.append((i, picture(eng, lesson, k / max(1, int(SECS * FPS)))))
     frames = []
     if series:
         allv = [v for s in series for v in s]

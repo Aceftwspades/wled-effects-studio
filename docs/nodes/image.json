@@ -1,0 +1,96 @@
+{
+ "node": "Image",
+ "star": 1,
+ "caption": "Image: a picture file, reduced to 16 x 16 and six colours, baked into the effect",
+ "why": [
+  "A logo, an icon, a photo reduced to a few pixels: when the picture already exists as a file, drawing it digit by digit is wasted effort. Image reads the file when the graph compiles, shrinks it to the size you ask, keeps a few colours, and bakes the result into the effect - the device never needs the file.",
+  "Read it with any coordinate, like the other pictures: across the whole panel, on each face of a cube (Cube face's a, b), scrolled. Its neighbours: Bitmap is pixel art you type, with colour slots; States is several bitmaps shown in turn; Image takes its pixels and colours from a picture file."
+ ],
+ "steps": [
+  "**file** names the picture - `assets/smiley.png`, from the project's own folder (Try it copies it into the tutorials project).",
+  "**width** and **height** are 16: the picture is shrunk to 16 x 16 pixels, one per LED on this matrix. **colours** is 6: it is reduced to the six colours that matter most, which keeps the effect small.",
+  "**u** and **v** are unwired, so the picture is read at the pixel's own place, stretched over the matrix.",
+  "`color` is the picture's colour there, straight to the **Output**. `slot` says which of its colours it is (a number, for Colour pick), and `on` is false where the picture is transparent - **transparent is off** is ticked, so its clear corners stay off."
+ ],
+ "try": [
+  {
+   "label": "Two colours",
+   "text": "colours 2: the picture is posterised to two colours - a stencil.",
+   "set": [
+    [
+     1,
+     "colours",
+     2
+    ]
+   ]
+  },
+  {
+   "label": "Chunky",
+   "text": "width and height 8: the picture is shrunk to 8 x 8 first, so each of its pixels covers four LEDs.",
+   "set": [
+    [
+     1,
+     "width",
+     8
+    ],
+    [
+     1,
+     "height",
+     8
+    ]
+   ]
+  },
+  {
+   "label": "Keep the background",
+   "text": "transparent is off unticked: transparent pixels take the nearest colour instead of turning off, so the corners fill in.",
+   "set": [
+    [
+     1,
+     "alpha_clear",
+     false
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "matrix",
+  "params": {
+   "w": 16,
+   "h": 16
+  }
+ },
+ "assets": [
+  "assets/smiley.png"
+ ],
+ "graph": {
+  "name": "Tutorial Image",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Image",
+    "params": {
+     "file": "assets/smiley.png",
+     "width": 16,
+     "height": 16,
+     "colours": 6,
+     "alpha_clear": true
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "color",
+    2,
+    "color"
+   ]
+  ]
+ }
+}

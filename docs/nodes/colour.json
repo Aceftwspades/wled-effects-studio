@@ -1,0 +1,130 @@
+{
+ "node": "Colour",
+ "star": 1,
+ "caption": "Colour: one fixed colour, shown through scrolling stripes",
+ "why": [
+  "Not everything should follow the palette: a brand colour, a warning red, a warm white for a lamp. Colour is one fixed colour you pick, part of the effect itself.",
+  "Use it wherever a single steady colour is wanted, then shape it with a mask, a blend or a scale. Its neighbours: Colour 1, 2 and 3 (controls) are the colour pickers on the WLED page, chosen by the person; Colour pick is eight fixed colours by number; Colour is one, fixed in the graph."
+ ],
+ "steps": [
+  "Colour has no inputs; its **rgb** setting is the colour - here a warm orange.",
+  "Its `color` goes into a **Mask**, shown only where scrolling **Stripes** (count 5, duty 0.4, a clock as phase) are lit.",
+  "The masked colour goes to the **Output**: orange stripes on black, whatever palette is chosen on the WLED page."
+ ],
+ "try": [
+  {
+   "label": "Another colour",
+   "text": "rgb at teal: the stripes change colour at once - the colour is set on the node, not the page.",
+   "set": [
+    [
+     1,
+     "rgb",
+     [
+      0,
+      200,
+      180
+     ]
+    ]
+   ]
+  },
+  {
+   "label": "Warm white",
+   "text": "rgb at a warm white: a lamp-like light rather than a colour.",
+   "set": [
+    [
+     1,
+     "rgb",
+     [
+      255,
+      200,
+      140
+     ]
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Colour",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Colour",
+    "params": {
+     "rgb": [
+      255,
+      120,
+      0
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   },
+   {
+    "id": 4,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 5.0,
+     "duty": 0.4
+    }
+   },
+   {
+    "id": 5,
+    "type": "Mask",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "phase"
+   ],
+   [
+    1,
+    "color",
+    5,
+    "color"
+   ],
+   [
+    4,
+    "value",
+    5,
+    "mask"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

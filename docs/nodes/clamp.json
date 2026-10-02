@@ -1,0 +1,151 @@
+{
+ "node": "Clamp",
+ "star": 1,
+ "caption": "Clamp: a wave's peaks and troughs cut flat at 0.25 and 0.75 - flat-topped bands",
+ "why": [
+  "A value that strays outside the range you want - a brightness above 1, a position past the edge, a negative size - can cause wrapping colours or glitches. Clamp keeps it between a low and a high: anything below low becomes low, anything above high becomes high.",
+  "It is also a shaping tool: clamp a smooth wave and its peaks go flat. Its neighbours: Remap and Map range rescale a range; Smoothstep makes a soft edge; Clamp just cuts."
+ ],
+ "steps": [
+  "A **Wave** along **Coords** `u` (3 cycles, scrolled by a clock) is the **x** input: smooth 0..1 hills.",
+  "**low** is 0.25 and **high** is 0.75: below a quarter becomes a quarter, above three quarters becomes three quarters.",
+  "The result is the **Palette**'s brightness: the hills have flat tops and the valleys flat floors - never fully dark, never fully bright.",
+  "The trace shows the wave at the centre pixel, cut flat at both ends."
+ ],
+ "try": [
+  {
+   "label": "No clamp",
+   "text": "low 0 and high 1: nothing is cut - the smooth wave again.",
+   "set": [
+    [
+     1,
+     "lo",
+     0.0
+    ],
+    [
+     1,
+     "hi",
+     1.0
+    ]
+   ]
+  },
+  {
+   "label": "Dark ceiling",
+   "text": "high 0.4: everything above 0.4 is held there - dim, flat bands.",
+   "set": [
+    [
+     1,
+     "hi",
+     0.4
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Clamp",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Clamp",
+    "params": {
+     "lo": 0.25,
+     "hi": 0.75
+    },
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "x"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "phase"
+   ],
+   [
+    3,
+    "value",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "u",
+    4,
+    "index"
+   ],
+   [
+    1,
+    "result",
+    4,
+    "brightness"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

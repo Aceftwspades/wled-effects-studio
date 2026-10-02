@@ -1,0 +1,102 @@
+{
+ "node": "Power",
+ "star": 1,
+ "caption": "Power: a ramp across the matrix raised to the power 3 - dark for most of the way, then bright at the end",
+ "why": [
+  "A straight ramp from 0 to 1 is rarely the shape a light wants: the eye sees brightness unevenly, and a glow should fall away fast. Power reshapes a 0..1 value - raised to a high exponent it hugs 0 and shoots up at the end; below 1 it rises quickly and levels off.",
+  "Its neighbours: Exp grows by proportion; Float curve is any shape you draw; Smoothstep is an S; Power is the simple bend, one number to adjust."
+ ],
+ "steps": [
+  "**x** is **Coords** `u`, a straight ramp 0..1 across.",
+  "**exponent** is 3: u times u times u - at the middle of the matrix that is 0.125, so most of the ramp is dim, then it rises steeply.",
+  "The result is the **Palette**'s brightness; `u` picks the colour.",
+  "The trace shows the centre pixel's value - 0.125 rather than 0.5."
+ ],
+ "try": [
+  {
+   "label": "Sharper",
+   "text": "exponent 8: almost everything dark, a bright edge only at the very right.",
+   "set": [
+    [
+     1,
+     "e",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "Lifted",
+   "text": "exponent 0.4: the opposite bend - most of the ramp is bright, falling to dark only at the left edge.",
+   "set": [
+    [
+     1,
+     "e",
+     0.4
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Power",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Power",
+    "params": {},
+    "inputs": {
+     "e": 3.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "u",
+    3,
+    "index"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "brightness"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ]
+  ]
+ }
+}

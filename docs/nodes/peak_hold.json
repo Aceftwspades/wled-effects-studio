@@ -1,0 +1,194 @@
+{
+ "node": "Peak hold",
+ "star": 1,
+ "caption": "Peak hold: the bass (left) and its peak (right) - jumping up at once, holding, then falling",
+ "why": [
+  "A VU meter on a mixing desk has a little bar that jumps to each peak and hangs there for a moment before falling. It makes a meter readable: you see how loud it got, not just how loud it is this instant. Peak hold is that bar - it jumps to each new peak, holds it, then falls at a steady rate, never below the live value.",
+  "Its neighbours: Envelope rises fast and falls smoothly (no hold); Slew limits both directions; Hold samples on a trigger; Peak hold is the highest lately, held then dropping."
+ ],
+ "steps": [
+  "**Audio**'s `bass` is the **x** input.",
+  "**hold** is 500 ms: after a peak the value stays put for half a second. **fall** is 1: then it drops by 1 a second until it meets the bass again.",
+  "`fresh` is true on the frame a new peak arrives. The left meter is the bass, the right one the peak: two meters - a **Threshold** on `u` switches a **Select** between the two values, left half and right half; each value plus `v` through a Threshold at 1 lights a column from the bottom as high as the value.",
+  "The trace: the bass (grey) and the peak (orange) - flat tops after each kick, then straight lines down."
+ ],
+ "try": [
+  {
+   "label": "Long hold",
+   "text": "hold 1500: each peak hangs for a second and a half - nearly always waiting for the next kick.",
+   "set": [
+    [
+     1,
+     "hold",
+     1500.0
+    ]
+   ]
+  },
+  {
+   "label": "Slow fall",
+   "text": "fall 0.3: once the hold is over the bar sinks slowly, a third of the way a second.",
+   "set": [
+    [
+     1,
+     "fall",
+     0.3
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   2,
+   "bass"
+  ],
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Peak hold",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Peak hold",
+    "params": {},
+    "inputs": {
+     "hold": 500.0,
+     "fall": 1.0
+    }
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 22,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 23,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 25,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "bass",
+    1,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "x"
+   ],
+   [
+    21,
+    "on",
+    22,
+    "on"
+   ],
+   [
+    2,
+    "bass",
+    22,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    22,
+    "b"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    23,
+    "b"
+   ],
+   [
+    23,
+    "result",
+    24,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    25,
+    "index"
+   ],
+   [
+    24,
+    "value",
+    25,
+    "brightness"
+   ],
+   [
+    25,
+    "color",
+    26,
+    "color"
+   ]
+  ]
+ }
+}

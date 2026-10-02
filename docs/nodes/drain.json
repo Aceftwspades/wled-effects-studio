@@ -1,0 +1,297 @@
+{
+ "node": "Drain",
+ "star": 1,
+ "caption": "Drain: rain falling on noise hills, the water running down into the hollows",
+ "why": [
+  "Water runs downhill and gathers in the hollows - rivers, puddles, lakes. Drain does the hard part of that simulation for every pixel: given a field of heights and a field of water, it says how much water arrives here this frame from the higher neighbours, and whether this pixel is a hollow nothing drains out of.",
+  "It works with Field and Field write, which keep numbers per pixel between frames: heights in one field, water in another. Its neighbours: Field is the plain memory; Reaction diffusion is a ready-made simulation; Drain is the downhill step you build a water simulation from."
+ ],
+ "steps": [
+  "The landscape: a **Noise** (scale 2) of **Coords** `u`, `v` is written into field 0 every frame by a **Field write** - the heights. **heights** (Drain's height_field setting) is 0, so Drain reads them there.",
+  "**water** (the water_field setting) is 1: Drain reads the water from field 1, and its `water` output is what flows into this pixel from higher neighbours this frame.",
+  "Rain: a **Sparkle** (density 0.02, reseeded six times a second) times 0.5 is added to it; times 0.98 (a slow loss), that is the new water, written back into field 1 by a second Field write.",
+  "To see it: the **Palette** colours the land by `height` (dim), and a **Blend** adds a blue **Colour** on top, as much as there is water. `sink` - true in a hollow - is where the water collects."
+ ],
+ "try": [
+  {
+   "label": "Heavier rain",
+   "text": "the Sparkle's density at 0.1: five times the rain, so rivers form fast and the hollows fill into lakes.",
+   "set": [
+    [
+     33,
+     "density",
+     0.1
+    ]
+   ]
+  },
+  {
+   "label": "Evaporation",
+   "text": "the loss Multiply at 0.9: a tenth of the water is lost each frame, so only the main channels keep water.",
+   "set": [
+    [
+     7,
+     "b",
+     0.9
+    ]
+   ]
+  },
+  {
+   "label": "Rougher land",
+   "text": "the Noise's scale at 5: more, smaller hills, so the water splits into many short streams.",
+   "set": [
+    [
+     2,
+     "scale",
+     5.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Drain",
+  "nodes": [
+   {
+    "id": 30,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 31,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 6.0
+    }
+   },
+   {
+    "id": 32,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 33,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.02
+    }
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Noise",
+    "params": {
+     "octaves": 1,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 2.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Field write",
+    "params": {
+     "field": 0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Drain",
+    "params": {
+     "height_field": 0,
+     "water_field": 1
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 6,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.98
+    }
+   },
+   {
+    "id": 8,
+    "type": "Field write",
+    "params": {
+     "field": 1
+    },
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   },
+   {
+    "id": 10,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Colour",
+    "params": {
+     "rgb": [
+      40,
+      120,
+      255
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Blend",
+    "params": {
+     "mode": "add"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    30,
+    "t",
+    31,
+    "a"
+   ],
+   [
+    31,
+    "result",
+    32,
+    "x"
+   ],
+   [
+    32,
+    "result",
+    33,
+    "seed"
+   ],
+   [
+    20,
+    "u",
+    2,
+    "x"
+   ],
+   [
+    20,
+    "v",
+    2,
+    "y"
+   ],
+   [
+    2,
+    "value",
+    3,
+    "value"
+   ],
+   [
+    33,
+    "value",
+    5,
+    "a"
+   ],
+   [
+    1,
+    "water",
+    6,
+    "a"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "b"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "a"
+   ],
+   [
+    7,
+    "result",
+    8,
+    "value"
+   ],
+   [
+    1,
+    "height",
+    9,
+    "a"
+   ],
+   [
+    1,
+    "height",
+    10,
+    "index"
+   ],
+   [
+    9,
+    "result",
+    10,
+    "brightness"
+   ],
+   [
+    10,
+    "color",
+    12,
+    "under"
+   ],
+   [
+    11,
+    "color",
+    12,
+    "over"
+   ],
+   [
+    1,
+    "water",
+    12,
+    "amount"
+   ],
+   [
+    12,
+    "color",
+    13,
+    "color"
+   ]
+  ]
+ }
+}

@@ -482,13 +482,23 @@ def _image(b, parent):
     c = _c()
     if not b["exists"]:
         return dpg.add_text(f"[picture missing: {os.path.basename(b['path'])}]", parent=parent, color=c.DIM)
+    gif = b["path"].lower().endswith(".gif")
     got = S.textures.get(b["path"])
-    if got is None or not dpg.does_item_exist(got[0]):
+    if gif and (got is None or not dpg.does_item_exist(got[0])):
+        # a GIF's texture is made when it comes into view (_play): the node reference has one for nearly
+        # every node, and loading them all made opening it take a second. Until then, a stand-in of its size.
+        try:
+            from PIL import Image
+            with Image.open(b["path"]) as im:
+                w, h = im.size
+        except Exception as e:
+            return dpg.add_text(f"[picture unreadable: {e}]", parent=parent, color=c.DIM)
+        got = (_placeholder(), w, h)
+    elif got is None or not dpg.does_item_exist(got[0]):
         try:
             w, h, ch, data = dpg.load_image(b["path"])
             from native.textures import registry
-            add = dpg.add_dynamic_texture if b["path"].lower().endswith(".gif") else dpg.add_static_texture
-            got = S.textures[b["path"]] = (add(w, h, data, parent=registry()), w, h)
+            got = S.textures[b["path"]] = (dpg.add_static_texture(w, h, data, parent=registry()), w, h)
         except Exception as e:
             return dpg.add_text(f"[picture unreadable: {e}]", parent=parent, color=c.DIM)
     tex, w, h = got
@@ -497,13 +507,26 @@ def _image(b, parent):
         img = dpg.add_image(tex, width=int(w * s), height=int(h * s))
         dpg.bind_item_handler_registry(img, "reader_pic_click")
         S.pics[img] = (b["path"], b["alt"])
-        if b["path"].lower().endswith(".gif"):
-            S.anims[img] = {"path": b["path"], "tex": tex, "w": w, "h": h, "frames": None, "i": 0, "next": 0.0}
+        if gif:
+            S.anims[img] = {"path": b["path"], "tex": tex if b["path"] in S.textures else None, "w": w, "h": h,
+                            "frames": None, "i": 0, "next": 0.0}
         c.tip("click: the picture at full size" if s < 1.0 else "click: the picture in a window of its own", item=img)
         cap = (b["alt"] + "  -  " if b["alt"] else "") + ("click for full size" if s < 1.0 else "")
         if cap:
             dpg.add_text(cap.strip(" -"), color=c.DIM, wrap=int(w * s))
     return g
+
+
+_PLACE = {}
+
+
+def _placeholder():
+    """The stand-in texture a picture is drawn with until it is loaded: one pixel of the page's dark."""
+    t = _PLACE.get("tex")
+    if t is None or not dpg.does_item_exist(t):
+        from native.textures import registry
+        t = _PLACE["tex"] = dpg.add_static_texture(1, 1, [0.08, 0.09, 0.1, 1.0], parent=registry())
+    return t
 
 
 def _gif_frames(path, w, h):
@@ -524,11 +547,22 @@ def _play():
     import time
     now = time.time()
     for item, a in list(S.anims.items()):
-        if not dpg.does_item_exist(item) or not dpg.does_item_exist(a["tex"]):
+        if not dpg.does_item_exist(item):
             S.anims.pop(item, None); continue
         if not dpg.is_item_visible(item):
             a["frames"] = None
             continue
+        if a["tex"] is None or not dpg.does_item_exist(a["tex"]):
+            got = S.textures.get(a["path"])                  # in view: its texture now (another copy may have made it)
+            if got is None or not dpg.does_item_exist(got[0]):
+                try:
+                    w, h, ch, data = dpg.load_image(a["path"])
+                    from native.textures import registry
+                    got = S.textures[a["path"]] = (dpg.add_dynamic_texture(w, h, data, parent=registry()), w, h)
+                except Exception:
+                    S.anims.pop(item, None); continue
+            a["tex"] = got[0]
+            dpg.configure_item(item, texture_tag=a["tex"])
         if a["frames"] is None:
             try:
                 a["frames"] = _gif_frames(a["path"], a["w"], a["h"])

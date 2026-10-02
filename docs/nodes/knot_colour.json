@@ -1,0 +1,112 @@
+{
+ "node": "Knot colour",
+ "star": 1,
+ "caption": "Knot colour: a bend in the colour wire from the palette to the output - the effect unchanged",
+ "why": [
+  "Knot colour is the bend for a colour wire: a point the wire passes through, to route it neatly. The colour comes out exactly as it went in.",
+  "Its neighbours: Knot for a number wire; Send colour and Receive colour skip the wire. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph."
+ ],
+ "steps": [
+  "The **Palette**'s `color` goes into the knot's **in**, and its `out` on to the **Output**.",
+  "Drag it to steer the wire round the other nodes."
+ ],
+ "try": [],
+ "graph": {
+  "name": "Tutorial Knot colour",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Knot colour",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 23,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 24,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 25,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    21,
+    "t",
+    22,
+    "a"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "x"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "phase"
+   ],
+   [
+    20,
+    "u",
+    24,
+    "index"
+   ],
+   [
+    23,
+    "value",
+    24,
+    "brightness"
+   ],
+   [
+    24,
+    "color",
+    1,
+    "in"
+   ],
+   [
+    1,
+    "out",
+    25,
+    "color"
+   ]
+  ]
+ }
+}

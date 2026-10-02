@@ -1,0 +1,219 @@
+{
+ "node": "Audio",
+ "star": 1,
+ "caption": "Audio: the bass (left) and the treble (right) as two meters, and both as lines",
+ "why": [
+  "Audio is where an effect hears the music: the overall loudness, three bands (bass, mid and treble) and a beat, all as numbers each frame. In the sim it is the synth (or a file, or the line in); on the device it is WLED's microphone through the audioreactive usermod.",
+  "Plug bass into a brightness and the effect pumps with the kick; plug beat into a trigger and something happens on every hit. Its neighbours: Spectrum and FFT bin give the sixteen bands in detail; Onset hears hits over a steady bass; Tempo measures the beat's speed; Audio is the everyday summary."
+ ],
+ "steps": [
+  "Audio has no inputs or settings. Its outputs, each 0..1 unless it is a switch: `volume` (overall loudness), `bass`, `mid` and `treble` (the low, middle and high bands), `beat` (true on the frame a kick lands) and `hit` (how hard it landed).",
+  "Two **Mix** nodes choose what the meters show: the left one passes `bass` (its t at 0, with `hit` waiting in b), the right one passes `treble` (with `mid` waiting).",
+  "Then two meters - a **Threshold** on `u` switches a **Select** between the two values, left half and right half; each value plus `v` through a Threshold at 1 lights a column from the bottom as high as the value.",
+  "Watch them move differently: the bass jumps on every kick and drops between; the treble ticks with the hats. The trace shows the bass (grey) and the treble (orange)."
+ ],
+ "try": [
+  {
+   "label": "Hit instead of bass",
+   "text": "the left Mix's t at 1: the left meter shows `hit` - a spike on each kick as hard as it landed, nothing between.",
+   "set": [
+    [
+     2,
+     "t",
+     1.0
+    ]
+   ]
+  },
+  {
+   "label": "Mid instead of treble",
+   "text": "the right Mix's t at 1: the right meter shows the middle band - voices and chords, steadier than the hats.",
+   "set": [
+    [
+     3,
+     "t",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "bass"
+  ],
+  [
+   1,
+   "treble"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Audio",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Mix",
+    "params": {},
+    "inputs": {
+     "t": 0.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Mix",
+    "params": {},
+    "inputs": {
+     "t": 0.0
+    }
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 22,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 23,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 25,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "bass",
+    2,
+    "a"
+   ],
+   [
+    1,
+    "hit",
+    2,
+    "b"
+   ],
+   [
+    1,
+    "treble",
+    3,
+    "a"
+   ],
+   [
+    1,
+    "mid",
+    3,
+    "b"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "x"
+   ],
+   [
+    21,
+    "on",
+    22,
+    "on"
+   ],
+   [
+    2,
+    "result",
+    22,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    22,
+    "b"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    23,
+    "b"
+   ],
+   [
+    23,
+    "result",
+    24,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    25,
+    "index"
+   ],
+   [
+    24,
+    "value",
+    25,
+    "brightness"
+   ],
+   [
+    25,
+    "color",
+    26,
+    "color"
+   ]
+  ]
+ }
+}

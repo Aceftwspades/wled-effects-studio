@@ -1,0 +1,127 @@
+{
+ "node": "Effect settings",
+ "star": 1,
+ "caption": "Effect settings: the effect starting on Lava, for 2-D, with its colour pickers named",
+ "why": [
+  "Some things belong to the effect as a whole rather than to any pixel: which palette it starts with, whether it is for a strip, a matrix or both, whether it listens to audio, and what the colour pickers are called on the WLED page. Effect settings holds them - one per graph, not wired to anything.",
+  "They go into the effect's metadata, which WLED reads to set up its page when the effect is chosen. Its neighbours: Speed, Intensity and the other controls carry their own names and defaults; Effect settings is everything else."
+ ],
+ "steps": [
+  "**palette** is 8 (Lava): the palette the effect starts on when chosen - the person can still pick another.",
+  "**dimensions** is 2-D: WLED lists it among the matrix effects. **audio** is none: it does not ask for the microphone (volume or frequency would).",
+  "**colours** names the three pickers Flame, Ember and Smoke, so the WLED page labels them that way.",
+  "The rest of the graph is a scroll of **Noise** coloured by the **Palette** - Lava, from these settings."
+ ],
+ "try": [
+  {
+   "label": "Another palette",
+   "text": "palette 9 (Ocean): rebuild and choose the effect again (or pick 'the effect's own' palette) - it starts on Ocean.",
+   "set": [
+    [
+     1,
+     "palette",
+     9
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Effect settings",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Effect settings",
+    "params": {
+     "palette": 8,
+     "dimensions": "2-D",
+     "audio": "none",
+     "colours": "Flame,Ember,Smoke"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Noise",
+    "params": {
+     "octaves": 2,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "x"
+   ],
+   [
+    2,
+    "v",
+    3,
+    "y"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "z"
+   ],
+   [
+    3,
+    "value",
+    4,
+    "index"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

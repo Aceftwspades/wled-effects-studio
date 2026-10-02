@@ -1,0 +1,240 @@
+{
+ "node": "Silence",
+ "star": 1,
+ "caption": "Silence: the music look (stripes on the beat) while there is sound, fading to a calm idle look when it stops",
+ "why": [
+  "An audio effect with no music is often a dead, dark cube - or a flicker of noise. Silence notices when the sound has stopped: it says whether there is sound, how long it has been quiet, and gives a mix that is 1 while there is sound and fades to 0 after it stops.",
+  "Blend the music look by that mix and an idle look by the rest, and the effect settles into the idle look on its own when the music ends. Its neighbours: Audio's volume is the level itself; Gate makes on and off from a level; Silence is about whether there is any sound at all, with a hold and a fade."
+ ],
+ "steps": [
+  "**threshold** is 0.03: the volume that counts as sound. **hold** is 1.5: sound stays on for a second and a half after the volume last passed it. **fade** is 2: after that, the mix falls to 0 over two seconds.",
+  "`mix` is the amount of a **Blend**: over a slow palette scroll (the idle look) it lays bright stripes that lurch on the beat (the music look, a **Beat kick** into a **Wave**).",
+  "`sound` is true while there is sound; `quiet` counts the seconds since there was any.",
+  "The synth never stops, so the mix stays at 1 - see below to hear it stop. The trace shows the mix."
+ ],
+ "try": [
+  {
+   "label": "Pretend it is quiet",
+   "text": "threshold 0.99: almost nothing counts as sound, so after the hold the mix fades to the idle look.",
+   "set": [
+    [
+     1,
+     "threshold",
+     0.99
+    ]
+   ]
+  },
+  {
+   "label": "Quick to settle",
+   "text": "threshold 0.99, hold 0.2 and fade 0.5: the idle look takes over within a second of the music counting as gone.",
+   "set": [
+    [
+     1,
+     "threshold",
+     0.99
+    ],
+    [
+     1,
+     "hold",
+     0.2
+    ],
+    [
+     1,
+     "fade",
+     0.5
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "mix"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Silence",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Silence",
+    "params": {},
+    "inputs": {
+     "threshold": 0.03,
+     "hold": 1.5,
+     "fade": 2.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.1
+    }
+   },
+   {
+    "id": 5,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 0.35
+    }
+   },
+   {
+    "id": 8,
+    "type": "Beat kick",
+    "params": {},
+    "inputs": {
+     "throw": 1.0
+    }
+   },
+   {
+    "id": 9,
+    "type": "Wave",
+    "params": {
+     "shape": "square"
+    },
+    "inputs": {
+     "cycles": 4.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 10,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Blend",
+    "params": {
+     "mode": "over"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    5,
+    "u",
+    6,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    6,
+    "b"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "index"
+   ],
+   [
+    2,
+    "beat",
+    8,
+    "beat"
+   ],
+   [
+    5,
+    "u",
+    9,
+    "x"
+   ],
+   [
+    8,
+    "phase",
+    9,
+    "phase"
+   ],
+   [
+    5,
+    "u",
+    10,
+    "index"
+   ],
+   [
+    9,
+    "value",
+    10,
+    "brightness"
+   ],
+   [
+    7,
+    "color",
+    11,
+    "under"
+   ],
+   [
+    10,
+    "color",
+    11,
+    "over"
+   ],
+   [
+    1,
+    "mix",
+    11,
+    "amount"
+   ],
+   [
+    11,
+    "color",
+    12,
+    "color"
+   ]
+  ]
+ }
+}

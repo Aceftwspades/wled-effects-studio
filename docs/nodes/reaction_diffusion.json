@@ -1,0 +1,141 @@
+{
+ "node": "Reaction diffusion",
+ "star": 1,
+ "caption": "Reaction diffusion: tendrils growing, splitting and merging over the matrix",
+ "why": [
+  "Coral, zebra stripes, fingerprints and leopard spots are made by the same process: two chemicals spreading out while one eats the other. Reaction diffusion runs that process on a small hidden grid, frame after frame, and the patterns grow by themselves - never quite the same twice.",
+  "It is the one generator here with a memory: the picture is the result of everything before it, so it evolves rather than repeats. Read it with any coordinate. Its neighbours: Noise is smooth random with no structure; Voronoi is cells that sit still; Reaction diffusion grows living shapes."
+ ],
+ "steps": [
+  "**Coords** `u` and `v` go into **u** and **v**: where to read the hidden grid. The grid wraps across, so the pattern has no seam left to right.",
+  "**feed** (0.037) is how fast fresh chemical flows in, **kill** (0.06) how fast the second one dies away. Between them they choose the family of pattern - these give branching tendrils.",
+  "**steps** is 2: the simulation runs two steps each frame. **seed** is how much of the second chemical it starts with.",
+  "The `v` output - the second chemical, the tendrils - rarely goes above 0.4, so a **Smoothstep** (edges 0.08 and 0.35) stretches it to 0..1. That is the **Palette**'s index and its brightness: the tendrils glow in the palette's colours on a dark ground. `u` (the first chemical) is the inverse, the background."
+ ],
+ "try": [
+  {
+   "label": "Spots",
+   "text": "feed 0.03 and kill 0.062: the tendrils break up into separate spots that divide like cells.",
+   "set": [
+    [
+     1,
+     "feed",
+     0.03
+    ],
+    [
+     1,
+     "kill",
+     0.062
+    ]
+   ]
+  },
+  {
+   "label": "Maze",
+   "text": "feed 0.055 and kill 0.062: the pattern grows into a winding maze of lines that fills the whole picture.",
+   "set": [
+    [
+     1,
+     "feed",
+     0.055
+    ],
+    [
+     1,
+     "kill",
+     0.062
+    ]
+   ]
+  },
+  {
+   "label": "Grow faster",
+   "text": "steps 6: three times the simulation a frame - the pattern spreads quickly, at three times the work.",
+   "set": [
+    [
+     1,
+     "steps",
+     6
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Reaction diffusion",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Reaction diffusion",
+    "params": {
+     "feed": 0.037,
+     "kill": 0.06,
+     "steps": 2,
+     "seed": 0.02
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.08,
+     "e1": 0.35
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    1,
+    "u"
+   ],
+   [
+    2,
+    "v",
+    1,
+    "v"
+   ],
+   [
+    1,
+    "v",
+    5,
+    "x"
+   ],
+   [
+    5,
+    "result",
+    3,
+    "index"
+   ],
+   [
+    5,
+    "result",
+    3,
+    "brightness"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ]
+  ]
+ }
+}

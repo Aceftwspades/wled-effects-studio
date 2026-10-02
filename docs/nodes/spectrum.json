@@ -1,0 +1,139 @@
+{
+ "node": "Spectrum",
+ "star": 1,
+ "caption": "Spectrum: a graphic equaliser - the sixteen bands across the matrix, each a column as tall as it is loud",
+ "why": [
+  "The classic picture of music on lights is the graphic equaliser: bass at one end, treble at the other, each band a bar as tall as it is loud. Spectrum gives the whole spectrum as a curve you can read anywhere - feed a coordinate into index and the bands spread across it.",
+  "Across u it is an equaliser; round a ring's angle it is a circular one; down a wall it is a level. Its neighbours: FFT bin is one band; Spectrum history adds the past; Audio is the summary; Spectrum is all the bands now."
+ ],
+ "steps": [
+  "**index** is **Coords** `u`: the lowest band at the left edge, the highest at the right.",
+  "**smooth** is 0.5: the levels are smoothed a little so the bars do not flicker. **interpolate** is on: between bands the curve blends, so the bars flow into each other rather than stepping.",
+  "`level` is how loud the spectrum is there: plus `v`, through a **Threshold** at 1, it lights each column from the bottom up to its level - the bars. The **Palette** colours them by `u`."
+ ],
+ "try": [
+  {
+   "label": "Smoother",
+   "text": "smooth 0.9: the bars rise and fall slowly, like an analogue meter.",
+   "set": [
+    [
+     1,
+     "smooth",
+     0.9
+    ]
+   ]
+  },
+  {
+   "label": "Steps",
+   "text": "interpolate off: each band is a flat block of columns, sixteen distinct bars.",
+   "set": [
+    [
+     1,
+     "interpolate",
+     false
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Spectrum",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Spectrum",
+    "params": {
+     "smooth": 0.5,
+     "interpolate": true
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    1,
+    "index"
+   ],
+   [
+    1,
+    "level",
+    3,
+    "a"
+   ],
+   [
+    2,
+    "v",
+    3,
+    "b"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    2,
+    "u",
+    5,
+    "index"
+   ],
+   [
+    4,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

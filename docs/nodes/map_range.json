@@ -1,0 +1,115 @@
+{
+ "node": "Map range",
+ "star": 1,
+ "caption": "Map range: u from 0..1 into 0.2..0.7, in five steps with an ease - a stepped slice of the palette",
+ "why": [
+  "Remap rescales one range into another; Map range does the same with everything on pins, so a slider or a signal can set the range itself, plus an easing curve and an option to come out in whole steps.",
+  "Wire a slider into out high and the person controls the range. Its neighbours: Remap is the quick version with settings; Clamp only cuts; Floor makes steps; Map range does all of it."
+ ],
+ "steps": [
+  "**x** is **Coords** `u`, 0..1 across.",
+  "**in low** 0 and **in high** 1 is the range it comes from; **out low** 0.2 and **out high** 0.7 is where it goes: only part of the palette is used.",
+  "**steps** is 5: the result comes out in five flat steps. **ease** is ease in-out: the steps bunch toward the ends. **clamp** is on: anything outside the in range is held at the ends.",
+  "The result is the **Palette**'s index: five bands taking colours from 0.2..0.7 of the palette."
+ ],
+ "try": [
+  {
+   "label": "Smooth",
+   "text": "steps 0: no steps - a smooth sweep through that slice of the palette.",
+   "set": [
+    [
+     1,
+     "steps",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Whole palette",
+   "text": "out low 0 and out high 1: the full palette across, in five steps.",
+   "set": [
+    [
+     1,
+     "out_lo",
+     0.0
+    ],
+    [
+     1,
+     "out_hi",
+     1.0
+    ]
+   ]
+  },
+  {
+   "label": "Linear",
+   "text": "ease linear: the five steps are evenly spaced.",
+   "set": [
+    [
+     1,
+     "ease",
+     "linear"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Map range",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Map range",
+    "params": {
+     "ease": "ease in-out",
+     "clamp": true
+    },
+    "inputs": {
+     "in_lo": 0.0,
+     "in_hi": 1.0,
+     "out_lo": 0.2,
+     "out_hi": 0.7,
+     "steps": 5.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    1,
+    "x"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "index"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ]
+  ]
+ }
+}

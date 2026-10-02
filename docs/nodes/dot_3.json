@@ -1,0 +1,157 @@
+{
+ "node": "Dot 3",
+ "star": 1,
+ "caption": "Dot 3: every pixel's place measured along a slowly turning direction - slabs of light sweeping through the cube at an angle",
+ "why": [
+  "How far along a direction is this point? That one question gives slabs (measure along an axis and band it), height (measure along down), lighting (how much a surface faces a light). Dot 3 is that measurement - the dot product of two vectors.",
+  "Its neighbours: Vector math has dot among many operations; Length is distance from the origin; Dot 3 is distance along a direction."
+ ],
+ "steps": [
+  "**a** is **Position**'s `pos`, the pixel's place in the cube.",
+  "**b** is a direction from **Direction to**, its heading turning with a clock (**Time** times 0.1) and tilted up 0.1.",
+  "The result is how far along that direction the pixel lies, -1.7..1.7: into a **Wave** (3 cycles), it makes flat slabs of light at right angles to the direction - and as the direction turns, the slabs sweep through the cube at a changing angle.",
+  "The wave is the **Palette**'s brightness, coloured by the same distance."
+ ],
+ "try": [
+  {
+   "label": "Thinner slabs",
+   "text": "the Wave's cycles at 6: twice as many slabs, half as thick.",
+   "set": [
+    [
+     4,
+     "cycles",
+     6.0
+    ]
+   ]
+  },
+  {
+   "label": "Tilted up",
+   "text": "Direction to's up at 0.2: the direction tips toward vertical, so the slabs lie nearly flat - layers.",
+   "set": [
+    [
+     3,
+     "turns_b",
+     0.2
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Dot 3",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Direction to",
+    "params": {},
+    "inputs": {
+     "turns_b": 0.1
+    }
+   },
+   {
+    "id": 1,
+    "type": "Dot 3",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Wave",
+    "params": {
+     "shape": "triangle"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.1
+    }
+   }
+  ],
+  "links": [
+   [
+    11,
+    "result",
+    3,
+    "turns_a"
+   ],
+   [
+    2,
+    "pos",
+    1,
+    "a"
+   ],
+   [
+    3,
+    "dir",
+    1,
+    "b"
+   ],
+   [
+    1,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    1,
+    "result",
+    5,
+    "index"
+   ],
+   [
+    4,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

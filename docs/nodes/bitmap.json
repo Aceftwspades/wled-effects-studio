@@ -1,0 +1,141 @@
+{
+ "node": "Bitmap",
+ "star": 1,
+ "caption": "Bitmap: a heart typed as digits, coloured by Colour pick, on a 16 x 16 matrix",
+ "why": [
+  "Sometimes you know exactly which pixels you want lit: an icon, a letter, a face, a heart. Bitmap is pixel art you type - one row per line of digits, a dot for empty - and it is baked into the effect, so the device needs no file.",
+  "Each digit is a colour slot rather than a colour, so the same drawing can be recoloured by whatever turns slots into colours (Colour pick here). Its neighbours: Image reads a picture file instead of typed digits; States holds several bitmaps and shows one at a time, for animation; Text draws letters from a font."
+ ],
+ "steps": [
+  "The **rows** setting is the drawing: eight rows of eight characters, separated by '/'. `1` is the heart, `2` its highlight, `.` empty.",
+  "**u** and **v** are unwired, so they are the pixel's own place: the drawing is stretched over the whole matrix, two LEDs for each of its pixels.",
+  "`slot` is the digit under the pixel - 1, 2, or 0 where there is a dot - and goes into **Colour pick**'s index, which turns 0 into black, 1 into red and 2 into pink.",
+  "`on` is false on the dots; it is unused here because slot 0 is already black, but it is how you would leave the background to another pattern (a Select or a Mix)."
+ ],
+ "try": [
+  {
+   "label": "A smile instead",
+   "text": "rows set to a smiley face: the same colours, a different drawing - type any shape you like the same way.",
+   "set": [
+    [
+     1,
+     "rows",
+     "..1111../.1....1./1.2..2.1/1......1/1.2..2.1/1..22..1/.1....1./..1111.."
+    ]
+   ]
+  },
+  {
+   "label": "Recolour it",
+   "text": "Colour pick's colour 1 at blue: the slot-1 pixels change colour without touching the drawing.",
+   "set": [
+    [
+     2,
+     "c1",
+     [
+      40,
+      90,
+      255
+     ]
+    ]
+   ]
+  },
+  {
+   "label": "Finer drawing",
+   "text": "rows of sixteen characters: one character per LED, so the heart is drawn at full resolution, smaller, in the middle of a wider drawing.",
+   "set": [
+    [
+     1,
+     "rows",
+     "......11..11..../.....1221111..../.....1211111..../.....1111111..../......11111...../.......111....../........1......./................"
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "matrix",
+  "params": {
+   "w": 16,
+   "h": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Bitmap",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Bitmap",
+    "params": {
+     "rows": ".11.11../1221111./1211111./1111111./.11111../..111.../...1..../........"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Colour pick",
+    "params": {
+     "c0": [
+      0,
+      0,
+      0
+     ],
+     "c1": [
+      230,
+      20,
+      40
+     ],
+     "c2": [
+      255,
+      140,
+      170
+     ],
+     "c3": [
+      0,
+      0,
+      255
+     ],
+     "c4": [
+      255,
+      255,
+      0
+     ],
+     "c5": [
+      0,
+      255,
+      255
+     ],
+     "c6": [
+      255,
+      0,
+      255
+     ],
+     "c7": [
+      128,
+      128,
+      128
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "slot",
+    2,
+    "index"
+   ],
+   [
+    2,
+    "color",
+    3,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,205 @@
+{
+ "node": "Ease",
+ "star": 1,
+ "caption": "Ease: a random level picked on each beat (left), and Ease gliding to it (right)",
+ "why": [
+  "Values that change in steps - a slider moved on the WLED page, a random picked on the beat, a switch flipped - look abrupt when they drive a picture directly. Ease glides to each new target over about the time you set, so the change fades in instead of snapping.",
+  "Its neighbours: Slew moves at a fixed speed (a big jump takes longer); Spring overshoots and settles; Envelope follows a level with separate rise and fall; Ease takes about the same time for any jump, easing in and out."
+ ],
+ "steps": [
+  "A **Random hold** picks a new random level on each of **Audio**'s beats: that is Ease's **target**.",
+  "**seconds** is 0.5: Ease reaches each new target in about half a second.",
+  "`moving` is true while it is still on its way.",
+  "The left meter is the target, the right one Ease's `value`: two meters - a **Threshold** on `u` switches a **Select** between the two values, left half and right half; each value plus `v` through a Threshold at 1 lights a column from the bottom as high as the value. The trace shows the target jumping (grey) and Ease following it in smooth curves (orange)."
+ ],
+ "try": [
+  {
+   "label": "Slower",
+   "text": "seconds 2: Ease takes two seconds to arrive, so it rarely gets there before the next beat picks another target.",
+   "set": [
+    [
+     1,
+     "seconds",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "Snappy",
+   "text": "seconds 0.1: almost a jump, with just the corners rounded off.",
+   "set": [
+    [
+     1,
+     "seconds",
+     0.1
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   2,
+   "value"
+  ],
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Ease",
+  "nodes": [
+   {
+    "id": 3,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Random hold",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Ease",
+    "params": {},
+    "inputs": {
+     "seconds": 0.5
+    }
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 22,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 23,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 25,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "beat",
+    2,
+    "trigger"
+   ],
+   [
+    2,
+    "value",
+    1,
+    "target"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "x"
+   ],
+   [
+    21,
+    "on",
+    22,
+    "on"
+   ],
+   [
+    2,
+    "value",
+    22,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    22,
+    "b"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    23,
+    "b"
+   ],
+   [
+    23,
+    "result",
+    24,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    25,
+    "index"
+   ],
+   [
+    24,
+    "value",
+    25,
+    "brightness"
+   ],
+   [
+    25,
+    "color",
+    26,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,140 @@
+{
+ "node": "Select",
+ "star": 1,
+ "caption": "Select: switched on every kick between two ways of colouring - a sweep across and drifting noise",
+ "why": [
+  "An effect with two behaviours needs a way to choose between them: a checkbox on the WLED page, a beat, a phase of a cycle. Select gives b when its switch is on and a when it is off - a fork in the graph.",
+  "Its neighbours: Mix fades smoothly between two values; Not flips the switch; Colour pick chooses among eight colours; Select is the hard switch between two numbers."
+ ],
+ "steps": [
+  "**on** is a **Toggle** flipped by **Audio**'s beat: on for one kick, off for the next.",
+  "**a** is **Coords** `u` - a plain sweep of the palette. **b** is a **Noise** of `u` and `v` - blobs.",
+  "The result is the **Palette**'s index: on every kick the matrix swaps between the sweep and the blobs.",
+  "Wire a **Check 1** into on instead and the checkbox on the WLED page chooses."
+ ],
+ "try": [],
+ "trace": [
+  [
+   1,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Select",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Toggle",
+    "params": {
+     "on": true
+    },
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Noise",
+    "params": {
+     "octaves": 1,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0,
+     "z": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "beat",
+    3,
+    "flip"
+   ],
+   [
+    3,
+    "on",
+    1,
+    "on"
+   ],
+   [
+    4,
+    "u",
+    1,
+    "a"
+   ],
+   [
+    4,
+    "u",
+    5,
+    "x"
+   ],
+   [
+    4,
+    "v",
+    5,
+    "y"
+   ],
+   [
+    5,
+    "value",
+    1,
+    "b"
+   ],
+   [
+    1,
+    "result",
+    6,
+    "index"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

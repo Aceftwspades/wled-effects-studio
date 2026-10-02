@@ -1,0 +1,141 @@
+{
+ "node": "Colour expression",
+ "star": 1,
+ "caption": "Colour expression: one line of C++ giving a colour - a hue wheel across, brightness down",
+ "why": [
+  "Colour expression is Expression for colours: one line of C++ giving a colour, from a, b and a colour called under, with helpers for the usual jobs - gc_hsv(h, s, v) for a hue, mq_scale(c, 0..255) to dim, color_blend(a, b, 0..255) to mix, SEGCOLOR(0) for the picked colours.",
+  "Its neighbours: HSV, Blend and Scale are the same jobs as nodes; Expression gives a number; Colour expression gives a colour."
+ ],
+ "steps": [
+  "**a** is **Coords** `u` plus a slow clock (**Time** times 0.1); **b** is `v`; **under** is a scrolling **Palette** colour.",
+  "**expr** is `gc_hsv(a, 1.0f, b)`: a hue from a (round the wheel across the matrix, turning slowly), full saturation, brightness from b (dark at the top).",
+  "The colour goes to the **Output**. under is unused by this expression - see below."
+ ],
+ "try": [
+  {
+   "label": "Mix with under",
+   "text": "expr `color_blend(gc_hsv(a, 1.0f, b), under, 128)`: half the hue wheel, half the palette colour under it.",
+   "set": [
+    [
+     1,
+     "expr",
+     "color_blend(gc_hsv(a, 1.0f, b), under, 128)"
+    ]
+   ]
+  },
+  {
+   "label": "Pastel",
+   "text": "expr `gc_hsv(a, 0.4f, b)`: saturation 0.4 - soft pastel hues.",
+   "set": [
+    [
+     1,
+     "expr",
+     "gc_hsv(a, 0.4f, b)"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Colour expression",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Colour expression",
+    "params": {
+     "expr": "gc_hsv(a, 1.0f, b)"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.1
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "b"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "a"
+   ],
+   [
+    2,
+    "v",
+    1,
+    "b"
+   ],
+   [
+    2,
+    "u",
+    4,
+    "index"
+   ],
+   [
+    4,
+    "color",
+    1,
+    "under"
+   ],
+   [
+    1,
+    "color",
+    5,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

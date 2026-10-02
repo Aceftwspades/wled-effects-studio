@@ -1,0 +1,177 @@
+{
+ "node": "Shells",
+ "star": 4,
+ "caption": "Shells: a ring of light born on each beat, crossing every face of the cube as one ring",
+ "why": [
+  "On a cube, a ring drawn on one face stops at its edge. Shells works in the cube's real space instead: each beat starts a sphere growing from a point on the surface, and wherever the sphere's skin crosses the LEDs they light - so the ring flows over the edges and round the cube as one ring.",
+  "It reads where the spheres are from Emitters, which drops one on each trigger and remembers up to eight. Each shell carries a tag (a colour) and an age. Its neighbours: Ripple is rings on a flat picture from a fixed centre; Sprites draws Particles as dots; Shells draws Emitters as growing rings."
+ ],
+ "steps": [
+  "**Audio**'s `beat` fires **Emitters**' trigger: on every kick a new emitter is dropped at a random place on the surface (its `random` setting), and lives four seconds.",
+  "A **Random hold** on the same beat picks a new random number per kick - the emitter's tag, so each shell gets its own colour.",
+  "Emitters' `slots` go into Shells' **slots**, and **Position**'s `pos` into **pos**: each pixel asks how much shell is passing through its place in the cube.",
+  "**speed** is 1: a shell grows one cube-width a second. **width** is 0.2: how thick its skin is.",
+  "`value` is the **Palette**'s brightness and `tag` its index: rings of light, each its own colour."
+ ],
+ "try": [
+  {
+   "label": "Slow shells",
+   "text": "speed 0.4: each ring takes more than two seconds to cross the cube, so several are on it at once.",
+   "set": [
+    [
+     4,
+     "speed",
+     0.4
+    ]
+   ]
+  },
+  {
+   "label": "Thick shells",
+   "text": "width 0.6: broad bands of light rather than thin rings - each beat floods the cube.",
+   "set": [
+    [
+     4,
+     "width",
+     0.6
+    ]
+   ]
+  },
+  {
+   "label": "Fast and thin",
+   "text": "speed 2.5 and width 0.08: a sharp flash that races over the cube on every kick.",
+   "set": [
+    [
+     4,
+     "speed",
+     2.5
+    ],
+    [
+     4,
+     "width",
+     0.08
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Shells",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Random hold",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Emitters",
+    "params": {
+     "random": true
+    },
+    "inputs": {
+     "life": 4.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Shells",
+    "params": {},
+    "inputs": {
+     "speed": 1.0,
+     "width": 0.2
+    }
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "both",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "beat",
+    3,
+    "trigger"
+   ],
+   [
+    1,
+    "beat",
+    2,
+    "trigger"
+   ],
+   [
+    2,
+    "value",
+    3,
+    "tag"
+   ],
+   [
+    3,
+    "slots",
+    4,
+    "slots"
+   ],
+   [
+    5,
+    "pos",
+    4,
+    "pos"
+   ],
+   [
+    4,
+    "tag",
+    6,
+    "index"
+   ],
+   [
+    4,
+    "value",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,199 @@
+{
+ "node": "Gate",
+ "star": 1,
+ "caption": "Gate: the bass (left) and the gate it opens (right) - on above 0.6, off again only below 0.4",
+ "why": [
+  "Turning a level into on and off with one threshold flickers: a level that hovers near the line crosses it back and forth every frame. Gate has two lines - it turns on when the level reaches high, and only turns off again when it falls to low - so a wobbling level gives a clean on and off.",
+  "Its neighbours: Threshold is the single line (fine for steady values); Rising edge turns on into a one-frame tap; ADSR shapes what happens when a gate opens; Gate is a clean switch from a noisy level."
+ ],
+ "steps": [
+  "**Audio**'s `bass` is the **x** input.",
+  "**high** is 0.6: the gate opens when the bass reaches it. **low** is 0.4: it closes only when the bass falls back to there.",
+  "`value` is 1 while open, 0 while closed (`on` is the same as a switch, `rise` true on the frame it opens). The left meter is the bass, the right one the gate: two meters - a **Threshold** on `u` switches a **Select** between the two values, left half and right half; each value plus `v` through a Threshold at 1 lights a column from the bottom as high as the value.",
+  "The trace: the bass (grey) and the gate (orange) - a square pulse for each kick, with no chatter at the edges."
+ ],
+ "try": [
+  {
+   "label": "More sensitive",
+   "text": "high 0.35 and low 0.2: quieter kicks open the gate too.",
+   "set": [
+    [
+     1,
+     "high",
+     0.35
+    ],
+    [
+     1,
+     "low",
+     0.2
+    ]
+   ]
+  },
+  {
+   "label": "No gap",
+   "text": "low 0.59: high and low nearly the same, so it behaves like a plain threshold - watch the edges for chatter.",
+   "set": [
+    [
+     1,
+     "low",
+     0.59
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   2,
+   "bass"
+  ],
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Gate",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Gate",
+    "params": {},
+    "inputs": {
+     "high": 0.6,
+     "low": 0.4
+    }
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 22,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 23,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 25,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "bass",
+    1,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "x"
+   ],
+   [
+    21,
+    "on",
+    22,
+    "on"
+   ],
+   [
+    2,
+    "bass",
+    22,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    22,
+    "b"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    23,
+    "b"
+   ],
+   [
+    23,
+    "result",
+    24,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    25,
+    "index"
+   ],
+   [
+    24,
+    "value",
+    25,
+    "brightness"
+   ],
+   [
+    25,
+    "color",
+    26,
+    "color"
+   ]
+  ]
+ }
+}

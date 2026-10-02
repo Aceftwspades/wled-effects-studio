@@ -1,0 +1,131 @@
+{
+ "node": "Text",
+ "star": 1,
+ "caption": "Text: words scrolling across the matrix, each letter its own colour",
+ "why": [
+  "A name, a message, a score, a greeting: words on a matrix are one of the things people most often want, and the hardest to draw by hand. Text bakes the letters into the effect - in a 5x7 pixel font that is the same everywhere, or in one of the computer's own faces at a height you choose.",
+  "It tells you, for every pixel, whether it is on a letter, how much of it the letter covers (for smooth edges), and which letter it is - so you colour the words with anything. Its neighbours: Bitmap draws a shape you type pixel by pixel; Image draws a picture file; Text draws words."
+ ],
+ "steps": [
+  "**text** is the words; **font** is 5x7, the little pixel font, at **size** 1 (one LED per font pixel). **row** is -1, which centres the letters top to bottom.",
+  "**Time** times 12 goes into **offset**: the words move twelve pixels a second to the left. **loop** is on, so after the last letter leaves, the text comes round again after a gap the width of the matrix.",
+  "**u** and **v** are unwired - the pixel's own place.",
+  "`level` (how much of the pixel is letter) is the **Palette**'s brightness, and `i` (0 at the first letter .. 1 at the last) its index, so each letter takes a different colour. **height** only matters for the computer's faces (see below)."
+ ],
+ "try": [
+  {
+   "label": "Bigger letters",
+   "text": "size 2: each font pixel is two LEDs square, so the letters fill the height of the matrix.",
+   "set": [
+    [
+     1,
+     "size",
+     2
+    ]
+   ]
+  },
+  {
+   "label": "A smooth face",
+   "text": "font sans and height 14: the words drawn in this computer's sans-serif face, 14 pixels high, with soft edges from `level`.",
+   "set": [
+    [
+     1,
+     "font",
+     "sans"
+    ],
+    [
+     1,
+     "height",
+     14
+    ]
+   ]
+  },
+  {
+   "label": "Your own words",
+   "text": "text set to HAPPY BIRTHDAY: the effect is rebuilt with the new words baked in.",
+   "set": [
+    [
+     1,
+     "text",
+     "HAPPY BIRTHDAY"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Text",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 12.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Text",
+    "params": {
+     "text": "HELLO WLED",
+     "size": 1,
+     "row": -1,
+     "loop": true,
+     "font": "5x7",
+     "height": 12
+    },
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "offset"
+   ],
+   [
+    1,
+    "i",
+    4,
+    "index"
+   ],
+   [
+    1,
+    "level",
+    4,
+    "brightness"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,133 @@
+{
+ "node": "HSV",
+ "star": 1,
+ "caption": "HSV: hue across the matrix and turning with the clock, value rising from top to bottom",
+ "why": [
+  "Thinking in red, green and blue is awkward: 'a bit more orange' is not an obvious change to three numbers. HSV builds a colour the way people think of one - which colour (hue), how vivid (saturation), how bright (value).",
+  "Hue goes round the rainbow and wraps, so a growing number cycles through every colour - the easiest rainbow there is. Its neighbours: Combine builds from red, green and blue; Palette takes colours from the WLED palette; Adjust changes the hue of a colour you already have; HSV builds one from scratch."
+ ],
+ "steps": [
+  "**hue** is **Coords** `u` plus a clock (**Time** times 0.2): the rainbow runs across the matrix and turns slowly. 0 is red, 0.33 green, 0.67 blue, 1 red again.",
+  "**saturation** is unwired, typed at 1: full, vivid colour.",
+  "**value** is `v`: 0 at the top (dark) to 1 at the bottom (full brightness).",
+  "The `color` goes to the **Output**."
+ ],
+ "try": [
+  {
+   "label": "Pastel",
+   "text": "saturation 0.35: the colours are washed toward white - soft pastels.",
+   "set": [
+    [
+     1,
+     "s",
+     0.35
+    ]
+   ]
+  },
+  {
+   "label": "Grey",
+   "text": "saturation 0: no colour at all - only the brightness ramp from top to bottom is left.",
+   "set": [
+    [
+     1,
+     "s",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Faster rainbow",
+   "text": "the clock's Multiply at 1: the rainbow turns a full cycle every second.",
+   "set": [
+    [
+     4,
+     "b",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial HSV",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "HSV",
+    "params": {},
+    "inputs": {
+     "s": 1.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    2,
+    "u",
+    5,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    1,
+    "h"
+   ],
+   [
+    2,
+    "v",
+    1,
+    "v"
+   ],
+   [
+    1,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

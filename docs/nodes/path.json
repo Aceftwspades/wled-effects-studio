@@ -1,0 +1,160 @@
+{
+ "node": "Path",
+ "star": 1,
+ "caption": "Path: a glowing wire round the cube's lid, the palette flowing along it",
+ "why": [
+  "Shapes on a cube are awkward to draw from flat coordinates: a line that crosses from one face to the next bends at the fold. Path works in the cube's real space - you type the corners of a route, and for every pixel it says how far the pixel is from the route and how far along the route its nearest point is.",
+  "Distance gives you a glowing wire, an outline, a tube; along gives you something to run along it - a light chasing round a track, colours flowing. Its neighbours: Torus knot is one fixed looping tube; Shells grow from points; Path is any route you choose."
+ ],
+ "steps": [
+  "**points** are the route's corners, x, y, z each -1..1 in the cube's box, separated by ';'. The four here are the lid's corners (z = 1), and **closed** is on, so the last joins back to the first: a square round the top.",
+  "**pos** is unwired, so it is the pixel's own place on the cube.",
+  "`distance` goes into a **Smoothstep** whose edges are 0.3 and 0: 1 on the route, fading to 0 by 0.3 away - the **Palette**'s brightness, a glowing wire.",
+  "`along` plus a clock (**Time** times 0.25) is the palette's index: the colours run round the route as the clock turns."
+ ],
+ "try": [
+  {
+   "label": "A spiral down the walls",
+   "text": "points at the four vertical edges, each a third lower than the last, and closed off: one line winding round the cube from the lid to the floor, over every edge it meets.",
+   "set": [
+    [
+     1,
+     "points",
+     "-1,-1,1; 1,-1,0.33; 1,1,-0.33; -1,1,-1"
+    ],
+    [
+     1,
+     "closed",
+     false
+    ]
+   ]
+  },
+  {
+   "label": "A zigzag round the walls",
+   "text": "points zigzagging up and down round the four walls: a crown of light.",
+   "set": [
+    [
+     1,
+     "points",
+     "-1,-1,-1; 0,-1,1; 1,-1,-1; 1,0,1; 1,1,-1; 0,1,1; -1,1,-1; -1,0,1"
+    ]
+   ]
+  },
+  {
+   "label": "Thicker wire",
+   "text": "the Smoothstep's first edge at 0.7: the glow reaches more than twice as far, so the route is a broad band.",
+   "set": [
+    [
+     2,
+     "e0",
+     0.7
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Path",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Path",
+    "params": {
+     "points": "-1,-1,1; 1,-1,1; 1,1,1; -1,1,1",
+     "closed": true
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.3,
+     "e1": 0.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.25
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "distance",
+    2,
+    "x"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    1,
+    "along",
+    5,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "index"
+   ],
+   [
+    2,
+    "result",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

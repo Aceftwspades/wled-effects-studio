@@ -1,0 +1,277 @@
+{
+ "node": "Ring to uv",
+ "star": 1,
+ "caption": "Ring to uv: drops born along the rim running down the walls, each pixel taking the light from just above it",
+ "why": [
+  "Cube ring describes a pixel as around and depth; Ring to uv goes back the other way - give it an around and a depth, and it tells you which pixel shows that spot. With that, a pixel can read the one just above it on the lid-and-walls path, wherever that is on the net, and light can flow along depth: rain off the lid and down the walls, fire climbing them.",
+  "It is the pair to Cube ring, as Position to uv is to Position. Its neighbours: Position to uv works in straight lines through the box; Previous at reads the pixel it names; Ring to uv names the pixel a step along the well."
+ ],
+ "steps": [
+  "**Cube ring** gives this pixel's `around` and `depth`. A **Subtract** takes 0.04 off the depth: the spot a little nearer the lid's middle.",
+  "That around and depth go into Ring to uv's **around** and **depth**; its `u` and `v` are the pixel there - over the rim, it is on the lid.",
+  "**Previous at** reads that pixel from last frame and a **Fade** (keep 0.9) dims it: light moves one step outward and down each frame.",
+  "New drops: a **Sparkle** (density 0.2, reseeded twelve times a second) masked by a **Band** round depth 0.5 (depth minus 0.5, sharp 8) - drops are only born along the rim. Their brightness lights the **Palette** (coloured by around), and a **Blend** in max mode lays them over the falling light, so streaks run from the rim down every wall."
+ ],
+ "try": [
+  {
+   "label": "Longer runs",
+   "text": "the Fade's keep at 0.96: each drop leaves a long trail down the walls.",
+   "set": [
+    [
+     8,
+     "keep",
+     0.96
+    ]
+   ]
+  },
+  {
+   "label": "Faster",
+   "text": "the Subtract's step at 0.1: each frame reads further back, so the drops move faster - and in bigger jumps.",
+   "set": [
+    [
+     2,
+     "b",
+     0.1
+    ]
+   ]
+  },
+  {
+   "label": "Rising",
+   "text": "the Subtract's step at -0.04: each pixel reads the spot below it, so the light climbs from the rim over the lid toward its middle.",
+   "set": [
+    [
+     2,
+     "b",
+     -0.04
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Ring to uv",
+  "nodes": [
+   {
+    "id": 3,
+    "type": "Cube ring",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {
+     "b": 0.04
+    }
+   },
+   {
+    "id": 1,
+    "type": "Ring to uv",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Previous at",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Fade",
+    "params": {},
+    "inputs": {
+     "keep": 0.9
+    }
+   },
+   {
+    "id": 4,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 12.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.2
+    }
+   },
+   {
+    "id": 15,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 10,
+    "type": "Band",
+    "params": {},
+    "inputs": {
+     "sharp": 8.0
+    }
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Blend",
+    "params": {
+     "mode": "max"
+    },
+    "inputs": {
+     "amount": 1.0
+    }
+   },
+   {
+    "id": 14,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "depth",
+    2,
+    "a"
+   ],
+   [
+    3,
+    "around",
+    1,
+    "around"
+   ],
+   [
+    2,
+    "result",
+    1,
+    "depth"
+   ],
+   [
+    1,
+    "u",
+    7,
+    "u"
+   ],
+   [
+    1,
+    "v",
+    7,
+    "v"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ],
+   [
+    4,
+    "t",
+    5,
+    "a"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "x"
+   ],
+   [
+    6,
+    "result",
+    9,
+    "seed"
+   ],
+   [
+    3,
+    "depth",
+    15,
+    "a"
+   ],
+   [
+    15,
+    "result",
+    10,
+    "x"
+   ],
+   [
+    9,
+    "value",
+    11,
+    "a"
+   ],
+   [
+    10,
+    "result",
+    11,
+    "b"
+   ],
+   [
+    3,
+    "around",
+    12,
+    "index"
+   ],
+   [
+    11,
+    "result",
+    12,
+    "brightness"
+   ],
+   [
+    8,
+    "color",
+    13,
+    "under"
+   ],
+   [
+    12,
+    "color",
+    13,
+    "over"
+   ],
+   [
+    13,
+    "color",
+    14,
+    "color"
+   ]
+  ]
+ }
+}

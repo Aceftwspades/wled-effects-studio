@@ -16,7 +16,7 @@ sys.path.insert(0, ROOT)
 from native import tutorials, nodedocs, reader          # noqa: E402
 from native.nodedefs import library                     # noqa: E402
 
-ALL_REQUIRED = False         # True once every node has its tutorial: then a node without one fails
+ALL_REQUIRED = True          # every node has its tutorial: a node without one (a new node) fails
 
 
 def test_every_lesson_is_sound():
@@ -38,6 +38,11 @@ def test_every_lesson_has_its_picture():
             frames = [f.convert("RGB") for f in ImageSequence.Iterator(im)]
         assert len(frames) >= 2, node
         assert max(max(c[1] for c in f.getextrema()) for f in frames) > 60, f"{node}: the picture is dark"
+        # every LED one colour in every frame (the background between them aside - an unlit LED counts, so a
+        # pattern in one colour on black passes): a coordinate not read
+        ground = {(14, 15, 18)}
+        kinds = max(len({c for _, c in (f.getcolors(1 << 16) or [(0, (i, i, i)) for i in range(99)])} - ground) for f in frames)
+        assert kinds > 1, f"{node}: the picture is one flat colour"
 
 
 def test_nodes_md_carries_the_tutorials():
@@ -51,17 +56,18 @@ def test_nodes_md_carries_the_tutorials():
         sec = blocks[k:end]
         assert any(b["kind"] == "img" and b["exists"] for b in sec), f"{node}: no picture in its entry"
         links = [t for b in sec for _, t in b.get("links", [])]
-        assert f"studio:try/{node}" in links, f"{node}: no Try it"
+        assert f"studio:try/{tutorials.ident(node)}" in links, f"{node}: no Try it"
         for i in range(1, len(les["try"]) + 1):
-            assert f"studio:try/{node}/{i}" in links, f"{node}: try {i} has no link"
+            assert f"studio:try/{tutorials.ident(node)}/{i}" in links, f"{node}: try {i} has no link"
 
 
 def test_the_links_name_lessons():
     """Every studio: link in NODES.md names a node with a lesson and a change it has."""
     text = open(os.path.join(ROOT, "NODES.md"), encoding="utf-8").read()
     lessons = tutorials.all_lessons()
-    for node, k in re.findall(r"\(studio:try/([^)/]+)(?:/(\d+))?\)", text):
-        assert node in lessons, node
+    for stem, k in re.findall(r"\(studio:try/([^)/]+)(?:/(\d+))?\)", text):
+        node = tutorials.by_ident(stem)
+        assert node in lessons, stem
         if k:
             assert 1 <= int(k) <= len(lessons[node]["try"]), (node, k)
 

@@ -1,0 +1,162 @@
+{
+ "node": "Direction",
+ "star": 1,
+ "caption": "Direction: noise flowing over the cube without a seam at any edge",
+ "why": [
+  "Draw noise from Coords on a cube and every edge shows a seam: the net is cut there, and neighbours across the fold get unrelated values. Direction avoids the folds entirely - for each pixel it gives the direction from the middle of the cube out through that pixel, a point on a sphere, and anything drawn from that flows over every edge.",
+  "Use it for anything that should wrap the cube seamlessly: noise, a direction of light (Dot 3), a mirror fold, a torus knot. Its neighbours: Position is the place in the box, for straight lines and planes; Coords is the flat net; Direction is the angle, for things that should flow round."
+ ],
+ "steps": [
+  "Direction has no inputs or settings. Its `dir` output is the direction as one vector; `x`, `y` and `z` are its three parts (z is straight up).",
+  "`x` and `y` go into a **Noise**'s x and y; `z` plus a clock (**Time** times 0.3, added) goes into its z, so the field drifts.",
+  "**scale** on the Noise is 2: a few big blobs round the whole cube.",
+  "The noise picks a colour from the **Palette** - and the blobs cross each edge without a break."
+ ],
+ "try": [
+  {
+   "label": "Smaller blobs",
+   "text": "the Noise's scale at 5: more, smaller blobs round the cube - still no seams.",
+   "set": [
+    [
+     2,
+     "scale",
+     5.0
+    ]
+   ]
+  },
+  {
+   "label": "Faster drift",
+   "text": "the clock's Multiply at 1: the blobs churn three times as fast.",
+   "set": [
+    [
+     4,
+     "b",
+     1.0
+    ]
+   ]
+  },
+  {
+   "label": "Detail",
+   "text": "the Noise's octaves at 3: finer layers on top of the blobs, like clouds.",
+   "set": [
+    [
+     2,
+     "octaves",
+     3
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Direction",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Direction",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Noise",
+    "params": {
+     "octaves": 1,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 2.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "nx",
+    2,
+    "x"
+   ],
+   [
+    1,
+    "ny",
+    2,
+    "y"
+   ],
+   [
+    1,
+    "nz",
+    5,
+    "a"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    2,
+    "z"
+   ],
+   [
+    2,
+    "value",
+    6,
+    "index"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

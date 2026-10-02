@@ -1,0 +1,143 @@
+{
+ "node": "Notes",
+ "star": 1,
+ "caption": "Notes: the twelve notes as twelve keys across the matrix, each lit as strongly as it sounds; the colour follows the chord",
+ "why": [
+  "Bands tell you how loud the bass and treble are; they do not tell you what is being played. Notes does: it measures the twelve pitch classes - C, C#, D up to B, in any octave - so you can see the chord, and colour an effect by it.",
+  "`note` is the strongest note as a position round the circle of notes - into a hue, each chord gets its own colour - and `clarity` says how clearly it stands out. It reads the studio's audioreactive patch (the sim's synth plays chords); WLED's stock audioreactive does not have it. Its neighbours: Spectrum shows the bands; Timbre the brightness of the mix; Notes the harmony."
+ ],
+ "steps": [
+  "**index** is unwired, so it is the pixel's own `u`: the twelve notes are spread across the matrix, C at the left, B at the right.",
+  "`level` is how strongly that note is sounding: a level meter: the level plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the level, so a column is lit from the bottom as high as the level, in the **Palette**'s colours across.",
+  "**smooth** is 0.5: how much the levels are smoothed from frame to frame.",
+  "`note` (the strongest) is the **Palette**'s index for every key, so the whole picture takes the colour of the chord, changing as the synth's chords change. The trace shows `note` and `clarity`."
+ ],
+ "try": [
+  {
+   "label": "Steadier",
+   "text": "smooth 0.9: the keys rise and fall slowly - the chord rather than every note.",
+   "set": [
+    [
+     1,
+     "smooth",
+     0.9
+    ]
+   ]
+  },
+  {
+   "label": "Raw",
+   "text": "smooth 0: every frame's measurement as it is - jumpy, but quick to follow.",
+   "set": [
+    [
+     1,
+     "smooth",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "clarity"
+  ],
+  [
+   1,
+   "note"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Notes",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Notes",
+    "params": {
+     "smooth": 0.5
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "level",
+    3,
+    "a"
+   ],
+   [
+    2,
+    "v",
+    3,
+    "b"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    1,
+    "note",
+    5,
+    "index"
+   ],
+   [
+    4,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

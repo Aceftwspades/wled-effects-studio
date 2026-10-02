@@ -1,0 +1,140 @@
+{
+ "node": "Intensity",
+ "star": 1,
+ "caption": "Intensity: the WLED Intensity slider setting how many sparkles there are",
+ "why": [
+  "The second standard slider on the WLED page, Intensity, is for how much: how bright, how big, how many. The Intensity node is that slider as a number, 0 at the left to 1 at the right.",
+  "Its neighbours: Speed is for how fast; Custom 1, 2 and 3 are extra sliders with names of your own; Intensity is the one people expect to mean 'more'."
+ ],
+ "steps": [
+  "Intensity has no inputs. Its `value` is the slider, 0..1.",
+  "**label** is Intensity, the name the slider shows; **default** is 100 (of 255): where it starts.",
+  "The value is a **Sparkle**'s density: at 100 of 255, about four in ten pixels lit - more as the slider goes up. The sparkles are reseeded twelve times a second (**Time**, a **Multiply** and a **Floor**) and coloured by the **Palette** across `u`."
+ ],
+ "try": [
+  {
+   "label": "Move the slider",
+   "text": "In the side panel's PARAMETERS section, drag the Intensity slider: to the right and the matrix fills with sparkles, to the left they thin to a few. Nothing is rebuilt: the effect reads the slider every frame.",
+   "set": []
+  },
+  {
+   "label": "Rename it",
+   "text": "label Sparkles: the slider is called Sparkles on the WLED page (and in PARAMETERS) - the effect is rebuilt with the new name.",
+   "set": [
+    [
+     1,
+     "label",
+     "Sparkles"
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Intensity",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Intensity",
+    "params": {
+     "label": "Intensity",
+     "default": 100
+    },
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 12.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    4,
+    "result",
+    8,
+    "seed"
+   ],
+   [
+    1,
+    "value",
+    8,
+    "density"
+   ],
+   [
+    5,
+    "u",
+    6,
+    "index"
+   ],
+   [
+    8,
+    "value",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}
