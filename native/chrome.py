@@ -716,9 +716,11 @@ def build_dialogs(app):
         pass
     with dpg.window(tag="compare_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
         pass
-    # Appearance: a tab each for the colours, the selection frames and the interface size; the window takes its
-    # tab's size, so nothing opens below its edge (it was 470 high, the interface size under the fold)
-    with dpg.window(tag="appearance_win", label="Appearance", no_title_bar=True, show=False, autosize=True, no_collapse=True):
+    # Appearance: a tab each for the colours, the selection frames and the interface size. One size for all
+    # three - the largest tab's (show_appearance), so switching tabs no longer grows and shrinks the window under
+    # the pointer; it scrolls on a screen too small for it
+    with dpg.window(tag="appearance_win", label="Appearance", no_title_bar=True, show=False, no_collapse=True,
+                    width=px(APPEARANCE_W), height=px(APPEARANCE_H)):
         dialog_header("appearance_win", "Appearance")                 # one window style (C8): the frames' header
         with dpg.tab_bar(tag="app_tabs"):
             with dpg.tab(label="Colours", tag="app_tab_colours"):
@@ -1703,13 +1705,18 @@ def show_compare(app):
 
 
 # --- appearance, pane menus ----------------------------------------------------------------
+APPEARANCE_W, APPEARANCE_H = 700, 700        # at 100%: the Colours tab's width, the Selection frames tab's height, and a margin
+
+
 def show_appearance(app, tab=None):
     """Settings > Appearance, at a tab ("colours", "frames", "size") or the one it was left at."""
     refresh_appearance(app)
     refresh_frames(app)
     if tab and dpg.does_item_exist(f"app_tab_{tab}"):
         dpg.set_value("app_tabs", f"app_tab_{tab}")
-    _centre("appearance_win", 600, 660)
+    vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+    w, h = px(APPEARANCE_W), min(px(APPEARANCE_H), max(px(200), vh - 20))      # a short screen: it scrolls
+    dpg.configure_item("appearance_win", width=w, height=h, pos=(max(0, (vw - w) // 2), max(10, (vh - h) // 2)))
     dpg.show_item("appearance_win")
 
 
