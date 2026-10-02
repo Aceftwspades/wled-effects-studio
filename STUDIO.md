@@ -3165,6 +3165,9 @@ textured quads), so each part goes where it can.
       thumbnail after Fire 2012); the smoke opens Stock and Graphs and
       generates one preview through the bar.
 
+Released as 1.6.0 (2026-10-02): the 3-D view's look, the firmware sources and
+the Library's banks, with the four builds.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every
