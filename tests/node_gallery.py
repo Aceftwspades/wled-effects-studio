@@ -21,7 +21,9 @@ NAME = "node_gallery"
 COLS = 8                 # nodes a row
 PITCH_X = 240            # graph units between columns: a node is 150 inside, its padding and a gap besides
 GAP_Y = 60               # between rows, below the tallest node of the row
-SLACK = 1.5              # px: a measure's rounding
+# px: a measure's rounding - and off Windows, where the faces are not the ones typeface.measure was
+# calibrated on, the 2 px a name draws wider than it measures (seen on Linux, ARM Linux and macOS)
+SLACK = 1.5 if sys.platform.startswith("win") else 3.5
 
 
 def _height(d):
