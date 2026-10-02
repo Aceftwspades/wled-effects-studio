@@ -214,6 +214,14 @@ class FakeWled:
                 p = self.path.split("?")[0]
                 n = int(self.headers.get("Content-Length") or 0)
                 raw = self.rfile.read(n) if n else b""
+                if p == "/update":
+                    # an OTA: the image kept, and a reboot - the uptime starts over a moment later
+                    head, sep, rest = raw.partition(b"\r\n\r\n")
+                    with fake._lock:
+                        fake.firmware = rest.rsplit(b"\r\n--", 1)[0]
+                        fake.log.append(f"update {len(fake.firmware)} bytes")
+                        fake.t0 = time.time() + 1
+                    return self._send(200, b"<html><body>Update successful! Rebooting...</body></html>", "text/html")
                 if p == "/upload":
                     # multipart: the one file, by its filename
                     name = "/unknown"

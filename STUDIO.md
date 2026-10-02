@@ -3114,6 +3114,29 @@ textured quads), so each part goes where it can.
 - [ ] **Camera moves for recordings**: a turntable, depth of field in renders;
       and a project remembering its look.
 
+### Firmware: what is flashed (October 2026)
+
+- [x] **The Flash frame's firmware sources**: the studio's build, **a WLED
+      release** (`native/firmware.py`: WLED's GitHub releases, the files for
+      the device's chip ordered plainest first - board builds, Ethernet,
+      debug after - downloaded once into HOME/firmware), **WLED from the
+      checkout** (`flash.stage_stock`: the environment without cube_fx and
+      the studio's usermod) or **a .bin file**. Every binary's chip is read
+      from its image header (`firmware.bin_chip`: the ESP32 family's chip id,
+      the ESP8266's entry address, a gzip) and one for another chip is never
+      sent; a firmware that is not the studio's is asked about first. Each
+      flash is recorded with its source.
+- [x] **The built-in cube effects one by one**: `flash.builtin_catalog` (the
+      name from each file's metadata, what it leans on from the helpers it
+      calls), an unticked one left out of a copy of cube_fx the build uses
+      instead (`usermods/cube_fx_studio`, every helper kept), sizes measured
+      per effect after a build, and a chosen effect needing a feature left
+      out called out. Tested: `test_firmware.py` (the headers, the release
+      matching through a file URL and the cache, the trimmed copy in a tree
+      made for the test, a .bin flashed to the fake WLED and one for the
+      wrong chip refused); the smoke flashes a .bin to the fake device through
+      the frame, fills the release list and leaves out a built-in.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every

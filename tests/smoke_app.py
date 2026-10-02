@@ -533,6 +533,34 @@ STEPS = [
     ([{"chrome": "shortcuts"}, {"chrome": "frames"}, {"chrome": "flash"}, {"feature": ["imu", False]}, {"feature": ["audio", "none"]},
       {"feature": ["imu", True]}, {"feature": ["audio", "pcm"]}, {"chrome": "usermods"}, {"usermod": ["add", "Temperature"]},
       {"usermod": ["off", "Temperature"]}, {"usermod": ["remove", "Temperature"]}, {"chrome": "about"}], 1.0),
+    # the Flash frame's firmware sources: a .bin of the fake device's chip (an S3) chosen, asked about, flashed
+    # to it through /update and recorded; WLED's releases (a list given here, not the network) matched to its
+    # chip; a built-in cube effect left out of the studio's build; and back to the studio's build
+    ([{"frame": "flash"}, {"device": "127.0.0.1:8770"},
+      {"py": "open(app.project.path + '/export/smoke_s3.bin', 'wb').write(bytes([0xE9, 3, 0, 0, 0, 4, 8, 0x40, 0, 0, 0, 0, 9, 0]) + bytes(4082)) and None"},
+      {"py": "device_ui._set_source(app, 'file')"}, {"py": "device_ui._pick_bin(app, app.project.path + '/export/smoke_s3.bin')"}], 0.8),
+    ([{"check": "dpg.is_item_shown('flash_file_row') and not dpg.is_item_shown('flash_fx') and not dpg.is_item_shown('flash_env_row')"},
+      {"check": "any('an esp32-s3 image' in dpg.get_value(i) for i in dpg.get_item_children('flash_manifest', 1))"},
+      {"py": "device_ui.start_flash(app)"}], 0.6),
+    ([{"check": "dpg.is_item_shown('confirm_dialog') and 'cube effects' in dpg.get_value('confirm_text')"},
+      {"py": "dpg.hide_item('confirm_dialog')"}, {"py": "device_ui.start_flash(app, confirmed=True)"}], 14.0),
+    ([{"check": "app.flash_job.done and app.flash_job.ok and app.flash_job.source == 'file'"},
+      {"check": "app.project.options['flash_history'][-1]['firmware'] == 'smoke_s3.bin'"},
+      {"py": "setattr(app, '_fw_rels', [{'tag': 'v16.0.1', 'name': 'x', 'pre': False, 'date': '2026-09-20', 'assets': ["
+             "{'name': n, 'url': '', 'size': 1000} for n in ('WLED_16.0.1_ESP32.bin', 'WLED_16.0.1_ESP32-S3_8MB_opi.bin', "
+             "'WLED_16.0.1_ESP32-S3_4M_qspi.bin')]}])"},
+      {"py": "setattr(app, '_fw_fetching', True)"}, {"py": "device_ui._set_source(app, 'release')"},
+      {"py": "(setattr(app, '_fw_fetching', False), setattr(app, '_fw_fresh', True))"}], 0.8),
+    ([{"check": "dpg.is_item_shown('flash_rel_row') and dpg.get_item_configuration('flash_asset')['items'] == "
+                "['WLED_16.0.1_ESP32-S3_4M_qspi.bin', 'WLED_16.0.1_ESP32-S3_8MB_opi.bin']"},
+      {"check": "any('several flash sizes' in dpg.get_value(i) for i in dpg.get_item_children('flash_manifest', 1))"},
+      {"py": "device_ui._set_source(app, 'studio')"},
+      {"py": "device_ui._builtin_toggle(app, flash.builtin_catalog()[0]['file'], False)"}], 0.8),
+    ([{"check": "dpg.is_item_shown('flash_fx') and flash.builtin_chosen(app.project) == [e['file'] for e in flash.builtin_catalog()][1:]"},
+      {"check": "any('built-in cube effects: %d of %d' % (len(flash.builtin_catalog()) - 1, len(flash.builtin_catalog())) in dpg.get_value(i) "
+                "for i in dpg.get_item_children('flash_manifest', 1))"},
+      {"py": "device_ui._ship_all(app, True)"}], 0.5),
+    ([{"check": "app.project.options.get('builtin_ship') is None"}, {"py": "chrome.close_all_frames(app)"}], 0.3),
     ([{"appearance": {"light": True}}, {"appearance": {"light": False}}], 1.0),
     ([{"gpu": False}, {"gpu": True}, {"gpu_net": False}, {"gpu_net": True}], 1.5),
     ([{"ui": False}, {"ui": True}, {"layout": "graph"}, {"measure": True}, {"randomise": True}], 1.0),
@@ -876,6 +904,10 @@ def make_films():
 
 
 def main():
+    try:
+        sys.stdout.reconfigure(errors="replace")         # the app's lines can hold what a Windows console cannot print
+    except Exception:
+        pass
     if not scratch.DIR:
         print("smoke: no private scratch folder to drive the app through (native/scratch.py)")
         return 1
@@ -889,6 +921,8 @@ def main():
     caps_before = set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()
     STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs, and the last project: put back after
     saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
+    if saved_prefs is not None:
+        os.remove(STUDIO_FILE)       # from no settings, as a CI runner starts: frames docked by an earlier run take the room the steps measure
     from fake_wled import FakeWled                          # the device every send goes to, and the DDP receiver
     ddp = FakeWled(port=8770, ddp_port=4048).start()
     with open(LOG, "w") as log:
