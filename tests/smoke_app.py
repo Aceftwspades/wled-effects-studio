@@ -555,9 +555,10 @@ STEPS = [
                 "['WLED_16.0.1_ESP32-S3_4M_qspi.bin', 'WLED_16.0.1_ESP32-S3_8MB_opi.bin']"},
       {"check": "any('several flash sizes' in dpg.get_value(i) for i in dpg.get_item_children('flash_manifest', 1))"},
       {"py": "device_ui._set_source(app, 'studio')"},
-      {"py": "device_ui._builtin_toggle(app, flash.builtin_catalog()[0]['file'], False)"}], 0.8),
-    ([{"check": "dpg.is_item_shown('flash_fx') and flash.builtin_chosen(app.project) == [e['file'] for e in flash.builtin_catalog()][1:]"},
-      {"check": "any('built-in cube effects: %d of %d' % (len(flash.builtin_catalog()) - 1, len(flash.builtin_catalog())) in dpg.get_value(i) "
+      # the cube_fx sources come from a WLED checkout: CI and a packaged app without one have no catalog
+      {"py": "flash.builtin_catalog() and device_ui._builtin_toggle(app, flash.builtin_catalog()[0]['file'], False)"}], 0.8),
+    ([{"check": "not flash.builtin_catalog() or (dpg.is_item_shown('flash_fx') and flash.builtin_chosen(app.project) == [e['file'] for e in flash.builtin_catalog()][1:])"},
+      {"check": "not flash.builtin_catalog() or any('built-in cube effects: %d of %d' % (len(flash.builtin_catalog()) - 1, len(flash.builtin_catalog())) in dpg.get_value(i) "
                 "for i in dpg.get_item_children('flash_manifest', 1))"},
       {"py": "device_ui._ship_all(app, True)"}], 0.5),
     ([{"check": "app.project.options.get('builtin_ship') is None"}, {"py": "chrome.close_all_frames(app)"}], 0.3),
