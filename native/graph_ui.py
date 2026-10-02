@@ -3127,6 +3127,8 @@ class GraphPanel(Glyphs):
         m = min(max(2, self.px(3)), max(0, col - 2 * g - 1 - math.ceil(self.text_w(name))))   # never a name cut for it
         room = col - 2 * g - 1 - m
         shown = name if self.text_w(name) <= room else nodeface.fit_width(name, max(1, room), self.text_w)
+        if not shown.endswith("...") and len(name) <= 2:
+            shown = name                 # no room even for "..." (a knot's "in" in a wider face): whole beats a letter
         kw = {"tag": tag} if tag else {}
         t = dpg.add_text(shown, **kw)
         pad = col - 2 * g - m - math.ceil(self.text_w(shown))
