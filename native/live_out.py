@@ -244,6 +244,7 @@ class WiringTest:
         self.trail = 6               # LEDs lit behind the head
         self.index = 0               # the LED (index mode) or the part (part mode)
         self.colour = (255, 255, 255)
+        self.mask = None             # (n,) bool: the LEDs lit in the "mask" mode (mapping by camera's binary codes)
         self.pos = 0.0
         self.t = 0.0
 
@@ -265,6 +266,8 @@ class WiringTest:
             return f"output {o + 1} of {len(self.outputs)}: LEDs {self.outputs[o][0]}..{self.outputs[o][0] + self.outputs[o][1] - 1}"
         elif self.mode in ("red", "green", "blue", "white"):
             return f"all {self.mode}: every LED the one colour - a colour-order check"
+        elif self.mode == "mask":
+            return f"{int(np.count_nonzero(self.mask)) if self.mask is not None else 0} LEDs lit by code"
         elif self.mode == "alternate":
             return "every other LED, swapping"
         elif self.mode == "twinkle":
@@ -293,6 +296,9 @@ class WiringTest:
                 out[i] = np.maximum(out[i], (c * f).astype(np.uint8))
         elif self.mode == "index":
             out[self.index % self.n] = c
+        elif self.mode == "mask" and self.mask is not None:
+            m = np.asarray(self.mask, bool)[:self.n]
+            out[:len(m)][m] = c
         elif self.mode == "part" and self.owner is not None:
             out[self.owner == (self.index % self._parts())] = c
         elif self.mode == "parts in turn" and self.owner is not None:

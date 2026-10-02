@@ -71,6 +71,35 @@ MAP_STEPS = [
       {"py": "chrome.close_dialog('map_win')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.8),
 ]
 
+# a camera mapping live, without ffmpeg: a synthetic webcam on a 60-LED tree pictures what the plan lights (the
+# device's frame, never sent: nothing streams); calibration counts the LEDs on the flash, the binary plan steps
+# through its 14 pictures and the side is read; the shape (the cube's five faces) out as Lightwork's layout CSV and
+# back in as a part of as many LEDs
+_LIVE_TREE = ("np.stack([(40 * (1 - np.linspace(0, 1, 60)) + 4) * np.cos(np.linspace(0, 8 * np.pi, 60)), "
+              "(40 * (1 - np.linspace(0, 1, 60)) + 4) * np.sin(np.linspace(0, 8 * np.pi, 60)), np.linspace(0, 120, 60)], 1)")
+_EXPORT = "__import__('os').path.join(app.project.path, 'export', 'lightwork_layout.csv')"
+LIVE_MAP_STEPS = [
+    ([{"py": "camera_map_ui.show(app)"}, {"py": "dpg.set_value('map_method', camera_map_ui.METHODS[1][1])"},
+      {"py": "num.set('map_n', 60)"}, {"py": "num.set('map_bright', 200)"}, {"py": "dpg.set_value('map_cam', 'synthetic')"},
+      {"py": "camera_map_ui._state(app).__setitem__('cam', camera_map.SyntheticCamera(" + _LIVE_TREE + ", lambda: app._map_frame))"},
+      {"py": "camera_map_ui.calibrate(app)"}], 1.5),
+    ([{"expect": ["map_cam_words", "found of 60 LEDs"]}, {"check": "app.wiring is not None and app.wiring.mode == 'mask'"},
+      {"check": "int(np.frombuffer(app._map_frame, np.uint8).max()) == 200"}, {"py": "camera_map_ui.calibrate(app)"}], 0.3),
+    ([{"check": "app._map['calib'] is None and app.wiring is None and app._map_frame is None"},
+      {"py": "camera_map_ui.live(app)"}], 4.0),
+    ([{"check": "app._map['live'] is None and app._map['busy'] is None and not app._map['queue']"},
+      {"check": "len(app._map['sides'][-1]['found']) >= 58"}, {"check": "app._map['sides'][-1]['words'].startswith('the webcam')"},
+      {"py": "camera_map_ui.export_csv(app)"}], 0.5),
+    ([{"check": "open(" + _EXPORT + ").readline().strip() == 'address,x,y,z'"},
+      {"check": "len(open(" + _EXPORT + ").read().split()) == app.project.geometry.count + 1"},
+      {"py": "num.set('map_height', 120.0)"}, {"py": "camera_map_ui.import_csv(app, " + _EXPORT + ")"}], 1.0),
+    ([{"check": "app.project.geometry.kind == 'shape' and [shapes.part_count(q) for q in app.project.geometry.params['parts'] "
+                "if q['name'].startswith('lightwork_layout')] == [16 * 16 * 5]"},
+      {"expect": ["map_result", "from lightwork_layout.csv"]},
+      {"py": "camera_map_ui._close_cam(app)"}, {"py": "chrome.close_dialog('map_win')"},
+      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.8),
+]
+
 STEPS = [
     # the run's own project, from the examples; Maelstrom's graph compiled, built and put on the effects list
     # (a batch that starts with wait_build is taken once the build in hand is loaded, however long that is here)
@@ -703,6 +732,7 @@ STEPS = [
     ([{"check": "app.project.geometry.kind == 'shape' and app.project.geometry.count == 256 and dpg.get_value('geom_kind') == 'shape'"},
       {"dock": ["shape", False]}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
     *MAP_STEPS,
+    *LIVE_MAP_STEPS,
     # S19: a matrix-only effect on a shape's one-row layout says so under the effect (not on the cube); a grid that leaves
     # LEDs dark behind others is a check; the tree tutorial opens at its chapter
     ([{"geometry": {"kind": "shape", "params": {"parts": [_TREE]}}}, {"effect": "Ace 3-D Plasma"}], 1.0),

@@ -92,7 +92,7 @@ class TestPattern:
 class FfmpegSource:
     """A file or a webcam through ffmpeg, frames read on a thread; latest() is the newest decoded."""
 
-    def __init__(self, input_args, label, kind, width=WIDTH, height=HEIGHT, realtime=True, loop=False):
+    def __init__(self, input_args, label, kind, width=WIDTH, height=HEIGHT, realtime=True, loop=False, fit=False):
         self.kind, self.label = kind, label
         self.w, self.h = int(width), int(height) // 2 * 2
         self.error = None
@@ -104,7 +104,10 @@ class FfmpegSource:
         if not exe:
             raise ValueError("video needs ffmpeg on the PATH (ffmpeg.org) - the test pattern works without it")
         pre = (["-re"] if realtime else []) + (["-stream_loop", "-1"] if loop else [])
-        vf = f"scale={self.w}:{self.h}:force_original_aspect_ratio=increase,crop={self.w}:{self.h}"
+        if fit:                                                  # all of the picture, bars where it is narrower (mapping)
+            vf = f"scale={self.w}:{self.h}:force_original_aspect_ratio=decrease,pad={self.w}:{self.h}:(ow-iw)/2:(oh-ih)/2"
+        else:                                                    # the frame filled (the LEDs: no black bars)
+            vf = f"scale={self.w}:{self.h}:force_original_aspect_ratio=increase,crop={self.w}:{self.h}"
         self.cmd = [exe, "-v", "error", "-nostdin"] + pre + list(input_args) + ["-vf", vf, "-an", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
         from native import procs
         self.proc = procs.popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -181,7 +184,7 @@ def webcams():
     return out
 
 
-def open_source(kind, path=None, name=None, width=WIDTH, height=HEIGHT, loop=True):
+def open_source(kind, path=None, name=None, width=WIDTH, height=HEIGHT, loop=True, fit=False):
     """A video source: kind "test", "file" (path) or "webcam" (name, from webcams())."""
     if kind == "test":
         return TestPattern(width, height)
@@ -194,6 +197,6 @@ def open_source(kind, path=None, name=None, width=WIDTH, height=HEIGHT, loop=Tru
         cams = dict(webcams())
         if name not in cams:
             raise ValueError(f"no camera called {name!r}" + (f" - there is {', '.join(cams)}" if cams else " - none found"))
-        return FfmpegSource(cams[name], name, "webcam", width, height, realtime=False)
+        return FfmpegSource(cams[name], name, "webcam", width, height, realtime=False, fit=fit)
     raise ValueError(f"unknown video source {kind!r}")
 # AI: end

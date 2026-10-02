@@ -577,9 +577,34 @@ a points part in wiring order, sized to it: from two sides or more in 3-D,
 from one side flat as it faces the camera (a window, a wall). An LED no two
 sides saw is estimated from its neighbours in the wiring: the checks list
 them, the view rings them in amber while the part is selected, and with
-BY HAND's **place** ticked each drags to where it really is. **Film with
-the webcam** does a side with no video file when OpenCV is installed (`pip
-install opencv-python`): the plan plays while the webcam takes its pictures.
+BY HAND's **place** ticked each drags to where it really is.
+
+**How** picks the plan. **One LED at a time** is sure where LEDs sit close
+together, but slow for a long string (500 LEDs at 0.2 s are close to two
+minutes). **Every LED at once, by code** (the way of Lightwork) lights every
+LED in each picture, each flashing its own address in Gray code: a bit
+picture and its inverse for each bit of the count, so 500 LEDs take 20
+pictures - seconds, not minutes. It reads the pictures pixel by pixel, so
+two LEDs that blur together on the flash still part, and a reflection lit
+in every picture (and its inverse) takes no address. It wants a darker room
+than the slow way. **LED brightness** sets how bright the plan lights
+them: lower it when the camera flares.
+
+**Mapping live with a webcam** needs no film: pick the camera (**Find**
+lists those ffmpeg can open), and **Map live** lights each step of the plan
+on the device, waits **settle** new pictures for the stream and the camera
+to catch up, takes the picture itself, and reads the side - no flashes, no
+clock. **Calibrate** first: it lights every LED and shows the camera's view
+with each LED found marked and counted. Raise **threshold** if the room's
+lights or reflections are counted, lower it if dim LEDs are missed; **apart**
+drops doubles closer than that; **largest** drops a spot too big to be one
+LED (a lamp, a window). The same settings read the filmed sides.
+
+**Lightwork's layout CSV**: **Save CSV (Lightwork)** writes the shape's
+LEDs, in wiring order, as `address,x,y,z` (each 0 to 1, y down the picture)
+into the project's `export` folder - for Lightwork's scraper, MadMapper or
+TouchDesigner. **Import CSV...** takes one back as a points part, sized to
+**its height** (one made in two dimensions lies flat).
 
 **Building in the 3-D view.** While the frame is open the view shows each
 part in a colour of its own - the selected ones bright, the rest dimmed
@@ -1360,7 +1385,7 @@ Every button, with what its tooltip says.
 
 **Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ Add from the sim` — a new step: what the sim shows now - effect, sliders, palette, colours, segments; `Update from the sim` — the selected step becomes what the sim shows now; `Load into the sim` — the sim shows the selected step; `Add what the sim shows`; `x` — this slider's ramp off (the others stay); `Play in the sim`; `Stop`; `Render GIF` — plays the sequence once and records it as a GIF, into captures/; `Render video` — plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path; `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap durations to bars` — every step's seconds rounded to whole bars, so the sequence changes on the music; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Send and run it`; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 
-**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `making...`; `not built yet`
+**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `not built yet`; `making...`
 
 **Palettes frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ New`; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy`; `Remove`; `Use in the sim`; `New palette`; `spread evenly`; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all`; `Remove this one there`
 
@@ -1388,7 +1413,7 @@ Every button, with what its tooltip says.
 
 **Report a problem**: `close` — close (Esc while it has the focus); `Open the issues page` — a new issue on the studio's GitHub page, in the browser - attach the zip there; `Show the zip` — the captures folder, where the report landed; `Close`
 
-**Map lights by camera**: `close` — close (Esc while it has the focus); `Play the plan` — in the sim - and on the device while the sim is streamed to it (Stream the sim to the device, Ctrl+Shift+T); `Stop` — the plan stopped part way; `+ a side` — another side: how far it was turned from the first, then its film; `Film with the webcam` — the plan played while the webcam takes its pictures: a side without a video file (needs OpenCV: pip install opencv-python); `Make the part` — the lights as a points part in the shape, in wiring order: an LED no two sides saw is estimated (the shape's checks list them, to drag where they are)
+**Map lights by camera**: `close` — close (Esc while it has the focus); `Play the plan` — in the sim - and on the device while the sim is streamed to it (Stream the sim to the device, Ctrl+Shift+T); `Stop` — the plan stopped part way; `+ a side` — another side: how far it was turned from the first, then its film; `Find` — the webcams ffmpeg can open on this computer; `Calibrate` — every LED lit, the camera's view with the LEDs found marked: set the threshold, the LED brightness, the blob distance and size until the count is right; again: stop; `Map live` — the plan stepped through with the webcam: each step lit, let settle, pictured - the next side without an empty slot gets it; `Make the part` — the lights as a points part in the shape, in wiring order: an LED no two sides saw is estimated (the shape's checks list them, to drag where they are); `Save CSV (Lightwork)` — the shape's LEDs as Lightwork's layout CSV - address,x,y,z, each 0..1 - for Lightwork's scraper, MadMapper or TouchDesigner; into the project's export folder; `Import CSV...` — a Lightwork layout CSV (address,x,y,z) as a points part, sized to its height above
 
 **Message log**: `close` — close (Esc while it has the focus); `copy all` — the log as text, to paste into an issue or a note; `clear` — empties the recent messages; the problems stay until they are fixed
 

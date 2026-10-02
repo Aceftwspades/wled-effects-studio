@@ -5013,7 +5013,7 @@ def process_stats(app):
 # a clone or a download from the network, a restart, a program opened on the desktop, a key capture,
 # the clipboard (the log's copy: what the user had copied stays)
 SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
-                    "map_webcam",                         # the webcam: a camera turned on is not a test's to do
+                    "map_cam_find", "map_calib", "map_live",  # the webcam: a camera turned on is not a test's to do
                     "geom_read_wiring",                   # a real device's wiring read: the smoke reads the fake's
                     "history_switch")                     # its rows would put the walked project's settings back: the smoke does, in its own
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",

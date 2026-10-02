@@ -305,6 +305,11 @@ camera...** (on the start, or the Shape frame's File...) finds each LED:
    neighbours in the wiring: the checks list them, the view rings them in
    amber, and with BY HAND's **place** ticked each drags to where it is.
 
+With a webcam plugged in there is no filming to do: **Find** the camera,
+**Calibrate** until the count matches the string, and **Map live** each
+side. Set **How** to *every LED at once, by code* and a side of 500 LEDs
+takes seconds.
+
 ![map by camera](docs/tutorial/tree_camera.png)
 
 ## More to try

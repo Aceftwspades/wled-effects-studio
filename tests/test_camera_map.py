@@ -146,6 +146,96 @@ def test_a_film_through_ffmpeg():
     assert _shape_error(pos, P) < 0.05, _shape_error(pos, P)
 
 
+# --- binary mapping (after Lightwork), live steps, the CSV -----------------------------------------
+def test_gray_codes():
+    assert [cm.gray(i) for i in range(6)] == [0, 1, 3, 2, 6, 7]
+    assert all(cm.gray_decode(cm.gray(i)) == i for i in range(2000))
+    p = cm.BinaryPlan(500)
+    assert p.bits == 9 and len(set(p.codes.tolist())) == 500 and 0 not in p.codes   # no LED dark in every picture
+    assert len(p.steps()) == 2 + 2 * 9                                               # 500 LEDs in 20 pictures
+    assert (p.mask(3) ^ p.mask(3, inverse=True)).all()
+
+
+def test_binary_plan_maps_a_tree_from_two_sides():
+    P = _tree(60)
+    plan = cm.BinaryPlan(len(P), on=0.2, off=0.05)
+    assert plan.total < cm.Plan(len(P)).total / 2 and cm.BinaryPlan(500).total < cm.Plan(500).total / 15   # the more LEDs, the bigger the gain
+    sides = []
+    for ang, hide in ((0, (5, 17)), (90, (30,))):
+        frames = cm.synthetic_video(P, plan, ang, fps=30.0, size=(200, 200), hide=hide, seed=ang)
+        found, _ = cm.scan(frames, 30.0, plan)
+        assert len(found) >= len(P) - len(hide) - 2, len(found)
+        assert all(k not in found for k in hide)                     # unseen: not invented
+        sides.append((ang, found))
+    pos, full = cm.combine(sides, len(P))
+    assert _shape_error(pos, P) < 0.05, _shape_error(pos, P)
+
+
+def _camera(P, size=160, seed=3):
+    """A still camera on points P from the front: a picture of any set of them lit (and of the flash)."""
+    rs = np.random.RandomState(seed)
+    h = w = size
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
+    sc = 0.8 * size / np.ptp(P[:, 2])
+    u = w / 2 + P[:, 0] * sc
+    v = h / 2 - (P[:, 2] - P[:, 2].mean()) * sc
+    spot = lambda k, lv: lv * np.exp(-((xs - u[k]) ** 2 + (ys - v[k]) ** 2) / (2 * 1.6 ** 2))
+    base = 12.0 + rs.normal(0, 2.0, (h, w)).astype(np.float32)
+
+    def picture(lit):
+        m = np.zeros(len(P), bool)
+        if isinstance(lit, str) and lit == "all":
+            return cm.synthetic_picture("all", m, spot, len(P), set(), base, rs, 2.0)
+        if isinstance(lit, np.ndarray):
+            m = lit
+        elif lit is not None:
+            m[int(lit)] = True
+        return cm.synthetic_picture("lit", m, spot, len(P), set(), base, rs, 2.0)
+    return picture, u, v
+
+
+def test_live_steps_map_without_a_clock():
+    """Mapping live: each step lit, a picture taken - no flashes to find, the pictures keyed by step."""
+    P = _tree(40, seed=7)
+    picture, u, v = _camera(P)
+    for plan in (cm.Plan(len(P)), cm.BinaryPlan(len(P))):
+        frames = {what: picture(lit) for what, lit in plan.steps()}
+        found, _ = cm.scan(frames, None, plan, times={what: what for what, _ in plan.steps()})
+        assert len(found) >= len(P) - 1, (plan.kind, len(found))
+        assert max(abs(found[k][0] - u[k]) + abs(found[k][1] - v[k]) for k in found) < 1.5
+
+
+def test_a_reflection_is_not_an_led():
+    """A spot lit in every picture (a reflection of the room) reads the same lit and inverted: not trusted,
+    so it takes no LED's address."""
+    P = _tree(20, seed=2)
+    picture, u, v = _camera(P)
+    plan = cm.BinaryPlan(len(P))
+    h = w = 160
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
+    glare = 150 * np.exp(-((xs - 10) ** 2 + (ys - 10) ** 2) / (2 * 1.6 ** 2))
+    frames = {what: picture(lit).astype(np.float32) + (glare if what != "dark" else 0) for what, lit in plan.steps()}
+    found, _ = cm.scan(frames, None, plan, times={what: what for what, _ in plan.steps()})
+    assert len(found) >= len(P) - 1
+    assert all(abs(found[k][0] - u[k]) < 1.5 for k in found)          # none placed at the glare
+
+
+def test_the_csv_both_ways():
+    P = _tree(30)
+    seen = np.ones(len(P), bool); seen[[4]] = False
+    text = cm.to_csv(P, seen)
+    lines = text.strip().splitlines()
+    assert lines[0] == "address,x,y,z" and len(lines) == 30 and not any(l.startswith("4,") for l in lines)
+    vals = np.asarray([[float(x) for x in l.split(",")[1:]] for l in lines[1:]])
+    assert vals.min() >= 0.001 - 1e-9 and vals.max() <= 1.0 + 1e-9          # each axis 0.001..1, as Lightwork's
+    pos, found = cm.from_csv(text)
+    assert len(pos) == 30 and not found[4] and found.sum() == 29
+    for a in range(3):                                           # each axis rescaled on its own: the same order
+        assert np.array_equal(np.argsort(pos[found][:, a]), np.argsort(P[seen][:, a]))
+    flat = P.copy(); flat[:, 1] = 0.0
+    assert all(l.endswith(",0.000000") for l in cm.to_csv(flat).strip().splitlines()[1:])   # flat: depth 0
+
+
 if __name__ == "__main__":
     bad = 0
     for name, fn in list(globals().items()):

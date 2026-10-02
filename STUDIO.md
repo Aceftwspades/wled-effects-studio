@@ -3282,6 +3282,40 @@ a **Try it** that opens the graph live.
         build's black); the smoke plays, pauses and stops the test pattern
         from the panel.
 
+### Mapping the way of Lightwork (October 2026)
+
+- [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -
+      binary addresses, a live camera, calibration, its layout CSV - taken,
+      no code) added to Map by camera.
+      - **Binary plan** (`camera_map.BinaryPlan`, `make_plan`): every LED lit
+        in each picture with its address + 1 in Gray code, a picture and its
+        inverse for each bit after the dark picture and a flash: 2 x bits + 2
+        pictures (500 LEDs: 20, not 500). `decode_binary` reads them pixel by
+        pixel (structured light): each pixel lit by the flash takes the code of
+        the LED brightest there, bit by bit against the inverse; a pixel too
+        close to call (between two LEDs, a reflection lit in every picture) is
+        left out; an LED is the flash-weighted centre of its pixels, the
+        brightest place if its pixels lie in more than one. Two LEDs that run
+        together on the flash still part; the tests' tree: 58 of 60, the two
+        hidden missing.
+      - **Live** (`camera_map_ui`): the webcam through ffmpeg (`video.open_source`
+        with `fit`: all of the picture, barred, not cropped), no OpenCV. Each of
+        `plan.steps()` lit (the wiring test's new `mask` mode in the sim; the
+        device's frame while streaming), `settle` new pictures waited, one
+        kept; `scan` reads them keyed by step, no clock.
+      - **Calibration**: dark, then every LED lit; the live view with
+        `find_blobs` marked and counted; threshold, apart, largest and settle
+        - and the LED brightness - used by filmed sides too.
+      - **CSV**: `to_csv` / `from_csv` - `address,x,y,z`, each axis 0.001..1 on
+        its own, y down the picture, an LED not found left out. Save CSV
+        writes the shape in wiring order to `export/lightwork_layout.csv`;
+        Import CSV... makes a points part.
+      - Tests: `test_camera_map.py` (Gray codes, a binary tree from two sides,
+        live steps for both plans, a reflection, the CSV both ways); the smoke
+        calibrates, maps live and saves and imports the CSV through
+        `camera_map.SyntheticCamera`, a stand-in webcam that pictures the
+        frame the plan would send.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every
