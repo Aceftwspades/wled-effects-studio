@@ -348,7 +348,7 @@ def build_menus(app):
         with dpg.menu(label="Settings"):
             _mi(app, "Keyboard shortcuts...", "shortcuts", callback=lambda: show_keys(app))
             dpg.add_menu_item(label="Appearance...", callback=lambda: show_appearance(app))
-            tip("the colours, the selection frames and the interface size, a tab each")
+            tip("the colours, the selection frames, how the 3-D view is lit and the interface size, a tab each")
             dpg.add_menu_item(label="External editor command...", callback=lambda: show_editor(app))
             dpg.add_menu_item(label="Draw the 3-D view on the GPU", check=True, default_value=app.gpu_cube, tag="menu_gpu",
                               callback=lambda s, a: app.set_gpu_cube(bool(a)))
@@ -727,6 +727,8 @@ def build_dialogs(app):
                 _appearance_colours(app)
             with dpg.tab(label="Selection frames", tag="app_tab_frames"):
                 _frames_content(app)
+            with dpg.tab(label="3-D view", tag="app_tab_view"):
+                _appearance_view(app)
             with dpg.tab(label="Interface size", tag="app_tab_size"):
                 _appearance_size(app)
     with dpg.window(tag="sweep_win", label="Sweep a slider", no_title_bar=True, show=False, width=px(400), height=px(190), no_collapse=True):
@@ -1107,6 +1109,60 @@ def _appearance_colours(app):
         for cat in nodeface.CATEGORY_ORDER + ("subgraphs",):
             dpg.add_color_button(list(nodeface.hue(cat)) + [255], width=px(12), height=px(12), no_border=True, no_drag_drop=True)
             dpg.add_text(cat)
+
+
+def _appearance_view(app):
+    """Appearance's 3-D view tab: how the view is lit (look.py) - a preset, then each part's strength."""
+    from native import look
+    dpg.add_text("How the 3-D view is lit: the studio's plain view, or the look of a film of the LEDs - each a glowing "
+                 "dot, their colour thrown into the room, a film's curve, a vignette, grain. Screenshots, GIFs and "
+                 "videos are made with it too, with bloom.", color=DIM, wrap=px(540))
+    typeface.label(dpg.add_text("LOOK", color=ACCENT))
+    with dpg.group(horizontal=True):
+        for name in look.PRESETS:
+            dpg.add_button(label=look.PRESET_WORDS[name], small=True, user_data=name, callback=lambda s, a, u: set_look(app, preset=u))
+        dpg.add_text("", tag="look_preset", color=DIM)
+    dpg.add_separator()
+    for key in look.KEYS:
+        word, what = look.WORDS[key]
+        lo, hi = look.RANGES[key]
+        with form.row(word, width=96):
+            num.add(f"look_{key}", 0.0, lo, hi, digits=2, width=px(220), user_data=key,
+                    callback=lambda s, v, k=key: set_look(app, key=k, value=v))
+            tip(what)
+    with dpg.group(horizontal=True):
+        dpg.add_button(label="Back to the preset", small=True,
+                       callback=lambda: set_look(app, preset=(app.prefs.get("look") or {}).get("preset", "studio")))
+        tip("the preset's values again, your changes dropped")
+    dpg.add_text("The glow is the cube's; on any other shape the rest of the look applies.", color=DIM, wrap=px(540))
+
+
+def set_look(app, preset=None, key=None, value=None):
+    """A look picked (its values with it) or one part moved: kept in the prefs, shown at once."""
+    from native import look
+    st = dict(app.prefs.get("look") or {})
+    if preset is not None:
+        st = {"preset": preset}
+    if key is not None:
+        lo, hi = look.RANGES[key]
+        st[key] = round(max(lo, min(hi, float(value))), 3)
+    app.prefs["look"] = st
+    save_prefs(app.prefs)
+    refresh_look(app)
+
+
+def refresh_look(app):
+    """The tab's fields show the look in force."""
+    from native import look
+    if not dpg.does_item_exist("look_preset"):
+        return
+    st = app.prefs.get("look") or {}
+    lk = look.current(app.prefs)
+    name = st.get("preset", "studio")
+    moved = [look.WORDS[k][0] for k in look.KEYS if k in st and abs(float(st[k]) - look.PRESETS[name][k]) > 1e-6]
+    dpg.set_value("look_preset", look.PRESET_WORDS.get(name, name) + (f", {', '.join(moved)} changed" if moved else ""))
+    for k in look.KEYS:
+        num.set(f"look_{k}", lk[k])
 
 
 def _appearance_size(app):
@@ -1709,14 +1765,15 @@ APPEARANCE_W, APPEARANCE_H = 700, 700        # at 100%: the Colours tab's width,
 
 
 def show_appearance(app, tab=None):
-    """Settings > Appearance, at a tab ("colours", "frames", "size") or the one it was left at."""
+    """Settings > Appearance, at a tab ("colours", "frames", "view", "size") or the one it was left at."""
     refresh_appearance(app)
     refresh_frames(app)
+    refresh_look(app)
     if tab and dpg.does_item_exist(f"app_tab_{tab}"):
         dpg.set_value("app_tabs", f"app_tab_{tab}")
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
-    w, h = px(APPEARANCE_W), min(px(APPEARANCE_H), max(px(200), vh - 20))      # a short screen: it scrolls
-    dpg.configure_item("appearance_win", width=w, height=h, pos=(max(0, (vw - w) // 2), max(10, (vh - h) // 2)))
+    w, h = px(APPEARANCE_W), min(px(APPEARANCE_H), max(px(200), vh - 10))      # a short screen: it scrolls
+    dpg.configure_item("appearance_win", width=w, height=h, pos=(max(0, (vw - w) // 2), max(5, (vh - h) // 2)))
     dpg.show_item("appearance_win")
 
 

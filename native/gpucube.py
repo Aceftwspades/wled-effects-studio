@@ -65,6 +65,93 @@ def _place_floor(items, on, z, cam, ox, oy, step=None):
         dpg.configure_item(q, p1=(ox + sx[0], oy + sy[0]), p2=(ox + sx[1], oy + sy[1]), color=FLOOR + (int(255 * a),), show=True)
 
 
+class Layers:
+    """The look's layers of a view (look.py): the spill, a pool of the LEDs'
+    light drawn under them, and the vignette and the grain drawn over them -
+    each a small texture stretched over the view, hidden while its strength
+    is 0. under() is called where the drawlist has its background, over()
+    after everything that stands in it (a drawlist draws in the order it
+    was made); update() once a frame."""
+
+    def __init__(self, tag):
+        self.tag = tag
+        self.under_item = None
+        self.over_items = []
+        self._vig_key = None
+        self._grain_n = 0
+        self._rng = np.random.default_rng(3)
+        self._tick = 0
+
+    def _tex(self, name, a):
+        """A dynamic texture of this view, made or written: `a` (h, w, 4) float."""
+        tex = f"{self.tag}_{name}"
+        h, w = a.shape[:2]
+        if dpg.does_item_exist(tex):
+            cfg = dpg.get_item_configuration(tex)
+            if (cfg.get("width"), cfg.get("height")) == (w, h):
+                dpg.set_value(tex, a.ravel()); return tex
+            return None                                   # a size change: the caller makes it anew
+        dpg.add_dynamic_texture(w, h, a.ravel(), tag=tex, parent=registry())
+        return tex
+
+    def under(self):
+        z = (0, 0)
+        self.under_item = dpg.draw_image(self._tex("spill", np.zeros((48, 48, 4), np.float32)), z, z, show=False, parent=self.tag)
+
+    def over(self):
+        for q in self.over_items:
+            if dpg.does_item_exist(q):
+                dpg.delete_item(q)
+        z = (0, 0)
+        vig, grain = f"{self.tag}_vig", f"{self.tag}_grain"
+        if not dpg.does_item_exist(vig):
+            self._tex("vig", np.zeros((64, 64, 4), np.float32)); self._vig_key = None
+        if not dpg.does_item_exist(grain):
+            self._tex("grain", np.zeros((8, 8, 4), np.float32))
+        self._grain_n = dpg.get_item_configuration(grain).get("width") or 8      # made again: its texture kept
+        self.over_items = [dpg.draw_image(vig, z, z, show=False, parent=self.tag),
+                           dpg.draw_image(grain, z, z, show=False, parent=self.tag)]
+
+    def update(self, lk, light, size, w, h):
+        """This frame's layers for look `lk` (look.current) and the LEDs'
+        light (look.mean_light), in a view `size` square centred in w x h."""
+        from native import look
+        ox, oy = (w - size) * 0.5, (h - size) * 0.5
+        if self.under_item is not None and dpg.does_item_exist(self.under_item):
+            if lk.get("spill", 0) > 0 and light is not None:
+                self._tex("spill", look.spill_rgba(light[0], light[1], lk))
+                pad = size * 0.25
+                dpg.configure_item(self.under_item, pmin=(ox - pad, oy - pad), pmax=(ox + size + pad, oy + size + pad), show=True)
+            else:
+                dpg.configure_item(self.under_item, show=False)
+        if len(self.over_items) != 2 or not all(dpg.does_item_exist(q) for q in self.over_items):
+            return
+        vig, grain = self.over_items
+        if lk.get("vignette", 0) > 0:
+            key = round(float(lk["vignette"]), 3)
+            if key != self._vig_key:
+                self._vig_key = key
+                self._tex("vig", look.vignette_rgba(lk))
+            dpg.configure_item(vig, pmin=(0, 0), pmax=(w, h), show=True)
+        else:
+            dpg.configure_item(vig, show=False)
+        if lk.get("grain", 0) > 0:
+            self._tick += 1
+            n = int(max(32, min(360, max(w, h) // 2)))
+            if n != self._grain_n:                        # a new size: its texture made again
+                tex = f"{self.tag}_grain"
+                dpg.configure_item(grain, texture_tag=f"{self.tag}_vig")   # off the old texture, so it can go
+                if dpg.does_item_exist(tex):
+                    dpg.delete_item(tex)
+                self._grain_n = n
+                dpg.configure_item(grain, texture_tag=self._tex("grain", look.grain_rgba(lk, n, self._rng)))
+            elif self._tick % 2 == 0:                     # new grain every other frame
+                self._tex("grain", look.grain_rgba(lk, n, self._rng))
+            dpg.configure_item(grain, pmin=(0, 0), pmax=(w, h), show=True)
+        else:
+            dpg.configure_item(grain, show=False)
+
+
 class CubeQuads:
     def __init__(self, parent, tag, texture):
         self.tag = tag
@@ -79,6 +166,8 @@ class CubeQuads:
             # a background picture, drawn first so the faces cover it (see background())
             self.bg_item = dpg.draw_image(texture, z, z, show=False)
             self.bg_key = None
+            self.layers = Layers(tag)
+            self.layers.under()                           # the look's spill, on the background
             self.floor_items = _floor_items(tag)          # then the floor, which the faces stand on
             for fi, fc in enumerate(FACES):
                 quads = []
@@ -90,6 +179,7 @@ class CubeQuads:
                         quads.append(dpg.draw_image_quad(texture, z, z, z, z, uv1=(u0, v0), uv2=(u1, v0),
                                                          uv3=(u1, v1), uv4=(u0, v1), show=False))
                 self.items[fi] = quads
+        self.layers.over()                                # the vignette and the grain, over everything
 
     def set_texture(self, texture):
         if texture == self.texture:
@@ -207,6 +297,7 @@ class PointQuads:
         self.items = []
         self.dot_items = []
         self.dot_tex = f"{tag}_dot"
+        self.layers = Layers(tag)
         self.set_points(pos)
 
     def set_points(self, pos, frame=None):
@@ -237,11 +328,15 @@ class PointQuads:
             z = (0, 0)
             if self.bg_item is None:
                 self.bg_item = dpg.draw_image(self.tex, z, z, show=False, parent=self.tag)
+                if self.layers.under_item is not None and dpg.does_item_exist(self.layers.under_item):
+                    dpg.delete_item(self.layers.under_item)
+                self.layers.under()                       # the look's spill, on the background
                 self.floor_items = _floor_items(self.tag)
             self.items, self.dot_items = [], []
             for _ in range(n):                            # in pairs: each LED's dot, then its square over it
                 self.dot_items.append(dpg.draw_image_quad(self.dot_tex, z, z, z, z, show=False, parent=self.tag))
                 self.items.append(dpg.draw_image_quad(self.tex, z, z, z, z, show=False, parent=self.tag))
+            self.layers.over()                            # the vignette and the grain, over the squares
         self.pos = pos
         self.frame = frame
         c, ext = frame or frame_of(pos)

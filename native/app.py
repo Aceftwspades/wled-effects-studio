@@ -48,6 +48,7 @@ from native.project import (default_project, Project, list_projects, project_pat
 from native.graph_ui import GraphPanel, build_panel
 from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight, view3d, shape_tools
 from native.gpucube import CubeQuads
+from native import look
 from native.textures import registry as tex_registry
 from native.features import Features
 from native.popout import Popouts
@@ -486,14 +487,34 @@ class App(Features):
         return rgb
 
     def view_image(self, net, px, eng=None):
+        """The 3-D view as a picture, with the look (look.py) - a
+        screenshot, a GIF's or a video's frame, or the view itself where
+        the GPU does not draw it."""
+        eng = eng or self.eng
+        img = self._view_image(net, px, eng)
+        lk = self.view_look()
+        if not look.active(lk):
+            return img
+        self._look_frame = getattr(self, "_look_frame", 0) + 1
+        return look.finish(img, lk, self._look_frame, look.mean_light(self.frame_rgb(eng)) if lk["spill"] > 0 else None)
+
+    def view_look(self):
+        """The look of the 3-D view in force (Settings > Appearance, its 3-D view tab)."""
+        return look.current(self.prefs)
+
+    def _view_image(self, net, px, eng):
         """The 3-D view: the face-warp renderer for the cube (faster, and
         exact for flat faces), the point cloud for everything else."""
-        eng = eng or self.eng
         g = eng.geom
         unlit, floor = self.view_extras()
         if g is not None and g.kind == "cube" and not eng.fx.get("o3"):
-            return render.render(net if net.shape[0] == eng.rows else self.frame_rgb(eng),
-                                 eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px),
+            src = net if net.shape[0] == eng.rows else self.frame_rgb(eng)
+            lk = self.view_look()
+            if lk["glow"] > 0:                             # the glowing LEDs, as the live view's texture has them
+                k = 8                                      # finer than the live texture: no GPU smooths a picture's dots
+                return render.render(look.led_texture(src, k, lk, unlit), eng.B * k, px, self.yaw, self.pitch, self.dist,
+                                     six=eng.six, bg=self.view_background(px), unlit=None, floor=floor, **view3d.kw(self))
+            return render.render(src, eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px),
                                  unlit=unlit, floor=floor, **view3d.kw(self))
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
@@ -3627,8 +3648,10 @@ class App(Features):
             k = self.CUBE_SRC_SCALE
             src = net if net.shape[0] == self.eng.rows else self.net_image()
             unlit, floor = self.view_extras()
-            dpg.set_value("cube_src_tex", self._rgba("cube_src", render.dotted(src, k, unlit) if unlit is not None
-                                                     else src.repeat(k, 0).repeat(k, 1)))
+            lk = self.view_look()
+            dpg.set_value("cube_src_tex", self._rgba("cube_src", look.led_texture(look.tone(src, lk), k, lk, unlit)))
+            cq = self.cube_quads
+            cq.layers.update(lk, look.mean_light(src) if lk["spill"] > 0 else None, cq.size, cq.w, cq.h)
             self.cube_quads.floor = floor
             self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six, **view3d.kw(self))
             self.cube_quads.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
@@ -3646,7 +3669,10 @@ class App(Features):
             pq.floor, pq.dots = floor, unlit is not None
             pq.camera(self.yaw, self.pitch, self.dist, floor_step=view3d.floor_step(self), **view3d.kw(self))
             pq.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
-            pq.colours(shape_ui.view_colours(self, (rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3)), unlit=unlit)
+            lk = self.view_look()
+            cols = shape_ui.view_colours(self, (rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3))
+            pq.colours(look.tone(cols, lk), unlit=unlit)
+            pq.layers.update(lk, look.mean_light(cols) if lk["spill"] > 0 else None, pq.size, pq.w, pq.h)
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on():

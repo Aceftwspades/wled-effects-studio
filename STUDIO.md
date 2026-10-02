@@ -3065,6 +3065,38 @@ C++, which a shader would only imitate), wled-toy's strip / ring / matrix
 layouts (the geometry, ledmaps and camera mapping go further), and the
 "export to WLED JSON" its README names (its code exports standalone GLSL).
 
+### The 3-D view's look (October 2026)
+
+The promo film (wled-studio-promo, `scripts/cine.py`) rendered the studio's
+effects offline with a look of its own: each LED a glowing dot on a dark
+board, bloom, a reflecting floor, the LEDs' colour spilling into the room, a
+filmic curve, a vignette, grain. The live view has no shaders (`gpucube.py`:
+textured quads), so each part goes where it can.
+
+- [x] **Looks in Settings > Appearance > 3-D view** (`native/look.py`): the
+      studio's plain view, **Glow**, **Cinematic** and **Night**, each part's
+      strength kept over the preset. Live: the **glow** in the cube's texture
+      (a disc and a halo reaching the neighbours, over a faint board; 3 ms
+      at 48 x 48), the **curve and exposure** on the colours as they are
+      uploaded (a table), the **spill** a 48 px pool of the LEDs' mean colour
+      stretched under them, the **vignette** and the **grain** layers over
+      them (`gpucube.Layers`; the cube and the point cloud alike - the glow
+      is the cube's). Pictures - a screenshot, a GIF, a video, the view
+      itself where the GPU does not draw it - are made with the look too,
+      the glow at 8 x, with **bloom** (`look.finish`: 17 ms for Glow, about
+      60 for Cinematic at 620 px). Tested: `test_look.py`; the smoke picks
+      Cinematic, finds the layers drawn and a picture made, moves a value
+      and goes back to the studio look.
+- [ ] **A reflecting floor**: the cube mirrored through the floor as a second
+      set of quads, faded - placed only when the camera moves.
+- [ ] **A diffuser**: the LEDs as behind frosted acrylic, a blur within each
+      face by the diffuser's distance - how an effect reads on a diffused
+      cube.
+- [ ] **The device's limits in the view**: its gamma and brightness cap, so a
+      dim gradient bands as it will on the LEDs.
+- [ ] **Camera moves for recordings**: a turntable, depth of field in renders;
+      and a project remembering its look.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every

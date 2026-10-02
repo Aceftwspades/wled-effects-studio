@@ -498,7 +498,20 @@ STEPS = [
                 "win {dpg.get_item_pos('appearance_win')} {dpg.get_item_rect_size('appearance_win')} "
                 "status {dpg.get_item_rect_min('gc_status')} {dpg.is_item_visible('frames_style')}\""},
       {"py": "chrome.show_appearance(app, 'size')"}], 0.8),
-    ([{"check": "dpg.is_item_visible('app_ui_scale')"}, {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
+    ([{"check": "dpg.is_item_visible('app_ui_scale')"}, {"py": "chrome.show_appearance(app, 'view')"},
+      {"py": "chrome.set_look(app, preset='cinematic')"}], 0.8),
+    # the 3-D view's look (look.py): Cinematic picked - its fields follow, the live view's layers drawn, a picture
+    # made with it; a value moved is kept over the preset; the studio look again
+    ([{"check": "dpg.get_value('look_preset') == 'Cinematic' and abs(dpg.get_value('look_spill') - 0.5) < 1e-6"},
+      {"check": "app.cube_quads is None or (dpg.get_item_configuration(app.cube_quads.layers.over_items[0])['show'] "
+                "and dpg.get_item_configuration(app.cube_quads.layers.under_item)['show'])"},
+      {"check": "app.view_image(app.net_image(), 160).shape == (160, 160, 3)"},
+      {"py": "chrome.set_look(app, key='grain', value=0.9)"}], 0.5),
+    ([{"check": "app.view_look()['grain'] == 0.9 and dpg.get_value('look_preset') == 'Cinematic, grain changed'"},
+      {"py": "chrome.set_look(app, preset='studio')"}], 0.5),
+    ([{"check": "not __import__('native.look', fromlist=['x']).active(app.view_look())"},
+      {"check": "app.cube_quads is None or not dpg.get_item_configuration(app.cube_quads.layers.over_items[0])['show']"},
+      {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
     # the footer (C18): power and the device's fps; the stats popover live while open, above its button; Esc closes it
     ([{"check": "'device ~' in dpg.get_value('stat_txt') and 'brightness' not in dpg.get_value('stat_txt')"},
       {"py": "chrome.toggle_stats(app)"}], 0.8),

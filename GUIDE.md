@@ -453,7 +453,14 @@ cell on a cube's face), so the shape reads when most of it is dark. The
 shape stands on a faint **floor** that fades out from the middle (left out
 when the view looks up from below it) - View > A floor under the shape
 turns it off; a popped-out view does the same, and a screenshot or a recording takes the view as
-it is shown (the library's and the shape's previews leave both out). The
+it is shown (the library's and the shape's previews leave both out).
+How the view is **lit** is Settings > Appearance's **3-D view** tab: the
+studio's plain look, or a film's - **Glow**, **Cinematic** or **Night** -
+each LED a glowing dot with a halo (on a cube), their colour **spilling**
+into the room behind them, a film's **curve** and an **exposure**, a
+**vignette** and moving **grain**; a screenshot, a GIF or a video adds
+**bloom**, the light past white spreading round it. Each part has its
+strength, kept over the preset; "Back to the preset" drops them. The
 **logical view** fits its pane: as many whole pixels an LED as the
 pane's width and height both allow (a wide net in a tall pane was drawn
 as if the pane were square).
@@ -912,11 +919,12 @@ on and install what it carries.
   temporary file, then moved over), and File > History keeps copies of them
   too (**The project's settings**, at most one every five minutes; their
   **changes** name the settings that differ).
-- Settings > Appearance, in three tabs: **Colours** (dark, light, soft
+- Settings > Appearance, in four tabs: **Colours** (dark, light, soft
   light or slate, and every one of the theme's seven colours editable;
   the nodes' category colours), **Selection frames** (the frames' look
-  and gradients) and **Interface size**. The window opens at the size of
-  the tab in front, so all of it is in view.
+  and gradients), **3-D view** (how the view is lit: a look and each
+  part's strength) and **Interface size**. The window is one size for all
+  of them - the largest tab's - and scrolls on a screen too short for it.
 - Settings > "Draw the 3-D view on the GPU" / "Scale the logical view on
   the GPU" are the fast paths: a cube is drawn as its faces, textured;
   every other geometry as a cloud of squares, one per LED, coloured from
@@ -1095,7 +1103,7 @@ on and install what it carries.
 - **Window** › Message log...
 - **Window** › Close every frame
 - **Settings** › Keyboard shortcuts... `Shift+F1`
-- **Settings** › Appearance... — the colours, the selection frames and the interface size, a tab each
+- **Settings** › Appearance... — the colours, the selection frames, how the 3-D view is lit and the interface size, a tab each
 - **Settings** › External editor command...
 - **Settings** › Draw the 3-D view on the GPU — the shape's faces as textured quads on the GPU, where it has them; loose LEDs are drawn as points either way. Off: the software renderer for everything - the fallback when a machine's GPU misbehaves
 - **Settings** › Scale the logical view on the GPU — softer LED edges and faster; off: the CPU repeats each LED's pixels
@@ -1273,7 +1281,7 @@ Every button, with what its tooltip says.
 
 **Keyboard shortcuts**: `close` — close (Esc while it has the focus); `Reset all to defaults`
 
-**Appearance**: `close` — close (Esc while it has the focus); `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped; `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`; `The monitor's` — the size the monitor is set to in the system's display settings; `Restart now` — the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first
+**Appearance**: `close` — close (Esc while it has the focus); `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped; `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`; `Studio`; `Glow`; `Cinematic`; `Night`; `The monitor's` — the size the monitor is set to in the system's display settings; `Restart now` — the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first
 
 **History**: `close` — close (Esc while it has the focus); `The project's settings` — The copies kept of the project's settings (project.json: the geometry, palettes, segments, sequence, outputs), or back to those of the graph or code open
 
