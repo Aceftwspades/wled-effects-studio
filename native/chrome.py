@@ -1134,8 +1134,8 @@ def _appearance_view(app):
         dpg.add_button(label="Back to the preset", small=True,
                        callback=lambda: set_look(app, preset=(app.prefs.get("look") or {}).get("preset", "studio")))
         tip("the preset's values again, your changes dropped")
-    dpg.add_text("The glow, the diffuser and the reflection are the cube's; on any other shape the rest of the look applies.",
-                 color=DIM, wrap=px(540))
+    dpg.add_text("Every shape takes all of it: a cube's diffuser spreads light within each face, any other shape's "
+                 "to the LEDs nearest it.", color=DIM, wrap=px(540))
 
 
 def set_look(app, preset=None, key=None, value=None):

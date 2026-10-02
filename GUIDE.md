@@ -456,16 +456,15 @@ turns it off; a popped-out view does the same, and a screenshot or a recording t
 it is shown (the library's and the shape's previews leave both out).
 How the view is **lit** is Settings > Appearance's **3-D view** tab: the
 studio's plain look, or a film's - **Glow**, **Cinematic** or **Night** -
-each LED a glowing dot with a halo (on a cube) or - **Diffused** - its
-light spread as behind frosted acrylic, each face on its own (a
-**diffuser** further away spreads it more: how an effect will read on a
-diffused cube), the floor a mirror with the cube's **reflection** fading
+each LED a glowing dot with a halo or - **Diffused** - its light spread
+as behind frosted acrylic (a cube's within each face, any other shape's
+to the LEDs nearest it; a **diffuser** further away spreads it more: how
+an effect will read on a diffused shape), the floor a mirror with the cube's **reflection** fading
 into it, their colour **spilling** into the room behind them, a film's **curve** and an **exposure**, a
 **vignette** and moving **grain**; a screenshot, a GIF or a video adds
 **bloom**, the light past white spreading round it. Each part has its
-strength, kept over the preset; "Back to the preset" drops them. The
-glow, the diffuser and the reflection are the cube's; any shape takes
-the rest. The
+strength, kept over the preset; "Back to the preset" drops them. Every
+shape - a cube, a strip, a sphere, a shape of parts - takes all of it. The
 **logical view** fits its pane: as many whole pixels an LED as the
 pane's width and height both allow (a wide net in a tall pane was drawn
 as if the pane were square).

@@ -33,9 +33,9 @@ PRESETS = {
 PRESET_WORDS = {"studio": "Studio", "glow": "Glow", "cinematic": "Cinematic", "diffused": "Diffused", "night": "Night"}
 RANGES = {"glow": (0.0, 1.0), "diffuse": (0.0, 1.0), "reflect": (0.0, 1.0), "spill": (0.0, 1.0), "bloom": (0.0, 1.0), "vignette": (0.0, 1.0), "grain": (0.0, 1.0),
           "exposure": (0.5, 2.0), "filmic": (0.0, 1.0)}
-WORDS = {"glow": ("glow", "each LED a bright dot with a soft halo, as a lit LED looks to a camera (the cube)"),
-         "diffuse": ("diffuser", "the LEDs as behind frosted acrylic: each face's light blurred, the further the diffuser the more (the cube)"),
-         "reflect": ("reflection", "the floor a mirror: the cube reflected in it, fading with depth (the cube)"),
+WORDS = {"glow": ("glow", "each LED a bright dot with a soft halo, as a lit LED looks to a camera"),
+         "diffuse": ("diffuser", "the LEDs as behind frosted acrylic: their light spread to their neighbours (a cube's within each face), the further the diffuser the more"),
+         "reflect": ("reflection", "the floor a mirror: the shape reflected in it, fading with depth"),
          "spill": ("spill", "the LEDs' colour thrown into the room behind them"),
          "bloom": ("bloom", "light past white spreading round it - in screenshots, GIFs and videos (the live view has the glow)"),
          "vignette": ("vignette", "the corners darkened, as a lens does"),
@@ -168,6 +168,79 @@ def led_texture(net, k, lk, unlit=None, B=None):
     halo = _blur(f).repeat(k, 0).repeat(k, 1) * (1.1 * g)
     board = np.array(unlit if unlit is not None else (9, 10, 12), np.float32) * (0.5 if unlit is not None else 1.0)
     out = np.maximum(disc + halo, board)
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+# --- any shape: an LED a sprite, a diffuser by distance ------------------------------------------
+SPRITE_K = 8                 # a point LED's sprite cell, texels a side
+
+
+def sprite_grow(lk):
+    """How much bigger than its bare square an LED's sprite is drawn: room for its halo, or its diffused light."""
+    return 1.0 + 0.9 * float(lk.get("glow", 0.0)) + 1.0 * float(lk.get("diffuse", 0.0))
+
+
+def sprite_mask(lk, k=SPRITE_K):
+    """A point LED's light in its sprite (k x k, 0..1): a bright disc the
+    size of the bare square in the middle, a halo out to the sprite's edge;
+    through a diffuser the disc softens into the halo. The alpha a sprite
+    is drawn with, and its colour's weight."""
+    g, d = float(lk.get("glow", 0.0)), float(lk.get("diffuse", 0.0))
+    grow = sprite_grow(lk)
+    u = (np.arange(k) + 0.5) / k * 2 - 1
+    r = np.sqrt(u[:, None] ** 2 + u[None, :] ** 2) * grow          # 1 at the bare square's edge
+    disc = np.clip((1.15 - r) / 0.3, 0, 1)
+    halo = np.exp(-(r * r) / max(0.2, 0.9 * grow)) * (0.45 * g + 0.6 * d)
+    core = disc * (1.0 - 0.6 * d)
+    return np.clip(np.maximum(core, halo) * np.clip((grow + 0.4 - r) / 0.4, 0, 1), 0, 1).astype(np.float32)
+
+
+_NEIGH = {}
+
+
+def neighbours(pos, k=12):
+    """Each LED's nearest k others (itself first) and their distances, and
+    the shape's LED spacing (the median nearest distance) - for the
+    diffuser on any shape. Made once for a set of positions."""
+    pos = np.asarray(pos, np.float32).reshape(-1, 3)
+    key = (pos.shape, hash(pos.tobytes()))
+    hit = _NEIGH.get(key)
+    if hit is not None:
+        return hit
+    n = len(pos)
+    P = np.where(np.isfinite(pos), pos, 1e9)                       # a NaN row: far from everything
+    k = max(1, min(k, n))
+    idx = np.zeros((n, k), np.int64)
+    dist = np.zeros((n, k), np.float32)
+    for a in range(0, n, 256):
+        d2 = ((P[a:a + 256, None, :] - P[None, :, :]) ** 2).sum(axis=2)
+        part = np.argpartition(d2, k - 1, axis=1)[:, :k]
+        dd = np.take_along_axis(d2, part, axis=1)
+        o = np.argsort(dd, axis=1)
+        idx[a:a + 256] = np.take_along_axis(part, o, axis=1)
+        dist[a:a + 256] = np.sqrt(np.take_along_axis(dd, o, axis=1))
+    near = dist[:, 1] if k > 1 else np.ones(n, np.float32)
+    spacing = float(np.median(near[np.isfinite(near) & (near < 1e8)])) if n > 1 else 1.0
+    if len(_NEIGH) > 8:
+        _NEIGH.clear()
+    hit = _NEIGH[key] = (idx, dist, max(spacing, 1e-6))
+    return hit
+
+
+def diffuse_points(pos, rgb, lk):
+    """The LEDs' colours through a diffuser on any shape: each one's light
+    shared with its neighbours within a reach the diffuser's distance sets
+    (a few LED spacings at the most), as frosted acrylic over them would."""
+    d = float(lk.get("diffuse", 0.0))
+    rgb = np.asarray(rgb)
+    if d <= 0 or len(rgb) < 2:
+        return rgb
+    idx, dist, spacing = neighbours(pos)
+    reach = spacing * (0.5 + 2.2 * d)
+    w = np.exp(-(dist / reach) ** 2)
+    w[dist > 1e8] = 0.0
+    f = rgb.astype(np.float32)[idx]                                  # (n, k, 3)
+    out = (f * w[..., None]).sum(axis=1) / np.maximum(w.sum(axis=1), 1e-6)[:, None]
     return np.clip(out, 0, 255).astype(np.uint8)
 
 

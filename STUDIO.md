@@ -3096,6 +3096,19 @@ textured quads), so each part goes where it can.
       its own, the further the diffuser the wider (`look.diffuse`), the dots
       washed out, smooth in pictures. Tested: `test_the_diffuser`,
       `test_the_reflection`; the smoke finds the reflection drawn and gone.
+- [x] **Every shape in parity**: the glow, the diffuser and the reflection
+      on a strip, a matrix, a sphere or a shape of parts as on the cube.
+      Live (`gpucube.PointQuads`): a second texture of sprites, a cell of
+      each LED's light (`look.sprite_mask`), its squares drawn bigger from
+      it; the diffuser by distance - each LED's light shared with its
+      nearest twelve within a reach of a few LED spacings
+      (`look.neighbours`, made once for a shape: 0.7 s for 5000 LEDs; 3 ms
+      a frame); the reflection a layer of mirrored LEDs under them, made the
+      first time it is wanted, faded over the shape's own height. Pictures
+      blend the sprites as the GPU does. A camera move on a 64 x 64 matrix:
+      64 ms plain, 103 ms with the reflection and sprites (a frame without
+      one, ~5 ms either way). Tested: `test_any_shape_has_the_look`; the
+      smoke finds a sphere's sprites and reflection drawn.
 - [ ] **The device's limits in the view**: its gamma and brightness cap, so a
       dim gradient bands as it will on the LEDs.
 - [ ] **Camera moves for recordings**: a turntable, depth of field in renders;

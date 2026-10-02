@@ -375,7 +375,7 @@ def unproject(sx, sy, size, yaw, pitch, dist, frame, axis=2, value=0.0, fov=38.0
 
 
 def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=0.42, unlit=None, floor=False,
-                  frame=None, look=None, ortho=False, floor_step=None):
+                  frame=None, look=None, ortho=False, floor_step=None, lk=None):
     """Draw any geometry as a cloud of LEDs (an LED that is off a smaller
     square of `unlit` when given; a faint floor under the shape with `floor`).
 
@@ -385,6 +385,8 @@ def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=
     frame : (centre, extent) the positions are fitted by (frame_of theirs when None)
     look, ortho : the camera's pan and projection (see Cam)
     floor_step : (step, origin) of the floor's lines in the fitted space (the default floor when None)
+    lk : the view's look (look.py): its glow and diffuser draw each LED as a soft sprite, its reflection
+          mirrors the shape in the floor (the diffused colours are the caller's: look.diffuse_points)
     Each LED is a square whose screen size follows its depth, painted far to
     near so nearer ones cover. No lighting, no smoothing: the point of the view
     is to see the LEDs, and an LED is a hard-edged square of one colour.
@@ -402,11 +404,70 @@ def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=
     # LED half-size on screen: the LED pitch in world units (1/ext per pixel),
     # times led (fraction of the pitch the emitter covers), projected
     half = cam.scale(depth) * (led / ext)
+    fz = float(np.nanmin(P[:, 2])) - 0.08 if np.isfinite(P[:, 2]).any() else -1.1
     if floor:
         st, org = floor_step or (FLOOR_STEP, (0.0, 0.0))
-        _floor(out, cam, float(np.nanmin(P[:, 2])) - 0.08 if np.isfinite(P[:, 2]).any() else -1.1, step=st, origin=org)
+        _floor(out, cam, fz, step=st, origin=org)
+    lk = lk or {}
+    from native import look as _look
+    sprites = lk.get("glow", 0) > 0 or lk.get("diffuse", 0) > 0
+    rgb = np.asarray(rgb)
+    if lk.get("reflect", 0) > 0 and cam.eye[2] > fz + 0.02:
+        # the shape mirrored in the floor, fading over its own height below it, added to what is behind
+        M = P.copy(); M[:, 2] = 2 * fz - P[:, 2]
+        msx, msy, mok, mdepth = cam.screen(M)
+        tall = max(1e-3, float(np.nanmax(P[:, 2])) - fz)
+        wgt = reflection_weight((P[:, 2] - fz) / tall * 2.0) * min(1.0, 0.55 * float(lk["reflect"]))
+        ref = np.zeros((size, size, 3), np.float32)
+        _points(ref, msx, msy, mok, mdepth, cam.scale(mdepth) * (led / ext), rgb * wgt[:, None], None, lk if sprites else None)
+        out = np.clip(out.astype(np.float32) + ref, 0, 255).astype(np.uint8)
+    _points(out, sx, sy, ok, depth, half, rgb, unlit, lk if sprites else None)
+    return out
+
+
+_SPRITES = {}
+
+
+def _sprite(lk, h):
+    """A sprite's alpha at h x h px, for a look (look.sprite_mask, resized; kept)."""
+    from native import look as _look
+    key = (round(float(lk.get("glow", 0)), 3), round(float(lk.get("diffuse", 0)), 3), h)
+    m = _SPRITES.get(key)
+    if m is None:
+        from PIL import Image
+        base = (_look.sprite_mask(lk, 32) * 255).astype(np.uint8)
+        m = _SPRITES[key] = np.asarray(Image.fromarray(base).resize((h, h), Image.BILINEAR), np.float32) / 255.0
+        if len(_SPRITES) > 256:
+            _SPRITES.clear()
+    return m
+
+
+def _points(out, sx, sy, ok, depth, half, rgb, unlit, lk):
+    """The LEDs painted into `out`, far first: squares (an unlit one a dim dot), or with a look's glow or
+    diffuser each a sprite over what is behind it, by its alpha - blended as the live view's GPU blends it."""
+    from native import look as _look
+    size = out.shape[0]
     off = (np.asarray(rgb).max(axis=1) < UNLIT_BELOW) if unlit is not None else None
     order = np.argsort(-depth)                  # far first
+    if lk is not None:
+        grow = _look.sprite_grow(lk)
+        for i in order:
+            if not ok[i]:
+                continue
+            h = max(2, int(round(half[i] * grow)))
+            x0, y0 = int(sx[i]) - h, int(sy[i]) - h
+            x1, y1 = x0 + 2 * h, y0 + 2 * h
+            if x1 <= 0 or y1 <= 0 or x0 >= size or y0 >= size:
+                continue
+            a = _sprite(lk, 2 * h)[max(0, -y0):2 * h - max(0, y1 - size), max(0, -x0):2 * h - max(0, x1 - size)]
+            dst = out[max(0, y0):min(size, y1), max(0, x0):min(size, x1)]
+            if off is not None and off[i]:
+                hh = max(1, int(round(half[i] * DOT_POINT)))     # off: its dim dot, no light
+                out[max(0, int(sy[i]) - hh):max(0, int(sy[i]) + hh), max(0, int(sx[i]) - hh):max(0, int(sx[i]) + hh)] = unlit
+                continue
+            col = np.asarray(rgb[i], np.float32)
+            dst[:] = np.clip(dst * (1.0 - a[..., None]) + col * a[..., None], 0, 255).astype(out.dtype)   # as the GPU blends it
+        return
     for i in order:
         if not ok[i]:
             continue

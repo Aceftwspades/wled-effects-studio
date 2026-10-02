@@ -313,10 +313,17 @@ class PointQuads:
     `dots`, an LED that is off is a smaller grey square: each LED has a dot
     behind its own square (made in pairs, so the far-first order holds for
     both), and its square's texel is transparent while it is off - as
-    render_points draws it, a dim lit LED full size, an unlit one a dot."""
+    render_points draws it, a dim lit LED full size, an unlit one a dot.
+
+    The view's look (look.py) as the cube has it: with a glow or a diffuser
+    (`sprite`) each square is drawn bigger, from a second texture holding a
+    soft sprite of each LED's light in a cell of its own; with a
+    `reflect`ion, a mirrored copy of every LED in a layer under them (made
+    the first time it is wanted), faded with its depth below the floor."""
     LED = 0.42               # the fraction of the LED pitch an emitter covers, as render_points draws it
     DOT = DOT_POINT          # an unlit LED's dot against a lit one's square, as render_points draws it
     COLS = 4096              # the colour texture's width; more LEDs than that take more rows
+    SCOLS = 512              # the sprite texture's cells across (each look.SPRITE_K texels)
 
     def __init__(self, parent, tag, pos):
         self.tag = tag
@@ -327,14 +334,20 @@ class PointQuads:
         self.pos = None
         self.n = 0
         self.tex = f"{tag}_col"
+        self.spr_tex = f"{tag}_spr"
         with dpg.drawlist(width=10, height=10, tag=tag, parent=parent):
             pass
         self.bg_item = None          # made with the first texture, before the squares, so they cover it
         self.floor_items = []        # and the floor after it, before the squares
         self.floor = False
         self.dots = False            # unlit LEDs as dim dots (the view's toggle)
+        self.sprite = False          # each LED a sprite of its light (the look's glow or diffuser)
+        self.grow = 1.0              # how much bigger a sprite is than the bare square
+        self.reflect = 0.0           # the floor a mirror this strong
         self.items = []
         self.dot_items = []
+        self.mirror_layer = None
+        self.mirror_items = []
         self.dot_tex = f"{tag}_dot"
         self.layers = Layers(tag)
         self.set_points(pos)
@@ -344,19 +357,24 @@ class PointQuads:
         ((centre, extent); their own, the way render_points fits them, when
         None). A new count remakes the squares."""
         from native.render import frame_of
+        from native.look import SPRITE_K
         pos = np.asarray(pos, np.float32).reshape(-1, 3)
         n = len(pos)
         if n != self.n:
-            for q in self.items + self.dot_items + self.floor_items:
+            for q in self.items + self.dot_items + self.floor_items + self.mirror_items:
                 dpg.delete_item(q)
+            if self.mirror_layer is not None and dpg.does_item_exist(self.mirror_layer):
+                dpg.delete_item(self.mirror_layer)
+            self.mirror_layer, self.mirror_items = None, []
             # the background picture draws the colour texture until one of its own is set: it goes before its
             # texture does (a texture something still draws cannot be deleted - its name stays taken), and is
             # made again after, before the floor and the squares (a drawlist draws in the order it was made)
             if self.bg_item is not None and dpg.does_item_exist(self.bg_item):
                 dpg.delete_item(self.bg_item)
             self.bg_item, self.bg_key, self.floor_items = None, None, []
-            if dpg.does_item_exist(self.tex):
-                dpg.delete_item(self.tex)
+            for t in (self.tex, self.spr_tex):
+                if dpg.does_item_exist(t):
+                    dpg.delete_item(t)
             if not dpg.does_item_exist(self.dot_tex):
                 dpg.add_static_texture(1, 1, [c / 255.0 for c in UNLIT] + [1.0], tag=self.dot_tex, parent=registry())
             self.n = n
@@ -364,6 +382,11 @@ class PointQuads:
             rows = max(1, (n + cols - 1) // cols)
             self.cols, self.rows = cols, rows
             dpg.add_dynamic_texture(cols, rows, [0.0, 0.0, 0.0, 1.0] * (cols * rows), tag=self.tex, parent=registry())
+            self.scols = min(max(1, n), self.SCOLS)
+            self.srows = max(1, (n + self.scols - 1) // self.scols)
+            K = SPRITE_K
+            dpg.add_dynamic_texture(self.scols * K, self.srows * K, np.zeros(self.scols * K * self.srows * K * 4, np.float32),
+                                    tag=self.spr_tex, parent=registry())
             z = (0, 0)
             if self.bg_item is None:
                 self.bg_item = dpg.draw_image(self.tex, z, z, show=False, parent=self.tag)
@@ -371,6 +394,7 @@ class PointQuads:
                     dpg.delete_item(self.layers.under_item)
                 self.layers.under()                       # the look's spill, on the background
                 self.floor_items = _floor_items(self.tag)
+            self.mirror_layer = dpg.add_draw_layer(parent=self.tag)       # the reflection, under the LEDs
             self.items, self.dot_items = [], []
             for _ in range(n):                            # in pairs: each LED's dot, then its square over it
                 self.dot_items.append(dpg.draw_image_quad(self.dot_tex, z, z, z, z, show=False, parent=self.tag))
@@ -400,13 +424,25 @@ class PointQuads:
 
     background = CubeQuads.background
 
+    def _uv(self, i):
+        """LED i's part of the texture it is drawn from: its texel's centre (one colour), or its sprite's cell."""
+        if self.sprite:
+            cx, cy = i % self.scols, i // self.scols
+            u0, u1 = cx / self.scols, (cx + 1) / self.scols
+            v0, v1 = cy / self.srows, (cy + 1) / self.srows
+            return dict(uv1=(u0, v0), uv2=(u1, v0), uv3=(u1, v1), uv4=(u0, v1), texture_tag=self.spr_tex)
+        uv = ((i % self.cols + 0.5) / self.cols, (i // self.cols + 0.5) / self.rows)
+        return dict(uv1=uv, uv2=uv, uv3=uv, uv4=uv, texture_tag=self.tex)
+
     def camera(self, yaw, pitch, dist, look=None, ortho=False, floor_step=None):
-        """Every square placed for this camera, far first. Nothing is touched
-        when the camera and size are as they were. `floor_step`: (step,
-        origin) of the floor's lines, a shape's round distances."""
+        """Every square placed for this camera, far first - and the
+        reflection's, mirrored in the floor. Nothing is touched when the
+        camera, the size and the look are as they were. `floor_step`:
+        (step, origin) of the floor's lines, a shape's round distances."""
         lk = tuple(np.round(np.asarray(look if look is not None else (0, 0, 0), np.float64), 4))
         fs = None if floor_step is None else (round(float(floor_step[0]), 5), tuple(np.round(floor_step[1], 4)))
-        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), lk, bool(ortho), fs, self.size, self.w, self.h, self.floor, self.dots)
+        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), lk, bool(ortho), fs, self.size, self.w, self.h, self.floor, self.dots,
+               self.sprite, round(self.grow, 3), round(self.reflect, 3))
         if key == self._last or not self.size or self.n == 0:
             return
         self._last = key
@@ -414,20 +450,22 @@ class PointQuads:
         cam = Cam(yaw, pitch, dist, size, look, ortho, FOV)
         ox, oy = (self.w - size) * 0.5, (self.h - size) * 0.5
         zs = self.P[:, 2][np.isfinite(self.P[:, 2])]
-        _place_floor(self.floor_items, self.floor, (float(zs.min()) - 0.08) if len(zs) else -1.1, cam, ox, oy, floor_step)
+        fz = (float(zs.min()) - 0.08) if len(zs) else -1.1
+        _place_floor(self.floor_items, self.floor, fz, cam, ox, oy, floor_step)
+        grow = self.grow if self.sprite else 1.0
+        self._place_mirror(cam, ox, oy, fz, zs, grow)
         sx, sy, ok, depth = cam.screen(self.P)
         sx = ox + sx
         sy = oy + sy
         half = np.maximum(1.0, cam.scale(depth) * (self.LED / self.ext))
         order = np.argsort(np.where(ok, -depth, np.inf))          # far first; the NaN and behind-the-eye last
-        cols, rows = self.cols, self.rows
         for k, i in enumerate(order):
             q, dq = self.items[k], self.dot_items[k]
-            if not ok[i] or sx[i] + half[i] < 0 or sy[i] + half[i] < 0 or sx[i] - half[i] > self.w or sy[i] - half[i] > self.h:
+            hs = half[i] * grow
+            if not ok[i] or sx[i] + hs < 0 or sy[i] + hs < 0 or sx[i] - hs > self.w or sy[i] - hs > self.h:
                 dpg.configure_item(q, show=False); dpg.configure_item(dq, show=False); continue
-            x0, x1, y0, y1 = sx[i] - half[i], sx[i] + half[i], sy[i] - half[i], sy[i] + half[i]
-            uv = ((int(i) % cols + 0.5) / cols, (int(i) // cols + 0.5) / rows)     # one texel's centre: one colour
-            dpg.configure_item(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), uv1=uv, uv2=uv, uv3=uv, uv4=uv, show=True)
+            x0, x1, y0, y1 = sx[i] - hs, sx[i] + hs, sy[i] - hs, sy[i] + hs
+            dpg.configure_item(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), show=True, **self._uv(int(i)))
             if self.dots:
                 h = max(1.0, half[i] * self.DOT)
                 dpg.configure_item(dq, p1=(sx[i] - h, sy[i] - h), p2=(sx[i] + h, sy[i] - h), p3=(sx[i] + h, sy[i] + h),
@@ -435,14 +473,68 @@ class PointQuads:
             else:
                 dpg.configure_item(dq, show=False)
 
-    def colours(self, rgb, unlit=None):
+    def _place_mirror(self, cam, ox, oy, fz, zs, grow):
+        """The reflection: each LED mirrored in the floor (z = fz), drawn far
+        first, its alpha by its height over the floor against the shape's
+        own height. Its squares are made the first time a reflection is
+        wanted, in the layer kept for them under the LEDs."""
+        on = self.reflect > 0 and cam.eye[2] > fz + 0.02 and len(zs)
+        if not on:
+            for q in self.mirror_items:
+                dpg.configure_item(q, show=False)
+            return
+        if len(self.mirror_items) != self.n:
+            z = (0, 0)
+            self.mirror_items = [dpg.draw_image_quad(self.tex, z, z, z, z, show=False, parent=self.mirror_layer)
+                                 for _ in range(self.n)]
+        M = self.P.copy()
+        M[:, 2] = 2 * fz - self.P[:, 2]
+        sx, sy, ok, depth = cam.screen(M)
+        sx = ox + sx
+        sy = oy + sy
+        half = np.maximum(1.0, cam.scale(depth) * (self.LED / self.ext)) * grow
+        tall = max(1e-3, float(zs.max()) - fz)
+        alpha = reflection_weight((self.P[:, 2] - fz) / tall * 2.0) * min(1.0, 0.55 * self.reflect)
+        order = np.argsort(np.where(ok, -depth, np.inf))
+        for k, i in enumerate(order):
+            q = self.mirror_items[k]
+            a = alpha[i]
+            if (not ok[i] or not np.isfinite(a) or a <= 0.01 or sx[i] + half[i] < 0 or sy[i] + half[i] < 0
+                    or sx[i] - half[i] > self.w or sy[i] - half[i] > self.h):
+                dpg.configure_item(q, show=False); continue
+            x0, x1, y0, y1 = sx[i] - half[i], sx[i] + half[i], sy[i] - half[i], sy[i] + half[i]
+            dpg.configure_item(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), show=True,
+                               color=(255, 255, 255, int(255 * a)), **self._uv(int(i)))
+
+    def colours(self, rgb, unlit=None, lk=None):
         """The LEDs' colours this frame: (n, 3) uint8, in the positions' order;
         with `unlit` (the view's dim dots) an LED that is off is transparent,
-        so its dot behind shows."""
+        so its dot behind shows. With `lk`'s glow or diffuser, the sprite
+        texture is written instead: each LED's colour in its cell, its
+        light's shape (look.sprite_mask) the alpha."""
+        from native import look
         rgb = np.asarray(rgb).reshape(-1, 3)
+        m = min(len(rgb), self.n)
+        sprite = bool(lk) and (lk.get("glow", 0) > 0 or lk.get("diffuse", 0) > 0)
+        if sprite != self.sprite or (sprite and abs(look.sprite_grow(lk) - self.grow) > 1e-6):
+            self.sprite = sprite
+            self.grow = look.sprite_grow(lk) if sprite else 1.0
+            self._last = None                             # the squares drawn again, from the other texture
+        if sprite:
+            K = look.SPRITE_K
+            mask = look.sprite_mask(lk, K)
+            n = self.scols * self.srows
+            col = np.zeros((n, 3), np.float32)
+            col[:m] = rgb[:m].astype(np.float32) / 255.0
+            lit = np.zeros(n, np.float32)
+            lit[:m] = (rgb[:m].max(axis=1) >= UNLIT_BELOW) if unlit is not None else 1.0
+            cells = np.empty((self.srows, self.scols, K, K, 4), np.float32)
+            cells[..., :3] = col.reshape(self.srows, self.scols, 1, 1, 3)
+            cells[..., 3] = mask[None, None] * lit.reshape(self.srows, self.scols, 1, 1)
+            dpg.set_value(self.spr_tex, cells.transpose(0, 2, 1, 3, 4).ravel())
+            return
         n = self.cols * self.rows
         buf = np.zeros((n, 4), np.float32); buf[:, 3] = 1.0
-        m = min(len(rgb), self.n)
         buf[:m, :3] = rgb[:m].astype(np.float32) / 255.0
         if unlit is not None:
             buf[:m, 3][rgb[:m].max(axis=1) < UNLIT_BELOW] = 0.0

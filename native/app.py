@@ -525,14 +525,15 @@ class App(Features):
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
+        lk = self.view_look()
         if eng is self.eng:
             pos = self.view_positions()
-            rgb = shape_ui.view_colours(self, rgb)             # a shape being built: each part its colour
+            rgb = look.diffuse_points(pos, shape_ui.view_colours(self, rgb), lk)     # a shape being built: each part its colour
             return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
                                         unlit=unlit, floor=floor, frame=view3d.frame(self), floor_step=view3d.floor_step(self),
-                                        **view3d.kw(self))
-        return render.render_points(g.pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
-                                    unlit=unlit, floor=floor, **view3d.kw(self))
+                                        lk=lk, **view3d.kw(self))
+        return render.render_points(g.pos, look.diffuse_points(g.pos, rgb, lk), px, self.yaw, self.pitch, self.dist,
+                                    bg=self.view_background(px), unlit=unlit, floor=floor, lk=lk, **view3d.kw(self))
 
     def fill_stats(self, pw, factor, dev_fps):
         """The stats popover's figures, this frame (while it is open): the
@@ -3678,7 +3679,9 @@ class App(Features):
             pq.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
             lk = self.view_look()
             cols = shape_ui.view_colours(self, (rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3))
-            pq.colours(look.tone(cols, lk), unlit=unlit)
+            cols = look.diffuse_points(pos, cols, lk)          # through the diffuser: light shared by distance
+            pq.reflect = lk["reflect"]
+            pq.colours(look.tone(cols, lk), unlit=unlit, lk=lk)
             pq.layers.update(lk, look.mean_light(cols) if lk["spill"] > 0 else None, pq.size, pq.w, pq.h)
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one

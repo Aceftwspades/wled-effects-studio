@@ -98,6 +98,32 @@ def test_the_reflection():
     assert np.array_equal(up, render.render(net, 16, 200, 0.7, -0.4, 5.0))
     assert render.reflection_weight(np.array([0.0, 1.0, 2.0, 3.0])).tolist() == [1.0, 0.25, 0.0, 0.0]
 
+
+def test_any_shape_has_the_look():
+    """Parity: a ring of LEDs gets the diffuser by distance, glowing sprites and a reflection, as the cube does."""
+    from native import render
+    t = np.linspace(0, 2 * np.pi, 60, endpoint=False)
+    pos = np.stack([np.cos(t) * 10, np.sin(t) * 10, np.zeros_like(t)], 1).astype(np.float32)
+    rgb = np.zeros((60, 3), np.uint8)
+    rgb[0] = (255, 200, 100)
+    d = look.diffuse_points(pos, rgb, dict(look.DEFAULTS, diffuse=0.8))
+    assert d[0].max() < 255 and d[1].max() > 0 and d[59].max() > 0 and d[30].max() == 0   # to its neighbours only
+    assert look.diffuse_points(pos, rgb, look.DEFAULTS) is rgb
+    idx, dist, spacing = look.neighbours(pos)
+    assert idx[5, 0] == 5 and set(idx[5, 1:3].tolist()) == {4, 6} and abs(spacing - 2 * 10 * np.sin(np.pi / 60)) < 1e-3
+    lit = np.full((60, 3), 200, np.uint8)
+    plain = render.render_points(pos, lit, 200, 0.7, 0.35, 5.0)
+    glow = render.render_points(pos, lit, 200, 0.7, 0.35, 5.0, lk=look.PRESETS["glow"])
+    assert (glow.max(axis=2) > 20).sum() > (plain.max(axis=2) > 20).sum()          # each LED's light reaches further
+    flat = render.render_points(pos, lit, 200, 0.7, 0.35, 5.0, lk=dict(look.DEFAULTS, reflect=0.0))
+    tall = np.concatenate([pos, pos + (0, 0, 8)]).astype(np.float32)
+    lit2 = np.full((120, 3), 200, np.uint8)
+    a = render.render_points(tall, lit2, 200, 0.7, 0.35, 5.0, floor=False)
+    b = render.render_points(tall, lit2, 200, 0.7, 0.35, 5.0, floor=False, lk=dict(look.DEFAULTS, reflect=0.9))
+    assert b.astype(int).sum() > a.astype(int).sum() and np.array_equal(flat, plain)  # the reflection adds light
+    m = look.sprite_mask(look.PRESETS["glow"])
+    assert m.shape == (look.SPRITE_K, look.SPRITE_K) and m[4, 4] == m.max() and m[0, 0] < m[4, 4]
+
 if __name__ == "__main__":
     import inspect
     bad = 0

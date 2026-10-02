@@ -515,6 +515,13 @@ STEPS = [
     ([{"check": "not __import__('native.look', fromlist=['x']).active(app.view_look())"},
       {"check": "app.cube_quads is None or not dpg.get_item_configuration(app.cube_quads.layers.over_items[0])['show']"},
       {"check": "app.cube_quads is None or not any(dpg.get_item_configuration(q)['show'] for qs in app.cube_quads.mirror.values() for q in qs)"},
+      # every shape in parity: a sphere's LEDs as glowing sprites with their reflection
+      {"geometry": {"kind": "sphere", "params": {"w": 24, "h": 12}}}, {"py": "chrome.set_look(app, preset='night')"}], 1.5),
+    ([{"check": "app.point_quads is not None and app.point_quads.sprite and app.point_quads.reflect > 0"},
+      {"check": "any(dpg.get_item_configuration(q)['show'] for q in app.point_quads.mirror_items)"},
+      {"check": "app.view_image(app.net_image(), 160).shape == (160, 160, 3)"},
+      {"py": "chrome.set_look(app, preset='studio')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.5),
+    ([{"check": "app.cube_quads is not None"},
       {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
     # the footer (C18): power and the device's fps; the stats popover live while open, above its button; Esc closes it
     ([{"check": "'device ~' in dpg.get_value('stat_txt') and 'brightness' not in dpg.get_value('stat_txt')"},
