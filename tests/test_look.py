@@ -72,6 +72,32 @@ def test_a_picture_finished():
     assert out[2, 2].sum() < out[70, 100].sum()                           # the vignette's corner darker
 
 
+
+def test_the_diffuser():
+    net = np.zeros((48, 48, 3), np.uint8)
+    net[24, 24] = (255, 255, 255)                                         # one LED on the top face (block 1, 1)
+    net[16, 16] = (0, 0, 0)
+    lk = dict(look.DEFAULTS, diffuse=0.8)
+    d = look.diffuse(net, 16, lk)
+    assert d[24, 24].max() < 255 and d[25, 24].max() > 0                  # its light spread to its neighbours
+    assert d[24, 15].max() == 0                                           # but not across the face's edge
+    assert look.diffuse(net, 16, look.DEFAULTS) is net                    # no diffuser: the net itself
+    tex = look.led_texture(net, 4, lk, B=16)
+    assert tex.shape == (192, 192, 3) and tex[96:100, 96:100].std() < 40  # smooth: no dot to see
+
+
+def test_the_reflection():
+    from native import render
+    net = np.full((48, 48, 3), 200, np.uint8)
+    plain = render.render(net, 16, 200, 0.7, 0.35, 5.0)
+    mirror = render.render(net, 16, 200, 0.7, 0.35, 5.0, reflect=0.8)
+    below = slice(170, 200)
+    assert mirror[below].astype(int).sum() > plain[below].astype(int).sum()   # the cube's light in the floor
+    assert np.array_equal(mirror[:60], plain[:60])                            # above, as it was
+    up = render.render(net, 16, 200, 0.7, -0.4, 5.0, reflect=0.8)             # from below the floor: none
+    assert np.array_equal(up, render.render(net, 16, 200, 0.7, -0.4, 5.0))
+    assert render.reflection_weight(np.array([0.0, 1.0, 2.0, 3.0])).tolist() == [1.0, 0.25, 0.0, 0.0]
+
 if __name__ == "__main__":
     import inspect
     bad = 0

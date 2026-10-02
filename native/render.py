@@ -213,8 +213,23 @@ def _floor(out, cam, z, off=(0.0, 0.0), step=FLOOR_STEP, origin=(0.0, 0.0)):
     out[ys_, xs_] = (out[ys_, xs_].astype(np.float32) * (1.0 - a) + np.asarray(FLOOR, np.float32) * a).astype(np.uint8)
 
 
+FLOOR_Z = -1.1               # the plane the cube stands over (its floor's grid, its reflection's mirror)
+
+
+def mirrored(corners, z=FLOOR_Z):
+    """A face's corners reflected in the floor's plane."""
+    c = np.array(corners, np.float64)
+    c[:, 2] = 2 * z - c[:, 2]
+    return c
+
+
+def reflection_weight(depth):
+    """How much of the reflection shows at a depth below the floor (0..2, a cube's height): strongest at the floor."""
+    return np.clip(1.0 - depth / 2.0, 0.0, 1.0) ** 2
+
+
 def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False, unlit=None, floor=False,
-           look=None, ortho=False):
+           look=None, ortho=False, reflect=0.0):
     """Draw the cube from the unfolded net image.
 
     net_rgb : (3B, 3B, 3) uint8 - the same image the flat view shows
@@ -222,6 +237,7 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
     unlit   : a colour an LED that is off is drawn as, a dot in its cell (None: black)
     floor   : a faint grid under the cube
     look, ortho : the camera's pan and projection (see Cam)
+    reflect : the floor a mirror this strong (0 none): the cube reflected in it, fading with depth
     returns : (size, size, 3) uint8
     """
     out = np.zeros((size, size, 3), np.uint8)
@@ -229,25 +245,43 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
     cam = Cam(yaw, pitch, dist, size, look, ortho, fov)
     eye = cam.eye
     if floor:
-        _floor(out, cam, -1.1)
+        _floor(out, cam, FLOOR_Z)
+    if reflect > 0 and eye[2] > FLOOR_Z + 0.02:
+        # the reflection first, added to what is behind it: each face mirrored in the floor, as bright as it is
+        # near the floor - the real faces then cover what they cover
+        ref = np.zeros((size, size, 3), np.float32)
+        _faces(ref, net_rgb, B, cam, size, six, unlit, mirror=True)
+        out = np.clip(out.astype(np.float32) + ref * (0.55 * reflect), 0, 255).astype(np.uint8)
+    _faces(out, net_rgb, B, cam, size, six, unlit)
+    return out
 
+
+def _faces(out, net_rgb, B, cam, size, six, unlit, mirror=False):
+    """The cube's faces drawn into `out` - or, `mirror`, their reflection in
+    the floor, each pixel weighted by its depth below it (reflection_weight)."""
+    eye = cam.eye
     drawn = []
     for fc in (FACES6 if six else FACES):
         c = fc["corners"]
         centre = c.mean(axis=0)
-        # Outward normal of a cube face is its own centre direction. Cull when
+        normal = centre
+        if mirror:
+            c = mirrored(c)
+            normal = centre * np.array([1.0, 1.0, -1.0])
+            centre = c.mean(axis=0)
+        # Outward normal of a cube face is its own centre direction (mirrored, its reflection's). Cull when
         # it points away, so at most three faces are ever rasterised.
-        if np.dot(centre, centre - eye) >= 0:
+        if np.dot(normal, centre - eye) >= 0:
             continue
         sx, sy, ok, _ = cam.screen(c)
         if not ok.all():                         # behind or through the eye
             continue
         scr = np.stack([sx, sy], axis=1)
-        drawn.append((float(np.linalg.norm(centre - eye)), fc, scr))
+        drawn.append((float(np.linalg.norm(centre - eye)), fc, scr, c))
 
     # Painter's algorithm: far faces first. With a convex solid and backface
     # culling this is exact, no z-buffer needed.
-    for _, fc, scr in sorted(drawn, key=lambda t: -t[0]):
+    for _, fc, scr, c in sorted(drawn, key=lambda t: -t[0]):
         x0 = max(0, int(np.floor(scr[:, 0].min())))
         x1 = min(size, int(np.ceil(scr[:, 0].max())) + 1)
         y0 = max(0, int(np.floor(scr[:, 1].min())))
@@ -293,8 +327,11 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
             fu, fv = u[inside] - ui - 0.5, v[inside] - vi - 0.5
             px_ = px_.copy()
             px_[(px_.max(axis=1) < UNLIT_BELOW) & (fu * fu + fv * fv <= DOT * DOT)] = unlit
+        if mirror:
+            # the reflected point's depth below the floor, from where it is on the face
+            z = c[0, 2] + (u[inside] / B) * (c[1, 2] - c[0, 2]) + (v[inside] / B) * (c[3, 2] - c[0, 2])
+            px_ = px_.astype(np.float32) * reflection_weight(FLOOR_Z - z)[:, None]
         out[y0:y1, x0:x1][inside] = px_
-    return out
 
 
 def texture_rgba(frame):

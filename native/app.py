@@ -498,6 +498,11 @@ class App(Features):
         self._look_frame = getattr(self, "_look_frame", 0) + 1
         return look.finish(img, lk, self._look_frame, look.mean_light(self.frame_rgb(eng)) if lk["spill"] > 0 else None)
 
+    def eye_above_floor(self):
+        """The 3-D view's camera is above the floor (a reflection in it can be seen)."""
+        from native.render import Cam, FLOOR_Z
+        return bool(Cam(self.yaw, self.pitch, self.dist, 100, **view3d.kw(self)).eye[2] > FLOOR_Z + 0.02)
+
     def view_look(self):
         """The look of the 3-D view in force (Settings > Appearance, its 3-D view tab)."""
         return look.current(self.prefs)
@@ -510,12 +515,13 @@ class App(Features):
         if g is not None and g.kind == "cube" and not eng.fx.get("o3"):
             src = net if net.shape[0] == eng.rows else self.frame_rgb(eng)
             lk = self.view_look()
-            if lk["glow"] > 0:                             # the glowing LEDs, as the live view's texture has them
+            if lk["glow"] > 0 or lk["diffuse"] > 0:        # the glowing or diffused LEDs, as the live view's texture has them
                 k = 8                                      # finer than the live texture: no GPU smooths a picture's dots
-                return render.render(look.led_texture(src, k, lk, unlit), eng.B * k, px, self.yaw, self.pitch, self.dist,
-                                     six=eng.six, bg=self.view_background(px), unlit=None, floor=floor, **view3d.kw(self))
+                return render.render(look.led_texture(src, k, lk, unlit, B=eng.B), eng.B * k, px, self.yaw, self.pitch,
+                                     self.dist, six=eng.six, bg=self.view_background(px), unlit=None, floor=floor,
+                                     reflect=lk["reflect"], **view3d.kw(self))
             return render.render(src, eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px),
-                                 unlit=unlit, floor=floor, **view3d.kw(self))
+                                 unlit=unlit, floor=floor, reflect=lk["reflect"], **view3d.kw(self))
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
@@ -3649,8 +3655,9 @@ class App(Features):
             src = net if net.shape[0] == self.eng.rows else self.net_image()
             unlit, floor = self.view_extras()
             lk = self.view_look()
-            dpg.set_value("cube_src_tex", self._rgba("cube_src", look.led_texture(look.tone(src, lk), k, lk, unlit)))
+            dpg.set_value("cube_src_tex", self._rgba("cube_src", look.led_texture(look.tone(src, lk), k, lk, unlit, B=self.eng.B)))
             cq = self.cube_quads
+            cq.reflect = lk["reflect"]
             cq.layers.update(lk, look.mean_light(src) if lk["spill"] > 0 else None, cq.size, cq.w, cq.h)
             self.cube_quads.floor = floor
             self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six, **view3d.kw(self))

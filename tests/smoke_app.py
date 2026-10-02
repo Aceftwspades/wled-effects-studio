@@ -506,11 +506,15 @@ STEPS = [
       {"check": "app.cube_quads is None or (dpg.get_item_configuration(app.cube_quads.layers.over_items[0])['show'] "
                 "and dpg.get_item_configuration(app.cube_quads.layers.under_item)['show'])"},
       {"check": "app.view_image(app.net_image(), 160).shape == (160, 160, 3)"},
+      # the floor a mirror: the reflection's quads drawn under the cube while the camera is above the floor
+      {"check": "app.cube_quads is None or app.eye_above_floor() is False or "
+                "any(dpg.get_item_configuration(q)['show'] for qs in app.cube_quads.mirror.values() for q in qs)"},
       {"py": "chrome.set_look(app, key='grain', value=0.9)"}], 0.5),
     ([{"check": "app.view_look()['grain'] == 0.9 and dpg.get_value('look_preset') == 'Cinematic, grain changed'"},
       {"py": "chrome.set_look(app, preset='studio')"}], 0.5),
     ([{"check": "not __import__('native.look', fromlist=['x']).active(app.view_look())"},
       {"check": "app.cube_quads is None or not dpg.get_item_configuration(app.cube_quads.layers.over_items[0])['show']"},
+      {"check": "app.cube_quads is None or not any(dpg.get_item_configuration(q)['show'] for qs in app.cube_quads.mirror.values() for q in qs)"},
       {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
     # the footer (C18): power and the device's fps; the stats popover live while open, above its button; Esc closes it
     ([{"check": "'device ~' in dpg.get_value('stat_txt') and 'brightness' not in dpg.get_value('stat_txt')"},

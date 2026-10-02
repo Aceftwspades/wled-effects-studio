@@ -3087,11 +3087,15 @@ textured quads), so each part goes where it can.
       60 for Cinematic at 620 px). Tested: `test_look.py`; the smoke picks
       Cinematic, finds the layers drawn and a picture made, moves a value
       and goes back to the studio look.
-- [ ] **A reflecting floor**: the cube mirrored through the floor as a second
-      set of quads, faded - placed only when the camera moves.
-- [ ] **A diffuser**: the LEDs as behind frosted acrylic, a blur within each
-      face by the diffuser's distance - how an effect reads on a diffused
-      cube.
+- [x] **A reflecting floor**: the cube mirrored in the floor's plane - live,
+      a second set of the faces' quads drawn under them, each tinted by its
+      depth below the floor (`render.reflection_weight`), placed only when
+      the camera moves; in pictures, the mirrored faces drawn first and
+      weighted per pixel. The cube's; Cinematic, Diffused and Night have it.
+- [x] **A diffuser** (the **Diffused** look): each face's light blurred on
+      its own, the further the diffuser the wider (`look.diffuse`), the dots
+      washed out, smooth in pictures. Tested: `test_the_diffuser`,
+      `test_the_reflection`; the smoke finds the reflection drawn and gone.
 - [ ] **The device's limits in the view**: its gamma and brightness cap, so a
       dim gradient bands as it will on the LEDs.
 - [ ] **Camera moves for recordings**: a turntable, depth of field in renders;

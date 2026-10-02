@@ -21,18 +21,21 @@ any value moved from it:
 import numpy as np
 
 # the strengths, 0 for off; exposure a factor
-KEYS = ("glow", "spill", "bloom", "vignette", "grain", "exposure", "filmic")
-DEFAULTS = {"glow": 0.0, "spill": 0.0, "bloom": 0.0, "vignette": 0.0, "grain": 0.0, "exposure": 1.0, "filmic": 0.0}
+KEYS = ("glow", "diffuse", "reflect", "spill", "bloom", "vignette", "grain", "exposure", "filmic")
+DEFAULTS = {"glow": 0.0, "diffuse": 0.0, "reflect": 0.0, "spill": 0.0, "bloom": 0.0, "vignette": 0.0, "grain": 0.0, "exposure": 1.0, "filmic": 0.0}
 PRESETS = {
     "studio":    dict(DEFAULTS),                                                  # the view as it always was
     "glow":      dict(DEFAULTS, glow=0.6, bloom=0.3),
-    "cinematic": dict(DEFAULTS, glow=0.7, spill=0.5, bloom=0.5, vignette=0.45, grain=0.25, exposure=1.1, filmic=1.0),
-    "night":     dict(DEFAULTS, glow=1.0, spill=0.8, bloom=0.6, vignette=0.6, grain=0.15, exposure=1.15, filmic=1.0),
+    "cinematic": dict(DEFAULTS, glow=0.7, reflect=0.35, spill=0.5, bloom=0.5, vignette=0.45, grain=0.25, exposure=1.1, filmic=1.0),
+    "diffused":  dict(DEFAULTS, diffuse=0.45, reflect=0.3, spill=0.45, bloom=0.3, vignette=0.3, filmic=1.0),
+    "night":     dict(DEFAULTS, glow=1.0, reflect=0.5, spill=0.8, bloom=0.6, vignette=0.6, grain=0.15, exposure=1.15, filmic=1.0),
 }
-PRESET_WORDS = {"studio": "Studio", "glow": "Glow", "cinematic": "Cinematic", "night": "Night"}
-RANGES = {"glow": (0.0, 1.0), "spill": (0.0, 1.0), "bloom": (0.0, 1.0), "vignette": (0.0, 1.0), "grain": (0.0, 1.0),
+PRESET_WORDS = {"studio": "Studio", "glow": "Glow", "cinematic": "Cinematic", "diffused": "Diffused", "night": "Night"}
+RANGES = {"glow": (0.0, 1.0), "diffuse": (0.0, 1.0), "reflect": (0.0, 1.0), "spill": (0.0, 1.0), "bloom": (0.0, 1.0), "vignette": (0.0, 1.0), "grain": (0.0, 1.0),
           "exposure": (0.5, 2.0), "filmic": (0.0, 1.0)}
 WORDS = {"glow": ("glow", "each LED a bright dot with a soft halo, as a lit LED looks to a camera (the cube)"),
+         "diffuse": ("diffuser", "the LEDs as behind frosted acrylic: each face's light blurred, the further the diffuser the more (the cube)"),
+         "reflect": ("reflection", "the floor a mirror: the cube reflected in it, fading with depth (the cube)"),
          "spill": ("spill", "the LEDs' colour thrown into the room behind them"),
          "bloom": ("bloom", "light past white spreading round it - in screenshots, GIFs and videos (the live view has the glow)"),
          "vignette": ("vignette", "the corners darkened, as a lens does"),
@@ -121,17 +124,45 @@ def _blur(a, passes=2):
     return out
 
 
-def led_texture(net, k, lk, unlit=None):
+def diffuse(net, B, lk):
+    """The net as seen through a diffuser: each B x B face blurred on its
+    own (light does not cross a cube's edge through acrylic), the further
+    the diffuser the wider - box passes, each a third of an LED's reach."""
+    d = float(lk.get("diffuse", 0.0))
+    if d <= 0 or not B:
+        return net
+    passes = int(round(1 + d * max(1.5, B / 8.0)))
+    out = net.copy()
+    h, w = net.shape[:2]
+    for by in range(0, h - B + 1, B):
+        for bx in range(0, w - B + 1, B):
+            blk = net[by:by + B, bx:bx + B]
+            if blk.max() == 0:
+                continue                                  # a corner of the net: no LEDs
+            out[by:by + B, bx:bx + B] = np.clip(_blur(blk.astype(np.float32), passes), 0, 255).astype(np.uint8)
+    return out
+
+
+def led_texture(net, k, lk, unlit=None, B=None):
     """The net at k times its size, each lit LED a glowing dot - a disc
     and a halo reaching the neighbours - over a faint board, so the shape
-    of the faces still reads where the LEDs are off. With no glow: the net
-    as squares (and `unlit`'s dim dots, as render.dotted draws them)."""
+    of the faces still reads where the LEDs are off. Through a diffuser
+    (B: a face's side) the light is spread and the dots fade into it. With
+    neither: the net as squares (and `unlit`'s dim dots, as render.dotted
+    draws them)."""
     from native.render import dotted
     g = float(lk.get("glow", 0.0))
+    d = float(lk.get("diffuse", 0.0)) if B else 0.0
+    if d > 0:
+        net = diffuse(net, B, lk)
     if g <= 0.0:
+        if d > 0:                                         # the diffuser: smooth, no dots to see - and no steps
+            from PIL import Image
+            h, w = net.shape[:2]
+            return np.asarray(Image.fromarray(net).resize((w * k, h * k), Image.BILINEAR))
         return dotted(net, k, unlit) if unlit is not None else net.repeat(k, 0).repeat(k, 1)
     f = net.astype(np.float32)
-    cell = _cell(k, g)
+    cell = _cell(k, g) * (1.0 - d) + d                    # a diffuser washes the dots out
     h, w = net.shape[:2]
     disc = f.repeat(k, 0).repeat(k, 1) * np.tile(cell, (h, w))[..., None]
     halo = _blur(f).repeat(k, 0).repeat(k, 1) * (1.1 * g)

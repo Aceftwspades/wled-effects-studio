@@ -34,7 +34,7 @@ import dearpygui.dearpygui as dpg
 
 from native.textures import registry
 
-from native.render import FACES6 as FACES, Cam, floor_segments, FLOOR, FLOOR_POOL, FLOOR_STEP, UNLIT, UNLIT_BELOW, DOT_POINT
+from native.render import FACES6 as FACES, Cam, floor_segments, FLOOR, FLOOR_POOL, FLOOR_STEP, UNLIT, UNLIT_BELOW, DOT_POINT, FLOOR_Z, mirrored, reflection_weight
 
 N = 8            # sub-quads across a face
 FOV = 38.0
@@ -161,6 +161,8 @@ class CubeQuads:
         self.items = {}          # face index -> list of quad ids, row-major
         self._last = None
         self.floor = False       # a faint grid under the cube (the view's toggle)
+        self.reflect = 0.0       # the floor a mirror this strong (look.py's reflection)
+        self.mirror = {}         # face index -> its reflection's quads, row-major
         with dpg.drawlist(width=10, height=10, tag=tag, parent=parent):
             z = (0, 0)
             # a background picture, drawn first so the faces cover it (see background())
@@ -169,6 +171,8 @@ class CubeQuads:
             self.layers = Layers(tag)
             self.layers.under()                           # the look's spill, on the background
             self.floor_items = _floor_items(tag)          # then the floor, which the faces stand on
+            for fi, fc in enumerate(FACES):               # the reflection in it, under the faces
+                self.mirror[fi] = self._quads(fc, texture)
             for fi, fc in enumerate(FACES):
                 quads = []
                 bx, by = fc["bx"], fc["by"]
@@ -181,11 +185,25 @@ class CubeQuads:
                 self.items[fi] = quads
         self.layers.over()                                # the vignette and the grain, over everything
 
+    @staticmethod
+    def _quads(fc, texture):
+        """A face's N x N quads, hidden, each sampling its part of the net's block."""
+        z = (0, 0)
+        bx, by = fc["bx"], fc["by"]
+        quads = []
+        for j in range(N):
+            for i in range(N):
+                u0, u1 = (bx + i / N) / 3.0, (bx + (i + 1) / N) / 3.0
+                v0, v1 = (by + j / N) / 3.0, (by + (j + 1) / N) / 3.0
+                quads.append(dpg.draw_image_quad(texture, z, z, z, z, uv1=(u0, v0), uv2=(u1, v0),
+                                                 uv3=(u1, v1), uv4=(u0, v1), show=False))
+        return quads
+
     def set_texture(self, texture):
         if texture == self.texture:
             return
         self.texture = texture
-        for quads in self.items.values():
+        for quads in list(self.items.values()) + list(self.mirror.values()):
             for q in quads:
                 dpg.configure_item(q, texture_tag=texture)
 
@@ -229,7 +247,8 @@ class CubeQuads:
         the bottom unless the cube has six. Nothing is touched when the
         camera and size are as they were."""
         lk = tuple(np.round(np.asarray(look if look is not None else (0, 0, 0), np.float64), 4))
-        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), lk, bool(ortho), self.size, self.w, self.h, bool(six), self.floor)
+        key = (round(yaw, 4), round(pitch, 4), round(dist, 3), lk, bool(ortho), self.size, self.w, self.h, bool(six), self.floor,
+               round(self.reflect, 3))
         if key == self._last or not self.size:
             return
         self._last = key
@@ -237,8 +256,20 @@ class CubeQuads:
         cam = Cam(yaw, pitch, dist, size, look, ortho, FOV)
         eye = cam.eye
         ox, oy = (self.w - size) * 0.5, (self.h - size) * 0.5
-        _place_floor(self.floor_items, self.floor, -1.1, cam, ox, oy)
+        _place_floor(self.floor_items, self.floor, FLOOR_Z, cam, ox, oy)
         a = np.linspace(-1.0, 1.0, N + 1)
+        above = eye[2] > FLOOR_Z + 0.02
+        for fi, fc in enumerate(FACES):
+            # the face's reflection in the floor, each quad as bright as it is near the floor (a tint's alpha)
+            quads = self.mirror[fi]
+            c = mirrored(fc["corners"])
+            normal = fc["corners"].mean(axis=0) * np.array([1.0, 1.0, -1.0])
+            if self.reflect <= 0 or not above or np.dot(normal, c.mean(axis=0) - eye) >= 0 or (fi == 5 and not six):
+                for q in quads:
+                    dpg.configure_item(q, show=False)
+            else:
+                self._place(quads, c, cam, ox, oy, a,
+                            lambda z: (255, 255, 255, int(255 * min(1.0, 0.55 * self.reflect) * float(reflection_weight(FLOOR_Z - z)))))
         for fi, fc in enumerate(FACES):
             c = fc["corners"]
             centre = c.mean(axis=0)
@@ -247,26 +278,34 @@ class CubeQuads:
                 for q in quads:
                     dpg.configure_item(q, show=False)
                 continue
-            # the face's corners span a, b in -1..1 the way the net block does
-            o, ea, eb = c[0], c[1] - c[0], c[3] - c[0]
-            aa, bb = np.meshgrid(a, a)                            # (N+1, N+1): bb rows, aa cols
-            pts = o + ((aa + 1) / 2)[..., None] * ea + ((bb + 1) / 2)[..., None] * eb
-            sx, sy, ok, _ = cam.screen(pts.reshape(-1, 3))
-            if not ok.all():
-                for q in quads:
-                    dpg.configure_item(q, show=False)
-                continue
-            scr = np.stack([ox + sx, oy + sy], 1).reshape(N + 1, N + 1, 2)
-            k = 0
-            for j in range(N):
-                for i in range(N):
-                    p1, p2, p3, p4 = scr[j, i], scr[j, i + 1], scr[j + 1, i + 1], scr[j + 1, i]
-                    # grown a third of a pixel about its centre: two quads
-                    # meeting on a non-integer edge otherwise leave a crack
-                    cx, cy = (p1 + p2 + p3 + p4) / 4.0
-                    p1, p2, p3, p4 = (q + np.sign(q - (cx, cy)) * 0.35 for q in (p1, p2, p3, p4))
-                    dpg.configure_item(quads[k], p1=tuple(p1), p2=tuple(p2), p3=tuple(p3), p4=tuple(p4), show=True)
-                    k += 1
+            self._place(quads, c, cam, ox, oy, a)
+
+    @staticmethod
+    def _place(quads, c, cam, ox, oy, a, tint=None):
+        """A face's quads on screen: its corners c spanning a, b in -1..1 the
+        way the net block does; `tint(z)` the colour a quad is drawn in by its
+        middle's height (the reflection's fade), None for white."""
+        o, ea, eb = c[0], c[1] - c[0], c[3] - c[0]
+        aa, bb = np.meshgrid(a, a)                            # (N+1, N+1): bb rows, aa cols
+        pts = o + ((aa + 1) / 2)[..., None] * ea + ((bb + 1) / 2)[..., None] * eb
+        sx, sy, ok, _ = cam.screen(pts.reshape(-1, 3))
+        if not ok.all():
+            for q in quads:
+                dpg.configure_item(q, show=False)
+            return
+        scr = np.stack([ox + sx, oy + sy], 1).reshape(N + 1, N + 1, 2)
+        zz = pts[..., 2]
+        k = 0
+        for j in range(N):
+            for i in range(N):
+                p1, p2, p3, p4 = scr[j, i], scr[j, i + 1], scr[j + 1, i + 1], scr[j + 1, i]
+                # grown a third of a pixel about its centre: two quads
+                # meeting on a non-integer edge otherwise leave a crack
+                cx, cy = (p1 + p2 + p3 + p4) / 4.0
+                p1, p2, p3, p4 = (q + np.sign(q - (cx, cy)) * 0.35 for q in (p1, p2, p3, p4))
+                kw = {} if tint is None else {"color": tint((zz[j, i] + zz[j + 1, i + 1]) * 0.5)}
+                dpg.configure_item(quads[k], p1=tuple(p1), p2=tuple(p2), p3=tuple(p3), p4=tuple(p4), show=True, **kw)
+                k += 1
 
 
 class PointQuads:
