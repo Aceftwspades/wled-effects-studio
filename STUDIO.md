@@ -3058,6 +3058,8 @@ most valuable first:
       injection and moves it by a real datagram, and hides, keeps and
       groups Math's pin and operations.
 
+Released as 1.5.0 (2026-10-02), with the macOS and ARM Linux builds.
+
 Not taken: a GLSL mode and a GPU preview (the sim runs the device's own
 C++, which a shader would only imitate), wled-toy's strip / ring / matrix
 layouts (the geometry, ledmaps and camera mapping go further), and the
