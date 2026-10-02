@@ -556,7 +556,7 @@ def builtin_catalog():
             text = open(os.path.join(d, f), encoding="utf-8", errors="replace").read()
         except OSError:
             continue
-        m = re.search(r'_data_FX_MODE_\w+\[\]\s*PROGMEM\s*=\s*"([^"@;]+)', text)
+        m = re.search(r'_data_FX_MODE_\w+\[\]\s*PROGMEM\s*=(?:\s|//[^\n]*\n)*"([^"@;]+)', text)
         name = m.group(1).strip() if m else f[11:-4].replace("_", " ").title()
         needs = requirements_of_code(text)
         if "cfx_pos(" in text or "cfx_geom" in text:

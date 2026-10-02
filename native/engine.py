@@ -562,6 +562,23 @@ class Engine:
         self.last_audio = (float(vol), int(peak))
         self.lib.simAudioSet(C.c_float(vol), int(peak))
 
+    # audioreactive's sixteen fftResult channels, the middle of each (Hz, geometric): what a band's peak means
+    BAND_HZ = (61, 107, 167, 249, 360, 491, 678, 952, 1261, 1636, 2138, 2697, 3342, 4073, 5642, 8111)
+
+    def audio_peak(self, freq=None, magnitude=None):
+        """The major peak and its magnitude (u_data[4], [5]) - given, or from
+        the bins as they are now: the loudest band's frequency, its level x 4
+        (my_magnitude's scale: Freqmap lights by a quarter of it). Ignored by
+        an engine built without it."""
+        if freq is None:
+            f = self.fft
+            i = int(np.argmax(f))
+            freq, magnitude = (float(self.BAND_HZ[i]), float(f[i]) * 4.0) if f[i] > 0 else (0.0, 0.0)
+        try:
+            self.lib.simAudioPeak(C.c_float(freq), C.c_float(magnitude or 0.0))
+        except AttributeError:
+            pass
+
     @property
     def fft(self):
         """Writable 16-byte view of the FFT bins the effects read."""
@@ -581,6 +598,18 @@ class Engine:
             self.now_ms = int(ms)
         except AttributeError:
             pass
+
+    def clear(self):
+        """A clean cube: every pixel off and every segment's effect started
+        from nothing, the clock at 0 - what a preview starts on (selecting an
+        effect keeps the pixels, as WLED does). An engine built without
+        simClearPixels is set up afresh instead, which clears less."""
+        try:
+            self.lib.simClearPixels()
+        except AttributeError:
+            self.set_geometry(self.geom) if self.geom is not None else None
+        self.set_now(0)
+        self.sim_ms = 0
 
     def clock(self):
         """Both clocks, (strip.now, ms since the effect was picked), to hand

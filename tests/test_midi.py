@@ -105,6 +105,9 @@ def test_the_synth_beat_follows_the_clock():
 
         def audio(self, v, peak):
             pass
+
+        def audio_peak(self):
+            pass
     e, s = Eng(), Synth(bpm=120)
     fired = []
     for k in range(200):                                       # 5 s at 25 ms: its own beat, 120 bpm

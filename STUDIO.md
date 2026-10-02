@@ -3137,6 +3137,34 @@ textured quads), so each part goes where it can.
       wrong chip refused); the smoke flashes a .bin to the fake device through
       the frame, fills the release list and leaves out a built-in.
 
+### The Library in three banks (October 2026)
+
+- [x] **Banks**: Graphs, Usermod effects (cube_fx by the names in its
+      metadata, the project's code effects, the Studio Script) and Stock -
+      every effect of the sim in exactly one (`library_ui.banks`). A graph
+      not built is drawn by the script VM when its nodes allow
+      (`_script_of`); three cannot be and say "not built yet".
+- [x] **A clean cube**: `simClearPixels` (sim_main.cpp) zeroes every
+      segment's buffer and resets its state - the buffer was calloc'd once
+      and never cleared, so a thumbnail showed the effect before it -
+      and `Engine.clear()` puts the clock at 0. Thumbnails and generated
+      previews select, clear, then render with the synth pushed every
+      frame; a picture dark at every third frame is retried at every frame
+      (Strobe's flashes fell between the samples).
+- [x] **The major peak**: `simAudioPeak` fills u_data[4] and [5] from the
+      loudest of the sixteen bands (`Engine.audio_peak`, the synth and live
+      sources) - 0 before, so Freqmap, Freqmatrix, Freqwave, Freqpixels,
+      Rocktaves and the rest were dark. Left dark on purpose: Sunrise,
+      Image, Blurz.
+- [x] **Progress**: thumbnails on a worker with its own engine, the bank in
+      front first, a bar with the count; Generate previews covers the bank
+      in front with a bar, the effect it is on and Cancel. The metadata
+      regex in `flash.builtin_catalog` and the Library skips a comment
+      before the name (Spectral Bloom and Sauron were misnamed). Tested:
+      `test_library.py` (clean against fresh, the peak, the banks, a
+      thumbnail after Fire 2012); the smoke opens Stock and Graphs and
+      generates one preview through the bar.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every

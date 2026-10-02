@@ -140,6 +140,7 @@ class Synth:
         # prevPeak inside fx_lowBeat and suppresses every later beat.
         peak = 1 if fire else 0
         eng.audio(min(255.0, self.vol + kick * 0.4), peak)
+        eng.audio_peak()                                # the major peak from the bands, as audioreactive finds one
         # what pcm() draws from: these bins, phases turning as the firmware's do
         self._last_fft = np.array([int(arr[i]) for i in range(16)], np.float32)
         self._ph += np.array([(9 + 6 * b) * (2 * np.pi / 65536.0) * 33.0 for b in range(16)], np.float32)

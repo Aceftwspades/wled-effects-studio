@@ -34,21 +34,28 @@ def _median_cut(px, n=256):
     hue at full saturation puts almost nothing near the grey axis, so a uniform
     RGB cube would spend most of its entries on colours that never appear.
     """
-    boxes = [px]
+    def span(b):                           # (longest side, its axis); -1 for a box that cannot split
+        if len(b) <= 1:
+            return -1, 0
+        ext = b.max(0) - b.min(0)
+        ax = int(ext.argmax())
+        return int(ext[ax]), ax
+
+    # each box's side measured once, when it is made: measuring every box at
+    # every split was 2.4 s of a 15-frame 320 px clip, most of its writing
+    boxes, spans = [px], [span(px)]
     while len(boxes) < n:
         # widest box first, by its longest side
-        i = max(range(len(boxes)),
-                key=lambda k: (boxes[k].max(0) - boxes[k].min(0)).max()
-                if len(boxes[k]) > 1 else -1)
-        b = boxes[i]
-        if len(b) <= 1:
+        i = max(range(len(boxes)), key=lambda k: spans[k][0])
+        if spans[i][0] < 0:
             break
-        ax = int((b.max(0) - b.min(0)).argmax())
+        b, ax = boxes[i], spans[i][1]
         b = b[b[:, ax].argsort()]
         mid = len(b) // 2
         if mid == 0:
             break
         boxes[i:i + 1] = [b[:mid], b[mid:]]
+        spans[i:i + 1] = [span(b[:mid]), span(b[mid:])]
     pal = np.array([b.mean(0) for b in boxes], np.float32)
     if len(pal) < n:                       # pad, so the table is always 256
         pal = np.vstack([pal, np.zeros((n - len(pal), 3), np.float32)])

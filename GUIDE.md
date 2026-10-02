@@ -715,16 +715,28 @@ palettes (`/palette{n}.json`, the same ids there - by position, so the
 first here replaces whatever the device had as palette 0). "From the
 sim's palette" starts from whatever the sim shows.
 
-**The library** (Window > Library) shows every graph of the project as a
-looping thumbnail with its tags (what nodes it uses, audio, 3-D, script);
-type to search; click a tile to run its effect in the sim (built first if
-it never was) - the layout stays as it is, and its graph is waiting in
-the graph pane (G).
-**Generate previews** renders a turn of the 3-D view for every effect (or
-only the tiles shown) on the project's shape, each with the graph's own
-settings - a GIF and a PNG per effect in `export/library/` with a
-README index, for a catalogue or a forum post - and the tiles then show
-those turns.
+**The library** (Window > Library) shows every effect in the sim as a
+looping thumbnail, in three banks: **Graphs** (the project's graphs, with
+their tags - what nodes they use, audio, 3-D, script), **Usermod effects**
+(cube_fx, the project's code effects, the Studio Script) and **Stock**
+(WLED's own). The bank in front is drawn first; a bar under the banks
+shows how far the thumbnails have got. Type to search; click a tile to
+run its effect in the sim (a graph is built first if it never was) - the
+layout stays as it is, and a graph is waiting in the graph pane (G). A
+graph not built yet shows as its script runs it, when the script can.
+Every thumbnail and preview starts from a clean cube - the pixels and the
+effect's memory cleared, the clock at 0 - hearing the synth, so nothing
+of the effect before shows through.
+**Generate previews** renders a turn of the 3-D view for every effect of
+the bank in front (or only the tiles shown) on the project's shape, each
+with the graph's own settings - a GIF and a PNG per effect in
+`export/library/` with a README index, for a catalogue or a forum post -
+and the tiles then show those turns. A bar shows which effect it is on
+and how many are left; **Cancel** stops it after the one it is making.
+
+The audio's major peak (the loudest band's frequency and level, which
+the Freq effects, Rocktaves and Blurz place their pixels by) comes from
+the sixteen bands - the synth's and live audio alike.
 
 **Curves by hand**: select a Float curve node and the Properties pane
 shows its curve large - click to add a point, drag one, right-click to
@@ -1292,7 +1304,7 @@ Every button, with what its tooltip says.
 
 **Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ Add from the sim` — a new step: what the sim shows now - effect, sliders, palette, colours, segments; `Update from the sim` — the selected step becomes what the sim shows now; `Load into the sim` — the sim shows the selected step; `Add what the sim shows`; `x` — this slider's ramp off (the others stay); `Play in the sim`; `Stop`; `Render GIF` — plays the sequence once and records it as a GIF, into captures/; `Render video` — plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path; `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap durations to bars` — every step's seconds rounded to whole bars, so the sequence changes on the music; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Send and run it`; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 
-**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Open the folder`; `no preview`
+**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `not built yet`; `making...`
 
 **Palettes frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ New`; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy`; `Remove`; `Use in the sim`; `New palette`; `spread evenly`; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all`; `Remove this one there`
 

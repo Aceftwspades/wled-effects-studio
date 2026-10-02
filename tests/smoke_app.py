@@ -826,8 +826,17 @@ STEPS = [
       {"py": "messages.clear(app, 'graph:sad_smoke.json')"}], 0.5),
     # a problem report bundled, the project zipped (both land in captures/; the test removes them)
     ([{"report": True}, {"py": "app.export_project_zip()"}, {"expect": ["edit_status", "project zipped"]}], 3.0),
-    # the library: thumbnails made for the graphs, the frame docked and floated
-    ([{"frame": "library"}, {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
+    # the library: three banks (the project's graphs, the usermod effects, WLED's stock ones), thumbnails made on a
+    # worker for every effect - each from a clean cube, hearing the synth - with a bar while they are; a preview
+    # generated with its own bar; the frame docked and floated
+    ([{"frame": "library"}, {"py": "library_ui._set_bank(app, 'stock')"}], 14.0),
+    ([{"check": "dpg.get_item_label('lib_bank_stock').startswith('Stock (') and dpg.get_item_label('lib_bank_usermod').startswith('Usermod effects (')"},
+      {"check": "len([k for k, v in app._lib_thumbs.items() if v]) > 150"},
+      {"py": "library_ui._set_bank(app, 'graphs')"}, {"py": "library_ui.generate_previews(app, 1.0, only=['Rainbow'])"}], 0.3),
+    ([{"check": "app._lib_gprog is not None and dpg.is_item_shown('lib_progress_row') and dpg.is_item_shown('lib_cancel')"}], 6.0),
+    ([{"check": "app._lib_gprog is None"}, {"check": "not dpg.is_item_shown('lib_cancel')"},
+      {"check": "'1 preview' in dpg.get_value('lib_status')"},
+      {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": f"projects/{SMOKE}/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),

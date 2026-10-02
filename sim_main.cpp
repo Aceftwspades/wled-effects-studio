@@ -324,6 +324,17 @@ SIM_API void simInit(int w, int h) {
   memset(gPixels, 0, sizeof(uint32_t) * (size_t)w * h);
 }
 
+// Every pixel off - the segments' own buffers (an effect that fades or paints only some pixels reads them
+// back) and the strip's - and every segment's effect from nothing: a clean cube, as a preview starts on.
+// Selecting an effect leaves the pixels as they were, as WLED does on the device.
+SIM_API void simClearPixels() {
+  for (int k = 0; k < SIM_MAX_SEGS; k++) {
+    if (gSegs[k].buf && gSegs[k].bufLen) memset(gSegs[k].buf, 0, sizeof(uint32_t) * gSegs[k].bufLen);
+    simSegReset(gSegs[k]);
+  }
+  memset(gPixels, 0, sizeof(uint32_t) * (size_t)gStripW * gStripH);
+}
+
 // --- the segment API ----------------------------------------------------------
 SIM_API int simSegCount() { return gSegCount; }
 
@@ -559,6 +570,10 @@ SIM_API double simProfClock() {
   return (double)std::chrono::steady_clock::now().time_since_epoch().count();
 #endif
 }
+
+// u_data[4] and [5]: audioreactive's FFT_MajorPeak (Hz) and my_magnitude - the Freq effects, Rocktaves and
+// Blurz place and light their pixels by them; they were 0 here, and those effects dark
+SIM_API void simAudioPeak(float freq, float magnitude) { gMajorPeak = freq; gMagnitude = magnitude; }
 
 SIM_API void simAudioSet(float vol, int peak) {
   gVolume = vol; gPeak = (uint8_t)peak;
