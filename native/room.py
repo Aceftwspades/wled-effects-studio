@@ -47,14 +47,15 @@ TIP_DELAY = 0.35        # s the pointer rests before the help comes up
 CORNERS = ("br", "bl", "tr", "tl")
 
 ICON = {"effect": "fx", "segments": "segments", "geometry": "cube", "colours": "swatches",
-        "parameters": "sliders", "audio": "audio", "live": "mic"}
+        "parameters": "sliders", "audio": "audio", "live": "mic", "video": "video"}
 TIP = {"effect": "EFFECT: the project, the effect and its palette",
        "segments": "SEGMENTS: the strip's segments, their bounds and blends",
        "geometry": "GEOMETRY: the shape the LEDs are on",
        "colours": "COLOURS: the segment's three colours",
        "parameters": "PARAMETERS: the effect's sliders and checkboxes",
        "audio": "AUDIO: the synthetic audio's levels",
-       "live": "LIVE: audio from a line in, a microphone or an audio file"}
+       "live": "LIVE: audio from a line in, a microphone or an audio file",
+       "video": "VIDEO: a webcam, a video file or the test pattern, for the Video node"}
 
 
 class _State:

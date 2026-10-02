@@ -1347,7 +1347,16 @@ extern "C" void simParamBind(float *t, int n);  // the studio writes typed value
 #define GC_PROBE(i, v) simProbeSet((i), (v))
 #define GC_PARAM_TABLE static
 #define GC_PARAMS(t, n) simParamBind((t), (n))
+extern "C" uint32_t simVideoAt(float u, float v);   // the studio's video frame (the Video node: sim only)
+extern "C" int simVideoW();
+extern "C" int simVideoH();
+#define GC_VIDEO(u, v) simVideoAt((u), (v))
+#define GC_VIDEO_W() simVideoW()
+#define GC_VIDEO_H() simVideoH()
 #else
+#define GC_VIDEO(u, v) (0u)                             // video plays in the studio; the device gets it by stream
+#define GC_VIDEO_W() 0
+#define GC_VIDEO_H() 0
 #define GC_PROBE(i, v) ((void)0)
 #define GC_PARAM_TABLE static const                     // the typed values, baked in: flash, not RAM
 #define GC_PARAMS(t, n) ((void)0)

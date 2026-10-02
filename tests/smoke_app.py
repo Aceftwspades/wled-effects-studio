@@ -863,6 +863,13 @@ STEPS = [
     ([{"check": "app.project.path.endswith('smoke_run') and app.gp.file == 'wave_tutorial.json' and getattr(app, '_tutorial', None) is None"},
       {"check": "not dpg.is_item_shown('reader_tut_row') and not reader_ui.S.side and app.prefs.get('graph_panel_open') == app._tut_panel_was"},
       {"py": "chrome.close_dialog(reader_ui.TAG)"}], 0.5),
+    # S22 live video: the test pattern into the engine's video slot from the VIDEO section, paused, stopped
+    ([{"check": "dpg.does_item_exist('video_kind') and dpg.does_item_exist('video_play')"},
+      {"py": "video_ui.start(app, 'test')"}], 0.8),
+    ([{"check": "app.video_src is not None and app._video_n > 2 and dpg.get_item_label('video_play') == 'Pause'"},
+      {"check": "'playing - test pattern' in dpg.get_value('video_msg')"}, {"py": "video_ui.toggle(app)"}], 0.3),
+    ([{"check": "app.video_src.paused and dpg.get_item_label('video_play') == 'Play'"}, {"py": "video_ui.stop(app)"}], 0.3),
+    ([{"check": "app.video_src is None and dpg.get_value('video_msg').startswith('stopped')"}], 0.1),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": f"projects/{SMOKE}/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),

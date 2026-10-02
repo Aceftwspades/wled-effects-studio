@@ -49,6 +49,7 @@ from native.graph_ui import GraphPanel, build_panel
 from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight, view3d, shape_tools
 from native.gpucube import CubeQuads
 from native import look
+from native import video_ui
 from native.textures import registry as tex_registry
 from native.features import Features
 from native.popout import Popouts
@@ -584,6 +585,7 @@ class App(Features):
     # --- audio ---------------------------------------------------------------
     def audio_push(self):
         src = self.live if self.live else self.syn
+        video_ui.push(self)                              # the newest video frame into the engine (the Video node)
         try:
             hit = src.push(self.eng)
             if src is not self.syn:
@@ -2285,7 +2287,7 @@ class App(Features):
             self.request_layout()
 
     # --- the side panel's sections: folded, and in any order -----------------------
-    SECTIONS = ("effect", "segments", "geometry", "colours", "parameters", "audio", "live")
+    SECTIONS = ("effect", "segments", "geometry", "colours", "parameters", "audio", "live", "video")
 
     def sec_save(self):
         self.prefs["sections"] = {"order": list(self.sec_order), "closed": sorted(self.sec_closed)}
@@ -3963,6 +3965,8 @@ def build(app):
                     with form.row("level"):
                         dpg.add_progress_bar(tag="lvl_bar", default_value=0.0, width=-1)
                     dpg.add_text("", tag="live_msg", wrap=0)
+                with Section(app, "video", "VIDEO"):
+                    video_ui.build(app)                  # a webcam, a video file or the test pattern, for the Video node
                 app.sec_apply_order()
         with dpg.group(tag="footer"):
           with dpg.group(horizontal=True, tag="stat_row"):
@@ -4063,7 +4067,7 @@ def _hook_names(app):
     from native import camera_map, camera_map_ui
     from native import flash
     from native import library_ui, tutorials
-    return {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
+    return {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "video_ui": video_ui, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
             "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,

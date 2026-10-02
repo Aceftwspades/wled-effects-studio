@@ -139,6 +139,46 @@ extern "C" SIM_API void simPcmSet(const int8_t *samples, int n) {
   gPcm.which = w;
 }
 
+// The video slot (the Video node): the studio decodes a webcam or a file and writes each frame here, RGB,
+// at most 256 x 256; a graph's Video node samples it at any u, v. Video plays only in the studio - the
+// device gets it by streaming the sim's picture - so a device build of the node reads black (graph.py).
+// Two buffers, as the PCM's: the frame being written is never the one being read.
+static const int SIM_VID_MAX = 256;
+static uint8_t gVid[2][SIM_VID_MAX * SIM_VID_MAX * 3];
+static int gVidW[2] = {0, 0}, gVidH[2] = {0, 0};
+static volatile uint8_t gVidWhich = 0;
+
+extern "C" SIM_API void simVideoSet(const uint8_t *rgb, int w, int h) {
+  const uint8_t k = gVidWhich ^ 1;
+  if (!rgb || w <= 0 || h <= 0) { gVidW[k] = gVidH[k] = 0; gVidWhich = k; return; }   // no picture: black
+  w = w > SIM_VID_MAX ? SIM_VID_MAX : w; h = h > SIM_VID_MAX ? SIM_VID_MAX : h;
+  memcpy(gVid[k], rgb, (size_t)w * h * 3);
+  gVidW[k] = w; gVidH[k] = h;
+  gVidWhich = k;
+}
+
+extern "C" SIM_API int simVideoW() { return gVidW[gVidWhich]; }
+extern "C" SIM_API int simVideoH() { return gVidH[gVidWhich]; }
+
+// the frame's colour at u, v (0..1 across and down, clamped), blended between the four nearest pixels
+extern "C" SIM_API uint32_t simVideoAt(float u, float v) {
+  const uint8_t k = gVidWhich;
+  const int w = gVidW[k], h = gVidH[k];
+  if (w <= 0 || h <= 0) return 0;
+  u = u < 0.0f ? 0.0f : (u > 1.0f ? 1.0f : u); v = v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+  const float fx = u * (w - 1), fy = v * (h - 1);
+  const int x0 = (int)fx, y0 = (int)fy, x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+  const float ax = fx - x0, ay = fy - y0;
+  const uint8_t *b = gVid[k];
+  uint32_t out = 0;
+  for (int c = 0; c < 3; c++) {
+    const float top = b[(y0 * w + x0) * 3 + c] * (1.0f - ax) + b[(y0 * w + x1) * 3 + c] * ax;
+    const float bot = b[(y1 * w + x0) * 3 + c] * (1.0f - ax) + b[(y1 * w + x1) * 3 + c] * ax;
+    out |= (uint32_t)(top * (1.0f - ay) + bot * ay + 0.5f) << (16 - 8 * c);
+  }
+  return out;
+}
+
 // --- palettes ----------------------------------------------------------------
 // wled00/palettes.cpp is compiled in, so the tables below are the firmware's
 // own. What is transcribed here is Segment::loadPalette() from FX_fcn.cpp,

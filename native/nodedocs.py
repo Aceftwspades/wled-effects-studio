@@ -468,6 +468,21 @@ DOCS = {
                "c_lo": "the c window's left edge", "c_hi": "its right edge", "x_lo": "the x window's bottom", "x_hi": "its top"},
         "out": {"density": "how often the sequence visits here, 0..1"},
         "params": {"trail": "how long visits glow, 0 .. 0.99", "orbits": "how many steps to run each frame"}},
+    "Video": {
+        "doc": "Live video - a webcam, a video file or the test pattern, chosen in the side panel's VIDEO section - "
+               "at this pixel. The projection puts it on any shape: the picture as it is, through the shape from the "
+               "front or the top, round it, on every cube face, or all round a sphere. The style is a quick look: the "
+               "palette, a few flat colours, shades of Colour 1, outlines, or big blocks. Video plays in the studio; "
+               "the LEDs get it by streaming (Device > Stream) - on the device by itself the node is black.",
+        "in": {"u": "where on the frame, across, 0..1 (the picture projection)",
+               "v": "where on the frame, down, 0..1 (the picture projection)",
+               "levels": "posterize: how many steps each colour has",
+               "blocks": "pixelate: how many blocks across and down",
+               "gain": "edges: how bright the outlines are"},
+        "out": {"color": "the video's colour here, in the style chosen",
+                "luma": "the video's brightness here, 0..1 - for a mask, a palette index, anything"},
+        "params": {"projection": "how the frame lies on the shape: picture, front, top, around, faces or sphere",
+                   "style": "none, palette, posterize, mono (Colour 1), edges or pixelate"}},
     "Image": {
         "doc": "A picture file, baked into the effect. Pick the file, choose how many pixels across and down and how "
                "many colours, and read it with any coordinate - Cube face's a, b puts it on every face. The device "

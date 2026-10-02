@@ -110,6 +110,11 @@ def record(eng, lesson, g, title):
     eng.select(eng.names.index(title), params=lesson.get("fx") or None)
     eng.colors(*(lesson.get("colours") or (0xFFA000, 0, 0)))     # the app's starting pickers, or the lesson's own
     eng.clear()
+    vid = None
+    if lesson.get("video"):                                       # a Video lesson: the test pattern, frame by frame
+        from native import video
+        vid = video.TestPattern()
+    eng.video(None)
     syn = Synth()
     syn.gate_bass = syn.gate_mid = syn.gate_treb = True
     probes = {v: k for k, v in (g.probes or {}).items()}
@@ -124,6 +129,8 @@ def record(eng, lesson, g, title):
     pics = []
     for i in range(total):
         tgt = eng.sim_ms + step_ms
+        if vid is not None:
+            eng.video(vid.frame_at(eng.sim_ms / 1000.0))
         while eng.sim_ms < tgt:
             syn.push(eng); eng.frame()
         for s, k in zip(series, keys):

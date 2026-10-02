@@ -3250,6 +3250,38 @@ a **Try it** that opens the graph live.
       texture is now made only when it comes into view, a one-pixel stand-in
       of its size until then - 0.25 s.
 
+### Live video on any shape (October 2026)
+
+- [x] **A webcam, a video file or a test pattern as the picture**, on any
+      shape, with a style or a pattern layer over it. The device cannot play
+      video, so it plays in the studio and reaches the LEDs by the stream
+      (DDP, E1.31, Art-Net) - a flashed effect's Video node is black.
+      - `native/video.py`: files and webcams through ffmpeg (dshow,
+        avfoundation, v4l2 - no OpenCV), scaled and cropped to 96 x 54 (the
+        size setting) on a thread that keeps the newest frame; a file at its
+        own speed, looping if asked; `TestPattern` needs no ffmpeg (tests,
+        tutorials, trying it out).
+      - The engine's video slot: `simVideoSet` / `simVideoAt` (sim_main.cpp,
+        two buffers, bilinear), `Engine.video`. Generated code reaches it by
+        `GC_VIDEO` under `CFX_SIM` and reads 0 outside it.
+      - The **Video** node: projection picture (u, v - wired, or the pixel's),
+        front, top, around, faces, sphere; style none, palette, posterize
+        (levels), mono (Colour 1), edges (gain - looked at half an LED either
+        side, or an edge falls between the LEDs), pixelate (blocks); outputs
+        colour and luma.
+      - The side panel's **VIDEO** section (`native/video_ui.py`): source,
+        file and Choose..., camera and Find, loop, size, Play / Pause, Stop, a
+        preview; the choices kept in the project, nothing started when a
+        project opens. The newest frame goes into the engine before each
+        engine frame (from audio_push).
+      - Its tutorial runs on the test pattern (a lesson's `video`: the
+        generator feeds it, Try it starts it), with a stripe layer screened
+        over the video. Tested: `test_video.py` (a side build reads a frame
+        back through the picture projection and the faces, each style, the
+        test pattern, a file through ffmpeg when there is one, a device
+        build's black); the smoke plays, pauses and stops the test pattern
+        from the panel.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every

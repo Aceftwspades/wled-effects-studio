@@ -307,6 +307,9 @@ def try_it(app, node, change=None):
         if app.project.geometry.to_json() != geom.to_json():
             app.apply_geometry(geom)
         copy_assets(lesson, app.project.path)
+        if lesson.get("video") and getattr(app, "video_src", None) is None:
+            from native import video_ui
+            video_ui.start(app, lesson["video"])  # a Video lesson needs a picture: the test pattern, unless one plays
         if lesson.get("colours"):                 # the three pickers a lesson about them is shown with
             for i, c in enumerate(lesson["colours"][:3]):
                 app.on_color(i, ((c >> 16) & 255, (c >> 8) & 255, c & 255))

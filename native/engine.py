@@ -524,6 +524,20 @@ class Engine:
         f.restype = C.c_double
         return float(f())
 
+    def video(self, frame):
+        """The video slot the Video node reads: an (h, w, 3) uint8 frame (at most 256 x 256 - larger is
+        cut), or None for black. Ignored by an engine built without it."""
+        try:
+            f = self.lib.simVideoSet
+        except AttributeError:
+            return False
+        if frame is None:
+            f(None, 0, 0)
+            return True
+        a = np.ascontiguousarray(np.asarray(frame, np.uint8)[:256, :256, :3])
+        f(a.ctypes.data_as(C.POINTER(C.c_uint8)), int(a.shape[1]), int(a.shape[0]))
+        return True
+
     def chroma(self, pc, level=0.0):
         """The pitch-class slot (u_data[9]) for effects that follow the
         notes: twelve 0..1, C first, the strongest 1 (all 0 in silence),

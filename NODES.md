@@ -2953,6 +2953,50 @@ Besides on and off, it says how far along the tube the spot is (for stripes and 
 
 Candy Knot (`candy_knot.json`)
 
+### Video
+
+Live video - a webcam, a video file or the test pattern, chosen in the side panel's VIDEO section - at this pixel. The projection puts it on any shape: the picture as it is, through the shape from the front or the top, round it, on every cube face, or all round a sphere. The style is a quick look: the palette, a few flat colours, shades of Colour 1, outlines, or big blocks. Video plays in the studio; the LEDs get it by streaming (Device > Stream) - on the device by itself the node is black.
+
+**Inputs**
+- **u** *(float)*: where on the frame, across, 0..1 (the picture projection) - unwired, the pixel's u
+- **v** *(float)*: where on the frame, down, 0..1 (the picture projection) - unwired, the pixel's v
+- **levels** *(float)*: posterize: how many steps each colour has
+- **blocks** *(float)*: pixelate: how many blocks across and down
+- **gain** *(float)*: edges: how bright the outlines are
+
+**Outputs**
+- **color** *(color)*: the video's colour here, in the style chosen
+- **luma** *(float)*: the video's brightness here, 0..1 - for a mask, a palette index, anything
+
+**Settings**
+- **projection** *(choice)*: how the frame lies on the shape: picture, front, top, around, faces or sphere
+- **style** *(choice)*: none, palette, posterize, mono (Colour 1), edges or pixelate
+
+**Why use it**
+
+Some of the best light shows are not drawn at all: a webcam pointed at a dancer, a music video, a fire filmed close up. Video brings a live picture into a graph - a webcam, a video file, or the built-in test pattern, chosen in the side panel's VIDEO section - and gives its colour at every pixel.
+
+The projection puts it on any shape: the picture as it is on a matrix or a cube's net, through a 3-D shape from the front or the top, wrapped round a cylinder or a tree, upright on every cube face, or all round a sphere. The style is a quick look, and everything else in the graph - Adjust, Levels, Blend, Layers, any pattern - works on it as on any colour. Video plays in the studio; the LEDs get it by streaming (Device > Stream). On the device by itself the node is black, as the device cannot play video. Its neighbours: Image is one still picture baked into the effect; Video is moving, live, studio-only.
+
+**Tutorial**
+
+![Video: the test pattern as live video on the matrix, with a layer of scrolling stripes screened over it](docs/nodes/video.gif)
+
+1. The side panel's VIDEO section chooses the source; Try it starts the test pattern (colour bars, a white disc going round) if nothing is playing.
+2. **projection** is picture, so **u** and **v** - unwired, the pixel's own place - say where on the frame each LED looks: the frame is laid over the whole matrix.
+3. **style** is none: the frame's own colours. **levels**, **blocks** and **gain** belong to the posterize, pixelate and edges styles and show only with them.
+4. `color` is the **under** of a **Blend**; over it, a pattern layer - **Stripes** (count 6, duty 0.15) scrolling with a clock, coloured by the **Palette** - in screen mode at 0.6, so the stripes lighten the video without covering it.
+5. `luma` (the frame's brightness here) is unused - wire it into a palette index or a mask to drive anything by the picture.
+
+[Try it in the studio](studio:try/video): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
+
+**Try this**
+
+- [Palette style](studio:try/video/1): style palette: the frame's brightness read through the WLED palette - the video recoloured to match the effect.
+- [Outlines](studio:try/video/2): style edges: only where the picture changes - the disc and the bars' edges as lines of light. gain sets how bright.
+- [Big blocks](studio:try/video/3): style pixelate with blocks 8: the frame read in an 8 x 8 grid - easy to read on a small or sparse shape.
+- [No pattern](studio:try/video/4): the Blend's amount at 0: the stripe layer gone - the video alone.
+
 ### Voronoi
 
 Cells. Random points are scattered through space and every pixel belongs to the nearest one - the pattern of a giraffe, dried mud, stained glass. Feed Position (seamless on the cube) and use distance for soft cells, edge for the cracks between them, id to colour each cell.

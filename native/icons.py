@@ -358,6 +358,12 @@ def _mic(ic):
     ic.arc((0.5, 0.5), 0.24, 0, 180, w=0.07)
     ic.seg((0.5, 0.74), (0.5, 0.9), w=0.07); ic.seg((0.34, 0.9), (0.66, 0.9), w=0.07)
 
+def _video(ic):
+    # a film camera: live video in (a webcam or a file)
+    ic.box(0.06, 0.3, 0.66, 0.74, w=0.08)
+    ic.seg((0.66, 0.46), (0.94, 0.3), w=0.08); ic.seg((0.94, 0.3), (0.94, 0.74), w=0.08); ic.seg((0.94, 0.74), (0.66, 0.58), w=0.08)
+    ic.circle((0.22, 0.2), 0.1); ic.circle((0.48, 0.2), 0.1)
+
 def _rail_open(ic):
     # a pane with a chevron out of it: open the panel
     ic.box(0.1, 0.1, 0.9, 0.9, w=0.08); ic.rect(0.6, 0.1, 0.9, 0.9)
@@ -463,7 +469,7 @@ def _add_part(ic):
 
 
 ICONS = {
-    "fx": _fx, "segments": _segments, "swatches": _swatches, "sliders": _sliders, "audio": _audio, "mic": _mic,
+    "fx": _fx, "segments": _segments, "swatches": _swatches, "sliders": _sliders, "audio": _audio, "mic": _mic, "video": _video,
     "rail_open": _rail_open, "rail_fold": _rail_fold, "tuck": _tuck, "resize": _resize, "pip": _pip, "maximize": _maximize, "restore": _restore,
     "size_tl": _size_grip("tl"), "size_tr": _size_grip("tr"), "size_bl": _size_grip("bl"), "size_br": _size_grip("br"),
     "new": _new, "open": _open, "save": _save, "build": _build, "live": _live,
