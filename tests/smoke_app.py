@@ -838,6 +838,31 @@ STEPS = [
     ([{"check": "app._lib_gprog is None"}, {"check": "not dpg.is_item_shown('lib_cancel')"},
       {"check": "'1 preview' in dpg.get_value('lib_status')"},
       {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
+    # S21 the node tutorials: Slew's page with its picture playing; Try it opens its graph live in the tutorials
+    # project, the page beside it, the panel folded; a "Try this" change to an input, then to another lesson's
+    # setting; Reset; Copy into my project - back in this run's project with the graph, the layout as it was
+    ([{"py": "chrome.close_all_frames(app)"}, {"py": "setattr(app, '_tut_panel_was', app.prefs.get('graph_panel_open'))"},
+      {"py": "reader_ui.open_doc(app, 'NODES.md', 'Slew')"}], 1.5),
+    ([{"check": "reader_ui.S.doc == 'NODES.md' and len(reader_ui.S.anims) >= 5 and not reader_ui.S.side"},
+      {"py": "reader_ui.follow(app, 'studio:try/Slew')"}], 8.0),
+    ([{"check": "app.project.path.endswith('node_tutorials') and app.gp.file == 'tutorial_slew.json'"},
+      {"check": "app.eng.names[app.eng.idx] == 'Tutorial Slew' and app.gp.ext_sel == [2]"},
+      {"check": "dpg.is_item_shown('reader_tut_row') and dpg.get_value('reader_tut_what') == 'Tutorial: Slew'"},
+      {"check": "reader_ui.S.side and dpg.get_item_pos('reader_win')[0] > dpg.get_viewport_client_width() // 2 and room.folded(app)"},
+      {"py": "setattr(reader_ui.S, 'pending', {'k': next(i for i in range(reader_ui.reader.heading_index(reader_ui.S.blocks, 'Slew'), "
+             "len(reader_ui.S.blocks)) if reader_ui.S.blocks[i]['kind'] == 'img'), 'tries': 0})"}], 2.0),
+    ([{"check": "any(a['frames'] and a['i'] > 0 for a in reader_ui.S.anims.values())"},
+      {"py": "reader_ui.follow(app, 'studio:try/Slew/1')"}], 1.0),
+    ([{"check": "app.gp.graph.nodes[2]['inputs']['up'] == 40.0 and dpg.is_item_shown('props_fly')"},
+      {"py": "reader_ui.follow(app, 'studio:try/Wave/1')"}], 8.0),
+    ([{"check": "app.gp.file == 'tutorial_wave.json' and app.gp.graph.nodes[4]['params']['shape'] == 'square'"},
+      {"check": "app._tutorial['back'][0].endswith('smoke_run') and app._tutorial['node'] == 'Wave'"},
+      {"py": "tutorials.reset(app)"}], 6.0),
+    ([{"check": "app.gp.graph.nodes[4]['params']['shape'] == 'sine'"},
+      {"py": "reader_ui._tut('copy', app)"}], 6.0),
+    ([{"check": "app.project.path.endswith('smoke_run') and app.gp.file == 'wave_tutorial.json' and getattr(app, '_tutorial', None) is None"},
+      {"check": "not dpg.is_item_shown('reader_tut_row') and not reader_ui.S.side and app.prefs.get('graph_panel_open') == app._tut_panel_was"},
+      {"py": "chrome.close_dialog(reader_ui.TAG)"}], 0.5),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": f"projects/{SMOKE}/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),
@@ -928,6 +953,8 @@ def main():
     for d in (smoke_dir, os.path.join(ROOT, "projects", "smoke_bad")):
         if os.path.isdir(d):
             shutil.rmtree(d)                                  # a run that was stopped: started afresh
+    tut_dir = os.path.join(ROOT, "projects", "node_tutorials")
+    tut_had = os.path.isdir(tut_dir)                          # the tutorials' project: removed after only if this run made it
     caps_before = set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()
     STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs, and the last project: put back after
     saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
@@ -959,6 +986,8 @@ def main():
             open(STUDIO_FILE, "w", encoding="utf-8").write(saved_prefs)
         shutil.rmtree(smoke_dir, ignore_errors=True)          # the run's project, and all it made in it
         shutil.rmtree(os.path.join(ROOT, "projects", "smoke_bad"), ignore_errors=True)    # the one with the broken project.json
+        if not tut_had:
+            shutil.rmtree(tut_dir, ignore_errors=True)
     text = open(LOG, encoding="utf-8", errors="replace").read()
     ddp.stop()
     print(f"e1.31: {ddp.e131_packets} packets, universes {sorted(ddp.e131_univ)[:3]}...; "

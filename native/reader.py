@@ -306,8 +306,14 @@ def find_all(blocks, needle):
 
 
 def heading_index(blocks, target):
-    """The block of a heading, by its text (any case) or its anchor."""
-    t = (target or "").strip().lstrip("#").lower()
+    """The block of a heading, by its text (as written first, then any case) or
+    its anchor. As written first: NODES.md has a "coords" category and a
+    "Coords" node, and F1 on the node went to the category."""
+    exact = (target or "").strip().lstrip("#")
+    for k, b in enumerate(blocks):
+        if b["kind"] == "h" and b["text"] == exact:
+            return k
+    t = exact.lower()
     for k, b in enumerate(blocks):
         if b["kind"] == "h" and (b["text"].lower() == t or b["anchor"] == t):
             return k

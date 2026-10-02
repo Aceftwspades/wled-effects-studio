@@ -604,6 +604,13 @@ def _poll_props(app):
     S.props_content = content
     h = int(max(px(120), min(room, content + top + px(30))))
     w = int(min(PROPS_W, ew - 2 * MARGIN))
+    from native import reader_ui
+    if reader_ui.S.side and dpg.is_item_shown(reader_ui.TAG):
+        # a tutorial's page down the right covers that corner: the bottom right of what it leaves in view,
+        # beside the 3-D view (bottom left) and under the lesson's graph (framed above them)
+        h = int(max(px(120), min(eh - 2 * MARGIN, content + top + px(30))))
+        x = min(ex + ew, dpg.get_item_pos(reader_ui.TAG)[0]) - w - MARGIN
+        y = ey + eh - h - MARGIN
     if not dpg.is_item_shown("props_fly"):
         dpg.configure_item("props_win", show=True)
         dpg.show_item("props_fly")

@@ -4062,8 +4062,8 @@ def _hook_names(app):
     from native import shape_view, shapes, units, shape_gallery, shape_run, shape_fields, shape_checks, shape_start
     from native import camera_map, camera_map_ui
     from native import flash
-    from native import library_ui
-    return {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
+    from native import library_ui, tutorials
+    return {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
             "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,

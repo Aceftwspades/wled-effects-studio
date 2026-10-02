@@ -1415,10 +1415,11 @@ class GraphPanel(Glyphs):
         self.offset[0] -= dx / self.zoom
         self.rebuild()
 
-    def _frame_view(self, nids, most=1.0):
+    def _frame_view(self, nids, most=1.0, room=None):
         """The view fitted to these nodes: the zoom the largest step their box
         fits at (no more than `most`), and the offset that puts the box's
-        top-left 20 px in from the editor's corner. A node's place on screen
+        top-left 20 px in from the editor's corner. `room`: (w, h) of the
+        canvas to fit in, when less of it is seen (a tutorial's page over it). A node's place on screen
         is (pos + offset) x zoom + the editor's own pan, so the offset is
         worked back from the pan measured now."""
         self._sync_pos()
@@ -1428,7 +1429,7 @@ class GraphPanel(Glyphs):
             return
         x0 = min(p[0] for p, _ in boxes); y0 = min(p[1] for p, _ in boxes)
         x1 = max(p[0] + sz[0] for p, sz in boxes); y1 = max(p[1] + sz[1] for p, sz in boxes)
-        w, h = dpg.get_item_rect_size("node_editor") if dpg.does_item_exist("node_editor") else (0, 0)
+        w, h = room or (dpg.get_item_rect_size("node_editor") if dpg.does_item_exist("node_editor") else (0, 0))
         if w <= 0 or h <= 0:
             # not drawn yet (the layout changed to the graph this frame): the pane's size as the layout set it,
             # less its padding and the row above the canvas - a guess of 800 x 600 framed a big graph at 20%
@@ -4039,6 +4040,23 @@ class GraphPanel(Glyphs):
         elif name == "label" and nodeface.is_meta(self.graph.nodes[nid]["type"], name) and dpg.does_item_exist(f"gnode_{nid}"):
             n = self.graph.nodes[nid]
             dpg.configure_item(f"gnode_{nid}", label=self.node_title(n, self.graph.node_def(n)))   # "Speed: Rise"
+
+    def set_param(self, nid, name, val):
+        """A setting changed from outside the node (a tutorial's "Try this"): one undo step, the
+        node's fields and the properties follow, and the graph is rebuilt as after any edit -
+        a setting changes the code, so there is no live poke for it."""
+        n = self.graph.nodes.get(nid) if self.graph else None
+        if n is None:
+            return False
+        self.touch(); self.snapshot(("param", nid, name))
+        n["params"][name] = val
+        self._mirror(None, nid, name, val)
+        self._refresh_summary(nid)
+        if any((i.get("when") or {}).get("param") == name for i in self.graph.node_def(n)["inputs"]):
+            self._sync_pos(); self.rebuild()                # a pin it reads comes or goes
+        if not self.auto:
+            self.app.build_current()                       # seen at once, Live on or off
+        return True
 
     def _make_link(self, a, out, b, inp):
         ta, tb = self._pins.get((a, "out", out)), self._pins.get((b, "in", inp))

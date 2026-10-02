@@ -3168,6 +3168,51 @@ textured quads), so each part goes where it can.
 Released as 1.6.0 (2026-10-02): the 3-D view's look, the firmware sources and
 the Library's banks, with the four builds.
 
+### A tutorial for every node (October 2026)
+
+Every node gets, under its reference in NODES.md: why you would use it
+(and against what), a small graph built round it with a picture of it
+running, changes to try, and the examples that use it - and in the studio
+a **Try it** that opens the graph live.
+
+- [x] **Phase 1 - the format, the machinery, five pilots** (Wave, Noise,
+      Coords, Slew, Palette). A lesson is `docs/nodes/<node>.json`, written
+      by hand: the why, the steps, the changes (node, pin or setting,
+      value), the shape, the values to trace, the graph (laid out by
+      `Graph.arrange` when it has no places). `tests/make_tutorials.py`
+      compiles every lesson into one side build ("Tutorial <node>", the
+      app's build untouched), runs each on the gated synth and writes its
+      GIF - the LEDs, and under them the traced outputs read back from the
+      build's probes - then NODES.md (`nodedocs.markdown` adds each
+      lesson under its node). `tests/test_tutorials.py`: every lesson
+      compiles, names real pins, says what each input and setting does;
+      its picture is newer than it and not dark; NODES.md is current and
+      carries the picture and a link for Try it and for each change; which
+      nodes have none is reported (ALL_REQUIRED turns that into a failure
+      once all have one).
+      In the studio (`native/tutorials.py`): `studio:try/<node>[/<n>]`
+      links in the reader; Try it saves and leaves the person's project,
+      writes the lesson fresh into the *Node tutorials* project, opens it
+      with its node selected, builds it, folds the panel, puts the 3-D view
+      bottom left (a flat shape from the front) and the page in a column
+      at the right (`reader_ui.beside`; its place re-applied for a few
+      frames, as the dialogs' clamp measures the old size), then frames the
+      graph into what the page leaves in view; the properties go to the
+      bottom right of it. A change: an input as a knob sets it
+      (`set_input_live`), a setting through `GraphPane.set_param` (new).
+      Reset, Copy into my project and Back to my project on a bar at the
+      page's top; Back (or leaving the project any way) puts the panel,
+      the 3-D view's corner and the camera back. The reader plays GIFs
+      (frames read while one is on screen). F1 on Coords, Colour or Output
+      went to the category of the same name - a heading is matched as
+      written first. The smoke opens Slew's page, sees its picture play,
+      tries it, changes an input and another lesson's setting, resets and
+      copies.
+- [ ] **Phase 2** - generate (21). **Phase 3** - coords (11), colour (22).
+      **Phase 4** - signals and audio (37). **Phase 5** - maths (35),
+      controls, custom and output (15). **Phase 6** - graph tools (11);
+      then ALL_REQUIRED.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every

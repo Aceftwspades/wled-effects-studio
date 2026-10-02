@@ -71,6 +71,26 @@ over a node - or with one selected - opens that node's own entry in the
 does the same, and every row of that menu shows its key. Keyboard
 shortcuts moved to **Shift+F1**.
 
+**Node tutorials.** A node with a tutorial has more under its reference
+entry: **Why use it** (what it is for, and how it differs from the
+nodes like it), a **Tutorial** - a small graph built round the node,
+step by step, with a picture of it running (it plays in the reader
+too), and for a value that changes over time a line of it under the
+LEDs - then **Try this**, changes to make and what each does, and
+**Used in**, the examples that use it. **Try it in the studio** opens
+that graph live: your project is saved and left, the graph opens in
+a project of its own (*Node tutorials*) with the node selected, the
+page moves to a column at the right, the side panel folds away and the
+3-D view goes to the bottom-left corner, so the graph, the LEDs and
+the node's values are all in sight. Each **Try this** button makes its
+change on the running graph; change anything else you like as well.
+The bar at the top of the page has **Reset the tutorial** (the graph
+as written), **Copy into my project** (the graph as you have it, saved
+as a new graph in your own project, which then opens with it) and
+**Back to my project** (your project, the graph you had open, and the
+panel, the 3-D view's corner and the camera as they were). Nothing a
+tutorial does reaches your project but Copy.
+
 The window: a menu bar and a toolbar of icons; the two views (the
 **logical net** the effect draws, and the **3-D cube**); a side panel with
 the project, the effect, its sliders, the segments, the geometry, colours

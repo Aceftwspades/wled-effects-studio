@@ -1,0 +1,40 @@
+{
+ "node": "Palette",
+ "star": 6,
+ "caption": "Palette: the chosen palette laid across the matrix and scrolled by the Speed slider",
+ "why": [
+  "WLED effects do not pick their own colours: the person chooses a palette on the WLED page, and the effect draws with it. Palette is how a graph does that - give it a number and it answers with the palette's colour at that point - so one effect looks right in Rainbow, in Ocean, in Fire, in whatever they choose.",
+  "Use it for the colour of almost everything. Its neighbours: Colour ramp is a gradient you draw on the node itself (your colours, fixed in the effect); Colour 1 to 3 are the three colour pickers on the WLED page; HSV builds a colour from hue, saturation and value. Palette is the one that follows the person's palette choice."
+ ],
+ "steps": [
+  "**index** is a position along the palette, 0..1, and it wraps: 1.25 is the same colour as 0.25. Anything can feed it - here, a position plus a clock.",
+  "**Coords** `u` times 1 (a **Multiply** - its b is how many times the palette repeats across) lays the palette once from the left edge to the right.",
+  "**Speed** times **Time**'s `t` is a number growing with the slider; **Add** puts it onto the position, so every pixel's index creeps up together and the colours scroll to the left.",
+  "**brightness** is 1, full. Unwired here; wire a pattern into it to light some pixels and leave others dark in the same colours.",
+  "This is the graph a new graph starts as (with the repeat added): the palette is the one chosen in the side panel's EFFECT section, as on the WLED page."
+ ],
+ "try": [
+  {"label": "Three times across", "text": "the first Multiply's b at 3: u is stretched to 0..3, so the palette runs three times from left to right - tighter bands of colour.", "set": [[8, "b", 3.0]]},
+  {"label": "Dim it", "text": "brightness 0.25: the same colours at a quarter strength - how a pattern wired into brightness darkens the palette without changing its hue.", "set": [[6, "brightness", 0.25]]},
+  {"label": "Half a palette", "text": "the first Multiply's b at 0.5: only the first half of the palette fits across at once, so the scroll shows each part of it in turn, slowly.", "set": [[8, "b", 0.5]]}
+ ],
+ "graph": {
+  "name": "Tutorial Palette",
+  "nodes": [
+   {"id": 1, "type": "Speed", "params": {"label": "Speed", "default": 128}, "inputs": {}},
+   {"id": 2, "type": "Time", "params": {}, "inputs": {}},
+   {"id": 3, "type": "Multiply", "params": {}, "inputs": {}},
+   {"id": 4, "type": "Coords", "params": {}, "inputs": {}},
+   {"id": 8, "type": "Multiply", "params": {}, "inputs": {"b": 1.0}},
+   {"id": 5, "type": "Add", "params": {}, "inputs": {}},
+   {"id": 6, "type": "Palette", "params": {}, "inputs": {"brightness": 1.0}},
+   {"id": 7, "type": "Output", "params": {}, "inputs": {}}
+  ],
+  "links": [
+   [1, "value", 3, "a"], [2, "t", 3, "b"],
+   [4, "u", 8, "a"], [8, "result", 5, "a"], [3, "result", 5, "b"],
+   [5, "result", 6, "index"],
+   [6, "color", 7, "color"]
+  ]
+ }
+}

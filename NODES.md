@@ -2,6 +2,7 @@
 
 What every node, pin and setting does. Numbers are mostly 0..1; a 'turn' is one full circle.
 Hover a node or a pin in the editor and the same text appears under the toolbar.
+A node with a tutorial says why you would use it, builds a small graph round it with a picture of it running, and lists changes to try; in the studio, Try it opens that graph live.
 
 ## controls
 
@@ -481,6 +482,30 @@ Follows x, but no faster than up a second while rising and down a second while f
 **Outputs**
 - **value** *(float)*: where it is now
 
+**Why use it**
+
+Audio levels and other live values jump: the bass leaps on a kick and drops between kicks, frame to frame. Wired straight to brightness or size, that jumping reads as flicker. Slew follows the value but no faster than a speed you set, so jumps become glides.
+
+Its speeds are separate for rising and falling, which is how a VU meter behaves: rise fast enough to catch the hit, fall slowly so it reads. Compared with its neighbours: Ease and Envelope glide in curves over a set time; Spring overshoots and settles; Slew moves at a constant pace, so a big jump takes longer than a small one.
+
+**Tutorial**
+
+![Slew: two level meters - the bass as it comes (left) and through Slew (right); under them, the two as lines](docs/nodes/slew.gif)
+
+1. **Audio**'s `bass` goes into Slew's **x** - the value to follow. The synth plays a beat, so the bass jumps on every kick.
+2. **up** is 6: Slew rises at most 6 a second, so from 0 to full takes a sixth of a second - not quite as fast as a kick, so it rounds each one off. **down** is 1.5: it falls at most 1.5 a second, two thirds of a second from top to bottom.
+3. Two meters show both: **Coords** `u` into a **Threshold** at 0.5 switches a **Select** from the raw bass (left half) to Slew's `value` (right half).
+4. The meter itself: the level plus `v` (an **Add**) reaches 1 only where `v` is above 1 minus the level, so a second **Threshold** at 1 lights a column from the bottom up as high as the level. That is the **Palette**'s brightness.
+5. Watch the right meter lag the left: it climbs after each kick and sinks smoothly between them.
+
+[Try it in the studio](studio:try/Slew): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
+
+**Try this**
+
+- [Snappy rise](studio:try/Slew/1): up 40: Slew rises forty a second - it catches each kick at once - but still falls at its own pace, a peak meter.
+- [Slow fall](studio:try/Slew/2): down 0.3: after a kick the meter takes three seconds to sink, so it barely drops between beats and holds near the top.
+- [Lazy both ways](studio:try/Slew/3): up 0.5 and down 0.5: Slew can no longer keep up with the beat at all, so it settles at a level that rises and falls with how busy the music is.
+
 ### Spectrum
 
 The whole spectrum as a curve you can read anywhere: index 0 is the lowest band, 1 the highest. Feed a coordinate into index and the bands spread across the cube - a graphic equaliser along u, or round the ring. smooth stops it flickering.
@@ -626,6 +651,34 @@ Where this pixel is. u and v run 0..1 across and down the whole logical picture 
 - **centred y** `cy` *(float)*: up, centred: -1 .. 1
 - **r** *(float)*: distance from the centre, 0 .. ~1.4
 - **angle** *(float)*: angle round the centre, in radians (-pi .. pi)
+
+**Why use it**
+
+A graph runs once for every pixel, every frame. Without knowing which pixel it is working on, it can only make every pixel the same colour. Coords is how a graph knows where it is - and so how anything comes to vary across the strip or panel.
+
+It gives the place several ways, for different jobs: `u` and `v` run 0..1 across and down (for things laid out in rows and columns); `cx` and `cy` are the same centred, -1..1 (for things symmetric about the middle); `r` and `angle` are polar about the centre (for rings, spirals and anything round). Position is the neighbour for real 3-D places on a shape; Coords is the picture's own grid.
+
+**Tutorial**
+
+![Coords: the palette laid across the matrix by u, dimmed away from the centre by r](docs/nodes/coords.gif)
+
+1. Coords has no inputs or settings - it only answers. Its six outputs are six ways of saying where this pixel is.
+2. `u` goes into a **Mix**'s a, and the Mix's result into the **Palette**'s index: with the Mix's t at 0 it passes a straight through, so the colours run left to right across the matrix.
+3. `angle` waits in the Mix's b - the angle round the centre, 0..1 for a full turn. The Mix chooses between u and angle, so one change shows the other.
+4. `r` - the distance from the centre - goes into a **Smoothstep** whose edges are 1.2 and 0: bright where r is 0, fading to dark by r 1.2. That is the Palette's brightness, so the corners fall away.
+5. `v`, `cx` and `cy` are left unwired here; v is u's partner down the matrix, cx and cy are u and v moved so the centre is 0.
+
+[Try it in the studio](studio:try/Coords): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
+
+**Try this**
+
+- [Colour by angle](studio:try/Coords/1): the Mix's t at 1: the palette's index comes from angle instead of u, so the colours go round the centre - a colour wheel, the start of every spinner.
+- [Halfway](studio:try/Coords/2): the Mix's t at 0.5: the index is half u and half angle, so the bands bend - a spiral between a gradient and a wheel.
+- [No falloff](studio:try/Coords/3): the Smoothstep's edges at -1 and -0.5: r is never below them, so the brightness is 1 everywhere and the whole matrix is lit evenly.
+
+**Used in**
+
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json`), Fan (`fan.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Shockwave (`shockwave.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Watershed (`watershed.json`)
 
 ### Cube face
 
@@ -891,6 +944,34 @@ Smooth random blobs - clouds, plasma, flames. Give it a point (Direction's nx, n
 - **octaves** *(int)*: 1 is smooth blobs; 3-5 adds finer and finer detail on top - clouds, smoke
 - **roughness** *(float)*: how strong each finer layer is, 0..1
 
+**Why use it**
+
+Nature does not repeat: clouds, flames, water and smoke vary smoothly from place to place without a pattern you can see. Noise gives you that - a value 0..1 for every point, close to its neighbours' values, never the same twice across the picture.
+
+Use it for anything organic, or to break up something too regular (added to a Wave's x, it wobbles the stripes). Compared with its neighbours: Wave repeats exactly; Hash and Sparkle are random per pixel, with no smoothness between neighbours; Noise is random but smooth.
+
+**Tutorial**
+
+![Noise: smooth blobs drifting over the matrix, coloured by the palette; under it, the noise at the centre pixel](docs/nodes/noise.gif)
+
+1. **Coords** `u` and `v` go into **x** and **y**: every pixel asks the noise for the value at its own place on the matrix, so neighbouring pixels get neighbouring values - blobs.
+2. **scale** is 4: how many blobs fit across a unit of x and y. Higher gives smaller, busier blobs; lower gives big slow clouds.
+3. **Time** times 0.3 (the Multiply) goes into **z**. Noise is a 3-D field; moving through its third dimension makes the blobs change shape and drift without sliding, the way clouds boil.
+4. The value picks a colour from the **Palette**; **Effect settings** starts the effect on Lava, so low values are dark red and high ones yellow - the blobs read as flame. Noise rarely reaches 0 or 1 (the trace stays near the middle): to use the whole palette, stretch it with a Remap.
+5. **octaves** is 1 - one layer of blobs. **roughness** only matters with more octaves: how strong each finer layer is.
+
+[Try it in the studio](studio:try/Noise): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
+
+**Try this**
+
+- [Smaller blobs](studio:try/Noise/1): scale 10: more blobs fit across, so the picture gets busy and fine - sparkly water rather than clouds.
+- [Add detail](studio:try/Noise/2): octaves 4 and roughness 0.6: three finer layers are added on top of the big blobs, so edges get ragged - smoke and flames rather than lava lamp.
+- [Drift faster](studio:try/Noise/3): the Multiply's b at 1.5: the clock runs through z five times as fast, so the blobs churn quickly.
+
+**Used in**
+
+Box Fire (`box_fire.json`), Lightning (`lightning.json`), Snowstorm (`snowstorm.json`), Watershed (`watershed.json`)
+
 ### Path
 
 A route through the cube, from points you type (x, y, z in the -1..1 box, one point per ';'). For each pixel: how far it is from the route, and how far along the route the nearest point is - a light running along a track (Band on `along` plus a clock), a glowing wire, a shape's outline.
@@ -1087,6 +1168,35 @@ A repeating wave along its input: sine, triangle, square or saw. Feed a coordina
 
 **Settings**
 - **shape** *(choice)*: sine (smooth), triangle (linear), square (on/off), saw (ramp)
+
+**Why use it**
+
+Most patterns that repeat - stripes, bars, pulses, ripples - are a wave read along some coordinate. Wave is that one job: give it a position and it answers how far up the wave that position is, 0..1, repeating as often as you ask.
+
+Reach for it whenever something should repeat evenly. Noise is the neighbour to compare: Noise wanders without repeating, Wave repeats exactly. Sine (in maths) is the raw function, -1..1 and one cycle per turn; Wave is already scaled to 0..1, counts cycles for you, and has the other shapes (triangle, square, saw) a pattern usually wants.
+
+**Tutorial**
+
+![Wave: sine stripes across the matrix, scrolled by the clock; under it, the wave's value at the centre pixel](docs/nodes/wave.gif)
+
+1. **Coords** gives each pixel its place: `u` runs 0 at the left edge to 1 at the right. Wired into Wave's **x**, the wave is laid out across the matrix.
+2. **cycles** is 3, so three whole waves fit between the left edge and the right: three bright stripes and three dark ones.
+3. **Speed** times **Time**'s `t` (the Multiply) is a number that grows steadily, faster with the slider higher. Wired into **phase**, it slides the wave along x - the stripes scroll. A phase of 1 moves the wave one whole cycle.
+4. Wave's `value` sets the **Palette**'s brightness, while the palette's index follows `u`: the colours stay put across the matrix and the wave lights and darkens them as it passes.
+5. **shape** is sine, the smoothest. **distort** is 0, so every stripe is the same width.
+
+[Try it in the studio](studio:try/Wave): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
+
+**Try this**
+
+- [Square stripes](studio:try/Wave/1): shape square: the wave snaps between 0 and 1, so the stripes get hard edges - a marquee's on and off.
+- [Eight cycles](studio:try/Wave/2): cycles 8: eight waves across the same width, so the stripes are narrower and there are more of them.
+- [Distort it](studio:try/Wave/3): distort 0.6: the wave is pushed off even spacing, so the stripes bunch and stretch - organic rather than mechanical.
+- [Saw](studio:try/Wave/4): shape saw: each cycle ramps up and drops at once, so the stripes have a soft side and a hard side, and scroll like a wipe.
+
+**Used in**
+
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json`), Fan (`fan.json`), Garlands (`garlands.json`), Liquid Tunnel (`liquid_tunnel.json`), Morph (`morph.json`), Spirals (`spirals.json`), Tendril (`tendril.json`)
 
 ## maths
 
@@ -1739,6 +1849,34 @@ A colour from the palette chosen on the WLED page. index 0..1 runs through the p
 
 **Outputs**
 - **color** *(color)*: the colour
+
+**Why use it**
+
+WLED effects do not pick their own colours: the person chooses a palette on the WLED page, and the effect draws with it. Palette is how a graph does that - give it a number and it answers with the palette's colour at that point - so one effect looks right in Rainbow, in Ocean, in Fire, in whatever they choose.
+
+Use it for the colour of almost everything. Its neighbours: Colour ramp is a gradient you draw on the node itself (your colours, fixed in the effect); Colour 1 to 3 are the three colour pickers on the WLED page; HSV builds a colour from hue, saturation and value. Palette is the one that follows the person's palette choice.
+
+**Tutorial**
+
+![Palette: the chosen palette laid across the matrix and scrolled by the Speed slider](docs/nodes/palette.gif)
+
+1. **index** is a position along the palette, 0..1, and it wraps: 1.25 is the same colour as 0.25. Anything can feed it - here, a position plus a clock.
+2. **Coords** `u` times 1 (a **Multiply** - its b is how many times the palette repeats across) lays the palette once from the left edge to the right.
+3. **Speed** times **Time**'s `t` is a number growing with the slider; **Add** puts it onto the position, so every pixel's index creeps up together and the colours scroll to the left.
+4. **brightness** is 1, full. Unwired here; wire a pattern into it to light some pixels and leave others dark in the same colours.
+5. This is the graph a new graph starts as (with the repeat added): the palette is the one chosen in the side panel's EFFECT section, as on the WLED page.
+
+[Try it in the studio](studio:try/Palette): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
+
+**Try this**
+
+- [Three times across](studio:try/Palette/1): the first Multiply's b at 3: u is stretched to 0..3, so the palette runs three times from left to right - tighter bands of colour.
+- [Dim it](studio:try/Palette/2): brightness 0.25: the same colours at a quarter strength - how a pattern wired into brightness darkens the palette without changing its hue.
+- [Half a palette](studio:try/Palette/3): the first Multiply's b at 0.5: only the first half of the palette fits across at once, so the scroll shows each part of it in turn, slowly.
+
+**Used in**
+
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
 
 ### Palette source
 

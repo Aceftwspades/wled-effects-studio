@@ -869,16 +869,21 @@ def gaps():
 
 
 def markdown():
-    """The whole reference as Markdown, one section per category."""
+    """The whole reference as Markdown, one section per category; a node with
+    a lesson (docs/nodes, tutorials.py) has its tutorial under its reference."""
     from native.nodedefs import library
+    from native import tutorials
     lib = library()
+    lessons = tutorials.all_lessons()
     order = ["controls", "signals", "coords", "generate", "maths", "colour", "custom", "output", "graph"]
     cats = {}
     for name, d in lib.items():
         cats.setdefault(d["cat"], []).append((name, d))
     out = ["# The nodes", "",
            "What every node, pin and setting does. Numbers are mostly 0..1; a 'turn' is one full circle.",
-           "Hover a node or a pin in the editor and the same text appears under the toolbar.", ""]
+           "Hover a node or a pin in the editor and the same text appears under the toolbar.",
+           "A node with a tutorial says why you would use it, builds a small graph round it with a picture "
+           "of it running, and lists changes to try; in the studio, Try it opens that graph live.", ""]
     for c in order + sorted(k for k in cats if k not in order):
         if c not in cats:
             continue
@@ -897,6 +902,8 @@ def markdown():
                     key_ = f" `{p['name']}`" if shown != p["name"] else ""
                     out.append(f"- **{shown}**{key_} *({p['type']})*: {p.get('doc', '')}")
                 out.append("")
+            if name in lessons:                            # why it is there, a graph round it, changes to try
+                out += tutorials.markdown(name, lessons[name])
     return "\n".join(out)
 
 
