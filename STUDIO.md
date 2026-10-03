@@ -3282,6 +3282,54 @@ a **Try it** that opens the graph live.
         build's black); the smoke plays, pauses and stops the test pattern
         from the panel.
 
+### From upstream WLED and the web (October 2026)
+
+What upstream WLED (16_x, main / 17.0-dev, open PRs), WLED-MM, xLights and
+LedFx have added that matters here, in the order it helps most.
+
+- [x] **The fork onto 16_x's latest**: 48 commits since the fork's base
+      (2026-06-30) - setGeometry corner cases, a default segment when the heap
+      runs out, the on/off transition flick, Stream FX, the ETH IP crash, the
+      dynarray ordering fixes. Merged into `playground` (e74dc129), built for
+      the cube (esp32s3_customfx, 1.57 MB of 3 MB). The stock effects now read
+      AudioReactive's `volumeRaw` as the int16 it is (they read a float): the
+      sim's `gen/wled_fx1d.cpp` follows, and the sim already kept it an int16.
+      Found on the way: `platformio_override.ini` held the studio's generated
+      env twice - one block under the pre-rename markers (WLED Effect Studio)
+      the writer did not know, so it added a second. `flash.put_block` takes
+      out every studio block, old markers too, and writes one where the first
+      was (`test_firmware.py`).
+- [ ] **A flaky test**: `test_a_bin_flashed_to_the_fake_device` failed once in
+      five runs on 2026-10-03 ("did not reboot": the fake's uptime did not start
+      over) and would not fail again; find why before it turns CI red.
+- [ ] **The studio sends audio sync**: WLED's AudioSync v2 packet (UDP 11988,
+      multicast 239.0.0.1) from the studio's audio analysis, so any stock WLED
+      on the network hears the studio's WAV or microphone. Upstream adds UDP
+      broadcast as a second transport (wled/WLED#5863): offer both.
+- [ ] **AudioReactive out of tree** (wled/WLED#5311, #5764): the fork's PCM and
+      pitch-class slots are a patch to `usermods/audioreactive`; keep them as a
+      fork of the out-of-tree repo, or offer them upstream, before the move lands.
+- [ ] **New chips in the flasher**: ESP32-C5, C61 and P4 (17.0's V5 builds) in
+      `firmware.py`'s chip table (image chip IDs to check against esptool).
+- [ ] **The device's gamma against the sim's**: 16.0.x applies gamma during
+      realtime override (#5666, in the fork); #5722 moves gamma to the bus and
+      limits low brightness. Check a stream looks the same on the cube as in
+      the view; follow #5722.
+- [ ] **Ledmap fixes from main**: the parser reading past the end (#5693, in
+      the fork) and trailing strips in sparse ledmaps (075abaff) - the studio
+      writes ledmaps.
+- [ ] **Streaming over the WebSocket** (DDP on `/ws`, nightly): a fallback
+      where UDP is blocked.
+- [ ] **cube_fx controls in WLED's own UI** through `/um.js` (wled/WLED#5741)
+      once merged.
+- [ ] **Effect parity**: Dissolve Plus (main), multiple and slow meteors
+      (#5758), WLED-MM's Color Clouds; the stock bank checked against the
+      pre-16 looks upstream restored (#5684).
+- [ ] **An xLights model from a mapped shape** (xLights 2026.16 counts bulbs
+      per node on export).
+- [ ] **Watch**: past 255 effects (#5108, the bank's ceiling), the WLED Pixel
+      Bus driver (#5704: LED timing tuned to stop flicker).
+
 ### Mapping the way of Lightwork (October 2026)
 
 - [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -

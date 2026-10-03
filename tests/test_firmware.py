@@ -147,6 +147,22 @@ def test_the_built_in_effects_one_by_one():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_one_generated_block_in_the_override():
+    """platformio_override.ini keeps one studio block: an old one under the pre-rename markers (WLED Effect
+    Studio) is replaced, not left beside the new one - two [env:] sections of one name stop every build."""
+    old = flash.OLD_MARKS[0]
+    blk = [flash.MARK_BEGIN, "[env:studio_x]", "extends = env:x", flash.MARK_END, ""]
+    text = ("[platformio]\ndefault_envs = x\n\n[env:x]\nextends = env:esp32dev\n\n"
+            + "\n".join([old[0], "[env:studio_x]", "extends = env:x", old[1]]) + "\n\n" + "\n".join(blk))
+    out = flash.put_block(text, blk)
+    assert out.count("[env:studio_x]") == 1 and old[0] not in out and out.startswith("[platformio]\ndefault_envs = x")
+    assert flash.put_block(out, blk) == out                                  # written again: the same file
+    mid = "[a]\nx=1\n\n" + "\n".join(blk) + "\n[b]\ny=2\n"
+    r = flash.put_block(mid, [flash.MARK_BEGIN, "[env:z]", flash.MARK_END, ""])
+    assert r.startswith("[a]") and r.index("[env:z]") < r.index("[b]") and "[env:studio_x]" not in r
+    assert flash.put_block("[platformio]\n", blk).endswith(flash.MARK_END + "\n")
+
+
 def test_a_bin_flashed_to_the_fake_device():
     from fake_wled import FakeWled
     dev = FakeWled(port=8772, ddp_port=4052).start()            # its arch: ESP32-S3
