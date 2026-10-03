@@ -42,10 +42,10 @@ _part = "app.project.geometry.params['parts'][0]"
 _TREE = {"kind": "tree", "name": "tree", "params": {"strands": 9, "per_strand": 40, "height": 90.0, "base": 54.0, "top": 3.0,
          "turns": 0.0, "degrees": 360.0, "zigzag": True}, "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": 1.0, "reverse": False}
 MAP_STEPS = [
-    # the plan: the wiring test lights one LED at a time in the sim, the device's own frame has the plan's 60 LEDs
+    # the plan: the wiring test lights one LED at a time in the sim (its mask mode), the device's own frame has the plan's 60 LEDs
     ([{"geometry": {"kind": "cube", "params": {"B": 16}}}, {"py": "camera_map_ui.show(app)"}, {"py": "num.set('map_n', 60)"},
       {"py": "num.set('map_on', 0.2)"}, {"py": "camera_map_ui.play(app)"}], 3.0),
-    ([{"check": "app.wiring is not None and app.wiring.mode in ('index', 'off', 'white') and len(app._map_frame) == 60 * 3"},
+    ([{"check": "app.wiring is not None and app.wiring.mode in ('mask', 'off') and len(app._map_frame) == 60 * 3"},
       {"check": "int((np.frombuffer(app._map_frame, np.uint8).reshape(-1, 3).max(1) > 0).sum()) in (0, 1, 60)"},
       {"expect": ["map_play_words", "left"]}, {"py": "camera_map_ui.stop(app)"}], 0.5),
     # two films read (the second waits its turn), their LEDs found; a side added and dropped
