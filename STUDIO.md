@@ -3361,6 +3361,10 @@ LedFx have added that matters here, in the order it helps most.
 - [ ] **Watch**: past 255 effects (#5108, the bank's ceiling), the WLED Pixel
       Bus driver (#5704: LED timing tuned to stop flicker).
 
+Released as 1.8.0 (2026-10-03): audio sync out, the newer chips in the
+flasher, the override's one generated env, and the stock effects after the
+fork's 16_x merge.
+
 ### Mapping the way of Lightwork (October 2026)
 
 - [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -
