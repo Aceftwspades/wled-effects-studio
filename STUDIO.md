@@ -3316,6 +3316,9 @@ a **Try it** that opens the graph live.
         `camera_map.SyntheticCamera`, a stand-in webcam that pictures the
         frame the plan would send.
 
+Released as 1.7.0 (2026-10-03), with the node tutorials and live video: the
+per-node lessons, the Video node and the Lightwork mapping.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every
