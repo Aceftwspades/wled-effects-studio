@@ -3302,6 +3302,16 @@ LedFx have added that matters here, in the order it helps most.
 - [ ] **A flaky test**: `test_a_bin_flashed_to_the_fake_device` failed once in
       five runs on 2026-10-03 ("did not reboot": the fake's uptime did not start
       over) and would not fail again; find why before it turns CI red.
+- [ ] **`test_library` hangs on the last engine built**: after the smoke or the
+      walk, the engine is the default project's, without Freqmatrix,
+      Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
+      (`list.index`); a standard build (`build.py --native-only`) puts it right.
+      It should build or pick the engine it needs.
+- [x] **A key from the test hooks lands on the graph**: `over_view()` took the
+      real pointer's hover when the hook held the canvas, so with the mouse
+      resting on the 3-D view, Home went to the view's own Home and the smoke's
+      "frame the whole graph" step failed here but never on CI (no pointer).
+      The hook's canvas hold now says the pointer is off the view.
 - [x] **The studio sends audio sync**: WLED's AudioSync v2 packet (UDP 11988,
       multicast 239.0.0.1) from the studio's audio analysis, so any stock WLED
       on the network hears the studio's WAV or microphone. Upstream adds UDP
