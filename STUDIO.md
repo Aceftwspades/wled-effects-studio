@@ -3302,10 +3302,21 @@ LedFx have added that matters here, in the order it helps most.
 - [ ] **A flaky test**: `test_a_bin_flashed_to_the_fake_device` failed once in
       five runs on 2026-10-03 ("did not reboot": the fake's uptime did not start
       over) and would not fail again; find why before it turns CI red.
-- [ ] **The studio sends audio sync**: WLED's AudioSync v2 packet (UDP 11988,
+- [x] **The studio sends audio sync**: WLED's AudioSync v2 packet (UDP 11988,
       multicast 239.0.0.1) from the studio's audio analysis, so any stock WLED
       on the network hears the studio's WAV or microphone. Upstream adds UDP
       broadcast as a second transport (wled/WLED#5863): offer both.
+      `native/audio_sync.py`: the 44-byte packet laid out as audio_reactive.cpp's
+      `audioSyncPacket` (header "00002", the smoothed and raw level, the beat,
+      the sixteen bands - 254 at most, as the device sends - the major peak and
+      its magnitude); a sender at most every 20 ms, a beat between two packets
+      held for the next. LIVE AUDIO's **send to WLEDs**: off, multicast,
+      broadcast, unicast (the active device). The engine keeps the major peak
+      it was given (`last_peak`). A device receives with the Audio input
+      frame's *network sound only* (type 254 forces receive). Tests:
+      `test_audio_sync.py` (the offsets, the rate and the held beat, the modes -
+      to 127.0.0.1 only); the smoke sends unicast to the fake on this machine,
+      never multicast. Not yet heard by a real device.
 - [ ] **AudioReactive out of tree** (wled/WLED#5311, #5764): the fork's PCM and
       pitch-class slots are a patch to `usermods/audioreactive`; keep them as a
       fork of the out-of-tree repo, or offer them upstream, before the move lands.

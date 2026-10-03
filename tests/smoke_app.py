@@ -758,6 +758,14 @@ STEPS = [
     ([{"check": "type(app.ddp).__name__ == 'ArtNetOut' and app.ddp.universe == 0"}, {"expect": ["live_status", "Art-Net:"]},
       {"py": "app.set_stream_out(protocol='ddp')"}, {"stream": False}], 1.0),
     ([{"check": "app.ddp is None and app.stream_out('127.0.0.1:8770')[0] == 'ddp'"}], 0.2),
+    # the synth's sound sent as audio sync - unicast to the fake on this machine (never multicast: the network's WLEDs
+    # would hear it), from the panel's combo; off again closes it
+    ([{"device": "127.0.0.1:8770"}, {"check": "app.active_host().endswith('127.0.0.1:8770')"},
+      {"py": "app.set_audio_sync('unicast')"}], 1.0),
+    ([{"check": "app.audio_sync.addr == '127.0.0.1' and app.audio_sync.sent > 15 and app.audio_sync.error is None"},
+      {"check": "dpg.get_value('audio_sync_mode') == 'unicast'"}, {"expect": ["audio_sync_msg", "127.0.0.1:11988"]},
+      {"py": "app.set_audio_sync('off')"}], 0.2),
+    ([{"check": "app.audio_sync is None and dpg.get_value('audio_sync_msg') == 'off'"}], 0.1),
     # every send to a device, against the fake WLED: the script, the settings, the shape, the ledmap
     ([{"frame": "devices"}, {"device": "127.0.0.1:8770"}, {"scan": "all"}], 6.0),
     ([{"layout": "graph"}, {"graph_open": "fan.json"}, {"py": "app.send_script()"}], 6.0),

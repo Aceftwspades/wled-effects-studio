@@ -588,6 +588,7 @@ class Engine:
             f = self.fft
             i = int(np.argmax(f))
             freq, magnitude = (float(self.BAND_HZ[i]), float(f[i]) * 4.0) if f[i] > 0 else (0.0, 0.0)
+        self.last_peak = (float(freq), float(magnitude or 0.0))     # what audio sync sends on (audio_sync.py)
         try:
             self.lib.simAudioPeak(C.c_float(freq), C.c_float(magnitude or 0.0))
         except AttributeError:

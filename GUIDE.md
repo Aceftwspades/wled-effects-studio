@@ -783,6 +783,17 @@ The audio's major peak (the loudest band's frequency and level, which
 the Freq effects, Rocktaves and Blurz place their pixels by) comes from
 the sixteen bands - the synth's and live audio alike.
 
+**Sending the sound to WLEDs**: LIVE AUDIO's **send to WLEDs** sends what
+the effects here hear - the synth, live audio or an audio file - as
+audioreactive's audio sync, so every WLED on the network set to receive
+it moves to the same music, stock firmware too, no microphone needed.
+**multicast** is how WLEDs send it themselves (239.0.0.1, port 11988);
+**broadcast** is for a network that drops multicast; **unicast** sends to
+the active device only. A device receives with its audio input set to
+**network sound only** (Device > Audio input), or with Sync set to
+Receive in its own audioreactive settings. The line under it counts the
+packets sent, about fifty a second.
+
 **Curves by hand**: select a Float curve node and the Properties pane
 shows its curve large - click to add a point, drag one, right-click to
 remove it; the node's small preview and its numbers follow, and the
