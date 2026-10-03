@@ -33,6 +33,41 @@ def image(chip_id=None, esp8266=False, size=4096):
     return bytes(h) + b"\x00" * (size - 24)
 
 
+def test_the_newer_chips():
+    """17.0's V5 chips by the names WLED gives them (/json/info's arch is ESP.getChipModel()) and by their release
+    files' names; the C61 is not taken for the C6 its name holds; the classic's models are the classic; a variant
+    the studio does not know keeps its name, so the classic's files and images are never taken for it."""
+    for arch, want in (("ESP32-C5", "esp32-c5"), ("ESP32-C61", "esp32-c61"), ("ESP32-P4", "esp32-p4"), ("ESP32-C6", "esp32-c6"),
+                       ("ESP32-S3", "esp32-s3"), ("esp32", "esp32"), ("ESP32-D0WD-V3", "esp32"), ("ESP32-PICO-D4", "esp32"),
+                       ("ESP32-S0WD", "esp32"), ("esp8266", "esp8266"), ("ESP32-H4", "esp32-h4"), ("", None),
+                       ("esp32s3dev_8MB_opi", "esp32-s3"), ("esp32c5dev", "esp32-c5"), ("esp32c6dev_4MB", "esp32-c6"),
+                       ("esp32p4_16MB", "esp32-p4"), ("esp32dev", "esp32"), ("ESP32-U4WDH", "esp32")):
+        assert firmware.chip(arch) == want, (arch, firmware.chip(arch))
+    for name, want in (("WLED_17.0.0_ESP32-C5.bin", "esp32-c5"), ("WLED_17.0.0_ESP32-C5_8MB_qspi.bin", "esp32-c5"),
+                       ("WLED_17.0.0_ESP32-C6_4MB.bin", "esp32-c6"), ("WLED_17.0.0_ESP32-C61.bin", "esp32-c61"),
+                       ("WLED_17.0.0_ESP32-P4_16MB.bin", "esp32-p4"), ("WLED_17.0.0_ESP32-C3-QIO.bin", "esp32-c3"),
+                       ("WLED_17.0.0_ESP32_WROVER.bin", "esp32"), ("WLED_17.0.0_ESP02.bin.gz", "esp8266")):
+        assert firmware.chip_of_asset(name) == want, (name, firmware.chip_of_asset(name))
+    rel = {"assets": [{"name": n, "url": "", "size": 1} for n in (
+        "WLED_17.0.0_ESP32.bin", "WLED_17.0.0_ESP32-C6_4MB.bin", "WLED_17.0.0_ESP32-C61.bin", "WLED_17.0.0_ESP32-C5.bin")]}
+    names = lambda arch: [a["name"][12:] for a in firmware.assets_for(rel, arch)]
+    assert names("ESP32-C6") == ["ESP32-C6_4MB.bin"] and names("ESP32-C61") == ["ESP32-C61.bin"]
+    assert names("ESP32-H4") == []                                     # not the classic's
+    d = tempfile.mkdtemp()
+    try:
+        for n, cid in (("c5.bin", 23), ("c61.bin", 20), ("p4.bin", 18), ("new.bin", 99)):
+            open(os.path.join(d, n), "wb").write(image(cid))
+        got = {n: firmware.bin_chip(os.path.join(d, n)) for n in ("c5.bin", "c61.bin", "p4.bin", "new.bin")}
+        assert got == {"c5.bin": "esp32-c5", "c61.bin": "esp32-c61", "p4.bin": "esp32-p4", "new.bin": "ESP chip id 99"}, got
+        assert firmware.check(os.path.join(d, "c5.bin"), "ESP32-C5")[0]
+        assert not firmware.check(os.path.join(d, "c61.bin"), "ESP32-C6")[0]
+        assert not firmware.check(os.path.join(d, "c5.bin"), "esp32")[0]
+        ok, words = firmware.check(os.path.join(d, "new.bin"), None)
+        assert not ok and "does not know" in words
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def test_a_binary_says_its_chip():
     d = tempfile.mkdtemp()
     try:

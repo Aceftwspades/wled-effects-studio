@@ -3330,8 +3330,18 @@ LedFx have added that matters here, in the order it helps most.
 - [ ] **AudioReactive out of tree** (wled/WLED#5311, #5764): the fork's PCM and
       pitch-class slots are a patch to `usermods/audioreactive`; keep them as a
       fork of the out-of-tree repo, or offer them upstream, before the move lands.
-- [ ] **New chips in the flasher**: ESP32-C5, C61 and P4 (17.0's V5 builds) in
-      `firmware.py`'s chip table (image chip IDs to check against esptool).
+      Waits on upstream: both PRs are open and aim at 17.0; the fork is on
+      16.0.x, where the usermod stays in the tree. A new repo for it is the
+      owner's to make.
+- [x] **New chips in the flasher**: ESP32-C5, C61 and P4 (17.0's V5 builds) in
+      `firmware.py`'s chip table - image chip IDs 23, 20 and 18 from esptool's
+      targets, arch names as `ESP.getChipModel()` gives them, release files as
+      17.0's release names. And a hole closed: `chip()` took any ESP32 name it
+      did not know for the classic ESP32, so a C5 device was offered, and
+      passed, a classic image that would not boot. A variant not in the table
+      now keeps its own name ("esp32-h4": no file, no image is taken for it), an
+      image of an unknown chip id is named and refused, and the C61 is not
+      taken for the C6 its name holds (`test_the_newer_chips`).
 - [ ] **The device's gamma against the sim's**: 16.0.x applies gamma during
       realtime override (#5666, in the fork); #5722 moves gamma to the bus and
       limits low brightness. Check a stream looks the same on the cube as in
