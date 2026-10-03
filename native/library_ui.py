@@ -264,6 +264,8 @@ def _thumb_worker(app):
                 stop.wait(0.2)
             if stop.is_set():
                 break
+            if key in getattr(app, "_lib_turns", ()):
+                continue                             # the previews made this one while the worker waited
             app._lib_tprog = (done0 + i, total, key)
             frames, params = None, None
             if key in scripts:                       # a graph not built: its script on the Studio Script effect
@@ -324,8 +326,8 @@ def _poll_thumbs(app):
             src, key, frames = q.get_nowait()
         except Exception:
             break
-        if src == app.eng.library:
-            app._lib_thumbs[key] = frames
+        if src == app.eng.library and key not in getattr(app, "_lib_turns", ()):
+            app._lib_thumbs[key] = frames            # a preview's turn is not replaced by the plain thumbnail
             got += 1
     if got:
         app._lib_dirty = True
@@ -340,6 +342,7 @@ def refresh(app):
         app._lib_thumbs, app._lib_tags = {}, {}
     if getattr(app, "_lib_src", None) != app.eng.library:
         app._lib_thumbs = {}; app._lib_src = app.eng.library      # a new build: its effects may have changed
+        app._lib_turns = set()
         stop = getattr(app, "_lib_tstop", None)
         if stop is not None:
             stop.set()
@@ -352,7 +355,7 @@ def refresh(app):
     rows = []
     for key, name, fn in b[app._lib_bank]:
         tags = app.__dict__.get("_lib_tags", {}).get(fn, []) if fn else []
-        if q and q not in name.lower() and not any(q in t for t in tags):
+        if q and q not in name.lower() and not any(q in t.lower() for t in tags):     # "3-D" finds the 3-D tag
             continue
         rows.append((key, name, fn, tags))
     app._lib_shown = rows
@@ -511,6 +514,7 @@ def _poll_previews(app):
         if item[0] == "made":
             _, key, small, gpath = item
             app._lib_thumbs[key] = small
+            app.__dict__.setdefault("_lib_turns", set()).add(key)    # kept over the thumbnail worker's flat one
             app._lib_made = getattr(app, "_lib_made", 0) + 1
             app._lib_dirty = True
         elif item[0] == "skip":
