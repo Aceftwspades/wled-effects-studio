@@ -1,0 +1,141 @@
+{
+ "node": "Palette source",
+ "star": 1,
+ "caption": "Palette source: the palette-source colours laid across the matrix and scrolled",
+ "why": [
+  "The studio's audioreactive build lets the person pick a second set of colours - the palette source - that its audio-reactive palettes are built from. Palette source reads that set, where Palette reads the segment's own palette.",
+  "Use it when an effect should match the colours the audio palettes use, independently of the segment's palette. On a build without that usermod it falls back to the segment's palette, so the effect still works. Its neighbours: Palette reads the segment's palette - almost always the one you want; Colour ramp is colours of your own."
+ ],
+ "steps": [
+  "**Coords** `u` times 1 (a **Multiply**, the spread) plus a clock (**Time** times 0.2) goes into the **index**: where in the palette source to read, wrapping at 1 - laid once across the matrix, scrolling.",
+  "**brightness** is 1, full.",
+  "The `color` goes to the **Output**: the palette source laid across the matrix, scrolling.",
+  "In the studio the palette source is set in the side panel with the palette; on the device, on the WLED page beside it."
+ ],
+ "try": [
+  {
+   "label": "Dim",
+   "text": "brightness 0.3: the same colours at a third.",
+   "set": [
+    [
+     1,
+     "brightness",
+     0.3
+    ]
+   ]
+  },
+  {
+   "label": "Three times across",
+   "text": "the spread Multiply at 3: the palette source repeats three times across the matrix.",
+   "set": [
+    [
+     11,
+     "b",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Faster",
+   "text": "the clock's Multiply at 1: the colours scroll five times as fast.",
+   "set": [
+    [
+     13,
+     "b",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Palette source",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 1.0
+    }
+   },
+   {
+    "id": 12,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   },
+   {
+    "id": 14,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Palette source",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 2,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "u",
+    11,
+    "a"
+   ],
+   [
+    12,
+    "t",
+    13,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    14,
+    "a"
+   ],
+   [
+    13,
+    "result",
+    14,
+    "b"
+   ],
+   [
+    14,
+    "result",
+    1,
+    "index"
+   ],
+   [
+    1,
+    "color",
+    2,
+    "color"
+   ]
+  ]
+ }
+}

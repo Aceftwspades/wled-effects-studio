@@ -1,0 +1,152 @@
+{
+ "node": "Fract",
+ "star": 1,
+ "caption": "Fract: a growing number wrapped into 0..1 three times across - sawtooth bands sweeping along",
+ "why": [
+  "Most repeating patterns are a growing number made to start again: a phase that goes 0..1 and wraps. Fract does exactly that - it keeps the part after the decimal point, so 2.7 becomes 0.7 - turning any rising number into a repeating 0..1.",
+  "Its neighbours: Floor keeps the whole part; Modulo wraps at any period; Wave's saw shape is the same ramp with a cycles control; Fract is the plain wrap."
+ ],
+ "steps": [
+  "**Coords** `u` times 3 (a **Multiply**) plus a clock (**Time** times 0.4, an **Add**) is the **x** input: a number rising across the matrix and with time.",
+  "Fract keeps only its fractional part: three ramps from 0 to 1 across the matrix, each dropping back to 0 - a sawtooth - moving.",
+  "The result is the **Palette**'s brightness: bands with a soft side and a hard side.",
+  "The trace shows the centre pixel's value: a ramp up, a drop, a ramp up."
+ ],
+ "try": [
+  {
+   "label": "More teeth",
+   "text": "the Multiply at 8: eight ramps across - fine sawtooth bands.",
+   "set": [
+    [
+     2,
+     "b",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "One",
+   "text": "the Multiply at 1: one ramp across the whole matrix, scrolling.",
+   "set": [
+    [
+     2,
+     "b",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Fract",
+  "nodes": [
+   {
+    "id": 3,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 3.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Fract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   }
+  ],
+  "links": [
+   [
+    3,
+    "u",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    4,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    4,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    3,
+    "u",
+    5,
+    "index"
+   ],
+   [
+    1,
+    "result",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

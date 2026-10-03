@@ -1,0 +1,136 @@
+{
+ "node": "Sprites",
+ "star": 2,
+ "caption": "Sprites: a fountain of particles from the lid, each a soft dot coloured by its age",
+ "why": [
+  "Particles moves points about - born, flying, falling, dying - but a point has no size: something has to draw it. Sprites does: at each pixel, how much particle is there, as a soft dot of the size you choose, plus the nearest particle's tag, age and speed so you can colour, fade or stretch it.",
+  "Keep the two apart and you can change how sparks look without touching how they move. Its neighbours: Shells draws Emitters as growing rings; Sparkle lights random pixels that do not move; Sprites draws moving particles as dots."
+ ],
+ "steps": [
+  "**Particles** makes twelve a second at the middle of the lid, with a spread of 0.8 so they leave in different directions; gravity pulls them down over the edges and they live two seconds.",
+  "Its `slots` go into Sprites' **slots**, and **Position**'s `pos` into **pos**: every pixel asks how close the nearest particle is to its place in the cube.",
+  "**size** is 0.15 (in the cube's -1..1 units): how big each dot is. **falloff** is soft: a smooth dot, brightest at its middle.",
+  "`value` is the **Palette**'s brightness; `age` (0 newborn .. 1 dying) is its index, so each spark changes colour as it falls."
+ ],
+ "try": [
+  {
+   "label": "Sparks",
+   "text": "falloff spark: each particle is a bright pin with a faint halo - welding sparks rather than soft blobs.",
+   "set": [
+    [
+     2,
+     "falloff",
+     "spark"
+    ]
+   ]
+  },
+  {
+   "label": "Big blobs",
+   "text": "size 0.35: each dot more than twice as wide, so they merge into a flowing liquid.",
+   "set": [
+    [
+     2,
+     "size",
+     0.35
+    ]
+   ]
+  },
+  {
+   "label": "Hard discs",
+   "text": "falloff hard: each particle is a solid disc with a sharp edge.",
+   "set": [
+    [
+     2,
+     "falloff",
+     "hard"
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Sprites",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Particles",
+    "params": {
+     "max": 32,
+     "random_pos": false,
+     "on_surface": true,
+     "floor": "die"
+    },
+    "inputs": {
+     "rate": 12.0,
+     "spread": 0.8,
+     "life": 2.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Sprites",
+    "params": {
+     "falloff": "soft"
+    },
+    "inputs": {
+     "size": 0.15
+    }
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "slots",
+    2,
+    "slots"
+   ],
+   [
+    3,
+    "pos",
+    2,
+    "pos"
+   ],
+   [
+    2,
+    "age",
+    4,
+    "index"
+   ],
+   [
+    2,
+    "value",
+    4,
+    "brightness"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ]
+  ]
+ }
+}

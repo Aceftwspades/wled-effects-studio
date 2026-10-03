@@ -1,0 +1,123 @@
+{
+ "node": "Loudest bin",
+ "star": 1,
+ "caption": "Loudest bin: the whole matrix coloured by which band is loudest, as bright as it is loud",
+ "why": [
+  "A kick drum, a voice and a hi-hat each sit in a different part of the spectrum. Loudest bin says which part is loudest right now - 0 for bass up to 1 for treble - and how loud it is, so the colour of an effect can follow what is playing: red on the kicks, blue on the hats.",
+  "Its neighbours: FFT bin follows one band you choose; Timbre gives the balance of the whole mix; Spectrum gives every band; Loudest bin gives the winner."
+ ],
+ "steps": [
+  "Loudest bin has no inputs. **from** is 1 and **to** is 15: it listens to bands 1..15 (band 0, the very lowest rumble, is left out).",
+  "`bin` - which band is loudest, 0..1 - is the **Palette**'s index, so the whole matrix takes the colour for that part of the spectrum.",
+  "`level` - how loud that band is - lifted by a **Remap** (0..0.5 into 0.15..1) is the brightness, so the matrix is never quite dark.",
+  "The trace shows which band wins (orange) jumping between the kick's band and the hats', and its level (grey)."
+ ],
+ "try": [
+  {
+   "label": "Ignore the bass",
+   "text": "from 6: only the middle and high bands compete, so the colour follows the melody and the hats.",
+   "set": [
+    [
+     1,
+     "from",
+     6
+    ]
+   ]
+  },
+  {
+   "label": "Only the bass",
+   "text": "to 4: only the low bands compete - the colour changes with which bass note is loudest.",
+   "set": [
+    [
+     1,
+     "to",
+     4
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "level"
+  ],
+  [
+   1,
+   "bin"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Loudest bin",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Loudest bin",
+    "params": {
+     "from": 1,
+     "to": 15
+    },
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Remap",
+    "params": {
+     "in_lo": 0.0,
+     "in_hi": 0.5,
+     "out_lo": 0.15,
+     "out_hi": 1.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "bin",
+    2,
+    "index"
+   ],
+   [
+    1,
+    "level",
+    4,
+    "x"
+   ],
+   [
+    4,
+    "result",
+    2,
+    "brightness"
+   ],
+   [
+    2,
+    "color",
+    3,
+    "color"
+   ]
+  ]
+ }
+}

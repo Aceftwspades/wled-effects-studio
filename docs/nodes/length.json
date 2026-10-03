@@ -1,0 +1,178 @@
+{
+ "node": "Length",
+ "star": 1,
+ "caption": "Length: the size of a vector - here the centred coordinates' distance from the middle - as rings",
+ "why": [
+  "How far is a point from the origin? For a 2-D point that is the radius; for a 3-D one, the distance from the centre of the box. Length gives the size of any vector - so a vector built from coordinates becomes a distance, and rings, spheres and glows follow.",
+  "Its neighbours: Coords' r is the 2-D radius ready-made; Vector math's distance is between two points; Length is the size of one vector, any vector."
+ ],
+ "steps": [
+  "A **Vector** is built from **Coords** `centred x`, `centred y` and a z of 0: the pixel's place measured from the centre.",
+  "Its length is the **v** input's size: the distance from the middle, 0 at the centre.",
+  "That times 3, minus a clock (**Time** times 0.5), into a **Fract**: rings moving outward. The **Palette**'s brightness is the ring, its index the distance.",
+  "Change the vector and the shape changes: a z that is not 0 lifts the whole thing off the plane (see below)."
+ ],
+ "try": [
+  {
+   "label": "Lift it",
+   "text": "the Vector's z at 0.8: every point is now at least 0.8 from the origin, so the rings start part way out and the middle is a broad flat area.",
+   "set": [
+    [
+     2,
+     "z",
+     0.8
+    ]
+   ]
+  },
+  {
+   "label": "More rings",
+   "text": "the Multiply after Length at 6: twice as many rings between the centre and the edge.",
+   "set": [
+    [
+     3,
+     "b",
+     6.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Length",
+  "nodes": [
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Vector",
+    "params": {},
+    "inputs": {
+     "z": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Length",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 3.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Fract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   }
+  ],
+  "links": [
+   [
+    4,
+    "cx",
+    2,
+    "x"
+   ],
+   [
+    4,
+    "cy",
+    2,
+    "y"
+   ],
+   [
+    2,
+    "v",
+    1,
+    "v"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    5,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "x"
+   ],
+   [
+    1,
+    "result",
+    7,
+    "index"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "brightness"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

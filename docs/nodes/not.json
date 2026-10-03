@@ -1,0 +1,208 @@
+{
+ "node": "Not",
+ "star": 1,
+ "caption": "Not: on the left, stripes where a wave passes 0.5; on the right, the same switch flipped - the gaps lit instead",
+ "why": [
+  "A switch sometimes needs to work the other way round: light the gaps instead of the stripes, run an animation while a checkbox is off. Not flips a switch - on becomes off, off becomes on.",
+  "Its neighbours: Threshold makes a switch from a value; Select picks a value by a switch (swap its a and b to invert it instead); Not flips the switch itself."
+ ],
+ "steps": [
+  "A **Wave** along **Coords** `u` (3 cycles, scrolling) goes into a **Threshold** at 0.5: its `on` is true where the wave is above half - stripes.",
+  "Not's **on** input is that switch; its `result` is the opposite: true in the gaps.",
+  "Two **Select**s turn each switch into 0 or 1; a third Select, switched by a Threshold on `u` at 0.5, shows the plain stripes on the left half and the flipped ones on the right.",
+  "That is the **Palette**'s brightness: on the right, the lit and dark parts are exactly swapped."
+ ],
+ "try": [
+  {
+   "label": "Thinner stripes",
+   "text": "the Threshold's at 0.8: only the tops of the wave count as on - thin stripes on the left, wide ones (the gaps) on the right.",
+   "set": [
+    [
+     3,
+     "at",
+     0.8
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Not",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 1,
+    "type": "Not",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Select",
+    "params": {},
+    "inputs": {
+     "a": 0.0,
+     "b": 1.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Select",
+    "params": {},
+    "inputs": {
+     "a": 0.0,
+     "b": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 8,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    4,
+    "x"
+   ],
+   [
+    11,
+    "result",
+    4,
+    "phase"
+   ],
+   [
+    4,
+    "value",
+    3,
+    "x"
+   ],
+   [
+    3,
+    "on",
+    1,
+    "on"
+   ],
+   [
+    3,
+    "on",
+    5,
+    "on"
+   ],
+   [
+    1,
+    "result",
+    6,
+    "on"
+   ],
+   [
+    2,
+    "u",
+    7,
+    "x"
+   ],
+   [
+    7,
+    "on",
+    8,
+    "on"
+   ],
+   [
+    5,
+    "result",
+    8,
+    "a"
+   ],
+   [
+    6,
+    "result",
+    8,
+    "b"
+   ],
+   [
+    2,
+    "u",
+    9,
+    "index"
+   ],
+   [
+    8,
+    "result",
+    9,
+    "brightness"
+   ],
+   [
+    9,
+    "color",
+    20,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

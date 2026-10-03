@@ -213,8 +213,23 @@ def _floor(out, cam, z, off=(0.0, 0.0), step=FLOOR_STEP, origin=(0.0, 0.0)):
     out[ys_, xs_] = (out[ys_, xs_].astype(np.float32) * (1.0 - a) + np.asarray(FLOOR, np.float32) * a).astype(np.uint8)
 
 
+FLOOR_Z = -1.1               # the plane the cube stands over (its floor's grid, its reflection's mirror)
+
+
+def mirrored(corners, z=FLOOR_Z):
+    """A face's corners reflected in the floor's plane."""
+    c = np.array(corners, np.float64)
+    c[:, 2] = 2 * z - c[:, 2]
+    return c
+
+
+def reflection_weight(depth):
+    """How much of the reflection shows at a depth below the floor (0..2, a cube's height): strongest at the floor."""
+    return np.clip(1.0 - depth / 2.0, 0.0, 1.0) ** 2
+
+
 def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False, unlit=None, floor=False,
-           look=None, ortho=False):
+           look=None, ortho=False, reflect=0.0):
     """Draw the cube from the unfolded net image.
 
     net_rgb : (3B, 3B, 3) uint8 - the same image the flat view shows
@@ -222,6 +237,7 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
     unlit   : a colour an LED that is off is drawn as, a dot in its cell (None: black)
     floor   : a faint grid under the cube
     look, ortho : the camera's pan and projection (see Cam)
+    reflect : the floor a mirror this strong (0 none): the cube reflected in it, fading with depth
     returns : (size, size, 3) uint8
     """
     out = np.zeros((size, size, 3), np.uint8)
@@ -229,25 +245,43 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
     cam = Cam(yaw, pitch, dist, size, look, ortho, fov)
     eye = cam.eye
     if floor:
-        _floor(out, cam, -1.1)
+        _floor(out, cam, FLOOR_Z)
+    if reflect > 0 and eye[2] > FLOOR_Z + 0.02:
+        # the reflection first, added to what is behind it: each face mirrored in the floor, as bright as it is
+        # near the floor - the real faces then cover what they cover
+        ref = np.zeros((size, size, 3), np.float32)
+        _faces(ref, net_rgb, B, cam, size, six, unlit, mirror=True)
+        out = np.clip(out.astype(np.float32) + ref * (0.55 * reflect), 0, 255).astype(np.uint8)
+    _faces(out, net_rgb, B, cam, size, six, unlit)
+    return out
 
+
+def _faces(out, net_rgb, B, cam, size, six, unlit, mirror=False):
+    """The cube's faces drawn into `out` - or, `mirror`, their reflection in
+    the floor, each pixel weighted by its depth below it (reflection_weight)."""
+    eye = cam.eye
     drawn = []
     for fc in (FACES6 if six else FACES):
         c = fc["corners"]
         centre = c.mean(axis=0)
-        # Outward normal of a cube face is its own centre direction. Cull when
+        normal = centre
+        if mirror:
+            c = mirrored(c)
+            normal = centre * np.array([1.0, 1.0, -1.0])
+            centre = c.mean(axis=0)
+        # Outward normal of a cube face is its own centre direction (mirrored, its reflection's). Cull when
         # it points away, so at most three faces are ever rasterised.
-        if np.dot(centre, centre - eye) >= 0:
+        if np.dot(normal, centre - eye) >= 0:
             continue
         sx, sy, ok, _ = cam.screen(c)
         if not ok.all():                         # behind or through the eye
             continue
         scr = np.stack([sx, sy], axis=1)
-        drawn.append((float(np.linalg.norm(centre - eye)), fc, scr))
+        drawn.append((float(np.linalg.norm(centre - eye)), fc, scr, c))
 
     # Painter's algorithm: far faces first. With a convex solid and backface
     # culling this is exact, no z-buffer needed.
-    for _, fc, scr in sorted(drawn, key=lambda t: -t[0]):
+    for _, fc, scr, c in sorted(drawn, key=lambda t: -t[0]):
         x0 = max(0, int(np.floor(scr[:, 0].min())))
         x1 = min(size, int(np.ceil(scr[:, 0].max())) + 1)
         y0 = max(0, int(np.floor(scr[:, 1].min())))
@@ -293,8 +327,11 @@ def render(net_rgb, B, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), six=False
             fu, fv = u[inside] - ui - 0.5, v[inside] - vi - 0.5
             px_ = px_.copy()
             px_[(px_.max(axis=1) < UNLIT_BELOW) & (fu * fu + fv * fv <= DOT * DOT)] = unlit
+        if mirror:
+            # the reflected point's depth below the floor, from where it is on the face
+            z = c[0, 2] + (u[inside] / B) * (c[1, 2] - c[0, 2]) + (v[inside] / B) * (c[3, 2] - c[0, 2])
+            px_ = px_.astype(np.float32) * reflection_weight(FLOOR_Z - z)[:, None]
         out[y0:y1, x0:x1][inside] = px_
-    return out
 
 
 def texture_rgba(frame):
@@ -338,7 +375,7 @@ def unproject(sx, sy, size, yaw, pitch, dist, frame, axis=2, value=0.0, fov=38.0
 
 
 def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=0.42, unlit=None, floor=False,
-                  frame=None, look=None, ortho=False, floor_step=None):
+                  frame=None, look=None, ortho=False, floor_step=None, lk=None):
     """Draw any geometry as a cloud of LEDs (an LED that is off a smaller
     square of `unlit` when given; a faint floor under the shape with `floor`).
 
@@ -348,6 +385,8 @@ def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=
     frame : (centre, extent) the positions are fitted by (frame_of theirs when None)
     look, ortho : the camera's pan and projection (see Cam)
     floor_step : (step, origin) of the floor's lines in the fitted space (the default floor when None)
+    lk : the view's look (look.py): its glow and diffuser draw each LED as a soft sprite, its reflection
+          mirrors the shape in the floor (the diffused colours are the caller's: look.diffuse_points)
     Each LED is a square whose screen size follows its depth, painted far to
     near so nearer ones cover. No lighting, no smoothing: the point of the view
     is to see the LEDs, and an LED is a hard-edged square of one colour.
@@ -365,11 +404,70 @@ def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=
     # LED half-size on screen: the LED pitch in world units (1/ext per pixel),
     # times led (fraction of the pitch the emitter covers), projected
     half = cam.scale(depth) * (led / ext)
+    fz = float(np.nanmin(P[:, 2])) - 0.08 if np.isfinite(P[:, 2]).any() else -1.1
     if floor:
         st, org = floor_step or (FLOOR_STEP, (0.0, 0.0))
-        _floor(out, cam, float(np.nanmin(P[:, 2])) - 0.08 if np.isfinite(P[:, 2]).any() else -1.1, step=st, origin=org)
+        _floor(out, cam, fz, step=st, origin=org)
+    lk = lk or {}
+    from native import look as _look
+    sprites = lk.get("glow", 0) > 0 or lk.get("diffuse", 0) > 0
+    rgb = np.asarray(rgb)
+    if lk.get("reflect", 0) > 0 and cam.eye[2] > fz + 0.02:
+        # the shape mirrored in the floor, fading over its own height below it, added to what is behind
+        M = P.copy(); M[:, 2] = 2 * fz - P[:, 2]
+        msx, msy, mok, mdepth = cam.screen(M)
+        tall = max(1e-3, float(np.nanmax(P[:, 2])) - fz)
+        wgt = reflection_weight((P[:, 2] - fz) / tall * 2.0) * min(1.0, 0.55 * float(lk["reflect"]))
+        ref = np.zeros((size, size, 3), np.float32)
+        _points(ref, msx, msy, mok, mdepth, cam.scale(mdepth) * (led / ext), rgb * wgt[:, None], None, lk if sprites else None)
+        out = np.clip(out.astype(np.float32) + ref, 0, 255).astype(np.uint8)
+    _points(out, sx, sy, ok, depth, half, rgb, unlit, lk if sprites else None)
+    return out
+
+
+_SPRITES = {}
+
+
+def _sprite(lk, h):
+    """A sprite's alpha at h x h px, for a look (look.sprite_mask, resized; kept)."""
+    from native import look as _look
+    key = (round(float(lk.get("glow", 0)), 3), round(float(lk.get("diffuse", 0)), 3), h)
+    m = _SPRITES.get(key)
+    if m is None:
+        from PIL import Image
+        base = (_look.sprite_mask(lk, 32) * 255).astype(np.uint8)
+        m = _SPRITES[key] = np.asarray(Image.fromarray(base).resize((h, h), Image.BILINEAR), np.float32) / 255.0
+        if len(_SPRITES) > 256:
+            _SPRITES.clear()
+    return m
+
+
+def _points(out, sx, sy, ok, depth, half, rgb, unlit, lk):
+    """The LEDs painted into `out`, far first: squares (an unlit one a dim dot), or with a look's glow or
+    diffuser each a sprite over what is behind it, by its alpha - blended as the live view's GPU blends it."""
+    from native import look as _look
+    size = out.shape[0]
     off = (np.asarray(rgb).max(axis=1) < UNLIT_BELOW) if unlit is not None else None
     order = np.argsort(-depth)                  # far first
+    if lk is not None:
+        grow = _look.sprite_grow(lk)
+        for i in order:
+            if not ok[i]:
+                continue
+            h = max(2, int(round(half[i] * grow)))
+            x0, y0 = int(sx[i]) - h, int(sy[i]) - h
+            x1, y1 = x0 + 2 * h, y0 + 2 * h
+            if x1 <= 0 or y1 <= 0 or x0 >= size or y0 >= size:
+                continue
+            a = _sprite(lk, 2 * h)[max(0, -y0):2 * h - max(0, y1 - size), max(0, -x0):2 * h - max(0, x1 - size)]
+            dst = out[max(0, y0):min(size, y1), max(0, x0):min(size, x1)]
+            if off is not None and off[i]:
+                hh = max(1, int(round(half[i] * DOT_POINT)))     # off: its dim dot, no light
+                out[max(0, int(sy[i]) - hh):max(0, int(sy[i]) + hh), max(0, int(sx[i]) - hh):max(0, int(sx[i]) + hh)] = unlit
+                continue
+            col = np.asarray(rgb[i], np.float32)
+            dst[:] = np.clip(dst * (1.0 - a[..., None]) + col * a[..., None], 0, 255).astype(out.dtype)   # as the GPU blends it
+        return
     for i in order:
         if not ok[i]:
             continue

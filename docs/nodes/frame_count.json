@@ -1,0 +1,175 @@
+{
+ "node": "Frame count",
+ "star": 1,
+ "caption": "Frame count: the number of frames run, slowly turning the palette - and a flag for the very first frame",
+ "why": [
+  "Some things should happen exactly once, when the effect starts: seeding a simulation, picking a starting colour, clearing a field. Frame count says when that is (first is true on the first frame only) and how many frames have run since.",
+  "The count also works as a clock that counts frames rather than seconds - steady steps, whatever the frame rate. Its neighbours: Time counts seconds; Integrate grows at a rate; Counter counts triggers; Frame count counts frames, and marks the first."
+ ],
+ "steps": [
+  "Frame count has no inputs or settings. `count` is how many frames have run; `first` is true on the very first frame only.",
+  "`count` times 0.004 (a **Multiply**) plus **Coords** `u` (an **Add**) is the **Palette**'s index: the colours creep along a little every frame.",
+  "`first` lights the whole matrix white for that one frame through a **Select** into the brightness of a white **Colour** blended on top - you only see it if you restart the effect (the restart button, or Ctrl+R).",
+  "The trace shows the count climbing steadily, one a frame."
+ ],
+ "try": [
+  {
+   "label": "Faster",
+   "text": "the count's Multiply at 0.02: five times the step per frame - the colours scroll quickly.",
+   "set": [
+    [
+     2,
+     "b",
+     0.02
+    ]
+   ]
+  },
+  {
+   "label": "Backwards",
+   "text": "the count's Multiply at -0.004: the colours creep the other way.",
+   "set": [
+    [
+     2,
+     "b",
+     -0.004
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "count"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Frame count",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Frame count",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.004
+    }
+   },
+   {
+    "id": 3,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Select",
+    "params": {},
+    "inputs": {
+     "a": 0.0,
+     "b": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Colour",
+    "params": {
+     "rgb": [
+      255,
+      255,
+      255
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Blend",
+    "params": {
+     "mode": "over"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "count",
+    2,
+    "a"
+   ],
+   [
+    3,
+    "u",
+    4,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "index"
+   ],
+   [
+    1,
+    "first",
+    6,
+    "on"
+   ],
+   [
+    5,
+    "color",
+    8,
+    "under"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "over"
+   ],
+   [
+    6,
+    "result",
+    8,
+    "amount"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "color"
+   ]
+  ]
+ }
+}

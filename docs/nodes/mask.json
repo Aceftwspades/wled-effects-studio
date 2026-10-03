@@ -1,0 +1,178 @@
+{
+ "node": "Mask",
+ "star": 1,
+ "caption": "Mask: a single colour shown only where drifting noise is bright - coloured clouds",
+ "why": [
+  "Often you want one colour, but not everywhere: clouds of blue, a glow only near the edge, light only where a pattern says. Mask shows a colour by a 0..1 pattern - full where the mask is 1, gone where it is 0.",
+  "Any pattern can be the mask: noise for clouds, a gradient for a fade, stripes for bars. Its neighbours: Scale dims by one number for the whole colour (Mask is the same sum, named for a pattern); Blend lays one colour on another; Mask cuts a colour out by a pattern."
+ ],
+ "steps": [
+  "**color** is a **Colour**: a sky blue.",
+  "**mask** is a **Noise** of **Coords** `u`, `v`, drifting with a clock in z (**Time** times 0.3), sharpened by a **Smoothstep** (edges 0.4 and 0.65) so the clouds have defined edges.",
+  "Where the mask is 1 the blue shows full; where it is 0 it is black; in between, dimmer blue.",
+  "The masked colour goes to the **Output**."
+ ],
+ "try": [
+  {
+   "label": "Another colour",
+   "text": "the Colour's rgb at magenta: the same clouds, another colour - the mask decides where, the colour what.",
+   "set": [
+    [
+     2,
+     "rgb",
+     [
+      255,
+      0,
+      180
+     ]
+    ]
+   ]
+  },
+  {
+   "label": "Soft clouds",
+   "text": "the Smoothstep's edges at 0.2 and 0.8: the mask ramps gently, so the clouds fade into the dark.",
+   "set": [
+    [
+     3,
+     "e0",
+     0.2
+    ],
+    [
+     3,
+     "e1",
+     0.8
+    ]
+   ]
+  },
+  {
+   "label": "Bigger clouds",
+   "text": "the Noise's scale at 1.5: big, slow cloud shapes.",
+   "set": [
+    [
+     4,
+     "scale",
+     1.5
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Mask",
+  "nodes": [
+   {
+    "id": 5,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 4,
+    "type": "Noise",
+    "params": {
+     "octaves": 2,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.4,
+     "e1": 0.65
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Colour",
+    "params": {
+     "rgb": [
+      40,
+      160,
+      255
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Mask",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    5,
+    "u",
+    4,
+    "x"
+   ],
+   [
+    5,
+    "v",
+    4,
+    "y"
+   ],
+   [
+    6,
+    "t",
+    7,
+    "a"
+   ],
+   [
+    7,
+    "result",
+    4,
+    "z"
+   ],
+   [
+    4,
+    "value",
+    3,
+    "x"
+   ],
+   [
+    2,
+    "color",
+    1,
+    "color"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "mask"
+   ],
+   [
+    1,
+    "color",
+    8,
+    "color"
+   ]
+  ]
+ }
+}

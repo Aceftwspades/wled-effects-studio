@@ -1,0 +1,232 @@
+{
+ "node": "Mandelbrot",
+ "star": 1,
+ "caption": "Mandelbrot: the set, its escape times coloured by a cycling palette",
+ "why": [
+  "The Mandelbrot set is the best-known picture in mathematics: an endlessly detailed edge between points that stay put under a simple rule and points that fly off. For every point, the node runs the rule and reports how quickly the point escapes - 0 at once, 1 never (it is inside).",
+  "Colouring that escape time gives the familiar bands round the edge; adding a clock to the colour makes them flow, the classic colour-cycling look. With julia on, the same rule draws a Julia set - one of the infinitely many shapes the Mandelbrot set is a map of. Its neighbours: Bifurcation is the same rule seen another way (where the orbits live); Noise is smooth random texture; Mandelbrot is exact, infinitely detailed structure."
+ ],
+ "steps": [
+  "**Coords** `centred x` and `centred y` (-1..1 from the centre) are scaled and moved by **Multiply** and **Add** nodes into **x** and **y**: x runs -2.1 .. 0.9 so the whole set fits, y -1.1 .. 1.1.",
+  "**iterations** is 40: how many times the rule runs before a point counts as inside - more shows finer detail at the edge and costs more.",
+  "`value` plus a slow clock (**Time** times 0.15) is the **Palette**'s index: the bands of escape time take the palette's colours, and the clock cycles them. The value also goes through a **Smoothstep** (edges 0.02 and 0.3) into the brightness, so points that escape at once stay dark and the set stands out.",
+  "**julia** is off, so **julia x** and **julia y** do nothing yet - they are the Julia set's constant (see below)."
+ ],
+ "try": [
+  {
+   "label": "A Julia set",
+   "text": "julia on, julia x -0.8 and julia y 0.156: every pixel now runs the rule with that constant - a twisting, lacy Julia set in place of the Mandelbrot set.",
+   "set": [
+    [
+     1,
+     "julia",
+     true
+    ],
+    [
+     1,
+     "jx",
+     -0.8
+    ],
+    [
+     1,
+     "jy",
+     0.156
+    ]
+   ]
+  },
+  {
+   "label": "Rough edge",
+   "text": "iterations 10: the rule gives up early, so the fine detail goes and the bands are broad and soft.",
+   "set": [
+    [
+     1,
+     "iterations",
+     10
+    ]
+   ]
+  },
+  {
+   "label": "Zoom in",
+   "text": "the x Multiply at 0.4 and its Add at -0.75 (and y's Multiply at 0.3): the window closes in on the seahorse valley between the two big bulbs.",
+   "set": [
+    [
+     3,
+     "b",
+     0.4
+    ],
+    [
+     4,
+     "b",
+     -0.75
+    ],
+    [
+     5,
+     "b",
+     0.3
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Mandelbrot",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 1.5
+    }
+   },
+   {
+    "id": 4,
+    "type": "Add",
+    "params": {},
+    "inputs": {
+     "b": -0.6
+    }
+   },
+   {
+    "id": 5,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 1.1
+    }
+   },
+   {
+    "id": 1,
+    "type": "Mandelbrot",
+    "params": {
+     "iterations": 40,
+     "julia": false
+    },
+    "inputs": {
+     "jx": 0.0,
+     "jy": 0.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.15
+    }
+   },
+   {
+    "id": 8,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.02,
+     "e1": 0.3
+    },
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "cx",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "cy",
+    5,
+    "a"
+   ],
+   [
+    5,
+    "result",
+    1,
+    "y"
+   ],
+   [
+    6,
+    "t",
+    7,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    8,
+    "a"
+   ],
+   [
+    7,
+    "result",
+    8,
+    "b"
+   ],
+   [
+    8,
+    "result",
+    9,
+    "index"
+   ],
+   [
+    1,
+    "value",
+    11,
+    "x"
+   ],
+   [
+    11,
+    "result",
+    9,
+    "brightness"
+   ],
+   [
+    9,
+    "color",
+    10,
+    "color"
+   ]
+  ]
+ }
+}

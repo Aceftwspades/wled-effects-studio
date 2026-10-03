@@ -1,0 +1,180 @@
+{
+ "node": "Vector math",
+ "star": 1,
+ "caption": "Vector math: each pixel's distance from a point circling inside the cube - a ball of light moving round",
+ "why": [
+  "Working with points and directions as whole vectors keeps a graph small: add two positions, measure the distance between them, reflect one off another. Vector math has the common operations in one node - pick from the list - with a vector result and, for distance, dot and length, a number.",
+  "Its neighbours: Dot 3 and Length are single operations; Vector and Vector split build and take apart; Vector math is the toolbox."
+ ],
+ "steps": [
+  "**a** is each pixel's **Position**. **b** is a point circling just inside the cube's walls: a **Vector** whose x and y are a **Rotate** of (0.85, 0) by a clock (**Time** times 0.2), at height 0.4.",
+  "**operation** is distance: the `value` output is how far the pixel is from the point. **scale** is used only by the scale operation.",
+  "A **Smoothstep** (edges 1.1 and 0) turns the distance into a glow: bright near the point, dark by 1.1 away. The **Palette** colours it by the distance.",
+  "The ball of light circles the cube, lighting the faces it passes nearest."
+ ],
+ "try": [
+  {
+   "label": "Bigger ball",
+   "text": "the Smoothstep's first edge at 2: the glow reaches much further - most of the cube lit, brightest on the side nearest the point.",
+   "set": [
+    [
+     4,
+     "e0",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "Facing",
+   "text": "operation dot: instead of the distance, how far the pixel lies along the point's direction - a lit half facing the point, dark half away.",
+   "set": [
+    [
+     1,
+     "op",
+     "dot"
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Vector math",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Rotate",
+    "params": {},
+    "inputs": {
+     "x": 0.85,
+     "y": 0.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Vector",
+    "params": {},
+    "inputs": {
+     "z": 0.4
+    }
+   },
+   {
+    "id": 1,
+    "type": "Vector math",
+    "params": {
+     "op": "distance"
+    },
+    "inputs": {
+     "scale": 1.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 1.1,
+     "e1": 0.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   }
+  ],
+  "links": [
+   [
+    11,
+    "result",
+    3,
+    "turns"
+   ],
+   [
+    3,
+    "x",
+    5,
+    "x"
+   ],
+   [
+    3,
+    "y",
+    5,
+    "y"
+   ],
+   [
+    2,
+    "pos",
+    1,
+    "a"
+   ],
+   [
+    5,
+    "v",
+    1,
+    "b"
+   ],
+   [
+    1,
+    "value",
+    4,
+    "x"
+   ],
+   [
+    1,
+    "value",
+    6,
+    "index"
+   ],
+   [
+    4,
+    "result",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

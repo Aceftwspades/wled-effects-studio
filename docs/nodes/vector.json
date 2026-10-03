@@ -1,0 +1,169 @@
+{
+ "node": "Vector",
+ "star": 1,
+ "caption": "Vector: each pixel's position with a clock added to x - the Voronoi cells drift through the cube",
+ "why": [
+  "Several nodes take a point or a direction as one wire - a vector of three numbers: Voronoi, Path, Dot 3, Length, Vector math. Vector builds one from three numbers, so you can make a point from anything: a position with something added, a direction from three signals.",
+  "Its neighbours: Vector split takes one apart; Position and Direction give ready-made ones; Vector math combines them; Vector builds one."
+ ],
+ "steps": [
+  "**x** is **Position**'s `x` plus a clock (**Time** times 0.25, an **Add**); **y** and **z** are Position's own.",
+  "The `v` output is that point - the pixel's place, slid along x as time goes on.",
+  "It is a **Voronoi**'s pos (scale 1.2): the cells are drawn at the slid places, so they drift through the cube along x.",
+  "The cells' `edge` through a **Smoothstep** lights them with dark cracks; their `id` colours them."
+ ],
+ "try": [
+  {
+   "label": "Faster drift",
+   "text": "the clock's Multiply at 1: the cells slide through the cube four times as fast.",
+   "set": [
+    [
+     11,
+     "b",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Vector",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Vector",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Voronoi",
+    "params": {},
+    "inputs": {
+     "scale": 1.2,
+     "seed": 0.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.0,
+     "e1": 0.15
+    },
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.25
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "x",
+    3,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "b"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "y",
+    1,
+    "y"
+   ],
+   [
+    2,
+    "z",
+    1,
+    "z"
+   ],
+   [
+    1,
+    "v",
+    4,
+    "pos"
+   ],
+   [
+    4,
+    "edge",
+    5,
+    "x"
+   ],
+   [
+    4,
+    "id",
+    6,
+    "index"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

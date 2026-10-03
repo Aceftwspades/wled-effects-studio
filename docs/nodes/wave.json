@@ -1,0 +1,41 @@
+{
+ "node": "Wave",
+ "star": 4,
+ "caption": "Wave: sine stripes across the matrix, scrolled by the clock; under it, the wave's value at the centre pixel",
+ "why": [
+  "Most patterns that repeat - stripes, bars, pulses, ripples - are a wave read along some coordinate. Wave is that one job: give it a position and it answers how far up the wave that position is, 0..1, repeating as often as you ask.",
+  "Reach for it whenever something should repeat evenly. Noise is the neighbour to compare: Noise wanders without repeating, Wave repeats exactly. Sine (in maths) is the raw function, -1..1 and one cycle per turn; Wave is already scaled to 0..1, counts cycles for you, and has the other shapes (triangle, square, saw) a pattern usually wants."
+ ],
+ "steps": [
+  "**Coords** gives each pixel its place: `u` runs 0 at the left edge to 1 at the right. Wired into Wave's **x**, the wave is laid out across the matrix.",
+  "**cycles** is 3, so three whole waves fit between the left edge and the right: three bright stripes and three dark ones.",
+  "**Speed** times **Time**'s `t` (the Multiply) is a number that grows steadily, faster with the slider higher. Wired into **phase**, it slides the wave along x - the stripes scroll. A phase of 1 moves the wave one whole cycle.",
+  "Wave's `value` sets the **Palette**'s brightness, while the palette's index follows `u`: the colours stay put across the matrix and the wave lights and darkens them as it passes.",
+  "**shape** is sine, the smoothest. **distort** is 0, so every stripe is the same width."
+ ],
+ "try": [
+  {"label": "Square stripes", "text": "shape square: the wave snaps between 0 and 1, so the stripes get hard edges - a marquee's on and off.", "set": [[4, "shape", "square"]]},
+  {"label": "Eight cycles", "text": "cycles 8: eight waves across the same width, so the stripes are narrower and there are more of them.", "set": [[4, "cycles", 8.0]]},
+  {"label": "Distort it", "text": "distort 0.6: the wave is pushed off even spacing, so the stripes bunch and stretch - organic rather than mechanical.", "set": [[4, "distort", 0.6]]},
+  {"label": "Saw", "text": "shape saw: each cycle ramps up and drops at once, so the stripes have a soft side and a hard side, and scroll like a wipe.", "set": [[4, "shape", "saw"]]}
+ ],
+ "trace": [[4, "value"]],
+ "graph": {
+  "name": "Tutorial Wave",
+  "nodes": [
+   {"id": 1, "type": "Speed", "params": {"label": "Speed", "default": 128}, "inputs": {}},
+   {"id": 2, "type": "Time", "params": {}, "inputs": {}},
+   {"id": 3, "type": "Coords", "params": {}, "inputs": {}},
+   {"id": 5, "type": "Multiply", "params": {}, "inputs": {}},
+   {"id": 4, "type": "Wave", "params": {"shape": "sine"}, "inputs": {"cycles": 3.0, "distort": 0.0}},
+   {"id": 6, "type": "Palette", "params": {}, "inputs": {}},
+   {"id": 7, "type": "Output", "params": {}, "inputs": {}}
+  ],
+  "links": [
+   [1, "value", 5, "a"], [2, "t", 5, "b"],
+   [3, "u", 4, "x"], [5, "result", 4, "phase"],
+   [3, "u", 6, "index"], [4, "value", 6, "brightness"],
+   [6, "color", 7, "color"]
+  ]
+ }
+}

@@ -46,10 +46,13 @@ def frame_colours(app, eng, mode, wt, dt):
     return rgb.reshape(g.h, g.w, 3)
 
 
-def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=lambda m: None, eng=None, effect=None, params=None):
+def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=lambda m: None, eng=None, effect=None, params=None,
+              syn=None):
     """The turntable: a list of (size, size, 3) frames. `eng`, `effect`
     (an index) and `params` pick another effect on a second engine already
-    made - the library's previews; without them, the sim's own."""
+    made - the library's previews, each from a clean cube; without them, the
+    sim's own. `syn`: a Synth whose beat the effect hears (an audio effect is
+    dark without it)."""
     g = app.project.geometry
     if mode == "effect":
         try:
@@ -61,7 +64,10 @@ def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=
                 eng.colors(*app.seg_cols)
             else:
                 eng.select(int(effect), params=params or None)
+                eng.clear()                          # a clean cube: nothing of the effect before it
             for _ in range(10):
+                if syn is not None:
+                    syn.push(eng)
                 eng.frame(23)                        # a moment in, so the picture is not the first frame's
         except Exception as e:
             log(f"no second engine for the preview ({e}); the parts are shown instead")
@@ -76,6 +82,8 @@ def turntable(app, mode="effect", seconds=4.0, fps=15, size=320, turns=1.0, log=
     yaw0, pitch, dist = app.yaw, app.pitch, app.dist
     for i in range(n):
         yaw = yaw0 + turns * 2 * np.pi * i / n
+        if syn is not None and mode == "effect":
+            syn.push(eng)
         rgb = frame_colours(app, eng, mode, wt, 1.0 / fps)
         if g.kind == "cube" and not app.eng.fx.get("o3"):
             img = render.render(rgb, g.params.get("B", 16), size, yaw, pitch, dist, six=bool(g.params.get("six")))

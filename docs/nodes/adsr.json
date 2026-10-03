@@ -1,0 +1,187 @@
+{
+ "node": "ADSR",
+ "star": 1,
+ "caption": "ADSR: the bass opening a gate, and an envelope rising and falling on each one - as a meter, and as a line",
+ "why": [
+  "A light that just switches on and off with the beat looks mechanical. Instruments do not: a note swells in, falls to a level, holds, and dies away. ADSR shapes a value the same way - attack, decay, sustain, release - every time its gate opens, so a flash on the beat has a shape you choose.",
+  "In one shot mode it plays attack and decay whenever the gate turns on (a flash that fades); in held mode it also sustains while the gate stays on and releases when it closes (a swell that lasts as long as the bass does). Its neighbours: Envelope follows a level smoothly (no trigger); Slew and Ease glide toward a target; ADSR is a shape played on a trigger."
+ ],
+ "steps": [
+  "**Audio**'s `bass` goes into a **Gate** (on above 0.5, off below 0.3); the gate's `on` is ADSR's **gate** - open while the bass is loud.",
+  "**attack** is 10 ms: on each opening the value jumps up almost at once. **decay** is 300 ms: it falls away again over a third of a second.",
+  "**mode** is one shot, so **sustain** (0.5) and **release** (400 ms) are not used yet - they matter in held mode (see below).",
+  "`value` drives a level meter: the value plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the value, so a column is lit from the bottom as high as the value, in the **Palette**'s colours across. `active` is true while the envelope is anywhere but at rest.",
+  "The trace shows the gate (grey) and the envelope (orange): a sharp rise at each opening, then the decay."
+ ],
+ "try": [
+  {
+   "label": "Slow attack",
+   "text": "attack 250: each opening swells up over a quarter of a second instead of snapping - a soft pad rather than a hit.",
+   "set": [
+    [
+     1,
+     "attack",
+     250.0
+    ]
+   ]
+  },
+  {
+   "label": "Held",
+   "text": "mode held: the value falls to sustain (0.5) and stays there while the gate is open, then fades out over release when the bass drops.",
+   "set": [
+    [
+     1,
+     "mode",
+     "held"
+    ]
+   ]
+  },
+  {
+   "label": "Long tail",
+   "text": "decay 1200: each hit fades over more than a second, so the hits overlap into a continuous glow.",
+   "set": [
+    [
+     1,
+     "decay",
+     1200.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   3,
+   "value"
+  ],
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial ADSR",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Gate",
+    "params": {},
+    "inputs": {
+     "high": 0.5,
+     "low": 0.3
+    }
+   },
+   {
+    "id": 1,
+    "type": "ADSR",
+    "params": {
+     "mode": "one shot"
+    },
+    "inputs": {
+     "attack": 10.0,
+     "decay": 300.0,
+     "sustain": 0.5,
+     "release": 400.0
+    }
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "bass",
+    3,
+    "x"
+   ],
+   [
+    3,
+    "on",
+    1,
+    "gate"
+   ],
+   [
+    1,
+    "value",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "b"
+   ],
+   [
+    21,
+    "result",
+    22,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "index"
+   ],
+   [
+    22,
+    "value",
+    23,
+    "brightness"
+   ],
+   [
+    23,
+    "color",
+    24,
+    "color"
+   ]
+  ]
+ }
+}

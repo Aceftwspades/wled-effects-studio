@@ -1,0 +1,138 @@
+{
+ "node": "Sparkle",
+ "star": 1,
+ "caption": "Sparkle: a tenth of the pixels lit at random, a new tenth eight times a second",
+ "why": [
+  "Glitter, stars, static, snow in a light: random pixels lit, a different few each moment. Sparkle picks which pixels are lit from a density and a seed - the same seed always lights the same pixels, so you choose when they change.",
+  "Step the seed with a clock and the pixels twinkle; step it with the beat and they change on the kick; hold it and the stars stay put. Its neighbours: Hash gives a random number per thing (Sparkle is a lit/unlit per pixel); Noise is smooth; Particles are sparks that move."
+ ],
+ "steps": [
+  "**density** is 0.1: a tenth of the pixels are lit.",
+  "**seed** comes from **Time** times 8 through a **Floor**: it steps up eight times a second, and each step lights a different tenth.",
+  "`value` - 1 where lit, 0 elsewhere - is the **Palette**'s brightness, and **Coords** `u` its index, so the sparkles take the palette's colour for where they are."
+ ],
+ "try": [
+  {
+   "label": "Denser",
+   "text": "density 0.4: four in ten pixels lit - busy glitter rather than stars.",
+   "set": [
+    [
+     1,
+     "density",
+     0.4
+    ]
+   ]
+  },
+  {
+   "label": "Slow twinkle",
+   "text": "the seed's Multiply at 2: the pixels change twice a second, a slow twinkle.",
+   "set": [
+    [
+     3,
+     "b",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "A few stars",
+   "text": "density 0.02: one pixel in fifty - sparse stars in a dark sky.",
+   "set": [
+    [
+     1,
+     "density",
+     0.02
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Sparkle",
+  "nodes": [
+   {
+    "id": 5,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 8.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.1
+    }
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    4,
+    "result",
+    1,
+    "seed"
+   ],
+   [
+    5,
+    "u",
+    6,
+    "index"
+   ],
+   [
+    1,
+    "value",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

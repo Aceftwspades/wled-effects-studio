@@ -1,0 +1,141 @@
+{
+ "node": "Rotate",
+ "star": 1,
+ "caption": "Rotate: the centred coordinates turned round the middle by a clock - the stripes drawn from them spin",
+ "why": [
+  "Spinning a pattern means turning the coordinates it is drawn from. Rotate turns a pair of numbers - an x and a y - round the origin by a number of turns; feed a clock into turns and anything drawn from the result spins.",
+  "Three of them on the three pairs of x, y and z tumble a 3-D pattern. Its neighbours: Transform also moves and zooms, about any pivot; Vector rotate turns a 3-D vector about any axis; Rotate is the plain 2-D turn about 0."
+ ],
+ "steps": [
+  "**x** and **y** are **Coords** `centred x` and `centred y` - the place measured from the middle, so the turn is about the middle.",
+  "**turns** comes from a clock (**Time** times 0.08): one full turn every twelve and a half seconds.",
+  "The turned `x` goes into **Stripes** (count 1 - about three across the matrix, as x runs -1.4..1.4 corner to corner): stripes across the turned coordinate, so they spin about the centre. The **Palette** colours them by the turned `y`."
+ ],
+ "try": [
+  {
+   "label": "Faster",
+   "text": "the clock's Multiply at 0.4: a turn every two and a half seconds.",
+   "set": [
+    [
+     11,
+     "b",
+     0.4
+    ]
+   ]
+  },
+  {
+   "label": "More stripes",
+   "text": "the Stripes' count at 3: thinner spinning bars - at this size, about as fine as the matrix can draw cleanly.",
+   "set": [
+    [
+     3,
+     "count",
+     3.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Rotate",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Rotate",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 1.0,
+     "duty": 0.5,
+     "phase": 0.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.08
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "cx",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "cy",
+    1,
+    "y"
+   ],
+   [
+    11,
+    "result",
+    1,
+    "turns"
+   ],
+   [
+    1,
+    "x",
+    3,
+    "x"
+   ],
+   [
+    1,
+    "y",
+    4,
+    "index"
+   ],
+   [
+    3,
+    "value",
+    4,
+    "brightness"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

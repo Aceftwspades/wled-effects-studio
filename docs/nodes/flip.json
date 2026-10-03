@@ -1,0 +1,148 @@
+{
+ "node": "Flip",
+ "star": 1,
+ "caption": "Flip: scrolling text mirrored left to right - it reads backwards and scrolls the other way",
+ "why": [
+  "A matrix hung the other way round, a panel seen from behind, a strip wired from the wrong end: the picture comes out mirrored. Flip turns the coordinates round before anything is drawn from them, so the whole effect is mirrored or rotated without touching the nodes that draw it.",
+  "It is also a design tool - mirror half a pattern, swap the axes to turn stripes from vertical to horizontal. Its neighbours: Transform moves, turns and zooms coordinates by any amount; Mirror fold (maths) folds a value back on itself; Flip is the three quick flips."
+ ],
+ "steps": [
+  "**u** and **v** are unwired, so they are the pixel's own place.",
+  "**left-right** is on: u is turned round, 1 at the left edge and 0 at the right. **top-bottom** is off, **swap** is off.",
+  "Flip's `u` and `v` go into a **Text** node's u and v, so the text is read through the flip: it comes out mirrored, and its scroll (**Time** times 10 into the Text's offset) runs the other way.",
+  "The letters are coloured by the **Palette**: `i` (which letter) is its index and `level` its brightness."
+ ],
+ "try": [
+  {
+   "label": "Not flipped",
+   "text": "left-right off: the text reads normally and scrolls to the left.",
+   "set": [
+    [
+     1,
+     "flip_u",
+     false
+    ]
+   ]
+  },
+  {
+   "label": "Upside down",
+   "text": "top-bottom on as well: mirrored both ways - the text is turned half round and reads upside down.",
+   "set": [
+    [
+     1,
+     "flip_v",
+     true
+    ]
+   ]
+  },
+  {
+   "label": "Swap",
+   "text": "swap on: across and down are exchanged, so the text lies on its diagonal - mostly off the matrix, one column of each letter crossing it.",
+   "set": [
+    [
+     1,
+     "swap",
+     true
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Flip",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Flip",
+    "params": {
+     "flip_u": true,
+     "flip_v": false,
+     "swap": false
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 10.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Text",
+    "params": {
+     "text": "FLIP IT",
+     "size": 1,
+     "row": -1,
+     "loop": true,
+     "font": "5x7",
+     "height": 12
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "u",
+    4,
+    "u"
+   ],
+   [
+    1,
+    "v",
+    4,
+    "v"
+   ],
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "offset"
+   ],
+   [
+    4,
+    "i",
+    5,
+    "index"
+   ],
+   [
+    4,
+    "level",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

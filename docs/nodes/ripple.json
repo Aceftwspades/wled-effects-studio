@@ -1,0 +1,135 @@
+{
+ "node": "Ripple",
+ "star": 1,
+ "caption": "Ripple: rings spreading from the centre like a drop in water",
+ "why": [
+  "Rings spreading from a point read instantly as a drop in water, a sound wave, a pulse from the middle. Ripple draws them: for every pixel, where it sits on rings centred on a point you choose, with a phase that moves the rings outward.",
+  "Move the centre and the rings spread from somewhere else; drive the phase with a beat and they pulse with the music. Its neighbours: Gradient's spherical shape is one ramp out from the centre; Shells are rings that start on beats and travel over a cube; Ripple is an endless train of rings from one point."
+ ],
+ "steps": [
+  "**centre x** and **centre y** are the centre, in the picture's -1..1 coordinates: 0, 0 is the middle.",
+  "**rings** is 4: how many rings fit across the picture.",
+  "**Time** times 0.5 goes into **phase**: as it grows the rings move outward, half a ring a second.",
+  "`value` is the **Palette**'s brightness - bright on each ring, dark between - while **Coords** `r` (the distance from the centre) picks the colour, so each ring changes colour as it travels out."
+ ],
+ "try": [
+  {
+   "label": "Off centre",
+   "text": "centre x -0.7: the rings spread from near the left edge and sweep across the matrix.",
+   "set": [
+    [
+     1,
+     "cx",
+     -0.7
+    ]
+   ]
+  },
+  {
+   "label": "More rings",
+   "text": "rings 10: ten rings across - fine ripples, like rain on a pond.",
+   "set": [
+    [
+     1,
+     "rings",
+     10.0
+    ]
+   ]
+  },
+  {
+   "label": "Slow swell",
+   "text": "the clock's Multiply at 0.15: the rings creep outward, a slow swell rather than a pulse.",
+   "set": [
+    [
+     3,
+     "b",
+     0.15
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Ripple",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 1,
+    "type": "Ripple",
+    "params": {},
+    "inputs": {
+     "cx": 0.0,
+     "cy": 0.0,
+     "rings": 4.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    4,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "phase"
+   ],
+   [
+    2,
+    "r",
+    5,
+    "index"
+   ],
+   [
+    1,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

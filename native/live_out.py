@@ -22,8 +22,11 @@ The wiring test is a frame generator: a chase along the wiring order, one
 LED by index, or one part of a shape, written into the engine's pixel
 buffer (so the sim's views show it) and streamed like any other frame.
 """
+import collections
 import socket
 import struct
+import time
+import uuid
 
 import numpy as np
 
@@ -32,47 +35,168 @@ DDP_MAX = 1440                      # bytes of pixel data a packet carries
 FLAG_VER1, FLAG_PUSH = 0x40, 0x01
 TYPE_RGB8 = 0x0B                    # RGB, 8 bits a channel
 ID_DISPLAY = 1
+E131_PORT, ARTNET_PORT = 5568, 6454
+UNIVERSE_BYTES = 510                # 170 RGB pixels a universe: WLED's "Multiple RGB", xLights' and Falcon's default
 
 
-class DdpOut:
-    def __init__(self, host, port=DDP_PORT):
+class _UdpOut:
+    """What every sender shares: a non-blocking UDP socket to the device's IP (a host written
+    with its web port, "192.168.1.17:8080" or the tests' fake, takes the protocol's own port),
+    the counts, and the last second's frames and bytes for the stream's health line."""
+    NAME = "?"
+
+    def __init__(self, host, port):
         self.host, self.port = host, port
-        # a device written with its web port ("192.168.1.17:8080", the tests' fake WLED) takes DDP on DDP's own
         self.ip = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setblocking(False)
-        self.seq = 1
         self.frames = 0
         self.bytes = 0
         self.errors = 0
         self.last_error = ""
+        self._sent = collections.deque()             # (time, bytes) of each frame in the last second
 
-    def send(self, data):
-        """One frame: `data` is the RGB bytes in physical order."""
-        data = bytes(data)
-        n = len(data)
-        off = 0
-        while off < n or n == 0:
-            chunk = data[off:off + DDP_MAX]
-            last = off + len(chunk) >= n
-            head = struct.pack("!BBBBIH", FLAG_VER1 | (FLAG_PUSH if last else 0), self.seq, TYPE_RGB8, ID_DISPLAY, off, len(chunk))
-            try:
-                self.sock.sendto(head + chunk, (self.ip, self.port))
-                self.bytes += len(head) + len(chunk)
-            except OSError as e:
-                self.errors += 1; self.last_error = str(e)
-                break
-            off += len(chunk)
-            if n == 0:
-                break
-        self.seq = self.seq % 15 + 1
+    def _put(self, pkt):
+        try:
+            self.sock.sendto(pkt, (self.ip, self.port))
+            self.bytes += len(pkt)
+            return True
+        except OSError as e:
+            self.errors += 1; self.last_error = str(e)
+            return False
+
+    def _frame_done(self, nbytes):
         self.frames += 1
+        now = time.perf_counter()
+        self._sent.append((now, nbytes))
+        while self._sent and now - self._sent[0][0] > 1.0:
+            self._sent.popleft()
+
+    def rate(self):
+        """(frames a second, kbit a second) over the last second."""
+        now = time.perf_counter()
+        while self._sent and now - self._sent[0][0] > 1.0:
+            self._sent.popleft()
+        return float(len(self._sent)), sum(b for _, b in self._sent) * 8.0 / 1000.0
 
     def close(self):
         try:
             self.sock.close()
         except OSError:
             pass
+
+
+class DdpOut(_UdpOut):
+    NAME = "DDP"
+
+    def __init__(self, host, port=DDP_PORT):
+        super().__init__(host, port)
+        self.seq = 1
+
+    def send(self, data):
+        """One frame: `data` is the RGB bytes in physical order."""
+        data = bytes(data)
+        n = len(data)
+        off, sent = 0, 0
+        while off < n or n == 0:
+            chunk = data[off:off + DDP_MAX]
+            last = off + len(chunk) >= n
+            head = struct.pack("!BBBBIH", FLAG_VER1 | (FLAG_PUSH if last else 0), self.seq, TYPE_RGB8, ID_DISPLAY, off, len(chunk))
+            if not self._put(head + chunk):
+                break
+            sent += len(head) + len(chunk)
+            off += len(chunk)
+            if n == 0:
+                break
+        self.seq = self.seq % 15 + 1
+        self._frame_done(sent)
+
+
+class E131Out(_UdpOut):
+    """sACN (ANSI E1.31-2018): a data packet a universe, 510 bytes of RGB (170 pixels) in each, from
+    `universe` up, to the device's IP on 5568 - what WLED takes with E1.31 on in its Sync settings
+    (DMX mode Multiple RGB), and what Falcon, ESPixelStick or FPP controllers take. Each universe
+    keeps its own sequence number."""
+    NAME = "E1.31 (sACN)"
+    ROOT_ID = b"ASC-E1.17\x00\x00\x00"
+
+    def __init__(self, host, universe=1, port=E131_PORT, source="WLED Effects Studio", priority=100):
+        super().__init__(host, port)
+        self.universe = max(1, min(63999, int(universe)))
+        self.cid = uuid.uuid4().bytes                  # this sender, for the receiver to tell sources apart
+        self.source = source.encode("utf-8")[:63].ljust(64, b"\x00")
+        self.priority = max(0, min(200, int(priority)))
+        self.seqs = {}
+
+    def packet(self, universe, data, seq):
+        """One E1.31 data packet: the root layer, the framing layer, the DMP layer (start code 0)."""
+        n = len(data)
+        total = 126 + n
+        root = struct.pack("!HH12sHI16s", 0x0010, 0x0000, self.ROOT_ID, 0x7000 | (total - 16), 0x00000004, self.cid)
+        framing = struct.pack("!HI64sBHBBH", 0x7000 | (total - 38), 0x00000002, self.source, self.priority, 0,
+                              seq & 255, 0, universe)
+        dmp = struct.pack("!HBBHHHB", 0x7000 | (total - 115), 0x02, 0xA1, 0x0000, 0x0001, n + 1, 0x00)
+        return root + framing + dmp + bytes(data)
+
+    def send(self, data):
+        data = bytes(data)
+        sent = 0
+        for k, off in enumerate(range(0, max(1, len(data)), UNIVERSE_BYTES)):
+            u = self.universe + k
+            seq = self.seqs.get(u, 0)
+            self.seqs[u] = (seq + 1) & 255
+            pkt = self.packet(u, data[off:off + UNIVERSE_BYTES], seq)
+            if not self._put(pkt):
+                break
+            sent += len(pkt)
+        self._frame_done(sent)
+
+
+class ArtNetOut(_UdpOut):
+    """Art-Net (Art-Net 4): an ArtDMX packet a universe, 510 bytes of RGB (170 pixels) in each, from
+    the port-address `universe` up (net, sub-net and universe in its 15 bits), to the device's IP on
+    6454 - WLED with Art-Net on in its Sync settings, and the lighting world's nodes. The sequence
+    runs 1..255 (0 would switch the receiver's reordering off)."""
+    NAME = "Art-Net"
+
+    def __init__(self, host, universe=0, port=ARTNET_PORT):
+        super().__init__(host, port)
+        self.universe = max(0, min(32767, int(universe)))
+        self.seq = 1
+
+    def packet(self, universe, data, seq):
+        """One ArtDMX packet: the ID, OpDmx (0x5000, low byte first), protocol 14, the sequence, the
+        port-address (SubUni, Net) and the length (big-endian, even)."""
+        data = bytes(data)
+        if len(data) % 2:
+            data += b"\x00"
+        return (b"Art-Net\x00" + struct.pack("<H", 0x5000) + struct.pack("!H", 14)
+                + struct.pack("!BBBB", seq & 255, 0, universe & 0xFF, (universe >> 8) & 0x7F)
+                + struct.pack("!H", len(data)) + data)
+
+    def send(self, data):
+        data = bytes(data)
+        sent = 0
+        for k, off in enumerate(range(0, max(1, len(data)), UNIVERSE_BYTES)):
+            pkt = self.packet(self.universe + k, data[off:off + UNIVERSE_BYTES], self.seq)
+            if not self._put(pkt):
+                break
+            sent += len(pkt)
+        self.seq = self.seq % 255 + 1
+        self._frame_done(sent)
+
+
+# the protocols the stream can speak: (key, name, the universe it starts at by default - None: none)
+PROTOCOLS = (("ddp", "DDP", None), ("e131", "E1.31 (sACN)", 1), ("artnet", "Art-Net", 0))
+
+
+def make_out(protocol, host, universe=None):
+    """A sender for `protocol` ("ddp", "e131", "artnet") to host."""
+    if protocol == "e131":
+        return E131Out(host, 1 if universe is None else universe)
+    if protocol == "artnet":
+        return ArtNetOut(host, 0 if universe is None else universe)
+    return DdpOut(host)
 
 
 def stream_bytes(rgb, geom, order="logical"):
@@ -120,6 +244,7 @@ class WiringTest:
         self.trail = 6               # LEDs lit behind the head
         self.index = 0               # the LED (index mode) or the part (part mode)
         self.colour = (255, 255, 255)
+        self.mask = None             # (n,) bool: the LEDs lit in the "mask" mode (mapping by camera's binary codes)
         self.pos = 0.0
         self.t = 0.0
 
@@ -141,6 +266,8 @@ class WiringTest:
             return f"output {o + 1} of {len(self.outputs)}: LEDs {self.outputs[o][0]}..{self.outputs[o][0] + self.outputs[o][1] - 1}"
         elif self.mode in ("red", "green", "blue", "white"):
             return f"all {self.mode}: every LED the one colour - a colour-order check"
+        elif self.mode == "mask":
+            return f"{int(np.count_nonzero(self.mask)) if self.mask is not None else 0} LEDs lit by code"
         elif self.mode == "alternate":
             return "every other LED, swapping"
         elif self.mode == "twinkle":
@@ -169,6 +296,9 @@ class WiringTest:
                 out[i] = np.maximum(out[i], (c * f).astype(np.uint8))
         elif self.mode == "index":
             out[self.index % self.n] = c
+        elif self.mode == "mask" and self.mask is not None:
+            m = np.asarray(self.mask, bool)[:self.n]
+            out[:len(m)][m] = c
         elif self.mode == "part" and self.owner is not None:
             out[self.owner == (self.index % self._parts())] = c
         elif self.mode == "parts in turn" and self.owner is not None:

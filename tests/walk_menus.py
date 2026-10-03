@@ -39,7 +39,8 @@ CMD = scratch.path("command.json")
 LOG = scratch.path("walk.log")
 
 STEPS = [
-    ([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"graph_select": [3]}, {"menu_walk": True}], 20.0),
+    # Live off (on by default): the walk's edits are not to build as they land - its menu item is walked too
+    ([{"graph_auto": False}, {"layout": "graph"}, {"graph_open": "box_fire.json"}, {"graph_select": [3]}, {"menu_walk": True}], 20.0),
     # the menu walk opened every project in turn (File > Project): back to the one the rest walks in
     ([{"project": "default"}, {"layout": "graph"}, {"graph_open": "box_fire.json"}, {"action": "select_none"},
       {"ctx_walk": ["node", 3, None]}], 8.0),

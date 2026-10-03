@@ -29,12 +29,22 @@ prebuilt and a compiler is inside, so building your own effects works with
 nothing installed. `Desktop shortcut.cmd` puts it on the desktop; the app
 checks for newer releases once a day and updates itself.
 
-**Linux**: the release's tarball (`WLED_Effects_Studio_linux.tar.gz`), built
-on Ubuntu. Unpack it anywhere (`tar -xzf`), run `./WLED Effects Studio`;
-`./install_linux.sh` puts it in the app launcher. The engine comes prebuilt;
-building your own effects takes the system's gcc or clang (`build-essential`,
-`base-devel`, `gcc-c++`), live audio its PortAudio. The app says when a newer
-release is out and downloads its tarball for you to unpack over the folder.
+**Linux**: the release's tarball - `WLED_Effects_Studio_linux.tar.gz` on a
+PC, `WLED_Effects_Studio_aarch64.tar.gz` on a 64-bit ARM (a Raspberry Pi 4
+or 5 with a 64-bit OS; releases after 1.4.0) - built on Ubuntu. Unpack it anywhere (`tar -xzf`),
+run `./WLED Effects Studio`; `./install_linux.sh` puts it in the app
+launcher. The engine comes prebuilt; building your own effects takes the
+system's gcc or clang (`build-essential`, `base-devel`, `gcc-c++`), live
+audio its PortAudio. The app says when a newer release is out and downloads
+its tarball for you to unpack over the folder.
+
+**macOS** (Apple silicon; releases after 1.4.0): the release's
+`WLED_Effects_Studio_macos_arm64.tar.gz`. Unpack it anywhere, run
+`./WLED Effects Studio` (or double-click it). The build is not signed by a
+developer Apple knows, so the first time the Finder asks - right-click it,
+Open - or run `xattr -dr com.apple.quarantine .` in the folder once.
+Building your own effects takes Apple's compiler (`xcode-select --install`).
+An Intel Mac runs it from the source, below.
 
 **From the source**, on Windows:
 

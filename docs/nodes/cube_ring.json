@@ -1,0 +1,142 @@
+{
+ "node": "Cube ring",
+ "star": 1,
+ "caption": "Cube ring: rings of light pouring off the lid and down the walls, coloured round the cube",
+ "why": [
+  "A cube standing on a table is a lid and four walls - and a lot of effects want it treated as exactly that: rain running off the top and down the sides, fire climbing the walls, a spiral round them. Cube ring gives each pixel two numbers for that shape.",
+  "`around` goes once round the walls, 0..1; `depth` goes from the middle of the lid (0) out to the rim (0.5) and down the walls to the bottom edge (1). Anything that moves along depth flows off the lid and down; anything along around circles the cube. Its neighbours: Cube face repeats on each face; Position is straight lines through the box; Cube ring is the well."
+ ],
+ "steps": [
+  "Cube ring has no inputs or settings - two outputs that describe each pixel's place on the lid and walls.",
+  "`depth` goes into a **Wave**'s x (4 cycles, saw), with a clock (**Time** times -0.5) as its phase: bright rings start in the middle of the lid, cross the rim and run down the walls.",
+  "`around` is the **Palette**'s index, so the colour changes as you go round the cube; the wave is the brightness.",
+  "Because depth is continuous over the rim, the rings never break at the edge between the lid and a wall."
+ ],
+ "try": [
+  {
+   "label": "More rings",
+   "text": "the Wave's cycles at 8: twice the rings, half as far apart.",
+   "set": [
+    [
+     2,
+     "cycles",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "Rising",
+   "text": "the clock's Multiply at 0.5: the phase runs the other way, so the rings climb the walls and close in on the middle of the lid.",
+   "set": [
+    [
+     4,
+     "b",
+     0.5
+    ]
+   ]
+  },
+  {
+   "label": "Soft rings",
+   "text": "the Wave's shape sine: smooth swells of light instead of sharp-fronted rings.",
+   "set": [
+    [
+     2,
+     "shape",
+     "sine"
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Cube ring",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Cube ring",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": -0.5
+    }
+   },
+   {
+    "id": 2,
+    "type": "Wave",
+    "params": {
+     "shape": "saw"
+    },
+    "inputs": {
+     "cycles": 4.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "depth",
+    2,
+    "x"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    2,
+    "phase"
+   ],
+   [
+    1,
+    "around",
+    5,
+    "index"
+   ],
+   [
+    2,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

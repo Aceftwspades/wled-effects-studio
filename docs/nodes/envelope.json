@@ -1,0 +1,194 @@
+{
+ "node": "Envelope",
+ "star": 1,
+ "caption": "Envelope: the bass as it comes (left) and smoothed by Envelope (right) - a quick rise, a slow fall",
+ "why": [
+  "Audio levels flicker frame to frame; wired straight to brightness, the flicker shows. Envelope smooths a signal the way the ear hears loudness: it follows a rise quickly (attack) and lets go slowly (release), so a stuttering bass becomes a swell that breathes.",
+  "Put one between Audio and anything that would flicker. Its neighbours: Slew limits speed in units a second; Peak hold jumps to peaks and holds them; ADSR plays a shape on a trigger; Envelope is a smooth follower with separate attack and release times."
+ ],
+ "steps": [
+  "**Audio**'s `bass` is the **x** input.",
+  "**attack** is 20 ms: a rise is followed almost at once. **release** is 250 ms: a fall takes about a quarter of a second.",
+  "The left meter is the raw bass, the right one the envelope: two meters - a **Threshold** on `u` switches a **Select** between the two values, left half and right half; each value plus `v` through a Threshold at 1 lights a column from the bottom as high as the value.",
+  "The trace: the bass (grey) spikes and drops; the envelope (orange) rises with each spike and slides down after it."
+ ],
+ "try": [
+  {
+   "label": "Long release",
+   "text": "release 800: the envelope barely falls between kicks - a level that holds up through the beat.",
+   "set": [
+    [
+     1,
+     "release",
+     800.0
+    ]
+   ]
+  },
+  {
+   "label": "Slow attack",
+   "text": "attack 150: even the rise is smoothed - the envelope swells into each kick rather than jumping.",
+   "set": [
+    [
+     1,
+     "attack",
+     150.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   2,
+   "bass"
+  ],
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Envelope",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Envelope",
+    "params": {
+     "attack": 20.0,
+     "release": 250.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 22,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 23,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 25,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "bass",
+    1,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "x"
+   ],
+   [
+    21,
+    "on",
+    22,
+    "on"
+   ],
+   [
+    2,
+    "bass",
+    22,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    22,
+    "b"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    23,
+    "b"
+   ],
+   [
+    23,
+    "result",
+    24,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    25,
+    "index"
+   ],
+   [
+    24,
+    "value",
+    25,
+    "brightness"
+   ],
+   [
+    25,
+    "color",
+    26,
+    "color"
+   ]
+  ]
+ }
+}

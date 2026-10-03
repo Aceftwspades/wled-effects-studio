@@ -1,0 +1,205 @@
+{
+ "node": "Gravity",
+ "star": 1,
+ "caption": "Gravity: a tank of water in the cube, its surface level whichever way down is tilted",
+ "why": [
+  "An effect that should behave like something real - water, sand, a ball rolling - needs to know which way is down. Gravity gives it: with a motion sensor fitted, the real down; without one, straight down, tilted by the two inputs, which a slider or a slow wave can move.",
+  "Dotted with each pixel's Position it gives that pixel's height above the floor, measured the way gravity sees it. Its neighbours: Position gives the place in the cube; Dot 3 and Vector math combine directions; Gravity is the direction of down."
+ ],
+ "steps": [
+  "**tilt x** comes from a slow **Wave** of the clock (**Time** times 0.15), remapped to -0.6..0.6 by a **Remap**: down rocks from one side to the other. **tilt y** is 0.",
+  "`g` is down as a direction (`down x`, `down y`, `down z` its parts; `sensor` is true when a real motion sensor is fitted - not in the sim).",
+  "A **Vector math** in dot mode takes **Position**'s `pos` with `g`: how far along down each pixel is - its depth in the tank.",
+  "A **Smoothstep** (edges -0.1 and 0.1) lights every pixel deeper than the middle: water filling the lower half of the cube, its surface staying level as down rocks. The **Palette** colours it by depth."
+ ],
+ "try": [
+  {
+   "label": "Tilt the other way too",
+   "text": "tilt y 0.5: down leans toward one face as well, so the water surface tilts both ways.",
+   "set": [
+    [
+     1,
+     "tilt_y",
+     0.5
+    ]
+   ]
+  },
+  {
+   "label": "Fuller tank",
+   "text": "the Smoothstep's edges at -0.5 and -0.3: the water fills to well above the middle.",
+   "set": [
+    [
+     6,
+     "e0",
+     -0.5
+    ],
+    [
+     6,
+     "e1",
+     -0.3
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "trace": [
+  [
+   1,
+   "gx"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Gravity",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.15
+    }
+   },
+   {
+    "id": 4,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 1.0,
+     "distort": 0.0,
+     "phase": 0.0
+    }
+   },
+   {
+    "id": 9,
+    "type": "Remap",
+    "params": {
+     "in_lo": 0.0,
+     "in_hi": 1.0,
+     "out_lo": -0.6,
+     "out_hi": 0.6
+    },
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Gravity",
+    "params": {},
+    "inputs": {
+     "tilt_y": 0.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Vector math",
+    "params": {
+     "op": "dot"
+    },
+    "inputs": {
+     "scale": 1.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Smoothstep",
+    "params": {
+     "e0": -0.1,
+     "e1": 0.1
+    },
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    4,
+    "value",
+    9,
+    "x"
+   ],
+   [
+    9,
+    "result",
+    1,
+    "tilt_x"
+   ],
+   [
+    7,
+    "pos",
+    5,
+    "a"
+   ],
+   [
+    1,
+    "g",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "value",
+    6,
+    "x"
+   ],
+   [
+    5,
+    "value",
+    8,
+    "index"
+   ],
+   [
+    6,
+    "result",
+    8,
+    "brightness"
+   ],
+   [
+    8,
+    "color",
+    10,
+    "color"
+   ]
+  ]
+ }
+}

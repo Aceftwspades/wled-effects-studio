@@ -1,0 +1,229 @@
+{
+ "node": "Check 2",
+ "star": 1,
+ "caption": "Check 2: a checkbox turning a layer of white sparkles on over a scrolling palette",
+ "why": [
+  "Check 2 is the second checkbox on the WLED page - another on-off option of your own.",
+  "A common use: a layer that can be switched on and off - sparkles, an outline, a beat flash. Its neighbours: Check 1 and Check 3; Select chooses by a switch; Layers and Blend take an amount, which a checkbox can set through a Select."
+ ],
+ "steps": [
+  "Check 2 has no inputs. Its `on` is true while ticked.",
+  "**label** is Sparkles; **default** is on.",
+  "`on` sets the amount of a **Blend** through a **Select** (0 off, 1 on): white sparkles (a **Sparkle** into a white **Colour**'s mask) laid over a scrolling palette when ticked, gone when not."
+ ],
+ "try": [
+  {
+   "label": "Untick it",
+   "text": "In the side panel's PARAMETERS section, untick Sparkles (Check 2): the sparkles go and the palette scrolls on its own.",
+   "set": []
+  },
+  {
+   "label": "Rename it",
+   "text": "label Glitter: the slider is called Glitter on the WLED page (and in PARAMETERS) - the effect is rebuilt with the new name.",
+   "set": [
+    [
+     1,
+     "label",
+     "Glitter"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Check 2",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Check 2",
+    "params": {
+     "label": "Sparkles",
+     "default": true
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Select",
+    "params": {},
+    "inputs": {
+     "a": 0.0,
+     "b": 1.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 10.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.05
+    }
+   },
+   {
+    "id": 7,
+    "type": "Colour",
+    "params": {
+     "rgb": [
+      255,
+      255,
+      255
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Mask",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   },
+   {
+    "id": 11,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 0.6
+    }
+   },
+   {
+    "id": 13,
+    "type": "Blend",
+    "params": {
+     "mode": "max"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 14,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "on",
+    2,
+    "on"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "x"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "seed"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ],
+   [
+    6,
+    "value",
+    8,
+    "mask"
+   ],
+   [
+    3,
+    "t",
+    10,
+    "a"
+   ],
+   [
+    9,
+    "u",
+    11,
+    "a"
+   ],
+   [
+    10,
+    "result",
+    11,
+    "b"
+   ],
+   [
+    11,
+    "result",
+    12,
+    "index"
+   ],
+   [
+    12,
+    "color",
+    13,
+    "under"
+   ],
+   [
+    8,
+    "color",
+    13,
+    "over"
+   ],
+   [
+    2,
+    "result",
+    13,
+    "amount"
+   ],
+   [
+    13,
+    "color",
+    14,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,115 @@
+{
+ "node": "Colour 1",
+ "star": 1,
+ "caption": "Colour 1: the primary colour picked on the WLED page, as scrolling stripes",
+ "why": [
+  "Besides a palette, the WLED page has three colour pickers - primary, secondary and tertiary - and many people prefer to choose exact colours there. Colour 1 is the primary one, as a colour in the graph.",
+  "Effect settings can name the pickers, so the page says what each is for. Its neighbours: Colour 2 and Colour 3; Palette follows the palette instead; Colour is a fixed colour of the effect's own."
+ ],
+ "steps": [
+  "Colour 1 has no inputs or settings: its `color` is whatever is picked first on the WLED page (in the sim, the side panel's COLOURS).",
+  "It goes into a **Mask** shown by scrolling **Stripes** (count 4, duty 0.5): stripes of the picked colour.",
+  "**Effect settings**' colours names the pickers Stripes, Background and Accent, so the WLED page labels them."
+ ],
+ "try": [
+  {
+   "label": "Pick another colour",
+   "text": "In the side panel's COLOURS section, pick another colour for Stripes (Colour 1): the stripes' colour changes at once - the effect reads the picker every frame.",
+   "set": []
+  }
+ ],
+ "colours": [
+  16738816,
+  1056842,
+  15790335
+ ],
+ "graph": {
+  "name": "Tutorial Colour 1",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Colour 1",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 4.0,
+     "duty": 0.5
+    }
+   },
+   {
+    "id": 3,
+    "type": "Mask",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "none",
+     "colours": "Stripes,Background,Accent"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   }
+  ],
+  "links": [
+   [
+    11,
+    "result",
+    2,
+    "phase"
+   ],
+   [
+    1,
+    "color",
+    3,
+    "color"
+   ],
+   [
+    2,
+    "value",
+    3,
+    "mask"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

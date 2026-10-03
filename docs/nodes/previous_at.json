@@ -1,0 +1,246 @@
+{
+ "node": "Previous at",
+ "star": 1,
+ "caption": "Previous at: each pixel takes last frame's colour from the pixel below - fire climbing from the bottom row",
+ "why": [
+  "Light that moves - fire rising, rain falling, smoke drifting - is each pixel taking what a neighbour showed last frame. Previous at reads any pixel's colour from the frame before: give it a u and v, and it hands back what was there.",
+  "Read the pixel below and things rise; beside and they smear sideways; a little toward the centre and they converge. Its neighbours: Previous is this pixel's own last colour; Field remembers numbers rather than colours; Ring to uv and Position to uv find the neighbour on a cube."
+ ],
+ "steps": [
+  "Previous at's **u** is **Coords** `u`; its **v** is `v` plus 0.07 (an **Add**): the pixel one row below this one.",
+  "A **Fade** (keep 0.9) dims what it reads, so the light cools as it climbs.",
+  "New fire: a **Sparkle** (density 0.5, reseeded fifteen times a second) only in the bottom row (a **Threshold** on `v` at 0.94, multiplied in) is the brightness of the **Palette** at index 0.68 - Lava's orange (the **Effect settings** start it on Lava, whose colour at 0.75 is white).",
+  "A **Blend** in max mode keeps the brighter of the risen light and the new sparks: the bottom row flickers, and each frame the light climbs one row and dims."
+ ],
+ "try": [
+  {
+   "label": "Taller",
+   "text": "the Fade's keep at 0.96: the light dims less per row, so the fire climbs higher.",
+   "set": [
+    [
+     5,
+     "keep",
+     0.96
+    ]
+   ]
+  },
+  {
+   "label": "Falling",
+   "text": "the Add at -0.07: each pixel reads the one above it, so the light falls - put the sparks at the top to see it rain.",
+   "set": [
+    [
+     3,
+     "b",
+     -0.07
+    ]
+   ]
+  },
+  {
+   "label": "In place",
+   "text": "the Add at 0: each pixel reads itself - which is just Previous - so nothing climbs; the bottom row's sparks leave embers that fade where they are.",
+   "set": [
+    [
+     3,
+     "b",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Previous at",
+  "nodes": [
+   {
+    "id": 30,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 31,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 15.0
+    }
+   },
+   {
+    "id": 32,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 33,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.5
+    }
+   },
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {
+     "b": 0.07
+    }
+   },
+   {
+    "id": 1,
+    "type": "Previous at",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Fade",
+    "params": {},
+    "inputs": {
+     "keep": 0.9
+    }
+   },
+   {
+    "id": 6,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.94
+    }
+   },
+   {
+    "id": 7,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "index": 0.68
+    }
+   },
+   {
+    "id": 9,
+    "type": "Blend",
+    "params": {
+     "mode": "max"
+    },
+    "inputs": {
+     "amount": 1.0
+    }
+   },
+   {
+    "id": 10,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Effect settings",
+    "params": {
+     "palette": 8,
+     "dimensions": "2-D",
+     "audio": "none",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    30,
+    "t",
+    31,
+    "a"
+   ],
+   [
+    31,
+    "result",
+    32,
+    "x"
+   ],
+   [
+    32,
+    "result",
+    33,
+    "seed"
+   ],
+   [
+    2,
+    "u",
+    1,
+    "u"
+   ],
+   [
+    2,
+    "v",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "v"
+   ],
+   [
+    1,
+    "color",
+    5,
+    "color"
+   ],
+   [
+    2,
+    "v",
+    6,
+    "x"
+   ],
+   [
+    33,
+    "value",
+    7,
+    "a"
+   ],
+   [
+    6,
+    "value",
+    7,
+    "b"
+   ],
+   [
+    7,
+    "result",
+    8,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    9,
+    "under"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "over"
+   ],
+   [
+    9,
+    "color",
+    10,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,170 @@
+{
+ "node": "Particles",
+ "star": 1,
+ "caption": "Particles: a fountain from the middle of the lid, sparks flying out and falling over the edges",
+ "why": [
+  "Sparks, rain, fireworks, embers, snow: many points, each moving on its own. Particles keeps up to the number you set alive at once - born at a rate (or in bursts), thrown with a velocity and some random spread, pulled by gravity, slowed by drag, dying after their life - and on a cube they stay on the surface, flowing over the edges.",
+  "It moves them; Sprites draws them. Its neighbours: Emitters are events that stay where they land; Sparkle lights random pixels that do not move; Particles are points with motion."
+ ],
+ "steps": [
+  "**rate** is 12: twelve are born a second at **pos**, the middle of the lid (0, 0, 1). **burst** is off; when it turns on, **burst size** are born at once.",
+  "**velocity** is 0 and **spread** 0.8: each leaves in a random direction at up to 0.8. **gravity** pulls them down (0, 0, -1), **drag** (0.2) slows them, and each lives **life** 2 seconds. **tag** is a number each carries (0 here).",
+  "**max** is 32 alive at once. **born anywhere** is off (all from pos), **on the surface** is on (they slide over the cube rather than through it), and **floor** is die: one that reaches the bottom is gone.",
+  "`slots` goes to **Sprites** with **Position**'s `pos`, which draws each as a soft dot coloured by its age. `count` is how many are alive - the trace."
+ ],
+ "try": [
+  {
+   "label": "No gravity",
+   "text": "gravity 0, 0, 0: the sparks drift outward and never fall - a slow bloom over the lid and down the walls only by their own push.",
+   "set": [
+    [
+     1,
+     "gravity",
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "label": "Bounce",
+   "text": "floor bounce: sparks reaching the bottom edge bounce back up instead of dying.",
+   "set": [
+    [
+     1,
+     "floor",
+     "bounce"
+    ]
+   ]
+  },
+  {
+   "label": "A downpour",
+   "text": "rate 40 and born anywhere on: forty a second, born all over the cube - rain everywhere at once.",
+   "set": [
+    [
+     1,
+     "rate",
+     40.0
+    ],
+    [
+     1,
+     "random_pos",
+     true
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "trace": [
+  [
+   1,
+   "count"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Particles",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Particles",
+    "params": {
+     "max": 32,
+     "random_pos": false,
+     "on_surface": true,
+     "floor": "die"
+    },
+    "inputs": {
+     "rate": 12.0,
+     "burst": false,
+     "burst_count": 8.0,
+     "pos": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "velocity": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "spread": 0.8,
+     "gravity": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "drag": 0.2,
+     "life": 2.0,
+     "tag": 0.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Sprites",
+    "params": {
+     "falloff": "soft"
+    },
+    "inputs": {
+     "size": 0.15
+    }
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "slots",
+    2,
+    "slots"
+   ],
+   [
+    3,
+    "pos",
+    2,
+    "pos"
+   ],
+   [
+    2,
+    "age",
+    4,
+    "index"
+   ],
+   [
+    2,
+    "value",
+    4,
+    "brightness"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ]
+  ]
+ }
+}

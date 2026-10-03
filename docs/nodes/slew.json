@@ -1,0 +1,44 @@
+{
+ "node": "Slew",
+ "star": 2,
+ "caption": "Slew: two level meters - the bass as it comes (left) and through Slew (right); under them, the two as lines",
+ "why": [
+  "Audio levels and other live values jump: the bass leaps on a kick and drops between kicks, frame to frame. Wired straight to brightness or size, that jumping reads as flicker. Slew follows the value but no faster than a speed you set, so jumps become glides.",
+  "Its speeds are separate for rising and falling, which is how a VU meter behaves: rise fast enough to catch the hit, fall slowly so it reads. Compared with its neighbours: Ease and Envelope glide in curves over a set time; Spring overshoots and settles; Slew moves at a constant pace, so a big jump takes longer than a small one."
+ ],
+ "steps": [
+  "**Audio**'s `bass` goes into Slew's **x** - the value to follow. The synth plays a beat, so the bass jumps on every kick.",
+  "**up** is 6: Slew rises at most 6 a second, so from 0 to full takes a sixth of a second - not quite as fast as a kick, so it rounds each one off. **down** is 1.5: it falls at most 1.5 a second, two thirds of a second from top to bottom.",
+  "Two meters show both: **Coords** `u` into a **Threshold** at 0.5 switches a **Select** from the raw bass (left half) to Slew's `value` (right half).",
+  "The meter itself: the level plus `v` (an **Add**) reaches 1 only where `v` is above 1 minus the level, so a second **Threshold** at 1 lights a column from the bottom up as high as the level. That is the **Palette**'s brightness.",
+  "Watch the right meter lag the left: it climbs after each kick and sinks smoothly between them."
+ ],
+ "try": [
+  {"label": "Snappy rise", "text": "up 40: Slew rises forty a second - it catches each kick at once - but still falls at its own pace, a peak meter.", "set": [[2, "up", 40.0]]},
+  {"label": "Slow fall", "text": "down 0.3: after a kick the meter takes three seconds to sink, so it barely drops between beats and holds near the top.", "set": [[2, "down", 0.3]]},
+  {"label": "Lazy both ways", "text": "up 0.5 and down 0.5: Slew can no longer keep up with the beat at all, so it settles at a level that rises and falls with how busy the music is.", "set": [[2, "up", 0.5], [2, "down", 0.5]]}
+ ],
+ "trace": [[1, "bass"], [2, "value"]],
+ "graph": {
+  "name": "Tutorial Slew",
+  "nodes": [
+   {"id": 1, "type": "Audio", "params": {}, "inputs": {}},
+   {"id": 2, "type": "Slew", "params": {}, "inputs": {"up": 6.0, "down": 1.5}},
+   {"id": 3, "type": "Coords", "params": {}, "inputs": {}},
+   {"id": 4, "type": "Threshold", "params": {}, "inputs": {"at": 0.5}},
+   {"id": 5, "type": "Select", "params": {}, "inputs": {}},
+   {"id": 6, "type": "Add", "params": {}, "inputs": {}},
+   {"id": 7, "type": "Threshold", "params": {}, "inputs": {"at": 1.0}},
+   {"id": 8, "type": "Palette", "params": {}, "inputs": {}},
+   {"id": 9, "type": "Output", "params": {}, "inputs": {}},
+   {"id": 10, "type": "Effect settings", "params": {"palette": 11, "dimensions": "both", "audio": "volume", "colours": ""}, "inputs": {}}
+  ],
+  "links": [
+   [1, "bass", 2, "x"],
+   [3, "u", 4, "x"], [4, "on", 5, "on"], [1, "bass", 5, "a"], [2, "value", 5, "b"],
+   [5, "result", 6, "a"], [3, "v", 6, "b"], [6, "result", 7, "x"],
+   [3, "u", 8, "index"], [7, "value", 8, "brightness"],
+   [8, "color", 9, "color"]
+  ]
+ }
+}

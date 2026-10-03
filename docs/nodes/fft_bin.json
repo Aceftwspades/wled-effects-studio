@@ -1,0 +1,138 @@
+{
+ "node": "FFT bin",
+ "star": 1,
+ "caption": "FFT bin: one of the sixteen bands - band 2, the low bass - as a meter and a line",
+ "why": [
+  "The microphone's sound is split into sixteen frequency bands, from the deepest bass (0) to the highest treble (15). FFT bin gives you one of them: when you want an effect to follow exactly the kick drum, or exactly the hi-hats, rather than Audio's broad bass and treble.",
+  "Its neighbours: Audio sums the bands into bass, mid and treble; Spectrum spreads all sixteen along a coordinate; Loudest bin says which band is loudest; FFT bin is one band, chosen."
+ ],
+ "steps": [
+  "FFT bin has no inputs. **bin** is 2: the third band, low bass - where most kick drums sit.",
+  "`level` (0..1) drives a level meter: the value plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the value, so a column is lit from the bottom as high as the value, in the **Palette**'s colours across.",
+  "The trace shows that one band over time: tall spikes on the kicks, nearly nothing between."
+ ],
+ "try": [
+  {
+   "label": "Treble",
+   "text": "bin 12: a high band - it ticks with the hats and ignores the kick.",
+   "set": [
+    [
+     1,
+     "bin",
+     12
+    ]
+   ]
+  },
+  {
+   "label": "Mid",
+   "text": "bin 7: a middle band - voices and chords, steadier than either end.",
+   "set": [
+    [
+     1,
+     "bin",
+     7
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "level"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial FFT bin",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "FFT bin",
+    "params": {
+     "bin": 2
+    },
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "level",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "b"
+   ],
+   [
+    21,
+    "result",
+    22,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "index"
+   ],
+   [
+    22,
+    "value",
+    23,
+    "brightness"
+   ],
+   [
+    23,
+    "color",
+    24,
+    "color"
+   ]
+  ]
+ }
+}

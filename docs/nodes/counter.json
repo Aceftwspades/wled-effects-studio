@@ -1,0 +1,202 @@
+{
+ "node": "Counter",
+ "star": 1,
+ "caption": "Counter: the beats counted 0 to 3, one column of the matrix lit for each count",
+ "why": [
+  "Music comes in bars: four beats, then again. Counter counts triggers - beats, presses, anything - and starts again at the number of steps you give it, so an effect can do something on every fourth beat, or step through four looks a bar at a time.",
+  "Its wrap output fires on the trigger that brings it back to 0 - once a bar with four steps, a clock divider. Its neighbours: Steps plays a sequence of values on each trigger; Toggle flips between two; Tempo measures beats in time; Counter counts them."
+ ],
+ "steps": [
+  "**Audio**'s `beat` is the **trigger**: each kick counts one more.",
+  "**steps** is 4: the count goes 0, 1, 2, 3, 0... **reset** (unwired) would put it back to 0.",
+  "`count` lights one column of four: **Coords** `u` times 4, floored, minus the count, made positive (**Abs**), into a **Smoothstep** (edges 0.5 and 0) - 1 only in the column whose number matches. That is the **Palette**'s brightness.",
+  "`phase` (the count as 0..1) is the palette's index, so each count has its own colour; `wrap` (unused here) is true on the beat that starts the next bar. The trace shows the count stepping up and falling back."
+ ],
+ "try": [
+  {
+   "label": "Two steps",
+   "text": "steps 2: the count only goes 0, 1 - the light swaps between the first two columns on every beat.",
+   "set": [
+    [
+     1,
+     "steps",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "Eight steps",
+   "text": "steps 8: the count runs to 7, so after the fourth column it goes dark for four beats, then starts again - a two-bar cycle.",
+   "set": [
+    [
+     1,
+     "steps",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "Hold at the start",
+   "text": "reset on: the counter is held at 0, so only the first column lights.",
+   "set": [
+    [
+     1,
+     "reset",
+     true
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "count"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Counter",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Counter",
+    "params": {},
+    "inputs": {
+     "steps": 4.0,
+     "reset": false
+    }
+   },
+   {
+    "id": 3,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 4.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Abs",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.5,
+     "e1": 0.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "beat",
+    1,
+    "trigger"
+   ],
+   [
+    3,
+    "u",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "x"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "a"
+   ],
+   [
+    1,
+    "count",
+    6,
+    "b"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "x"
+   ],
+   [
+    7,
+    "result",
+    8,
+    "x"
+   ],
+   [
+    1,
+    "phase",
+    9,
+    "index"
+   ],
+   [
+    8,
+    "result",
+    9,
+    "brightness"
+   ],
+   [
+    9,
+    "color",
+    10,
+    "color"
+   ]
+  ]
+ }
+}

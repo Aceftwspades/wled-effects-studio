@@ -1,0 +1,145 @@
+{
+ "node": "Threshold",
+ "star": 1,
+ "caption": "Threshold: drifting noise cut at 0.5 - hard-edged blobs, on or off",
+ "why": [
+  "Smooth values make soft pictures; sometimes you want hard edges - a blob that is either there or not, a level that has been reached or not. Threshold is the hard switch: on when x reaches at, off below. It gives both a true/false and a 1/0 number.",
+  "Its neighbours: Smoothstep is the soft version; Gate has two levels so a noisy value does not flicker; Threshold is one clean cut."
+ ],
+ "steps": [
+  "**x** is a **Noise** of **Coords** `u`, `v`, drifting with a clock: smooth blobs, 0..1.",
+  "**at** is 0.5: above it, on; below, off.",
+  "`value` (1 or 0) is the **Palette**'s brightness: hard-edged blobs, no soft shading. `on` is the same as a switch, for Select, Not and the triggers.",
+  "The noise itself picks the colour, so each blob is shaded inside while its edge is hard."
+ ],
+ "try": [
+  {
+   "label": "Smaller blobs",
+   "text": "at 0.6: only the higher parts of the noise count - fewer, smaller blobs.",
+   "set": [
+    [
+     1,
+     "at",
+     0.6
+    ]
+   ]
+  },
+  {
+   "label": "Mostly lit",
+   "text": "at 0.4: most of the noise counts - holes in a lit field instead of blobs.",
+   "set": [
+    [
+     1,
+     "at",
+     0.4
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Threshold",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Noise",
+    "params": {
+     "octaves": 1,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "x"
+   ],
+   [
+    2,
+    "v",
+    3,
+    "y"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "z"
+   ],
+   [
+    3,
+    "value",
+    1,
+    "x"
+   ],
+   [
+    3,
+    "value",
+    4,
+    "index"
+   ],
+   [
+    1,
+    "value",
+    4,
+    "brightness"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

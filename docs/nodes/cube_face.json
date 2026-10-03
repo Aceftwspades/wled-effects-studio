@@ -1,0 +1,172 @@
+{
+ "node": "Cube face",
+ "star": 1,
+ "caption": "Cube face: the same checkerboard on every face, each face its own colour",
+ "why": [
+  "Coords sees the cube as the unfolded net - one flat picture with the faces laid out in a cross - so a pattern drawn from it is cut and turned at the folds. When you want the same thing on every face, each face the right way round, you need coordinates that start again on each face. Cube face gives them.",
+  "`a` and `b` run 0..1 across and down each face; `face` numbers the faces (0 east, 1 west, 2 north, 3 south, 4 lid, 5 bottom), so each can be treated differently; `normal x`, `normal y`, `normal z` say which way the face looks. Its neighbours: Coords is the whole net; Direction and Position see the cube as a solid; Cube face is one tile per face."
+ ],
+ "steps": [
+  "Cube face has no inputs or settings: it only says, for each pixel, which face it is on and where.",
+  "`a` and `b` go into a **Checker**'s x and y (scale 4): four squares across each face, the same on every face and lined up with its edges.",
+  "`face` times 1/6 (a **Multiply**) gives each face its own number 0..0.83, and a slow clock (**Time** times 0.1, added) moves them all together: the **Palette**'s index, so each face takes its own colour of the palette.",
+  "The checker's value is the palette's brightness, so the dark squares are off.",
+  "`normal` (and `normal x`, `normal y`, `normal z`) are unused here: they point out of the face, for lighting a face by which way it looks."
+ ],
+ "try": [
+  {
+   "label": "Finer tiles",
+   "text": "the Checker's scale at 8: eight squares across every face.",
+   "set": [
+    [
+     3,
+     "scale",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "One colour",
+   "text": "the face Multiply at 0: every face gets the same index, so the cube is one colour - only the squares show where the faces are.",
+   "set": [
+    [
+     4,
+     "b",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Faces far apart",
+   "text": "the face Multiply at 0.5: neighbouring faces are half the palette apart, so they contrast strongly.",
+   "set": [
+    [
+     4,
+     "b",
+     0.5
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Cube face",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Cube face",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Checker",
+    "params": {},
+    "inputs": {
+     "scale": 4.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.1667
+    }
+   },
+   {
+    "id": 5,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.1
+    }
+   },
+   {
+    "id": 7,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "a",
+    3,
+    "x"
+   ],
+   [
+    1,
+    "b",
+    3,
+    "y"
+   ],
+   [
+    1,
+    "face",
+    4,
+    "a"
+   ],
+   [
+    5,
+    "t",
+    6,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    7,
+    "a"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "b"
+   ],
+   [
+    7,
+    "result",
+    8,
+    "index"
+   ],
+   [
+    3,
+    "value",
+    8,
+    "brightness"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "color"
+   ]
+  ]
+ }
+}

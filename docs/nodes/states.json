@@ -1,0 +1,183 @@
+{
+ "node": "States",
+ "star": 1,
+ "caption": "States: three small drawings, one shown at a time, stepping on every beat",
+ "why": [
+  "An animation is a few drawings shown in turn; a face that blinks or changes expression is two or three. States holds several bitmaps in one node and shows the one you ask for - so the drawing changes with a beat, a counter, a slider, a random pick.",
+  "Each state is rows of digits like Bitmap's, and each digit is a colour slot. Its neighbours: Bitmap is a single drawing; Image is a picture file; States is a set of drawings with an index to choose between them."
+ ],
+ "steps": [
+  "**states** holds three 4 x 4 drawings, separated by '|': a ring, a dot in the middle, and a cross - rows separated by '/', '.' for empty.",
+  "A **Counter** counts **Audio**'s beats from 0 to 2 and starts again: its `count` is the **index**, so the drawing steps on every kick.",
+  "**u** and **v** are unwired, so the drawing fills the matrix (four LEDs for each of its pixels).",
+  "`slot` (the digit there) goes into **Colour pick**: 0 black, 1 orange, 2 blue. `count` says there are three states, for a counter that should match; `on` is false on the dots."
+ ],
+ "try": [
+  {
+   "label": "A blinking eye",
+   "text": "states set to an open eye and a closed one, and the Counter's steps at 2: two drawings, so each beat swaps them - a blink on the kick.",
+   "set": [
+    [
+     1,
+     "states",
+     ".11./1221/1221/.11.|..../..../1111/...."
+    ],
+    [
+     4,
+     "steps",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "Hold the last",
+   "text": "the Counter's steps at 4: it counts 0 to 3, and index 3 is past the last drawing - an index is clamped, so the cross shows for two beats.",
+   "set": [
+    [
+     4,
+     "steps",
+     4.0
+    ]
+   ]
+  },
+  {
+   "label": "Recolour",
+   "text": "Colour pick's colour 1 at green: every drawing's 1s turn green at once.",
+   "set": [
+    [
+     2,
+     "c1",
+     [
+      40,
+      220,
+      80
+     ]
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "matrix",
+  "params": {
+   "w": 16,
+   "h": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial States",
+  "nodes": [
+   {
+    "id": 3,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Counter",
+    "params": {},
+    "inputs": {
+     "steps": 3.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "States",
+    "params": {
+     "states": "1111/1..1/1..1/1111|..../.22./.22./....|1..1/.22./.22./1..1"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Colour pick",
+    "params": {
+     "c0": [
+      0,
+      0,
+      0
+     ],
+     "c1": [
+      255,
+      120,
+      0
+     ],
+     "c2": [
+      40,
+      90,
+      255
+     ],
+     "c3": [
+      0,
+      0,
+      255
+     ],
+     "c4": [
+      255,
+      255,
+      0
+     ],
+     "c5": [
+      0,
+      255,
+      255
+     ],
+     "c6": [
+      255,
+      0,
+      255
+     ],
+     "c7": [
+      128,
+      128,
+      128
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "beat",
+    4,
+    "trigger"
+   ],
+   [
+    4,
+    "count",
+    1,
+    "index"
+   ],
+   [
+    1,
+    "slot",
+    2,
+    "index"
+   ],
+   [
+    2,
+    "color",
+    5,
+    "color"
+   ]
+  ]
+ }
+}

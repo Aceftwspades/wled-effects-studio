@@ -1,0 +1,147 @@
+{
+ "node": "Number",
+ "star": 1,
+ "caption": "Number: one value, 6, setting both how many stripes there are and how many times the palette repeats",
+ "why": [
+  "Most pins can have a number typed straight onto them. When the same number belongs in several places - the count of stripes and the colours that go with them, a size used three times - typing it in each place means changing it in each place. Number holds one value and sends it wherever you wire it.",
+  "Its neighbours: Speed, Intensity and the other controls are numbers the person sets on the WLED page; Number is a fixed one, set in the graph and shared."
+ ],
+ "steps": [
+  "Number has no inputs; its **value** setting is 6.",
+  "It goes to two places: the **count** of a **Stripes** node (six stripes, scrolling with a clock), and a **Multiply** with **Coords** `u` that is the **Palette**'s index - the palette repeated six times across.",
+  "So each stripe has the whole palette's worth of colour in it, and the two always agree, because one number sets both."
+ ],
+ "try": [
+  {
+   "label": "Three",
+   "text": "value 3: three stripes and three runs of the palette - both change together.",
+   "set": [
+    [
+     1,
+     "value",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Twelve",
+   "text": "value 12: twelve thin stripes, the palette repeated twelve times to match.",
+   "set": [
+    [
+     1,
+     "value",
+     12.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Number",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Number",
+    "params": {
+     "value": 6.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 4,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "duty": 0.5
+    }
+   },
+   {
+    "id": 5,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "value",
+    4,
+    "count"
+   ],
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "phase"
+   ],
+   [
+    5,
+    "u",
+    6,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    6,
+    "b"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "index"
+   ],
+   [
+    4,
+    "value",
+    7,
+    "brightness"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ]
+  ]
+ }
+}

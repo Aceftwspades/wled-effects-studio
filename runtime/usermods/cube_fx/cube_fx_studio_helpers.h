@@ -30,7 +30,7 @@ static inline float gc_rnd() { return (float)hw_random16() * (1.0f / 65535.0f); 
 static inline float gc_fbm(float x, float y, float z, float scale, int oct, float rough) {
   float sum = 0.0f, amp = 1.0f, norm = 0.0f, f = scale;
   for (int i = 0; i < oct; i++) {
-    sum += amp * perlin8((uint16_t)(x * f * 256.0f), (uint16_t)(y * f * 256.0f), (uint16_t)(z * f * 256.0f)) * (1.0f / 255.0f);
+    sum += amp * perlin8((uint16_t)(int32_t)(x * f * 256.0f), (uint16_t)(int32_t)(y * f * 256.0f), (uint16_t)(int32_t)(z * f * 256.0f)) * (1.0f / 255.0f);
     norm += amp; amp *= rough; f *= 2.0f;
   }
   return norm > 0.0f ? sum / norm : 0.0f;
@@ -338,4 +338,21 @@ static inline uint32_t gc_blend_screen(uint32_t u, uint32_t o, float a) {
   for (int s = 0; s < 24; s += 8) { const uint32_t x = (u >> s) & 255, y = (o >> s) & 255; const uint32_t m = 255u - ((255u - x) * (255u - y)) / 255u;
     r |= (uint32_t)(x + (int)((int)m - (int)x) * a) << s; }
   return r; }
+// The sound's waveform and its notes for the Waveform and Notes nodes: the studio's audioreactive
+// patch's PCM slot (the last batch, 256 points) and pitch-class slot (twelve, C first), each looked
+// up once a frame (a lookup walks the usermods: a pixel's read is an index after it). None without
+// the patch: gc_wave() reads 0 and gc_chroma_now() is null.
+static inline const int8_t *gc_pcm_now() {
+  static const int8_t *p = nullptr; static uint32_t at = 0xFFFFFFFFu;
+  if (at != strip.now) { p = cfx_pcm(cfx_getAudioData()); at = strip.now; }
+  return p; }
+static inline float gc_wave(float i) {
+  const int8_t *p = gc_pcm_now();
+  if (!p) return 0.0f;
+  const float f = gc_sat(i) * 255.0f; const int a = (int)f; const int b = a < 255 ? a + 1 : 255;
+  return ((float)p[a] + ((float)p[b] - (float)p[a]) * (f - (float)a)) * (1.0f / 127.0f); }
+static inline const float *gc_chroma_now() {
+  static const float *c = nullptr; static uint32_t at = 0xFFFFFFFFu;
+  if (at != strip.now) { c = cfx_chroma(cfx_getAudioData()); at = strip.now; }
+  return c; }
 

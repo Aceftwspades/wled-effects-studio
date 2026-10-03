@@ -227,6 +227,19 @@ LIBRARY = [
             "$out.value = $st.peak;",
             "up at once to each new peak, held for hold ms, then down fall a second - a VU meter's falling bar"),
          state=["peak", "age"]),
+    # Scenes on the device (wled-toy's Scene Switch, compiled in): the graph's snapshots (Snapshots,
+    # Ctrl+Shift+K) - the typed values of its pins, what a drag or a knob moves - kept in the effect as
+    # a table, and the one index picks faded to over fade seconds: a verse look and a chorus look in
+    # one effect, the beat's Counter or a slider choosing. Settings are the build's (they are
+    # compiled in); a snapshot without a pin's value leaves it as built. The compiler writes the
+    # table and the fade where the marker is (graph.py, _scenes_code).
+    dict(_n("Scenes", "signals", "frame", [("index", F, 0.0), ("fade", F, 1.0)], [("scene", F), ("blend", F)],
+            [_p("scenes", "text", "")],
+            "{ const float sc_index_ = $in.index, sc_fade_ = $in.fade; float sc_scene_ = 0.0f, sc_blend_ = 1.0f;\n"
+            "  /*@@SCENES@@*/\n"
+            "  $out.scene = sc_scene_; $out.blend = sc_blend_; }",
+            "the graph's snapshots as scenes: the one index picks, faded to over fade seconds"),
+         noscript="it writes the graph's own typed values, which the script cannot reach"),
     # A straight glide: x followed no faster than up a second rising and down a second falling (Ease and
     # Envelope glide in curves over a time; this one in lines, at a speed).
     dict(_n("Slew", "signals", "frame", [("x", F, 0.0), ("up", F, 2.0), ("down", F, 1.0)], [("value", F)], [],
@@ -302,18 +315,19 @@ LIBRARY = [
             "    S_[18] = flux_; $out.strength = gc_sat(flux_ * 4.0f); }\n"
             "}",
             "a hit anywhere in the sound - the bands' rise against its recent mean - true for a frame, and how big the rise is"),
-         state=20),
+         state=20, noscript="it reads the sound its own way; the script reads it only as the Audio and FFT bin nodes do"),
     # The sound's colour from the sixteen bands: brightness is where its weight sits, 0 all bass .. 1
     # all treble (the bands' centre of mass - they are log-spaced, so the spectral centroid on a log
     # axis); noisiness is how flat it is, 0 for a tone .. 1 for a hiss (the bands' geometric over
     # arithmetic mean, the spectral flatness). Both 0 in silence.
-    _n("Timbre", "signals", "frame", [], [("brightness", F), ("noisiness", F)], [],
+    dict(_n("Timbre", "signals", "frame", [], [("brightness", F), ("noisiness", F)], [],
        "{ um_data_t *um_ = cfx_getAudioData(); const uint8_t *fft_ = (const uint8_t *)um_->u_data[2];\n"
        "  float tot_ = 0.0f, w_ = 0.0f, lg_ = 0.0f;\n"
        "  for (int i_ = 0; i_ < 16; i_++) { const float p_ = (float)fft_[i_] * (1.0f / 255.0f); tot_ += p_; w_ += p_ * (float)i_; lg_ += logf(p_ + 0.001f); }\n"
        "  $out.brightness = tot_ > 0.05f ? w_ / tot_ * (1.0f / 15.0f) : 0.0f;\n"
        "  $out.noisiness = tot_ > 0.05f ? gc_sat(expf(lg_ * (1.0f / 16.0f)) / (tot_ * (1.0f / 16.0f))) : 0.0f; }",
        "where the sound's weight sits, 0 bass .. 1 treble, and how noisy it is, 0 a tone .. 1 a hiss"),
+         noscript="it reads the sound its own way; the script reads it only as the Audio and FFT bin nodes do"),
     # Whether there is sound at all: sound is on while the volume has passed threshold within the last
     # hold seconds; quiet counts the seconds since it last did; mix is 1 while there is sound and falls
     # to 0 over fade seconds after the hold - the music's look times mix, an idle look times 1 - mix.
@@ -325,7 +339,7 @@ LIBRARY = [
             "  $out.quiet = $st.q; $out.sound = $st.q <= $in.hold;\n"
             "  $out.mix = $st.q <= $in.hold ? 1.0f : gc_sat(1.0f - ($st.q - $in.hold) / fmaxf($in.fade, 0.001f)); }",
             "on while there is sound (the volume past threshold in the last hold s), the seconds quiet, and 1 falling to 0 after"),
-         state=["q"]),
+         state=["q"], noscript="it reads the sound its own way; the script reads it only as the Audio and FFT bin nodes do"),
     # The sixteen bands as they were: a row every 40 ms, 48 rows (~1.9 s) - read at index 0..1 across the
     # bands and age 0 (now) .. 1 (the oldest). Unwired, index is the pixel's u and age its v: the spectrum
     # across the picture, flowing down it - a waterfall.
@@ -615,10 +629,73 @@ LIBRARY = [
             "        const int b_ = (int)(((x_ - $in.x_lo) / ($in.x_hi - $in.x_lo)) * NX_); if (b_ >= 0 && b_ < NX_) col_[b_] += 1.0f / (float)$p.orbits; }\n"
             "      X_[j_] = x_; }\n"
             "    S_[0] = (float)(SEGENV.call & 0xFFFF); }\n"
-            "  int j_ = (int)(gc_sat($in.u) * NC_); if (j_ >= NC_) j_ = NC_ - 1; int b_ = (int)(gc_sat($in.v) * NX_); if (b_ >= NX_) b_ = NX_ - 1;\n"
-            "  $out.density = gc_sat(D_[j_ * NX_ + b_]); }",
+            # a picture smaller than the 64 x 48 bins: a pixel covers several, and reads the brightest of them -
+            # reading one, a branch between the pixels that read was never seen (a 32 x 16 matrix showed a third)
+            "  const int sj_ = W < NC_ ? (NC_ + W - 1) / W : 1, sb_ = H < NX_ ? (NX_ + H - 1) / H : 1;\n"
+            "  const int j0_ = (int)(gc_sat($in.u) * NC_) - sj_ / 2, b0_ = (int)(gc_sat($in.v) * NX_) - sb_ / 2; float m_ = 0.0f;\n"
+            "  for (int jj_ = j0_; jj_ < j0_ + sj_; jj_++) for (int bb_ = b0_; bb_ < b0_ + sb_; bb_++)\n"
+            "    if (jj_ >= 0 && jj_ < NC_ && bb_ >= 0 && bb_ < NX_ && D_[jj_ * NX_ + bb_] > m_) m_ = D_[jj_ * NX_ + bb_];\n"
+            "  $out.density = gc_sat(m_); }",
             "the fig tree: the bifurcation diagram of x -> x^2 + c between c_lo..c_hi (u) and x_lo..x_hi (v), as orbit density with a trail - zoom the windows toward -1.401155 to fly into it"),
          state=1 + 64 + 64 * 48),
+    # AI: below section was generated by an AI
+    # Live video: the studio's video source (a webcam or a file, native/video.py) sampled at any point. The
+    # frame lives in the sim (simVideoAt); a device build reads black - the device gets the picture by stream.
+    # The projection says where on the frame each pixel looks: the picture's own u, v (or wired coordinates),
+    # through the shape from the front or the top, round it (a cylinder, a tree), on every cube face alike,
+    # or all round it (a sphere's map). The style is a one-step look; anything more is the graph's.
+    _n("Video", "generate", "pixel",
+       [("u", F, 0.0), ("v", F, 0.0), ("levels", F, 4.0), ("blocks", F, 12.0), ("gain", F, 4.0)],
+       [("color", C), ("luma", F)],
+       [_p("projection", "choice", "picture", choices=["picture", "front", "top", "around", "faces", "sphere"]),
+        _p("style", "choice", "none", choices=["none", "palette", "posterize", "mono", "edges", "pixelate"])],
+       """
+{ const char *pj_ = "$p.projection"; const char *st_ = "$p.style";
+  float vu_ = $in.u, vv_ = $in.v;
+  const float up_ = (cube || fabsf(Z3) > 1e-6f) ? Z3 : Y3;     // a flat picture has no z: its height is y
+  if (!strcmp(pj_, "front")) { vu_ = X3 * 0.5f + 0.5f; vv_ = 0.5f - up_ * 0.5f; }
+  else if (!strcmp(pj_, "top")) { vu_ = X3 * 0.5f + 0.5f; vv_ = 0.5f - Y3 * 0.5f; }
+  else if (!strcmp(pj_, "around")) { vu_ = cfx_atan2f(Y3, X3) * (0.5f / 3.14159265f) + 0.5f; vv_ = 0.5f - up_ * 0.5f; }
+  else if (!strcmp(pj_, "faces")) {                              // as Cube face's a, b: the picture upright on each face
+    const float ax_ = fabsf(X3), ay_ = fabsf(Y3), az_ = fabsf(Z3); float m_, pa_, pb_;
+    if (cube && az_ >= ax_ && az_ >= ay_) { m_ = az_; pa_ = X3; pb_ = Y3; }
+    else if (cube && ay_ >= ax_)          { m_ = ay_; pa_ = X3; pb_ = Z3; }
+    else if (cube)                         { m_ = ax_; pa_ = Y3; pb_ = Z3; }
+    else                                   { m_ = 1.0f; pa_ = X3; pb_ = Y3; }
+    if (m_ < 1e-3f) m_ = 1e-3f;
+    vu_ = pa_ / m_ * 0.5f + 0.5f; vv_ = 0.5f - pb_ / m_ * 0.5f; }
+  else if (!strcmp(pj_, "sphere")) {
+    vu_ = cfx_atan2f(ny, nx) * (0.5f / 3.14159265f) + 0.5f;
+    vv_ = acosf(nz < -1.0f ? -1.0f : (nz > 1.0f ? 1.0f : nz)) * (1.0f / 3.14159265f); }
+  if (!strcmp(st_, "pixelate")) {                                // the frame read in blocks: blocks across and down
+    const float b_ = fmaxf(1.0f, $in.blocks);
+    vu_ = (floorf(vu_ * b_) + 0.5f) / b_; vv_ = (floorf(vv_ * b_) + 0.5f) / b_; }
+  uint32_t c_ = GC_VIDEO(vu_, vv_);
+  const float r_ = ((c_ >> 16) & 255) * (1.0f / 255.0f), g_ = ((c_ >> 8) & 255) * (1.0f / 255.0f), b_ = (c_ & 255) * (1.0f / 255.0f);
+  $out.luma = r_ * 0.3f + g_ * 0.59f + b_ * 0.11f;
+  if (!strcmp(st_, "palette")) {                                 // the brightness through the palette, as dark as the frame
+    c_ = mq_scale(SEGMENT.color_from_palette((uint8_t)(gc_sat($out.luma) * 255.0f), false, true, 0), (uint8_t)(gc_sat($out.luma) * 255.0f)); }
+  else if (!strcmp(st_, "posterize")) {                          // each channel in a few flat steps
+    const float n_ = fmaxf(1.0f, floorf($in.levels) - 1.0f);
+    c_ = RGBW32((uint8_t)(roundf(r_ * n_) / n_ * 255.0f), (uint8_t)(roundf(g_ * n_) / n_ * 255.0f), (uint8_t)(roundf(b_ * n_) / n_ * 255.0f), 0); }
+  else if (!strcmp(st_, "mono")) {                               // shades of the first colour picked on the WLED page
+    c_ = mq_scale(SEGCOLOR(0), (uint8_t)(gc_sat($out.luma) * 255.0f)); }
+  else if (!strcmp(st_, "edges")) {                              // how fast the brightness changes here: outlines
+    // looked at as far as half an LED either side (or a video pixel, if that is further): a pixel apart on
+    // a frame many times finer than the LEDs, an edge fell between the LEDs and was never seen
+    const float du_ = fmaxf(1.0f / fmaxf(1.0f, (float)GC_VIDEO_W()), 0.5f / fmaxf(1.0f, (float)(W - 1)));
+    const float dv_ = fmaxf(1.0f / fmaxf(1.0f, (float)GC_VIDEO_H()), 0.5f / fmaxf(1.0f, (float)(H - 1)));
+    #define VL_(c) ((((c) >> 16) & 255) * 0.3f + (((c) >> 8) & 255) * 0.59f + ((c) & 255) * 0.11f) * (1.0f / 255.0f)
+    const float gx_ = VL_(GC_VIDEO(vu_ + du_, vv_)) - VL_(GC_VIDEO(vu_ - du_, vv_));
+    const float gy_ = VL_(GC_VIDEO(vu_, vv_ + dv_)) - VL_(GC_VIDEO(vu_, vv_ - dv_));
+    #undef VL_
+    const float e_ = gc_sat((fabsf(gx_) + fabsf(gy_)) * $in.gain);
+    const float m_ = fmaxf(r_, fmaxf(g_, b_));                     // the outline in the frame's own colour, at full brightness
+    c_ = m_ > 0.02f ? RGBW32((uint8_t)(r_ / m_ * e_ * 255.0f), (uint8_t)(g_ / m_ * e_ * 255.0f), (uint8_t)(b_ / m_ * e_ * 255.0f), 0)
+                    : RGBW32((uint8_t)(e_ * 255.0f), (uint8_t)(e_ * 255.0f), (uint8_t)(e_ * 255.0f), 0); }
+  $out.color = c_; }""",
+       "the studio's live video (a webcam or a file) at this pixel: projected onto the shape, with a one-step style"),
+    # AI: end
     # An image file, baked into the effect at compile time: resized to the
     # node's size, quantised to its number of colours, stored as an index
     # table and a palette in the generated C++ - so the effect still needs
@@ -1373,7 +1450,7 @@ IMPLICIT = {
     "Noise": {"x": "x", "y": "y", "z": "z"}, "Voronoi": {"pos": "pos"}, "Path": {"pos": "pos"},
     "Checker": {"x": "u", "y": "v"}, "Brick": {"x": "u", "y": "v"}, "Stripes": {"x": "u"},
     "Gradient": {"x": "u", "y": "v"}, "Wave": {"x": "u"}, "Mandelbrot": {"x": "cx", "y": "cy"},
-    **{name: {"u": "u", "v": "v"} for name in ("Bitmap", "Image", "States", "Text", "Field", "Previous at",
+    **{name: {"u": "u", "v": "v"} for name in ("Bitmap", "Image", "Video", "States", "Text", "Field", "Previous at",
                                                "Transform", "Flip", "Bifurcation")},
     "Waveform": {"index": "u"}, "Notes": {"index": "u"}, "Spectrum history": {"index": "u", "age": "v"},
 }
@@ -1402,6 +1479,7 @@ UNITS = {
     "Silence":    {"threshold": ("", 0.0, 1.0, None), "hold": ("s", 0.0, 30.0, None), "fade": ("s", 0.0, 30.0, None)},
     "Spectrum history": {"index": ("", 0.0, 1.0, None), "age": ("", 0.0, 1.0, None)},
     "Counter":    {"steps": ("", 1.0, 64.0, None)},
+    "Scenes":     {"fade": ("s", 0.0, 30.0, None)},
     "Peak hold":  {"hold": ("ms", 0.0, 5000.0, None), "fall": ("/s", 0.0, 10.0, None)},
     "Slew":       {"up": ("/s", 0.0, 20.0, None), "down": ("/s", 0.0, 20.0, None)},
     "Spring":     {"hz": ("Hz", 0.05, 20.0, "log"), "damping": ("", 0.0, 1.0, None)},
@@ -1447,6 +1525,27 @@ UNITS = {
 }
 # two inputs that are one point: an XY pad on the node sets both while neither is wired
 # (name, name, low, high - the pad's range on both axes)
+# A pin shown only while a setting picks an operation that reads it (Blender's Math hides its second
+# socket for a one-input operation): {node: {pin: (setting, [the values that read it])}}. A wire on it
+# keeps it shown, so nothing hangs loose; the code reads it whatever the operation (a constant then).
+MATH_UNARY = ("sqrt", "abs", "sign", "round", "ceil", "floor", "fract", "sin", "cos", "tan", "asin", "acos", "log", "exp")
+VECTOR_BINARY = ("add", "subtract", "multiply", "cross", "dot", "distance", "reflect", "project", "min", "max")
+SHOWN_WHEN = {
+    "Math": {"b": ("op", None)},                                   # None: every operation but MATH_UNARY (filled below)
+    "Vector math": {"b": ("op", VECTOR_BINARY), "scale": ("op", ("scale",))},
+    # the frame's coordinates only for the picture projection; each style's own number only with that style
+    "Video": {"u": ("projection", ("picture",)), "v": ("projection", ("picture",)), "levels": ("style", ("posterize",)),
+              "blocks": ("style", ("pixelate",)), "gain": ("style", ("edges",))},
+}
+# A choice's values in groups, for its dropdown (each group's name a row of its own above its values):
+# {node: {setting: [(group, [values])]}} - every value in one group, in the order the dropdown lists them
+CHOICE_GROUPS = {
+    "Math": {"op": [("arithmetic", ["add", "subtract", "multiply", "divide", "power", "sqrt", "log", "exp", "abs"]),
+                    ("compare", ["min", "max", "smooth min", "smooth max", "less", "greater", "equal", "sign"]),
+                    ("rounding", ["round", "floor", "ceil", "fract", "modulo", "wrap", "snap", "pingpong"]),
+                    ("trigonometry, in turns", ["sin", "cos", "tan", "asin", "acos", "atan2"])]},
+}
+
 PADS = {"Transform": [("pivot_u", "pivot_v", 0.0, 1.0), ("move_u", "move_v", -1.0, 1.0)],
         "Gravity": [("tilt_x", "tilt_y", -1.0, 1.0)],
         "Mandelbrot": [("jx", "jy", -2.0, 2.0)]}
@@ -1467,6 +1566,17 @@ def library(extra=()):
             lib[d["name"]]["pads"] = PADS[d["name"]]
         if d["name"] in IMPLICIT:
             lib[d["name"]]["implicit"] = dict(IMPLICIT[d["name"]])
+        for pin, (param, vals) in (SHOWN_WHEN.get(d["name"]) or {}).items():
+            spec = next(p for p in lib[d["name"]]["params"] if p["name"] == param)
+            if vals is None:                                     # Math: what the one-input list leaves
+                vals = [c for c in spec["choices"] if c not in MATH_UNARY]
+            for q in lib[d["name"]]["inputs"]:
+                if q["name"] == pin:
+                    q["when"] = {"param": param, "values": list(vals), "default": spec["default"]}
+        for param, groups in (CHOICE_GROUPS.get(d["name"]) or {}).items():
+            for p in lib[d["name"]]["params"]:
+                if p["name"] == param:
+                    p["groups"] = [(g, list(vs)) for g, vs in groups]
         for pin, spec in (UNITS.get(d["name"]) or {}).items():
             if spec is None:
                 continue

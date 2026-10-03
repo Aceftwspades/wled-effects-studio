@@ -1,0 +1,142 @@
+{
+ "node": "Abs",
+ "star": 1,
+ "caption": "Abs: the distance from the middle line as the colour - the pattern mirrored either side of it",
+ "why": [
+  "Many patterns should be symmetrical: the same either side of a centre line, a point, a moment. Abs drops the sign of a number - -0.3 becomes 0.3 - which turns a coordinate that runs through zero into a distance from zero, the same on both sides.",
+  "Its neighbours: Mirror fold mirrors in 3-D with many copies; Flip mirrors coordinates left to right; Abs is the plain sum that makes anything symmetrical about 0."
+ ],
+ "steps": [
+  "**Coords** `centred x` runs -1 at the left edge, 0 in the middle, 1 at the right. An **Add** shifts it (by 0 for now).",
+  "Abs turns it into its distance from 0 - the **x** input made positive: 1 at both edges, 0 in the middle.",
+  "That plus a clock (**Time** times 0.2, another Add) is the **Palette**'s index: the colours flow outward from the middle line to both edges at once, mirrored.",
+  "Without Abs the colours would run straight across; with it, they fold back at 0."
+ ],
+ "try": [
+  {
+   "label": "Move the mirror",
+   "text": "the first Add's b at 0.5: the zero point moves to the left of centre, so the mirror line moves with it.",
+   "set": [
+    [
+     2,
+     "b",
+     0.5
+    ]
+   ]
+  },
+  {
+   "label": "Inward",
+   "text": "the clock's Multiply at -0.2: the colours flow from both edges into the middle line.",
+   "set": [
+    [
+     11,
+     "b",
+     -0.2
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Abs",
+  "nodes": [
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Add",
+    "params": {},
+    "inputs": {
+     "b": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Abs",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   },
+   {
+    "id": 20,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 21,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    4,
+    "cx",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "b"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    20,
+    "index"
+   ],
+   [
+    20,
+    "color",
+    21,
+    "color"
+   ]
+  ]
+ }
+}

@@ -113,6 +113,8 @@ def test_links_resolve():
             for label, target in b.get("links", []):
                 if target.startswith(("http://", "https://", "mailto:")):
                     continue
+                if target.startswith("studio:"):
+                    continue                     # a tutorial's: test_tutorials.py checks each names a lesson and its change
                 name, _, frag = target.partition("#")
                 doc = f if not name else name
                 if not os.path.exists(os.path.join(ROOT, doc)):

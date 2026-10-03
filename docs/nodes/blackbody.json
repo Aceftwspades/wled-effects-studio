@@ -1,0 +1,203 @@
+{
+ "node": "Blackbody",
+ "star": 1,
+ "caption": "Blackbody: noise as heat, from a dull red ember to a yellow-white flame",
+ "why": [
+  "Things that glow because they are hot - embers, filaments, flames, stars - all follow one colour scale: dull red, then orange, yellow, white, and blue-white for the hottest. Blackbody is that scale: give it a temperature in kelvin and it gives the colour of something that hot.",
+  "Feed it a heat value and fire looks right without hand-picking colours: red where it is cool, white where it is hottest. Its neighbours: Colour ramp lets you draw any gradient (a fire ramp is easy too); Palette follows the WLED page; Blackbody is physically real glow colours."
+ ],
+ "steps": [
+  "A **Noise** reads **Coords** `u`, and `v` plus a clock (**Time** times 0.6, added): blobs that rise up the matrix like flames.",
+  "A **Remap** turns the noise (0.3..0.7 in) into 800..3000: the **kelvin** input, from a deep red ember to a candle-flame yellow. (Real glow is pale above about 3000 - see Hotter below.)",
+  "Blackbody's `color` is the glow at that temperature - always full brightness, so a **Scale** dims it by the noise, stretched by a **Smoothstep** (edges 0.3 and 0.65): the cool parts are dark as well as red.",
+  "The scaled colour goes to the **Output**."
+ ],
+ "try": [
+  {
+   "label": "Hotter",
+   "text": "the Remap's out high at 9000: the hottest blobs go white and then blue-white, like a gas flame.",
+   "set": [
+    [
+     3,
+     "out_hi",
+     9000.0
+    ]
+   ]
+  },
+  {
+   "label": "Embers",
+   "text": "the Remap's out high at 1700: nothing gets past red-orange - smouldering coals.",
+   "set": [
+    [
+     3,
+     "out_hi",
+     1700.0
+    ]
+   ]
+  },
+  {
+   "label": "Flatter fire",
+   "text": "the Remap's in low at 0 and in high at 1: the noise is barely stretched, so the colours stay in a narrow, even band.",
+   "set": [
+    [
+     3,
+     "in_lo",
+     0.0
+    ],
+    [
+     3,
+     "in_hi",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Blackbody",
+  "nodes": [
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.6
+    }
+   },
+   {
+    "id": 7,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Noise",
+    "params": {
+     "octaves": 2,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Remap",
+    "params": {
+     "in_lo": 0.3,
+     "in_hi": 0.7,
+     "out_lo": 800.0,
+     "out_hi": 3000.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Blackbody",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.3,
+     "e1": 0.65
+    },
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Scale",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    4,
+    "u",
+    2,
+    "x"
+   ],
+   [
+    5,
+    "t",
+    6,
+    "a"
+   ],
+   [
+    4,
+    "v",
+    7,
+    "a"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "b"
+   ],
+   [
+    7,
+    "result",
+    2,
+    "y"
+   ],
+   [
+    2,
+    "value",
+    3,
+    "x"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "kelvin"
+   ],
+   [
+    1,
+    "color",
+    8,
+    "color"
+   ],
+   [
+    2,
+    "value",
+    10,
+    "x"
+   ],
+   [
+    10,
+    "result",
+    8,
+    "by"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "color"
+   ]
+  ]
+ }
+}

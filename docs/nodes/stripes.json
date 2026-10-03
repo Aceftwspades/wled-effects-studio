@@ -1,0 +1,128 @@
+{
+ "node": "Stripes",
+ "star": 1,
+ "caption": "Stripes: six hard-edged bands scrolling across, half lit and half dark",
+ "why": [
+  "Hard-edged bands are everywhere in lighting - marquees, barber poles, scanners, flags. Stripes makes them along any coordinate: how many, how wide the lit part of each is, and a phase to scroll them.",
+  "Its duty setting is what Wave cannot do cleanly: a thin bright line with wide gaps, or wide bright bands with thin gaps. Its neighbours: Wave is smooth (or square at exactly half); Checker alternates in two directions; Stripes is one direction, hard edges, any width."
+ ],
+ "steps": [
+  "**x** is unwired, so it is the pixel's own `u`: the stripes run across the matrix.",
+  "**count** is 6: six stripes across. **duty** is 0.5: the bright part takes half of each.",
+  "**Time** times 0.3 goes into **phase**, which slides the stripes along - a scroll of 0.3 stripes a second.",
+  "`value` - 1 in a stripe, 0 between - is the **Palette**'s brightness; **Coords** `u` is its index, so each stripe takes the palette's colour for where it is."
+ ],
+ "try": [
+  {
+   "label": "Thin lines",
+   "text": "duty 0.15: only the first sixth of each stripe is lit - thin scanning lines with wide gaps.",
+   "set": [
+    [
+     1,
+     "duty",
+     0.15
+    ]
+   ]
+  },
+  {
+   "label": "More stripes",
+   "text": "count 12: twelve stripes in the same width, so they are half as wide.",
+   "set": [
+    [
+     1,
+     "count",
+     12.0
+    ]
+   ]
+  },
+  {
+   "label": "Mostly lit",
+   "text": "duty 0.85: the stripes are wide and the gaps thin - a lit field with dark lines moving through it.",
+   "set": [
+    [
+     1,
+     "duty",
+     0.85
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Stripes",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 1,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 6.0,
+     "duty": 0.5
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    1,
+    "phase"
+   ],
+   [
+    2,
+    "u",
+    5,
+    "index"
+   ],
+   [
+    1,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

@@ -6,6 +6,11 @@
 // effect sources registered into the bank roster at static-init time, so it
 // cannot drift from what the firmware would register.
 // ===========================================================================
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__)
+#include <x86intrin.h>          // the profile clock: __rdtsc
+#else
+#include <chrono>
+#endif
 #include <stdio.h>
 #include "shim/wled.h"
 #include "cube_fx_bank.h"                 // usermods/cube_fx, on the include path
@@ -132,6 +137,46 @@ extern "C" SIM_API void simPcmSet(const int8_t *samples, int n) {
   const uint8_t w = gPcm.which ^ 1;
   for (int i = 0; i < 256; i++) gPcm.buf[w][i] = (i < n) ? samples[i] : 0;
   gPcm.which = w;
+}
+
+// The video slot (the Video node): the studio decodes a webcam or a file and writes each frame here, RGB,
+// at most 256 x 256; a graph's Video node samples it at any u, v. Video plays only in the studio - the
+// device gets it by streaming the sim's picture - so a device build of the node reads black (graph.py).
+// Two buffers, as the PCM's: the frame being written is never the one being read.
+static const int SIM_VID_MAX = 256;
+static uint8_t gVid[2][SIM_VID_MAX * SIM_VID_MAX * 3];
+static int gVidW[2] = {0, 0}, gVidH[2] = {0, 0};
+static volatile uint8_t gVidWhich = 0;
+
+extern "C" SIM_API void simVideoSet(const uint8_t *rgb, int w, int h) {
+  const uint8_t k = gVidWhich ^ 1;
+  if (!rgb || w <= 0 || h <= 0) { gVidW[k] = gVidH[k] = 0; gVidWhich = k; return; }   // no picture: black
+  w = w > SIM_VID_MAX ? SIM_VID_MAX : w; h = h > SIM_VID_MAX ? SIM_VID_MAX : h;
+  memcpy(gVid[k], rgb, (size_t)w * h * 3);
+  gVidW[k] = w; gVidH[k] = h;
+  gVidWhich = k;
+}
+
+extern "C" SIM_API int simVideoW() { return gVidW[gVidWhich]; }
+extern "C" SIM_API int simVideoH() { return gVidH[gVidWhich]; }
+
+// the frame's colour at u, v (0..1 across and down, clamped), blended between the four nearest pixels
+extern "C" SIM_API uint32_t simVideoAt(float u, float v) {
+  const uint8_t k = gVidWhich;
+  const int w = gVidW[k], h = gVidH[k];
+  if (w <= 0 || h <= 0) return 0;
+  u = u < 0.0f ? 0.0f : (u > 1.0f ? 1.0f : u); v = v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+  const float fx = u * (w - 1), fy = v * (h - 1);
+  const int x0 = (int)fx, y0 = (int)fy, x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+  const float ax = fx - x0, ay = fy - y0;
+  const uint8_t *b = gVid[k];
+  uint32_t out = 0;
+  for (int c = 0; c < 3; c++) {
+    const float top = b[(y0 * w + x0) * 3 + c] * (1.0f - ax) + b[(y0 * w + x1) * 3 + c] * ax;
+    const float bot = b[(y1 * w + x0) * 3 + c] * (1.0f - ax) + b[(y1 * w + x1) * 3 + c] * ax;
+    out |= (uint32_t)(top * (1.0f - ay) + bot * ay + 0.5f) << (16 - 8 * c);
+  }
+  return out;
 }
 
 // --- palettes ----------------------------------------------------------------
@@ -317,6 +362,17 @@ SIM_API void simInit(int w, int h) {
   strip.isMatrix = (h > 1);
   strip.now = 0;
   memset(gPixels, 0, sizeof(uint32_t) * (size_t)w * h);
+}
+
+// Every pixel off - the segments' own buffers (an effect that fades or paints only some pixels reads them
+// back) and the strip's - and every segment's effect from nothing: a clean cube, as a preview starts on.
+// Selecting an effect leaves the pixels as they were, as WLED does on the device.
+SIM_API void simClearPixels() {
+  for (int k = 0; k < SIM_MAX_SEGS; k++) {
+    if (gSegs[k].buf && gSegs[k].bufLen) memset(gSegs[k].buf, 0, sizeof(uint32_t) * gSegs[k].bufLen);
+    simSegReset(gSegs[k]);
+  }
+  memset(gPixels, 0, sizeof(uint32_t) * (size_t)gStripW * gStripH);
 }
 
 // --- the segment API ----------------------------------------------------------
@@ -537,6 +593,27 @@ SIM_API uint8_t *simFftPtr() { return gFft; }
 static float gProbe[256];
 SIM_API void simProbeSet(int i, float v) { if ((unsigned)i < 256u) gProbe[i] = v; }
 SIM_API float simProbeGet(int i) { return ((unsigned)i < 256u) ? gProbe[i] : 0.0f; }
+
+// A profiling build's sums (graph.py, compile(profile=True)): per slot the ticks its node's code
+// took and how many times it ran, as the effect last handed them over; and the clock's ticks a
+// second, the same clock as the build's gc_tick (the time-stamp counter where there is one).
+static double gProf[512];
+static int gProfN[512];
+SIM_API void simProfSet(int k, double ticks, int n) { if ((unsigned)k < 512u) { gProf[k] = ticks; gProfN[k] = n; } }
+SIM_API double simProfTicks(int k) { return ((unsigned)k < 512u) ? gProf[k] : 0.0; }
+SIM_API int simProfCount(int k) { return ((unsigned)k < 512u) ? gProfN[k] : 0; }
+SIM_API void simProfClear() { for (int k = 0; k < 512; k++) { gProf[k] = 0.0; gProfN[k] = 0; } }
+SIM_API double simProfClock() {
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__)
+  return (double)__rdtsc();
+#else
+  return (double)std::chrono::steady_clock::now().time_since_epoch().count();
+#endif
+}
+
+// u_data[4] and [5]: audioreactive's FFT_MajorPeak (Hz) and my_magnitude - the Freq effects, Rocktaves and
+// Blurz place and light their pixels by them; they were 0 here, and those effects dark
+SIM_API void simAudioPeak(float freq, float magnitude) { gMajorPeak = freq; gMagnitude = magnitude; }
 
 SIM_API void simAudioSet(float vol, int peak) {
   gVolume = vol; gPeak = (uint8_t)peak;

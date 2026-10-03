@@ -1,0 +1,147 @@
+{
+ "node": "Beat kick",
+ "star": 1,
+ "caption": "Beat kick: stripes that lurch forward on every kick and settle, instead of jumping",
+ "why": [
+  "A pattern that moves with the music should be pushed by the beat - but a jump looks like a glitch, and a pattern that only pulses its brightness does not move at all. Beat kick gives a position that jumps forward on each beat and settles over a few frames: add it to anything that scrolls and the picture lurches on the kick, like it was hit.",
+  "Its neighbours: Spring swings back and forth after a kick; Ease glides to a target; Counter steps by whole numbers; Beat kick is forward motion with a soft landing, always onward."
+ ],
+ "steps": [
+  "**Audio**'s `beat` is the **beat** input: true on the frame a kick lands.",
+  "**throw** is 1: how far each kick moves the phase - one whole cycle of whatever it scrolls.",
+  "`phase` is a **Wave**'s phase (x from **Coords** `u`, 4 cycles, triangle): on each kick the stripes lurch along by a cycle and ease to a stop. That wave is the **Palette**'s brightness.",
+  "Watch the stripes: still between kicks, a quick lurch on each one that eases to a stop."
+ ],
+ "try": [
+  {
+   "label": "Harder kicks",
+   "text": "throw 2.5: each kick throws the stripes two and a half cycles - a big lurch.",
+   "set": [
+    [
+     1,
+     "throw",
+     2.5
+    ]
+   ]
+  },
+  {
+   "label": "Nudge",
+   "text": "throw 0.25: a quarter cycle per kick - a gentle nudge on the beat.",
+   "set": [
+    [
+     1,
+     "throw",
+     0.25
+    ]
+   ]
+  },
+  {
+   "label": "Finer stripes",
+   "text": "the Wave's cycles at 10: narrow stripes, so the same throw moves them past many stripes at once.",
+   "set": [
+    [
+     3,
+     "cycles",
+     10.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Beat kick",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Beat kick",
+    "params": {},
+    "inputs": {
+     "throw": 1.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Wave",
+    "params": {
+     "shape": "triangle"
+    },
+    "inputs": {
+     "cycles": 4.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "beat",
+    1,
+    "beat"
+   ],
+   [
+    4,
+    "u",
+    3,
+    "x"
+   ],
+   [
+    1,
+    "phase",
+    3,
+    "phase"
+   ],
+   [
+    4,
+    "u",
+    5,
+    "index"
+   ],
+   [
+    3,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

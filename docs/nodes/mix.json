@@ -1,0 +1,174 @@
+{
+ "node": "Mix",
+ "star": 1,
+ "caption": "Mix: the palette's index crossfading slowly between a plain sweep across and drifting noise",
+ "why": [
+  "A crossfade: at one end a, at the other b, in between the blend. Mix slides between two values by t, so two patterns, two speeds or two sizes can be faded between - by a slider, a beat, or slowly over time.",
+  "Its neighbours: Select jumps between two values by a switch; Blend crossfades colours; Scenes fades a whole graph's values; Mix fades two numbers."
+ ],
+ "steps": [
+  "**a** is **Coords** `u`: a plain sweep of the palette across.",
+  "**b** is a **Noise** of `u` and `v`, drifting with a clock: blobs.",
+  "**t** comes from a slow **Wave** of the clock: it rises and falls between 0 and 1 every four seconds, so the picture fades from the sweep to the blobs and back.",
+  "The result is the **Palette**'s index."
+ ],
+ "try": [
+  {
+   "label": "Faster",
+   "text": "the clock's Multiply at 1: the crossfade swings back and forth quickly.",
+   "set": [
+    [
+     11,
+     "b",
+     1.0
+    ]
+   ]
+  },
+  {
+   "label": "Mostly noise",
+   "text": "the Wave's shape square: t snaps between 0 and 1 - a hard cut between the two looks instead of a fade.",
+   "set": [
+    [
+     4,
+     "shape",
+     "square"
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   4,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Mix",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Noise",
+    "params": {
+     "octaves": 1,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 1.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Mix",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.25
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    1,
+    "a"
+   ],
+   [
+    2,
+    "u",
+    3,
+    "x"
+   ],
+   [
+    2,
+    "v",
+    3,
+    "y"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "z"
+   ],
+   [
+    11,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    3,
+    "value",
+    1,
+    "b"
+   ],
+   [
+    4,
+    "value",
+    1,
+    "t"
+   ],
+   [
+    1,
+    "result",
+    5,
+    "index"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

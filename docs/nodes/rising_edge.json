@@ -1,0 +1,169 @@
+{
+ "node": "Rising edge",
+ "star": 1,
+ "caption": "Rising edge: the bass gate stays open for several frames, but each opening counts only once",
+ "why": [
+  "A switch that is on stays on - for as many frames as the bass is loud, a button is held, a level is high. When something should happen once per press, not every frame of it, you need the moment it turns on. Rising edge gives exactly that: true for one frame, when its input goes from off to on.",
+  "Its neighbours: Gate's own rise output does the same for its gate; Counter and Toggle count triggers (they need a tap, not a hold); Rising edge turns any held switch into a tap."
+ ],
+ "steps": [
+  "**Audio**'s `bass` opens a **Gate** (high 0.5, low 0.3); the gate's `on` stays true for several frames on each kick - that is Rising edge's **x**.",
+  "`pulse` is true only on the first frame of each opening.",
+  "The pulse drives a **Counter** (steps 4), and its `phase` is the **Palette**'s index across the matrix (plus **Coords** `u`): the colours step once per kick.",
+  "The trace shows the gate (grey) held open for several frames on each kick, and the Counter (orange) stepping once per opening - the pulse itself lasts a single frame, too short to draw."
+ ],
+ "try": [
+  {
+   "label": "More sensitive gate",
+   "text": "the Gate's high at 0.3 and low at 0.15: quieter kicks open it too, so the colours step more often.",
+   "set": [
+    [
+     2,
+     "high",
+     0.3
+    ],
+    [
+     2,
+     "low",
+     0.15
+    ]
+   ]
+  },
+  {
+   "label": "Smaller steps",
+   "text": "the Counter's steps at 12: each kick moves the colours a twelfth of the way round.",
+   "set": [
+    [
+     3,
+     "steps",
+     12.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   2,
+   "value"
+  ],
+  [
+   3,
+   "phase"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Rising edge",
+  "nodes": [
+   {
+    "id": 4,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Gate",
+    "params": {},
+    "inputs": {
+     "high": 0.5,
+     "low": 0.3
+    }
+   },
+   {
+    "id": 1,
+    "type": "Rising edge",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Counter",
+    "params": {},
+    "inputs": {
+     "steps": 4.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    4,
+    "bass",
+    2,
+    "x"
+   ],
+   [
+    2,
+    "on",
+    1,
+    "x"
+   ],
+   [
+    1,
+    "pulse",
+    3,
+    "trigger"
+   ],
+   [
+    5,
+    "u",
+    6,
+    "a"
+   ],
+   [
+    3,
+    "phase",
+    6,
+    "b"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "index"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ]
+  ]
+ }
+}

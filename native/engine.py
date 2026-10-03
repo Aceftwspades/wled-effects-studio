@@ -111,7 +111,8 @@ class Engine:
         self.idx = 0
         self.pal = 1
         self.fx = {}
-        self.sim_ms = 0
+        self.sim_ms = 0              # ms since the effect was picked (the synth's beat counts from it)
+        self.now_ms = 0              # the engine's clock, strip.now: from the start, through every pick
         self.B = 16
         self.geom = None
         self.map1d2d = 0
@@ -207,6 +208,7 @@ class Engine:
         self._px = self.lib.simPixels()
         self._fft = self.lib.simFftPtr()
         self.sim_ms = 0
+        self.now_ms = 0                                  # simInit starts strip.now again
         self.seg = 0
         self._segstate.clear()
         self.select(self.idx)
@@ -502,6 +504,40 @@ class Engine:
         a = np.ascontiguousarray(np.clip(samples, -127, 127).astype(np.int8))
         f(a.ctypes.data_as(C.POINTER(C.c_int8)), int(a.size))
 
+    def prof(self, k):
+        """A profiling build's slot k (graph.compile(profile=True)): (ticks, runs) as the
+        effect last handed its sums over; (0, 0) from an engine without them."""
+        try:
+            ft, fn = self.lib.simProfTicks, self.lib.simProfCount
+        except AttributeError:
+            return 0.0, 0
+        ft.restype, ft.argtypes = C.c_double, [C.c_int]
+        fn.restype, fn.argtypes = C.c_int, [C.c_int]
+        return float(ft(int(k))), int(fn(int(k)))
+
+    def prof_clock(self):
+        """The profile's clock now, in its own ticks (the time-stamp counter where there is one)."""
+        try:
+            f = self.lib.simProfClock
+        except AttributeError:
+            return None
+        f.restype = C.c_double
+        return float(f())
+
+    def video(self, frame):
+        """The video slot the Video node reads: an (h, w, 3) uint8 frame (at most 256 x 256 - larger is
+        cut), or None for black. Ignored by an engine built without it."""
+        try:
+            f = self.lib.simVideoSet
+        except AttributeError:
+            return False
+        if frame is None:
+            f(None, 0, 0)
+            return True
+        a = np.ascontiguousarray(np.asarray(frame, np.uint8)[:256, :256, :3])
+        f(a.ctypes.data_as(C.POINTER(C.c_uint8)), int(a.shape[1]), int(a.shape[0]))
+        return True
+
     def chroma(self, pc, level=0.0):
         """The pitch-class slot (u_data[9]) for effects that follow the
         notes: twelve 0..1, C first, the strongest 1 (all 0 in silence),
@@ -540,6 +576,23 @@ class Engine:
         self.last_audio = (float(vol), int(peak))
         self.lib.simAudioSet(C.c_float(vol), int(peak))
 
+    # audioreactive's sixteen fftResult channels, the middle of each (Hz, geometric): what a band's peak means
+    BAND_HZ = (61, 107, 167, 249, 360, 491, 678, 952, 1261, 1636, 2138, 2697, 3342, 4073, 5642, 8111)
+
+    def audio_peak(self, freq=None, magnitude=None):
+        """The major peak and its magnitude (u_data[4], [5]) - given, or from
+        the bins as they are now: the loudest band's frequency, its level x 4
+        (my_magnitude's scale: Freqmap lights by a quarter of it). Ignored by
+        an engine built without it."""
+        if freq is None:
+            f = self.fft
+            i = int(np.argmax(f))
+            freq, magnitude = (float(self.BAND_HZ[i]), float(f[i]) * 4.0) if f[i] > 0 else (0.0, 0.0)
+        try:
+            self.lib.simAudioPeak(C.c_float(freq), C.c_float(magnitude or 0.0))
+        except AttributeError:
+            pass
+
     @property
     def fft(self):
         """Writable 16-byte view of the FFT bins the effects read."""
@@ -547,6 +600,7 @@ class Engine:
 
     def frame(self, dt=23):
         self.sim_ms += dt
+        self.now_ms += dt
         self.lib.simFrame(self.idx, dt)
 
     def set_now(self, ms=0):
@@ -555,8 +609,35 @@ class Engine:
         self.sim_ms = int(ms)
         try:
             self.lib.simNowSet(C.c_uint32(int(ms)))
+            self.now_ms = int(ms)
         except AttributeError:
             pass
+
+    def clear(self):
+        """A clean cube: every pixel off and every segment's effect started
+        from nothing, the clock at 0 - what a preview starts on (selecting an
+        effect keeps the pixels, as WLED does). An engine built without
+        simClearPixels is set up afresh instead, which clears less."""
+        try:
+            self.lib.simClearPixels()
+        except AttributeError:
+            self.set_geometry(self.geom) if self.geom is not None else None
+        self.set_now(0)
+        self.sim_ms = 0
+
+    def clock(self):
+        """Both clocks, (strip.now, ms since the effect was picked), to hand
+        to set_clock after a pick or a reload that would start them again."""
+        return self.now_ms, self.sim_ms
+
+    def set_clock(self, c):
+        """The clocks from clock() put back: an effect that stands in for
+        another (the script preview, then the build it stood in for) takes
+        over at the same moment, so a pattern that follows the time does not
+        jump back to its start."""
+        now, since = c
+        self.set_now(now)
+        self.sim_ms = int(since)
 
     def pixels(self):
         """(rows, cols) uint32 0x00RRGGBB, a live view of the engine's buffer."""

@@ -1,0 +1,138 @@
+{
+ "node": "Combine",
+ "star": 1,
+ "caption": "Combine: red across, green as a wave down, a fixed half of blue",
+ "why": [
+  "A colour on an LED is three amounts of light - red, green and blue. Combine builds a colour from those three numbers directly, so any three patterns can be the three channels.",
+  "It is the plainest way to turn numbers into colour, and good for colour you compute rather than pick: a heat map, channels driven by three audio bands. Its neighbours: HSV builds from hue, saturation and brightness (usually easier to think in); Split takes a colour back apart into r, g, b; Combine builds from r, g, b."
+ ],
+ "steps": [
+  "**r** is **Coords** `u`: no red at the left edge, full red at the right.",
+  "**g** is a **Wave** down the matrix (x from `v`, 2 cycles) scrolled by a clock (**Time** times 0.3): bands of green rolling downward.",
+  "**b** is unwired, typed at 0.5: half blue everywhere.",
+  "Where the three overlap the light mixes - red and green make yellow, all three white - and the `color` goes to the **Output**."
+ ],
+ "try": [
+  {
+   "label": "No blue",
+   "text": "b 0: only red and green - yellows, greens and reds.",
+   "set": [
+    [
+     1,
+     "b",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Full blue",
+   "text": "b 1: blue everywhere - purples, cyans and white where red and green are high too.",
+   "set": [
+    [
+     1,
+     "b",
+     1.0
+    ]
+   ]
+  },
+  {
+   "label": "Faster green",
+   "text": "the clock's Multiply at 1.2: the green bands roll four times as fast.",
+   "set": [
+    [
+     4,
+     "b",
+     1.2
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Combine",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 5,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 2.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Combine",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    1,
+    "r"
+   ],
+   [
+    2,
+    "v",
+    5,
+    "x"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "phase"
+   ],
+   [
+    5,
+    "value",
+    1,
+    "g"
+   ],
+   [
+    1,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

@@ -71,13 +71,57 @@ MAP_STEPS = [
       {"py": "chrome.close_dialog('map_win')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.8),
 ]
 
+# a camera mapping live, without ffmpeg: a synthetic webcam on a 60-LED tree pictures what the plan lights (the
+# device's frame, never sent: nothing streams); calibration counts the LEDs on the flash, the binary plan steps
+# through its 14 pictures and the side is read; the shape (the cube's five faces) out as Lightwork's layout CSV and
+# back in as a part of as many LEDs
+_LIVE_TREE = ("np.stack([(40 * (1 - np.linspace(0, 1, 60)) + 4) * np.cos(np.linspace(0, 8 * np.pi, 60)), "
+              "(40 * (1 - np.linspace(0, 1, 60)) + 4) * np.sin(np.linspace(0, 8 * np.pi, 60)), np.linspace(0, 120, 60)], 1)")
+_EXPORT = "__import__('os').path.join(app.project.path, 'export', 'lightwork_layout.csv')"
+LIVE_MAP_STEPS = [
+    ([{"py": "camera_map_ui.show(app)"}, {"py": "dpg.set_value('map_method', camera_map_ui.METHODS[1][1])"},
+      {"py": "num.set('map_n', 60)"}, {"py": "num.set('map_bright', 200)"}, {"py": "dpg.set_value('map_cam', 'synthetic')"},
+      {"py": "camera_map_ui._state(app).__setitem__('cam', camera_map.SyntheticCamera(" + _LIVE_TREE + ", lambda: app._map_frame))"},
+      {"py": "camera_map_ui.calibrate(app)"}], 1.5),
+    ([{"expect": ["map_cam_words", "found of 60 LEDs"]}, {"check": "app.wiring is not None and app.wiring.mode == 'mask'"},
+      {"check": "int(np.frombuffer(app._map_frame, np.uint8).max()) == 200"}, {"py": "camera_map_ui.calibrate(app)"}], 0.3),
+    ([{"check": "app._map['calib'] is None and app.wiring is None and app._map_frame is None"},
+      {"py": "camera_map_ui.live(app)"}], 4.0),
+    ([{"check": "app._map['live'] is None and app._map['busy'] is None and not app._map['queue']"},
+      {"check": "len(app._map['sides'][-1]['found']) >= 58"}, {"check": "app._map['sides'][-1]['words'].startswith('the webcam')"},
+      {"py": "camera_map_ui.export_csv(app)"}], 0.5),
+    ([{"check": "open(" + _EXPORT + ").readline().strip() == 'address,x,y,z'"},
+      {"check": "len(open(" + _EXPORT + ").read().split()) == app.project.geometry.count + 1"},
+      {"py": "num.set('map_height', 120.0)"}, {"py": "camera_map_ui.import_csv(app, " + _EXPORT + ")"}], 1.0),
+    ([{"check": "app.project.geometry.kind == 'shape' and [shapes.part_count(q) for q in app.project.geometry.params['parts'] "
+                "if q['name'].startswith('lightwork_layout')] == [16 * 16 * 5]"},
+      {"expect": ["map_result", "from lightwork_layout.csv"]},
+      {"py": "camera_map_ui._close_cam(app)"}, {"py": "chrome.close_dialog('map_win')"},
+      {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.8),
+]
+
 STEPS = [
     # the run's own project, from the examples; Maelstrom's graph compiled, built and put on the effects list
     # (a batch that starts with wait_build is taken once the build in hand is loaded, however long that is here)
-    ([{"project": SMOKE}], 3.0),
+    # Live (rebuild as the graph changes) off for the steps that build by hand - it is on by default; the
+    # steps that are about it turn it on
+    ([{"project": SMOKE}, {"graph_auto": False}], 3.0),
     ([{"wait_build": True}, {"check": f"app.project.path.endswith({SMOKE!r})"}, {"layout": "graph"},
       {"graph_open": "maelstrom.json"}, {"py": "app.gp.compile()"}, {"py": "app.project.set_imported('maelstrom.cpp', True)"}], 5.0),
     ([{"wait_build": True}, {"expect": ["edit_status", "loaded cubefx_"]}, {"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
+    # a rewire seen at once: with Live on, the edit runs as bytecode in the sim's Studio Script effect a moment
+    # after it is made - under the graph's own name - while its C++ builds; the build takes over at the same clock
+    ([{"check": "app.eng.names[app.eng.idx] == 'Maelstrom'"}, {"layout": "graph"}, {"graph_open": "maelstrom.json"},
+      {"py": "app.eng.set_now(50000)"}, {"graph_auto": True}, {"graph_link": [4, "value", 23, "b"]}], 0.7),
+    ([{"check": "app.gp.standin_on() and 'Studio Script' in app.eng.names[app.eng.idx]"},
+      {"check": "dpg.get_value('fx_combo') == 'Maelstrom' and app.eng.clock()[0] >= 50000"},
+      {"expect": ["messages", "runs it as a script until its build lands"]}], 0.3),
+    ([{"wait_build": True}, {"check": "app.eng.names[app.eng.idx] == 'Maelstrom' and not app.gp.standin_on()"},
+      {"check": "app.eng.clock()[0] >= 50000 and app.gp._shown is not None"},
+      {"py": "setattr(app, '_lib_live', app.eng.library)"}, {"graph_zoom": 0.85}], 0.9),
+    # an edit that changes no code (a zoom rebuilds the editor) builds nothing, Live or not
+    ([{"check": "not app.building and app.eng.library == app._lib_live and not app.gp.standin_on()"},
+      {"graph_zoom": 1.0}, {"graph_auto": False}, {"graph_undo": True}, {"layout": "both"}], 0.5),
     # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
     ([{"check": "app.eng.names[app.eng.idx] == 'Maelstrom'"}, {"layout": "graph"}, {"graph_open": "box_fire.json"},
       {"py": "app.gp.compile()"}], 5.0),
@@ -201,6 +245,15 @@ STEPS = [
     # a bool output's light, the Audio node's beat: framed in the top left first - in the whole graph at macOS's
     # 1280 x 646 it sat under the minimap, where no readout is drawn
     ([{"check": "any(dpg.get_item_type(i).endswith('DrawCircle') for i in app.gp._readout_items)"}], 0.5),
+    # every node in the library on one graph (tests/node_gallery.py, the tree's): what is drawn in a node lies
+    # within the width it is laid out to - a title, a field, a face - a name too long is cut with "...", an
+    # output's name ends at its pin and an input's row starts at its - at 100%, 70% and 140%
+    ([{"py": f"setattr(app, '_gal', __import__('runpy').run_path({os.path.join(HERE, 'node_gallery.py')!r}, run_name='x'))"},
+      {"py": "app._gal['write'](app.project.path)[0]"}, {"layout": "graph"}, {"graph_open": "node_gallery.json"},
+      {"graph_zoom": 1.0}], 2.5),
+    ([{"py": "app._gal['check'](app)"}, {"check": "not app._gal['check'](app)"}, {"graph_zoom": 0.7}], 2.0),
+    ([{"py": "app._gal['check'](app)"}, {"check": "not app._gal['check'](app)"}, {"graph_zoom": 1.4}], 2.0),
+    ([{"py": "app._gal['check'](app)"}, {"check": "not app._gal['check'](app)"}, {"graph_zoom": 1.0}], 0.5),
     # an unwired coordinate reads the pixel: a Noise dropped in says "position x" on its field and compiles per
     # pixel; a number typed makes it a number again, a reset brings the words back; a vector pin (Voronoi's) is
     # a button that gives it a typed value
@@ -214,6 +267,24 @@ STEPS = [
       {"py": "app.gp._implicit_to_typed(None, None, (app._vz, 'pos'))"}], 0.6),
     ([{"check": "dpg.get_item_configuration(f'gin_{app._nz}_x_w')['format'] == 'position x'"},
       {"check": "not dpg.get_item_type(f'gin_{app._vz}_pos_w').endswith('Button') and 'pos' in app.gp.graph.nodes[app._vz]['inputs']"}], 0.2),
+    # Math's second pin only for the operations that read it - sqrt has one input - and kept while a wire is on it;
+    # its operations grouped in the dropdown, a group's name picked changing nothing
+    ([{"graph_open": "box_fire.json"}, {"py": "setattr(app, '_mz', app.gp.graph.add('Math', (60, 900)))"}, {"py": "app.gp.rebuild()"}], 0.5),
+    ([{"check": "dpg.does_item_exist(f'gin_{app._mz}_b') and '-- compare --' in dpg.get_item_configuration(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')))['items']"},
+      {"py": "dpg.get_item_callback(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')))(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')), 'sqrt')"}], 0.5),
+    ([{"check": "not dpg.does_item_exist(f'gin_{app._mz}_b') and app.gp.graph.nodes[app._mz]['params']['op'] == 'sqrt'"},
+      {"py": "dpg.get_item_callback(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')))(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op')), '-- compare --')"}], 0.3),
+    ([{"check": "app.gp.graph.nodes[app._mz]['params']['op'] == 'sqrt' and dpg.get_value(next(w for w in app.gp._widgets if dpg.does_item_exist(w) and dpg.get_item_user_data(w) == (app._mz, 'op'))) == 'sqrt'"},
+      {"py": "(app.gp.graph.link(13, 'result', app._mz, 'b'), app.gp.rebuild())"}], 0.4),
+    ([{"check": "dpg.does_item_exist(f'gin_{app._mz}_b')"}, {"py": "(app.gp.graph.remove(app._mz), app.gp.rebuild())"}], 0.3),
+    # what each node costs: a profiling build of the graph run in an engine of its own - each node then says its
+    # share of the frame and its time on the device, the status the frame's; compiled again, they are old
+    ([{"graph_open": "box_fire.json"}, {"graph_zoom": 1.0}, {"py": "app.gp.measure_costs()"}], 25.0),
+    ([{"check": "app.gp._costs and app.gp._costs['frame_ms'] > 0 and not app.building"},
+      {"check": "abs(sum(s for s, ms in app.gp._costs['nodes'].values()) + app.gp._costs['rest'] - 1.0) < 1e-6"},
+      {"check": "len(app.gp._cost_items) > 0"}, {"expect": ["messages", "on the device"]},
+      {"py": "app.gp.compile(False)"}], 0.5),
+    ([{"check": "app.gp._costs is None and not app.gp._cost_items"}], 0.3),
     # a wire that closes a loop (the Multiply of the time back into its own b) gets a Delay; undone
     ([{"graph_open": "box_fire.json"}, {"py": "app.gp.on_link(None, (app.gp._pins[(11, 'out', 'result')], app.gp._pins[(11, 'in', 'b')]))"}], 1.0),
     ([{"expect": ["messages", "closed a loop"]}, {"py": "[n['type'] for n in app.gp.graph.nodes.values()].count('Delay')"}, {"graph_undo": True}], 0.5),
@@ -239,7 +310,18 @@ STEPS = [
       {"expect": ["messages", "MIDI clock: the synth's beat follows it"]}, {"midi": [0xFC]}], 0.4),
     ([{"check": "not app.syn.external"}, {"expect": ["messages", "the synth keeps its own beat again"]},
       {"py": "(setattr(app.syn, 'bpm', 120), num.set('inp_bpm', 120))"}], 0.3),
-    ([{"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
+    # OSC beside MIDI: on a port (any free one), a fader learnt as a knob is - its 0..1 finer than MIDI's 128 steps -
+    # then a real datagram to that port, sent from inside the app, moves the slider; off again
+    ([{"py": "midi_ui._st(app)['osc'].__setitem__('host', '127.0.0.1')"},
+      {"py": "midi_ui.set_osc(app, on=True, port=0)"}, {"midi_learn": {"kind": "fx", "key": "ix"}},
+      {"osc": ["/1/fader1", 0.5]}], 0.6),
+    ([{"expect": ["messages", "MIDI: OSC /1/fader1 -> "]}, {"check": "app.eng.fx['ix'] == 128 and app.osc.port > 0"},
+      {"expect": ["osc_state", "listening on"]},
+      {"py": "__import__('socket').socket(2, 2).sendto(__import__('native.osc', fromlist=['osc']).message('/1/fader1', 0.2), "
+             "('127.0.0.1', app.osc.port))"}], 0.8),
+    ([{"check": "app.eng.fx['ix'] == 51"}, {"py": "midi_ui.set_osc(app, on=False)"}], 0.3),
+    ([{"check": "app.osc.port is None and dpg.get_value('osc_state') == ''"},
+      {"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
       {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),
     # the help: the guide in its window, a search that marks the words and scrolls to them, F1 with a node
     # selected landing on that node's entry, Back to where the guide was, the node's menu with its keys and
@@ -445,7 +527,31 @@ STEPS = [
                 "win {dpg.get_item_pos('appearance_win')} {dpg.get_item_rect_size('appearance_win')} "
                 "status {dpg.get_item_rect_min('gc_status')} {dpg.is_item_visible('frames_style')}\""},
       {"py": "chrome.show_appearance(app, 'size')"}], 0.8),
-    ([{"check": "dpg.is_item_visible('app_ui_scale')"}, {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
+    ([{"check": "dpg.is_item_visible('app_ui_scale')"}, {"py": "chrome.show_appearance(app, 'view')"},
+      {"py": "chrome.set_look(app, preset='cinematic')"}], 0.8),
+    # the 3-D view's look (look.py): Cinematic picked - its fields follow, the live view's layers drawn, a picture
+    # made with it; a value moved is kept over the preset; the studio look again
+    ([{"check": "dpg.get_value('look_preset') == 'Cinematic' and abs(dpg.get_value('look_spill') - 0.5) < 1e-6"},
+      {"check": "app.cube_quads is None or (dpg.get_item_configuration(app.cube_quads.layers.over_items[0])['show'] "
+                "and dpg.get_item_configuration(app.cube_quads.layers.under_item)['show'])"},
+      {"check": "app.view_image(app.net_image(), 160).shape == (160, 160, 3)"},
+      # the floor a mirror: the reflection's quads drawn under the cube while the camera is above the floor
+      {"check": "app.cube_quads is None or app.eye_above_floor() is False or "
+                "any(dpg.get_item_configuration(q)['show'] for qs in app.cube_quads.mirror.values() for q in qs)"},
+      {"py": "chrome.set_look(app, key='grain', value=0.9)"}], 0.5),
+    ([{"check": "app.view_look()['grain'] == 0.9 and dpg.get_value('look_preset') == 'Cinematic, grain changed'"},
+      {"py": "chrome.set_look(app, preset='studio')"}], 0.5),
+    ([{"check": "not __import__('native.look', fromlist=['x']).active(app.view_look())"},
+      {"check": "app.cube_quads is None or not dpg.get_item_configuration(app.cube_quads.layers.over_items[0])['show']"},
+      {"check": "app.cube_quads is None or not any(dpg.get_item_configuration(q)['show'] for qs in app.cube_quads.mirror.values() for q in qs)"},
+      # every shape in parity: a sphere's LEDs as glowing sprites with their reflection
+      {"geometry": {"kind": "sphere", "params": {"w": 24, "h": 12}}}, {"py": "chrome.set_look(app, preset='night')"}], 1.5),
+    ([{"check": "app.point_quads is not None and app.point_quads.sprite and app.point_quads.reflect > 0"},
+      {"check": "any(dpg.get_item_configuration(q)['show'] for q in app.point_quads.mirror_items)"},
+      {"check": "app.view_image(app.net_image(), 160).shape == (160, 160, 3)"},
+      {"py": "chrome.set_look(app, preset='studio')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.5),
+    ([{"check": "app.cube_quads is not None"},
+      {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
     # the footer (C18): power and the device's fps; the stats popover live while open, above its button; Esc closes it
     ([{"check": "'device ~' in dpg.get_value('stat_txt') and 'brightness' not in dpg.get_value('stat_txt')"},
       {"py": "chrome.toggle_stats(app)"}], 0.8),
@@ -456,6 +562,35 @@ STEPS = [
     ([{"chrome": "shortcuts"}, {"chrome": "frames"}, {"chrome": "flash"}, {"feature": ["imu", False]}, {"feature": ["audio", "none"]},
       {"feature": ["imu", True]}, {"feature": ["audio", "pcm"]}, {"chrome": "usermods"}, {"usermod": ["add", "Temperature"]},
       {"usermod": ["off", "Temperature"]}, {"usermod": ["remove", "Temperature"]}, {"chrome": "about"}], 1.0),
+    # the Flash frame's firmware sources: a .bin of the fake device's chip (an S3) chosen, asked about, flashed
+    # to it through /update and recorded; WLED's releases (a list given here, not the network) matched to its
+    # chip; a built-in cube effect left out of the studio's build; and back to the studio's build
+    ([{"frame": "flash"}, {"device": "127.0.0.1:8770"},
+      {"py": "open(app.project.path + '/export/smoke_s3.bin', 'wb').write(bytes([0xE9, 3, 0, 0, 0, 4, 8, 0x40, 0, 0, 0, 0, 9, 0]) + bytes(4082)) and None"},
+      {"py": "device_ui._set_source(app, 'file')"}, {"py": "device_ui._pick_bin(app, app.project.path + '/export/smoke_s3.bin')"}], 0.8),
+    ([{"check": "dpg.is_item_shown('flash_file_row') and not dpg.is_item_shown('flash_fx') and not dpg.is_item_shown('flash_env_row')"},
+      {"check": "any('an esp32-s3 image' in dpg.get_value(i) for i in dpg.get_item_children('flash_manifest', 1))"},
+      {"py": "device_ui.start_flash(app)"}], 0.6),
+    ([{"check": "dpg.is_item_shown('confirm_dialog') and 'cube effects' in dpg.get_value('confirm_text')"},
+      {"py": "dpg.hide_item('confirm_dialog')"}, {"py": "device_ui.start_flash(app, confirmed=True)"}], 14.0),
+    ([{"check": "app.flash_job.done and app.flash_job.ok and app.flash_job.source == 'file'"},
+      {"check": "app.project.options['flash_history'][-1]['firmware'] == 'smoke_s3.bin'"},
+      {"py": "setattr(app, '_fw_rels', [{'tag': 'v16.0.1', 'name': 'x', 'pre': False, 'date': '2026-09-20', 'assets': ["
+             "{'name': n, 'url': '', 'size': 1000} for n in ('WLED_16.0.1_ESP32.bin', 'WLED_16.0.1_ESP32-S3_8MB_opi.bin', "
+             "'WLED_16.0.1_ESP32-S3_4M_qspi.bin')]}])"},
+      {"py": "setattr(app, '_fw_fetching', True)"}, {"py": "device_ui._set_source(app, 'release')"},
+      {"py": "(setattr(app, '_fw_fetching', False), setattr(app, '_fw_fresh', True))"}], 0.8),
+    ([{"check": "dpg.is_item_shown('flash_rel_row') and dpg.get_item_configuration('flash_asset')['items'] == "
+                "['WLED_16.0.1_ESP32-S3_4M_qspi.bin', 'WLED_16.0.1_ESP32-S3_8MB_opi.bin']"},
+      {"check": "any('several flash sizes' in dpg.get_value(i) for i in dpg.get_item_children('flash_manifest', 1))"},
+      {"py": "device_ui._set_source(app, 'studio')"},
+      # the cube_fx sources come from a WLED checkout: CI and a packaged app without one have no catalog
+      {"py": "flash.builtin_catalog() and device_ui._builtin_toggle(app, flash.builtin_catalog()[0]['file'], False)"}], 0.8),
+    ([{"check": "not flash.builtin_catalog() or (dpg.is_item_shown('flash_fx') and flash.builtin_chosen(app.project) == [e['file'] for e in flash.builtin_catalog()][1:])"},
+      {"check": "not flash.builtin_catalog() or any('built-in cube effects: %d of %d' % (len(flash.builtin_catalog()) - 1, len(flash.builtin_catalog())) in dpg.get_value(i) "
+                "for i in dpg.get_item_children('flash_manifest', 1))"},
+      {"py": "device_ui._ship_all(app, True)"}], 0.5),
+    ([{"check": "app.project.options.get('builtin_ship') is None"}, {"py": "chrome.close_all_frames(app)"}], 0.3),
     ([{"appearance": {"light": True}}, {"appearance": {"light": False}}], 1.0),
     ([{"gpu": False}, {"gpu": True}, {"gpu_net": False}, {"gpu_net": True}], 1.5),
     ([{"ui": False}, {"ui": True}, {"layout": "graph"}, {"measure": True}, {"randomise": True}], 1.0),
@@ -597,6 +732,7 @@ STEPS = [
     ([{"check": "app.project.geometry.kind == 'shape' and app.project.geometry.count == 256 and dpg.get_value('geom_kind') == 'shape'"},
       {"dock": ["shape", False]}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
     *MAP_STEPS,
+    *LIVE_MAP_STEPS,
     # S19: a matrix-only effect on a shape's one-row layout says so under the effect (not on the cube); a grid that leaves
     # LEDs dark behind others is a check; the tree tutorial opens at its chapter
     ([{"geometry": {"kind": "shape", "params": {"parts": [_TREE]}}}, {"effect": "Ace 3-D Plasma"}], 1.0),
@@ -613,6 +749,15 @@ STEPS = [
       {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),
     ([{"check": "app._stream_wiring is not None and app.stream_order() == 'logical'"},
       {"expect": ["messages", "in the device's own order"]}, {"stream": False}], 1.0),
+    # the stream in E1.31 (sACN) from universe 3, then Art-Net from 0, kept for the device - each restarts it, the
+    # health line names it and its rate (the fake keeps every universe: checked at the end), then back to DDP
+    ([{"device": "127.0.0.1:8770"}, {"py": "app.set_stream_out(protocol='e131', universe=3)"}, {"stream": "127.0.0.1:8770"}], 2.5),
+    ([{"check": "type(app.ddp).__name__ == 'E131Out' and app.ddp.universe == 3 and app.stream_out('127.0.0.1:8770') == ('e131', 3)"},
+      {"expect": ["live_status", "E1.31 (sACN):"]}, {"expect": ["live_status", "fps sent"]},
+      {"py": "app.set_stream_out(protocol='artnet')"}], 2.5),
+    ([{"check": "type(app.ddp).__name__ == 'ArtNetOut' and app.ddp.universe == 0"}, {"expect": ["live_status", "Art-Net:"]},
+      {"py": "app.set_stream_out(protocol='ddp')"}, {"stream": False}], 1.0),
+    ([{"check": "app.ddp is None and app.stream_out('127.0.0.1:8770')[0] == 'ddp'"}], 0.2),
     # every send to a device, against the fake WLED: the script, the settings, the shape, the ledmap
     ([{"frame": "devices"}, {"device": "127.0.0.1:8770"}, {"scan": "all"}], 6.0),
     ([{"layout": "graph"}, {"graph_open": "fan.json"}, {"py": "app.send_script()"}], 6.0),
@@ -712,8 +857,49 @@ STEPS = [
       {"py": "messages.clear(app, 'graph:sad_smoke.json')"}], 0.5),
     # a problem report bundled, the project zipped (both land in captures/; the test removes them)
     ([{"report": True}, {"py": "app.export_project_zip()"}, {"expect": ["edit_status", "project zipped"]}], 3.0),
-    # the library: thumbnails made for the graphs, the frame docked and floated
-    ([{"frame": "library"}, {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
+    # the library: three banks (the project's graphs, the usermod effects, WLED's stock ones), thumbnails made on a
+    # worker for every effect - each from a clean cube, hearing the synth - with a bar while they are; a preview
+    # generated with its own bar; the frame docked and floated
+    ([{"frame": "library"}, {"py": "library_ui._set_bank(app, 'stock')"}], 14.0),
+    ([{"check": "dpg.get_item_label('lib_bank_stock').startswith('Stock (') and dpg.get_item_label('lib_bank_usermod').startswith('Usermod effects (')"},
+      {"check": "len([k for k, v in app._lib_thumbs.items() if v]) > 150"},
+      {"py": "library_ui._set_bank(app, 'graphs')"}, {"py": "library_ui.generate_previews(app, 1.0, only=['Rainbow'])"}], 0.3),
+    ([{"check": "app._lib_gprog is not None and dpg.is_item_shown('lib_progress_row') and dpg.is_item_shown('lib_cancel')"}], 6.0),
+    ([{"check": "app._lib_gprog is None"}, {"check": "not dpg.is_item_shown('lib_cancel')"},
+      {"check": "'1 preview' in dpg.get_value('lib_status')"},
+      {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
+    # S21 the node tutorials: Slew's page with its picture playing; Try it opens its graph live in the tutorials
+    # project, the page beside it, the panel folded; a "Try this" change to an input, then to another lesson's
+    # setting; Reset; Copy into my project - back in this run's project with the graph, the layout as it was
+    ([{"py": "chrome.close_all_frames(app)"}, {"py": "setattr(app, '_tut_panel_was', app.prefs.get('graph_panel_open'))"},
+      {"py": "reader_ui.open_doc(app, 'NODES.md', 'Slew')"}], 1.5),
+    ([{"check": "reader_ui.S.doc == 'NODES.md' and len(reader_ui.S.anims) >= 5 and not reader_ui.S.side"},
+      {"py": "reader_ui.follow(app, 'studio:try/slew')"}], 8.0),
+    ([{"check": "app.project.path.endswith('node_tutorials') and app.gp.file == 'tutorial_slew.json'"},
+      {"check": "app.eng.names[app.eng.idx] == 'Tutorial Slew' and app.gp.ext_sel == [2]"},
+      {"check": "dpg.is_item_shown('reader_tut_row') and dpg.get_value('reader_tut_what') == 'Tutorial: Slew'"},
+      {"check": "reader_ui.S.side and dpg.get_item_pos('reader_win')[0] > dpg.get_viewport_client_width() // 2 and room.folded(app)"},
+      {"py": "setattr(reader_ui.S, 'pending', {'k': next(i for i in range(reader_ui.reader.heading_index(reader_ui.S.blocks, 'Slew'), "
+             "len(reader_ui.S.blocks)) if reader_ui.S.blocks[i]['kind'] == 'img'), 'tries': 0})"}], 2.0),
+    ([{"check": "any(a['frames'] and a['i'] > 0 for a in reader_ui.S.anims.values())"},
+      {"py": "reader_ui.follow(app, 'studio:try/slew/1')"}], 1.0),
+    ([{"check": "app.gp.graph.nodes[2]['inputs']['up'] == 40.0 and dpg.is_item_shown('props_fly')"},
+      {"py": "reader_ui.follow(app, 'studio:try/wave/1')"}], 8.0),
+    ([{"check": "app.gp.file == 'tutorial_wave.json' and app.gp.graph.nodes[4]['params']['shape'] == 'square'"},
+      {"check": "app._tutorial['back'][0].endswith('smoke_run') and app._tutorial['node'] == 'Wave'"},
+      {"py": "tutorials.reset(app)"}], 6.0),
+    ([{"check": "app.gp.graph.nodes[4]['params']['shape'] == 'sine'"},
+      {"py": "reader_ui._tut('copy', app)"}], 6.0),
+    ([{"check": "app.project.path.endswith('smoke_run') and app.gp.file == 'wave_tutorial.json' and getattr(app, '_tutorial', None) is None"},
+      {"check": "not dpg.is_item_shown('reader_tut_row') and not reader_ui.S.side and app.prefs.get('graph_panel_open') == app._tut_panel_was"},
+      {"py": "chrome.close_dialog(reader_ui.TAG)"}], 0.5),
+    # S22 live video: the test pattern into the engine's video slot from the VIDEO section, paused, stopped
+    ([{"check": "dpg.does_item_exist('video_kind') and dpg.does_item_exist('video_play')"},
+      {"py": "video_ui.start(app, 'test')"}], 0.8),
+    ([{"check": "app.video_src is not None and app._video_n > 2 and dpg.get_item_label('video_play') == 'Pause'"},
+      {"check": "'playing - test pattern' in dpg.get_value('video_msg')"}, {"py": "video_ui.toggle(app)"}], 0.3),
+    ([{"check": "app.video_src.paused and dpg.get_item_label('video_play') == 'Play'"}, {"py": "video_ui.stop(app)"}], 0.3),
+    ([{"check": "app.video_src is None and dpg.get_value('video_msg').startswith('stopped')"}], 0.1),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": f"projects/{SMOKE}/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     ([{"layout": "both"}, {"popout": ["cube", True]}, {"layout": "graph"}], 5.0),
@@ -790,6 +976,10 @@ def make_films():
 
 
 def main():
+    try:
+        sys.stdout.reconfigure(errors="replace")         # the app's lines can hold what a Windows console cannot print
+    except Exception:
+        pass
     if not scratch.DIR:
         print("smoke: no private scratch folder to drive the app through (native/scratch.py)")
         return 1
@@ -800,9 +990,13 @@ def main():
     for d in (smoke_dir, os.path.join(ROOT, "projects", "smoke_bad")):
         if os.path.isdir(d):
             shutil.rmtree(d)                                  # a run that was stopped: started afresh
+    tut_dir = os.path.join(ROOT, "projects", "node_tutorials")
+    tut_had = os.path.isdir(tut_dir)                          # the tutorials' project: removed after only if this run made it
     caps_before = set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()
     STUDIO_FILE = os.path.join(ROOT, "projects", "studio.json")   # the prefs, and the last project: put back after
     saved_prefs = open(STUDIO_FILE, encoding="utf-8").read() if os.path.exists(STUDIO_FILE) else None
+    if saved_prefs is not None:
+        os.remove(STUDIO_FILE)       # from no settings, as a CI runner starts: frames docked by an earlier run take the room the steps measure
     from fake_wled import FakeWled                          # the device every send goes to, and the DDP receiver
     ddp = FakeWled(port=8770, ddp_port=4048).start()
     with open(LOG, "w") as log:
@@ -829,8 +1023,12 @@ def main():
             open(STUDIO_FILE, "w", encoding="utf-8").write(saved_prefs)
         shutil.rmtree(smoke_dir, ignore_errors=True)          # the run's project, and all it made in it
         shutil.rmtree(os.path.join(ROOT, "projects", "smoke_bad"), ignore_errors=True)    # the one with the broken project.json
+        if not tut_had:
+            shutil.rmtree(tut_dir, ignore_errors=True)
     text = open(LOG, encoding="utf-8", errors="replace").read()
     ddp.stop()
+    print(f"e1.31: {ddp.e131_packets} packets, universes {sorted(ddp.e131_univ)[:3]}...; "
+          f"art-net: {ddp.artnet_packets} packets, universes {sorted(ddp.artnet_univ)[:3]}...")
     print(f"ddp: {ddp.ddp_packets} packets, {ddp.ddp_frames} frames received from the stream; "
           f"the fake got {len(ddp.files)} file(s), {len(ddp.presets) - 1} preset(s), {len(ddp.cfg['timers']['ins'])} timer(s)")
     bad = [l for l in text.splitlines() if "Traceback" in l or "Error:" in l or "command file:" in l
@@ -842,6 +1040,12 @@ def main():
                    "a buffered stdout, the wrong exe, or STUDIO_REMOTE_CONTROL not reaching it")
     if ddp.ddp_frames < 10:
         bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
+    # the cube's net in logical order, 6912 bytes, is 14 universes of 510 (the last 282): from 3 in E1.31, from 0 in Art-Net
+    for name, univ, first in (("E1.31", ddp.e131_univ, 3), ("Art-Net", ddp.artnet_univ, 0)):
+        if sorted(univ) != list(range(first, first + 14)):
+            bad.append(f"the {name} stream's universes were {sorted(univ)}; {first}..{first + 13} expected")
+        elif sum(len(univ[u]) for u in univ) != 48 * 48 * 3:
+            bad.append(f"the {name} stream's universes held {sum(len(univ[u]) for u in univ)} bytes; {48 * 48 * 3} expected")
     if len(ddp.ddp_last) != 48 * 48 * 3:                 # the cube's whole net, in logical order - not its 1280 LEDs in wiring order
         bad.append(f"the last streamed frame was {len(ddp.ddp_last)} bytes; the 48 x 48 cube in logical order is {48 * 48 * 3}")
     bad += [l for l in text.splitlines() if "EXPECT FAILED" in l]

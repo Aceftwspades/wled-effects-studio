@@ -1,8 +1,13 @@
 """The "Map lights by camera" dialog (the ninth pass's S18): the plan played
 - in the sim, and on the device while the sim is streamed to it - each
-side's film added (a video from any camera, read on a worker thread; or
-taken live by a webcam when OpenCV is there), and the points part made
-from them (camera_map does the finding and the 3-D).
+side's film added (a video from any camera, read on a worker thread), or
+each side mapped live by a webcam - the studio lights each step and takes
+its picture itself, no film and no clock (after Lightwork, PWRFLcreative) -
+and the points part made from them (camera_map does the finding and the
+3-D). The plan lights one LED at a time, or every LED at once by binary
+codes (seconds, not minutes, for a long string); the camera's live view
+calibrates the finding (threshold, LED brightness, blob distance and size);
+a map goes out to, and comes in from, Lightwork's layout CSV.
 
     camera_map_ui.build(app)     # the window, once (shape_ui.build calls it)
     camera_map_ui.show(app)
@@ -15,7 +20,7 @@ import time
 import numpy as np
 import dearpygui.dearpygui as dpg
 
-from native import camera_map as cm, units, typeface, form, num, weight
+from native import camera_map as cm, units, typeface, form, num, weight, video
 from native.typeface import px
 
 TAG = "map_win"
@@ -27,16 +32,18 @@ THUMB_W, THUMB_H = 132, 99           # a side's picture in its card (at 100%): t
 def _state(app):
     s = getattr(app, "_map", None)
     if s is None:
-        s = app._map = {"sides": [], "play": None, "busy": None, "queue": [], "webcam": None}
+        s = app._map = {"sides": [], "play": None, "busy": None, "queue": [], "cam": None,
+                        "live": None, "calib": None}
     return s
 
 
 def webcam_ok():
-    import importlib.util
-    try:
-        return importlib.util.find_spec("cv2") is not None
-    except Exception:
-        return False
+    """A webcam can be read: through ffmpeg (the video module's), no OpenCV needed."""
+    return bool(video.ffmpeg())
+
+
+METHODS = (("sequence", "one LED at a time"), ("binary", "every LED at once, by code"))
+CAM_W, CAM_H = 320, 240               # the camera's picture as mapping reads it (all of it, barred where narrower)
 
 
 def build(app):
@@ -54,6 +61,14 @@ def build(app):
             dpg.add_text("", tag="map_plan_words", color=chrome.DIM)
         with form.row("its height", tip="the object's height, measured: the mapped lights are sized to it"):
             num.add("map_height", 180.0, 1.0, None, digits=1, unit="cm", width=px(120))
+        with form.row("how", tip="one LED at a time: slow for a long string, sure where LEDs are close or blend; "
+                                 "every LED at once by code (Lightwork's binary mode): each LED flashes its own address "
+                                 "in a few pictures - seconds for hundreds - wants a darker room"):
+            dpg.add_combo([n for _, n in METHODS], tag="map_method", default_value=METHODS[0][1], width=px(220),
+                          callback=lambda s_, v: _plan_words(app))
+        with form.row("LED brightness", tip="how bright the plan lights the LEDs, 0..255: lower it if the camera flares "
+                                            "(a lit LED a blot, its neighbours run into it)"):
+            num.add("map_bright", 255, 8, 255, integer=True, width=px(120))
         typeface.label(dpg.add_text("1. PLAY THE PLAN WHILE A CAMERA FILMS", color=chrome.ACCENT))
         dpg.add_text("A white flash, each LED in turn, a white flash. Film all of it with the whole object in view, the room "
                      "dark and the camera still (a phone on a tripod will do).", color=chrome.DIM, wrap=px(590))
@@ -73,9 +88,39 @@ def build(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="+ a side", callback=lambda: _add_side(app))
             chrome.tip("another side: how far it was turned from the first, then its film")
-            dpg.add_button(label="Film with the webcam", tag="map_webcam", callback=lambda: webcam(app))
-            chrome.tip("the plan played while the webcam takes its pictures: a side without a video file "
-                       "(needs OpenCV: pip install opencv-python)")
+        typeface.label(dpg.add_text("OR MAP LIVE WITH A WEBCAM", color=chrome.ACCENT))
+        dpg.add_text("The studio lights each step on the device (streamed) and takes the webcam's picture itself - no film. "
+                     "Calibrate first: the view shows what is found.", color=chrome.DIM, wrap=px(590))
+        with dpg.group(horizontal=True):
+            dpg.add_combo([], tag="map_cam", width=px(250))
+            dpg.add_button(label="Find", tag="map_cam_find", callback=lambda: find_cameras(app))
+            chrome.tip("the webcams ffmpeg can open on this computer")
+            dpg.add_button(label="Calibrate", tag="map_calib", callback=lambda: calibrate(app))
+            chrome.tip("every LED lit, the camera's view with the LEDs found marked: set the threshold, the LED brightness, "
+                       "the blob distance and size until the count is right; again: stop")
+            dpg.add_button(label="Map live", tag="map_live", callback=lambda: live(app))
+            weight.primary("map_live")
+            chrome.tip("the plan stepped through with the webcam: each step lit, let settle, pictured - the next side without "
+                       "an empty slot gets it")
+        from native.textures import registry
+        if not dpg.does_item_exist("map_cam_tex"):
+            dpg.add_dynamic_texture(CAM_W, CAM_H, [0.0] * (CAM_W * CAM_H * 4), tag="map_cam_tex", parent=registry())
+        with dpg.group(horizontal=True):
+            dpg.add_image("map_cam_tex", width=px(CAM_W), height=px(CAM_H), tag="map_cam_view")
+            with dpg.group():
+                with form.row("threshold", width=px(110), tip="how far above the picture's noise a spot must stand to be an "
+                                                              "LED (the noise's spread): higher - only bright, sure spots"):
+                    num.add("map_conf", cm.CONF, 3.0, 60.0, digits=1, width=px(110))
+                with form.row("apart", width=px(110), tip="the least distance between two LEDs found, in the picture's pixels "
+                                                          "(of 320 across): flare and doubles closer than this are dropped"):
+                    num.add("map_dist", 4.0, 1.0, 40.0, digits=1, unit="px", width=px(110))
+                with form.row("largest", width=px(110), tip="the most pixels a spot may cover at half its height: LEDs run "
+                                                            "together, a lamp, a window are not an LED (0: any size)"):
+                    num.add("map_area", 0, 0, 2000, integer=True, unit="px", width=px(110))
+                with form.row("settle", width=px(110), tip="pictures waited after each step before one is taken (Lightwork's "
+                                                           "frame skip): more for a slow camera or a long stream delay"):
+                    num.add("map_settle", 3, 1, 15, integer=True, width=px(110))
+                dpg.add_text("", tag="map_cam_words", color=chrome.DIM, wrap=px(220))
         typeface.label(dpg.add_text("3. THE PART", color=chrome.ACCENT))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Make the part", tag="map_make", callback=lambda: make(app))
@@ -83,6 +128,16 @@ def build(app):
             chrome.tip("the lights as a points part in the shape, in wiring order: an LED no two sides saw is estimated "
                        "(the shape's checks list them, to drag where they are)")
             dpg.add_text("", tag="map_result", color=chrome.DIM, wrap=px(430))
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Save CSV (Lightwork)", tag="map_csv_out", callback=lambda: export_csv(app))
+            chrome.tip("the shape's LEDs as Lightwork's layout CSV - address,x,y,z, each 0..1 - for Lightwork's scraper, "
+                       "MadMapper or TouchDesigner; into the project's export folder")
+            dpg.add_button(label="Import CSV...", tag="map_csv_in", callback=lambda: dpg.show_item("map_csv_dialog"))
+            chrome.tip("a Lightwork layout CSV (address,x,y,z) as a points part, sized to its height above")
+    with dpg.file_dialog(directory_selector=False, show=False, tag="map_csv_dialog", width=px(640), height=px(420),
+                         callback=lambda s, a: import_csv(app, a.get("file_path_name", ""))):
+        dpg.add_file_extension(".csv", color=(200, 180, 90))
+        dpg.add_file_extension(".*")
     with dpg.file_dialog(directory_selector=False, show=False, tag="map_film_dialog", width=px(640), height=px(420),
                          callback=lambda s, a: _film_chosen(app, a.get("file_path_name", ""))):
         for ext in VIDEO:
@@ -103,16 +158,53 @@ def show(app):
         _add_side(app)
     _plan_words(app)
     _sides(app)
-    dpg.set_value("map_ff_words", "ffmpeg is not on the PATH, so a video cannot be read: install it (ffmpeg.org) and restart "
-                  "the studio" + (", or film with the webcam" if webcam_ok() else ""))
+    dpg.set_value("map_ff_words", "ffmpeg is not on the PATH, so neither a video nor a webcam can be read: install it "
+                  "(ffmpeg.org) and restart the studio")
     dpg.configure_item("map_ff_words", show=not cm.ffmpeg())
-    dpg.configure_item("map_webcam", show=webcam_ok())
     chrome._centre(TAG, 620, 720)
     dpg.show_item(TAG)
 
 
+# AI: below section was generated by an AI
+def _method(app):
+    words = dpg.get_value("map_method") if dpg.does_item_exist("map_method") else METHODS[0][1]
+    return next((k for k, n in METHODS if n == words), "sequence")
+
+
 def _plan(app):
-    return cm.Plan(int(dpg.get_value("map_n")), on=float(dpg.get_value("map_on")), off=0.05)
+    return cm.make_plan(_method(app), int(dpg.get_value("map_n")), on=float(dpg.get_value("map_on")), off=0.05)
+
+
+def _found_settings():
+    """The calibration's settings, for every finding (a film's, live)."""
+    area = int(dpg.get_value("map_area")) if dpg.does_item_exist("map_area") else 0
+    return dict(conf=float(dpg.get_value("map_conf")) if dpg.does_item_exist("map_conf") else cm.CONF,
+                min_dist=float(dpg.get_value("map_dist")) if dpg.does_item_exist("map_dist") else 4.0,
+                max_area=area or None)
+
+
+def _bright(app):
+    return int(dpg.get_value("map_bright")) if dpg.does_item_exist("map_bright") else 255
+
+
+def _light(app, lit, n):
+    """The LEDs to light now - None (dark), "all", an index or an (n,) bool mask - in the sim's wiring test and as
+    the device's own frame while streaming, at the plan's LED brightness."""
+    wt = getattr(app, "wiring", None)
+    b = _bright(app)
+    m = np.zeros(n, bool)
+    if isinstance(lit, str) and lit == "all":
+        m[:] = True
+    elif isinstance(lit, np.ndarray):
+        m = np.asarray(lit, bool)[:n]
+    elif lit is not None:
+        m[int(lit)] = True
+    if wt is not None:
+        wt.colour = (b, b, b)
+        wt.mode, wt.mask = ("mask", m) if m.any() else ("off", None)
+    frame = np.zeros((n, 3), np.uint8)
+    frame[m] = b
+    app._map_frame = frame.tobytes()
 
 
 def _plan_words(app):
@@ -120,16 +212,17 @@ def _plan_words(app):
         p = _plan(app)
         m, sec = divmod(int(round(p.total)), 60)
         dpg.set_value("map_plan_words", f"the plan takes {m} min {sec} s" if m else f"the plan takes {sec} s")
+# AI: end
 
 
 # --- playing the plan ---------------------------------------------------------------------------
-def play(app, record=None):
+def play(app):
     """The plan on: the wiring test driven through it (the sim shows it; the
-    device while the sim is streamed); `record`: a webcam taking pictures meanwhile."""
+    device while the sim is streamed), to be filmed."""
     s = _state(app)
     if s["play"] is not None:
         stop(app)
-    s["play"] = {"plan": _plan(app), "t0": time.perf_counter() + 0.4, "record": record}
+    s["play"] = {"plan": _plan(app), "t0": time.perf_counter() + 0.4}
     app.wiring_start("index")
     app.wiring.mode = "off"
     app.gp.status("the plan is playing: film it" + ("" if getattr(app, "ddp", None) is not None else
@@ -140,9 +233,6 @@ def stop(app):
     s = _state(app)
     app._map_frame = None
     if s["play"] is not None:
-        rec = s["play"].get("record")
-        if rec is not None:
-            rec["stop"] = True
         s["play"] = None
         app.wiring_stop()
         if dpg.does_item_exist("map_play_words"):
@@ -162,32 +252,20 @@ def _drive(app):
     if wt is None:                                   # play pressed: the effect took the buffer back
         stop(app); return
     what = plan.at(t) if t >= 0 else "none"
-    if what == "all":
-        wt.mode = "white"
-    elif isinstance(what, int) and what < wt.n:
-        wt.mode = "index"; wt.index = what
-    else:
-        wt.mode = "off"                              # dark (an LED past the sim's count lights on the device only)
-    frame = np.zeros((plan.n, 3), np.uint8)
-    if what == "all":
-        frame[:] = 255
-    elif isinstance(what, int):
-        frame[what] = 255
-    app._map_frame = frame.tobytes()
+    _light(app, plan.lit(t) if t >= 0 else None, plan.n)   # an LED past the sim's count lights on the device only
     left = max(0.0, plan.total - t)
     if dpg.does_item_exist("map_play_words"):
-        dpg.set_value("map_play_words", (f"LED {what + 1} of {plan.n}" if isinstance(what, int) else ("flash" if what == "all" else "dark"))
-                      + f" - {int(left) // 60}:{int(left) % 60:02d} left")
+        now = (f"LED {what + 1} of {plan.n}" if isinstance(what, int) else
+               f"bit {what[1] + 1} of {plan.bits}{' inverted' if what[2] else ''}" if isinstance(what, tuple) else
+               ("flash" if what == "all" else "dark"))
+        dpg.set_value("map_play_words", now + f" - {int(left) // 60}:{int(left) % 60:02d} left")
     if t > plan.total + 0.3:
-        rec = p.get("record")
         s["play"] = None
         app._map_frame = None
         app.wiring_stop()
         if dpg.does_item_exist("map_play_words"):
             dpg.set_value("map_play_words", "played")
-        if rec is not None:
-            rec["stop"] = True
-        app.gp.status("the plan has played" + ("" if rec is not None else ": add the film of this side"))
+        app.gp.status("the plan has played: add the film of this side")
 
 
 # --- the sides ----------------------------------------------------------------------------------
@@ -266,12 +344,13 @@ def _film_chosen(app, path):
     if not cm.ffmpeg():
         s["sides"][k]["words"] = "reading a video needs ffmpeg on the PATH"; _sides(app); return
     name = os.path.basename(path)
-    _analyse(app, k, lambda plan, log: _from_video(path, plan, log), name)
+    settings = _found_settings()
+    _analyse(app, k, lambda plan, log: _from_video(path, plan, log, settings), name)
 
 
-def _from_video(path, plan, log):
+def _from_video(path, plan, log, settings=None):
     keep, fps, times = cm.read_video(path, plan, across=320, log=log)
-    return cm.scan(keep, fps, plan, times=times, log=log)
+    return cm.scan(keep, fps, plan, times=times, log=log, **(settings or {}))
 
 
 def _analyse(app, k, work, what):
@@ -315,62 +394,230 @@ def _thumb(k, dark, found):
     return tag, max(1, int(w * f)), max(1, int(h * f))
 
 
-# --- the webcam (OpenCV, optional) ----------------------------------------------------------------
-def webcam(app, index=0):
-    """The plan played while the webcam's pictures are taken: a side without a video file."""
-    if not webcam_ok():
-        app.gp.status("the webcam needs OpenCV: pip install opencv-python (a video from any camera works without it)"); return
+# AI: below section was generated by an AI
+# --- the webcam (ffmpeg): calibration and mapping live -------------------------------------------------
+def find_cameras(app):
+    cams = [n for n, _ in video.webcams()]
+    dpg.configure_item("map_cam", items=cams)
+    if cams and dpg.get_value("map_cam") not in cams:
+        dpg.set_value("map_cam", cams[0])
+    _cam_words(f"{len(cams)} camera(s) found" if cams else
+               ("no camera found" if video.ffmpeg() else "a webcam needs ffmpeg on the PATH (ffmpeg.org)"))
+    return cams
+
+
+def _cam_words(text):
+    if dpg.does_item_exist("map_cam_words"):
+        dpg.set_value("map_cam_words", text)
+
+
+def _open_cam(app):
+    """The chosen webcam, open (the one already open if it is that one)."""
     s = _state(app)
-    if s["webcam"] is not None:
-        app.gp.status("the webcam is already filming"); return
+    name = dpg.get_value("map_cam") or (find_cameras(app) or [None])[0]
+    if not name:
+        _cam_words("no camera: Find, or plug one in"); return None
+    cam = s["cam"]
+    if cam is not None and cam.label == name and cam.error is None:
+        return cam
+    if cam is not None:
+        cam.close()
+    try:
+        s["cam"] = video.open_source("webcam", name=name, width=CAM_W, height=CAM_H, fit=True)
+    except Exception as e:
+        s["cam"] = None
+        _cam_words(str(e)); return None
+    return s["cam"]
+
+
+def _close_cam(app):
+    s = _state(app)
+    if s["cam"] is not None:
+        s["cam"].close()
+        s["cam"] = None
+
+
+def _grey(frame):
+    return np.asarray(frame, np.float32) @ np.asarray([0.299, 0.587, 0.114], np.float32)
+
+
+def _show(grey, spots=()):
+    """The camera's picture in the view, the LEDs found marked."""
+    from native import chrome
+    if not dpg.does_item_exist("map_cam_tex"):
+        return
+    g = np.clip(np.asarray(grey, np.float32), 0, 255)
+    rgb = np.stack([g, g, g], -1)
+    acc = np.asarray(chrome.ACCENT[:3], np.float32)
+    for u, v, _ in spots:
+        x, y = int(round(u)), int(round(v))
+        for dx, dy in ((-3, 0), (3, 0), (0, -3), (0, 3), (-2, 0), (2, 0), (0, -2), (0, 2)):
+            if 0 <= y + dy < CAM_H and 0 <= x + dx < CAM_W:
+                rgb[y + dy, x + dx] = acc
+    rgba = np.concatenate([rgb / 255.0, np.ones((CAM_H, CAM_W, 1), np.float32)], -1)
+    dpg.set_value("map_cam_tex", rgba.ravel())
+
+
+def _step_box(app, lit, n):
+    """A step: lit now, its picture to be taken once `settle` new pictures have come."""
+    cam = _state(app)["cam"]
+    _light(app, lit, n)
+    return {"after": cam.n + max(1, int(dpg.get_value("map_settle")))}
+
+
+def calibrate(app):
+    """Every LED lit and the camera's view, the LEDs found marked and counted - against a dark picture taken
+    first; again: stopped."""
+    s = _state(app)
+    if s["calib"] is not None:
+        _stop_calib(app); return
+    if s["live"] is not None or s["play"] is not None:
+        app.gp.status("a plan is running: stop it first"); return
+    if _open_cam(app) is None:
+        return
+    n = int(dpg.get_value("map_n"))
+    app.wiring_start("index")
+    s["calib"] = {"n": n, "phase": "dark", "dark": None, "step": _step_box(app, None, n)}
+    dpg.configure_item("map_calib", label="Stop")
+    _cam_words("the dark picture...")
+
+
+def _stop_calib(app):
+    s = _state(app)
+    s["calib"] = None
+    app._map_frame = None
+    app.wiring_stop()
+    if dpg.does_item_exist("map_calib"):
+        dpg.configure_item("map_calib", label="Calibrate")
+
+
+def _poll_calib(app):
+    s = _state(app)
+    c = s["calib"]
+    cam = s["cam"]
+    if cam is None or cam.error:
+        _stop_calib(app); _cam_words(f"the camera stopped: {cam.error if cam else 'closed'}"); return
+    frame, n = cam.latest()
+    if frame is None or n < c["step"]["after"]:
+        return
+    g = _grey(frame)
+    if c["phase"] == "dark":
+        c["dark"] = g
+        c["phase"] = "lit"
+        c["step"] = _step_box(app, "all", c["n"])
+        return
+    c["step"]["after"] = n + 1                                  # every new picture from here on
+    spots = cm.find_blobs(g, c["dark"], limit=c["n"] * 2 + 8, **_found_settings())
+    _show(g, spots)
+    _cam_words(f"{len(spots)} found of {c['n']} LEDs"
+               + (" - too many: raise the threshold, lower the LED brightness or darken the room" if len(spots) > c["n"] else
+                  " - too few: lower the threshold, or the distance apart" if len(spots) < c["n"] * 0.9 else " - ready to map"))
+
+
+def live(app):
+    """The plan stepped through with the webcam: each step lit, settled, pictured; read as the next empty side."""
+    s = _state(app)
+    if s["live"] is not None:
+        _end_live(app, "stopped"); return
+    if s["calib"] is not None:
+        _stop_calib(app)
+    if s["play"] is not None:
+        stop(app)
+    if _open_cam(app) is None:
+        return
     k = next((i for i, side in enumerate(s["sides"]) if side["found"] is None), None)
     if k is None:
         _add_side(app); k = len(s["sides"]) - 1
-    rec = {"frames": [], "times": [], "stop": False, "error": None}
-
-    def grab():
-        import cv2
-        cam = cv2.VideoCapture(index)
-        try:
-            if not cam.isOpened():
-                rec["error"] = f"no webcam at index {index}"; return
-            while not rec["stop"]:
-                ok, f = cam.read()
-                if not ok:
-                    continue
-                g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
-                h, w = g.shape
-                rec["frames"].append(cv2.resize(g, (320, max(2, int(h * 320 / w)))))
-                rec["times"].append(time.perf_counter())
-        except Exception as e:
-            rec["error"] = str(e)
-        finally:
-            cam.release()
-    rec["thread"] = threading.Thread(target=grab, daemon=True)
-    rec["thread"].start()
-    s["webcam"] = {"k": k, "rec": rec}
-    play(app, record=rec)
-    s["sides"][k]["words"] = "filming with the webcam..."
+    plan = _plan(app)
+    app.wiring_start("index")
+    steps = plan.steps()
+    s["live"] = {"k": k, "plan": plan, "steps": steps, "i": 0, "frames": {}, "step": _step_box(app, steps[0][1], plan.n)}
+    dpg.configure_item("map_live", label="Stop")
+    s["sides"][k]["words"] = "mapping live..."
     _sides(app)
 
 
-def _webcam_done(app):
-    """The webcam's pictures, once the plan has played and the camera let go: evened out and read as a side."""
+def _end_live(app, words=None):
     s = _state(app)
-    w = s["webcam"]
-    rec = w["rec"]
-    if rec["error"] and s["play"] is not None and s["play"].get("record") is rec:
-        stop(app)                                            # no camera: the plan need not run on
-    if not rec["stop"] or rec["thread"].is_alive():
+    lv = s["live"]
+    s["live"] = None
+    app._map_frame = None
+    app.wiring_stop()
+    if dpg.does_item_exist("map_live"):
+        dpg.configure_item("map_live", label="Map live")
+    if words and lv is not None and lv["k"] < len(s["sides"]):
+        s["sides"][lv["k"]]["words"] = words
+        _sides(app)
+
+
+def _poll_live(app):
+    s = _state(app)
+    lv = s["live"]
+    cam = s["cam"]
+    if cam is None or cam.error:
+        _end_live(app, f"the camera stopped: {cam.error if cam else 'closed'}"); return
+    frame, n = cam.latest()
+    if frame is None or n < lv["step"]["after"]:
         return
-    s["webcam"] = None
-    k = w["k"]
-    if k >= len(s["sides"]):
+    what, _ = lv["steps"][lv["i"]]
+    g = _grey(frame)
+    lv["frames"][what] = g
+    _show(g)
+    lv["i"] += 1
+    if dpg.does_item_exist("map_play_words"):
+        dpg.set_value("map_play_words", f"live: picture {lv['i']} of {len(lv['steps'])}")
+    if lv["i"] < len(lv["steps"]):
+        lv["step"] = _step_box(app, lv["steps"][lv["i"]][1], lv["plan"].n)
         return
-    if rec["error"] or len(rec["frames"]) < 10:
-        s["sides"][k]["words"] = rec["error"] or "the webcam gave no pictures"; _sides(app); return
-    frames, fps = cm.resample(rec["frames"], rec["times"], 30.0)
-    _analyse(app, k, lambda plan, log: cm.scan(frames, fps, plan, log=log), "the webcam's pictures")
+    frames, plan, k = lv["frames"], lv["plan"], lv["k"]
+    _end_live(app)
+    times = {w: w for w, _ in plan.steps()}
+    settings = _found_settings()
+    _analyse(app, k, lambda p_, log: cm.scan(frames, None, plan, times=times, log=log, **settings), "the webcam, live")
+
+
+# --- Lightwork's layout CSV ----------------------------------------------------------------------------
+def export_csv(app):
+    """The shape's LEDs, in wiring order, as Lightwork's layout CSV in the project's export folder."""
+    g = app.project.geometry
+    if g is None or g.pos is None:
+        dpg.set_value("map_result", "no shape to save"); return None
+    order = g.phys if getattr(g, "phys", None) is not None else np.arange(len(g.pos))
+    pos = np.asarray(g.pos, np.float64)[np.asarray(order)]
+    found = np.isfinite(pos).all(1)
+    if not found.any():
+        dpg.set_value("map_result", "the shape has no LED positions"); return None
+    out = os.path.join(app.project.path, "export", "lightwork_layout.csv")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w", encoding="utf-8", newline="\n") as f:
+        f.write(cm.to_csv(pos, found))
+    words = f"{int(found.sum())} LEDs saved as Lightwork's layout: {out}"
+    dpg.set_value("map_result", words)
+    app.gp.status(words)
+    return out
+
+
+def import_csv(app, path):
+    """A Lightwork layout CSV as a points part (sized to the height above)."""
+    from native import shape_gallery
+    if not path:
+        return False
+    try:
+        pos, found = cm.from_csv(open(path, encoding="utf-8").read())
+    except Exception as e:
+        dpg.set_value("map_result", f"could not read {os.path.basename(path)}: {e}"); return False
+    cm._between(pos, found) if found.any() and not found.all() else None
+    g = app.project.geometry
+    sp = g.params if g is not None and g.kind == "shape" else {}
+    height = units.from_unit(float(dpg.get_value("map_height")), dict(sp, unit="cm"))
+    flat = float(np.ptp(pos[found][:, 2])) < 1e-9
+    q = cm.to_part(pos, found, height=None if flat else height, name=os.path.splitext(os.path.basename(path))[0])
+    shape_gallery.add(app, q, close=False)
+    words = f"{int(found.sum())} LEDs from {os.path.basename(path)}" + (f", {int((~found).sum())} missing put between neighbours" if not found.all() else "")
+    dpg.set_value("map_result", words)
+    app.gp.status(words)
+    return True
+# AI: end
 
 
 # --- per frame, and the part ---------------------------------------------------------------------
@@ -380,8 +627,12 @@ def poll(app):
         return
     if s["play"] is not None:
         _drive(app)
-    if s["webcam"] is not None:
-        _webcam_done(app)
+    if s["calib"] is not None:
+        _poll_calib(app)
+    if s["live"] is not None:
+        _poll_live(app)
+    if s["cam"] is not None and s["calib"] is None and s["live"] is None and not dpg.is_item_shown(TAG):
+        _close_cam(app)                                      # the window closed: the camera off
     box = s["busy"]
     if box is not None:
         if box["result"] is None and box["error"] is None:

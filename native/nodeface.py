@@ -194,6 +194,7 @@ SUMMARY = {
     "ADSR":       lambda V, x: (f"{_g(V, 'attack')} up, {_g(V, 'decay')} down ms" if V.get("mode") != "held"
                                else f"{_g(V, 'attack')}/{_g(V, 'decay')} ms to {_g(V, 'sustain')}, release {_g(V, 'release')} ms"),
     "Gate":       lambda V, x: f"on at {_g(V, 'high')}, off at {_g(V, 'low')}",
+    "Scenes":     lambda V, x: (f"scenes {V.get('scenes')}" if V.get("scenes") else "every snapshot") + f", fade {_g(V, 'fade')} s",
     "Counter":    lambda V, x: f"counts to {_g(V, 'steps')}, then 0",
     "Hold":       lambda V, x: "x at the last trigger",
     "Peak hold":  lambda V, x: f"hold {_g(V, 'hold')} ms, fall {_g(V, 'fall')} /s",
@@ -574,7 +575,7 @@ OUT_RANGES = {
     ("FFT bin", "level"): _UNIT, ("Loudest bin", "level"): _UNIT, ("Spectrum", "value"): _UNIT,
     ("Wave", "value"): _UNIT, ("Ease", "value"): _UNIT, ("Envelope", "value"): _UNIT, ("Random hold", "value"): _UNIT,
     ("Tempo", "phase"): _UNIT, ("Tempo", "bar"): _UNIT, ("Sequencer", "phase"): _UNIT, ("Sequencer", "progress"): _UNIT,
-    ("ADSR", "value"): _UNIT, ("Counter", "phase"): _UNIT, ("Gate", "value"): _UNIT,
+    ("ADSR", "value"): _UNIT, ("Counter", "phase"): _UNIT, ("Gate", "value"): _UNIT, ("Scenes", "blend"): _UNIT,
     ("Waveform", "sample"): (-1.0, 1.0), ("Waveform", "level"): _UNIT, ("Notes", "note"): _UNIT, ("Notes", "clarity"): _UNIT,
     ("Onset", "strength"): _UNIT, ("Timbre", "brightness"): _UNIT, ("Timbre", "noisiness"): _UNIT, ("Silence", "mix"): _UNIT,
     ("Beat kick", "phase"): _UNIT, ("Smoothstep", "result"): _UNIT, ("Cosine", "result"): _UNIT, ("Band", "result"): _UNIT,

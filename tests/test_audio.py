@@ -90,6 +90,9 @@ def test_the_synth_plays_a_chord_a_bar():
 
         def audio(self, v, p):
             pass
+
+        def audio_peak(self):
+            pass
     syn, eng = Synth(bpm=120), Eng()
     got = []
     for bar in range(4):

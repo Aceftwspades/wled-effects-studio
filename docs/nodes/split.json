@@ -1,0 +1,195 @@
+{
+ "node": "Split",
+ "star": 1,
+ "caption": "Split: a palette taken apart and put back together with its channels swapped, red to green to blue",
+ "why": [
+  "Sometimes you need the parts of a colour: how red it is, how bright it looks. Split takes a colour apart into red, green and blue (0..1 each) and its luma - the brightness the eye sees, weighting green most.",
+  "From there the numbers drive anything: brightness by luma, a colour's red into a size. Its neighbours: Combine is the reverse, three numbers into a colour; Adjust and Levels change a colour without taking it apart; Split gives you its numbers."
+ ],
+ "steps": [
+  "A scrolling palette (**Coords** `u` plus a clock, into a **Palette**) goes into Split's **color**.",
+  "`r`, `g` and `b` go into a **Combine** shifted round by one: red into green, green into blue, blue into red. Every colour of the palette turns to another - red becomes green, yellow becomes cyan.",
+  "`luma` is the colour's brightness as the eye sees it, 0..1: it goes into a **Scale** that dims the result by it, so dark parts of the palette stay dark.",
+  "The rebuilt colour goes to the **Output**."
+ ],
+ "try": [
+  {
+   "label": "More colours across",
+   "text": "the spread Multiply at 3: the palette three times across, so more of its colours - each swapped - are on the matrix at once.",
+   "set": [
+    [
+     11,
+     "b",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Slower",
+   "text": "the clock's Multiply at 0.05: the colours creep, easier to follow which became which.",
+   "set": [
+    [
+     13,
+     "b",
+     0.05
+    ]
+   ]
+  },
+  {
+   "label": "Halve the brightness",
+   "text": "the Palette's brightness at 0.5: Split's luma halves too, so the result dims twice as much - by its own brightness.",
+   "set": [
+    [
+     16,
+     "brightness",
+     0.5
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Split",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 1.0
+    }
+   },
+   {
+    "id": 12,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   },
+   {
+    "id": 14,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 16,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Split",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Combine",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Scale",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "u",
+    11,
+    "a"
+   ],
+   [
+    12,
+    "t",
+    13,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    14,
+    "a"
+   ],
+   [
+    13,
+    "result",
+    14,
+    "b"
+   ],
+   [
+    14,
+    "result",
+    16,
+    "index"
+   ],
+   [
+    16,
+    "color",
+    1,
+    "color"
+   ],
+   [
+    1,
+    "r",
+    2,
+    "g"
+   ],
+   [
+    1,
+    "g",
+    2,
+    "b"
+   ],
+   [
+    1,
+    "b",
+    2,
+    "r"
+   ],
+   [
+    2,
+    "color",
+    3,
+    "color"
+   ],
+   [
+    1,
+    "luma",
+    3,
+    "by"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,234 @@
+{
+ "node": "Colour pick",
+ "star": 1,
+ "caption": "Colour pick: eight bars in eight chosen colours, stepping one place on every beat",
+ "why": [
+  "When a pattern hands out numbers - a cell, a slot, a step, a digit - the next question is which colour each number gets. Colour pick is a little set of eight colours you choose: 0 gives the first, 1 the second, and so on.",
+  "Use it for pixel art (Bitmap's digits), for team colours, for a fixed set of brand colours that should not follow the WLED palette. Its neighbours: Palette follows the palette chosen on the WLED page and blends between colours; Colour ramp blends between stops you draw; Colour pick gives exact colours by number, no blending."
+ ],
+ "steps": [
+  "**Coords** `u` times 8, floored, numbers eight bars 0..7 across the matrix.",
+  "A **Counter** counts **Audio**'s beats (steps 8), and an **Add** puts the count onto the bar number; a **Modulo** with m 8 wraps it back into 0..7. Each bar's number goes up by one on every beat.",
+  "That number is Colour pick's **index**: bar 0 shows **colour 0**, bar 1 **colour 1**, then **colour 2**, **colour 3**, **colour 4**, **colour 5**, **colour 6** and **colour 7** - set here to red, orange, yellow, green, blue, violet, white and grey - so the colours step one bar along on every kick.",
+  "Colour pick's `color` goes to the **Output**."
+ ],
+ "try": [
+  {
+   "label": "Your own colours",
+   "text": "colour 0 at deep blue and colour 1 at gold: two of the bars change at once, wherever they have moved to.",
+   "set": [
+    [
+     1,
+     "c0",
+     [
+      10,
+      30,
+      160
+     ]
+    ],
+    [
+     1,
+     "c1",
+     [
+      255,
+      190,
+      20
+     ]
+    ]
+   ]
+  },
+  {
+   "label": "Fewer colours",
+   "text": "the Modulo's m at 3: only colour 0, 1 and 2 are used, repeating across the bars.",
+   "set": [
+    [
+     6,
+     "m",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Blackout",
+   "text": "colour 7 at black: one bar is dark, and the gap steps along with the beat.",
+   "set": [
+    [
+     1,
+     "c7",
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Colour pick",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 8.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Counter",
+    "params": {},
+    "inputs": {
+     "steps": 8.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Modulo",
+    "params": {},
+    "inputs": {
+     "m": 8.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Colour pick",
+    "params": {
+     "c0": [
+      255,
+      0,
+      0
+     ],
+     "c1": [
+      255,
+      140,
+      0
+     ],
+     "c2": [
+      255,
+      240,
+      0
+     ],
+     "c3": [
+      0,
+      220,
+      60
+     ],
+     "c4": [
+      0,
+      160,
+      255
+     ],
+     "c5": [
+      120,
+      40,
+      255
+     ],
+     "c6": [
+      255,
+      255,
+      255
+     ],
+     "c7": [
+      90,
+      90,
+      90
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    7,
+    "beat",
+    8,
+    "trigger"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "a"
+   ],
+   [
+    8,
+    "count",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "x"
+   ],
+   [
+    6,
+    "result",
+    1,
+    "index"
+   ],
+   [
+    1,
+    "color",
+    9,
+    "color"
+   ]
+  ]
+ }
+}

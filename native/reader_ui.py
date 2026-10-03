@@ -83,6 +83,9 @@ class _State:
         self.history = []        # [(doc, y)]: where Back goes
         self.keys = False        # the last click landed in the window: its keys are the reader's
         self.pics = {}           # picture item -> (path, caption): a click shows it at full size
+        self.side = False        # placed beside a tutorial (beside()): a column at the right, no contents list
+        self.place = None        # ([x, y], until tick): a place kept while the window's new size is measured
+        self.anims = {}          # a GIF's picture item -> {"path", "tex", "w", "h", "frames", "i", "next"}: it plays
         self.tick = 0
 
 
@@ -108,6 +111,15 @@ def build(app):
             dpg.add_button(label="Previous", callback=lambda: search(app, -1))
             c.tip("the place before (Shift+F3)")
             dpg.add_text("", tag="reader_found", color=c.DIM)
+        # while a node's tutorial is open (tutorials.py): its name, and the way back
+        with dpg.group(horizontal=True, tag="reader_tut_row", show=False):
+            dpg.add_text("", tag="reader_tut_what")
+            dpg.add_button(label="Reset the tutorial", tag="reader_tut_reset", callback=lambda: _tut("reset", app))
+            c.tip("the tutorial's graph as it was written: every change you made to it undone")
+            dpg.add_button(label="Copy into my project", tag="reader_tut_copy", callback=lambda: _tut("copy", app))
+            c.tip("the graph as you have it now, saved as a new graph in your own project - then back there with it open")
+            dpg.add_button(label="Back to my project", tag="reader_tut_back", callback=lambda: _tut("back", app))
+            c.tip("your own project again, with the graph you had open; the tutorial is left as it is")
         with dpg.group(horizontal=True):
             with dpg.child_window(tag="reader_toc", width=px(240), height=-1, border=True):
                 pass
@@ -285,7 +297,7 @@ def render(app, name):
     except OSError as e:
         text = f"# {name}\n\nThe file could not be read: {e}"
     S.doc, S.blocks = name, reader.parse(plain(text), os.path.dirname(path))
-    S.items, S.texts, S.toc, S.here, S.found, S.pics = {}, {}, [], None, None, {}
+    S.items, S.texts, S.toc, S.here, S.found, S.pics, S.anims = {}, {}, [], None, None, {}, {}
     S.fontkey, S.frames, S.cells, S.hit = {}, {}, {}, None
     dpg.set_value("reader_found", "")
     for label, f in reader.DOCS:
@@ -388,9 +400,62 @@ def _links(app, b, parent):
             _c().tip(target)
 
 
+def _tut(what, app):
+    from native import tutorials
+    {"reset": tutorials.reset, "copy": tutorials.copy_to_project, "back": tutorials.back}[what](app)
+    tutorial_bar(app)
+
+
+def tutorial_bar(app):
+    """The row under the reader's buttons: shown while a node's tutorial is open, naming it."""
+    if not dpg.does_item_exist("reader_tut_row"):
+        return
+    from native import tutorials
+    t = tutorials.active(app)
+    if t:
+        dpg.set_value("reader_tut_what", f"Tutorial: {t['node']}")
+        proj = os.path.basename(t["back"][0])
+        dpg.configure_item("reader_tut_back", label=f"Back to my project ({proj})")
+    elif S.side:
+        beside(app, False)                               # the lesson is over: the reader as it is anywhere else
+    dpg.configure_item("reader_tut_row", show=bool(t))
+
+
+def beside(app, on=True):
+    """The reader as a column at the right, its contents list folded away, so a tutorial's graph
+    and LEDs are seen beside its page (on); or back to the middle with its contents (off)."""
+    S.side = bool(on)
+    if not dpg.does_item_exist(TAG):
+        return
+    vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+    dpg.configure_item("reader_toc", show=not on)
+    if on:
+        w = max(px(420), min(px(560), int(vw * 0.38)))
+        h = vh - px(70)
+        dpg.configure_item(TAG, width=w, height=h)
+        pos = [max(0, vw - w - px(48)), px(34)]                     # clear of the rail at the right edge
+        dpg.set_item_pos(TAG, pos)
+        S.place = (pos, S.tick + 8)
+        # the text rewraps to the narrower column, so the place on the page is found again once laid out
+        t = __import__("native.tutorials", fromlist=["x"]).active(app)
+        k = reader.heading_index(S.blocks, t["node"]) if t else None
+        if k is not None:
+            S.pending = {"k": k, "tries": 0}
+    else:
+        w, h = min(px(1180), vw - 40), min(px(840), vh - 60)
+        dpg.configure_item(TAG, width=w, height=h)
+        dpg.set_item_pos(TAG, [max(0, (vw - w) // 2), max(20, (vh - h) // 3)])
+
+
 def follow(app, target):
-    """A link: web addresses to the browser, the documents here."""
+    """A link: web addresses to the browser, the documents here, a tutorial's
+    studio: links to the studio (tutorials.py)."""
     t = (target or "").strip()
+    if t.startswith("studio:"):
+        from native import tutorials
+        done = tutorials.follow(app, t)
+        tutorial_bar(app)
+        return "studio" if done else None
     if t.startswith(("http://", "https://", "mailto:")):
         app.open_url(t)
         return "web"
@@ -417,8 +482,19 @@ def _image(b, parent):
     c = _c()
     if not b["exists"]:
         return dpg.add_text(f"[picture missing: {os.path.basename(b['path'])}]", parent=parent, color=c.DIM)
+    gif = b["path"].lower().endswith(".gif")
     got = S.textures.get(b["path"])
-    if got is None or not dpg.does_item_exist(got[0]):
+    if gif and (got is None or not dpg.does_item_exist(got[0])):
+        # a GIF's texture is made when it comes into view (_play): the node reference has one for nearly
+        # every node, and loading them all made opening it take a second. Until then, a stand-in of its size.
+        try:
+            from PIL import Image
+            with Image.open(b["path"]) as im:
+                w, h = im.size
+        except Exception as e:
+            return dpg.add_text(f"[picture unreadable: {e}]", parent=parent, color=c.DIM)
+        got = (_placeholder(), w, h)
+    elif got is None or not dpg.does_item_exist(got[0]):
         try:
             w, h, ch, data = dpg.load_image(b["path"])
             from native.textures import registry
@@ -431,11 +507,74 @@ def _image(b, parent):
         img = dpg.add_image(tex, width=int(w * s), height=int(h * s))
         dpg.bind_item_handler_registry(img, "reader_pic_click")
         S.pics[img] = (b["path"], b["alt"])
+        if gif:
+            S.anims[img] = {"path": b["path"], "tex": tex if b["path"] in S.textures else None, "w": w, "h": h,
+                            "frames": None, "i": 0, "next": 0.0}
         c.tip("click: the picture at full size" if s < 1.0 else "click: the picture in a window of its own", item=img)
         cap = (b["alt"] + "  -  " if b["alt"] else "") + ("click for full size" if s < 1.0 else "")
         if cap:
             dpg.add_text(cap.strip(" -"), color=c.DIM, wrap=int(w * s))
     return g
+
+
+_PLACE = {}
+
+
+def _placeholder():
+    """The stand-in texture a picture is drawn with until it is loaded: one pixel of the page's dark."""
+    t = _PLACE.get("tex")
+    if t is None or not dpg.does_item_exist(t):
+        from native.textures import registry
+        t = _PLACE["tex"] = dpg.add_static_texture(1, 1, [0.08, 0.09, 0.1, 1.0], parent=registry())
+    return t
+
+
+def _gif_frames(path, w, h):
+    """A GIF's frames as flat RGBA float lists for a dynamic texture, with each one's time (s)."""
+    import numpy as np
+    from PIL import Image, ImageSequence
+    out = []
+    with Image.open(path) as im:
+        for fr in ImageSequence.Iterator(im):
+            a = np.asarray(fr.convert("RGBA").resize((w, h)), np.uint8)
+            out.append((a, max(0.02, fr.info.get("duration", 66) / 1000.0)))
+    return out
+
+
+def _play():
+    """The GIFs on screen moving: a picture's frames are read when it comes into view and let
+    go when it leaves (a page of them would otherwise hold every frame of every one)."""
+    import time
+    now = time.time()
+    for item, a in list(S.anims.items()):
+        if not dpg.does_item_exist(item):
+            S.anims.pop(item, None); continue
+        if not dpg.is_item_visible(item):
+            a["frames"] = None
+            continue
+        if a["tex"] is None or not dpg.does_item_exist(a["tex"]):
+            got = S.textures.get(a["path"])                  # in view: its texture now (another copy may have made it)
+            if got is None or not dpg.does_item_exist(got[0]):
+                try:
+                    w, h, ch, data = dpg.load_image(a["path"])
+                    from native.textures import registry
+                    got = S.textures[a["path"]] = (dpg.add_dynamic_texture(w, h, data, parent=registry()), w, h)
+                except Exception:
+                    S.anims.pop(item, None); continue
+            a["tex"] = got[0]
+            dpg.configure_item(item, texture_tag=a["tex"])
+        if a["frames"] is None:
+            try:
+                a["frames"] = _gif_frames(a["path"], a["w"], a["h"])
+            except Exception:
+                S.anims.pop(item, None); continue
+            a["i"], a["next"] = 0, now
+        if len(a["frames"]) < 2 or now < a["next"]:
+            continue
+        a["i"] = (a["i"] + 1) % len(a["frames"])
+        rgba, dur = a["frames"][a["i"]]
+        dpg.set_value(a["tex"], (rgba.astype("float32") * (1.0 / 255.0)).ravel())
+        a["next"] = now + dur
 
 
 def _pic_clicked(app, a):
@@ -706,6 +845,13 @@ def poll(app):
     if not shown():
         return
     S.tick += 1
+    if S.place is not None:
+        # the column's place, kept for a few frames: the dialogs' clamp (chrome.poll_dialogs) measures
+        # the size a frame late, and with the wide window's size it pushed the narrow one to the left
+        pos, until = S.place
+        dpg.set_item_pos(TAG, pos)
+        if S.tick >= until:
+            S.place = None
     p = S.pending
     if p is not None:
         p["tries"] += 1
@@ -729,3 +875,7 @@ def poll(app):
         return
     if S.tick % 6 == 0:
         _mark_here()
+    if S.tick % 30 == 0:
+        tutorial_bar(app)
+    __import__("native.tutorials", fromlist=["x"]).poll(app)
+    _play()

@@ -1,0 +1,174 @@
+{
+ "node": "Waveform",
+ "star": 1,
+ "caption": "Waveform: the sound itself drawn across the matrix as an oscilloscope trace",
+ "why": [
+  "The bands say how loud each part of the sound is; the waveform is the sound itself - the line an oscilloscope draws, swinging up and down hundreds of times a second. Waveform gives the last 23 milliseconds of it, read anywhere along 0..1, so an effect can draw the music's own shape.",
+  "It reads the studio's audioreactive patch (the sim's synth makes one); with WLED's stock audioreactive it is flat. Its neighbours: Spectrum is the sound split into bands; Audio its levels; Waveform its shape."
+ ],
+ "steps": [
+  "**index** is unwired, so it is the pixel's own `u`: the 23 ms are spread across the matrix.",
+  "**gain** is 1: how much the swing is magnified.",
+  "`sample` swings -1..1: times -0.5 plus 0.5 (a **Multiply** and an **Add**), it is the row the trace is at; the distance from the pixel's `v` (a **Subtract**, made positive by **Abs**) through a **Smoothstep** (edges 0.08 and 0) lights a thin line there.",
+  "`level` - the size of the swing - is the **Palette**'s index, so a loud moment changes the trace's colour."
+ ],
+ "try": [
+  {
+   "label": "More gain",
+   "text": "gain 3: the swing is tripled, so quiet passages fill the height - loud ones clip at the edges.",
+   "set": [
+    [
+     1,
+     "gain",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Thicker line",
+   "text": "the Smoothstep's first edge at 0.2: a broader trace.",
+   "set": [
+    [
+     6,
+     "e0",
+     0.2
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Waveform",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Waveform",
+    "params": {},
+    "inputs": {
+     "gain": 1.0
+    }
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": -0.5
+    }
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 7,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Abs",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.08,
+     "e1": 0.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "sample",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    3,
+    "a"
+   ],
+   [
+    7,
+    "v",
+    4,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "x"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "x"
+   ],
+   [
+    1,
+    "level",
+    8,
+    "index"
+   ],
+   [
+    6,
+    "result",
+    8,
+    "brightness"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "color"
+   ]
+  ]
+ }
+}

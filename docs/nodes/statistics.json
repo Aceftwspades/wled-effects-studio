@@ -1,0 +1,206 @@
+{
+ "node": "Statistics",
+ "star": 1,
+ "caption": "Statistics: noise written into a field, then stretched by the field's own least and most to fill 0..1",
+ "why": [
+  "A field of numbers - heat, water, noise - wanders: one moment it sits between 0.4 and 0.6, the next it fills 0..1. Statistics reads the least, the most and the average of a field over every pixel, so you can keep it in range whatever it does: subtract the least and divide by the spread and it always fills 0..1.",
+  "The average says how much of the picture is lit, for an effect that should keep its overall brightness. Its neighbours: Field reads one pixel's stored number; Field write stores it; Statistics sums up the whole field."
+ ],
+ "steps": [
+  "A **Noise** (scale 3, drifting with a clock in z) is written into field 0 by a **Field write** every frame.",
+  "Statistics' **field** is 0: it reads that field's `min`, `max` and `mean` - from last frame, over every pixel.",
+  "The noise minus `min` (a **Subtract**), divided (a **Divide**) by `max` minus `min`, runs from 0 at the lowest point on the matrix to 1 at the highest - the **Palette**'s index and brightness. Without it the noise would sit in a narrow band of colour.",
+  "The trace shows the min (grey) and max (orange) moving as the noise drifts."
+ ],
+ "try": [
+  {
+   "label": "Another field",
+   "text": "field 1: Statistics reads a field nothing writes - its min and max are 0, so the division has nothing to stretch by and the picture goes dark.",
+   "set": [
+    [
+     1,
+     "field",
+     1
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "min"
+  ],
+  [
+   1,
+   "max"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Statistics",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 5,
+    "type": "Noise",
+    "params": {
+     "octaves": 1,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 3.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Field write",
+    "params": {
+     "field": 0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Statistics",
+    "params": {
+     "field": 0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Divide",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    5,
+    "x"
+   ],
+   [
+    2,
+    "v",
+    5,
+    "y"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "z"
+   ],
+   [
+    5,
+    "value",
+    6,
+    "value"
+   ],
+   [
+    5,
+    "value",
+    7,
+    "a"
+   ],
+   [
+    1,
+    "min",
+    7,
+    "b"
+   ],
+   [
+    1,
+    "max",
+    8,
+    "a"
+   ],
+   [
+    1,
+    "min",
+    8,
+    "b"
+   ],
+   [
+    7,
+    "result",
+    9,
+    "a"
+   ],
+   [
+    8,
+    "result",
+    9,
+    "b"
+   ],
+   [
+    9,
+    "result",
+    10,
+    "index"
+   ],
+   [
+    9,
+    "result",
+    10,
+    "brightness"
+   ],
+   [
+    10,
+    "color",
+    11,
+    "color"
+   ]
+  ]
+ }
+}

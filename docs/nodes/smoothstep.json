@@ -1,0 +1,113 @@
+{
+ "node": "Smoothstep",
+ "star": 1,
+ "caption": "Smoothstep: the distance from the centre turned into a soft-edged disc of light",
+ "why": [
+  "'Bright near here, dark elsewhere, with a soft edge' is in almost every effect: a spot, a glow, a vignette, a fade at the end of a trail. Smoothstep makes it: 0 below one edge, 1 above the other, an S-curve between - and swap the edges to flip it.",
+  "Its neighbours: Threshold is the hard switch; Clamp cuts without curving; Band is a bright line at whole numbers; Smoothstep is the soft step."
+ ],
+ "steps": [
+  "**x** is **Coords** `r`, the distance from the centre.",
+  "**edge 0** is 0.6 and **edge 1** is 0.2: edge 0 is above edge 1, so the step is flipped - 1 inside a distance of 0.2, falling smoothly to 0 by 0.6. A soft disc.",
+  "The result is the **Palette**'s brightness; `r` picks the colour, so the disc has rings of colour in it.",
+  "The trace shows the value at the centre pixel: 1."
+ ],
+ "try": [
+  {
+   "label": "Hard edge",
+   "text": "edge 0 at 0.42 and edge 1 at 0.4: the S-curve is squeezed into a thin band - a nearly hard-edged disc.",
+   "set": [
+    [
+     1,
+     "e0",
+     0.42
+    ],
+    [
+     1,
+     "e1",
+     0.4
+    ]
+   ]
+  },
+  {
+   "label": "A ring",
+   "text": "edge 0 at 0.2 and edge 1 at 0.6: the step the normal way round - dark in the middle, lit outside: a hole.",
+   "set": [
+    [
+     1,
+     "e0",
+     0.2
+    ],
+    [
+     1,
+     "e1",
+     0.6
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Smoothstep",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.6,
+     "e1": 0.2
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "r",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "r",
+    3,
+    "index"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "brightness"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ]
+  ]
+ }
+}

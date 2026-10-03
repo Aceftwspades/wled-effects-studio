@@ -47,14 +47,15 @@ TIP_DELAY = 0.35        # s the pointer rests before the help comes up
 CORNERS = ("br", "bl", "tr", "tl")
 
 ICON = {"effect": "fx", "segments": "segments", "geometry": "cube", "colours": "swatches",
-        "parameters": "sliders", "audio": "audio", "live": "mic"}
+        "parameters": "sliders", "audio": "audio", "live": "mic", "video": "video"}
 TIP = {"effect": "EFFECT: the project, the effect and its palette",
        "segments": "SEGMENTS: the strip's segments, their bounds and blends",
        "geometry": "GEOMETRY: the shape the LEDs are on",
        "colours": "COLOURS: the segment's three colours",
        "parameters": "PARAMETERS: the effect's sliders and checkboxes",
        "audio": "AUDIO: the synthetic audio's levels",
-       "live": "LIVE: audio from a line in, a microphone or an audio file"}
+       "live": "LIVE: audio from a line in, a microphone or an audio file",
+       "video": "VIDEO: a webcam, a video file or the test pattern, for the Video node"}
 
 
 class _State:
@@ -604,6 +605,13 @@ def _poll_props(app):
     S.props_content = content
     h = int(max(px(120), min(room, content + top + px(30))))
     w = int(min(PROPS_W, ew - 2 * MARGIN))
+    from native import reader_ui
+    if reader_ui.S.side and dpg.is_item_shown(reader_ui.TAG):
+        # a tutorial's page down the right covers that corner: the bottom right of what it leaves in view,
+        # beside the 3-D view (bottom left) and under the lesson's graph (framed above them)
+        h = int(max(px(120), min(eh - 2 * MARGIN, content + top + px(30))))
+        x = min(ex + ew, dpg.get_item_pos(reader_ui.TAG)[0]) - w - MARGIN
+        y = ey + eh - h - MARGIN
     if not dpg.is_item_shown("props_fly"):
         dpg.configure_item("props_win", show=True)
         dpg.show_item("props_fly")

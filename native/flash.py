@@ -108,10 +108,11 @@ def effect_sizes(env):
     import glob
     tool = size_tool()
     objs = glob.glob(os.path.join(ROOT, ".pio", "build", env, "lib*", USERMOD, "*.cpp.o"))
+    built = glob.glob(os.path.join(ROOT, ".pio", "build", env, "lib*", "cube_fx*", "cube_fx_[0-9][0-9]_*.cpp.o"))
     if not tool or not objs:
         return {}
     try:
-        out = procs.run([tool] + objs, capture_output=True, text=True, timeout=60).stdout
+        out = procs.run([tool] + objs + built, capture_output=True, text=True, timeout=60).stdout
     except Exception:
         return {}
     # Objects of effects staged for an earlier build stay in the build
@@ -122,8 +123,8 @@ def effect_sizes(env):
         parts = line.split()
         if len(parts) >= 6 and parts[0].isdigit():
             stem = os.path.basename(parts[-1])
-            if stem.endswith(".cpp.o") and stem != "cube_fx_bank.cpp.o" and stem[:-2] in staged:
-                sizes[stem[:-2]] = int(parts[0]) + int(parts[1])
+            if stem.endswith(".cpp.o") and stem != "cube_fx_bank.cpp.o" and (stem[:-2] in staged or "cube_fx" in parts[-1].replace("\\", "/").split("/")[-2]):
+                sizes[stem[:-2]] = int(parts[0]) + int(parts[1])        # a built-in's by its file name, as the catalogue has it
     return sizes
 
 
@@ -393,12 +394,15 @@ def stage(project, base_env, log, only=None):
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
     mods = staged_usermods(project, base_env)
+    trimmed = stage_builtins(project, log) if "cube_fx" in mods else None
+    if trimmed:
+        mods = [trimmed if m == "cube_fx" else m for m in mods]
     base = usermods_of(base_env)
     added = [m for m in mods if m not in base]
     dropped = [m for m in base if m not in mods]
     if added or dropped:
         log("usermods: " + ", ".join(["+" + m for m in added] + ["-" + m for m in dropped]))
-    if "cube_fx" in mods:
+    if "cube_fx" in mods or BUILTIN_STAGED in mods:
         # The effects register through cube_fx's bank; a second copy of the
         # bank's usermod would be the same class twice.
         for f in ("cube_fx_bank.cpp",):
@@ -434,6 +438,29 @@ def stage(project, base_env, log, only=None):
     if os.path.isdir(src_deps) and not os.path.isdir(dst_deps):
         shutil.copytree(src_deps, dst_deps)
         log(f"libraries seeded from {base_env}")
+    return env
+
+
+def stage_stock(base_env, log):
+    """WLED as the checkout has it on this environment, without the studio: its env's usermods less cube_fx
+    and the studio's own (audioreactive and the rest kept), no feature flags. Returns the env to build."""
+    mods = [m for m in usermods_of(base_env) if m not in ("cube_fx", BUILTIN_STAGED, USERMOD)]
+    env = "stock_" + base_env
+    lines = [MARK_BEGIN, f"[env:{env}]", f"extends = env:{base_env}", "custom_usermods ="]
+    lines += [f"  {m}" for m in mods] + [MARK_END, ""]
+    path = os.path.join(ROOT, "platformio_override.ini")
+    text = open(path, encoding="utf-8").read() if os.path.exists(path) else "[platformio]\n"
+    if MARK_BEGIN in text and MARK_END in text:
+        a, b = text.index(MARK_BEGIN), text.index(MARK_END) + len(MARK_END)
+        text = text[:a] + "\n".join(lines).rstrip("\n") + text[b:]
+    else:
+        text = text.rstrip("\n") + "\n\n" + "\n".join(lines)
+    open(path, "w", encoding="utf-8", newline="\n").write(text)
+    log(f"environment [env:{env}]: {base_env} without the studio - usermods " + (", ".join(mods) or "none"))
+    src_deps = os.path.join(ROOT, ".pio", "libdeps", base_env)
+    dst_deps = os.path.join(ROOT, ".pio", "libdeps", env)
+    if os.path.isdir(src_deps) and not os.path.isdir(dst_deps):
+        shutil.copytree(src_deps, dst_deps)
     return env
 
 
@@ -501,16 +528,94 @@ def wled_version():
     return ver, vid
 
 
-def builtin_effects():
-    """The cube_fx effects every build with the usermod carries: (count, [names])."""
+# The cube effects the fork's cube_fx carries, one file each (cube_fx_NN_name.cpp). They can be chosen one by
+# one: the build then compiles a copy of cube_fx without the others (BUILTIN_STAGED), every helper kept - the
+# shape table, the bank, the palettes, the slider memory, the IMU and the menu (those two the features' flags
+# leave out) - and cube_fx.cpp's own flat analysers, which are part of the usermod itself.
+BUILTIN_STAGED = "cube_fx_studio"
+HELPERS = ("cube_fx_00_geometry.cpp",)          # numbered like an effect, but the shape table every effect may read
+NEED_WORDS = {"imu": "the IMU", "audio": "audio", "pcm": "the PCM patch", "geometry": "the shape table"}
+
+
+def builtin_catalog():
+    """The cube_fx effects in this tree: [{"file", "name", "needs": set}], in file order - the name the
+    firmware lists it by (its metadata), and what it leans on, from the helpers it calls."""
+    import re
     d = os.path.join(ROOT, "usermods", "cube_fx")
-    names = []
-    if os.path.isdir(d):
-        import re
-        for f in sorted(os.listdir(d)):
-            if re.match(r"cube_fx_\d\d_.*\.cpp$", f) and not f.startswith("cube_fx_00_"):   # 00 is the shape table, not an effect
-                names.append(f[11:-4].replace("_", " "))
-    return names
+    out = []
+    if not os.path.isdir(d):
+        return out
+    names = sorted(os.listdir(d))
+    key = (d, tuple((f, os.path.getmtime(os.path.join(d, f))) for f in names if f.endswith(".cpp")))
+    if _CATALOG.get("key") == key:                     # read once; again only when a file there changes
+        return [dict(e, needs=set(e["needs"])) for e in _CATALOG["cat"]]
+    for f in names:
+        if not re.match(r"cube_fx_\d\d_.*\.cpp$", f) or f in HELPERS:
+            continue
+        try:
+            text = open(os.path.join(d, f), encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        m = re.search(r'_data_FX_MODE_\w+\[\]\s*PROGMEM\s*=(?:\s|//[^\n]*\n)*"([^"@;]+)', text)
+        name = m.group(1).strip() if m else f[11:-4].replace("_", " ").title()
+        needs = requirements_of_code(text)
+        if "cfx_pos(" in text or "cfx_geom" in text:
+            needs.add("geometry")
+        out.append({"file": f, "name": name, "needs": needs})
+    _CATALOG.update(key=key, cat=out)
+    return [dict(e, needs=set(e["needs"])) for e in out]
+
+
+_CATALOG = {}
+
+
+def builtin_effects():
+    """The names of the cube_fx effects a build carries."""
+    return [e["name"] for e in builtin_catalog()]
+
+
+def builtin_chosen(project):
+    """The built-in effect files this project ships - all of them unless it has chosen."""
+    cat = [e["file"] for e in builtin_catalog()]
+    chosen = project.options.get("builtin_ship")
+    return cat if chosen is None else [f for f in cat if f in chosen]
+
+
+def builtin_missing(project):
+    """[(effect name, [feature words])]: chosen built-ins that lean on a feature this project leaves out."""
+    chosen = set(builtin_chosen(project))
+    out = []
+    for e in builtin_catalog():
+        if e["file"] in chosen:
+            miss = missing_features(project, e["needs"] & {"imu", "audio", "pcm"})
+            if miss:
+                out.append((e["name"], [NEED_WORDS[k] for k in sorted(miss)]))
+    return out
+
+
+def stage_builtins(project, log):
+    """cube_fx as the project chose its effects: None when it ships them all (the tree's own folder is
+    built), else the name of a copy without the unchosen effect files."""
+    chosen = project.options.get("builtin_ship")
+    cat = [e["file"] for e in builtin_catalog()]
+    if chosen is None or set(cat) <= set(chosen):
+        return None
+    import json
+    src = os.path.join(ROOT, "usermods", "cube_fx")
+    dst = os.path.join(ROOT, "usermods", BUILTIN_STAGED)
+    if os.path.isdir(dst):
+        shutil.rmtree(dst)
+    left = set(cat) - set(chosen)
+    shutil.copytree(src, dst, ignore=lambda d, names: [n for n in names if n in left])
+    lj = os.path.join(dst, "library.json")
+    try:
+        meta = json.load(open(lj, encoding="utf-8"))
+    except Exception:
+        meta = {"version": "1.0.0"}
+    meta["name"] = BUILTIN_STAGED                   # its own library: the tree's cube_fx is not built beside it
+    json.dump(meta, open(lj, "w", encoding="utf-8"), indent=2)
+    log(f"built-in cube effects: {len(cat) - len(left)} of {len(cat)} (usermods/{BUILTIN_STAGED}, every helper kept)")
+    return BUILTIN_STAGED
 
 
 def manifest(project, base_env, only=None):
@@ -529,13 +634,15 @@ def manifest(project, base_env, only=None):
     known = stats.get("known") or stats.get("sizes") or {}
     f = features_of(project)
     feats = [(key, label, bool(f.get(key))) for key, label, _, _, _ in FEATURES]
+    cat, chosen_b = builtin_catalog(), set(builtin_chosen(project))
     return {"wled": ver, "build_id": vid, "env": base_env, "studio_env": "studio_" + base_env, "chain": [e for e, _ in chain],
             "board": board, "partitions": os.path.basename(parts), "usermods": staged_usermods(project, base_env) + [USERMOD],
             "flags": feature_flags(project), "features": feats, "audio": f["audio"],
             "audio_input": __import__("native.audioin", fromlist=["x"]).describe(project.options["audioin"]) if project.options.get("audioin") and f["audio"] != "none" else "",
             "effects": [(f_, project.effect_title(f_), known.get(f_)) for f_ in ship],
             "not_shipped": [(f_, project.effect_title(f_)) for f_ in files if f_ not in ship],
-            "builtin": builtin_effects(), "script": True,
+            "builtin": [e["name"] for e in cat if e["file"] in chosen_b],
+            "builtin_all": len(cat), "script": any(e["file"].startswith("cube_fx_98_") for e in cat if e["file"] in chosen_b),
             "partition": stats.get("partition"), "firmware": stats.get("firmware"),
             "geometry": project.geometry.describe()}
 
@@ -556,7 +663,9 @@ def manifest_text(m, device=None):
     L.append(f"studio effects shipped: {n}" + (" - " + ", ".join(t for _, t, _ in m["effects"]) if n else " (none ticked)"))
     if m["not_shipped"]:
         L.append(f"on the list but NOT shipped: {', '.join(t for _, t in m['not_shipped'])}")
-    L.append(f"built in: the cube_fx effects ({len(m['builtin'])} source files, Studio Script among them; the bank places them, all register when no slots are chosen)")
+    n_all = m.get("builtin_all", len(m["builtin"]))
+    L.append(f"built-in cube effects: {len(m['builtin'])} of {n_all}" + (" - all" if len(m["builtin"]) == n_all else "")
+             + ("" if m.get("script", True) else "; NO Studio Script: a graph sent as a script will not run"))
     L.append(f"the flash sends firmware only - not the ledmap, the shape or a script (Window > Send to device...); geometry here: {m['geometry']}")
     if device:
         L.append(f"device now: {device.get('name', '?')} at {device.get('host', '?')}, WLED {device.get('ver', '?')} build {device.get('vid', '?')}, "
@@ -898,10 +1007,16 @@ def advice(stats, env):
 
 
 class Job:
-    def __init__(self, project, base_env, host, build=True, upload=True, only=None):
+    """A flash: `source` "studio" (the project's build), "checkout" (WLED from the checkout, without the
+    studio), "release" (WLED's official binary: `release` (tag, asset), downloaded) or "file" (`bin_path`).
+    Whatever it is, the binary's chip is checked against the device's before it is sent."""
+
+    def __init__(self, project, base_env, host, build=True, upload=True, only=None, source="studio",
+                 release=None, bin_path=None):
         self.project, self.base_env, self.host = project, base_env, host
         self.build, self.upload = build, upload
         self.only = only
+        self.source, self.release, self.bin_path = source, release, bin_path
         self.stats = None            # after a build: partition, firmware size, each effect's size
         self.q = queue.Queue()
         self.done = False
@@ -944,7 +1059,10 @@ class Job:
 
     def _run(self):
         try:
-            env = stage(self.project, self.base_env, self.log, self.only)
+            if self.source in ("release", "file"):
+                self._send_binary(); return
+            env = (stage_stock(self.base_env, self.log) if self.source == "checkout"
+                   else stage(self.project, self.base_env, self.log, self.only))
             if self.build:
                 pio = pio_exe()
                 if not pio:
@@ -990,11 +1108,15 @@ class Job:
             if not os.path.exists(bin_):
                 self.result = f"no firmware at {bin_} - build first"; return
             self.log(f"firmware: {bin_} ({os.path.getsize(bin_) // 1024} KB)")
+            if self.source == "checkout":
+                self._send(bin_, f"WLED {wled_version()[0]} from the checkout ({env})"); return
             if self.upload:
                 before = device_info(self.host)
                 if before:
                     self.log(f"device before: WLED {before.get('ver', '?')}, build {before.get('vid', '?')}, {before.get('name', '')}")
                 self.log("manifest: " + " | ".join(manifest_text(manifest(self.project, self.base_env, self.only))[:5]))
+                if not self._chip_ok(bin_, before):
+                    return
                 ok, msg = upload(self.host, bin_, self.log)
                 self.log(msg)
                 # The device can take the whole file and reboot without its
@@ -1019,3 +1141,71 @@ class Job:
             self.result = f"failed: {e}"
         finally:
             self.done = True
+
+    def _chip_ok(self, bin_, device):
+        """The binary is for the device's chip; else the job ends saying so and nothing is sent."""
+        from native import firmware
+        ok, words = firmware.check(bin_, (device or {}).get("arch"))
+        self.log(f"checked: {words}")
+        if not ok:
+            self.result = f"not sent: {words}"
+        return ok
+
+    def _send_binary(self):
+        """A release's file (downloaded once) or a .bin chosen, sent as it is."""
+        from native import firmware
+        if self.source == "release":
+            tag, asset = self.release
+            self.log(f"WLED {tag}: {asset['name']} ({asset.get('size', 0) // 1024} KB)")
+            last = [0]
+
+            def prog(done, total):
+                if total and done * 10 // total != last[0]:
+                    last[0] = done * 10 // total
+                    self.log(f"  downloading... {done * 100 // total}%")
+            path = firmware.download(tag, asset, prog)
+            self.log(f"cached: {path}")
+            what = f"WLED {tag} ({asset['name']})"
+        else:
+            path = self.bin_path or ""
+            if not os.path.exists(path):
+                self.result = f"no such file: {path}"; return
+            what = os.path.basename(path)
+        if not self.upload:
+            ok, words = firmware.check(path, None)
+            self.result = f"ready, not sent: {words}"; self.ok = ok; return
+        self._send(path, what)
+
+    def _send(self, path, what):
+        """A firmware that is not the studio's build to the device: checked, sent, the reboot waited for,
+        recorded."""
+        if not self.upload:
+            self.result = "built; not sent"; self.ok = True; return
+        before = device_info(self.host)
+        if before:
+            self.log(f"device before: WLED {before.get('ver', '?')}, build {before.get('vid', '?')}, {before.get('name', '')}")
+        if not self._chip_ok(path, before):
+            return
+        ok, msg = upload(self.host, path, self.log)
+        self.log(msg)
+        if ok or "timed out" in msg or "closed connection" in msg:
+            self.log("waiting for the device to reboot...")
+            back, msg2 = verify_reboot(self.host, before, self.log)
+            ok, msg = (back, msg2) if (back or ok) else (False, msg + "; " + msg2)
+            if ok:
+                import hashlib
+                rec = {"when": time.strftime("%Y-%m-%d %H:%M"), "host": self.host, "mac": (before or {}).get("mac", ""),
+                       "source": self.source, "firmware": what, "env": self.base_env if self.source == "checkout" else "",
+                       "wled": "", "build_id": "", "board": "", "usermods": [], "features": {}, "audio": "", "flags": [],
+                       "effects": [], "builtin": 0}
+                try:
+                    data = open(path, "rb").read()
+                    rec["size"] = len(data); rec["sha256"] = hashlib.sha256(data).hexdigest()[:16]
+                except OSError:
+                    pass
+                hist = list(self.project.options.get("flash_history") or [])
+                hist.append(rec)
+                self.project.options["flash_history"] = hist[-20:]
+                self.project.save()
+                self.log(f"recorded: {rec['when']}, {what}")
+        self.result, self.ok = msg, ok

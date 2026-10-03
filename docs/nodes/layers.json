@@ -1,0 +1,303 @@
+{
+ "node": "Layers",
+ "star": 1,
+ "caption": "Layers: a palette base, stripes added on top, and white sparks over everything - one node",
+ "why": [
+  "A rich effect is usually a stack: a background, a pattern on it, highlights on that. With Blends that is a chain of nodes; Layers holds the whole stack in one - a base and up to four layers, each with its own mode and amount.",
+  "A layer with nothing wired is skipped, so it grows as you need. Its neighbours: Blend is one layer with every mode a paint program has; Layers is the quick stack of up to four with the common modes (over, add, max, screen, multiply)."
+ ],
+ "steps": [
+  "**base** is a scrolling palette, dimmed to a third by a **Scale**: the background.",
+  "**layer 1** is a **Colour** (orange), shown by **amount 1** from **Stripes** (count 4, duty 0.2): **mode 1** is add, so orange light is added in four moving stripes.",
+  "**layer 2** is white, shown by **amount 2** from a **Sparkle**: **mode 2** is max, so the sparks are the brightest thing wherever they land.",
+  "**layer 3** and **layer 4** (with **amount 3**, **amount 4**, **mode 3** and **mode 4**) are unwired, so they are skipped. The stack goes to the **Output**."
+ ],
+ "try": [
+  {
+   "label": "Stripes cover",
+   "text": "mode 1 over: the orange stripes cover the background instead of adding to it - flat orange bars.",
+   "set": [
+    [
+     1,
+     "mode 1",
+     "over"
+    ]
+   ]
+  },
+  {
+   "label": "Tint with stripes",
+   "text": "mode 1 multiply: the orange multiplies what is under it - inside the stripes the background is tinted orange and darkened.",
+   "set": [
+    [
+     1,
+     "mode 1",
+     "multiply"
+    ]
+   ]
+  },
+  {
+   "label": "Sparks added",
+   "text": "mode 2 add: the white sparks add to what is under them instead of replacing it - hotter, tinted sparks.",
+   "set": [
+    [
+     1,
+     "mode 2",
+     "add"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Layers",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Speed",
+    "params": {
+     "label": "Speed",
+     "default": 128
+    },
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 14,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 31,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 10.0
+    }
+   },
+   {
+    "id": 32,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 33,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.03
+    }
+   },
+   {
+    "id": 16,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 17,
+    "type": "Scale",
+    "params": {},
+    "inputs": {
+     "by": 0.35
+    }
+   },
+   {
+    "id": 2,
+    "type": "Colour",
+    "params": {
+     "rgb": [
+      255,
+      120,
+      0
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 5,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 4.0,
+     "duty": 0.2
+    }
+   },
+   {
+    "id": 6,
+    "type": "Colour",
+    "params": {
+     "rgb": [
+      255,
+      255,
+      255
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Layers",
+    "params": {
+     "mode 1": "add",
+     "mode 2": "max",
+     "mode 3": "add",
+     "mode 4": "add"
+    },
+    "inputs": {
+     "amount 3": 1.0,
+     "amount 4": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "value",
+    12,
+    "a"
+   ],
+   [
+    11,
+    "t",
+    12,
+    "b"
+   ],
+   [
+    13,
+    "u",
+    14,
+    "a"
+   ],
+   [
+    12,
+    "result",
+    14,
+    "b"
+   ],
+   [
+    30,
+    "t",
+    31,
+    "a"
+   ],
+   [
+    31,
+    "result",
+    32,
+    "x"
+   ],
+   [
+    32,
+    "result",
+    33,
+    "seed"
+   ],
+   [
+    14,
+    "result",
+    16,
+    "index"
+   ],
+   [
+    16,
+    "color",
+    17,
+    "color"
+   ],
+   [
+    17,
+    "color",
+    1,
+    "base"
+   ],
+   [
+    2,
+    "color",
+    1,
+    "layer 1"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "phase"
+   ],
+   [
+    5,
+    "value",
+    1,
+    "amount 1"
+   ],
+   [
+    6,
+    "color",
+    1,
+    "layer 2"
+   ],
+   [
+    33,
+    "value",
+    1,
+    "amount 2"
+   ],
+   [
+    1,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

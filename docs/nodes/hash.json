@@ -1,0 +1,197 @@
+{
+ "node": "Hash",
+ "star": 1,
+ "caption": "Hash: a mosaic of tiles, each its own random colour, reshuffled twice a second",
+ "why": [
+  "Random numbers that change every frame flicker. What a pattern usually wants is a random that stays put: each tile its own colour, each column its own speed, each brick its own shade. Hash gives that - the same inputs always give the same random 0..1, and different inputs give unrelated ones.",
+  "Feed it whole numbers that name things (a tile, a column, a beat count) and it hands each thing its own fixed random. Change the seed and every random reshuffles at once. Its neighbours: Noise is smooth - neighbours get similar values; Random hold picks a new random when triggered, one for the whole frame; Hash is a random per thing, steady."
+ ],
+ "steps": [
+  "**Coords** `u` times 8, rounded down by a **Floor**, numbers eight columns of tiles 0..7; `v` times 4 the same way numbers four rows. Every pixel in a tile gets the same two numbers.",
+  "Those go into Hash's **x** and **y**, so each tile gets its own random `value`, the same for all its pixels: the **Palette**'s index, a random colour per tile.",
+  "**Time** times 2, floored, goes into **seed**: it steps up twice a second, and each step reshuffles every tile's colour at once.",
+  "Leave seed alone and the mosaic stays still - the randoms only change when what goes in changes."
+ ],
+ "try": [
+  {
+   "label": "Frozen",
+   "text": "the seed's Multiply at 0: the seed stays 0, so the mosaic never changes - the same tiles, the same colours, every frame.",
+   "set": [
+    [
+     5,
+     "b",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Smaller tiles",
+   "text": "the columns' Multiply at 16: sixteen columns of tiles, so the tiles are narrow and the mosaic busy.",
+   "set": [
+    [
+     2,
+     "b",
+     16.0
+    ]
+   ]
+  },
+  {
+   "label": "Reshuffle faster",
+   "text": "the seed's Multiply at 8: eight new mosaics a second - nearly a flicker.",
+   "set": [
+    [
+     5,
+     "b",
+     8.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Hash",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Hash",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 8.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 4.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 2.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 9,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "u",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    3,
+    "x"
+   ],
+   [
+    10,
+    "v",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    6,
+    "x"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    6,
+    "result",
+    1,
+    "y"
+   ],
+   [
+    11,
+    "t",
+    5,
+    "a"
+   ],
+   [
+    5,
+    "result",
+    7,
+    "x"
+   ],
+   [
+    7,
+    "result",
+    1,
+    "seed"
+   ],
+   [
+    1,
+    "value",
+    8,
+    "index"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "color"
+   ]
+  ]
+ }
+}

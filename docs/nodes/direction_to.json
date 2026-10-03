@@ -1,0 +1,155 @@
+{
+ "node": "Direction to",
+ "star": 1,
+ "caption": "Direction to: a spotlight sweeping round the cube, aimed by two angles",
+ "why": [
+  "Aiming something in 3-D - a light, the normal of a slab, a direction to sweep - is awkward with x, y and z. Direction to builds a direction from two angles you can understand: how far round (like a compass heading) and how far up.",
+  "Feed a clock into round and the direction sweeps about. Its neighbours: Direction is each pixel's own direction from the middle; Gravity is down; Vector builds one from x, y and z; Direction to builds one from angles."
+ ],
+ "steps": [
+  "**round** comes from a clock (**Time** times 0.15): the heading turns a full circle every seven seconds or so. **up** is 0.1: tilted a little above level (in turns: 0.25 would be straight up).",
+  "`dir` is that direction; `x`, `y`, `z` are its parts.",
+  "A **Dot 3** of each pixel's **Direction** with it says how nearly the pixel faces that way - 1 straight on. A **Smoothstep** (edges 0.7 and 1) makes a soft spot of light there.",
+  "The spot is the **Palette**'s brightness, coloured by the heading, as it sweeps round the walls of the cube."
+ ],
+ "try": [
+  {
+   "label": "Higher",
+   "text": "up 0.2: the spot rides higher, near the top edge of the walls.",
+   "set": [
+    [
+     1,
+     "turns_b",
+     0.2
+    ]
+   ]
+  },
+  {
+   "label": "Wider beam",
+   "text": "the Smoothstep's first edge at 0.3: the spot widens into a broad wash.",
+   "set": [
+    [
+     4,
+     "e0",
+     0.3
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Direction to",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Direction to",
+    "params": {},
+    "inputs": {
+     "turns_b": 0.1
+    }
+   },
+   {
+    "id": 2,
+    "type": "Direction",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Dot 3",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.7,
+     "e1": 1.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.15
+    }
+   }
+  ],
+  "links": [
+   [
+    11,
+    "result",
+    1,
+    "turns_a"
+   ],
+   [
+    2,
+    "dir",
+    3,
+    "a"
+   ],
+   [
+    1,
+    "dir",
+    3,
+    "b"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    11,
+    "result",
+    5,
+    "index"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

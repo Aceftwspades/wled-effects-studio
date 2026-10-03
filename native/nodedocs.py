@@ -172,6 +172,17 @@ DOCS = {
                "release": "held: how long the fall to 0 takes once gate is off, in milliseconds"},
         "out": {"value": "the envelope, 0..1", "active": "true while it is anywhere but at rest"},
         "params": {"mode": "one shot (attack, decay on each rise) or held (attack, decay, sustain, release)"}},
+    "Scenes": {
+        "doc": "Scenes on the device: the graph's snapshots (Snapshots, Ctrl+Shift+K) kept in the effect, and the one "
+               "index picks faded to over fade seconds - every typed value on a pin moving from where it was to the "
+               "scene's, a switch crossing at the middle. A verse look and a chorus look in one effect: a Counter on "
+               "the beat into index steps through them a bar at a time, a slider picks one. A node's settings are "
+               "the build's (they are compiled in); a snapshot without a pin's value leaves it as built. Rebuild "
+               "after saving a snapshot: the table is made when the graph compiles.",
+        "in": {"index": "which scene: 0 the first, 1 the next... (rounded, held to the last)",
+               "fade": "seconds to fade to a newly picked scene (0: at once)"},
+        "out": {"scene": "the scene picked", "blend": "how far the fade to it is, 0..1"},
+        "params": {"scenes": "which snapshots, in order, comma separated (empty: every snapshot as they were made)"}},
     "Gate": {
         "doc": "A switch with a gap: it turns on when x reaches high and only turns off again when x falls to low. A "
                "level that wobbles about one point - a bass band, a noisy volume - would flicker a plain Threshold; "
@@ -457,6 +468,21 @@ DOCS = {
                "c_lo": "the c window's left edge", "c_hi": "its right edge", "x_lo": "the x window's bottom", "x_hi": "its top"},
         "out": {"density": "how often the sequence visits here, 0..1"},
         "params": {"trail": "how long visits glow, 0 .. 0.99", "orbits": "how many steps to run each frame"}},
+    "Video": {
+        "doc": "Live video - a webcam, a video file or the test pattern, chosen in the side panel's VIDEO section - "
+               "at this pixel. The projection puts it on any shape: the picture as it is, through the shape from the "
+               "front or the top, round it, on every cube face, or all round a sphere. The style is a quick look: the "
+               "palette, a few flat colours, shades of Colour 1, outlines, or big blocks. Video plays in the studio; "
+               "the LEDs get it by streaming (Device > Stream) - on the device by itself the node is black.",
+        "in": {"u": "where on the frame, across, 0..1 (the picture projection)",
+               "v": "where on the frame, down, 0..1 (the picture projection)",
+               "levels": "posterize: how many steps each colour has",
+               "blocks": "pixelate: how many blocks across and down",
+               "gain": "edges: how bright the outlines are"},
+        "out": {"color": "the video's colour here, in the style chosen",
+                "luma": "the video's brightness here, 0..1 - for a mask, a palette index, anything"},
+        "params": {"projection": "how the frame lies on the shape: picture, front, top, around, faces or sphere",
+                   "style": "none, palette, posterize, mono (Colour 1), edges or pixelate"}},
     "Image": {
         "doc": "A picture file, baked into the effect. Pick the file, choose how many pixels across and down and how "
                "many colours, and read it with any coordinate - Cube face's a, b puts it on every face. The device "
@@ -586,7 +612,8 @@ DOCS = {
                "scale multiplies by the number; normalize makes the length 1; cross gives the direction at right "
                "angles to both; dot, distance and length give a number (on the value pin); reflect bounces a off b; "
                "project drops a onto b.",
-        "in": {"a": "the first vector", "b": "the second vector (where the op needs one)", "scale": "the number, for scale"},
+        "in": {"a": "the first vector", "b": "the second vector - on the node only while the operation takes one, unless wired",
+               "scale": "the number - on the node only for scale, unless wired"},
         "out": {"v": "the vector result", "value": "the number result (dot, distance, length; else the result's length)"},
         "params": {"op": "which operation"}},
     "Vector rotate": {
@@ -597,9 +624,11 @@ DOCS = {
         "doc": "One node for every sum: pick the operation from the dropdown. Covers what Add, Multiply and the rest do, "
                "plus sqrt, sign, round, ceil, snap (round to a step of b), ping-pong (bounce between 0 and b), wrap, "
                "less / greater / equal (1 or 0), sin / cos / tan in turns, log and exp.",
-        "in": {"a": "the first number", "b": "the second number, where the op needs one"},
+        "in": {"a": "the first number",
+               "b": "the second number - on the node only while the operation takes two (a one-input one: sqrt, abs, "
+                    "sign, round, ceil, floor, fract, sin, cos, tan, asin, acos, log, exp - leaves it off, unless wired)"},
         "out": {"result": "the answer"},
-        "params": {"op": "which operation"}},
+        "params": {"op": "which operation - the dropdown in groups: arithmetic, compare, rounding, trigonometry"}},
     "Rotate": {"doc": "Turns a pair of coordinates round the origin. Feed a clock into turns and a pattern spins; three "
                       "of these on x, y, z tumble the whole cube.",
                "in": {"x": "the point's x", "y": "the point's y", "turns": "how far to turn: 1 = a full circle"}, "out": {"x": "the turned x", "y": "the turned y"}},
@@ -855,16 +884,21 @@ def gaps():
 
 
 def markdown():
-    """The whole reference as Markdown, one section per category."""
+    """The whole reference as Markdown, one section per category; a node with
+    a lesson (docs/nodes, tutorials.py) has its tutorial under its reference."""
     from native.nodedefs import library
+    from native import tutorials
     lib = library()
+    lessons = tutorials.all_lessons()
     order = ["controls", "signals", "coords", "generate", "maths", "colour", "custom", "output", "graph"]
     cats = {}
     for name, d in lib.items():
         cats.setdefault(d["cat"], []).append((name, d))
     out = ["# The nodes", "",
            "What every node, pin and setting does. Numbers are mostly 0..1; a 'turn' is one full circle.",
-           "Hover a node or a pin in the editor and the same text appears under the toolbar.", ""]
+           "Hover a node or a pin in the editor and the same text appears under the toolbar.",
+           "A node with a tutorial says why you would use it, builds a small graph round it with a picture "
+           "of it running, and lists changes to try; in the studio, Try it opens that graph live.", ""]
     for c in order + sorted(k for k in cats if k not in order):
         if c not in cats:
             continue
@@ -883,6 +917,8 @@ def markdown():
                     key_ = f" `{p['name']}`" if shown != p["name"] else ""
                     out.append(f"- **{shown}**{key_} *({p['type']})*: {p.get('doc', '')}")
                 out.append("")
+            if name in lessons:                            # why it is there, a graph round it, changes to try
+                out += tutorials.markdown(name, lessons[name])
     return "\n".join(out)
 
 

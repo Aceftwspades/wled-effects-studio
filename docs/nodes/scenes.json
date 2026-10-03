@@ -1,0 +1,222 @@
+{
+ "node": "Scenes",
+ "star": 1,
+ "caption": "Scenes: two looks of the same stripes - calm and busy - swapped every four beats with a fade",
+ "why": [
+  "An effect for a whole song wants more than one look: calm in the verse, busy in the chorus. Scenes keeps several snapshots of the graph's values inside the effect itself - each a look - and fades between them when its index changes, so the device switches looks without the studio.",
+  "Snapshots are taken in the studio (Snapshots, Ctrl+Shift+K); the Scenes node puts them in the build. Its neighbours: Sequencer and Counter decide when; Mix fades two numbers; Scenes fades every typed value of the graph at once."
+ ],
+ "steps": [
+  "This graph has two snapshots: calm (the **Wave**'s cycles 2, its clock's **Multiply** 0.2) and busy (cycles 8, clock 1.5).",
+  "A **Counter** counts **Audio**'s beats (steps 8), and a **Threshold** at 4 turns that into 0 for four beats, then 1 for four: Scenes' **index**, which scene to show.",
+  "**fade** is 1: each change of scene glides every value over a second. **scenes** is empty, which means every snapshot, in order.",
+  "`scene` is the scene shown and `blend` how far the fade has got - the trace. The stripes calm and quicken every four beats."
+ ],
+ "try": [
+  {
+   "label": "Hard cut",
+   "text": "fade 0: the values jump at once - a cut, not a fade.",
+   "set": [
+    [
+     1,
+     "fade",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Slow fade",
+   "text": "fade 3: a three-second glide, so the look is changing for most of each four beats.",
+   "set": [
+    [
+     1,
+     "fade",
+     3.0
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "blend"
+  ],
+  [
+   1,
+   "scene"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Scenes",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Counter",
+    "params": {},
+    "inputs": {
+     "steps": 8.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 4.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Scenes",
+    "params": {
+     "scenes": ""
+    },
+    "inputs": {
+     "fade": 1.0
+    }
+   },
+   {
+    "id": 5,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   },
+   {
+    "id": 7,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 2.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 9,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "beat",
+    3,
+    "trigger"
+   ],
+   [
+    3,
+    "count",
+    4,
+    "x"
+   ],
+   [
+    4,
+    "value",
+    1,
+    "index"
+   ],
+   [
+    5,
+    "t",
+    6,
+    "a"
+   ],
+   [
+    7,
+    "u",
+    8,
+    "x"
+   ],
+   [
+    6,
+    "result",
+    8,
+    "phase"
+   ],
+   [
+    7,
+    "u",
+    9,
+    "index"
+   ],
+   [
+    8,
+    "value",
+    9,
+    "brightness"
+   ],
+   [
+    9,
+    "color",
+    10,
+    "color"
+   ]
+  ],
+  "snapshots": {
+   "calm": {
+    "8": {
+     "inputs": {
+      "cycles": 2.0
+     }
+    },
+    "6": {
+     "inputs": {
+      "b": 0.2
+     }
+    }
+   },
+   "busy": {
+    "8": {
+     "inputs": {
+      "cycles": 8.0
+     }
+    },
+    "6": {
+     "inputs": {
+      "b": 1.5
+     }
+    }
+   }
+  }
+ }
+}

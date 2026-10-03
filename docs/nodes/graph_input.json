@@ -1,0 +1,122 @@
+{
+ "node": "Graph input",
+ "star": 1,
+ "caption": "Graph input: a sub-graph's speed pin - previewed on its own, at its default of 0.3",
+ "why": [
+  "A piece of graph you use again and again - a fire, a sparkle layer, a scroll - can become a node of its own: a sub-graph. Graph input and Graph output are its pins: each Graph input becomes an input of the node, each Graph output an output.",
+  "Select nodes and Node > Fold into a sub-graph makes one, with these pins already in place. Its neighbours: Send and Receive carry values within one graph; Graph input and output carry them in and out of a sub-graph."
+ ],
+ "steps": [
+  "**name** is speed: the pin the node made from this graph will show.",
+  "**type** is float, a number. **default** is 0.3: what it gives when nothing is wired to the pin - and what the preview runs at.",
+  "Its `value` times **Time** scrolls a **Palette**; the colour leaves by a **Graph output** named colour.",
+  "Save it in the project's subgraphs and it appears in the add menu as a node with a speed input and a colour output."
+ ],
+ "try": [
+  {
+   "label": "Faster default",
+   "text": "default 1: the pin's default triples the scroll - in the preview, and wherever the node is used with speed unwired.",
+   "set": [
+    [
+     1,
+     "default",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Graph input",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Graph input",
+    "params": {
+     "name": "speed",
+     "type": "float",
+     "default": 0.3
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 23,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 2,
+    "type": "Graph output",
+    "params": {
+     "name": "colour",
+     "type": "color"
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    21,
+    "t",
+    22,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    22,
+    "b"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "a"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "b"
+   ],
+   [
+    23,
+    "result",
+    24,
+    "index"
+   ],
+   [
+    24,
+    "color",
+    2,
+    "value"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,121 @@
+{
+ "node": "Note",
+ "star": 1,
+ "caption": "Note: a note on the graph saying what the wave is for - the effect unchanged",
+ "why": [
+  "A graph that made sense when you built it may not a month later, or to someone else. Note is text on the graph: what a part is for, why a value is what it is, what to try.",
+  "Its neighbours: Frame titles a group of nodes; a node's own title can be renamed; Note is free text anywhere. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph."
+ ],
+ "steps": [
+  "**text** is the note itself - here, what the wave does and which value to change for more stripes.",
+  "It sits beside the **Wave** it talks about; drag it anywhere.",
+  "The note can run over several lines (edit it in the Properties pane)."
+ ],
+ "try": [
+  {
+   "label": "Say something else",
+   "text": "text set to a reminder: the note changes, the effect does not.",
+   "set": [
+    [
+     1,
+     "text",
+     "Try the Wave's shape: square for hard stripes."
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Note",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Note",
+    "params": {
+     "text": "The Wave makes the stripes: its cycles is how many fit across."
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 23,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 24,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 25,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    21,
+    "t",
+    22,
+    "a"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "x"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "phase"
+   ],
+   [
+    20,
+    "u",
+    24,
+    "index"
+   ],
+   [
+    24,
+    "color",
+    25,
+    "color"
+   ],
+   [
+    23,
+    "value",
+    24,
+    "brightness"
+   ]
+  ]
+ }
+}

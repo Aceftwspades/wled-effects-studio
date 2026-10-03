@@ -17,9 +17,12 @@
        contents, so a first build in the copy compiles only the new effect
     7. --zip: the folder zipped, for a release (about 85 MB with the
        compiler); on Linux a tarball instead,
-       WLED_Effects_Studio_linux.tar.gz (the files keep their modes), with
-       install_linux.sh and linux/ for the app launcher's entry - no
-       compiler inside: the system's gcc or clang builds the effects
+       WLED_Effects_Studio_linux.tar.gz (WLED_Effects_Studio_aarch64.tar.gz
+       on a 64-bit ARM; the files keep their modes), with install_linux.sh
+       and linux/ for the app launcher's entry - no compiler inside: the
+       system's gcc or clang builds the effects. On macOS a tarball too,
+       WLED_Effects_Studio_macos_arm64.tar.gz: the folder, Apple's clang
+       (the Command Line Tools) building the effects
 
 The result is dist/WLED Effects Studio/: portable - projects, builds and
 captures land beside the exe when the folder can be written to, else in
@@ -202,6 +205,21 @@ def trim_toolchain(src, dst, log=print):
     return dst
 
 
+def archive_base():
+    """The release file's name without its extension: by system, and by
+    processor where there is more than one build for the system. The ARM
+    Linux name has no "linux" in it: a studio up to 1.4.0 took the first
+    tarball whose name had, whatever its processor (native/update.py)."""
+    import platform
+    base = os.path.join(HERE, "dist", APP.replace(" ", "_"))
+    arm = platform.machine().lower() in ("arm64", "aarch64")
+    if sys.platform.startswith("linux"):
+        return base + ("_aarch64" if arm else "_linux")
+    if sys.platform == "darwin":
+        return base + ("_macos_arm64" if arm else "_macos_x64")
+    return base
+
+
 def main():
     args = sys.argv[1:]
     toolchain = args[args.index("--toolchain") + 1] if "--toolchain" in args else None
@@ -272,6 +290,17 @@ def main():
         shutil.copyfile(os.path.join(HERE, "install_linux.sh"), os.path.join(DIST, "install_linux.sh"))
         os.chmod(os.path.join(DIST, "install_linux.sh"), 0o755)
         shutil.copytree(os.path.join(HERE, "linux"), os.path.join(DIST, "linux"), dirs_exist_ok=True)
+    elif sys.platform == "darwin":
+        open(os.path.join(DIST, "README.txt"), "w", encoding="utf-8").write(
+            f"{APP}\n\nRun './{APP}' from a Terminal in this folder (or './{APP} (console)' to see what it prints), or "
+            "double-click it in the Finder. The build is not signed by a developer Apple knows: the first time, the Finder "
+            "asks - right-click it, Open, Open - or run  xattr -dr com.apple.quarantine .  in the folder once. Projects, "
+            f"builds and captures are kept in this folder (or in ~/Library/Application Support/{APP} when it cannot be "
+            "written to).\n\nBuilding an effect needs Apple's C++ compiler: xcode-select --install (the Command Line "
+            "Tools). Without it, the effects already built, the examples, the script preview and every send to a device "
+            "still work.\n\nFlashing firmware needs a WLED checkout and PlatformIO: set WLED_ROOT to the checkout.\n\n"
+            "Help > User guide (F1) opens the guide in the studio; Help > Tutorial makes a first effect step by step. "
+            "The files are in _internal/ (GUIDE.md, TUTORIAL.md, NODES.md).\n")
     else:
         open(os.path.join(DIST, "README.txt"), "w", encoding="utf-8").write(
             f"{APP}\n\nRun '{APP}.exe'. Projects, builds and captures are kept in this folder (or in %LOCALAPPDATA%\\{APP} "
@@ -294,9 +323,9 @@ def main():
     size = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(DIST) for f in fs)
     print(f"package: {DIST}  ({size / 1e6:.0f} MB)")
     if "--zip" in args:
-        base = os.path.join(HERE, "dist", APP.replace(" ", "_"))
-        if sys.platform.startswith("linux"):                # a tarball keeps the executables' modes
-            z = shutil.make_archive(base + "_linux", "gztar", os.path.join(HERE, "dist"), APP)
+        base = archive_base()
+        if sys.platform.startswith("linux") or sys.platform == "darwin":     # a tarball keeps the executables' modes
+            z = shutil.make_archive(base, "gztar", os.path.join(HERE, "dist"), APP)
         else:
             z = shutil.make_archive(base, "zip", os.path.join(HERE, "dist"), APP)
         print(f"package: {z}  ({os.path.getsize(z) / 1e6:.0f} MB)")

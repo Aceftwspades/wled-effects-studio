@@ -1,0 +1,196 @@
+{
+ "node": "Scale",
+ "star": 1,
+ "caption": "Scale: a scrolling palette dimmed by a slow sine - the whole picture breathing",
+ "why": [
+  "Dimming is the most common thing done to a colour: a fade-in, a pulse, a heartbeat, brightness from a slider. Scale multiplies a colour by a number - 1 leaves it, 0.5 halves it, 0 is black.",
+  "Wire any 0..1 number into by and that number becomes the colour's brightness: a wave makes it breathe, the audio level makes it pump. Its neighbours: Fade is the same sum, named for trails; Mask is the same, named for a pattern; Levels and Adjust do more than dim."
+ ],
+ "steps": [
+  "**color** is a scrolling palette (**Speed**, **Time**, **Coords** `u` into a **Palette**).",
+  "**by** comes from a **Wave** whose x is a clock (**Time** times 0.4) - no coordinate, so every pixel gets the same value: the whole picture rises and falls together, once every two and a half seconds.",
+  "The scaled colour goes to the **Output**.",
+  "Because by is one number for every pixel, nothing moves - the picture breathes."
+ ],
+ "try": [
+  {
+   "label": "Blink",
+   "text": "the Wave's shape square: by jumps between 0 and 1, so the picture blinks on and off.",
+   "set": [
+    [
+     3,
+     "shape",
+     "square"
+    ]
+   ]
+  },
+  {
+   "label": "Heartbeat",
+   "text": "the Wave's shape saw: a fade-in that drops to black, over and over.",
+   "set": [
+    [
+     3,
+     "shape",
+     "saw"
+    ]
+   ]
+  },
+  {
+   "label": "Faster",
+   "text": "the clock's Multiply at 2: five times as fast - a quick pulse.",
+   "set": [
+    [
+     2,
+     "b",
+     2.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Scale",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Speed",
+    "params": {
+     "label": "Speed",
+     "default": 128
+    },
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 14,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 16,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   },
+   {
+    "id": 3,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 1.0,
+     "distort": 0.0,
+     "phase": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Scale",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "value",
+    12,
+    "a"
+   ],
+   [
+    11,
+    "t",
+    12,
+    "b"
+   ],
+   [
+    13,
+    "u",
+    14,
+    "a"
+   ],
+   [
+    12,
+    "result",
+    14,
+    "b"
+   ],
+   [
+    14,
+    "result",
+    16,
+    "index"
+   ],
+   [
+    16,
+    "color",
+    1,
+    "color"
+   ],
+   [
+    4,
+    "t",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    3,
+    "x"
+   ],
+   [
+    3,
+    "value",
+    1,
+    "by"
+   ],
+   [
+    1,
+    "color",
+    5,
+    "color"
+   ]
+  ]
+ }
+}

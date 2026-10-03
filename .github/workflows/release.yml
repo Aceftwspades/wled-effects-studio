@@ -1,15 +1,17 @@
-# Every push to main and every pull request: the tests on Linux, Windows and
-# macOS, the app driven on each (the smoke test; on Linux and Windows the
-# packaged app's too, and on Windows the pointer's) - each of those gating,
-# with one retry that leaves a warning, so a push is never known good only
-# on the machine it came from.
+# Every push to main and every pull request: the tests on Linux (x64 and
+# ARM), Windows and macOS, the app driven on each (the smoke test; the
+# packaged app's too on every one, and on Windows the pointer's) - each of
+# those gating, with one retry that leaves a warning, so a push is never
+# known good only on the machine it came from.
 # A version tag (v1.2.3) does all that and the release: the engine built, a
 # MinGW-w64 fetched from winlibs and cut down, PyInstaller's folder made
 # and zipped by package.py, the zip attached to a DRAFT release for the
-# tag - with the Linux build beside it (PyInstaller's folder as a tarball,
-# made and driven on every push too). Publish it by hand; the app's update
-# check reads the newest published release. The tag must match
-# native/version.py's __version__.
+# tag - with the Linux builds (x64, and ARM for a Raspberry Pi 4 or 5 on a
+# 64-bit OS) and the macOS one (Apple silicon) beside it, PyInstaller's
+# folder as a tarball each, made and driven on every push too. Publish it
+# by hand; the app's update check reads the newest published release and
+# takes its own machine's file. The tag must match native/version.py's
+# __version__.
 # The unit tests run on Linux too (issue #9): a crash only Linux has (the
 # engine's unload, issue #3) cannot show on Windows - the draft waits on both.
 name: release
@@ -106,9 +108,67 @@ jobs:
           name: WLED_Effects_Studio_linux
           path: dist/WLED_Effects_Studio_linux.tar.gz
 
+  # the ARM Linux build (a Raspberry Pi 4 or 5 with a 64-bit OS, an ARM server or laptop), on GitHub's ARM
+  # runner: the engine built with its gcc, every unit test, the release's tarball made and the app driven from
+  # it under a virtual display (the x64 job drives the tree's; this one the build that ships). Its name has no
+  # "linux" in it: a studio up to 1.4.0 took the first tarball whose name had (native/update.py)
+  linux_arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: the system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libportaudio2 libasound2-dev libjack-jackd2-dev xvfb libgl1 libegl1 \
+            libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 ffmpeg
+
+      - name: the packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: the engine
+        run: python build.py --native-only
+
+      - name: the tests
+        env:
+          STUDIO_NO_UPDATE_CHECK: "1"
+          STUDIO_NO_WELCOME: "1"
+        run: |
+          for t in tests/test_*.py; do
+            echo "== $t"
+            python "$t" || exit 1
+          done
+
+      - name: the release folder and tarball
+        run: python package.py --zip
+
+      - name: the app, packaged, under a virtual display
+        timeout-minutes: 25
+        env:
+          STUDIO_NO_UPDATE_CHECK: "1"
+          STUDIO_NO_WELCOME: "1"
+        run: |
+          mkdir -p packaged && tar -xzf dist/WLED_Effects_Studio_aarch64.tar.gz -C packaged
+          export STUDIO_EXE="$PWD/packaged/WLED Effects Studio/WLED Effects Studio (console)"
+          xvfb-run -a -s "-screen 0 1600x1000x24" python tests/smoke_app.py && exit 0
+          echo "::warning::the smoke test failed once against the packaged app on ARM Linux; running it again"
+          xvfb-run -a -s "-screen 0 1600x1000x24" python tests/smoke_app.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WLED_Effects_Studio_aarch64
+          path: dist/WLED_Effects_Studio_aarch64.tar.gz
+
   # the roadmap's Linux / macOS pass, macOS half: the engine built with Apple's clang, every unit test, the app
-  # driven by the smoke test (the runner's screen is 1280 x 646). Gating since it ran green (1.4.0); no macOS
-  # build is released - macOS runs from a checkout
+  # driven by the smoke test (the runner's screen is 1280 x 646). Gating since it ran green (1.4.0). After 1.4.0 a
+  # macOS build ships too: the runner is Apple silicon, so the tarball is - PyInstaller's folder, Apple's clang (the
+  # Command Line Tools) building the effects - driven like the others
   macos:
     runs-on: macos-latest
     steps:
@@ -149,6 +209,28 @@ jobs:
           python tests/smoke_app.py && exit 0
           echo "::warning::the smoke test failed once on macOS; running it again"
           python tests/smoke_app.py
+
+      - name: the release folder and tarball
+        run: |
+          python -m pip install pyinstaller
+          python package.py --zip
+
+      - name: the app, packaged
+        timeout-minutes: 20
+        env:
+          STUDIO_NO_UPDATE_CHECK: "1"
+          STUDIO_NO_WELCOME: "1"
+        run: |
+          mkdir -p packaged && tar -xzf dist/WLED_Effects_Studio_macos_arm64.tar.gz -C packaged
+          export STUDIO_EXE="$PWD/packaged/WLED Effects Studio/WLED Effects Studio (console)"
+          python tests/smoke_app.py && exit 0
+          echo "::warning::the smoke test failed once against the packaged app on macOS; running it again"
+          python tests/smoke_app.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WLED_Effects_Studio_macos
+          path: dist/WLED_Effects_Studio_macos_arm64.tar.gz
 
   windows:
     runs-on: windows-latest
@@ -243,7 +325,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, windows, macos]
+    needs: [linux, linux_arm, windows, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -256,7 +338,17 @@ jobs:
           name: WLED_Effects_Studio_linux
           path: dist
 
-      # both builds on the draft: the app's update check takes its own platform's (native/update.py asset_for)
+      - uses: actions/download-artifact@v4
+        with:
+          name: WLED_Effects_Studio_aarch64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: WLED_Effects_Studio_macos
+          path: dist
+
+      # every build on the draft: the app's update check takes its own machine's (native/update.py asset_for)
       - name: the draft release
         uses: softprops/action-gh-release@v2
         with:
@@ -264,4 +356,6 @@ jobs:
           files: |
             dist/WLED_Effects_Studio.zip
             dist/WLED_Effects_Studio_linux.tar.gz
+            dist/WLED_Effects_Studio_aarch64.tar.gz
+            dist/WLED_Effects_Studio_macos_arm64.tar.gz
           generate_release_notes: true

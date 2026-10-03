@@ -1,0 +1,183 @@
+{
+ "node": "Blur",
+ "star": 1,
+ "caption": "Blur: sparks that spread into soft clouds as last frame's picture is blurred under them",
+ "why": [
+  "A sharp dot on a few dozen LEDs looks harsh; light in the real world spreads. Blur reads last frame's picture, softened - each pixel the average of the ones around it - so whatever you blend it with has a soft spread of its past around it.",
+  "Fed back into the picture through a Fade it makes things bloom and drift into clouds; added lightly it is a soft halo. Its neighbours: Glow does the bloom in one node; Previous is last frame unblurred; Blur is last frame, softened."
+ ],
+ "steps": [
+  "Blur has no inputs: it reads the whole of last frame's picture. **radius** is 1: each pixel is the average of the 3 x 3 around it.",
+  "A **Fade** (keep 0.94) dims the blurred picture a little each frame, so old light dies away.",
+  "New light: a **Sparkle** (density 0.02, reseeded eight times a second) lights a few pixels in the **Palette**'s colour for their place.",
+  "A **Blend** in max mode keeps the brighter of the fading blur and the new sparks; the result is the **Output** - and next frame's Blur reads it, so every spark spreads out a pixel further each frame and fades as it goes."
+ ],
+ "try": [
+  {
+   "label": "Wider spread",
+   "text": "radius 2: each frame averages the 5 x 5 around, so the clouds spread twice as fast.",
+   "set": [
+    [
+     1,
+     "radius",
+     2
+    ]
+   ]
+  },
+  {
+   "label": "Linger",
+   "text": "the Fade's keep at 0.985: the light dies slowly, so the clouds build up and merge.",
+   "set": [
+    [
+     2,
+     "keep",
+     0.985
+    ]
+   ]
+  },
+  {
+   "label": "No feedback",
+   "text": "the Fade's keep at 0: the blur is gone each frame, leaving the sparks sharp and alone - Blur only does anything by reading what came before.",
+   "set": [
+    [
+     2,
+     "keep",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Blur",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 8.0
+    }
+   },
+   {
+    "id": 12,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.02
+    }
+   },
+   {
+    "id": 1,
+    "type": "Blur",
+    "params": {
+     "radius": 1
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Fade",
+    "params": {},
+    "inputs": {
+     "keep": 0.94
+    }
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Blend",
+    "params": {
+     "mode": "max"
+    },
+    "inputs": {
+     "amount": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    12,
+    "x"
+   ],
+   [
+    12,
+    "result",
+    13,
+    "seed"
+   ],
+   [
+    1,
+    "color",
+    2,
+    "color"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "index"
+   ],
+   [
+    13,
+    "value",
+    21,
+    "brightness"
+   ],
+   [
+    2,
+    "color",
+    22,
+    "under"
+   ],
+   [
+    21,
+    "color",
+    22,
+    "over"
+   ],
+   [
+    22,
+    "color",
+    23,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,155 @@
+{
+ "node": "Glow",
+ "star": 1,
+ "caption": "Glow: sparse sparks given a soft halo of light that bleeds into their neighbours",
+ "why": [
+  "A single lit pixel next to dark ones looks like a hard dot; real light blooms - bright things bleed a soft halo into what is around them. Glow adds that: the colour plus a blurred copy of last frame's picture, so anything bright spreads light to its neighbours.",
+  "Put it just before the Output and the whole effect gets a softer, more luminous look. Its neighbours: Blur gives the blurred last frame on its own, to combine as you like; Fade makes trails in time; Glow is bloom in space, ready to use."
+ ],
+ "steps": [
+  "A **Sparkle** (density 0.04, reseeded five times a second) lights a few pixels in the **Palette**'s colour for their place: hard, single dots.",
+  "That picture goes into Glow's **color**.",
+  "**amount** is 0.6: how much of the blurred last frame is added. **radius** is 1: the halo reaches one pixel out.",
+  "Glow's `color` goes to the **Output** - each spark now has a soft glow round it, and lingers a moment as the glow of its last frame fades."
+ ],
+ "try": [
+  {
+   "label": "More glow",
+   "text": "amount 0.9: a strong halo - each spark becomes a soft ball of light.",
+   "set": [
+    [
+     1,
+     "amount",
+     0.9
+    ]
+   ]
+  },
+  {
+   "label": "Wide glow",
+   "text": "radius 3: the halo reaches three pixels out, a broad haze.",
+   "set": [
+    [
+     1,
+     "radius",
+     3
+    ]
+   ]
+  },
+  {
+   "label": "No glow",
+   "text": "amount 0: just the hard dots, for comparison.",
+   "set": [
+    [
+     1,
+     "amount",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Glow",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 5.0
+    }
+   },
+   {
+    "id": 12,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.04
+    }
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Glow",
+    "params": {
+     "radius": 1
+    },
+    "inputs": {
+     "amount": 0.6
+    }
+   },
+   {
+    "id": 22,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    12,
+    "x"
+   ],
+   [
+    12,
+    "result",
+    13,
+    "seed"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "index"
+   ],
+   [
+    13,
+    "value",
+    21,
+    "brightness"
+   ],
+   [
+    21,
+    "color",
+    1,
+    "color"
+   ],
+   [
+    1,
+    "color",
+    22,
+    "color"
+   ]
+  ]
+ }
+}

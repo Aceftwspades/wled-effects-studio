@@ -48,6 +48,8 @@ from native.project import (default_project, Project, list_projects, project_pat
 from native.graph_ui import GraphPanel, build_panel
 from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight, view3d, shape_tools
 from native.gpucube import CubeQuads
+from native import look
+from native import video_ui
 from native.textures import registry as tex_registry
 from native.features import Features
 from native.popout import Popouts
@@ -486,26 +488,53 @@ class App(Features):
         return rgb
 
     def view_image(self, net, px, eng=None):
+        """The 3-D view as a picture, with the look (look.py) - a
+        screenshot, a GIF's or a video's frame, or the view itself where
+        the GPU does not draw it."""
+        eng = eng or self.eng
+        img = self._view_image(net, px, eng)
+        lk = self.view_look()
+        if not look.active(lk):
+            return img
+        self._look_frame = getattr(self, "_look_frame", 0) + 1
+        return look.finish(img, lk, self._look_frame, look.mean_light(self.frame_rgb(eng)) if lk["spill"] > 0 else None)
+
+    def eye_above_floor(self):
+        """The 3-D view's camera is above the floor (a reflection in it can be seen)."""
+        from native.render import Cam, FLOOR_Z
+        return bool(Cam(self.yaw, self.pitch, self.dist, 100, **view3d.kw(self)).eye[2] > FLOOR_Z + 0.02)
+
+    def view_look(self):
+        """The look of the 3-D view in force (Settings > Appearance, its 3-D view tab)."""
+        return look.current(self.prefs)
+
+    def _view_image(self, net, px, eng):
         """The 3-D view: the face-warp renderer for the cube (faster, and
         exact for flat faces), the point cloud for everything else."""
-        eng = eng or self.eng
         g = eng.geom
         unlit, floor = self.view_extras()
         if g is not None and g.kind == "cube" and not eng.fx.get("o3"):
-            return render.render(net if net.shape[0] == eng.rows else self.frame_rgb(eng),
-                                 eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px),
-                                 unlit=unlit, floor=floor, **view3d.kw(self))
+            src = net if net.shape[0] == eng.rows else self.frame_rgb(eng)
+            lk = self.view_look()
+            if lk["glow"] > 0 or lk["diffuse"] > 0:        # the glowing or diffused LEDs, as the live view's texture has them
+                k = 8                                      # finer than the live texture: no GPU smooths a picture's dots
+                return render.render(look.led_texture(src, k, lk, unlit, B=eng.B), eng.B * k, px, self.yaw, self.pitch,
+                                     self.dist, six=eng.six, bg=self.view_background(px), unlit=None, floor=floor,
+                                     reflect=lk["reflect"], **view3d.kw(self))
+            return render.render(src, eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px),
+                                 unlit=unlit, floor=floor, reflect=lk["reflect"], **view3d.kw(self))
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
+        lk = self.view_look()
         if eng is self.eng:
             pos = self.view_positions()
-            rgb = shape_ui.view_colours(self, rgb)             # a shape being built: each part its colour
+            rgb = look.diffuse_points(pos, shape_ui.view_colours(self, rgb), lk)     # a shape being built: each part its colour
             return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
                                         unlit=unlit, floor=floor, frame=view3d.frame(self), floor_step=view3d.floor_step(self),
-                                        **view3d.kw(self))
-        return render.render_points(g.pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
-                                    unlit=unlit, floor=floor, **view3d.kw(self))
+                                        lk=lk, **view3d.kw(self))
+        return render.render_points(g.pos, look.diffuse_points(g.pos, rgb, lk), px, self.yaw, self.pitch, self.dist,
+                                    bg=self.view_background(px), unlit=unlit, floor=floor, lk=lk, **view3d.kw(self))
 
     def fill_stats(self, pw, factor, dev_fps):
         """The stats popover's figures, this frame (while it is open): the
@@ -556,8 +585,11 @@ class App(Features):
     # --- audio ---------------------------------------------------------------
     def audio_push(self):
         src = self.live if self.live else self.syn
+        video_ui.push(self)                              # the newest video frame into the engine (the Video node)
         try:
             hit = src.push(self.eng)
+            if src is not self.syn:
+                self.eng.audio_peak()                   # the live sound's major peak, from its bands (the synth sets its own)
             if hasattr(src, "pcm"):
                 self.eng.pcm(src.pcm())
             if hasattr(src, "chroma"):
@@ -1606,14 +1638,20 @@ class App(Features):
             return
         # success: swap the engine, keep everything the user had
         want = self.project.effect_title(self.edit_file) if self.edit_file else self.project.selected
+        sub = self.gp.standin_on()                       # the edit shown at once as a script (graph_ui.standin)
+        clock = self.eng.clock()
         self.eng.reload(rep.library)
         self._ab_reloaded(rep.library)
         dpg.configure_item("fx_combo", items=self.eng.names)
-        if want in self.eng.names:
-            self.eng.select(self.eng.names.index(want))
-        dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
-        self.rebuild_params()
-        self.sync_palette_combo()
+        if not (sub and self.gp.standin_stays(want, self.eng.names) and self.gp.standin_reload(clock)):
+            if want in self.eng.names:
+                self.eng.select(self.eng.names.index(want))
+            if sub:
+                self.eng.set_clock(clock)                # the build takes the stand-in's place at the same moment
+            self.gp.standin_done(sub)
+            dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
+            self.rebuild_params()
+            self.sync_palette_combo()
         dpg.set_value("edit_status", f"loaded {os.path.basename(rep.library)}  ({self.eng.count} effects)")
         messages.clear(self, "build:")                       # it builds: the build's problem is gone
         if self.edit_file:
@@ -1656,7 +1694,7 @@ class App(Features):
             num.add(it, value, lo, hi, integer=not is_float, digits=1 if is_float else None, unit=unit, width=-1,
                     callback=lambda s, v: setter(max(lo, min(hi, v))))
 
-    def fx_fit(self):
+    def fx_fit(self, meta=None):
         """A word under the effect when it cannot show on this geometry: an
         effect written for a matrix alone, on LEDs laid out as one row (a
         strip, a ring, a shape's strip layout), runs as a solid colour."""
@@ -1664,7 +1702,7 @@ class App(Features):
             return
         from native.engine import matrix_only
         g = self.project.geometry
-        bad = bool(self.eng.meta) and not g.is2d and matrix_only(self.eng.meta[self.eng.idx])
+        bad = bool(self.eng.meta) and not g.is2d and matrix_only(meta or self.eng.meta[self.eng.idx])
         if bad:
             dpg.set_value("fx_fit_note", "an effect for a matrix: on this shape's one-row (strip) layout it shows one colour - "
                                          "pick one made for any shape (the project's own, a 1-D one), or lay the shape out as a "
@@ -1672,11 +1710,13 @@ class App(Features):
                           "an effect for a matrix: on a single row of LEDs it shows one colour - pick a 1-D effect, or one for both")
         dpg.configure_item("fx_fit_note", show=bad)
 
-    def rebuild_params(self):
-        """Sliders are labelled from the effect's own metadata, as the web UI is."""
-        self.fx_fit()                                    # the effect or the geometry changed: whether it can show here
+    def rebuild_params(self, meta=None):
+        """Sliders are labelled from the effect's own metadata, as the web UI is
+        - or from `meta`, an effect another stands in for (the script running a
+        graph's edit until its build lands)."""
+        self.fx_fit(meta)                                # the effect or the geometry changed: whether it can show here
         dpg.delete_item("params", children_only=True)
-        m = self.eng.meta[self.eng.idx]
+        m = meta or self.eng.meta[self.eng.idx]
         generic = {"sx": "Speed", "ix": "Intensity", "c1": "Custom 1",
                    "c2": "Custom 2", "c3": "Custom 3"}
         for i, k in enumerate(("sx", "ix", "c1", "c2", "c3")):
@@ -2247,7 +2287,7 @@ class App(Features):
             self.request_layout()
 
     # --- the side panel's sections: folded, and in any order -----------------------
-    SECTIONS = ("effect", "segments", "geometry", "colours", "parameters", "audio", "live")
+    SECTIONS = ("effect", "segments", "geometry", "colours", "parameters", "audio", "live", "video")
 
     def sec_save(self):
         self.prefs["sections"] = {"order": list(self.sec_order), "closed": sorted(self.sec_closed)}
@@ -3109,6 +3149,7 @@ class App(Features):
             "tutorial_tree": lambda: reader_ui.open_doc(self, "TUTORIAL.md", "Tutorial 2: a Christmas tree in 3-D"),
             "node_ref":     lambda: reader_ui.open_doc(self, "NODES.md"),
             "node_help":    gp.help_here,
+            "node_costs":   gp.measure_costs,
             "welcome":      lambda: reader_ui.show_welcome(self),
             "graph_room":   lambda: room.set_on(self, not room.on(self)),
             "graph_panel":  lambda: room.toggle_panel(self),
@@ -3618,8 +3659,11 @@ class App(Features):
             k = self.CUBE_SRC_SCALE
             src = net if net.shape[0] == self.eng.rows else self.net_image()
             unlit, floor = self.view_extras()
-            dpg.set_value("cube_src_tex", self._rgba("cube_src", render.dotted(src, k, unlit) if unlit is not None
-                                                     else src.repeat(k, 0).repeat(k, 1)))
+            lk = self.view_look()
+            dpg.set_value("cube_src_tex", self._rgba("cube_src", look.led_texture(look.tone(src, lk), k, lk, unlit, B=self.eng.B)))
+            cq = self.cube_quads
+            cq.reflect = lk["reflect"]
+            cq.layers.update(lk, look.mean_light(src) if lk["spill"] > 0 else None, cq.size, cq.w, cq.h)
             self.cube_quads.floor = floor
             self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six, **view3d.kw(self))
             self.cube_quads.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
@@ -3637,7 +3681,12 @@ class App(Features):
             pq.floor, pq.dots = floor, unlit is not None
             pq.camera(self.yaw, self.pitch, self.dist, floor_step=view3d.floor_step(self), **view3d.kw(self))
             pq.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
-            pq.colours(shape_ui.view_colours(self, (rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3)), unlit=unlit)
+            lk = self.view_look()
+            cols = shape_ui.view_colours(self, (rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3))
+            cols = look.diffuse_points(pos, cols, lk)          # through the diffuser: light shared by distance
+            pq.reflect = lk["reflect"]
+            pq.colours(look.tone(cols, lk), unlit=unlit, lk=lk)
+            pq.layers.update(lk, look.mean_light(cols) if lk["spill"] > 0 else None, pq.size, pq.w, pq.h)
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on():
@@ -3916,6 +3965,8 @@ def build(app):
                     with form.row("level"):
                         dpg.add_progress_bar(tag="lvl_bar", default_value=0.0, width=-1)
                     dpg.add_text("", tag="live_msg", wrap=0)
+                with Section(app, "video", "VIDEO"):
+                    video_ui.build(app)                  # a webcam, a video file or the test pattern, for the Video node
                 app.sec_apply_order()
         with dpg.group(tag="footer"):
           with dpg.group(horizontal=True, tag="stat_row"):
@@ -4014,7 +4065,9 @@ def _hook_names(app):
     """What a test hook's line of Python ("py", "check") has in scope."""
     from native import shape_view, shapes, units, shape_gallery, shape_run, shape_fields, shape_checks, shape_start
     from native import camera_map, camera_map_ui
-    return {"app": app, "dpg": dpg, "np": np, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
+    from native import flash
+    from native import library_ui, tutorials
+    return {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "video_ui": video_ui, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
             "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,
@@ -4599,6 +4652,8 @@ def service_command(app):
                 print("expr", app.gp.apply_expr(int(nid), name, kind, text))
             if "midi" in c:                             # test hook: a MIDI message's bytes, as if the port sent them
                 app.midi.inject([int(b) for b in c["midi"]])
+            if "osc" in c:                              # test hook: [address, value...] as if a sender sent it
+                app.osc.inject(*c["osc"])
             if "midi_learn" in c:                       # test hook: a target to learn next (see midi_ui.targets), or null to cancel
                 midi_ui.learn(app, c["midi_learn"])
             if "snap" in c:                             # test hook: ["save", name] | ["apply", name] | ["morph", a, b, t] | ["del", name]
@@ -4751,7 +4806,7 @@ SKIP_MENU = ("Quit", "Record 15 s GIF", "Record 15 s video", "Fullscreen", "Chec
              "Open the project folder", "Open the build folder",
              "Open code in external editor",                # these hand a path to the desktop: another program opens
              "Send the graph as a script", "Send the current effect's settings", "Send the shape (ledmap + positions)",
-             "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device (DDP)",
+             "Send the ledmap only", "Scan the network for devices", "Stream the sim to the device",
              "Import the device's ledmap", "Read the device's wiring")   # these reach a real device: not a test's to do (a read replaces the wiring)
 
 
@@ -4958,7 +5013,7 @@ def process_stats(app):
 # a clone or a download from the network, a restart, a program opened on the desktop, a key capture,
 # the clipboard (the log's copy: what the user had copied stays)
 SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
-                    "map_webcam",                         # the webcam: a camera turned on is not a test's to do
+                    "map_cam_find", "map_calib", "map_live",  # the webcam: a camera turned on is not a test's to do
                     "geom_read_wiring",                   # a real device's wiring read: the smoke reads the fake's
                     "history_switch")                     # its rows would put the walked project's settings back: the smoke does, in its own
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",

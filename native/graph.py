@@ -814,6 +814,7 @@ class Graph:
         flat.nodes = {}
         flat.link_meta = dict(self.link_meta)
         flat.origin = {}          # a node here -> the node of this graph it came from (a sub-graph's: its instance)
+        flat.snapshots = dict(self.snapshots)    # a Scenes node's table: the plain nodes keep their ids
         idmap = {}
         # plain nodes first, keeping ids where possible
         for nid, n in self.nodes.items():
@@ -934,11 +935,55 @@ class Graph:
                 nstate += len(st) if isinstance(st, (list, tuple)) else int(st)
         return order, defs, scope, src_of, slots, nstate
 
-    def _compile_as(self, other, title):
+    def scene_names(self, node=None):
+        """The snapshots a Scenes node fades between, in order: those its setting names (comma
+        separated), else every snapshot as they were made."""
+        want = str(((node or {}).get("params") or {}).get("scenes", "") or "").strip()
+        if want:
+            return [s.strip() for s in want.split(",") if s.strip() in self.snapshots]
+        return list(self.snapshots)
+
+    def _scenes_code(self, node):
+        """The Scenes node's body: a table of each scene's value for the slots of the typed-value
+        table (gc_param) - all but its own index and fade, which a scene must not rewrite - and the
+        fade to the scene the index picks: an S-curve over fade seconds from wherever the values
+        were, a switch (0 or 1) crossing at the middle; once there, the values are left alone, so a
+        drag or a knob in the sim holds until the next change."""
+        names = self.scene_names(node)
+        ks = [k for k in range(len(self.live_init)) if self.live[k][0] != node.get("id")]
+        if not names or not ks:
+            why = "no snapshots" if not names else "no typed values"
+            return f"// Scenes: {why} - nothing to fade"
+        rows = []
+        for name in names:
+            snap = self.snapshots.get(name) or {}
+            row = []
+            for k in ks:
+                nid, pin, comp = self.live[k]
+                v = ((snap.get(str(nid)) or {}).get("inputs") or {}).get(pin)
+                row.append(_scene_value(v, comp, self.live_init[k]))
+            rows.append("{" + ", ".join(f"{x}f" for x in row) + "}")
+        n, m = len(names), len(ks)
+        return (f"// Scenes: {', '.join(names)}\n"
+                f"static const float sc_tab_[{n}][{m}] = {{{', '.join(rows)}}};\n"
+                f"static const uint16_t sc_k_[{m}] = {{{', '.join(str(k) for k in ks)}}};   // the slots they fill\n"
+                f"static float sc_from_[{m}]; static float sc_tgt_ = -1.0f, sc_t_ = 1.0f; static bool sc_moving_ = false;\n"
+                f"{{ const float w_ = fminf(fmaxf(floorf(sc_index_ + 0.5f), 0.0f), {float(n - 1)}f);\n"
+                f"  if (SEGENV.call == 0 || sc_tgt_ < 0.0f) {{ sc_tgt_ = w_; sc_t_ = 1.0f; sc_moving_ = true; }}   // the start: at once\n"
+                f"  else if (w_ != sc_tgt_) {{ for (int m_ = 0; m_ < {m}; m_++) sc_from_[m_] = gc_param[sc_k_[m_]];\n"
+                f"    sc_tgt_ = w_; sc_t_ = 0.0f; sc_moving_ = true; }}\n"
+                f"  if (sc_moving_) {{\n"
+                f"    if (sc_t_ < 1.0f) {{ sc_t_ += (float)dt * 0.001f / fmaxf(sc_fade_, 0.001f); if (sc_t_ > 1.0f) sc_t_ = 1.0f; }}\n"
+                f"    const float e_ = sc_t_ * sc_t_ * (3.0f - 2.0f * sc_t_); const float *to_ = sc_tab_[(int)sc_tgt_];\n"
+                f"    for (int m_ = 0; m_ < {m}; m_++) gc_param[sc_k_[m_]] = sc_t_ >= 1.0f ? to_[m_] : sc_from_[m_] + (to_[m_] - sc_from_[m_]) * e_;\n"
+                f"    if (sc_t_ >= 1.0f) sc_moving_ = false; }}\n"
+                f"  sc_scene_ = sc_tgt_; sc_blend_ = sc_t_; }}")
+
+    def _compile_as(self, other, title, profile=False):
         """Compile a derived graph (flattened, sends joined, an Output added
         for a preview) and keep what the panel reads back after a compile -
         the probes, the scopes, the live-parameter table - on this one."""
-        src = other.compile(title or self.name)
+        src = other.compile(title or self.name, profile=profile)
         self.probes = dict(getattr(other, "probes", {}) or {})
         self.last_scope = dict(getattr(other, "last_scope", {}) or {})
         self.live = dict(getattr(other, "live", {}) or {})
@@ -948,15 +993,18 @@ class Graph:
         org = getattr(other, "origin", None) or {}
         self.line_nodes = {ln: org.get(nid, nid) for ln, nid in (getattr(other, "line_nodes", None) or {}).items()
                            if org.get(nid, nid) in self.nodes}
+        # a profile's slots the same way: a sub-graph's nodes are its instance's (several slots may be one node)
+        self.prof_nodes = [org.get(nid, nid) if org.get(nid, nid) in self.nodes else None
+                           for nid in (getattr(other, "prof_nodes", None) or [])]
         return src
 
-    def compile(self, title=None):
+    def compile(self, title=None, profile=False):
         """The effect as C++ text. Raises GraphError with a message worth
         showing when the graph cannot be compiled."""
         if any(n["type"].startswith(SUB) for n in self.nodes.values()):
-            return self._compile_as(self.flatten(), title)
+            return self._compile_as(self.flatten(), title, profile)
         if self.has_sends():
-            return self._compile_as(self.resolve_sends(), title)
+            return self._compile_as(self.resolve_sends(), title, profile)
         title = title or self.name
         ident = _ident(title)
         outs = [n for n in self.nodes.values() if n["type"] == "Output"]
@@ -971,7 +1019,7 @@ class Graph:
                     prev = Graph(self.to_json(), lib=self.lib, resolver=self.resolver)
                     o = prev.add("Output", gouts[0]["pos"])
                     prev.link(src[0], src[1], o, "color")
-                    return self._compile_as(prev, title)
+                    return self._compile_as(prev, title, profile)
         if len(outs) != 1:
             raise GraphError("the graph needs exactly one Output node" + (f" (it has {len(outs)})" if outs else ""))
         defs = {nid: self.node_def(n) for nid, n in self.nodes.items()}
@@ -1149,6 +1197,10 @@ class Graph:
                     out += f"      {guard}GC_PROBE({k}, (float)({var(nid, o['name'])}));\n"
             return out
 
+        scenes = [nid for nid in order if self.nodes[nid]["type"] == "Scenes"]
+        if len(scenes) > 1:
+            raise GraphError(f"Scenes #{scenes[1]}: one Scenes node a graph (#{scenes[0]} is one)")
+
         # each node's text kept with its id, so a line of the C++ can be traced to the node
         # that wrote it (line_nodes, below): a build error lands on the node, not on a line
         # of a file nobody wrote by hand
@@ -1156,6 +1208,12 @@ class Graph:
         frame_blocks += [(nid, expand(nid, late=True)) for nid in order if defs[nid].get("late")]
         pixel_blocks = [(nid, expand(nid) + probe(nid, "if (px == W / 2 && py == H / 2) "))
                         for nid in order if scope[nid] == "pixel"]
+        if scenes:
+            # the table and the fade go where the Scenes node's marker is, now that every typed
+            # value has its slot in the table (live_slot, above)
+            code = self._scenes_code(self.nodes[scenes[0]])
+            frame_blocks = [(nid, t.replace("/*@@SCENES@@*/", code.replace("\n", "\n      "))) for nid, t in frame_blocks]
+            pixel_blocks = [(nid, t.replace("/*@@SCENES@@*/", code.replace("\n", "\n      "))) for nid, t in pixel_blocks]
 
         # metadata: slider labels from the control nodes that are present
         labels = ["", "", "", "", "", "", "", ""]
@@ -1201,8 +1259,48 @@ class Graph:
             state += "  (void)gc_first;\n"
         if self.live_init:
             vals = ", ".join(f"{v}f" for v in self.live_init)
-            state = (f"  GC_PARAM_TABLE float gc_param[{len(self.live_init)}] = {{{vals}}};   // the typed values (live in the sim)\n"
+            table = ("static float gc_param" if scenes else "GC_PARAM_TABLE float gc_param")   # the scenes write it: RAM
+            state = (f"  {table}[{len(self.live_init)}] = {{{vals}}};   // the typed values (live in the sim)\n"
                      f"  GC_PARAMS(gc_param, {len(self.live_init)});\n") + state
+        # A profiling build (profile=True: the studio's "what each node costs" - never the
+        # firmware's): each node's code between two reads of a tick counter, the difference and
+        # a count summed into the node's slot; one more slot times two reads with nothing between
+        # (their own cost, taken off each node's), one the whole frame. Once a frame the sums go to
+        # the sim (simProfSet). prof_nodes: slot -> node id, the last two None. profile="frame"
+        # times the whole frame alone: two reads a frame, so its time is the effect's own (a
+        # node's reads overlap the work around them, so taking their cost off the instrumented
+        # frame took off about twice what they added).
+        self.prof_nodes = []
+        prof_head = prof_end = ""
+        if profile:
+            frame_only = profile == "frame"
+            slot_of, uses = {}, [0]
+
+            def timed(nid, text):
+                k = slot_of.setdefault(nid, len(slot_of))     # a node's late block shares its slot
+                uses[0] += 1
+                t = f"gc_pt{uses[0]}"
+                return (f"      const uint64_t {t} = gc_tick();\n" + text +
+                        f"      gc_prof[{k}] += gc_tick() - {t}; gc_prof_n[{k}]++;\n")
+            if not frame_only:
+                frame_blocks = [(nid, timed(nid, text)) for nid, text in frame_blocks]
+                pixel_blocks = [(nid, timed(nid, text)) for nid, text in pixel_blocks]
+            n = len(slot_of)
+            null, whole = n, n + 1
+            self.prof_nodes = [nid for nid, _ in sorted(slot_of.items(), key=lambda kv: kv[1])] + [None, None]
+
+            def nothing(tag):
+                return (f"      {{ const uint64_t gc_pn = gc_tick(); gc_prof[{null}] += gc_tick() - gc_pn; gc_prof_n[{null}]++; }}"
+                        f"   // {tag}: the reads' own cost\n")
+            if frame_blocks and not frame_only:
+                frame_blocks.insert(0, (None, nothing("once a frame")))
+            if pixel_blocks and not frame_only:
+                pixel_blocks.insert(0, (None, nothing("once a pixel")))
+            prof_head = (f"  static uint64_t gc_prof[{n + 2}]; static uint32_t gc_prof_n[{n + 2}];   // the profile's sums\n"
+                         f"  const uint64_t gc_pframe = gc_tick();\n")
+            prof_end = (f"  gc_prof[{whole}] += gc_tick() - gc_pframe; gc_prof_n[{whole}]++;\n"
+                        f"  for (int k_ = 0; k_ < {n + 2}; k_++) simProfSet(k_, (double)gc_prof[k_], (int)gc_prof_n[k_]);\n")
+
         # line_nodes: 1-based line of the text -> the node that wrote it. The blocks go in
         # where markers stand, frame first, so each block's line is counted in the final text.
         src = GENERATED.format(title=title, ident=ident, upper=ident.upper(), helpers=HELPERS,
@@ -1215,7 +1313,29 @@ class Graph:
                 self.line_nodes.update((at + k, nid) for k in range(n))
                 at += n
             src = src.replace(mark, "".join(text for _, text in blocks))
+        if profile:
+            # the profile's clock and sums around the effect's body (not in line_nodes: a
+            # profiling build is the studio's own, never shown for its errors)
+            src = src.replace("  (void)N; (void)dt; (void)t;\n", "  (void)N; (void)dt; (void)t;\n" + prof_head, 1)
+            end = "\n  FX_DONE;\n}\n\nstatic const char _data_FX_MODE_"
+            assert src.count(end) == 1
+            src = src.replace(end, "\n" + prof_end + "  FX_DONE;\n}\n\nstatic const char _data_FX_MODE_")
+            src = src.replace('#include "cube_fx_bank.h"\n', '#include "cube_fx_bank.h"\n' + PROFILE_HELPERS, 1)
         return src
+
+
+# A profiling build's clock and where its sums go (compile(profile=True)): the CPU's time-stamp
+# counter where there is one (a few cycles to read), else the steady clock; ticks, whatever their
+# unit - the studio takes shares of the frame, and the sim's simProfClock says ticks a second.
+PROFILE_HELPERS = r'''#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__)
+#include <x86intrin.h>
+static inline uint64_t gc_tick() { return __rdtsc(); }
+#else
+#include <chrono>
+static inline uint64_t gc_tick() { return (uint64_t)std::chrono::steady_clock::now().time_since_epoch().count(); }
+#endif
+extern "C" void simProfSet(int k, double ticks, int n);
+'''
 
 
 GENERATED = r'''#include "wled.h"
@@ -1227,7 +1347,16 @@ extern "C" void simParamBind(float *t, int n);  // the studio writes typed value
 #define GC_PROBE(i, v) simProbeSet((i), (v))
 #define GC_PARAM_TABLE static
 #define GC_PARAMS(t, n) simParamBind((t), (n))
+extern "C" uint32_t simVideoAt(float u, float v);   // the studio's video frame (the Video node: sim only)
+extern "C" int simVideoW();
+extern "C" int simVideoH();
+#define GC_VIDEO(u, v) simVideoAt((u), (v))
+#define GC_VIDEO_W() simVideoW()
+#define GC_VIDEO_H() simVideoH()
 #else
+#define GC_VIDEO(u, v) (0u)                             // video plays in the studio; the device gets it by stream
+#define GC_VIDEO_W() 0
+#define GC_VIDEO_H() 0
 #define GC_PROBE(i, v) ((void)0)
 #define GC_PARAM_TABLE static const                     // the typed values, baked in: flash, not RAM
 #define GC_PARAMS(t, n) ((void)0)
@@ -1307,6 +1436,24 @@ for _t, _v, _pins in (("Dot 3", "a", ("ax", "ay", "az")), ("Dot 3", "b", ("bx", 
     for _c, _p in zip("xyz", _pins):
         MIGRATE[(_t, _p)] = (_v, _c)
 MIGRATE_OUT = {("Mirror fold", "x"): ("v", "x"), ("Mirror fold", "y"): ("v", "y"), ("Mirror fold", "z"): ("v", "z")}
+
+
+def _scene_value(v, comp, built):
+    """A snapshot's value for one slot of the typed-value table: a number, a switch's 1 or 0, a
+    vector's component or a colour's channel (0..255, from [r, g, b] or a packed 0xRRGGBB); what the
+    snapshot does not hold is the built value."""
+    try:
+        if v is None:
+            return float(built)
+        if isinstance(v, bool):
+            return 1.0 if v else 0.0
+        if comp is None:
+            return float(v)
+        if isinstance(v, (list, tuple)):
+            return float(v[comp])
+        return float((int(v) >> (16 - 8 * int(comp))) & 255)
+    except (TypeError, ValueError, IndexError):
+        return float(built)
 
 
 def migrate(g):

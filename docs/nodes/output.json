@@ -1,0 +1,104 @@
+{
+ "node": "Output",
+ "star": 1,
+ "caption": "Output: where every graph ends - the colour each pixel shows",
+ "why": [
+  "A graph runs once for every pixel, every frame, and Output is where it ends: whatever colour reaches it is what that pixel shows. Every graph needs exactly one.",
+  "Everything else in the graph exists to work out that colour. Its neighbours: Graph output is a sub-graph's ending (a pin of the node it becomes); Effect settings sets things about the effect as a whole; Output is the pixel."
+ ],
+ "steps": [
+  "Output has one input, **color**, and no outputs.",
+  "Here it gets a **Palette** colour: **Coords** `u` plus a clock is its index, so the matrix shows the palette scrolling.",
+  "Unwired, color is black - every pixel off. Wire anything that gives a colour: a Palette, a Blend, a Colour pick, a Glow."
+ ],
+ "try": [
+  {
+   "label": "Dim the picture",
+   "text": "the Palette's brightness at 0.3: everything reaching the Output is dimmer - the Output shows exactly what arrives.",
+   "set": [
+    [
+     2,
+     "brightness",
+     0.3
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Output",
+  "nodes": [
+   {
+    "id": 3,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    3,
+    "u",
+    4,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    4,
+    "result",
+    2,
+    "index"
+   ],
+   [
+    2,
+    "color",
+    1,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

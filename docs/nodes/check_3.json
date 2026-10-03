@@ -1,0 +1,137 @@
+{
+ "node": "Check 3",
+ "star": 1,
+ "caption": "Check 3: a checkbox reversing the scroll",
+ "why": [
+  "Check 3 is the third checkbox. On a cube, WLED uses it for Flat mode (the effect drawn on the unfolded net rather than the solid), so an effect for a cube should prefer the first two; on a strip or a matrix it is free.",
+  "Its neighbours: Check 1 and Check 2; Toggle; Select."
+ ],
+ "steps": [
+  "Check 3 has no inputs. Its `on` is true while ticked.",
+  "**label** is Reverse; **default** is off.",
+  "`on` switches a **Select** between 0.3 and -0.3: the rate of the clock (a **Multiply** with **Time**) that scrolls the palette - ticked, the colours run the other way."
+ ],
+ "try": [
+  {
+   "label": "Tick it",
+   "text": "In the side panel's PARAMETERS section, tick Reverse (Check 3): the colours turn round and scroll the other way.",
+   "set": []
+  },
+  {
+   "label": "Rename it",
+   "text": "label Backwards: the slider is called Backwards on the WLED page (and in PARAMETERS) - the effect is rebuilt with the new name.",
+   "set": [
+    [
+     1,
+     "label",
+     "Backwards"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Check 3",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Check 3",
+    "params": {
+     "label": "Reverse",
+     "default": false
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Select",
+    "params": {},
+    "inputs": {
+     "a": 0.3,
+     "b": -0.3
+    }
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "on",
+    2,
+    "on"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    5,
+    "u",
+    6,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    6,
+    "b"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "index"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ]
+  ]
+ }
+}

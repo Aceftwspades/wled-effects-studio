@@ -2932,29 +2932,389 @@ most valuable first:
       48000 Hz, silence, the PCM's span, the synth's chords),
       `test_the_sound_nodes_read_what_they_hear` (each node, built, fed
       through the engine's slots), the census and the parity.
-- [ ] **What each node costs** (TouchDesigner's cook times; wled-toy only
-      has the whole frame's): a profiling build times each node, scaled by
-      the calibrated device factor - the ESP32's frame time is the limit.
-- [ ] **sACN and Art-Net out beside DDP, and the stream's health**: sent
-      against target fps, kbit/s, the device's reported fps, its latency,
-      frames dropped, each with a trace.
-- [ ] **Scenes with fades on the device**: the snapshots (which already
-      morph in the studio) compiled into the effect, one picked by a
-      signal - a verse look and a chorus look in one effect.
-- [ ] **A rewire seen at once**: the graph's bytecode run in the sim while
-      the native build compiles (the script and C++ already agree in
-      `test_parity`), swapped when it lands - then Live can be on by default.
-- [ ] **A node gallery layout test** (wled-toy's visual invariants): every
-      node in one graph, fields inside the node, pins on its edge, text cut
-      with an ellipsis.
-- [ ] **Smaller**: OSC in beside MIDI learn; Math's second pin hidden for a
-      one-input operation and its operations grouped (Blender); a macOS
-      build and ARM builds.
+- [x] **What each node costs** (TouchDesigner's cook times; wled-toy only
+      has the whole frame's). Node > What each node costs: the graph
+      compiled twice beside the sim - `compile(profile=True)`, each node's
+      code between two reads of the time-stamp counter (the steady clock
+      where there is none), summed with a count into its slot, a slot for
+      two reads with nothing between (their cost, off each node's), and
+      `profile="frame"`, its twin timing only the frame - built without
+      touching the app's engine (a side build, the build flag held so two
+      builds never share the generated sources), run 60 frames on the synth
+      (`native/costs.py`). A node's share is its time over the twin's frame:
+      taking the reads' cost off the instrumented frame instead took off
+      twice what they add (they overlap the work round them; box_fire's
+      frame came out at 0.125 ms against its twin's 0.194). Each node then
+      shows its share and its time on the device (the speed factor's
+      estimate) over its corner, a quarter or more in amber, kept off what
+      covers it; the status line says the frame, the top three and the
+      rest - each pixel's coordinates and the drawing, 68% of box_fire's
+      frame on a cube, its two Noises 11% each. A compile makes them old.
+      Tested: `test_a_profiling_build_times_each_node` (the slots, a sub-
+      graph's to its node, the ordinary compile unchanged),
+      `test_the_profile_finds_the_heavy_node` (a six-octave Noise over five
+      times an Add, the shares and the rest the whole frame, the twin's
+      frame under the instrumented one), the smoke's measurement of box_fire.
+- [x] **sACN and Art-Net out beside DDP, and the stream's health.** The
+      LIVE row's **over** picks DDP, **E1.31 (sACN)** or **Art-Net** for the
+      device (kept by host in the app's settings), and a **universe**: 510
+      bytes of RGB, 170 LEDs, a universe from it up - a WLED with that
+      receiver on in its Sync settings (DMX mode Multiple RGB), or a Falcon,
+      ESPixelStick or FPP controller (`live_out.E131Out`: the three layers
+      as E1.31 lays them out, a sequence for each universe; `ArtNetOut`:
+      ArtDMX, the port-address in SubUni and Net, an even length). Changing
+      it restarts a running stream. Under the row, once a second: the
+      frames sent against the rate asked, the kbit/s, the device's own fps
+      and how long it takes to answer (asked every two seconds while the
+      stream runs), the send errors, and a trace of the rate. The labels lost
+      "(DDP)" - the menu walk's skip list with them, so it still never
+      streams to a device. Tested: `test_stream.py` (each packet field
+      against its standard, a 1200-pixel frame through eight universes and
+      back on a socket here, in all three, the sequences, the rate); the
+      fake WLED takes E1.31 and Art-Net too, and the smoke streams to it in
+      each and checks the 14 universes of the cube's net, from 3 and from 0,
+      held the frame's 6912 bytes.
+- [x] **Scenes with fades on the device** (wled-toy's Knob and Scene
+      Switch, compiled in). The **Scenes** node: the graph's snapshots - the
+      typed values of its pins, the table a drag or a knob moves - kept in
+      the effect (`Graph._scenes_code`: a table of each scene's value for
+      every slot but the node's own index and fade, which a scene must not
+      rewrite), and the one its **index** picks faded to over **fade**
+      seconds: an S-curve from wherever the values were, a switch crossing
+      at the middle, left alone once there so a drag in the sim holds until
+      the next change; the effect starts on its scene at once. Settings are
+      the build's (compiled in); a snapshot without a pin's value leaves it
+      as built; a setting names which snapshots, in order. The typed-value
+      table is RAM on the device only in a graph with a Scenes node (it is
+      flash otherwise); one Scenes node a graph; a sub-graph's copy keeps
+      the snapshots. Saving a snapshot marks the graph changed. The script
+      says why it cannot (Timbre, Silence and Onset say why now too).
+      Tested: `test_scenes_are_the_snapshots_in_the_effect` (the table, the
+      node's own pins left out, the table writable only then, one a graph,
+      a named list, no snapshots), `test_the_scenes_fade_on_the_engine`
+      (built: the first scene from the start though 0.7 was typed, held,
+      faded to the chorus over the half second after the switch, rising all
+      the way, held).
+- [x] **A rewire seen at once.** An edit to be built - Live's, a moment
+      after it is made, or F5's - is on the cube at once: the graph compiled
+      to bytecode (a few ms; the script and C++ agree in `test_parity`) and
+      run by the sim's Studio Script effect under the graph's own name,
+      sliders and palette (`GraphPanel.standin`), while the C++ compiles;
+      when the build lands it takes the stand-in's place at the same clock
+      (`Engine.clock` / `set_clock`, strip.now kept across the reload), so
+      the swap is not seen. Edits made while it compiles stay on the cube -
+      the build that lands without them leaves the stand-in, in the new
+      library, until theirs does - and an edit undone before its build puts
+      the build back. A graph with a node the script does not have waits
+      for its build, as before; so does a comparison (A/B). A build asked
+      for while one runs is made when it lands (it was dropped). **Live is
+      on by default** now, and remembered: an edit that changes no code (a
+      zoom, a label, the graph opened) writes and builds nothing - with
+      Live on, a zoom used to rebuild the effect. Tested: the smoke rewires
+      Maelstrom with Live on and finds the Studio Script on the cube under
+      Maelstrom's name with the clock carried, the build in its place at
+      the same clock after, and a zoom building nothing.
+- [x] **A node gallery layout test** (wled-toy's visual invariants).
+      `tests/node_gallery.py` puts every node of the library on one graph,
+      and `check(app)` reads what Dear PyGui drew: a node's box is its
+      content, so nothing in it - a name, a field, a face - may reach past
+      the width it is laid out to, nor a title push the box wider; a name
+      cut short ends in "..."; an output's name ends at its pin, an input's
+      row starts at its. The smoke opens it at 100%, 70% and 140%. It found
+      a Note's, a Bitmap's and States' text box 220 wide on a 150 node, the
+      Colour ramp's gradient 220 and the Float curve's 160 (all the node's
+      width now; the properties keep their wider ramp), and the narrow
+      nodes - Knot colour, Send colour, Receive and Receive colour - pushed
+      wider by their titles with their pins' names left short of the edge:
+      a narrow node now widens to its title, up to a whole node, and lays
+      its pins out to that; a longer title, on any node, and an output's
+      name too long are cut with "..." (`GraphPanel._fit_title`).
+- [x] **Smaller.** **OSC in beside MIDI learn** (`native/osc.py`, nothing
+      to install): the MIDI window (now MIDI and OSC) has an OSC row - listen
+      on a UDP port, 9000 unless changed, off until turned on (OSC has no
+      password) and kept with the project; OSC 1.0 messages and bundles
+      parsed (ints, floats, doubles, true / false; strings and blobs stepped
+      over; nesting bounded); each number of a message is a control
+      ("OSC /1/fader1", an XY pad's second "#2"), learnt and mapped as a
+      knob is, a fader's 0..1 kept that fine (`midi.value_for(full=1.0)`),
+      an int 0..127 taken as MIDI's. **Math's second pin** is on the node
+      only while its operation takes two - sqrt, sin and the twelve other
+      one-input ones leave it off, unless a wire is on it - and its
+      operations are **grouped** in the dropdown (arithmetic, compare,
+      rounding, trigonometry: a group's name a row of its own, picking it
+      changes nothing); Vector math shows b and scale only for the
+      operations that read them (`nodedefs.SHOWN_WHEN`, `CHOICE_GROUPS`,
+      `GraphPanel.pin_read`). **A macOS build and an ARM build**: CI makes
+      and drives `WLED_Effects_Studio_macos_arm64.tar.gz` (Apple silicon,
+      Apple's clang building the effects) and `WLED_Effects_Studio_aarch64.tar.gz`
+      (64-bit ARM Linux - a Raspberry Pi 4 or 5 - on GitHub's ARM runner,
+      every unit test there too), and the draft release carries them; the
+      update check takes this machine's file (`update.asset_for` by system
+      and processor - the ARM tarball has no "linux" in its name, as a
+      studio up to 1.4.0 took the first tarball that had). Tested:
+      `test_osc.py` (packets and bundles, junk refused, a datagram through
+      a loopback port, a fader mapped), `test_update.py` (each machine its
+      file, an old studio still the x64 one); the smoke learns a fader by
+      injection and moves it by a real datagram, and hides, keeps and
+      groups Math's pin and operations.
+
+Released as 1.5.0 (2026-10-02), with the macOS and ARM Linux builds.
 
 Not taken: a GLSL mode and a GPU preview (the sim runs the device's own
 C++, which a shader would only imitate), wled-toy's strip / ring / matrix
 layouts (the geometry, ledmaps and camera mapping go further), and the
 "export to WLED JSON" its README names (its code exports standalone GLSL).
+
+### The 3-D view's look (October 2026)
+
+The promo film (wled-studio-promo, `scripts/cine.py`) rendered the studio's
+effects offline with a look of its own: each LED a glowing dot on a dark
+board, bloom, a reflecting floor, the LEDs' colour spilling into the room, a
+filmic curve, a vignette, grain. The live view has no shaders (`gpucube.py`:
+textured quads), so each part goes where it can.
+
+- [x] **Looks in Settings > Appearance > 3-D view** (`native/look.py`): the
+      studio's plain view, **Glow**, **Cinematic** and **Night**, each part's
+      strength kept over the preset. Live: the **glow** in the cube's texture
+      (a disc and a halo reaching the neighbours, over a faint board; 3 ms
+      at 48 x 48), the **curve and exposure** on the colours as they are
+      uploaded (a table), the **spill** a 48 px pool of the LEDs' mean colour
+      stretched under them, the **vignette** and the **grain** layers over
+      them (`gpucube.Layers`; the cube and the point cloud alike - the glow
+      is the cube's). Pictures - a screenshot, a GIF, a video, the view
+      itself where the GPU does not draw it - are made with the look too,
+      the glow at 8 x, with **bloom** (`look.finish`: 17 ms for Glow, about
+      60 for Cinematic at 620 px). Tested: `test_look.py`; the smoke picks
+      Cinematic, finds the layers drawn and a picture made, moves a value
+      and goes back to the studio look.
+- [x] **A reflecting floor**: the cube mirrored in the floor's plane - live,
+      a second set of the faces' quads drawn under them, each tinted by its
+      depth below the floor (`render.reflection_weight`), placed only when
+      the camera moves; in pictures, the mirrored faces drawn first and
+      weighted per pixel. The cube's; Cinematic, Diffused and Night have it.
+- [x] **A diffuser** (the **Diffused** look): each face's light blurred on
+      its own, the further the diffuser the wider (`look.diffuse`), the dots
+      washed out, smooth in pictures. Tested: `test_the_diffuser`,
+      `test_the_reflection`; the smoke finds the reflection drawn and gone.
+- [x] **Every shape in parity**: the glow, the diffuser and the reflection
+      on a strip, a matrix, a sphere or a shape of parts as on the cube.
+      Live (`gpucube.PointQuads`): a second texture of sprites, a cell of
+      each LED's light (`look.sprite_mask`), its squares drawn bigger from
+      it; the diffuser by distance - each LED's light shared with its
+      nearest twelve within a reach of a few LED spacings
+      (`look.neighbours`, made once for a shape: 0.7 s for 5000 LEDs; 3 ms
+      a frame); the reflection a layer of mirrored LEDs under them, made the
+      first time it is wanted, faded over the shape's own height. Pictures
+      blend the sprites as the GPU does. A camera move on a 64 x 64 matrix:
+      64 ms plain, 103 ms with the reflection and sprites (a frame without
+      one, ~5 ms either way). Tested: `test_any_shape_has_the_look`; the
+      smoke finds a sphere's sprites and reflection drawn.
+- [ ] **The device's limits in the view**: its gamma and brightness cap, so a
+      dim gradient bands as it will on the LEDs.
+- [ ] **Camera moves for recordings**: a turntable, depth of field in renders;
+      and a project remembering its look.
+
+### Firmware: what is flashed (October 2026)
+
+- [x] **The Flash frame's firmware sources**: the studio's build, **a WLED
+      release** (`native/firmware.py`: WLED's GitHub releases, the files for
+      the device's chip ordered plainest first - board builds, Ethernet,
+      debug after - downloaded once into HOME/firmware), **WLED from the
+      checkout** (`flash.stage_stock`: the environment without cube_fx and
+      the studio's usermod) or **a .bin file**. Every binary's chip is read
+      from its image header (`firmware.bin_chip`: the ESP32 family's chip id,
+      the ESP8266's entry address, a gzip) and one for another chip is never
+      sent; a firmware that is not the studio's is asked about first. Each
+      flash is recorded with its source.
+- [x] **The built-in cube effects one by one**: `flash.builtin_catalog` (the
+      name from each file's metadata, what it leans on from the helpers it
+      calls), an unticked one left out of a copy of cube_fx the build uses
+      instead (`usermods/cube_fx_studio`, every helper kept), sizes measured
+      per effect after a build, and a chosen effect needing a feature left
+      out called out. Tested: `test_firmware.py` (the headers, the release
+      matching through a file URL and the cache, the trimmed copy in a tree
+      made for the test, a .bin flashed to the fake WLED and one for the
+      wrong chip refused); the smoke flashes a .bin to the fake device through
+      the frame, fills the release list and leaves out a built-in.
+
+### The Library in three banks (October 2026)
+
+- [x] **Banks**: Graphs, Usermod effects (cube_fx by the names in its
+      metadata, the project's code effects, the Studio Script) and Stock -
+      every effect of the sim in exactly one (`library_ui.banks`). A graph
+      not built is drawn by the script VM when its nodes allow
+      (`_script_of`); three cannot be and say "not built yet".
+- [x] **A clean cube**: `simClearPixels` (sim_main.cpp) zeroes every
+      segment's buffer and resets its state - the buffer was calloc'd once
+      and never cleared, so a thumbnail showed the effect before it -
+      and `Engine.clear()` puts the clock at 0. Thumbnails and generated
+      previews select, clear, then render with the synth pushed every
+      frame; a picture dark at every third frame is retried at every frame
+      (Strobe's flashes fell between the samples).
+- [x] **The major peak**: `simAudioPeak` fills u_data[4] and [5] from the
+      loudest of the sixteen bands (`Engine.audio_peak`, the synth and live
+      sources) - 0 before, so Freqmap, Freqmatrix, Freqwave, Freqpixels,
+      Rocktaves and the rest were dark. Left dark on purpose: Sunrise,
+      Image, Blurz.
+- [x] **Progress**: thumbnails on a worker with its own engine, the bank in
+      front first, a bar with the count; Generate previews covers the bank
+      in front with a bar, the effect it is on and Cancel. The metadata
+      regex in `flash.builtin_catalog` and the Library skips a comment
+      before the name (Spectral Bloom and Sauron were misnamed). Tested:
+      `test_library.py` (clean against fresh, the peak, the banks, a
+      thumbnail after Fire 2012); the smoke opens Stock and Graphs and
+      generates one preview through the bar.
+
+Released as 1.6.0 (2026-10-02): the 3-D view's look, the firmware sources and
+the Library's banks, with the four builds.
+
+### A tutorial for every node (October 2026)
+
+Every node gets, under its reference in NODES.md: why you would use it
+(and against what), a small graph built round it with a picture of it
+running, changes to try, and the examples that use it - and in the studio
+a **Try it** that opens the graph live.
+
+- [x] **Phase 1 - the format, the machinery, five pilots** (Wave, Noise,
+      Coords, Slew, Palette). A lesson is `docs/nodes/<node>.json`, written
+      by hand: the why, the steps, the changes (node, pin or setting,
+      value), the shape, the values to trace, the graph (laid out by
+      `Graph.arrange` when it has no places). `tests/make_tutorials.py`
+      compiles every lesson into one side build ("Tutorial <node>", the
+      app's build untouched), runs each on the gated synth and writes its
+      GIF - the LEDs, and under them the traced outputs read back from the
+      build's probes - then NODES.md (`nodedocs.markdown` adds each
+      lesson under its node). `tests/test_tutorials.py`: every lesson
+      compiles, names real pins, says what each input and setting does;
+      its picture is newer than it and not dark; NODES.md is current and
+      carries the picture and a link for Try it and for each change; which
+      nodes have none is reported (ALL_REQUIRED turns that into a failure
+      once all have one).
+      In the studio (`native/tutorials.py`): `studio:try/<node>[/<n>]`
+      links in the reader; Try it saves and leaves the person's project,
+      writes the lesson fresh into the *Node tutorials* project, opens it
+      with its node selected, builds it, folds the panel, puts the 3-D view
+      bottom left (a flat shape from the front) and the page in a column
+      at the right (`reader_ui.beside`; its place re-applied for a few
+      frames, as the dialogs' clamp measures the old size), then frames the
+      graph into what the page leaves in view; the properties go to the
+      bottom right of it. A change: an input as a knob sets it
+      (`set_input_live`), a setting through `GraphPane.set_param` (new).
+      Reset, Copy into my project and Back to my project on a bar at the
+      page's top; Back (or leaving the project any way) puts the panel,
+      the 3-D view's corner and the camera back. The reader plays GIFs
+      (frames read while one is on screen). F1 on Coords, Colour or Output
+      went to the category of the same name - a heading is matched as
+      written first. The smoke opens Slew's page, sees its picture play,
+      tries it, changes an input and another lesson's setting, resets and
+      copies.
+- [x] **Phase 2 - generate** (all 21). Cube lessons are drawn in 3-D,
+      swaying either side of the three-quarter view so the loop has no
+      jump; a lesson can bring files from examples/ (Image's picture: read
+      there by the generator, copied into the tutorials project by Try it).
+      Found on the way: a lesson's graph lacked `"implicit": 1`, so its
+      unwired coordinates were fixed instead of reading the pixel (every
+      LED one colour - the test now fails a picture like that); links name
+      a node by its file stem (`studio:try/reaction_diffusion`: a Markdown
+      target has no spaces); a lesson must name each input and setting as
+      the node shows it ("transparent is off", not alpha_clear). And a bug in
+      **Bifurcation**: each pixel read one of its 64 x 48 bins, so on a
+      picture smaller than that most of the tree fell between the pixels
+      that read (a 32 x 16 matrix showed a third of it, and trail and orbits
+      seemed to do nothing) - a pixel now reads the brightest of the bins it
+      covers; at 64 x 48 and over, one, as before.
+- [x] **Phase 3 - coords (11) and colour (22).** A shape that is neither
+      a matrix nor a cube is drawn as a cloud of LEDs from the lesson's
+      `view` (Shape part's three rings, from above). Notes for the lessons
+      to come: noise sits near the middle of 0..1, so a lesson that colours
+      by it stretches it first (a Smoothstep) or the picture is one flat
+      colour; the sim's Lava is FastLED's LavaColors, white at 0.75; a
+      Blackbody above about 3000 K is pale, so fire stays below it.
+- [x] **Phase 4 - signals and audio (37)** and **maths (35).** A signal is
+      one number a frame, so its lesson shows it as a level meter on the
+      matrix - or two meters, input against output - and as a trace. Found
+      on the way: `Synth.push` gave the engine the levels but not the
+      waveform or the notes (the app added them itself), so Waveform and
+      Notes were flat in the Library's thumbnails and here; the synth now
+      gives all of it. Scenes' lesson carries its two snapshots in the
+      graph. A one-frame pulse falls between a picture's samples, so a
+      lesson traces what the pulse drives instead (Rising edge: its Counter).
+- [x] **Phase 5 - controls, custom and output (15)** and **Phase 6 - the
+      graph tools (11)**: every node of the 152 has its tutorial, and
+      `ALL_REQUIRED` is on - a new node is not finished without one. A
+      control's "Try this" can only say where its slider is (a rebuild keeps
+      the slider where the person left it); a lesson about the colour
+      pickers brings its own three colours (`colours`: the generator's, and
+      Try it's in the tutorials project). With a picture on nearly every
+      node, opening the reference took a second (F1 on a node): a GIF's
+      texture is now made only when it comes into view, a one-pixel stand-in
+      of its size until then - 0.25 s.
+
+### Live video on any shape (October 2026)
+
+- [x] **A webcam, a video file or a test pattern as the picture**, on any
+      shape, with a style or a pattern layer over it. The device cannot play
+      video, so it plays in the studio and reaches the LEDs by the stream
+      (DDP, E1.31, Art-Net) - a flashed effect's Video node is black.
+      - `native/video.py`: files and webcams through ffmpeg (dshow,
+        avfoundation, v4l2 - no OpenCV), scaled and cropped to 96 x 54 (the
+        size setting) on a thread that keeps the newest frame; a file at its
+        own speed, looping if asked; `TestPattern` needs no ffmpeg (tests,
+        tutorials, trying it out).
+      - The engine's video slot: `simVideoSet` / `simVideoAt` (sim_main.cpp,
+        two buffers, bilinear), `Engine.video`. Generated code reaches it by
+        `GC_VIDEO` under `CFX_SIM` and reads 0 outside it.
+      - The **Video** node: projection picture (u, v - wired, or the pixel's),
+        front, top, around, faces, sphere; style none, palette, posterize
+        (levels), mono (Colour 1), edges (gain - looked at half an LED either
+        side, or an edge falls between the LEDs), pixelate (blocks); outputs
+        colour and luma.
+      - The side panel's **VIDEO** section (`native/video_ui.py`): source,
+        file and Choose..., camera and Find, loop, size, Play / Pause, Stop, a
+        preview; the choices kept in the project, nothing started when a
+        project opens. The newest frame goes into the engine before each
+        engine frame (from audio_push).
+      - Its tutorial runs on the test pattern (a lesson's `video`: the
+        generator feeds it, Try it starts it), with a stripe layer screened
+        over the video. Tested: `test_video.py` (a side build reads a frame
+        back through the picture projection and the faces, each style, the
+        test pattern, a file through ffmpeg when there is one, a device
+        build's black); the smoke plays, pauses and stops the test pattern
+        from the panel.
+
+### Mapping the way of Lightwork (October 2026)
+
+- [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -
+      binary addresses, a live camera, calibration, its layout CSV - taken,
+      no code) added to Map by camera.
+      - **Binary plan** (`camera_map.BinaryPlan`, `make_plan`): every LED lit
+        in each picture with its address + 1 in Gray code, a picture and its
+        inverse for each bit after the dark picture and a flash: 2 x bits + 2
+        pictures (500 LEDs: 20, not 500). `decode_binary` reads them pixel by
+        pixel (structured light): each pixel lit by the flash takes the code of
+        the LED brightest there, bit by bit against the inverse; a pixel too
+        close to call (between two LEDs, a reflection lit in every picture) is
+        left out; an LED is the flash-weighted centre of its pixels, the
+        brightest place if its pixels lie in more than one. Two LEDs that run
+        together on the flash still part; the tests' tree: 58 of 60, the two
+        hidden missing.
+      - **Live** (`camera_map_ui`): the webcam through ffmpeg (`video.open_source`
+        with `fit`: all of the picture, barred, not cropped), no OpenCV. Each of
+        `plan.steps()` lit (the wiring test's new `mask` mode in the sim; the
+        device's frame while streaming), `settle` new pictures waited, one
+        kept; `scan` reads them keyed by step, no clock.
+      - **Calibration**: dark, then every LED lit; the live view with
+        `find_blobs` marked and counted; threshold, apart, largest and settle
+        - and the LED brightness - used by filmed sides too.
+      - **CSV**: `to_csv` / `from_csv` - `address,x,y,z`, each axis 0.001..1 on
+        its own, y down the picture, an LED not found left out. Save CSV
+        writes the shape in wiring order to `export/lightwork_layout.csv`;
+        Import CSV... makes a points part.
+      - Tests: `test_camera_map.py` (Gray codes, a binary tree from two sides,
+        live steps for both plans, a reflection, the CSV both ways); the smoke
+        calibrates, maps live and saves and imports the CSV through
+        `camera_map.SyntheticCamera`, a stand-in webcam that pictures the
+        frame the plan would send.
 
 ### Deferred from earlier lists
 

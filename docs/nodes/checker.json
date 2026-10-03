@@ -1,0 +1,172 @@
+{
+ "node": "Checker",
+ "star": 1,
+ "caption": "Checker: a chessboard that lurches sideways on every beat",
+ "why": [
+  "A checkerboard is the simplest pattern with two dimensions in it: squares that alternate across and down. Checker gives you that as a 1 or a 0 for every pixel, at any size.",
+  "Use it as a pattern on its own (a retro floor, a flag), or as a mask - multiply it into something else to light alternate squares, or use it to pick between two colours. Its neighbours: Stripes alternates along one direction only; Brick offsets its rows; Checker alternates both ways at once."
+ ],
+ "steps": [
+  "**Coords** `u` goes into **x** through an **Add** with **Beat kick**'s `phase`: on each kick of the synth's beat the phase jumps forward and settles, so the board lurches sideways on the beat. `v` goes into **y**.",
+  "**scale** is 4: four squares per unit, so four squares across and four down the matrix.",
+  "`value` is 1 on one colour of square and 0 on the other. Halved by a **Multiply**, it picks palette positions 0 and 0.5 - two contrasting colours from the **Palette** (0 and 1 would be the same colour: the palette wraps).",
+  "The beat comes from **Audio**'s `beat`, true for one frame on each kick."
+ ],
+ "try": [
+  {
+   "label": "Finer board",
+   "text": "scale 8: twice the squares each way, so the lurch moves a smaller step.",
+   "set": [
+    [
+     1,
+     "scale",
+     8.0
+    ]
+   ]
+  },
+  {
+   "label": "Big squares",
+   "text": "scale 2: two squares across - bold blocks of colour, and a kick swaps them almost entirely.",
+   "set": [
+    [
+     1,
+     "scale",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "A harder kick",
+   "text": "Beat kick's throw at 2: each beat moves the board twice as far.",
+   "set": [
+    [
+     5,
+     "throw",
+     2.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Checker",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Beat kick",
+    "params": {},
+    "inputs": {
+     "throw": 1.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Checker",
+    "params": {},
+    "inputs": {
+     "scale": 4.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 7,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 8,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    4,
+    "beat",
+    5,
+    "beat"
+   ],
+   [
+    2,
+    "u",
+    3,
+    "a"
+   ],
+   [
+    5,
+    "phase",
+    3,
+    "b"
+   ],
+   [
+    3,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    2,
+    "v",
+    1,
+    "y"
+   ],
+   [
+    1,
+    "value",
+    6,
+    "a"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "index"
+   ],
+   [
+    7,
+    "color",
+    8,
+    "color"
+   ]
+  ]
+ }
+}

@@ -44,7 +44,9 @@ def test_maps_bind_once_and_unbind():
     class P:
         options = {}
     st = midi.state(P)
-    assert st == {"port": "", "maps": [], "clock": True} and P.options["midi"] is st    # a port's clock followed
+    assert st == {"port": "", "maps": [], "clock": True, "osc": {"on": False, "port": 9000}}         and P.options["midi"] is st                                      # a port's clock followed; OSC off (osc.py)
+    P.options["midi"]["osc"] = "on"                                      # a hand-edited project: made right again
+    assert midi.state(P)["osc"] == {"on": False, "port": 9000}
     midi.bind(st, ("cc", 0, 7), {"kind": "fx", "key": "sx"})
     midi.bind(st, ("cc", 0, 7), {"kind": "fx", "key": "sx"})             # the same pair once
     midi.bind(st, ("cc", 0, 7), {"kind": "fx", "key": "ix"})             # one knob, two targets
@@ -102,6 +104,9 @@ def test_the_synth_beat_follows_the_clock():
         fft = np.zeros(16, np.uint8)
 
         def audio(self, v, peak):
+            pass
+
+        def audio_peak(self):
             pass
     e, s = Eng(), Synth(bpm=120)
     fired = []

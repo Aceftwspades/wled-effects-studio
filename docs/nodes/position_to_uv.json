@@ -1,0 +1,249 @@
+{
+ "node": "Position to uv",
+ "star": 1,
+ "caption": "Position to uv: sparks falling straight down the cube, each pixel taking last frame's light from just above it",
+ "why": [
+  "To make light fall, rise or drift, each pixel copies what was a little way off last frame - and on a cube, 'a little way down' means a different place on the net depending on the face, and crosses the folds. Position to uv does the hard part: give it any point in the cube's box and it tells you which pixel shows it.",
+  "So: take this pixel's Position, add a small step in the direction things come from, ask Position to uv which pixel that is, and read it with Previous at. Its neighbours: Ring to uv does the same for the lid-and-walls coordinates of Cube ring; Coords goes the other way (pixel to place); Position to uv is place to pixel."
+ ],
+ "steps": [
+  "**Position** gives this pixel's place; a **Vector** rebuilds it with z raised by 0.15 (an **Add** on z): the point just above this pixel.",
+  "That point goes into **pos**; Position to uv's `u` and `v` are the pixel that shows it - on the same face, or across the edge when the point is over it.",
+  "**Previous at** reads that pixel's colour from last frame, and a **Fade** (keep 0.88) dims it: each frame, every pixel takes the light from just above it, a little dimmer - light falls.",
+  "New light: a **Sparkle** (density 0.03, a new seed ten times a second) lights a few pixels in the **Palette**'s colour for their x. A **Blend** in max mode keeps the brighter of the falling light and the new sparks."
+ ],
+ "try": [
+  {
+   "label": "Longer trails",
+   "text": "the Fade's keep at 0.96: the light dims slowly, so each spark leaves a long streak.",
+   "set": [
+    [
+     9,
+     "keep",
+     0.96
+    ]
+   ]
+  },
+  {
+   "label": "Rising",
+   "text": "the Add's step on z at -0.15: each pixel now reads the point just below it, so the light rises up the cube instead of falling.",
+   "set": [
+    [
+     3,
+     "b",
+     -0.15
+    ]
+   ]
+  },
+  {
+   "label": "More sparks",
+   "text": "the Sparkle's density at 0.1: ten times as many sparks - a downpour.",
+   "set": [
+    [
+     10,
+     "density",
+     0.1
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Position to uv",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Add",
+    "params": {},
+    "inputs": {
+     "b": 0.15
+    }
+   },
+   {
+    "id": 4,
+    "type": "Vector",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Position to uv",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Previous at",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Fade",
+    "params": {},
+    "inputs": {
+     "keep": 0.88
+    }
+   },
+   {
+    "id": 5,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 10.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.03
+    }
+   },
+   {
+    "id": 11,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Blend",
+    "params": {
+     "mode": "max"
+    },
+    "inputs": {
+     "amount": 1.0
+    }
+   },
+   {
+    "id": 13,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "z",
+    3,
+    "a"
+   ],
+   [
+    2,
+    "x",
+    4,
+    "x"
+   ],
+   [
+    2,
+    "y",
+    4,
+    "y"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "z"
+   ],
+   [
+    4,
+    "v",
+    1,
+    "pos"
+   ],
+   [
+    1,
+    "u",
+    8,
+    "u"
+   ],
+   [
+    1,
+    "v",
+    8,
+    "v"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "color"
+   ],
+   [
+    5,
+    "t",
+    6,
+    "a"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "x"
+   ],
+   [
+    7,
+    "result",
+    10,
+    "seed"
+   ],
+   [
+    2,
+    "x",
+    11,
+    "index"
+   ],
+   [
+    10,
+    "value",
+    11,
+    "brightness"
+   ],
+   [
+    9,
+    "color",
+    12,
+    "under"
+   ],
+   [
+    11,
+    "color",
+    12,
+    "over"
+   ],
+   [
+    12,
+    "color",
+    13,
+    "color"
+   ]
+  ]
+ }
+}

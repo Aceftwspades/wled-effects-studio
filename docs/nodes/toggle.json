@@ -1,0 +1,148 @@
+{
+ "node": "Toggle",
+ "star": 1,
+ "caption": "Toggle: flipped on every kick, swapping the matrix between two halves of the palette",
+ "why": [
+  "Some things alternate: left then right, warm then cool, one pattern then the other. Toggle is a switch that flips each time its flip input turns on - wire the beat in and it changes on every kick - or a fixed on or off when nothing is wired.",
+  "Its neighbours: Counter counts through more than two; Gate is on and off by a level; Rising edge makes the one-frame tap a flip needs; Toggle is the flip-flop."
+ ],
+ "steps": [
+  "**Audio**'s `beat` is **flip**: each kick turns the switch over.",
+  "**on** (the setting) is the state it starts in - on.",
+  "Its `on` output picks between 0 and 0.5 through a **Select**, added to **Coords** `u` for the **Palette**'s index: each kick the colours jump half the palette, to their opposites.",
+  "The trace shows the switch going 1, 0, 1, 0 with the kicks."
+ ],
+ "try": [
+  {
+   "label": "Smaller jump",
+   "text": "the Select's b at 0.15: each flip moves the colours only a little - a shimmer on the beat.",
+   "set": [
+    [
+     2,
+     "b",
+     0.15
+    ]
+   ]
+  },
+  {
+   "label": "Start off",
+   "text": "on unticked: the switch starts off - the same flipping, the other way round.",
+   "set": [
+    [
+     1,
+     "on",
+     false
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "on"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Toggle",
+  "nodes": [
+   {
+    "id": 3,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Toggle",
+    "params": {
+     "on": true
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Select",
+    "params": {},
+    "inputs": {
+     "a": 0.0,
+     "b": 0.5
+    }
+   },
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    3,
+    "beat",
+    1,
+    "flip"
+   ],
+   [
+    1,
+    "on",
+    2,
+    "on"
+   ],
+   [
+    4,
+    "u",
+    5,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "index"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

@@ -80,7 +80,7 @@ class App:
             self.send([{"py": f"__import__('ctypes').windll.user32.SetForegroundWindow({int(prev)})"}], 0.5)
         self._drop_mouse_leave()
         self.u32.PostMessageW(self.hwnd, WM_SETFOCUS, 0, 0)
-        self.send([{"viewport": [1600, 1000]}, {"project": PROJECT}], 3.0)
+        self.send([{"viewport": [1600, 1000]}, {"project": PROJECT}, {"graph_auto": False}], 3.0)   # Live off: it builds by hand
         self.send([{"wait_build": True}, {"py": "1"}], 1.0)
 
     def stop(self):

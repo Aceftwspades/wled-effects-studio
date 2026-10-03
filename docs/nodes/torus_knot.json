@@ -1,0 +1,199 @@
+{
+ "node": "Torus knot",
+ "star": 1,
+ "caption": "Torus knot: a twisted tube floating in the cube, shaded at its edges, colours running along it",
+ "why": [
+  "A knot is a striking thing to see on a cube of LEDs: a tube that loops round and through itself, appearing on every face. Torus knot draws one as seen from the cube's middle - each pixel looks out in its own direction and asks whether the tube is there.",
+  "Besides on and off, it says how far along the tube the spot is (for stripes and flowing colour), how near its edge (for shading, so it looks round) and which way its surface faces (for lighting). Its neighbours: Path is a route you type, seen from outside; Shells are growing spheres; Torus knot is one beautiful closed curve, ready-made."
+ ],
+ "steps": [
+  "**Direction**'s `dir` - the way out from the cube's middle through this pixel - goes into **dir**.",
+  "**p** is 2 and **q** is 3: the knot winds twice round and three times through - the classic trefoil. **R** is the knot's overall size and **r** the size of its loop; **tube** (0.25) is how fat the tube is.",
+  "`edge` (0 at the tube's middle, 1 at its edge) goes into a **Smoothstep** whose edges are 1 and 0.3, and that is multiplied by `on`: bright down the middle of the tube, darker at its sides - it looks round.",
+  "`along` plus a clock (**Time** times 0.2) is the **Palette**'s index, so colour flows along the tube."
+ ],
+ "try": [
+  {
+   "label": "Another knot",
+   "text": "p 3 and q 5: a knot that winds three times round and five through - more loops, more crossings.",
+   "set": [
+    [
+     1,
+     "p",
+     3
+    ],
+    [
+     1,
+     "q",
+     5
+    ]
+   ]
+  },
+  {
+   "label": "A fat tube",
+   "text": "tube 0.45: the tube nearly doubles in width and covers most of the cube.",
+   "set": [
+    [
+     1,
+     "tube",
+     0.45
+    ]
+   ]
+  },
+  {
+   "label": "A tight knot",
+   "text": "R 0.45 and r 0.35: the knot drawn smaller with bigger loops, so it bunches in the middle of each face.",
+   "set": [
+    [
+     1,
+     "R",
+     0.45
+    ],
+    [
+     1,
+     "r",
+     0.35
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Torus knot",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Direction",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Torus knot",
+    "params": {
+     "p": 2,
+     "q": 3,
+     "R": 0.62,
+     "r": 0.3
+    },
+    "inputs": {
+     "tube": 0.25
+    }
+   },
+   {
+    "id": 3,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 1.0,
+     "e1": 0.3
+    },
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.2
+    }
+   },
+   {
+    "id": 7,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "dir",
+    1,
+    "dir"
+   ],
+   [
+    1,
+    "edge",
+    3,
+    "x"
+   ],
+   [
+    1,
+    "on",
+    4,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    5,
+    "t",
+    6,
+    "a"
+   ],
+   [
+    1,
+    "along",
+    7,
+    "a"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "b"
+   ],
+   [
+    7,
+    "result",
+    8,
+    "index"
+   ],
+   [
+    4,
+    "result",
+    8,
+    "brightness"
+   ],
+   [
+    8,
+    "color",
+    9,
+    "color"
+   ]
+  ]
+ }
+}

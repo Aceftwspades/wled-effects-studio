@@ -1,0 +1,147 @@
+{
+ "node": "Custom 1",
+ "star": 1,
+ "caption": "Custom 1: a slider of your own, named Stripes, choosing between 2 and 12 stripes",
+ "why": [
+  "Speed and Intensity are not always enough: an effect might want a size, a count, a softness, a second speed. Custom 1 is the third slider on the WLED page, 0..1, named whatever you like - the name you give it is what the page shows.",
+  "Its neighbours: Custom 2 and Custom 3 are the next two (Custom 3 has only 32 steps on the device); Speed and Intensity are the standard pair."
+ ],
+ "steps": [
+  "Custom 1 has no inputs. Its `value` is the slider, 0..1.",
+  "**label** is Stripes, so the slider is called Stripes on the WLED page. **default** is 64: it starts a quarter of the way.",
+  "A **Remap** turns the slider into 2..12: the **count** of a scrolling **Stripes** node. The **Palette** colours them."
+ ],
+ "try": [
+  {
+   "label": "Move the slider",
+   "text": "In the side panel's PARAMETERS section, drag the Stripes (Custom 1) slider: and the number of stripes goes from 2 at the left to 12 at the right. Nothing is rebuilt: the effect reads the slider every frame.",
+   "set": []
+  },
+  {
+   "label": "Rename it",
+   "text": "label Bands: the slider is called Bands on the WLED page (and in PARAMETERS) - the effect is rebuilt with the new name.",
+   "set": [
+    [
+     1,
+     "label",
+     "Bands"
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   2,
+   "result"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Custom 1",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Custom 1",
+    "params": {
+     "label": "Stripes",
+     "default": 64
+    },
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Remap",
+    "params": {
+     "in_lo": 0.0,
+     "in_hi": 1.0,
+     "out_lo": 2.0,
+     "out_hi": 12.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "duty": 0.5
+    }
+   },
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    1,
+    "value",
+    2,
+    "x"
+   ],
+   [
+    2,
+    "result",
+    3,
+    "count"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "phase"
+   ],
+   [
+    4,
+    "u",
+    5,
+    "index"
+   ],
+   [
+    3,
+    "value",
+    5,
+    "brightness"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

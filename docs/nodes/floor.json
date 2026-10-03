@@ -1,0 +1,166 @@
+{
+ "node": "Floor",
+ "star": 1,
+ "caption": "Floor: a smooth palette sweep rounded down into eight flat bands of colour",
+ "why": [
+  "Rounding down turns a smooth number into steps: 2.7 becomes 2. That makes cells out of a coordinate (which column, which tile), stepped colour out of a gradient, and frame-by-frame jumps out of a clock.",
+  "Its neighbours: Fract keeps the part after the point (Floor keeps the part before); Map range with steps rounds to a number of steps; Hash turns the whole numbers Floor makes into randoms."
+ ],
+ "steps": [
+  "**Coords** `u` times 8 (a **Multiply**) runs 0..8 across: the **x** input.",
+  "Floor rounds it down: 0 for the first eighth of the matrix, 1 for the next, up to 7 - eight flat steps.",
+  "Divided by 8 (a **Multiply** by 0.125) plus a clock (**Time** times 0.15) it is the **Palette**'s index: eight flat bands of colour, each one solid, all shifting together.",
+  "Without the Floor, the colours would blend smoothly across."
+ ],
+ "try": [
+  {
+   "label": "Three bands",
+   "text": "the first Multiply at 3 and the second at 0.333: three wide bands.",
+   "set": [
+    [
+     2,
+     "b",
+     3.0
+    ],
+    [
+     3,
+     "b",
+     0.333
+    ]
+   ]
+  },
+  {
+   "label": "Sixteen",
+   "text": "the first Multiply at 16 and the second at 0.0625: sixteen narrow bands - nearly smooth again.",
+   "set": [
+    [
+     2,
+     "b",
+     16.0
+    ],
+    [
+     3,
+     "b",
+     0.0625
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Floor",
+  "nodes": [
+   {
+    "id": 4,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 8.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.125
+    }
+   },
+   {
+    "id": 5,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.15
+    }
+   }
+  ],
+  "links": [
+   [
+    4,
+    "u",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    1,
+    "x"
+   ],
+   [
+    1,
+    "result",
+    3,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    5,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    5,
+    "b"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "index"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

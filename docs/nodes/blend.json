@@ -1,0 +1,213 @@
+{
+ "node": "Blend",
+ "star": 1,
+ "caption": "Blend: white stripes laid over a scrolling palette, 'over' at full amount",
+ "why": [
+  "Most good effects are layers: a background, something on top, maybe a sparkle over that. Blend puts one colour on another, and how they combine is its mode - cover, add light, keep the brighter, darken, lighten, and the rest of a paint program's list.",
+  "Chain Blends to stack as many layers as you like; amount sets how much of the top one shows. Its neighbours: Layers stacks up to four in one node; Mix (maths) crossfades numbers, not colours; Mask shows a colour only where a pattern is bright; Blend is two colours, any mode."
+ ],
+ "steps": [
+  "**under** is a scrolling palette (the usual **Speed**, **Time** and **Coords** `u` into a **Palette**).",
+  "**over** is a **Colour**: warm white.",
+  "**amount** comes from **Stripes** (count 5, duty 0.3) scrolling the other way: 1 in a stripe, 0 between - so the white covers the palette in stripes and the palette shows between them.",
+  "**mode** is over: where amount is 1 the top colour simply covers the bottom one."
+ ],
+ "try": [
+  {
+   "label": "Add",
+   "text": "mode add: the white is added to the palette's light, so the stripes are bright and tinted by what is under them.",
+   "set": [
+    [
+     1,
+     "mode",
+     "add"
+    ]
+   ]
+  },
+  {
+   "label": "Screen",
+   "text": "mode screen: the white lightens what is under it rather than covering it - pale, washed-out stripes with the palette still showing through.",
+   "set": [
+    [
+     1,
+     "mode",
+     "screen"
+    ]
+   ]
+  },
+  {
+   "label": "Difference",
+   "text": "mode difference: where the stripes are, the palette's colours are subtracted from white - their opposites show.",
+   "set": [
+    [
+     1,
+     "mode",
+     "difference"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Blend",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Speed",
+    "params": {
+     "label": "Speed",
+     "default": 128
+    },
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 14,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 16,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 2,
+    "type": "Colour",
+    "params": {
+     "rgb": [
+      255,
+      230,
+      200
+     ]
+    },
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": -0.4
+    }
+   },
+   {
+    "id": 5,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 5.0,
+     "duty": 0.3
+    }
+   },
+   {
+    "id": 1,
+    "type": "Blend",
+    "params": {
+     "mode": "over"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "value",
+    12,
+    "a"
+   ],
+   [
+    11,
+    "t",
+    12,
+    "b"
+   ],
+   [
+    13,
+    "u",
+    14,
+    "a"
+   ],
+   [
+    12,
+    "result",
+    14,
+    "b"
+   ],
+   [
+    14,
+    "result",
+    16,
+    "index"
+   ],
+   [
+    16,
+    "color",
+    1,
+    "under"
+   ],
+   [
+    2,
+    "color",
+    1,
+    "over"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "phase"
+   ],
+   [
+    5,
+    "value",
+    1,
+    "amount"
+   ],
+   [
+    1,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}

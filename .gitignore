@@ -20,3 +20,6 @@ gen/stock1d_skip.json
 captures/
 # a virtual environment for an install from source (README), whatever tool made it
 .venv/
+
+# WLED firmware downloaded by the Flash frame (native/firmware.py)
+firmware/

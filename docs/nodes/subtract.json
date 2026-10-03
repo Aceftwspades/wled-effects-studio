@@ -1,0 +1,170 @@
+{
+ "node": "Subtract",
+ "star": 1,
+ "caption": "Subtract: each pixel's row minus a wave's height - where the difference is near 0, a line: the wave drawn as a graph",
+ "why": [
+  "a minus b is a difference - and a difference is a distance. Subtract a wave's value from each pixel's height, make it positive, and only the pixels near zero difference are near the wave: the wave drawn as a line, like a graph on a screen.",
+  "Its neighbours: Add sums; Abs makes the difference a distance; Vector math's distance does it in 3-D; Subtract is the step that makes 'how far from this level'."
+ ],
+ "steps": [
+  "**a** is **Coords** `v`, the pixel's height (0 at the top).",
+  "**b** is a **Wave** along `u` (1 cycle, scrolling) - a level that rises and falls across the matrix.",
+  "Their difference, made positive by **Abs**, is how far each pixel is from the wave. A **Smoothstep** (edges 0.12 and 0) lights the pixels within 0.12 of it: a line tracing the wave.",
+  "The line is the **Palette**'s brightness, coloured across by `u`."
+ ],
+ "try": [
+  {
+   "label": "Two waves",
+   "text": "the Wave's cycles at 2: two humps across - the line follows them.",
+   "set": [
+    [
+     3,
+     "cycles",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "Square wave",
+   "text": "the Wave's shape square: the line jumps between top and bottom - it only shows on the flat parts.",
+   "set": [
+    [
+     3,
+     "shape",
+     "square"
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Subtract",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 1.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Subtract",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Abs",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Smoothstep",
+    "params": {
+     "e0": 0.12,
+     "e1": 0.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.25
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "x"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "phase"
+   ],
+   [
+    2,
+    "v",
+    1,
+    "a"
+   ],
+   [
+    3,
+    "value",
+    1,
+    "b"
+   ],
+   [
+    1,
+    "result",
+    4,
+    "x"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "x"
+   ],
+   [
+    2,
+    "u",
+    6,
+    "index"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

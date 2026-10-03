@@ -1,0 +1,181 @@
+{
+ "node": "Fade",
+ "star": 2,
+ "caption": "Fade: sparks leaving trails that die away over about a second",
+ "why": [
+  "Trails are what make motion read on LEDs: a moving dot with a tail looks like it is going somewhere. The trick is to keep last frame's picture, dim it a little, and draw the new frame on top. Fade is the dimming part - a colour times keep, named for the job it does after Previous.",
+  "keep sets how long the trails last: 0.9 fades to almost nothing in about a second, 0.98 lingers several seconds. Its neighbours: Scale is the same sum, named for any dimming; Previous and Previous at give the last frame to fade; Blur softens as well as keeping it."
+ ],
+ "steps": [
+  "**Previous** gives this pixel's colour from last frame; it goes into Fade's **color**.",
+  "**keep** is 0.9: nine tenths of the light survives each frame, so a trail fades over about a second.",
+  "New light: a **Sparkle** (density 0.03, reseeded twelve times a second) in the **Palette**'s colour for its place.",
+  "A **Blend** in max mode keeps the brighter of the faded old picture and the new sparks: each spark flashes and fades over the next frames instead of vanishing."
+ ],
+ "try": [
+  {
+   "label": "Long trails",
+   "text": "keep 0.98: the light lingers for seconds, so the sparks pile up into a glittering haze.",
+   "set": [
+    [
+     2,
+     "keep",
+     0.98
+    ]
+   ]
+  },
+  {
+   "label": "Short trails",
+   "text": "keep 0.6: the light is gone in a few frames - a quick flicker.",
+   "set": [
+    [
+     2,
+     "keep",
+     0.6
+    ]
+   ]
+  },
+  {
+   "label": "No trails",
+   "text": "keep 0: nothing of last frame survives - each spark lasts exactly one frame.",
+   "set": [
+    [
+     2,
+     "keep",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Fade",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 12.0
+    }
+   },
+   {
+    "id": 12,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.03
+    }
+   },
+   {
+    "id": 1,
+    "type": "Previous",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Fade",
+    "params": {},
+    "inputs": {
+     "keep": 0.9
+    }
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Blend",
+    "params": {
+     "mode": "max"
+    },
+    "inputs": {
+     "amount": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ],
+   [
+    11,
+    "result",
+    12,
+    "x"
+   ],
+   [
+    12,
+    "result",
+    13,
+    "seed"
+   ],
+   [
+    1,
+    "color",
+    2,
+    "color"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "index"
+   ],
+   [
+    13,
+    "value",
+    21,
+    "brightness"
+   ],
+   [
+    2,
+    "color",
+    22,
+    "under"
+   ],
+   [
+    21,
+    "color",
+    22,
+    "over"
+   ],
+   [
+    22,
+    "color",
+    23,
+    "color"
+   ]
+  ]
+ }
+}

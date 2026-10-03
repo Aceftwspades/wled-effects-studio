@@ -1,0 +1,133 @@
+{
+ "node": "Integrate",
+ "star": 1,
+ "caption": "Integrate: a phase growing at half a cycle a second and wrapping at 1, scrolling the stripes",
+ "why": [
+  "Moving something steadily means adding a little every frame - the right little for how long the frame took. Integrate does that: give it a rate (units a second) and it grows by exactly that much a second, whatever the frame rate, wrapping back to 0 at the value you set.",
+  "Plug a Speed slider into rate and you have a scroll the slider controls, which keeps its place when the slider moves (a Multiply of time would jump). Its neighbours: Time is seconds since the start; Delay builds a loop by hand; Integrate is a smooth, rate-controlled phase."
+ ],
+ "steps": [
+  "**rate** is 0.5: the value grows half a unit a second.",
+  "**wrap** is 1: at 1 it starts again from 0, so the value is a phase that cycles every two seconds. **reset**, while on, holds it at 0.",
+  "`value` is a **Wave**'s phase (x from **Coords** `u`, 3 cycles): the stripes scroll.",
+  "The trace shows the phase: a ramp that climbs to 1 and drops back to 0."
+ ],
+ "try": [
+  {
+   "label": "Faster",
+   "text": "rate 2: the phase cycles twice a second - a quick scroll.",
+   "set": [
+    [
+     1,
+     "rate",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "Never wrap",
+   "text": "wrap 0: the value keeps growing - the trace climbs forever (the stripes look the same, as a Wave repeats every 1 anyway).",
+   "set": [
+    [
+     1,
+     "wrap",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Stopped",
+   "text": "reset on: the value is held at 0 and the stripes stop.",
+   "set": [
+    [
+     1,
+     "reset",
+     true
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Integrate",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Integrate",
+    "params": {
+     "wrap": 1.0
+    },
+    "inputs": {
+     "rate": 0.5,
+     "reset": false
+    }
+   },
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "x"
+   ],
+   [
+    1,
+    "value",
+    3,
+    "phase"
+   ],
+   [
+    2,
+    "u",
+    4,
+    "index"
+   ],
+   [
+    3,
+    "value",
+    4,
+    "brightness"
+   ],
+   [
+    4,
+    "color",
+    5,
+    "color"
+   ]
+  ]
+ }
+}

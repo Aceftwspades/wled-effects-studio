@@ -175,14 +175,24 @@ def build(app):
         # LIVE: the sim's frames to the device as they are drawn, and the wiring test
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("LIVE", color=c.ACCENT))
-            dpg.add_checkbox(label="stream the sim to the device (DDP)", tag="live_on", default_value=False,
+            dpg.add_checkbox(label="stream the sim to the device", tag="live_on", default_value=False,
                              callback=lambda s, v: (app.stream_start(fps=int(dpg.get_value("live_fps").split()[0])) if v else app.stream_stop()))
             weight.need(dpg.last_item(), "stream")          # a device to stream to (or the stream running, to stop it)
             c.tip("whatever the sim shows - any effect, built or not - on the device as it is drawn; the device goes back to its own effect when this stops")
             form.inline("at")
             typeface.mono(dpg.add_combo(["15 fps", "30 fps", "60 fps"], tag="live_fps", width=px(96), default_value="30 fps",
                                         callback=lambda s, v: app.stream_start(fps=int(v.split()[0])) if getattr(app, "ddp", None) else None))
+            form.inline("over")
+            dpg.add_combo([p[1] for p in live_out.PROTOCOLS], tag="live_proto", width=px(120), default_value="DDP",
+                          callback=lambda s, v: app.set_stream_out(protocol=next(p[0] for p in live_out.PROTOCOLS if p[1] == v)))
+            c.tip("DDP: WLED takes it as it is. E1.31 (sACN) and Art-Net: 170 LEDs a universe from the first universe, for a "
+                  "WLED with that receiver on in its Sync settings (DMX mode Multiple RGB) or another pixel controller")
+            dpg.add_text("universe", tag="live_universe_label", color=form._dim())
+            typeface.mono(dpg.add_input_int(tag="live_universe", width=px(90), default_value=1, min_value=0, min_clamped=True,
+                                            callback=lambda s, v: app.set_stream_out(universe=int(v)), on_enter=True))
+        with dpg.group(horizontal=True):
             dpg.add_text("", tag="live_status", color=c.DIM)
+            dpg.add_simple_plot(tag="live_trace", default_value=[0.0], width=px(160), height=px(28), show=False)
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("WIRING TEST", color=c.ACCENT))
             dpg.add_combo(list(live_out.MODES), tag="wt_mode", width=px(120), default_value="off",
@@ -216,6 +226,11 @@ def build(app):
     audioin_ui.build(app)
 
 
+# the firmware's sources, as the frame words them
+SOURCES = (("studio", "the studio's build"), ("release", "a WLED release"), ("checkout", "WLED from the checkout"),
+           ("file", "a .bin file"))
+
+
 def build_flash(app):
     """FLASH: stage, build, send - to the active device, on the environment
     that fits it (the device's chip suggests one)."""
@@ -230,6 +245,27 @@ def build_flash(app):
                    "that extends the one chosen (its usermods plus ours), and sends the binary to the device's /update. "
                    "The device must have OTA unlocked and be on this subnet.")
         with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("FIRMWARE", color=c.ACCENT))
+            dpg.add_radio_button([w for _, w in SOURCES], tag="flash_source", horizontal=True,
+                                 default_value=dict(SOURCES).get(app.project.options.get("flash_source", "studio"), SOURCES[0][1]),
+                                 callback=lambda s, v: _set_source(app, next(k for k, w in SOURCES if w == v)))
+            c.info("The studio's build: WLED from the checkout with the project's effects, the cube effects chosen and the "
+                   "features. A WLED release: WLED's own binary for the device's chip, downloaded once. WLED from the "
+                   "checkout: the environment built without the studio. A .bin file: one you have. Whatever it is, a "
+                   "binary for another chip than the device's is never sent.")
+        with dpg.group(horizontal=True, tag="flash_rel_row", show=False):
+            form.inline("version")
+            dpg.add_combo([], tag="flash_rel", width=px(200), callback=lambda: _rel_assets(app))
+            form.inline("file")
+            dpg.add_combo([], tag="flash_asset", width=px(260), callback=lambda: refresh_manifest(app))
+            dpg.add_button(label="Refresh", small=True, callback=lambda: _fetch_releases(app, True))
+            c.tip("WLED's releases again, from GitHub")
+        with dpg.group(horizontal=True, tag="flash_file_row", show=False):
+            form.inline("file")
+            dpg.add_input_text(tag="flash_file", width=px(420), default_value=app.project.options.get("flash_file", ""),
+                               callback=lambda s, v: (app.project.options.__setitem__("flash_file", v), refresh_manifest(app)))
+            dpg.add_button(label="Choose...", small=True, callback=lambda: dpg.show_item("flash_bin_dialog"))
+        with dpg.group(horizontal=True, tag="flash_env_row"):
             form.inline("environment")
             dpg.add_combo(envs, tag="flash_env", width=px(260), default_value=app.project.options.get("flash_env") or default or "",
                           callback=lambda: refresh_flash(app))
@@ -242,14 +278,17 @@ def build_flash(app):
             c.tip("stages the build and lists what it would carry - the manifest, resolved the way the build resolves it - without compiling")
         with dpg.child_window(tag="flash_manifest", height=px(132), border=True):
             pass
-        with dpg.group(horizontal=True):
+        with dpg.group(horizontal=True, tag="flash_fx_head"):
             typeface.label(dpg.add_text("EFFECTS TO SHIP", color=c.ACCENT))
             dpg.add_button(label="all", small=True, callback=lambda: _ship_all(app, True))
             dpg.add_button(label="none", small=True, callback=lambda: _ship_all(app, False))
+            c.tip("the project's effects and the built-in cube effects, all or none")
+            dpg.add_button(label="what the project uses", small=True, callback=lambda: _ship_used(app))
+            c.tip("the project's effects, and of the built-in cube effects only Studio Script (for the graphs sent as scripts)")
             dpg.add_text("", tag="flash_budget", color=c.DIM)
-        with dpg.child_window(tag="flash_fx", height=px(96), border=True):
+        with dpg.child_window(tag="flash_fx", height=px(150), border=True):
             pass
-        with dpg.group(horizontal=True):
+        with dpg.group(horizontal=True, tag="flash_feat_head"):
             typeface.label(dpg.add_text("FEATURES", color=c.ACCENT))
             dpg.add_button(label="Usermods...", small=True, callback=lambda: c.show_usermods(app))
             c.info("what the firmware carries: untick what this device lacks and the build shrinks; Usermods... has WLED's own too")
@@ -268,6 +307,143 @@ def build_flash(app):
         with dpg.child_window(tag="flash_log", height=-1, border=True):
             typeface.mono(dpg.last_container())         # a log: its lines in the monospace
             pass
+    with dpg.file_dialog(directory_selector=False, show=False, tag="flash_bin_dialog", width=px(640), height=px(420),
+                         callback=lambda s, a: _pick_bin(app, a.get("file_path_name", ""))):
+        dpg.add_file_extension(".bin", color=(120, 200, 120))
+        dpg.add_file_extension(".gz", color=(120, 200, 120))
+        dpg.add_file_extension(".*")
+    _show_source(app)
+
+
+# --- the firmware's source -------------------------------------------------------------------
+def flash_source(app):
+    return app.project.options.get("flash_source", "studio")
+
+
+def _set_source(app, key):
+    app.project.options["flash_source"] = key
+    app.project.save()
+    _show_source(app)
+    if key == "release":
+        _fetch_releases(app)
+    refresh_flash(app)
+
+
+def _show_source(app):
+    """Each source's own rows: the release's version and file, the .bin's path, the environment (the studio's
+    build and the checkout's), the studio's effects and features (its build alone)."""
+    src = flash_source(app)
+    for tag, on in (("flash_rel_row", src == "release"), ("flash_file_row", src == "file"),
+                    ("flash_env_row", src in ("studio", "checkout")), ("flash_fx_head", src == "studio"),
+                    ("flash_fx", src == "studio"), ("flash_feat_head", src == "studio"), ("flash_features", src == "studio")):
+        if dpg.does_item_exist(tag):
+            dpg.configure_item(tag, show=on)
+    if dpg.does_item_exist("flash_build"):
+        dpg.configure_item("flash_build", show=src in ("studio", "checkout"))
+
+
+def _pick_bin(app, path):
+    if path:
+        dpg.set_value("flash_file", path)
+        app.project.options["flash_file"] = path
+        app.project.save()
+        refresh_manifest(app)
+
+
+def _fetch_releases(app, force=False):
+    """WLED's releases on a thread (GitHub can be slow, or away); the combo filled when they come."""
+    import threading
+    from native import firmware
+    if getattr(app, "_fw_fetching", False):
+        return
+    app._fw_fetching = True
+    if dpg.does_item_exist("flash_rel"):
+        dpg.configure_item("flash_rel", items=["(reading WLED's releases...)"])
+
+    def work():
+        try:
+            app._fw_rels = firmware.releases(force)
+        finally:
+            app._fw_fetching = False
+            app._fw_fresh = True
+    threading.Thread(target=work, daemon=True).start()
+
+
+def _rel_label(r):
+    return f"{r['tag']}  {r['date']}" + ("  (pre-release)" if r["pre"] else "")
+
+
+def _chosen_release(app):
+    rels = getattr(app, "_fw_rels", None) or []
+    lab = dpg.get_value("flash_rel") if dpg.does_item_exist("flash_rel") else ""
+    return next((r for r in rels if _rel_label(r) == lab), None)
+
+
+def _rel_assets(app):
+    """The chosen release's files for the device's chip, the plainest first - all of them when no device is chosen."""
+    from native import firmware
+    r = _chosen_release(app)
+    d = app.active_device()
+    files = firmware.assets_for(r, (d or {}).get("arch")) if r else []
+    names = [a["name"] for a in files]
+    dpg.configure_item("flash_asset", items=names)
+    if dpg.get_value("flash_asset") not in names:
+        dpg.set_value("flash_asset", names[0] if names else "")
+    refresh_manifest(app)
+
+
+def _poll_releases(app):
+    if not getattr(app, "_fw_fresh", False) or not dpg.does_item_exist("flash_rel"):
+        return
+    app._fw_fresh = False
+    rels = getattr(app, "_fw_rels", None) or []
+    labels = [_rel_label(r) for r in rels]
+    dpg.configure_item("flash_rel", items=labels or ["(no releases: offline?)"])
+    if dpg.get_value("flash_rel") not in labels:
+        dpg.set_value("flash_rel", next((_rel_label(r) for r in rels if not r["pre"]), labels[0] if labels else ""))
+    _rel_assets(app)
+
+
+def _chosen_asset(app):
+    r = _chosen_release(app)
+    name = dpg.get_value("flash_asset") if dpg.does_item_exist("flash_asset") else ""
+    return r, next((a for a in (r or {}).get("assets") or [] if a["name"] == name), None)
+
+
+def _source_lines(app):
+    """What a flash from a source that is not the studio's build would put on the device, and what it changes."""
+    from native import firmware
+    src = flash_source(app)
+    d = app.active_device()
+    arch = (d or {}).get("arch")
+    L = []
+    if src == "release":
+        r, a = _chosen_asset(app)
+        if not r or not a:
+            return ["choose a version and a file (the list comes from WLED's releases on GitHub)"]
+        L.append(f"WLED {r['tag']} ({r['date']}{', a pre-release' if r['pre'] else ''}): {a['name']}, {a['size'] // 1024} KB - "
+                 f"WLED's own build, downloaded once into {firmware.CACHE}")
+        if firmware.chip(arch) == "esp32-s3":
+            L.append("an ESP32-S3 comes in several flash sizes and PSRAM types: pick the file for your board's (4M qspi, 8MB opi...)")
+    elif src == "checkout":
+        env = dpg.get_value("flash_env") or "?"
+        mods = [m for m in flash.usermods_of(env) if m not in ("cube_fx", flash.BUILTIN_STAGED, flash.USERMOD)]
+        L.append(f"WLED {flash.wled_version()[0]} from the checkout ({flash.ROOT}), built on {env} without the studio - "
+                 f"usermods: {', '.join(mods) or 'none'}")
+    else:
+        path = dpg.get_value("flash_file") if dpg.does_item_exist("flash_file") else ""
+        if not path or not os.path.exists(path):
+            return ["choose a .bin (Choose...), or type its path"]
+        ok, words = firmware.check(path, arch)
+        L.append(f"{path}: {os.path.getsize(path) // 1024} KB, {words}")
+        if not ok:
+            L.append("!! " + words)
+    L.append("the studio's cube effects, Studio Script (graphs sent as scripts) and the shape table go from the device until "
+             "a studio build is flashed again; WLED keeps its settings, presets and ledmap across an update")
+    if d:
+        L.append(f"device now: {d.get('name', '?')}, WLED {d.get('ver', '?')}, {d.get('arch', '?')}"
+                 + (", Studio Script" if d.get("script") else ""))
+    return L
 
 
 # --- a WLED checkout for the flash -----------------------------------------------------------
@@ -514,6 +690,17 @@ def refresh_live(app):
         dpg.set_value("live_on", on)
         if not on:
             dpg.set_value("live_status", "")
+            if dpg.does_item_exist("live_trace"):
+                dpg.configure_item("live_trace", show=False)
+    # the active device's protocol and first universe (a universe only where there are universes)
+    host = devices.clean_host(app.active_host()) if hasattr(app, "stream_out") else None
+    if host and dpg.does_item_exist("live_proto"):
+        proto, uni = app.stream_out(host)
+        dpg.set_value("live_proto", next(p[1] for p in live_out.PROTOCOLS if p[0] == proto))
+        dpg.set_value("live_universe", uni)
+        for tag in ("live_universe", "live_universe_label"):
+            if dpg.does_item_exist(tag):
+                dpg.configure_item(tag, show=proto != "ddp")
 
 
 def _wt_step(app, d):
@@ -556,6 +743,24 @@ def _ship_files(app):
 
 def _ship_all(app, on):
     app.project.options["ship"] = list(app.project.build_files()) if on else []
+    app.project.options["builtin_ship"] = None if on else []
+    app.project.save()
+    refresh_flash(app)
+
+
+def _ship_used(app):
+    """The project's effects, and of the built-ins only Studio Script."""
+    app.project.options["ship"] = list(app.project.build_files())
+    app.project.options["builtin_ship"] = [e["file"] for e in flash.builtin_catalog() if e["file"].startswith("cube_fx_98_")]
+    app.project.save()
+    refresh_flash(app)
+
+
+def _builtin_toggle(app, fname, on):
+    cur = set(flash.builtin_chosen(app.project))
+    (cur.add if on else cur.discard)(fname)
+    cat = [e["file"] for e in flash.builtin_catalog()]
+    app.project.options["builtin_ship"] = None if set(cat) <= cur else [f for f in cat if f in cur]
     app.project.save()
     refresh_flash(app)
 
@@ -597,12 +802,29 @@ def refresh_flash(app):
             kb = known.get(f)
             typeface.small(dpg.add_text(f"{kb / 1024:.1f} KB" if kb else "not measured yet", color=c.DIM))
     if not files:
-        weight.empty("flash_fx", "The effects list is empty: the firmware carries the effects on it.",
-                     [("Add this effect to the list", lambda: (app.toggle_import_current(), refresh_flash(app)))])
+        dpg.add_text("the project's effects list is empty: add effects to it to ship them", parent="flash_fx", color=c.DIM)
+    # the built-in cube effects, one by one: what each leans on beside it, its size once measured
+    cat = flash.builtin_catalog()
+    chosen_b = set(flash.builtin_chosen(app.project))
+    if cat:
+        typeface.small(dpg.add_text(f"built-in cube effects: {len(chosen_b)} of {len(cat)} - an unticked one is not compiled",
+                                    parent="flash_fx", color=c.ACCENT))
+        for e in cat:
+            with dpg.group(horizontal=True, parent="flash_fx"):
+                dpg.add_checkbox(default_value=e["file"] in chosen_b, user_data=e["file"],
+                                 callback=lambda s, a, u: _builtin_toggle(app, u, bool(a)))
+                dpg.add_text(e["name"].replace("Ace 3-D ", ""))
+                words = [flash.NEED_WORDS[k] for k in sorted(e["needs"]) if k in flash.NEED_WORDS]
+                kb = known.get(e["file"])
+                typeface.small(dpg.add_text((f"{kb / 1024:.1f} KB" if kb else "") + (" - " if kb and words else "")
+                                            + (", ".join(words) if words else ""), color=c.DIM))
+        for name, miss in flash.builtin_missing(app.project):
+            dpg.add_text(f"{name.replace('Ace 3-D ', '')} needs {', '.join(miss)}, left out in the features below",
+                         parent="flash_fx", color=c.AMBER, wrap=0)
     if stats.get("partition"):
         base = stats["firmware"] - sum(sizes.values())
         avg = (sum(sizes.values()) / len(sizes)) if sizes else 4096
-        est = base + sum(known.get(f, avg) for f in ship)
+        est = base + sum(known.get(f, avg) for f in ship) + sum(known.get(f, 0) for f in flash.builtin_chosen(app.project))
         over = est - stats["partition"]
         if base > stats["partition"]:
             dpg.set_value("flash_budget", f"no selection fits: {base // 1024} KB before any effect, "
@@ -630,7 +852,7 @@ def refresh_manifest(app, env=None):
     env = env or dpg.get_value("flash_env") or ""
     dpg.delete_item("flash_manifest", children_only=True)
     from native import paths
-    if not paths.has_tree():
+    if not paths.has_tree() and flash_source(app) in ("studio", "checkout"):
         dpg.add_text("Flashing builds the firmware in a checkout of the WLED fork, and there is none here. "
                      "Get one below (a minute), or set WLED_ROOT to one you have; PlatformIO is needed too. "
                      "Everything else - the sim, building effects, every send to the device - needs neither.",
@@ -644,6 +866,10 @@ def refresh_manifest(app, env=None):
         for t in ("flash_start", "flash_env"):
             if dpg.does_item_exist(t):
                 dpg.configure_item(t, enabled=False)
+        return
+    if flash_source(app) != "studio":
+        for line in _source_lines(app):
+            dpg.add_text(line, parent="flash_manifest", color=c.RED if line.startswith("!!") else c.TEXT, wrap=0)
         return
     if not env:
         dpg.add_text("choose an environment", parent="flash_manifest", color=c.DIM); return
@@ -700,12 +926,15 @@ def preview_build(app):
     dpg.configure_item("flash_status", color=c.DIM)
 
 
-def start_flash(app):
+def start_flash(app, confirmed=False):
     if app.flash_job and not app.flash_job.done:
         return
     c = _c()
     env = dpg.get_value("flash_env")
     host = app.active_host()
+    src = flash_source(app)
+    if src != "studio":
+        _start_other(app, src, env, host, confirmed); return
     from native import paths
     if not paths.has_tree():
         dpg.set_value("flash_status", "no WLED checkout: set WLED_ROOT to one and start the app again"); return
@@ -730,8 +959,51 @@ def start_flash(app):
     app.flash_job.start()
 
 
+def _start_other(app, src, env, host, confirmed):
+    """A flash from a release, the checkout or a .bin: asked about first when it goes to a device, as it takes
+    the studio's effects off it."""
+    from native import paths
+    c = _c()
+    send = bool(dpg.get_value("flash_upload"))
+    if send and not host:
+        dpg.set_value("flash_status", "no device chosen to send to (Window > Devices...), or untick sending"); return
+    release = path = None
+    if src == "release":
+        r, a = _chosen_asset(app)
+        if not r or not a:
+            dpg.set_value("flash_status", "choose a version and a file"); return
+        release, what = (r["tag"], a), f"WLED {r['tag']} ({a['name']})"
+    elif src == "file":
+        path = (dpg.get_value("flash_file") or "").strip()
+        if not os.path.exists(path):
+            dpg.set_value("flash_status", "choose a .bin first"); return
+        what = os.path.basename(path)
+    else:
+        if not paths.has_tree():
+            dpg.set_value("flash_status", "no WLED checkout: set WLED_ROOT to one and start the app again"); return
+        if not env:
+            dpg.set_value("flash_status", "choose an environment"); return
+        what = f"WLED from the checkout ({env})"
+    if send and not confirmed:
+        d = app.active_device() or {}
+        c.confirm(app, "Flash this firmware?",
+                  f"{what} to {d.get('name') or host}. The studio's cube effects, Studio Script and the shape table go "
+                  "from the device until a studio build is flashed again; WLED keeps its settings.",
+                  [("Flash it", lambda: start_flash(app, confirmed=True), "danger"), ("Cancel", None)])
+        return
+    dpg.delete_item("flash_log", children_only=True)
+    dpg.set_value("flash_status", "working...")
+    dpg.configure_item("flash_status", color=c.DIM)
+    dpg.configure_item("flash_start", enabled=False)
+    dpg.configure_item("flash_cancel", enabled=True)
+    app.flash_job = flash.Job(app.project, env, host, build=bool(dpg.get_value("flash_build")), upload=send,
+                              source=src, release=release, bin_path=path)
+    app.flash_job.start()
+
+
 def poll_flash(app):
     """Every frame: the job's lines into the log, its end into the status."""
+    _poll_releases(app)
     job = getattr(app, "flash_job", None)
     if job is None or not dpg.does_item_exist("flash_log"):
         return
@@ -752,7 +1024,7 @@ def poll_flash(app):
         dpg.configure_item("flash_status", color=c.GREEN if job.ok else c.RED)
         dpg.configure_item("flash_start", enabled=True)
         dpg.configure_item("flash_cancel", enabled=False)
-        if job.stats:
+        if job.stats and job.source == "studio":                  # a stock build's sizes are not the studio's
             st = dict(app.project.options.get("flash_stats") or {})
             st[job.base_env] = job.stats
             app.project.options["flash_stats"] = st

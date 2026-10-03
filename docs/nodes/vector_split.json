@@ -1,0 +1,146 @@
+{
+ "node": "Vector split",
+ "star": 1,
+ "caption": "Vector split: each pixel's position taken apart into x, y and z - shown as red, green and blue",
+ "why": [
+  "A vector wire carries three numbers at once, which is tidy until you need just one of them: the height of a position, the up part of a direction. Vector split takes a vector apart into its x, y and z.",
+  "Its neighbours: Vector builds one from three numbers; Position and Direction already offer their parts as outputs; Vector split takes apart any vector - one from Vector math, Mirror fold or Vector rotate."
+ ],
+ "steps": [
+  "**v** is **Position**'s `pos`: each pixel's place in the cube as one vector.",
+  "`x`, `y` and `z` are its three parts, each -1..1.",
+  "Each goes through a **Remap** into 0..1 and into a **Combine**: x is the red, y the green, z the blue.",
+  "So the cube is coloured by place: red toward the east, green toward the north, blue toward the lid - white at the corner where all three are high."
+ ],
+ "try": [
+  {
+   "label": "Brighter top",
+   "text": "the z Remap's out low at 0.5: blue never drops below half, so the whole cube is tinted blue and the lid glows.",
+   "set": [
+    [
+     5,
+     "out_lo",
+     0.5
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Vector split",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Vector split",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Remap",
+    "params": {
+     "in_lo": -1.0,
+     "in_hi": 1.0,
+     "out_lo": 0.0,
+     "out_hi": 1.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Remap",
+    "params": {
+     "in_lo": -1.0,
+     "in_hi": 1.0,
+     "out_lo": 0.0,
+     "out_hi": 1.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Remap",
+    "params": {
+     "in_lo": -1.0,
+     "in_hi": 1.0,
+     "out_lo": 0.0,
+     "out_hi": 1.0
+    },
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Combine",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "pos",
+    1,
+    "v"
+   ],
+   [
+    1,
+    "x",
+    3,
+    "x"
+   ],
+   [
+    1,
+    "y",
+    4,
+    "x"
+   ],
+   [
+    1,
+    "z",
+    5,
+    "x"
+   ],
+   [
+    3,
+    "result",
+    6,
+    "r"
+   ],
+   [
+    4,
+    "result",
+    6,
+    "g"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "b"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

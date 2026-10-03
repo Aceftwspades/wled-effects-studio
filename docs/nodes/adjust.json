@@ -1,0 +1,189 @@
+{
+ "node": "Adjust",
+ "star": 1,
+ "caption": "Adjust: a scrolling palette with its hue turned slowly round the wheel and its saturation boosted",
+ "why": [
+  "Once a colour is made, you often want it a bit different: warmer, paler, punchier, the opposite. Adjust is the photo-editing panel for one colour - turn the hue, raise or drain the saturation, brighten, add contrast, bend the mids with gamma, or invert.",
+  "Because it works on whatever colour comes in, it is the easy way to vary a whole effect: one Adjust before the Output changes everything. Its neighbours: Levels is just brightness, contrast and gamma; Scale and Fade only dim; HSV builds a colour from hue, saturation and value; Adjust changes one you already have."
+ ],
+ "steps": [
+  "The usual scrolling palette - **Speed** times **Time**, plus **Coords** `u`, into a **Palette**'s index - goes into Adjust's **color**.",
+  "**hue** comes from a slow clock (**Time** times 0.1): every colour is turned round the wheel, a tenth of a turn a second, so the whole palette drifts through other hues.",
+  "**saturation** is 1.4: colours a little more vivid than the palette's own. **value** (1) is a brightness multiplier, **contrast** (1) pushes toward black and white above 1, **gamma** (1) lifts the mids below 1.",
+  "**invert** is off. The adjusted colour goes to the **Output**."
+ ],
+ "try": [
+  {
+   "label": "Invert",
+   "text": "invert on: every colour becomes its opposite - red to cyan, blue to yellow.",
+   "set": [
+    [
+     1,
+     "invert",
+     true
+    ]
+   ]
+  },
+  {
+   "label": "Greyscale",
+   "text": "saturation 0: all colour drained, only brightness left.",
+   "set": [
+    [
+     1,
+     "saturation",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Punchy",
+   "text": "contrast 2 and gamma 0.6: darks pushed down, brights up, mids lifted - a harder, more saturated look.",
+   "set": [
+    [
+     1,
+     "contrast",
+     2.0
+    ],
+    [
+     1,
+     "gamma",
+     0.6
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Adjust",
+  "nodes": [
+   {
+    "id": 10,
+    "type": "Speed",
+    "params": {
+     "label": "Speed",
+     "default": 128
+    },
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 12,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 14,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 16,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 3,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.1
+    }
+   },
+   {
+    "id": 1,
+    "type": "Adjust",
+    "params": {},
+    "inputs": {
+     "saturation": 1.4,
+     "value": 1.0,
+     "contrast": 1.0,
+     "gamma": 1.0,
+     "invert": false
+    }
+   },
+   {
+    "id": 5,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    10,
+    "value",
+    12,
+    "a"
+   ],
+   [
+    11,
+    "t",
+    12,
+    "b"
+   ],
+   [
+    13,
+    "u",
+    14,
+    "a"
+   ],
+   [
+    12,
+    "result",
+    14,
+    "b"
+   ],
+   [
+    14,
+    "result",
+    16,
+    "index"
+   ],
+   [
+    16,
+    "color",
+    1,
+    "color"
+   ],
+   [
+    3,
+    "t",
+    4,
+    "a"
+   ],
+   [
+    4,
+    "result",
+    1,
+    "hue"
+   ],
+   [
+    1,
+    "color",
+    5,
+    "color"
+   ]
+  ]
+ }
+}

@@ -1,0 +1,113 @@
+{
+ "node": "Spectrum history",
+ "star": 1,
+ "caption": "Spectrum history: a waterfall - the spectrum across the top, the last two seconds of it flowing down",
+ "why": [
+  "A spectrum shows the music now; a waterfall shows it over time - the bands across, the past flowing down the picture - so you can see the rhythm as well as the pitch. Spectrum history keeps the sixteen bands for the last two seconds and lets you read any band at any age.",
+  "Its neighbours: Spectrum is only now; Previous at could scroll a picture down by itself; Spectrum history is the past of the bands, ready to read."
+ ],
+ "steps": [
+  "**index** is unwired, so it is the pixel's own `u`: the bands across the matrix.",
+  "**age** is unwired, so it is the pixel's `v`: now at the top (0), two seconds ago at the bottom (1).",
+  "`level` is how loud that band was at that age; times 2.5 (a **Multiply**, as most bands are quiet) it is the **Palette**'s brightness, coloured by `u`.",
+  "Each kick is a bright line across the low bands that slides down the matrix and leaves at the bottom two seconds later."
+ ],
+ "try": [
+  {
+   "label": "Now only",
+   "text": "age typed 0: every row reads the present, so the waterfall becomes a flat display of the current spectrum.",
+   "set": [
+    [
+     1,
+     "age",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "One band",
+   "text": "index typed 0.1: every column reads the same low band - its last two seconds down the matrix, a scrolling beat graph.",
+   "set": [
+    [
+     1,
+     "index",
+     0.1
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Spectrum history",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Spectrum history",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 2.5
+    }
+   },
+   {
+    "id": 3,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "index"
+   ],
+   [
+    1,
+    "level",
+    5,
+    "a"
+   ],
+   [
+    5,
+    "result",
+    3,
+    "brightness"
+   ],
+   [
+    3,
+    "color",
+    4,
+    "color"
+   ]
+  ]
+ }
+}

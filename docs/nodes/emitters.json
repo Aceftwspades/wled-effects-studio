@@ -1,0 +1,171 @@
+{
+ "node": "Emitters",
+ "star": 3,
+ "caption": "Emitters: a point dropped on the cube on every beat, each growing into a ring drawn by Shells",
+ "why": [
+  "Some effects are made of events: something happens at a place, at a moment, and spreads or fades from there. Emitters keeps track of them - on each trigger it drops one at a place on the surface, and it remembers up to eight at once, with where each is, how old, and a tag of your choice.",
+  "It does not draw anything itself; Shells (rings growing from each one) reads it. Its neighbours: Particles keeps moving points with velocity and gravity; Random hold picks one random number per trigger; Emitters is a set of events in space and time."
+ ],
+ "steps": [
+  "**Audio**'s `beat` is the **trigger**: each kick drops a new emitter.",
+  "**random** is on, so each one lands at a random place on the cube's surface; with it off they all start at **pos** (here the middle of the lid, 0, 0, 1).",
+  "**life** is 4: each lives four seconds, then its slot is free again. **tag** comes from a **Random hold** on the same beat - each emitter gets its own number, read back as its colour.",
+  "`slots` goes to **Shells** (with **Position**'s `pos`), which draws each emitter as a ring growing from where it landed; `count` is how many are alive."
+ ],
+ "try": [
+  {
+   "label": "Always from the top",
+   "text": "random off: every emitter starts at pos, the middle of the lid - each beat sends a ring down the cube from the top.",
+   "set": [
+    [
+     3,
+     "random",
+     false
+    ]
+   ]
+  },
+  {
+   "label": "Short lives",
+   "text": "life 1: each emitter lives one second, so only the newest ring or two are on the cube at once.",
+   "set": [
+    [
+     3,
+     "life",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "trace": [
+  [
+   3,
+   "count"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Emitters",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Random hold",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Emitters",
+    "params": {
+     "random": true
+    },
+    "inputs": {
+     "life": 4.0,
+     "pos": [
+      0.0,
+      0.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "id": 5,
+    "type": "Position",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Shells",
+    "params": {},
+    "inputs": {
+     "speed": 1.0,
+     "width": 0.2
+    }
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "both",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "beat",
+    3,
+    "trigger"
+   ],
+   [
+    1,
+    "beat",
+    2,
+    "trigger"
+   ],
+   [
+    2,
+    "value",
+    3,
+    "tag"
+   ],
+   [
+    3,
+    "slots",
+    4,
+    "slots"
+   ],
+   [
+    5,
+    "pos",
+    4,
+    "pos"
+   ],
+   [
+    4,
+    "tag",
+    6,
+    "index"
+   ],
+   [
+    4,
+    "value",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ]
+  ]
+ }
+}

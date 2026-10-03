@@ -1,9 +1,11 @@
 """The MIDI window and the learn gesture (midi.py holds the port, the
-messages and the maps). Window > MIDI controller...: the port, a
-target and Learn, the mappings with a range each and a remove. A
-right-click on a parameter slider offers Learn there, and so does a
-node pin's menu; a learnt knob moves the slider, the picture and - with
-the sim streamed - the device.
+messages and the maps). Window > MIDI and OSC...: the port, a target
+and Learn, the mappings with a range each and a remove. A right-click on
+a parameter slider offers Learn there, and so does a node pin's menu; a
+learnt knob moves the slider, the picture and - with the sim streamed -
+the device. OSC (osc.py) comes in beside it: a phone's or a tablet's
+faders, on a UDP port the window turns on, learnt and mapped as the
+knobs are.
 """
 import dearpygui.dearpygui as dpg
 
@@ -12,7 +14,7 @@ from native import nodeface
 from native import num
 from native import typeface
 
-from native import midi, weight
+from native import midi, osc, weight
 
 TAG = "midi_win"
 
@@ -29,10 +31,12 @@ def _st(app):
 def build(app):
     c = _c()
     app.midi = midi.MidiIn()
+    app.osc = osc.OscIn()
     app._midi_learn = None
     app._midi_opened = False
-    with dpg.window(tag=TAG, label="MIDI controller", no_title_bar=True, show=False, width=px(600), height=px(440), no_collapse=True):
-        c.dialog_header(TAG, "MIDI controller")                 # one window style (C8): the frames' header
+    app._osc_error = ""
+    with dpg.window(tag=TAG, label="MIDI and OSC", no_title_bar=True, show=False, width=px(600), height=px(470), no_collapse=True):
+        c.dialog_header(TAG, "MIDI and OSC")                    # one window style (C8): the frames' header
         dpg.add_text("", tag="midi_note", color=c.DIM, wrap=px(580))
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("PORT", color=c.ACCENT))
@@ -41,14 +45,27 @@ def build(app):
             c.tip("the MIDI inputs on this PC, listed again - plug the controller in, then Rescan")
             dpg.add_text("", tag="midi_last", color=c.DIM)
         with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("OSC", color=c.ACCENT))
+            dpg.add_checkbox(label="listen on UDP port", tag="osc_on", default_value=False,
+                             callback=lambda s, v: set_osc(app, on=v))
+            c.tip("a phone's or a tablet's faders - TouchOSC, Open Stage Control, a DAW's OSC out - sent to this "
+                  "machine: Learn takes a fader as it takes a knob. OSC has no password: anyone on the network "
+                  "who reaches the port can move what is mapped, so it is off until turned on here")
+            typeface.mono(dpg.add_input_int(tag="osc_port", width=px(90), default_value=osc.DEFAULT_PORT, min_value=0,
+                                            max_value=65535, min_clamped=True, max_clamped=True, step=0, on_enter=True,
+                                            callback=lambda s, v: set_osc(app, port=int(v))))
+            c.tip("the port the sender sends to (TouchOSC's outgoing port); Enter to listen there")
+            dpg.add_text("", tag="osc_state", color=c.DIM)
+        with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("LEARN", color=c.ACCENT))
             dpg.add_combo([], tag="midi_target", width=px(300))
             dpg.add_button(label="Learn", tag="midi_learn_btn", width=px(80), callback=lambda: learn_from_combo(app))
             weight.primary(dpg.last_item())
-            c.tip("then move the knob (or press the button) that should drive it; Learn again cancels")
+            c.tip("then move the knob, the fader (or press the button) that should drive it; Learn again cancels")
             c.info("A target is a parameter slider, a check, the palette or the effect by index, or a typed value "
                    "on a pin of the graph open now (a pin's mapping belongs to that graph). A right-click on a "
-                   "parameter slider, or a pin's menu, offers Learn there. One knob may drive several targets.")
+                   "parameter slider, or a pin's menu, offers Learn there. One knob may drive several targets. "
+                   "An OSC fader sends 0..1 (an int 0..127 is taken as MIDI's); an XY pad's two numbers are two controls.")
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("CLOCK", color=c.ACCENT))
             dpg.add_checkbox(label="the synth's beat follows it", tag="midi_clock_on", default_value=True,
@@ -66,7 +83,7 @@ def build(app):
 
 def show(app):
     refresh(app)
-    _c()._centre(TAG, 600, 440)
+    _c()._centre(TAG, 600, 470)
     dpg.show_item(TAG)
 
 
@@ -107,7 +124,7 @@ def targets(app):
             except Exception:
                 continue
             for i in d["inputs"]:
-                if i["type"] in ("float", "bool") and (nid, i["name"]) not in wired:
+                if i["type"] in ("float", "bool") and (nid, i["name"]) not in wired and app.gp.pin_read(n, i):
                     out.append((f"{n['type']} #{nid} . {nodeface.label(n['type'], i['name'])}", pin_target(app, nid, i["name"])))
     return out
 
@@ -187,6 +204,9 @@ def refresh(app):
         dpg.set_value("midi_target", items[0] if items else "")
     dpg.configure_item("midi_learn_btn", label="cancel" if app._midi_learn else "Learn")
     dpg.set_value("midi_clock_on", bool(st.get("clock", True)))
+    dpg.set_value("osc_on", bool(st["osc"].get("on")))
+    dpg.set_value("osc_port", int(st["osc"].get("port", osc.DEFAULT_PORT)))
+    dpg.set_value("osc_state", app._osc_error or (f"listening on {app.osc.port}" if app.osc.port else ""))
     dpg.delete_item("midi_rows", children_only=True)
     for k, m in enumerate(st["maps"]):
         t = m["target"]
@@ -209,8 +229,45 @@ def refresh(app):
 def _last(app):
     if not dpg.does_item_exist("midi_last"):
         return
-    l = app.midi.last
-    dpg.set_value("midi_last", f"last: {midi.ctl_label(l[0])} = {l[1]}" if l else "")
+    l = max((x for x in (app.midi.last, app.osc.last) if x), key=lambda x: x[2], default=None)
+    if l is None:
+        dpg.set_value("midi_last", "")
+    else:
+        dpg.set_value("midi_last", f"last: {midi.ctl_label(l[0])} = " + (f"{l[1]:.3f}" if l[0][0] == "osc" else f"{l[1]}"))
+
+
+def set_osc(app, on=None, port=None):
+    """OSC on or off, or its port: the project's setting, and the listener with it."""
+    o = _st(app)["osc"]
+    if on is not None:
+        o["on"] = bool(on)
+    if port is not None:
+        o["port"] = max(0, min(65535, int(port)))
+    app.project.save()
+    open_osc(app)
+    refresh(app)
+
+
+def open_osc(app, quiet=False):
+    """The listener as the project has it: on its port, or closed. A port
+    another program holds is said, and the setting kept for next time."""
+    o = _st(app)["osc"]
+    app.osc.close()
+    app._osc_error = ""
+    if not o.get("on"):
+        if not quiet:
+            app.gp.status("OSC: off")
+        return
+    try:
+        # every interface, so a phone on the network reaches it ("host" in the project's setting narrows it:
+        # the tests listen on the loopback, and a firewall is not asked)
+        p = app.osc.open(int(o.get("port", osc.DEFAULT_PORT)), str(o.get("host") or "0.0.0.0"))
+    except (OSError, ValueError, OverflowError) as e:
+        app._osc_error = f"port {o.get('port')} cannot be opened ({getattr(e, 'strerror', None) or e})"
+        app.gp.status(f"OSC: {app._osc_error}", "warn")
+        return
+    if not quiet:
+        app.gp.status(f"OSC: listening on UDP port {p}")
 
 
 def _set_range(app, k, key, v):
@@ -253,12 +310,13 @@ def learn(app, target):
     app._midi_learn = target
     if target is not None:
         app.midi.drain()                                  # "the next control moved": from now, not the queue's past
+        app.osc.drain()
     if dpg.does_item_exist("midi_learn_btn"):
         dpg.configure_item("midi_learn_btn", label="cancel" if target else "Learn")
     if target is None:
         app.gp.status("MIDI learn cancelled")
-    elif not app.midi.port:
-        app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)} - no port is open yet (Window > MIDI controller)")
+    elif not app.midi.port and not app.osc.port:
+        app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)} - no port is open yet (Window > MIDI and OSC)")
     else:
         app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)}")
 
@@ -339,36 +397,40 @@ def poll(app):
             except Exception:
                 pass
     _clock(app, st)
-    evs = m.drain()
+    if getattr(app, "_osc_for", None) != app.project.path:
+        app._osc_for = app.project.path                   # the project's OSC: opened as the studio starts, and as
+        open_osc(app, quiet=True)                         # another project is opened - closed when its is off
+    # (control, value, its full scale): a knob's 0..127, an OSC fader's 0..1
+    evs = [(ctl, v, 127.0) for ctl, v in m.drain()] + [(ctl, v, 1.0) for ctl, v in app.osc.drain()]
     if not evs:
         return
     if app._midi_learn:
-        ctl, v = evs[0]
+        ctl, v, full = evs[0]
         target = app._midi_learn
         midi.bind(st, ctl, target)
         app.project.save()
         app._midi_learn = None
         app.gp.status(f"MIDI: {midi.ctl_label(ctl)} -> {target_label(app, target)}")
-        apply_target(app, target, v)
+        apply_target(app, target, v, full)
         if dpg.is_item_shown(TAG):
             refresh(app)
         return
     last = {}
-    for ctl, v in evs:
-        last[ctl] = v
+    for ctl, v, full in evs:
+        last[tuple(ctl)] = (v, full)
     for mp in st["maps"]:
-        v = last.get(tuple(mp["ctl"]))
-        if v is not None:
-            apply_target(app, mp["target"], v)
+        got = last.get(tuple(mp["ctl"]))
+        if got is not None:
+            apply_target(app, mp["target"], *got)
     if dpg.is_item_shown(TAG):
         _last(app)
 
 
-def apply_target(app, t, v):
-    """A control's value (0..127) onto its target: the engine, and the
-    widget that shows it."""
+def apply_target(app, t, v, full=127.0):
+    """A control's value (0..127; 0..`full`, an OSC fader's 0..1) onto its
+    target: the engine, and the widget that shows it."""
     kind = t.get("kind")
-    val = midi.value_for(t, v)
+    val = midi.value_for(t, v, full)
     if kind == "fx":
         key = t["key"]
         if app.eng.fx.get(key) == val:

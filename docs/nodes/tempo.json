@@ -1,0 +1,128 @@
+{
+ "node": "Tempo",
+ "star": 1,
+ "caption": "Tempo: the beat's speed measured, and a phase that runs 0 to 1 every beat in time with the music",
+ "why": [
+  "Reacting to each kick is one thing; moving in time with the music between kicks is another. Tempo measures the tempo from the gaps between beats and counts time in beats, so a wave can run once a bar, a pulse can land on the beat - at whatever speed the song goes.",
+  "On each hit the count snaps to the nearest whole beat, so it stays with the music. Its neighbours: Audio's beat is the hit itself; Counter counts hits; Time counts seconds; Tempo counts beats, smoothly, in between too."
+ ],
+ "steps": [
+  "**Audio**'s `beat` is the **beat** input. **fallback** is 120: the bpm it runs at when there are no beats (here the synth's beats are always there).",
+  "`bpm` is the measured tempo; `beats` counts beats; `phase` runs 0..1 through each beat; `bar` counts bars.",
+  "`phase` drives a level meter: the value plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the value, so a column is lit from the bottom as high as the value, in the **Palette**'s colours across - a ramp that rises through every beat and drops on the next.",
+  "The trace shows the phase: a sawtooth, one tooth per beat, locked to the synth's kicks."
+ ],
+ "try": [],
+ "trace": [
+  [
+   1,
+   "phase"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Tempo",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Tempo",
+    "params": {},
+    "inputs": {
+     "fallback": 120.0
+    }
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "beat",
+    1,
+    "beat"
+   ],
+   [
+    1,
+    "phase",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "b"
+   ],
+   [
+    21,
+    "result",
+    22,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    23,
+    "index"
+   ],
+   [
+    22,
+    "value",
+    23,
+    "brightness"
+   ],
+   [
+    23,
+    "color",
+    24,
+    "color"
+   ]
+  ]
+ }
+}

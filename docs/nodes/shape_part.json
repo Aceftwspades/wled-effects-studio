@@ -1,0 +1,275 @@
+{
+ "node": "Shape part",
+ "star": 1,
+ "caption": "Shape part: three rings of a shape - the picked one bright, a light chasing round each",
+ "why": [
+  "A shape built from parts - rings, strips, panels - is one long string of LEDs in wiring order. An effect usually wants to know which part a pixel is on and where along it, so each ring can chase on its own, or one part can be lit differently. Shape part says both.",
+  "It also gives a mask for one part you pick, the simplest way to make one ring or one strip special. Its neighbours: Coords and Pixel see the shape as one long strip; Position sees it in space; Shape part sees it as its parts. (On a matrix, a cube, or a device that has not been sent the shape, everything is part 0 of 1.)"
+ ],
+ "steps": [
+  "The shape is three rings of 12, 24 and 36 LEDs, one inside the next.",
+  "`along` runs 0..1 round each ring from its first LED to its last. Plus a clock (**Time** times 0.4, added) it goes into a **Wave** (1 cycle, saw): one bright head with a fading tail chasing round every ring at once.",
+  "`part` numbers the rings 0, 1, 2; times 0.3 (a **Multiply**) it is the **Palette**'s index, so each ring has its own colour.",
+  "**pick** is 1, so `mask` is true on the middle ring only: a **Select** gives 1 there and 0.25 elsewhere, multiplied into the brightness - the picked ring bright, the others dim. `count` says how many parts there are (3)."
+ ],
+ "try": [
+  {
+   "label": "Pick the inner ring",
+   "text": "pick 0: the mask moves to the first ring, so the small inner ring is the bright one.",
+   "set": [
+    [
+     1,
+     "pick",
+     0.0
+    ]
+   ]
+  },
+  {
+   "label": "Pick the outer ring",
+   "text": "pick 2: the outer ring is lit full.",
+   "set": [
+    [
+     1,
+     "pick",
+     2.0
+    ]
+   ]
+  },
+  {
+   "label": "Only the picked ring",
+   "text": "the Select's a at 0: the parts that are not picked go dark.",
+   "set": [
+    [
+     6,
+     "a",
+     0.0
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "shape",
+  "params": {
+   "parts": [
+    {
+     "kind": "ring",
+     "name": "ring",
+     "params": {
+      "n": 12,
+      "pitch": 1.0,
+      "radius": 0.0,
+      "start_deg": 0.0
+     },
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "rot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": 1.0,
+     "reverse": false
+    },
+    {
+     "kind": "ring",
+     "name": "ring",
+     "params": {
+      "n": 24,
+      "pitch": 1.0,
+      "radius": 0.0,
+      "start_deg": 0.0
+     },
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "rot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": 1.0,
+     "reverse": false
+    },
+    {
+     "kind": "ring",
+     "name": "ring",
+     "params": {
+      "n": 36,
+      "pitch": 1.0,
+      "radius": 0.0,
+      "start_deg": 0.0
+     },
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "rot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": 1.0,
+     "reverse": false
+    }
+   ]
+  }
+ },
+ "view": {
+  "pitch": 1.25,
+  "dist": 3.0
+ },
+ "graph": {
+  "name": "Tutorial Shape part",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Shape part",
+    "params": {},
+    "inputs": {
+     "pick": 1.0
+    }
+   },
+   {
+    "id": 2,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   },
+   {
+    "id": 4,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Wave",
+    "params": {
+     "shape": "saw"
+    },
+    "inputs": {
+     "cycles": 1.0,
+     "distort": 0.0,
+     "phase": 0.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Select",
+    "params": {},
+    "inputs": {
+     "a": 0.25,
+     "b": 1.0
+    }
+   },
+   {
+    "id": 7,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 8,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 9,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    2,
+    "t",
+    3,
+    "a"
+   ],
+   [
+    1,
+    "along",
+    4,
+    "a"
+   ],
+   [
+    3,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "x"
+   ],
+   [
+    1,
+    "mask",
+    6,
+    "on"
+   ],
+   [
+    5,
+    "value",
+    7,
+    "a"
+   ],
+   [
+    6,
+    "result",
+    7,
+    "b"
+   ],
+   [
+    1,
+    "part",
+    8,
+    "a"
+   ],
+   [
+    8,
+    "result",
+    9,
+    "index"
+   ],
+   [
+    7,
+    "result",
+    9,
+    "brightness"
+   ],
+   [
+    9,
+    "color",
+    10,
+    "color"
+   ]
+  ]
+ }
+}

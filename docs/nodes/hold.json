@@ -1,0 +1,235 @@
+{
+ "node": "Hold",
+ "star": 1,
+ "caption": "Hold: a slow wave (left), and the same wave sampled on each beat and held (right) - a staircase",
+ "why": [
+  "Sometimes a value should only change on the beat: a colour that moves on with each kick, a position that jumps to wherever the music has got to. Hold samples its input when the trigger fires and keeps that value until the next trigger - sample and hold.",
+  "Its neighbours: Random hold holds a new random number per trigger; Peak hold keeps the highest lately; Delay keeps last frame's; Hold keeps whatever its input was at the last trigger."
+ ],
+ "steps": [
+  "A slow **Wave** of the clock (**Time** times 0.25, sine) is the **x** input - a value gliding up and down.",
+  "**Audio**'s `beat` is the **trigger**: on each kick Hold takes x as it is then, and keeps it.",
+  "`changed` is true on the frame it takes a new value.",
+  "The left meter is the wave, the right one what Hold keeps: two meters - a **Threshold** on `u` switches a **Select** between the two values, left half and right half; each value plus `v` through a Threshold at 1 lights a column from the bottom as high as the value. The trace shows the smooth wave (grey) and Hold's staircase following it a beat at a time (orange)."
+ ],
+ "try": [
+  {
+   "label": "Faster wave",
+   "text": "the clock's Multiply at 1: the wave rises and falls within a few beats, so the staircase jumps by bigger steps.",
+   "set": [
+    [
+     2,
+     "b",
+     1.0
+    ]
+   ]
+  },
+  {
+   "label": "Slower wave",
+   "text": "the clock's Multiply at 0.05: the wave barely moves between beats - small steps.",
+   "set": [
+    [
+     2,
+     "b",
+     0.05
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   3,
+   "value"
+  ],
+  [
+   1,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Hold",
+  "nodes": [
+   {
+    "id": 5,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.25
+    }
+   },
+   {
+    "id": 3,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 1.0,
+     "distort": 0.0,
+     "phase": 0.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Audio",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Hold",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 0.5
+    }
+   },
+   {
+    "id": 22,
+    "type": "Select",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 23,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 25,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 26,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    5,
+    "t",
+    2,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    3,
+    "x"
+   ],
+   [
+    3,
+    "value",
+    1,
+    "x"
+   ],
+   [
+    4,
+    "beat",
+    1,
+    "trigger"
+   ],
+   [
+    20,
+    "u",
+    21,
+    "x"
+   ],
+   [
+    21,
+    "on",
+    22,
+    "on"
+   ],
+   [
+    3,
+    "value",
+    22,
+    "a"
+   ],
+   [
+    1,
+    "value",
+    22,
+    "b"
+   ],
+   [
+    22,
+    "result",
+    23,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    23,
+    "b"
+   ],
+   [
+    23,
+    "result",
+    24,
+    "x"
+   ],
+   [
+    20,
+    "u",
+    25,
+    "index"
+   ],
+   [
+    24,
+    "value",
+    25,
+    "brightness"
+   ],
+   [
+    25,
+    "color",
+    26,
+    "color"
+   ]
+  ]
+ }
+}

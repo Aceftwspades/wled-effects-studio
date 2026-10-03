@@ -1,0 +1,177 @@
+{
+ "node": "Vector rotate",
+ "star": 1,
+ "caption": "Vector rotate: each pixel's direction turned about the vertical axis by a clock - the noise pattern turns round the cube",
+ "why": [
+  "Turning a whole 3-D pattern - spinning it round the cube, tumbling it - means turning the direction or position it is drawn from. Vector rotate turns a vector about any axis by a number of turns: one node, and the whole picture rotates.",
+  "Its neighbours: Rotate turns a 2-D pair about the origin; Transform moves and zooms flat coordinates; Mirror fold reflects; Vector rotate turns in 3-D."
+ ],
+ "steps": [
+  "**v** is each pixel's **Direction**.",
+  "**axis** is (0, 0, 1): straight up. **turns** comes from a clock (**Time** times 0.08): one full turn every twelve and a half seconds.",
+  "The turned direction is split (**Vector split**) into a **Noise**'s x, y and z (scale 2.5): the noise pattern is drawn on the turned directions, so it turns round the cube - the lid spins, the walls slide past.",
+  "The noise picks a colour from the **Palette**."
+ ],
+ "try": [
+  {
+   "label": "Tumble",
+   "text": "axis (1, 0, 0): the turn is about a horizontal axis - the pattern rolls over the top and under.",
+   "set": [
+    [
+     1,
+     "axis",
+     [
+      1.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "label": "Diagonal",
+   "text": "axis (1, 1, 1): turning about the cube's corner-to-corner line - every face moves.",
+   "set": [
+    [
+     1,
+     "axis",
+     [
+      1.0,
+      1.0,
+      1.0
+     ]
+    ]
+   ]
+  }
+ ],
+ "shape": {
+  "kind": "cube",
+  "params": {
+   "B": 16
+  }
+ },
+ "graph": {
+  "name": "Tutorial Vector rotate",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Direction",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 1,
+    "type": "Vector rotate",
+    "params": {},
+    "inputs": {
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "id": 3,
+    "type": "Vector split",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Noise",
+    "params": {
+     "octaves": 1,
+     "roughness": 0.5
+    },
+    "inputs": {
+     "scale": 2.5
+    }
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.08
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "dir",
+    1,
+    "v"
+   ],
+   [
+    11,
+    "result",
+    1,
+    "turns"
+   ],
+   [
+    1,
+    "v",
+    3,
+    "v"
+   ],
+   [
+    3,
+    "x",
+    4,
+    "x"
+   ],
+   [
+    3,
+    "y",
+    4,
+    "y"
+   ],
+   [
+    3,
+    "z",
+    4,
+    "z"
+   ],
+   [
+    4,
+    "value",
+    5,
+    "index"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

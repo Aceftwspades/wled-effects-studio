@@ -1,0 +1,222 @@
+{
+ "node": "Colour 3",
+ "star": 3,
+ "caption": "Colour 3: the tertiary colour as sparkling accents over two-colour stripes",
+ "why": [
+  "Colour 3 is the third colour picker: for an accent - highlights, sparks, an outline - in a colour of its own.",
+  "Its neighbours: Colour 1 and Colour 2; Colour for a fixed one; Palette for a range."
+ ],
+ "steps": [
+  "Colour 3 has no inputs or settings: its `color` is the third colour picked on the WLED page.",
+  "It shows through a **Mask** of a **Sparkle** (reseeded ten times a second): sparks of the accent colour.",
+  "A **Blend** in max mode lays them over stripes of Colour 1 on a ground of Colour 2 (another Blend, by scrolling **Stripes**).",
+  "**Effect settings** names the three pickers Stripes, Background and Accent."
+ ],
+ "try": [
+  {
+   "label": "Pick another accent",
+   "text": "In the side panel's COLOURS section, pick another colour for Accent (Colour 3): the sparks' colour changes at once - the effect reads the picker every frame.",
+   "set": []
+  }
+ ],
+ "colours": [
+  16738816,
+  1056842,
+  15790335
+ ],
+ "graph": {
+  "name": "Tutorial Colour 3",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Colour 1",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Colour 2",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Colour 3",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Stripes",
+    "params": {},
+    "inputs": {
+     "count": 4.0,
+     "duty": 0.5
+    }
+   },
+   {
+    "id": 5,
+    "type": "Blend",
+    "params": {
+     "mode": "over"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 6,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 10.0
+    }
+   },
+   {
+    "id": 8,
+    "type": "Floor",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 9,
+    "type": "Sparkle",
+    "params": {},
+    "inputs": {
+     "density": 0.06
+    }
+   },
+   {
+    "id": 12,
+    "type": "Mask",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 13,
+    "type": "Blend",
+    "params": {
+     "mode": "max"
+    },
+    "inputs": {
+     "amount": 1.0
+    }
+   },
+   {
+    "id": 14,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 15,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "none",
+     "colours": "Stripes,Background,Accent"
+    },
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.4
+    }
+   }
+  ],
+  "links": [
+   [
+    11,
+    "result",
+    4,
+    "phase"
+   ],
+   [
+    2,
+    "color",
+    5,
+    "under"
+   ],
+   [
+    1,
+    "color",
+    5,
+    "over"
+   ],
+   [
+    4,
+    "value",
+    5,
+    "amount"
+   ],
+   [
+    6,
+    "t",
+    7,
+    "a"
+   ],
+   [
+    7,
+    "result",
+    8,
+    "x"
+   ],
+   [
+    8,
+    "result",
+    9,
+    "seed"
+   ],
+   [
+    3,
+    "color",
+    12,
+    "color"
+   ],
+   [
+    9,
+    "value",
+    12,
+    "mask"
+   ],
+   [
+    5,
+    "color",
+    13,
+    "under"
+   ],
+   [
+    12,
+    "color",
+    13,
+    "over"
+   ],
+   [
+    13,
+    "color",
+    14,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

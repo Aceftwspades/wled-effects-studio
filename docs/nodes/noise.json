@@ -1,0 +1,40 @@
+{
+ "node": "Noise",
+ "star": 4,
+ "caption": "Noise: smooth blobs drifting over the matrix, coloured by the palette; under it, the noise at the centre pixel",
+ "why": [
+  "Nature does not repeat: clouds, flames, water and smoke vary smoothly from place to place without a pattern you can see. Noise gives you that - a value 0..1 for every point, close to its neighbours' values, never the same twice across the picture.",
+  "Use it for anything organic, or to break up something too regular (added to a Wave's x, it wobbles the stripes). Compared with its neighbours: Wave repeats exactly; Hash and Sparkle are random per pixel, with no smoothness between neighbours; Noise is random but smooth."
+ ],
+ "steps": [
+  "**Coords** `u` and `v` go into **x** and **y**: every pixel asks the noise for the value at its own place on the matrix, so neighbouring pixels get neighbouring values - blobs.",
+  "**scale** is 4: how many blobs fit across a unit of x and y. Higher gives smaller, busier blobs; lower gives big slow clouds.",
+  "**Time** times 0.3 (the Multiply) goes into **z**. Noise is a 3-D field; moving through its third dimension makes the blobs change shape and drift without sliding, the way clouds boil.",
+  "The value picks a colour from the **Palette**; **Effect settings** starts the effect on Lava, so low values are dark red and high ones yellow - the blobs read as flame. Noise rarely reaches 0 or 1 (the trace stays near the middle): to use the whole palette, stretch it with a Remap.",
+  "**octaves** is 1 - one layer of blobs. **roughness** only matters with more octaves: how strong each finer layer is."
+ ],
+ "try": [
+  {"label": "Smaller blobs", "text": "scale 10: more blobs fit across, so the picture gets busy and fine - sparkly water rather than clouds.", "set": [[4, "scale", 10.0]]},
+  {"label": "Add detail", "text": "octaves 4 and roughness 0.6: three finer layers are added on top of the big blobs, so edges get ragged - smoke and flames rather than lava lamp.", "set": [[4, "octaves", 4], [4, "roughness", 0.6]]},
+  {"label": "Drift faster", "text": "the Multiply's b at 1.5: the clock runs through z five times as fast, so the blobs churn quickly.", "set": [[5, "b", 1.5]]}
+ ],
+ "trace": [[4, "value"]],
+ "graph": {
+  "name": "Tutorial Noise",
+  "nodes": [
+   {"id": 2, "type": "Time", "params": {}, "inputs": {}},
+   {"id": 3, "type": "Coords", "params": {}, "inputs": {}},
+   {"id": 5, "type": "Multiply", "params": {}, "inputs": {"b": 0.3}},
+   {"id": 4, "type": "Noise", "params": {"octaves": 1, "roughness": 0.5}, "inputs": {"scale": 4.0}},
+   {"id": 6, "type": "Palette", "params": {}, "inputs": {"brightness": 1.0}},
+   {"id": 7, "type": "Output", "params": {}, "inputs": {}},
+   {"id": 8, "type": "Effect settings", "params": {"palette": 8, "dimensions": "2-D", "audio": "none", "colours": ""}, "inputs": {}}
+  ],
+  "links": [
+   [2, "t", 5, "a"],
+   [3, "u", 4, "x"], [3, "v", 4, "y"], [5, "result", 4, "z"],
+   [4, "value", 6, "index"],
+   [6, "color", 7, "color"]
+  ]
+ }
+}

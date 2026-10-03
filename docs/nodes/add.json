@@ -1,0 +1,174 @@
+{
+ "node": "Add",
+ "star": 1,
+ "caption": "Add: a vertical wave plus a horizontal one - where both are bright, the sum is brightest",
+ "why": [
+  "Add is the most basic way to combine two things: a + b. It offsets a value (a coordinate plus a clock is a scroll) or sums two patterns into one, where each contributes its light.",
+  "Its neighbours: Multiply masks (both must be bright); Max keeps the brighter; Mix crossfades; Add lets both count, so where two patterns overlap the result is brighter than either."
+ ],
+ "steps": [
+  "A **Wave** along **Coords** `u` (3 cycles, scrolled by a clock) is **a**: vertical stripes.",
+  "A Wave along `v` (2 cycles) is **b**: horizontal stripes.",
+  "Add sums them, 0..2; a **Multiply** halves that into 0..1 for the **Palette**'s brightness. Where both stripes cross the sum is brightest; where neither, dark; where one, half.",
+  "The colour follows `u`."
+ ],
+ "try": [
+  {
+   "label": "More across",
+   "text": "the vertical Wave's cycles at 6: twice the vertical stripes - a finer weave.",
+   "set": [
+    [
+     3,
+     "cycles",
+     6.0
+    ]
+   ]
+  },
+  {
+   "label": "No halving",
+   "text": "the Multiply at 1: the sum is not halved, so wherever either stripe is lit the brightness tops out - a bolder grid.",
+   "set": [
+    [
+     5,
+     "b",
+     1.0
+    ]
+   ]
+  }
+ ],
+ "graph": {
+  "name": "Tutorial Add",
+  "nodes": [
+   {
+    "id": 2,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 3,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 3.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Wave",
+    "params": {
+     "shape": "sine"
+    },
+    "inputs": {
+     "cycles": 2.0,
+     "distort": 0.0
+    }
+   },
+   {
+    "id": 1,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.5
+    }
+   },
+   {
+    "id": 6,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 7,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 10,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 11,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   }
+  ],
+  "links": [
+   [
+    2,
+    "u",
+    3,
+    "x"
+   ],
+   [
+    11,
+    "result",
+    3,
+    "phase"
+   ],
+   [
+    2,
+    "v",
+    4,
+    "x"
+   ],
+   [
+    3,
+    "value",
+    1,
+    "a"
+   ],
+   [
+    4,
+    "value",
+    1,
+    "b"
+   ],
+   [
+    1,
+    "result",
+    5,
+    "a"
+   ],
+   [
+    2,
+    "u",
+    6,
+    "index"
+   ],
+   [
+    5,
+    "result",
+    6,
+    "brightness"
+   ],
+   [
+    6,
+    "color",
+    7,
+    "color"
+   ],
+   [
+    10,
+    "t",
+    11,
+    "a"
+   ]
+  ]
+ }
+}

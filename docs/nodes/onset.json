@@ -1,0 +1,177 @@
+{
+ "node": "Onset",
+ "star": 1,
+ "caption": "Onset: every hit in the sound - not only the kick - flashing a new colour",
+ "why": [
+  "Audio's beat listens for jumps in loudness, which mostly means the kick. Music has many more hits: snares, hats, plucked notes, a piano chord. Onset hears them - it watches all the bands for a rise bigger than they have been rising lately - and is true for one frame on each.",
+  "Narrow it to part of the spectrum to hear only the hats or only the snare. Its neighbours: Audio's beat is the kick; Tempo times the beat; Gate turns a level into on and off; Onset is any hit, anywhere in the sound."
+ ],
+ "steps": [
+  "Onset has one input, **sensitivity** (1.5): how far above the recent average a rise has to be to count. Lower hears more, higher only the strongest hits.",
+  "**from** and **to** (0 and 15) are the bands it listens to: all of them.",
+  "`onset` fires an **ADSR** (attack 5 ms, decay 250 ms) - a flash on each hit - and a **Random hold**, which picks a new colour on each.",
+  "The flash drives a level meter: the value plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the value, so a column is lit from the bottom as high as the value, in the **Palette**'s colours across - here the palette's index is the random colour rather than `u`. `strength` is how big the hit was. The trace shows the strength (grey) and the flashes (orange) - more of them than there are kicks."
+ ],
+ "try": [
+  {
+   "label": "Only big hits",
+   "text": "sensitivity 3: only the strongest hits count - mostly the kick and snare.",
+   "set": [
+    [
+     1,
+     "sensitivity",
+     3.0
+    ]
+   ]
+  },
+  {
+   "label": "Highs only",
+   "text": "from 9: only the high bands are watched - the hats and cymbals, not the kick.",
+   "set": [
+    [
+     1,
+     "from",
+     9
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "strength"
+  ],
+  [
+   3,
+   "value"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Onset",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Onset",
+    "params": {
+     "from": 0,
+     "to": 15
+    },
+    "inputs": {
+     "sensitivity": 1.5
+    }
+   },
+   {
+    "id": 3,
+    "type": "ADSR",
+    "params": {
+     "mode": "one shot"
+    },
+    "inputs": {
+     "attack": 5.0,
+     "decay": 250.0,
+     "sustain": 0.5,
+     "release": 400.0
+    }
+   },
+   {
+    "id": 4,
+    "type": "Random hold",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 30,
+    "type": "Effect settings",
+    "params": {
+     "palette": 11,
+     "dimensions": "2-D",
+     "audio": "volume",
+     "colours": ""
+    },
+    "inputs": {}
+   },
+   {
+    "id": 20,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 21,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 22,
+    "type": "Threshold",
+    "params": {},
+    "inputs": {
+     "at": 1.0
+    }
+   },
+   {
+    "id": 23,
+    "type": "Palette",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 24,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "onset",
+    3,
+    "gate"
+   ],
+   [
+    1,
+    "onset",
+    4,
+    "trigger"
+   ],
+   [
+    3,
+    "value",
+    21,
+    "a"
+   ],
+   [
+    20,
+    "v",
+    21,
+    "b"
+   ],
+   [
+    21,
+    "result",
+    22,
+    "x"
+   ],
+   [
+    22,
+    "value",
+    23,
+    "brightness"
+   ],
+   [
+    23,
+    "color",
+    24,
+    "color"
+   ],
+   [
+    4,
+    "value",
+    23,
+    "index"
+   ]
+  ]
+ }
+}

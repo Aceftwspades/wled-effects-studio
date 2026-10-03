@@ -1,0 +1,121 @@
+{
+ "node": "Time",
+ "star": 1,
+ "caption": "Time: the clock scrolling the palette across the matrix",
+ "why": [
+  "Anything that moves without being pushed by the music moves with the clock. Time counts seconds since the effect started; times a speed, it is a scroll, a spin, a drift. It also gives how long this frame took, for things that should move a fixed amount a second however fast the effect runs.",
+  "Its neighbours: Integrate grows at a rate (and keeps its place when the rate changes); Frame count counts frames; Tempo counts beats; Time is plain seconds."
+ ],
+ "steps": [
+  "Time has no inputs or settings. `t` is the seconds since the effect started; `frame ms` is how long this frame took, in milliseconds.",
+  "`t` times 0.3 (a **Multiply**) is added to **Coords** `u` (an **Add**): the **Palette**'s index, so the colours scroll steadily left.",
+  "The trace shows `frame ms`: steady here, as the sim runs at a fixed step; on the device it rises when the effect is busy."
+ ],
+ "try": [
+  {
+   "label": "Faster",
+   "text": "the Multiply at 1.5: the colours scroll five times as fast.",
+   "set": [
+    [
+     2,
+     "b",
+     1.5
+    ]
+   ]
+  },
+  {
+   "label": "Reverse",
+   "text": "the Multiply at -0.3: they scroll the other way.",
+   "set": [
+    [
+     2,
+     "b",
+     -0.3
+    ]
+   ]
+  }
+ ],
+ "trace": [
+  [
+   1,
+   "dt"
+  ]
+ ],
+ "graph": {
+  "name": "Tutorial Time",
+  "nodes": [
+   {
+    "id": 1,
+    "type": "Time",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 2,
+    "type": "Multiply",
+    "params": {},
+    "inputs": {
+     "b": 0.3
+    }
+   },
+   {
+    "id": 3,
+    "type": "Coords",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 4,
+    "type": "Add",
+    "params": {},
+    "inputs": {}
+   },
+   {
+    "id": 5,
+    "type": "Palette",
+    "params": {},
+    "inputs": {
+     "brightness": 1.0
+    }
+   },
+   {
+    "id": 6,
+    "type": "Output",
+    "params": {},
+    "inputs": {}
+   }
+  ],
+  "links": [
+   [
+    1,
+    "t",
+    2,
+    "a"
+   ],
+   [
+    3,
+    "u",
+    4,
+    "a"
+   ],
+   [
+    2,
+    "result",
+    4,
+    "b"
+   ],
+   [
+    4,
+    "result",
+    5,
+    "index"
+   ],
+   [
+    5,
+    "color",
+    6,
+    "color"
+   ]
+  ]
+ }
+}
