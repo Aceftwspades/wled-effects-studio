@@ -3388,6 +3388,9 @@ fork's 16_x merge.
       the canvas pans" (a middle-button drag posted to the window: none drawn
       mid-drag, all back inside nodes after) - it fails on the code before.
 
+Released as 1.8.1 (2026-10-04): the readouts while the canvas moves, the
+Library's turns and tag search, and the Video Switchboard example.
+
 ### Mapping the way of Lightwork (October 2026)
 
 - [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -
