@@ -40,7 +40,7 @@ Plug it into a Select to choose between two values, or into a mask to turn a lay
 
 **Used in**
 
-Box Fire (`box_fire.json`), Candy Knot (`candy_knot.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Moire (`moire.json`), Morph (`morph.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Candy Knot (`candy_knot.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Moire (`moire.json`), Morph (`morph.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Check 2
 
@@ -76,7 +76,7 @@ A common use: a layer that can be switched on and off - sparkles, an outline, a 
 
 **Used in**
 
-Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Slab Cut (`slab_cut.json`)
+Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Slab Cut (`slab_cut.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Check 3
 
@@ -109,6 +109,10 @@ Its neighbours: Check 1 and Check 2; Toggle; Select.
 
 - [Tick it](studio:try/check_3/1): In the side panel's PARAMETERS section, tick Reverse (Check 3): the colours turn round and scroll the other way.
 - [Rename it](studio:try/check_3/2): label Backwards: the slider is called Backwards on the WLED page (and in PARAMETERS) - the effect is rebuilt with the new name.
+
+**Used in**
+
+Video Switchboard (`video_switchboard.json`)
 
 ### Colour 1
 
@@ -227,7 +231,7 @@ Its neighbours: Custom 2 and Custom 3 are the next two (Custom 3 has only 32 ste
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Custom 2
 
@@ -263,7 +267,7 @@ Use it for a second quality of the effect next to Custom 1: a softness, a trail 
 
 **Used in**
 
-Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Slab Cut (`slab_cut.json`), Watershed (`watershed.json`)
+Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Slab Cut (`slab_cut.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Custom 3
 
@@ -335,7 +339,7 @@ Its neighbours: Speed is for how fast; Custom 1, 2 and 3 are extra sliders with 
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Speed
 
@@ -372,7 +376,7 @@ Its neighbours: Intensity is the other standard slider (how much); Custom 1, 2 a
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ## signals
 
@@ -454,7 +458,7 @@ Plug bass into a brightness and the effect pumps with the kick; plug beat into a
 
 **Used in**
 
-Box Fire (`box_fire.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Beat kick
 
@@ -527,7 +531,7 @@ Use it wherever a single steady colour is wanted, then shape it with a mask, a b
 
 **Used in**
 
-Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Meteors (`meteors.json`), Ring Rain (`ring_rain.json`), Snowstorm (`snowstorm.json`)
+Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Meteors (`meteors.json`), Ring Rain (`ring_rain.json`), Snowstorm (`snowstorm.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Counter
 
@@ -717,7 +721,7 @@ Put one between Audio and anything that would flicker. Its neighbours: Slew limi
 
 **Used in**
 
-Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Feigenbaum (`feigenbaum.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Watershed (`watershed.json`)
+Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Feigenbaum (`feigenbaum.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### FFT bin
 
@@ -934,7 +938,7 @@ Plug a Speed slider into rate and you have a scroll the slider controls, which k
 
 **Used in**
 
-Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Garlands (`garlands.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Garlands (`garlands.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Loudest bin
 
@@ -1779,7 +1783,7 @@ It gives the place several ways, for different jobs: `u` and `v` run 0..1 across
 
 **Used in**
 
-Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json`), Fan (`fan.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Shockwave (`shockwave.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Watershed (`watershed.json`)
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json`), Fan (`fan.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Shockwave (`shockwave.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Cube face
 
@@ -2856,7 +2860,7 @@ Its duty setting is what Wave cannot do cleanly: a thin bright line with wide ga
 
 **Used in**
 
-Fan (`fan.json`), Marquee (`marquee.json`), Pinwheel (`pinwheel.json`)
+Fan (`fan.json`), Marquee (`marquee.json`), Pinwheel (`pinwheel.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Text
 
@@ -2997,6 +3001,10 @@ The projection puts it on any shape: the picture as it is on a matrix or a cube'
 - [Big blocks](studio:try/video/3): style pixelate with blocks 8: the frame read in an 8 x 8 grid - easy to read on a small or sparse shape.
 - [No pattern](studio:try/video/4): the Blend's amount at 0: the stripe layer gone - the video alone.
 
+**Used in**
+
+Video Switchboard (`video_switchboard.json`)
+
 ### Voronoi
 
 Cells. Random points are scattered through space and every pixel belongs to the nearest one - the pattern of a giraffe, dried mud, stained glass. Feed Position (seamless on the cube) and use distance for soft cells, edge for the cracks between them, id to colour each cell.
@@ -3116,7 +3124,7 @@ Its neighbours: Mirror fold mirrors in 3-D with many copies; Flip mirrors coordi
 
 **Used in**
 
-Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Morph (`morph.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`)
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Morph (`morph.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Add
 
@@ -3153,7 +3161,7 @@ Its neighbours: Multiply masks (both must be bright); Max keeps the brighter; Mi
 
 **Used in**
 
-Box Fire (`box_fire.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Band
 
@@ -4012,7 +4020,7 @@ It is the everyday node between controls and the things they control. Its neighb
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Rotate
 
@@ -4050,7 +4058,7 @@ Three of them on the three pairs of x, y and z tumble a 3-D pattern. Its neighbo
 
 **Used in**
 
-Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Kaleidoscope (`kaleidoscope.json`), Liquid Tunnel (`liquid_tunnel.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`)
+Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Kaleidoscope (`kaleidoscope.json`), Liquid Tunnel (`liquid_tunnel.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Select
 
@@ -4083,7 +4091,7 @@ Its neighbours: Mix fades smoothly between two values; Not flips the switch; Col
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Sine
 
@@ -4196,7 +4204,7 @@ Its neighbours: Add sums; Abs makes the difference a distance; Vector math's dis
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Threshold
 
@@ -4234,7 +4242,7 @@ Its neighbours: Smoothstep is the soft version; Gate has two levels so a noisy v
 
 **Used in**
 
-Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Mandelbrot (`mandelbrot.json`), Meteors (`meteors.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Truchet Cube (`truchet_cube.json`)
+Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Mandelbrot (`mandelbrot.json`), Meteors (`meteors.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Vector
 
@@ -4496,7 +4504,7 @@ Chain Blends to stack as many layers as you like; amount sets how much of the to
 
 **Used in**
 
-Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Meteors (`meteors.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Snowstorm (`snowstorm.json`)
+Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Meteors (`meteors.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Snowstorm (`snowstorm.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Blur
 
@@ -5001,7 +5009,7 @@ Any pattern can be the mask: noise for clouds, a gradient for a fade, stripes fo
 
 **Used in**
 
-Liquid (`liquid.json`), Question Block (`question_block.json`)
+Liquid (`liquid.json`), Question Block (`question_block.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Palette
 
@@ -5040,7 +5048,7 @@ Use it for the colour of almost everything. Its neighbours: Colour ramp is a gra
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Palette source
 
@@ -5327,7 +5335,7 @@ They go into the effect's metadata, which WLED reads to set up its page when the
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Smiley (`smiley.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Smiley (`smiley.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ### Output
 
@@ -5358,7 +5366,7 @@ Everything else in the graph exists to work out that colour. Its neighbours: Gra
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Smiley (`smiley.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Smiley (`smiley.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
 
 ## graph
 

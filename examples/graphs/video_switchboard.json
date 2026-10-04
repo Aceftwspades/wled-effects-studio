@@ -1,0 +1,960 @@
+{
+ "name": "Video Switchboard",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Speed",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "label": "Spin speed",
+    "default": 96
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Intensity",
+   "pos": [
+    40,
+    170
+   ],
+   "params": {
+    "label": "Detail",
+    "default": 128
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Custom 1",
+   "pos": [
+    40,
+    300
+   ],
+   "params": {
+    "label": "Look",
+    "default": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Custom 2",
+   "pos": [
+    40,
+    430
+   ],
+   "params": {
+    "label": "Stripes",
+    "default": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Check 1",
+   "pos": [
+    40,
+    560
+   ],
+   "params": {
+    "label": "Kaleidoscope",
+    "default": false
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Check 2",
+   "pos": [
+    40,
+    690
+   ],
+   "params": {
+    "label": "Beat pulse",
+    "default": false
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Check 3",
+   "pos": [
+    40,
+    820
+   ],
+   "params": {
+    "label": "Negative",
+    "default": false
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Effect settings",
+   "pos": [
+    40,
+    950
+   ],
+   "params": {
+    "palette": 11,
+    "dimensions": "both",
+    "audio": "volume",
+    "colours": ""
+   },
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Coords",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Remap",
+   "pos": [
+    270,
+    170
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 0.6
+   },
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Integrate",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "wrap": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Subtract",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 13,
+   "type": "Subtract",
+   "pos": [
+    500,
+    170
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 14,
+   "type": "Rotate",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Abs",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Abs",
+   "pos": [
+    960,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Add",
+   "pos": [
+    1190,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.2
+   }
+  },
+  {
+   "id": 18,
+   "type": "Add",
+   "pos": [
+    1190,
+    170
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.2
+   }
+  },
+  {
+   "id": 19,
+   "type": "Select",
+   "pos": [
+    1420,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Select",
+   "pos": [
+    1420,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 21,
+   "type": "Remap",
+   "pos": [
+    1420,
+    430
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 1.0,
+    "out_hi": 8.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 22,
+   "type": "Remap",
+   "pos": [
+    1420,
+    560
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 4.0,
+    "out_hi": 32.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 23,
+   "type": "Video",
+   "pos": [
+    1650,
+    300.0
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 24,
+   "type": "Video",
+   "pos": [
+    1650,
+    495.0
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "edges"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 25,
+   "type": "Video",
+   "pos": [
+    1650,
+    690.0
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "pixelate"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 26,
+   "type": "Video",
+   "pos": [
+    1650,
+    885.0
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "palette"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 27,
+   "type": "Threshold",
+   "pos": [
+    1880,
+    300.0
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.25
+   }
+  },
+  {
+   "id": 28,
+   "type": "Select",
+   "pos": [
+    2110,
+    300.0
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 29,
+   "type": "Blend",
+   "pos": [
+    2340,
+    300.0
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 30,
+   "type": "Threshold",
+   "pos": [
+    1880,
+    495.0
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.5
+   }
+  },
+  {
+   "id": 31,
+   "type": "Select",
+   "pos": [
+    2110,
+    495.0
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 32,
+   "type": "Blend",
+   "pos": [
+    2340,
+    495.0
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 33,
+   "type": "Threshold",
+   "pos": [
+    1880,
+    690.0
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.75
+   }
+  },
+  {
+   "id": 34,
+   "type": "Select",
+   "pos": [
+    2110,
+    690.0
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 35,
+   "type": "Blend",
+   "pos": [
+    2340,
+    690.0
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 36,
+   "type": "Stripes",
+   "pos": [
+    2110,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "count": 6.0,
+    "duty": 0.2
+   }
+  },
+  {
+   "id": 37,
+   "type": "Palette",
+   "pos": [
+    2340,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 38,
+   "type": "Blend",
+   "pos": [
+    2570,
+    690
+   ],
+   "params": {
+    "mode": "screen"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 39,
+   "type": "Colour",
+   "pos": [
+    2570,
+    950
+   ],
+   "params": {
+    "rgb": [
+     255,
+     255,
+     255
+    ]
+   },
+   "inputs": {}
+  },
+  {
+   "id": 40,
+   "type": "Select",
+   "pos": [
+    2570,
+    1080
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 41,
+   "type": "Blend",
+   "pos": [
+    2800,
+    690
+   ],
+   "params": {
+    "mode": "difference"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 42,
+   "type": "Audio",
+   "pos": [
+    2800,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 43,
+   "type": "Envelope",
+   "pos": [
+    3030,
+    950
+   ],
+   "params": {
+    "attack": 10.0,
+    "release": 300.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 44,
+   "type": "Remap",
+   "pos": [
+    3260,
+    950
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.25,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 45,
+   "type": "Select",
+   "pos": [
+    3260,
+    820
+   ],
+   "params": {},
+   "inputs": {
+    "a": 1.0
+   }
+  },
+  {
+   "id": 46,
+   "type": "Mask",
+   "pos": [
+    3030,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 47,
+   "type": "Output",
+   "pos": [
+    3260,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   10,
+   "x"
+  ],
+  [
+   10,
+   "result",
+   11,
+   "rate"
+  ],
+  [
+   9,
+   "u",
+   12,
+   "a"
+  ],
+  [
+   9,
+   "v",
+   13,
+   "a"
+  ],
+  [
+   12,
+   "result",
+   14,
+   "x"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "y"
+  ],
+  [
+   11,
+   "value",
+   14,
+   "turns"
+  ],
+  [
+   14,
+   "x",
+   15,
+   "x"
+  ],
+  [
+   14,
+   "y",
+   16,
+   "x"
+  ],
+  [
+   15,
+   "result",
+   17,
+   "a"
+  ],
+  [
+   16,
+   "result",
+   18,
+   "a"
+  ],
+  [
+   5,
+   "on",
+   19,
+   "on"
+  ],
+  [
+   9,
+   "u",
+   19,
+   "a"
+  ],
+  [
+   17,
+   "result",
+   19,
+   "b"
+  ],
+  [
+   5,
+   "on",
+   20,
+   "on"
+  ],
+  [
+   9,
+   "v",
+   20,
+   "a"
+  ],
+  [
+   18,
+   "result",
+   20,
+   "b"
+  ],
+  [
+   2,
+   "value",
+   21,
+   "x"
+  ],
+  [
+   2,
+   "value",
+   22,
+   "x"
+  ],
+  [
+   19,
+   "result",
+   23,
+   "u"
+  ],
+  [
+   20,
+   "result",
+   23,
+   "v"
+  ],
+  [
+   19,
+   "result",
+   24,
+   "u"
+  ],
+  [
+   20,
+   "result",
+   24,
+   "v"
+  ],
+  [
+   21,
+   "result",
+   24,
+   "gain"
+  ],
+  [
+   19,
+   "result",
+   25,
+   "u"
+  ],
+  [
+   20,
+   "result",
+   25,
+   "v"
+  ],
+  [
+   22,
+   "result",
+   25,
+   "blocks"
+  ],
+  [
+   19,
+   "result",
+   26,
+   "u"
+  ],
+  [
+   20,
+   "result",
+   26,
+   "v"
+  ],
+  [
+   3,
+   "value",
+   27,
+   "x"
+  ],
+  [
+   27,
+   "on",
+   28,
+   "on"
+  ],
+  [
+   23,
+   "color",
+   29,
+   "under"
+  ],
+  [
+   24,
+   "color",
+   29,
+   "over"
+  ],
+  [
+   28,
+   "result",
+   29,
+   "amount"
+  ],
+  [
+   3,
+   "value",
+   30,
+   "x"
+  ],
+  [
+   30,
+   "on",
+   31,
+   "on"
+  ],
+  [
+   29,
+   "color",
+   32,
+   "under"
+  ],
+  [
+   25,
+   "color",
+   32,
+   "over"
+  ],
+  [
+   31,
+   "result",
+   32,
+   "amount"
+  ],
+  [
+   3,
+   "value",
+   33,
+   "x"
+  ],
+  [
+   33,
+   "on",
+   34,
+   "on"
+  ],
+  [
+   32,
+   "color",
+   35,
+   "under"
+  ],
+  [
+   26,
+   "color",
+   35,
+   "over"
+  ],
+  [
+   34,
+   "result",
+   35,
+   "amount"
+  ],
+  [
+   9,
+   "u",
+   36,
+   "x"
+  ],
+  [
+   11,
+   "value",
+   36,
+   "phase"
+  ],
+  [
+   9,
+   "v",
+   37,
+   "index"
+  ],
+  [
+   36,
+   "value",
+   37,
+   "brightness"
+  ],
+  [
+   35,
+   "color",
+   38,
+   "under"
+  ],
+  [
+   37,
+   "color",
+   38,
+   "over"
+  ],
+  [
+   4,
+   "value",
+   38,
+   "amount"
+  ],
+  [
+   7,
+   "on",
+   40,
+   "on"
+  ],
+  [
+   38,
+   "color",
+   41,
+   "under"
+  ],
+  [
+   39,
+   "color",
+   41,
+   "over"
+  ],
+  [
+   40,
+   "result",
+   41,
+   "amount"
+  ],
+  [
+   42,
+   "bass",
+   43,
+   "x"
+  ],
+  [
+   43,
+   "value",
+   44,
+   "x"
+  ],
+  [
+   6,
+   "on",
+   45,
+   "on"
+  ],
+  [
+   44,
+   "result",
+   45,
+   "b"
+  ],
+  [
+   41,
+   "color",
+   46,
+   "color"
+  ],
+  [
+   45,
+   "result",
+   46,
+   "mask"
+  ],
+  [
+   46,
+   "color",
+   47,
+   "color"
+  ]
+ ],
+ "implicit": 1
+}
