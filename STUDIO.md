@@ -3365,6 +3365,29 @@ Released as 1.8.0 (2026-10-03): audio sync out, the newer chips in the
 flasher, the override's one generated env, and the stock effects after the
 fork's 16_x merge.
 
+### After 1.8.0 (October 2026)
+
+- [x] **The Library keeps the previews' turns; its search finds tags in any
+      case** (9c66c5e - found filming the feature tour).
+- [x] **Video Switchboard** (`examples/graphs/video_switchboard.json`, 00bce0f):
+      live video routed by the effect's own switches - Look (four Video nodes'
+      styles by quarters of Custom 1), Kaleidoscope (u, v through a turned,
+      mirror-folded copy), Stripes, Negative, Beat pulse; Speed and Intensity
+      the spin and the detail. The example check plays the test pattern into
+      the Video node now (a video graph is dark without a picture).
+- [x] **Readouts trailing the canvas** (user, 2026-10-04: "pin values floating
+      through other nodes and dragging behind when dragging graph movement with
+      middle mouse button"). The readouts, range bars, hover plot, wire labels
+      and costs are drawn on a viewport drawlist from the nodes' rectangles as
+      imnodes drew them the frame before: while the canvas moved they trailed a
+      frame and stood on the nodes next to theirs (the cover check used the
+      same stale rectangles). `GraphPanel._overlay_paused`: while the canvas is
+      dragged with the middle button, nodes are dragged, the zoom changes or a
+      node's place on screen changes - and 0.12 s after - they stand aside, and
+      come back where they belong. Tested: `pointer_app.py`'s "readouts while
+      the canvas pans" (a middle-button drag posted to the window: none drawn
+      mid-drag, all back inside nodes after) - it fails on the code before.
+
 ### Mapping the way of Lightwork (October 2026)
 
 - [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -
