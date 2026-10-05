@@ -3426,6 +3426,10 @@ Library's turns and tag search, and the Video Switchboard example.
       the MIDI change, so not that. The sender goes once a frame at most; the
       check should count over time or the app's own frame rate.
 
+Released as 1.9.0 (2026-10-05): Paintball, Murmuration and Jelly Bounce, the
+Mandelbrot's trap-glow shading, switching effects from MIDI, and the sim's
+roster large enough for a project's graphs beside every stock effect.
+
 ### Mapping the way of Lightwork (October 2026)
 
 - [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -
