@@ -54,7 +54,7 @@
   #define CFX_BANK_SLOTS 36        // of ~39 available; the rest is headroom
 #endif
 #ifndef CFX_BANK_MAX_FX
-  #define CFX_BANK_MAX_FX 64       // roster capacity - compiled effects, not slots
+  #define CFX_BANK_MAX_FX 72       // roster capacity - compiled effects, not slots (65 since Paintball, Murmuration, Jelly Bounce)
 #endif
 
 struct CfxBankEntry {
