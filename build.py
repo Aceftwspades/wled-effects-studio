@@ -530,7 +530,7 @@ def main():
     cmd = ["em++", "-std=gnu++17", "-O2"]
     for d in include_dirs():                    # the same includes as the native build: the shim, the firmware, gen/, FastLED's slim copy
         cmd += ["-I", d]
-    cmd += ["-DWLED_PS_DONT_REPLACE_2D_FX", "-DCFX_BANK_MAX_FX=256",
+    cmd += ["-DWLED_PS_DONT_REPLACE_2D_FX", "-DCFX_BANK_MAX_FX=384",
             "-DCFX_SIM"] + srcs + [
         "-o", "cubefx.js",
         # HEAPU8/HEAPU32 must be listed explicitly - current Emscripten does not

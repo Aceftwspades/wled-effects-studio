@@ -2,7 +2,9 @@
 and unbound, a control's value as each target wants it, and the port
 list (empty or not) with or without python-rtmidi. A MIDI clock
 followed: its tempo, its beats, none while stopped, and the synth's own
-beat quiet while it plays. Run with
+beat quiet while it plays. Live effect switching: a Program Change
+parsed, the setlist picked from by number or by place, next and
+previous stepping and wrapping, a note-off never switching. Run with
 python tests/test_midi.py  or through pytest.
 """
 import os
@@ -20,6 +22,8 @@ def test_messages_parse_to_controls():
     assert midi.parse([0x90, 60, 90]) == (("note", 0, 60), 90)
     assert midi.parse([0x80, 60, 40]) == (("note", 0, 60), 0)             # off: 0 whatever the velocity
     assert midi.parse([0xE1, 0, 64]) == (("bend", 1, 0), 64)
+    assert midi.parse([0xC2, 5]) == (("pc", 2, 0), 5)                     # Program Change: the number is the value
+    assert midi.ctl_label(("pc", 2, 0)) == "program change ch 3"
     assert midi.parse([0xF8]) is None and midi.parse([]) is None          # a clock tick, nothing
     assert midi.ctl_label(("cc", 0, 7)) == "CC 7 ch 1" and midi.ctl_label(("note", 9, 36)) == "note 36 ch 10"
 
@@ -44,7 +48,8 @@ def test_maps_bind_once_and_unbind():
     class P:
         options = {}
     st = midi.state(P)
-    assert st == {"port": "", "maps": [], "clock": True, "osc": {"on": False, "port": 9000}}         and P.options["midi"] is st                                      # a port's clock followed; OSC off (osc.py)
+    assert st == {"port": "", "maps": [], "clock": True, "setlist": [], "pc": True, "xfade": 0.0, "xstyle": "fade",
+                  "osc": {"on": False, "port": 9000}}         and P.options["midi"] is st                                      # a port's clock followed; OSC off (osc.py)
     P.options["midi"]["osc"] = "on"                                      # a hand-edited project: made right again
     assert midi.state(P)["osc"] == {"on": False, "port": 9000}
     midi.bind(st, ("cc", 0, 7), {"kind": "fx", "key": "sx"})
@@ -67,6 +72,34 @@ def test_values_as_the_targets_want_them():
     assert midi.value_for({"kind": "pin", "bool": True}, 100) is True
     assert abs(midi.value_for({"kind": "palette"}, 127) - 1.0) < 1e-9
     assert midi.value_for({"kind": "effect"}, 200) == 1.0                  # clamped
+
+
+def test_the_setlist_and_stepping():
+    names = ["A", "B", "C", "D", "E"]
+    sl = ["D", "gone", "B", "E"]                                        # one no longer in the build: skipped
+    pc = ("pc", 0, 0)
+    assert midi.setlist_pick(names, sl, pc, 0) == "D"                   # program 1 (sent as 0) the first
+    assert midi.setlist_pick(names, sl, pc, 2) == "E"
+    assert midi.setlist_pick(names, sl, pc, 3) is None                  # beyond the list: nothing
+    assert midi.setlist_pick(names, sl, ("cc", 0, 1), 127) == "E"       # a knob: by place along it
+    assert midi.setlist_pick(names, sl, ("cc", 0, 1), 0) == "D"
+    assert midi.setlist_pick(names, [], pc, 0) is None
+    assert midi.step_effect(names, sl, "B", 1) == "E" and midi.step_effect(names, sl, "E", 1) == "D"   # wraps
+    assert midi.step_effect(names, sl, "D", -1) == "E"
+    assert midi.step_effect(names, sl, "A", 1) == "D" and midi.step_effect(names, sl, "A", -1) == "E"  # off the list
+    assert midi.step_effect(names, [], "E", 1) == "A"                   # no setlist: the whole list
+
+
+def test_switches_fire_on_the_press_only():
+    nxt, eff, fx = {"kind": "next"}, {"kind": "effect"}, {"kind": "fx", "key": "sx"}
+    note, cc = ("note", 0, 36), ("cc", 0, 20)
+    assert midi.fires(nxt, note, 100, None) and not midi.fires(nxt, note, 0, 100)      # press, not release
+    assert not midi.fires(eff, note, 0, 90)                             # a pad released never jumps to the first
+    assert midi.fires(eff, note, 90, 0)
+    assert midi.fires(nxt, cc, 127, 0) and not midi.fires(nxt, cc, 127, 120)           # a knob crossing the middle, once
+    assert not midi.fires(nxt, cc, 30, 0)
+    assert midi.fires(nxt, ("osc", "/next", 0), 1.0, 0.0, full=1.0)     # an OSC button: 0..1
+    assert midi.fires(fx, note, 0, 90)                                  # a slider still takes every value
 
 
 def test_a_clock_is_followed():

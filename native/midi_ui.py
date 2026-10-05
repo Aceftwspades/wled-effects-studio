@@ -5,7 +5,9 @@ a parameter slider offers Learn there, and so does a node pin's menu; a
 learnt knob moves the slider, the picture and - with the sim streamed -
 the device. OSC (osc.py) comes in beside it: a phone's or a tablet's
 faders, on a UDP port the window turns on, learnt and mapped as the
-knobs are.
+knobs are. Live effect switching (midi.py's notes): the SETLIST, picked
+from by Program Change or a learnt control; next and previous on a pad or
+a button; a crossfade between the outgoing effect and the incoming one.
 """
 import dearpygui.dearpygui as dpg
 
@@ -14,7 +16,7 @@ from native import nodeface
 from native import num
 from native import typeface
 
-from native import midi, osc, weight
+from native import midi, osc, weight, transition
 
 TAG = "midi_win"
 
@@ -35,7 +37,7 @@ def build(app):
     app._midi_learn = None
     app._midi_opened = False
     app._osc_error = ""
-    with dpg.window(tag=TAG, label="MIDI and OSC", no_title_bar=True, show=False, width=px(600), height=px(470), no_collapse=True):
+    with dpg.window(tag=TAG, label="MIDI and OSC", no_title_bar=True, show=False, width=px(600), height=px(640), no_collapse=True):
         c.dialog_header(TAG, "MIDI and OSC")                    # one window style (C8): the frames' header
         dpg.add_text("", tag="midi_note", color=c.DIM, wrap=px(580))
         with dpg.group(horizontal=True):
@@ -73,6 +75,33 @@ def build(app):
             c.tip("a drum machine's or a DAW's MIDI clock on the port: each beat of it fires the synth's, and its "
                   "tempo is the synth's - while it plays; stopped, the synth keeps its own beat again")
             dpg.add_text("", tag="midi_clock", color=c.DIM)
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("SETLIST", color=c.ACCENT))
+            dpg.add_button(label="Add current", tag="midi_sl_add", callback=lambda: setlist_add(app))
+            c.tip("the effect on screen onto the end of the setlist")
+            dpg.add_button(label="Up", tag="midi_sl_up", callback=lambda: setlist_move(app, -1))
+            c.tip("the selected effect one place earlier")
+            dpg.add_button(label="Down", tag="midi_sl_down", callback=lambda: setlist_move(app, 1))
+            c.tip("the selected effect one place later")
+            dpg.add_button(label="Remove", tag="midi_sl_rm", callback=lambda: setlist_remove(app))
+            weight.danger(dpg.last_item())
+            c.tip("the selected effect off the setlist")
+            dpg.add_checkbox(label="Program Change picks", tag="midi_pc_on", default_value=True,
+                             callback=lambda s, v: _set(app, "pc", bool(v)))
+            c.tip("a Program Change on the port selects from the setlist by its number - program 1 the first - "
+                  "with nothing to learn")
+        dpg.add_listbox([], tag="midi_setlist", num_items=5, width=-1)
+        c.tip("the effects to switch between live, in order: Program Change picks by number, next and previous step "
+              "through them (with no setlist, through every effect)")
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("CROSSFADE", color=c.ACCENT))
+            typeface.mono(dpg.add_input_float(tag="midi_xfade", width=px(90), default_value=0.0, min_value=0.0, max_value=10.0,
+                                              min_clamped=True, max_clamped=True, step=0, format="%.2f s", on_enter=True,
+                                              callback=lambda s, v: _set(app, "xfade", round(float(v), 2))))
+            c.tip("seconds the outgoing effect blends into the incoming one when MIDI switches; 0 cuts. Enter to set")
+            dpg.add_combo(transition.STYLES, tag="midi_xstyle", width=px(160), default_value="fade",
+                          callback=lambda s, v: _set(app, "xstyle", v))
+            c.tip("how the old effect gives way: a fade, a swipe, a push, a circle - the device's own transition styles")
         typeface.label(dpg.add_text("MAPPINGS", color=c.ACCENT))
         with dpg.child_window(tag="midi_rows", height=-1, border=True):
             pass
@@ -83,7 +112,7 @@ def build(app):
 
 def show(app):
     refresh(app)
-    _c()._centre(TAG, 600, 470)
+    _c()._centre(TAG, 600, 640)
     dpg.show_item(TAG)
 
 
@@ -115,6 +144,9 @@ def targets(app):
         seen[lab] = True
     out.append(("the palette, by index", {"kind": "palette"}))
     out.append(("the effect, by index", {"kind": "effect"}))
+    out.append(("the effect, from the setlist", {"kind": "setlist"}))
+    out.append(("next effect", {"kind": "next"}))
+    out.append(("previous effect", {"kind": "prev"}))
     g = app.gp.graph
     if g and app.gp.file:
         wired = {(b, i) for _, _, b, i in g.links}
@@ -161,6 +193,12 @@ def target_label(app, t):
         return "the palette"
     if kind == "effect":
         return "the effect"
+    if kind == "setlist":
+        return "the effect, from the setlist"
+    if kind == "next":
+        return "next effect"
+    if kind == "prev":
+        return "previous effect"
     if kind == "pin":
         g = app.gp.graph
         n = g.nodes.get(t.get("nid")) if g and app.gp.file == t.get("graph") else None
@@ -220,6 +258,14 @@ def refresh(app):
                     dpg.add_input_float(width=px(80), step=0, format="%g", default_value=float(t.get(key, 0.0)), user_data=(k, key),
                                         callback=lambda s_, v, u: _set_range(app, u[0], u[1], v))
                 c.tip("the pin's value at the knob's two ends")
+    items = [f"{k + 1}. {n}" + ("" if n in app.eng.names else "  (not in this build)") for k, n in enumerate(st["setlist"])]
+    keep = dpg.get_value("midi_setlist")
+    dpg.configure_item("midi_setlist", items=items)
+    if items:
+        dpg.set_value("midi_setlist", keep if keep in items else items[0])
+    dpg.set_value("midi_pc_on", bool(st.get("pc", True)))
+    dpg.set_value("midi_xfade", float(st.get("xfade", 0.0)))
+    dpg.set_value("midi_xstyle", st.get("xstyle", "fade") if st.get("xstyle") in transition.STYLES else "fade")
     if not st["maps"]:
         weight.empty("midi_rows", "No knobs on anything yet: pick what above and Learn, then move a knob - or right-click "
                                   "a slider, or a pin in the graph.")
@@ -268,6 +314,76 @@ def open_osc(app, quiet=False):
         return
     if not quiet:
         app.gp.status(f"OSC: listening on UDP port {p}")
+
+
+def _set(app, key, v):
+    _st(app)[key] = v
+    app.project.save()
+
+
+# --- the setlist --------------------------------------------------------------------------
+def _sel(app):
+    """The selected setlist row's place, or -1."""
+    v = dpg.get_value("midi_setlist") if dpg.does_item_exist("midi_setlist") else None
+    try:
+        return int(str(v).split(".", 1)[0]) - 1
+    except (TypeError, ValueError):
+        return -1
+
+
+def setlist_add(app, name=None):
+    st = _st(app)
+    name = name or app.eng.names[app.eng.idx]
+    st["setlist"].append(name)
+    app.project.save()
+    app.gp.status(f"setlist: {name} is number {len(st['setlist'])}")
+    refresh(app)
+    if dpg.does_item_exist("midi_setlist"):
+        dpg.set_value("midi_setlist", f"{len(st['setlist'])}. {name}")
+
+
+def setlist_move(app, d):
+    st = _st(app)
+    sl = st["setlist"]
+    k = _sel(app)
+    j = k + d
+    if not (0 <= k < len(sl) and 0 <= j < len(sl)):
+        return
+    sl[k], sl[j] = sl[j], sl[k]
+    app.project.save()
+    refresh(app)
+    dpg.set_value("midi_setlist", f"{j + 1}. {sl[j]}")
+
+
+def setlist_remove(app):
+    st = _st(app)
+    k = _sel(app)
+    if 0 <= k < len(st["setlist"]):
+        name = st["setlist"].pop(k)
+        app.project.save()
+        app.gp.status(f"setlist: {name} taken off")
+        refresh(app)
+
+
+def switch_effect(app, name):
+    """MIDI's effect change: the combo and the panel as a pick there would,
+    with the project's crossfade from the effect going out."""
+    if not name or name not in app.eng.names or name == app.eng.names[app.eng.idx]:
+        return
+    st = _st(app)
+    dur = float(st.get("xfade", 0.0) or 0.0)
+    prev = None
+    if dur > 0:
+        from native import sequence
+        try:
+            prev = sequence.capture(app.eng, app.seg_cols, int(getattr(app, "bri", 128)))
+        except Exception:
+            prev = None
+    app.on_effect(None, name)
+    if dpg.does_item_exist("fx_combo"):
+        dpg.set_value("fx_combo", name)
+    if prev is not None:
+        app.transition_start(prev, dur, st.get("xstyle", "fade") if st.get("xstyle") in transition.STYLES else "fade")
 
 
 def _set_range(app, k, key, v):
@@ -411,25 +527,51 @@ def poll(app):
         app.project.save()
         app._midi_learn = None
         app.gp.status(f"MIDI: {midi.ctl_label(ctl)} -> {target_label(app, target)}")
-        apply_target(app, target, v, full)
+        apply_target(app, target, v, full, tuple(ctl))
         if dpg.is_item_shown(TAG):
             refresh(app)
         return
+    # a slider or a pin takes the newest value of the frame; a switch takes
+    # every event in order - a pad's press and release can land in one frame
     last = {}
     for ctl, v, full in evs:
         last[tuple(ctl)] = (v, full)
     for mp in st["maps"]:
         got = last.get(tuple(mp["ctl"]))
-        if got is not None:
+        if got is not None and mp["target"].get("kind") not in midi.SWITCHES:
             apply_target(app, mp["target"], *got)
+    seen = getattr(app, "_midi_prev", None)
+    if seen is None:
+        seen = app._midi_prev = {}
+    for ctl, v, full in evs:
+        key = tuple(ctl)
+        before = seen.get(key)
+        mapped = False
+        for mp in st["maps"]:
+            if tuple(mp["ctl"]) != key or mp["target"].get("kind") not in midi.SWITCHES:
+                continue
+            mapped = True
+            if midi.fires(mp["target"], key, v, before, full):
+                apply_target(app, mp["target"], v, full, key)
+        if key[0] == "pc" and not mapped and st.get("pc", True) and st["setlist"]:
+            switch_effect(app, midi.setlist_pick(app.eng.names, st["setlist"], key, v))
+        seen[key] = v
     if dpg.is_item_shown(TAG):
         _last(app)
 
 
-def apply_target(app, t, v, full=127.0):
+def apply_target(app, t, v, full=127.0, ctl=None):
     """A control's value (0..127; 0..`full`, an OSC fader's 0..1) onto its
-    target: the engine, and the widget that shows it."""
+    target: the engine, and the widget that shows it. `ctl` the control it
+    came from (a Program Change picks the setlist by number)."""
     kind = t.get("kind")
+    if kind == "setlist":
+        switch_effect(app, midi.setlist_pick(app.eng.names, _st(app)["setlist"], ctl or ("cc", 0, 0), v, full))
+        return
+    if kind in midi.STEPS:
+        switch_effect(app, midi.step_effect(app.eng.names, _st(app)["setlist"], app.eng.names[app.eng.idx],
+                                            1 if kind == "next" else -1))
+        return
     val = midi.value_for(t, v, full)
     if kind == "fx":
         key = t["key"]
@@ -462,9 +604,7 @@ def apply_target(app, t, v, full=127.0):
         names = app.eng.names
         idx = int(round(val * (len(names) - 1)))
         if idx != app.eng.idx:
-            app.on_effect(None, names[idx])
-            if dpg.does_item_exist("fx_combo"):
-                dpg.set_value("fx_combo", names[idx])
+            switch_effect(app, names[idx])
     elif kind == "pin":
         g = app.gp.graph
         if not g or app.gp.file != t.get("graph") or t.get("nid") not in g.nodes:

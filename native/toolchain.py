@@ -42,11 +42,12 @@ IS_MAC = sys.platform == "darwin"
 
 # Flags every translation unit gets. The comments on WHY live in build.py's
 # history; briefly: legacy 2-D effects instead of the particle system, a roster
-# big enough for every stock effect, MSVC's M_PI gate, and CFX_SIM to skip the
+# big enough for every stock effect (384: 256 was outgrown once a project's graphs joined
+# the stock set and the Ace family - the last stock effects silently fell off), MSVC's M_PI gate, and CFX_SIM to skip the
 # settings-page code that reaches into FX_fcn.cpp.
 COMMON_FLAGS = ["-std=gnu++17", "-O2",
                 "-D_USE_MATH_DEFINES", "-DWLED_PS_DONT_REPLACE_2D_FX",
-                "-DCFX_BANK_MAX_FX=256", "-DCFX_SIM",
+                "-DCFX_BANK_MAX_FX=384", "-DCFX_SIM",
                 "-Wno-vla-cxx-extension", "-Wno-unknown-attributes",
                 "-Wno-deprecated-declarations", "-Wno-unused-value"]
 

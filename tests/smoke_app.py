@@ -320,6 +320,23 @@ STEPS = [
       {"py": "__import__('socket').socket(2, 2).sendto(__import__('native.osc', fromlist=['osc']).message('/1/fader1', 0.2), "
              "('127.0.0.1', app.osc.port))"}], 0.8),
     ([{"check": "app.eng.fx['ix'] == 51"}, {"py": "midi_ui.set_osc(app, on=False)"}], 0.3),
+    # live effect switching: a Program Change picks from the setlist with nothing learnt; next learnt on a pad
+    # (learning it steps once, wrapping); a release alone switches nothing, a press and release in one frame steps
+    # once; with a crossfade set, a switch blends from the effect going out; the effect put back
+    ([{"py": "setattr(app, '_sm_fx', app.eng.names[app.eng.idx]) or "
+             "midi_ui._st(app).__setitem__('setlist', ['Ace 3-D Paintball', 'Ace 3-D Jelly Bounce'])"},
+      {"midi": [0xC0, 1]}], 0.4),
+    ([{"check": "app.eng.names[app.eng.idx] == 'Ace 3-D Jelly Bounce'"}, {"midi_learn": {"kind": "next"}},
+      {"midi": [0x99, 36, 100]}], 0.4),
+    ([{"check": "app.eng.names[app.eng.idx] == 'Ace 3-D Paintball'"}, {"expect": ["messages", "note 36 ch 10 -> next effect"]},
+      {"midi": [0x89, 36, 0]}], 0.3),
+    ([{"check": "app.eng.names[app.eng.idx] == 'Ace 3-D Paintball'"}, {"midi": [0x99, 36, 90]}, {"midi": [0x89, 36, 0]}], 0.3),
+    ([{"check": "app.eng.names[app.eng.idx] == 'Ace 3-D Jelly Bounce'"},
+      {"py": "midi_ui._st(app).update(xfade=2.0, xstyle='swipe left')"}, {"midi": [0xC0, 0]}], 0.2),
+    ([{"check": "app.eng.names[app.eng.idx] == 'Ace 3-D Paintball' and app._transition is not None "
+                "and app._transition['style'] == 'swipe left'"},
+      {"py": "(setattr(app, '_transition', None), app.on_effect(None, app._sm_fx))"}], 0.6),
+    ([{"check": "app.eng.names[app.eng.idx] == app._sm_fx"}], 0.2),
     ([{"check": "app.osc.port is None and dpg.get_value('osc_state') == ''"},
       {"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
       {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),

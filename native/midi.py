@@ -5,8 +5,9 @@ python-rtmidi is optional (pip install python-rtmidi); without it the
 window says so and nothing else changes. A mapping is a control - a CC
 number on a channel, a note for a button, the pitch bend - and a target:
 an effect slider (sx, ix, c1..c3), a check (o1..o3), the palette or the
-effect by index, or a typed value on a node's pin with a range. The
-mappings live in the project's options under "midi":
+effect by index, the effect from the SETLIST, the next or the previous
+effect, or a typed value on a node's pin with a range. The mappings live
+in the project's options under "midi":
 
     {"port": "nanoKONTROL2 0", "maps": [{"ctl": ["cc", 0, 7], "target": {"kind": "fx", "key": "sx"}}, ...]}
 
@@ -21,6 +22,17 @@ with start, continue and stop - is followed apart from the controls: its
 tempo from the ticks' spacing and a beat at every 24th tick from the
 start, which midi_ui gives the synth (its beat fired by the clock, not its
 own period), when the project's "clock" setting is on.
+
+Switching effects live: a SETLIST is a short list of effects the project
+keeps ("setlist", names in order). A Program Change picks from it by its
+number - program 1 the first - with no learning needed while "pc" is on;
+next and previous step through it (or, with no setlist, the whole list),
+wrapping. A knob's 128 steps cannot reach every one of a long list, which
+is what the setlist is for. A note-off never switches anything (its value
+is 0: a pad released would jump to the list's first entry), and next and
+previous fire once as a control rises - a note's press, a knob crossing
+the middle. "xfade" seconds of "xstyle" (native/transition.py) blend the
+outgoing effect into the incoming one; 0 cuts.
 """
 import threading
 import time
@@ -36,6 +48,8 @@ except Exception:                       # not installed, or no MIDI API on this 
 
 FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
 CHECK_KEYS = ("o1", "o2", "o3")
+SWITCHES = ("effect", "palette", "setlist", "next", "prev")   # targets that pick, not set: a note-off never fires them
+STEPS = ("next", "prev")                                      # fired once as the control rises
 
 
 def available():
@@ -68,6 +82,8 @@ def parse(msg):
         return ("note", ch, int(msg[1])), 0
     if st == 0xE0 and len(msg) >= 3:
         return ("bend", ch, 0), int(msg[2])
+    if st == 0xC0 and len(msg) >= 2:
+        return ("pc", ch, 0), int(msg[1])                 # Program Change: the program number is the value
     return None
 
 
@@ -75,7 +91,7 @@ def ctl_label(ctl):
     kind, ch, n = ctl
     if kind == "osc":                                     # osc.py: ("osc", address, the number's place in it)
         return f"OSC {ch}" + (f" #{int(n) + 1}" if n else "")
-    return {"cc": f"CC {n}", "note": f"note {n}", "bend": "pitch bend"}.get(kind, kind) + f" ch {int(ch) + 1}"
+    return {"cc": f"CC {n}", "note": f"note {n}", "bend": "pitch bend", "pc": "program change"}.get(kind, kind) + f" ch {int(ch) + 1}"
 
 
 def state(project):
@@ -84,6 +100,9 @@ def state(project):
     maps as the knobs."""
     st = project.options.setdefault("midi", {})
     st.setdefault("port", ""); st.setdefault("maps", []); st.setdefault("clock", True)
+    if not isinstance(st.get("setlist"), list):
+        st["setlist"] = []
+    st.setdefault("pc", True); st.setdefault("xfade", 0.0); st.setdefault("xstyle", "fade")
     o = st.setdefault("osc", {})
     if not isinstance(o, dict):
         o = st["osc"] = {}
@@ -173,6 +192,50 @@ def value_for(target, v, full=127.0):
         lo, hi = float(target.get("lo", 0.0)), float(target.get("hi", 1.0))
         return lo + f * (hi - lo)
     return f                                              # palette, effect: a fraction of the list
+
+
+def fires(target, ctl, v, prev, full=127.0):
+    """Whether a control's value should act on a switching target: never a
+    note-off (0); next and previous only as the control rises - a note's
+    press, a knob or fader crossing its middle from below (`prev` the value
+    it had before, None when unknown)."""
+    kind = target.get("kind")
+    if kind not in SWITCHES:
+        return True
+    if ctl[0] == "note" and v <= 0:
+        return False
+    if kind in STEPS:
+        if ctl[0] in ("note", "pc"):
+            return True
+        half = full / 2.0
+        return v >= half and (prev is None or prev < half)
+    return True
+
+
+def setlist_pick(names, setlist, ctl, v, full=127.0):
+    """The effect a setlist target picks: a Program Change by its number
+    (beyond the list: None), anything else by its place along the list.
+    Names no longer in this build are skipped."""
+    live = [n for n in setlist if n in names]
+    if not live:
+        return None
+    if ctl[0] == "pc":
+        k = int(v)
+        return live[k] if 0 <= k < len(live) else None
+    f = max(0.0, min(1.0, v / float(full)))
+    return live[int(round(f * (len(live) - 1)))]
+
+
+def step_effect(names, setlist, current, d):
+    """The effect `d` steps (+1 next, -1 previous) from `current`, through
+    the setlist when there is one, else the whole list; wrapping. Off the
+    setlist, next is its first and previous its last."""
+    live = [n for n in setlist if n in names] or list(names)
+    if not live:
+        return None
+    if current not in live:
+        return live[0] if d > 0 else live[-1]
+    return live[(live.index(current) + d) % len(live)]
 
 
 class MidiIn:

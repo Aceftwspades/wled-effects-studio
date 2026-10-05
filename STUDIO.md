@@ -3302,11 +3302,15 @@ LedFx have added that matters here, in the order it helps most.
 - [ ] **A flaky test**: `test_a_bin_flashed_to_the_fake_device` failed once in
       five runs on 2026-10-03 ("did not reboot": the fake's uptime did not start
       over) and would not fail again; find why before it turns CI red.
-- [ ] **`test_library` hangs on the last engine built**: after the smoke or the
+- [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
-      (`list.index`); a standard build (`build.py --native-only`) puts it right.
-      It should build or pick the engine it needs.
+      (`list.index`). The cause (2026-10-05): the sim's effect roster was capped
+      at 256 (`-DCFX_BANK_MAX_FX=256`), and a project's graphs on top of the
+      stock set and the Ace family overflowed it - the last stock effects
+      registered simply fell off, no word said. Three new Ace effects made it
+      happen every time. The cap is 384 now (`toolchain.py`, `build.py`'s wasm
+      line); the sim keeps effect indices as ints, so past 255 is safe there.
 - [x] **A key from the test hooks lands on the graph**: `over_view()` took the
       real pointer's hover when the hook held the canvas, so with the mouse
       resting on the 3-D view, Home went to the view's own Home and the smoke's
@@ -3390,6 +3394,37 @@ fork's 16_x merge.
 
 Released as 1.8.1 (2026-10-04): the readouts while the canvas moves, the
 Library's turns and tag search, and the Video Switchboard example.
+
+### After 1.8.1 (October 2026)
+
+- [x] **Switching effects from MIDI** (user, 2026-10-05: "I'd like all those
+      features" - after "how does midi handle switching effects"). Before, a
+      control could only map to "the effect, by index": a knob's 128 steps over
+      a 245-effect list (half of them unreachable), a pad's velocity choosing
+      the effect, and its release (value 0) jumping to the first. Now
+      (`midi.py`, `midi_ui.py`):
+      - a **setlist** in the window (Add current, Up, Down, Remove), kept in the
+        project's `midi.setlist`; names not in the build are skipped;
+      - **Program Change** parsed (`("pc", ch, 0)`, the program number the
+        value) and picking from the setlist with nothing to learn ("Program
+        Change picks", `midi.pc`), or learnt onto "the effect, from the setlist";
+      - **next / previous effect** targets, stepping through the setlist (or
+        every effect), wrapping; they fire once as a control rises - a note's
+        press, a knob or OSC button crossing its middle (`midi.fires`);
+      - a **note-off never switches** (effect, palette, setlist, next, prev):
+        switching targets take every event of a frame in order, so a press and
+        release landing together still step once;
+      - a **crossfade** (`midi.xfade` seconds, `midi.xstyle` any of
+        `transition.STYLES`) through the sequence's own transition (the old
+        state in the second engine, blended in `frame_rgb`); 0 cuts.
+      Tests: `test_midi.py` (parsing, the setlist by number and by place,
+      stepping and wrapping, firing on the press only); the smoke (a Program
+      Change, next learnt on a pad, a release alone, press and release in one
+      frame, a crossfade's style).
+- [ ] **The smoke's audio sync check counts frames**: "sent > 15" in a second
+      needs 16 fps from the app, and on 2026-10-05 it got 9 - with and without
+      the MIDI change, so not that. The sender goes once a frame at most; the
+      check should count over time or the app's own frame rate.
 
 ### Mapping the way of Lightwork (October 2026)
 
