@@ -3564,6 +3564,12 @@ make sure that's done well."
       Tests: `test_face_outlines_sit_in_their_faces`,
       `test_a_mesh_surface_is_a_pitch_apart`.
 
+Released as 1.10.0 (2026-10-06): projections for 2-D effects on 3-D shapes,
+signs from SVG and lettering, power planning, the build sheet and template,
+face LEDs placed right, MIDI on the device, Window > Effect slots, and the
+build flags in the engine's object stamps (the first start after updating
+recompiles the engine once: about 45 s).
+
 ### Mapping the way of Lightwork (October 2026)
 
 - [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -
