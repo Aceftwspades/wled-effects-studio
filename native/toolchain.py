@@ -202,22 +202,25 @@ _CID = {}
 
 
 def _compiler_id(compiler, env):
-    """Which compiler, by its own account (`--version`, first line): an
-    object one compiler made is no good to another's linker - g++'s COFF
-    to MSVC's link, say - so the compiler is part of what an object was
-    made from."""
+    """Which compiler, by its own account (`--version`, first line), and
+    the flags every unit gets: an object one compiler made is no good to
+    another's linker - g++'s COFF to MSVC's link, say - and one made with
+    other flags is another object (CFX_BANK_MAX_FX 256 -> 384 left every
+    unchanged unit's roster at 256 until the flags joined the stamp), so
+    both are part of what an object was made from."""
     if compiler not in _CID:
         try:
             r = procs.run([compiler, "--version"], capture_output=True, text=True, env=env, timeout=30)
             line = (r.stdout or r.stderr or "").strip().splitlines()[0]
         except Exception:
             line = ""
-        _CID[compiler] = hashlib.sha1((os.path.basename(compiler).lower() + "|" + line).encode("utf-8", "replace")).hexdigest()[:12]
+        _CID[compiler] = hashlib.sha1((os.path.basename(compiler).lower() + "|" + line + "|" + " ".join(COMMON_FLAGS))
+                                      .encode("utf-8", "replace")).hexdigest()[:12]
     return _CID[compiler]
 
 
 def _obj_stamp(src, hstamp, cid=""):
-    """What an object was made from: the source's contents, the headers' digest, the compiler."""
+    """What an object was made from: the source's contents, the headers' digest, the compiler and its flags."""
     try:
         return hashlib.sha1(open(src, "rb").read()).hexdigest() + ":" + hstamp + (":" + cid if cid else "")
     except OSError:
