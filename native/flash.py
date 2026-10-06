@@ -909,11 +909,10 @@ def push_settings(host, effect, params, palette, colours, seg_id=0, blend=None, 
         return False, f"the device refused the state: {e}"
     note = "" if pal is not None else f" (palette {palette!r} not on the device; left as is)"
     if six is not None:
-        body = json.dumps({"um": {"CubeFXBank": {"six_faces": bool(six)}}}).encode()
-        req = urllib.request.Request(host + "/json/cfg", data=body, headers={"Content-Type": "application/json"})
+        # the whole bank block, read first: a block with six_faces alone would empty every effect slot
+        from native import bank
         try:
-            with urllib.request.urlopen(req, timeout=5) as r:
-                r.read()
+            bank.set_six(host, bool(six))
             note += f"; {'six' if six else 'five'} faces"
         except Exception as e:
             note += f" (the six-face setting was not taken: {e})"
@@ -992,11 +991,10 @@ def push_segments(host, segments, colours, size, palette_name, six=None):
     if unmatched:
         note += f" (palette {unmatched[0]!r} not on the device; left as is)"
     if six is not None:
-        body = json.dumps({"um": {"CubeFXBank": {"six_faces": bool(six)}}}).encode()
-        req = urllib.request.Request(host + "/json/cfg", data=body, headers={"Content-Type": "application/json"})
+        # the whole bank block, read first: a block with six_faces alone would empty every effect slot
+        from native import bank
         try:
-            with urllib.request.urlopen(req, timeout=5) as r:
-                r.read()
+            bank.set_six(host, bool(six))
             note += f"; {'six' if six else 'five'} faces"
         except Exception as e:
             note += f" (the six-face setting was not taken: {e})"

@@ -263,9 +263,8 @@ def mesh_estimate(mesh, mode="edges", pitch=1.0):
             return 0
         t = np.asarray(tri, np.int64)
         a, b, c = v[t[:, 0]], v[t[:, 1]], v[t[:, 2]]
-        na = np.maximum(1, np.floor(np.linalg.norm(b - a, axis=1) / pitch))
-        nc = np.maximum(1, np.floor(np.linalg.norm(c - a, axis=1) / pitch))
-        return int(np.sum((na + 1) * (nc + 1) / 2 + np.minimum(na, nc) / 2 + 1))
+        area = float(0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1).sum())
+        return int(round(area / (pitch * pitch))) + len(tri) // 8 + 1      # a pitch square each, and the odd one more
     raise ValueError(f"unknown mesh reading {mode!r}")
 
 
@@ -291,6 +290,182 @@ def mesh_pitch_for(mesh, mode, pitch=1.0, aim=MESH_AIM):
             break
         p = _round_up(p * 1.01)
     return p
+
+
+# --- LEDs over a mesh's surface ------------------------------------------------------------------
+# The first reading laid an affine lattice over each triangle of a fan - its spacing from two sides
+# taken apart, so a square at a pitch of 1 got 153 LEDs 0.77 apart instead of 100 a pitch apart,
+# a thin or obtuse triangle put LEDs a tenth of a pitch apart, and the duplicates on shared edges
+# were found by rounding to cells (two that straddle a cell's border both stayed: 0.4 apart on a
+# cube's folds). Now:
+#   - flat regions - the triangles of one plane joined across their shared edges, so an STL's
+#     triangulated cube face is one square again - get a regular grid at the pitch, centred, its
+#     LEDs at least half a pitch in from the region's border: a panel of the surface, as built;
+#   - the rest (curved surfaces, regions too small for a grid) is sampled finely and thinned so no
+#     two LEDs are nearer than 0.98 of a pitch (a spatial hash that looks in the neighbouring cells,
+#     so nothing straddles a border unseen);
+#   - the grids' LEDs on two sides of a fold are both kept: along the surface they are a pitch
+#     apart, though the chord between them is shorter.
+SURFACE_THIN = 0.98
+
+
+def _planes(v, tris):
+    """The triangles grouped into flat regions: those sharing an edge and lying in one plane (their
+    normals within a hundredth of a degree, their planes within a millionth of the mesh's size)."""
+    a, b, c = v[tris[:, 0]], v[tris[:, 1]], v[tris[:, 2]]
+    n = np.cross(b - a, c - a)
+    L = np.linalg.norm(n, axis=1)
+    good = L > 1e-12
+    n = n / np.where(good, L, 1.0)[:, None]
+    d = np.einsum("ij,ij->i", n, a)
+    scale = float(np.ptp(v, axis=0).max()) or 1.0
+    parent = list(range(len(tris)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    owner = {}
+    for t, (i, j, k) in enumerate(tris.tolist()):
+        if not good[t]:
+            continue
+        for e in ((i, j), (j, k), (k, i)):
+            key = (min(e), max(e))
+            o = owner.get(key)
+            if o is None:
+                owner[key] = t
+            elif np.dot(n[o], n[t]) > 1 - 1.5e-8 and abs(d[o] - d[t]) < 1e-6 * scale:
+                parent[find(o)] = find(t)
+    groups = {}
+    for t in range(len(tris)):
+        if good[t]:
+            groups.setdefault(find(t), []).append(t)
+    return list(groups.values()), n, L / 2.0
+
+
+def _seg_dist(P, A, B):
+    """Each point of P (k, 2) to the nearest of the segments A[i]-B[i] (m, 2)."""
+    AB = B - A
+    t = np.clip(np.einsum("kmj,mj->km", P[:, None] - A[None], AB) / np.maximum(np.einsum("mj,mj->m", AB, AB), 1e-18), 0, 1)
+    Q = A[None] + t[..., None] * AB[None]
+    return np.linalg.norm(P[:, None] - Q, axis=2).min(1)
+
+
+def _region_grid(v, tris, group, n, pitch):
+    """A flat region's grid: LEDs a pitch apart, centred on it, half a pitch in from its border."""
+    T = tris[group]
+    # the region's border: the edges only one of its triangles has
+    cnt = {}
+    for i, j, k in T.tolist():
+        for e in ((i, j), (j, k), (k, i)):
+            key = (min(e), max(e))
+            cnt[key] = cnt.get(key, 0) + 1
+    border = [e for e, c in cnt.items() if c == 1]
+    if not border:
+        return np.zeros((0, 3))
+    # the plane's axes: along its longest border edge, and across it
+    lens = [np.linalg.norm(v[b] - v[a]) for a, b in border]
+    a, b = border[int(np.argmax(lens))]
+    u = v[b] - v[a]
+    u = u / (np.linalg.norm(u) or 1.0)
+    w = np.cross(n, u)
+    o = v[a]
+    to2 = lambda P: np.stack([(P - o) @ u, (P - o) @ w], -1)            # noqa: E731
+    corners = to2(v[np.unique(T)])
+    lo, hi = corners.min(0), corners.max(0)
+    # laid in the half-pitch margin from the start: a 10-pitch square is 10 x 10 at 0.5 .. 9.5, not
+    # 11 x 11 from its border with the border rows dropped (9 x 9 and a ragged fill round it)
+    usable = np.maximum(hi - lo - pitch, 0.0)
+    cols = np.floor(usable / pitch + 1e-9).astype(int) + 1
+    start = lo + pitch / 2.0 + (usable - (cols - 1) * pitch) / 2.0
+    gx = start[0] + np.arange(cols[0]) * pitch
+    gy = start[1] + np.arange(cols[1]) * pitch
+    G = np.stack(np.meshgrid(gx, gy), -1).reshape(-1, 2)
+    if len(G) == 0:
+        return np.zeros((0, 3))
+    # inside one of the region's triangles
+    inside = np.zeros(len(G), bool)
+    for i, j, k in T.tolist():
+        A, B, C = to2(v[[i, j, k]])
+        d = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1])
+        if abs(d) < 1e-18:
+            continue
+        l1 = ((B[1] - C[1]) * (G[:, 0] - C[0]) + (C[0] - B[0]) * (G[:, 1] - C[1])) / d
+        l2 = ((C[1] - A[1]) * (G[:, 0] - C[0]) + (A[0] - C[0]) * (G[:, 1] - C[1])) / d
+        inside |= (l1 >= -1e-9) & (l2 >= -1e-9) & (1 - l1 - l2 >= -1e-9)
+    G = G[inside]
+    if len(G):
+        BA = to2(v[[e[0] for e in border]])
+        BB = to2(v[[e[1] for e in border]])
+        G = G[_seg_dist(G, BA, BB) >= pitch * 0.5 - 1e-9]
+    return o + G[:, :1] * u + G[:, 1:] * w
+
+
+def _fine(v, tris, n, pitch):
+    """Every triangle sampled finely (a barycentric lattice about a third of a pitch apart): the
+    candidates the thinning picks from. (points, normals)."""
+    out, nrm = [], []
+    for t, (i, j, k) in enumerate(tris.tolist()):
+        a, b, c = v[i], v[j], v[k]
+        m = max(1, int(np.ceil(max(np.linalg.norm(b - a), np.linalg.norm(c - a), np.linalg.norm(c - b)) / (pitch / 3.0))))
+        s, r = np.meshgrid(np.arange(m + 1), np.arange(m + 1))
+        ok = (s + r) <= m
+        s, r = s[ok] / m, r[ok] / m
+        out.append(a + (b - a) * s[:, None] + (c - a) * r[:, None])
+        nrm.append(np.repeat(n[t][None], len(s), 0))
+    if not out:
+        return np.zeros((0, 3)), np.zeros((0, 3))
+    return np.concatenate(out), np.concatenate(nrm)
+
+
+def surface_leds(mesh, pitch=1.0):
+    """LEDs over a mesh's surface about a pitch apart (see the notes above): (pos, normals)."""
+    v = np.asarray(mesh.v, np.float64)
+    tris = np.asarray([(f[0], f[k], f[k + 1]) for f in mesh.faces for k in range(1, len(f) - 1)], np.int64).reshape(-1, 3)
+    if len(tris) == 0:
+        return np.zeros((0, 3), np.float32), None
+    groups, n, area = _planes(v, tris)
+    kept, knrm = [], []
+    for g in groups:
+        if area[g].sum() >= 2.0 * pitch * pitch:
+            P = _region_grid(v, tris, g, n[g[0]], pitch)
+            kept += list(P)
+            knrm += [n[g[0]]] * len(P)
+    # the rest: fine samples thinned against everything kept so far
+    r = SURFACE_THIN * pitch
+    cell = {}
+
+    def key(p):
+        return (int(np.floor(p[0] / r)), int(np.floor(p[1] / r)), int(np.floor(p[2] / r)))
+
+    for p in kept:
+        cell.setdefault(key(p), []).append(p)
+    C, CN = _fine(v, tris, n, pitch)
+    r2 = r * r
+    for p, q in zip(C, CN):
+        kx, ky, kz = key(p)
+        near = False
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    for o in cell.get((kx + dx, ky + dy, kz + dz), ()):
+                        if (o[0] - p[0]) ** 2 + (o[1] - p[1]) ** 2 + (o[2] - p[2]) ** 2 < r2:
+                            near = True
+                            break
+                    if near:
+                        break
+                if near:
+                    break
+            if near:
+                break
+        if not near:
+            cell.setdefault((kx, ky, kz), []).append(p)
+            kept.append(p); knrm.append(q)
+    if not kept:
+        return np.zeros((0, 3), np.float32), None
+    return np.asarray(kept, np.float32), np.asarray(knrm, np.float32)
 
 
 def mesh_leds(mesh, mode="edges", pitch=1.0, limit=MESH_MAX):
@@ -326,33 +501,7 @@ def mesh_leds(mesh, mode="edges", pitch=1.0, limit=MESH_MAX):
                 seen.add(key); out.append(p)
         return np.asarray(out, np.float32), None
     if mode == "surface":
-        out, nrm = [], []
-        for f in mesh.faces:
-            for k in range(1, len(f) - 1):            # a polygon as a fan of triangles
-                a, b, c = v[f[0]], v[f[k]], v[f[k + 1]]
-                n = np.cross(b - a, c - a); L = np.linalg.norm(n)
-                if L < 1e-9:
-                    continue
-                n = n / L
-                lab, lac = np.linalg.norm(b - a), np.linalg.norm(c - a)
-                na, nc = max(1, int(lab / pitch)), max(1, int(lac / pitch))
-                for i in range(na + 1):
-                    for j in range(nc + 1):
-                        s, t = i / na, j / nc
-                        if s + t <= 1.0 + 1e-6:
-                            out.append(a + (b - a) * s + (c - a) * t); nrm.append(n)
-        pos = np.asarray(out, np.float32).reshape(-1, 3)
-        # sampling a fan doubles points on shared edges: the closer of any pair goes
-        keep = np.ones(len(pos), bool)
-        if len(pos) > 1:
-            q = np.round(pos / (pitch * 0.5)).astype(np.int64)
-            seen = set()
-            for i, key in enumerate(map(tuple, q)):
-                if key in seen:
-                    keep[i] = False
-                else:
-                    seen.add(key)
-        return pos[keep], np.asarray(nrm, np.float32)[keep] if nrm else None
+        return surface_leds(mesh, pitch)
     raise ValueError(f"unknown mesh reading {mode!r}")
 
 

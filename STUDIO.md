@@ -3430,6 +3430,140 @@ Released as 1.9.0 (2026-10-05): Paintball, Murmuration and Jelly Bounce, the
 Mandelbrot's trap-glow shading, switching effects from MIDI, and the sim's
 roster large enough for a project's graphs beside every stock effect.
 
+### After 1.9.0 (October 2026)
+
+- [x] **MIDI switches the device, and the effect slots from the studio**
+      (user, 2026-10-06: "Start with 1 and 2" - MIDI that drives the cube
+      itself, and a slot manager so a new effect reaches the cube's list).
+      - `native/bank.py`: the CubeFXBank block read, changed and written WHOLE
+        (a posted usermod block's missing keys take their defaults - six_faces
+        reset, slots emptied) and the reboot that applies it; `fx_hash` is
+        cfxBankHash, checked against the C compiled (`test_bank.py` pins five
+        names). `Switcher`: the device's effect set by name on a worker thread,
+        the newest request only, with `fxdef` (the device's own defaults) and
+        the crossfade as `tt` and `bs` (`transition.WLED_IDS`).
+      - **Window > Effect slots...** (`bank_ui.py`): the compiled cube_fx
+        effects and the slots in order; Read the device, Add, Add the rest, Up,
+        Down, Remove, Write to the device and reboot. It does not read the
+        device on opening: the menu walk opens every window, with the walked
+        project's device active - a real one on this network.
+      - The MIDI window's **DEVICE** row: "switch it too" (each MIDI switch
+        sets the active device's effect, not while the sim is streamed to it)
+        and "Send the setlist" (presets 70 up, playlist 69, so many seconds an
+        effect, the crossfade as the transition).
+      - **A bug the bank had all along**: the studio's six-face push
+        (`flash.push_settings`, `push_segments`) sent the block with
+        `six_faces` alone, which the firmware reads as every slot empty -
+        harmless while nobody chose slots from the studio. `bank.set_six` reads
+        the block and writes it back whole.
+      The fake device has the bank (its roster, the slots, the reboot placing
+      them, `seg` as an object). Tests: `test_bank.py`; the smoke reads and
+      writes the slots, switches the fake's effect by Program Change and sends
+      the setlist; the walk presses the window's buttons against the fake.
+      Not yet tried on the real cube.
+- [x] **The engine's object cache ignored the compiler flags**
+      (`toolchain._compiler_id`): an object's stamp was its source, the
+      headers and the compiler, so 1.9.0's CFX_BANK_MAX_FX 256 -> 384 left
+      every unchanged unit compiled at 256 - a build with a project's graphs
+      dropped Freqmap and the rest again (`test_library`, 2026-10-06). The
+      flags are in the stamp now; the first build after recompiles all of it.
+      An installed 1.9.0 keeps its old objects until the next release.
+
+### Shapes: projections, signs, power and the bench (October 2026)
+
+User, 2026-10-06: "Dive more into the shapes creation feature, where can we
+improve there" - then "These all are good, the svg import is great also
+make sure that's done well."
+
+- [x] **2-D effects on 3-D shapes: projections** (`shapes.grid_layout`,
+      `PROJECTIONS`). The grid was the front view only, so a tree, column or
+      ball put its back LEDs in its front's cells (a default tree lost 90 of
+      240). Now front, side, above, **around** (unrolled about the upright
+      axis: the picture runs all the way round) and **globe** (longitude,
+      latitude) - and **auto**, which keeps the fewest lost, then the
+      fullest grid (sides under 3 left out), and is the default when a shape
+      goes to grid; old projects keep the front. Every projection is FITTED
+      (`_fit`): cell counts searched from half to twice the estimate, four
+      offsets each, plus the shape's own natural counts (distinct strand
+      angles, row heights), capped at 256 a side and cached. Found on the
+      way: the front used `np.round`, which takes halves to the even
+      neighbour - a frame's sides half a pitch off the grid went two to a
+      cell, 50 of 100 LEDs lost. Every part kind now lands with 0 lost under
+      auto (`test_projections_put_every_led_in_a_cell`). The Shape frame:
+      **projected**, **grid cell**, and a line saying the grid and what it
+      loses; the check names the projection.
+- [x] **Signs: SVG drawings and lettering** (`svg_import.py`, `outline.py`,
+      parts "outline" and "text"). The SVG reader is stdlib only and follows
+      the spec: every path command with implicit repeats and the reflected
+      controls of S and T, the number grammar ("1.5.5", "-1-2", packed arc
+      flags "011"), arcs by the implementation notes' endpoint-to-centre
+      conversion with out-of-range radii scaled (F.6.5, F.6.6), every basic
+      shape (rounded rects too), g/svg/a/switch/symbol through `<use>`, all
+      transforms composed down the tree, and real units through width,
+      height and viewBox (preserveAspectRatio's default) - a sign drawn
+      600 mm wide comes in 600 mm wide. Hidden elements and defs, clips,
+      masks are left out, text and images are counted and said (they have
+      no geometry until Object to Path). Curves flattened to 0.05 mm after
+      the transform. LEDs: a real strip's fixed spacing along each stroke,
+      an open stroke's leftover split between its ends, a closed one's at
+      the join; a mark shorter than half a spacing is one LED (a dot). The
+      wiring between strokes: the drawing's order, or the shortest (nearest
+      end, closed strokes from their nearest point). Lettering: any system
+      font, drawn at 150 px a capital and traced - outlines by marching
+      squares, or one centre stroke by Zhang-Suen thinning, the skeleton
+      followed with diagonal steps counted only where no straight neighbour
+      joins (otherwise every staircase pixel is a branch: 713 strokes for
+      "OPEN Bar", now 18) and blobs the thinning wore away (an i's dot)
+      kept as dots; smoothed and simplified (RDP). Text is cached by what it
+      says. Gallery: SIGNS > lettering, FROM A FILE > An SVG drawing...;
+      the import dialog: real size or fitted to a width, and the wiring.
+      Tests: `test_outline.py`.
+- [x] **Power planning** (`power_plan.py`): the whole wiring as one ladder
+      (each LED a node drawing its current, the rails between neighbours R
+      times the distance, a lead between runs as a 22 AWG pair carrying the
+      power on), solved exactly by Thomas' algorithm; feeds at the first LED
+      and then every k, k from the closed form for a stretch fed at both
+      ends and tightened until no LED is past the drop allowed. Defaults for
+      5, 12 and 24 V strips; the supply with a fifth to spare and what the
+      brightness limiter lets through; a wire size for each feed. The Shape
+      frame's POWER section, amber rings at the feeds on the 3-D view.
+      Tests: `test_power.py` (the closed forms within 2 %, one feed fewer
+      fails, a sign's letters one chain).
+- [x] **The bench** (`build_sheet.py`): File > **Build sheet** (an HTML page
+      in the export folder, opened - diagram, parts with LED numbers, strip
+      to cut and data in, outputs, power, open checks) and **Print template
+      (1:1 SVG)...** (the shape flat at real size in mm, every LED a cross or
+      a hole of the diameter typed, numbered, a 100 mm bar). The walk skips
+      Build sheet (it opens a browser). Tests: `test_build_sheet.py`.
+- An xLights model export was already there (File > Export an xLights
+  model), so it was not built again.
+- [x] **LEDs on faces, checked and fixed** (user, 2026-10-06: "Check how face
+      LEDs are created on complex shapes and verify they are placed
+      correctly"). Measured on all six solids and on test meshes:
+      - the solids themselves were right (face counts, Euler, every edge in
+        two faces, flat, wound outward);
+      - **polyhedron faces mode** put every LED exactly on top of the
+        neighbouring face's (both outlines ran along the shared edge) and
+        gave them directions out from the middle (68 degrees off on a
+        tetrahedron). Each outline is now inset into its own face by
+        `inset` (half a spacing by default; a regular face's exact inset is
+        a scale about its centre) and its LEDs carry the face's normal;
+        `split_part` insets the same. A project made before keeps its
+        parts but their outlines move in: inset 0 puts them back;
+      - **mesh surface** laid an affine lattice per triangle with its
+        spacing from two sides apart: a 10 x 10 square got 153 LEDs 0.77
+        apart, thin triangles 0.10 apart, and a cube kept pairs 0.40 apart
+        at its folds (duplicates found by rounding to cells). Now flat
+        regions (coplanar triangles joined across shared edges - an STL's
+        cube is six squares again) get a regular grid a pitch apart, half a
+        pitch in from the border (the square: exactly 100), and the rest is
+        sampled finely and thinned, nothing nearer than 0.98 of a pitch (a
+        spatial hash looking in neighbouring cells). A UV sphere: neighbours
+        0.98 - 1.31 apart, median 1.03, all on the surface, normals out.
+        The estimate is the area over the pitch squared.
+      Tests: `test_face_outlines_sit_in_their_faces`,
+      `test_a_mesh_surface_is_a_pitch_apart`.
+
 ### Mapping the way of Lightwork (October 2026)
 
 - [x] **Lightwork's mapping** (PWRFLcreative/Lightwork, GPL-3: the ideas -

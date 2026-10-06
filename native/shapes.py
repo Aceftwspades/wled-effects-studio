@@ -33,8 +33,8 @@ KINDS = {
     "cube":     ({"B": 8, "pitch": 1.0, "six": False}, "B x B a face, five faces (six with the bottom)"),
     "polygon":  ({"sides": 5, "per_side": 6, "pitch": 1.0, "radius": 0.0, "start_deg": 0.0},
                  "sides straight sides of per_side LEDs each, in the X-Y plane (radius 0: from the pitch)"),
-    "polyhedron": ({"solid": "soccer ball", "mode": "edges", "per_edge": 5, "radius": 12.0},
-                   "the edges of a solid, per_edge LEDs each (mode faces: every face outlined on its own)"),
+    "polyhedron": ({"solid": "soccer ball", "mode": "edges", "per_edge": 5, "radius": 12.0, "inset": 0.5},
+                   "the edges of a solid, per_edge LEDs each (mode faces: every face outlined on its own, inset from its edges)"),
     "polyline": ({"points": [[0, 0, 0], [8, 0, 0], [8, 8, 0]], "pitch": 1.0}, "a strip run laid along a path, an LED every pitch"),
     "points":   ({"points": [[0, 0, 0]]}, "LEDs where they are put, in that order"),
     # the shapes people light (xLights' model types the checklist) - the ninth pass's S10
@@ -56,16 +56,22 @@ KINDS = {
     "formula":  ({"n": 100, "x": "cos(t*tau*3)*8", "y": "sin(t*tau*3)*8", "z": "t*16"},
                  "LEDs where x, y and z say: expressions of t (0 to 1 along), i (the LED) and n (the count)"),
     "reference": ({"vertices": [], "edges": [], "file": ""}, "a mesh drawn as a wireframe to place LEDs against - not LEDs"),
+    # signs: lettering traced from a font, and a drawing's strokes from an SVG (native/outline.py, svg_import.py)
+    "text":     ({"text": "OPEN", "font": "", "style": "center", "height": 12.0, "pitch": 1.0, "order": "shortest"},
+                 "lettering in any font, standing in the X-Z plane: one stroke a letter (neon) or the letters' outlines"),
+    "outline":  ({"paths": [], "closed": [], "pitch": 1.0, "order": "shortest", "source": ""},
+                 "a drawing's strokes (an SVG's paths), standing in the X-Z plane, an LED every pitch along each"),
 }
 
 
 # the choices a text parameter takes (the editor shows a combo)
 CHOICES = {"solid": ["tetrahedron", "cube", "octahedron", "dodecahedron", "icosahedron", "soccer ball"],
-           "mode": ["edges", "faces"], "start": ["bottom left", "top left", "top right", "bottom right"]}
+           "mode": ["edges", "faces"], "start": ["bottom left", "top left", "top right", "bottom right"],
+           "style": ["center", "outline"], "order": ["shortest", "drawing"]}
 
 # the axis "aim" points: a strip's length, a panel's face, a flat part's normal
 AXIS = {"strip": (1.0, 0.0, 0.0), "panel": (0.0, -1.0, 0.0), "polyline": (1.0, 0.0, 0.0), "arch": (0.0, -1.0, 0.0),
-        "frame": (0.0, -1.0, 0.0)}
+        "frame": (0.0, -1.0, 0.0), "text": (0.0, -1.0, 0.0), "outline": (0.0, -1.0, 0.0)}
 
 # the kinds that are one run of strip (a length says their size; the rest a box)
 LINEAR = ("strip", "ring", "polygon", "polyline", "star", "helix", "spiral", "arch", "frame")
@@ -253,13 +259,39 @@ def _part_points(part):
         m = max(1, int(p.get("per_edge", 5)))
         t = (np.arange(m) + 0.5) / m
         if p.get("mode", "edges") == "faces":
-            out = []
+            # every face outlined on its own: two faces share each edge, so each outline is pulled into its
+            # own face by `inset` - two strips cannot lie on one line, and outlines on the edges themselves
+            # put every LED on top of the neighbouring face's (each edge two strips side by side, as built).
+            # The solids' faces are regular, so the inset is exactly a scale about the face's centre.
+            # Each LED faces the way its face does (not out from the middle of the solid, up to 68 degrees
+            # off on a tetrahedron).
+            inset = max(0.0, float(p.get("inset", 0.5)))
+            out, nrm = [], []
             for face in face_order(V, F):
-                ring = list(face) + [face[0]]
-                out += [V[ring[i]] + (V[ring[i + 1]] - V[ring[i]]) * t[:, None] for i in range(len(face))]
+                P = V[list(face)].astype(np.float64)
+                c = P.mean(0)
+                n = np.cross(P[1] - P[0], P[2] - P[1])
+                n = n / (np.linalg.norm(n) or 1.0)
+                if np.dot(n, c) < 0:
+                    n = -n
+                mid = (P + np.roll(P, -1, axis=0)) / 2.0
+                r_in = float(np.linalg.norm(mid - c, axis=1).min())             # the face's inradius
+                s = max(0.05, (r_in - inset) / r_in) if r_in > 0 else 1.0
+                Q = c + (P - c) * s
+                ring = np.vstack([Q, Q[:1]])
+                for i in range(len(face)):
+                    out.append(ring[i] + (ring[i + 1] - ring[i]) * t[:, None])
+                    nrm.append(np.repeat(n[None], m, 0))
+            return np.concatenate(out).astype(np.float32), np.concatenate(nrm).astype(np.float32)
         else:
             out = [V[a] + (V[b] - V[a]) * t[:, None] for a, b in edge_walk(V, E)]
         return np.concatenate(out).astype(np.float32), None
+    if k in ("text", "outline"):
+        from native import outline
+        paths, closed = outline.part_paths(p)
+        order = outline.wiring(paths, closed, "drawing" if p.get("order") == "drawing" else "shortest")
+        pos, _ = outline.leds(paths, closed, pitch, order)
+        return pos, np.tile(np.asarray([[0.0, -1.0, 0.0]], np.float32), (len(pos), 1))    # facing the camera, as a sign
     if k == "polyline":
         pts = np.asarray(p.get("points") or [[0, 0, 0]], np.float32).reshape(-1, 3)
         if len(pts) < 2:
@@ -766,8 +798,13 @@ def split_part(part):
             z /= (np.linalg.norm(z) or 1.0)
             y = np.cross(z, x)
             R = np.stack([x, y, z], 1)
-            q = new_part("polygon", sides=len(face), per_side=m, radius=round(r, 4),
-                         pitch=round(float(np.linalg.norm(world(V[face[1]]) - v0)) / m, 4), start_deg=0.0)
+            # the face's outline inset into it as the whole part has it (a scale about its centre)
+            P = np.asarray(V[list(face)], np.float64)
+            cl = P.mean(0)
+            r_in = float(np.linalg.norm((P + np.roll(P, -1, axis=0)) / 2.0 - cl, axis=1).min())
+            k_in = max(0.05, (r_in - max(0.0, float(p.get("inset", 0.5)))) / r_in) if r_in > 0 else 1.0
+            q = new_part("polygon", sides=len(face), per_side=m, radius=round(r * k_in, 4),
+                         pitch=round(float(np.linalg.norm(world(V[face[1]]) - v0)) * k_in / m, 4), start_deg=0.0)
             q["name"] = f"{p.get('solid', 'solid')} face {k + 1}"
             q["pos"] = [round(float(v), 3) for v in c]; q["rot"] = euler_of(R)
             out.append(q)
@@ -992,18 +1029,153 @@ def chain_order(pos, start=0):
 
 
 # --- a logical grid for a shape ----------------------------------------------------------
-def grid_layout(pos, cell=1.0):
-    """The LEDs onto a w x h logical grid, seen from the front (X across, Z
-    up), a cell per pitch: (w, h, map) where map[logical] = LED index or -1.
-    Two LEDs in one cell: the first keeps it, the rest are reported as
-    collisions (they light with the ledmap as the last of the cell)."""
+# How a shape's LEDs are laid onto the w x h grid a 2-D effect draws on. Seen from the front
+# was the only way, and on anything round (a tree, a column, a helix, a globe) the LEDs at the
+# back fell into the same cells as those at the front: half the shape repeated the other half's
+# picture. "around" unrolls a shape about its upright axis - the angle round it across, the
+# height down - so a 2-D effect runs all the way round, its left and right edges meeting at the
+# back; "globe" does the same for a ball, longitude across and latitude down.
+# "auto" tries them all and keeps the one that loses the fewest LEDs to shared cells, the flat
+# views first on a tie (a panel, a ring on the floor, a sign on a wall), then around, then globe.
+PROJECTIONS = (("auto", "the best fit"), ("front", "from the front"), ("side", "from the side"),
+               ("top", "from above"), ("around", "around (unrolled)"), ("globe", "as a globe"))
+
+
+def _quantise(v, n, off):
+    """Values in 0..1 onto n cells, shifted by `off` of a cell: the cell of each."""
+    return np.floor(v * n + off).astype(int)
+
+
+def _fit(u, v, wrap_u, nu0, nv0):
+    """The grid that fits the shape's own rows and columns: u and v in 0..1 (u round a turn when
+    wrap_u), the cell counts searched from half to twice the estimates nu0, nv0, each with four
+    offsets, columns then rows then columns again - fewest LEDs sharing a cell, then the smallest
+    grid. A shape's rows (a sphere's latitudes, a tree's tiers) rarely sit on round multiples of a
+    pitch from its top, so a grid laid from the top put pairs of them in one row; this finds the
+    spacing and the offset they do sit on. (cols, rows, n_cols, n_rows)."""
+    n = len(u)
+
+    def score(cu, cv, nu, nv):
+        key = (cv % max(1, nv + 2)) * (nu + 2) + cu
+        return n - len(np.unique(key))
+
+    def natural(x, wrap):
+        """How many distinct places the LEDs take along an axis - a tree's strands, a sphere's rows -
+        when they take few (a continuous run like a helix has no such count)."""
+        q = np.unique(np.round(x * 4096.0).astype(int) % (4096 if wrap else 1 << 30))
+        if len(q) < 2 or len(q) > len(x) // 2:
+            return []
+        k = len(q) if wrap else len(q) - 1                      # a wrapped axis: k places, k cells; else k-1 gaps
+        return [k * m for m in (1, 2, 3) if k * m >= 2] + ([len(q)] if not wrap else [])
+
+    def best_axis(x, n0, wrap, other_cells, other_n, axis):
+        best = None
+        lo, hi = max(2 if wrap else 1, int(n0 * 0.5)), max(3, int(n0 * 2.0) + 1)
+        step = max(1, (hi - lo) // 48)                          # a long axis searched in steps: a big shape stays quick
+        for nn in sorted(set(range(lo, hi + 1, step)) | set(natural(x, wrap))):
+            if nn > GRID_MAX:
+                continue
+            for off in (0.0, 0.25, 0.5, 0.75):
+                c = _quantise(x, nn, off)
+                if wrap:
+                    c = c % nn
+                else:
+                    c = c - c.min()
+                    nn_used = int(c.max()) + 1
+                    if nn_used > GRID_MAX:
+                        continue
+                col, row = (c, other_cells) if axis == 0 else (other_cells, c)
+                ncol, nrow = (nn if wrap else nn_used, other_n) if axis == 0 else (other_n, nn if wrap else nn_used)
+                k = (score(col, row, ncol, nrow), ncol * nrow)
+                if best is None or k < best[0]:
+                    best = (k, c, nn if wrap else nn_used)
+        if best is None:                                        # every count past the cap: the cap itself
+            c = np.minimum(_quantise(x, GRID_MAX, 0.0), GRID_MAX - 1)
+            return (c % GRID_MAX if wrap else c - c.min()), GRID_MAX if wrap else int((c - c.min()).max()) + 1
+        return best[1], best[2]
+
+    cv = _quantise(v, min(nv0, GRID_MAX), 0.0); cv = cv - cv.min(); nv = int(cv.max()) + 1
+    cu, nu = best_axis(u, nu0, wrap_u, cv, nv, 0)
+    cv, nv = best_axis(v, nv0, False, cu, nu, 1)
+    cu, nu = best_axis(u, nu0, wrap_u, cv, nv, 0)
+    return cu, cv, nu, nv
+
+
+_FIT_CACHE = {}
+GRID_MAX = 256                           # a grid's side at most: the sim's (and a WLED matrix's) limit
+
+
+def _projected(pos, cell, projection):
+    """(column, row, columns, rows) of every LED in cells: columns from 0, rows from 0 at the top."""
+    x, y, z = pos[:, 0].astype(np.float64), pos[:, 1].astype(np.float64), pos[:, 2].astype(np.float64)
+    key = (projection, float(cell), pos.shape, hash(np.ascontiguousarray(pos, np.float32).tobytes()))
+    hit = _FIT_CACHE.get(key)
+    if hit is not None:
+        return hit
+    if projection in ("around", "globe"):
+        cx, cy = (x.min() + x.max()) / 2.0, (y.min() + y.max()) / 2.0
+        dx, dy = x - cx, y - cy
+        u = np.mod(np.arctan2(dy, dx), 2.0 * np.pi) / (2.0 * np.pi)          # 0..1 round the axis
+        if projection == "around":
+            r = np.hypot(dx, dy)
+            R = float(np.median(r[r > 1e-6])) if np.any(r > 1e-6) else 1.0
+            span = max(float(z.max() - z.min()), 1e-6)
+            v = (z.max() - z) / span                                         # 0 at the top
+            nu0, nv0 = max(3, int(round(2.0 * np.pi * R / cell))), int(round(span / cell)) + 1
+        else:
+            cz = (z.min() + z.max()) / 2.0
+            dz = z - cz
+            d = np.sqrt(dx * dx + dy * dy + dz * dz)
+            R = float(np.median(d[d > 1e-6])) if np.any(d > 1e-6) else 1.0
+            v = (np.pi / 2.0 - np.arctan2(dz, np.hypot(dx, dy))) / np.pi     # 0 at the north pole, 1 at the south
+            nu0, nv0 = max(4, int(round(2.0 * np.pi * R / cell))), max(2, int(round(np.pi * R / cell)))
+        out = _fit(u, v, True, nu0, nv0)
+    else:
+        if projection == "side":
+            a, b = y, z                                          # from +X: Y across, Z up
+        elif projection == "top":
+            a, b = x, -y                                         # from above: X across, north (+Y) at the top
+        else:
+            a, b = x, z                                          # from the front: X across, Z up
+        # Fitted too, not rounded: np.round takes halves to the even neighbour (0.5 -> 0, 1.5 -> 2),
+        # so LEDs half a pitch off the grid's edge - a frame's sides, a ring's - went two to a cell,
+        # and a 100-LED frame lost 50 of them from the front.
+        sa, sb = max(float(a.max() - a.min()), 1e-6), max(float(b.max() - b.min()), 1e-6)
+        out = _fit((a - a.min()) / sa * (1 - 1e-9), (b.max() - b) / sb * (1 - 1e-9), False,
+                   int(round(sa / cell)) + 1, int(round(sb / cell)) + 1)
+    if len(_FIT_CACHE) > 32:
+        _FIT_CACHE.clear()
+    _FIT_CACHE[key] = out
+    return out
+
+
+def auto_projection(pos, cell=1.0):
+    """The projection that loses the fewest LEDs; of those that lose as few, the fullest grid - the
+    most of its cells holding an LED, so a 2-D effect's picture lands on LEDs rather than on empty
+    cells (a tree unrolled round itself, strands by tiers, not the sparse star it makes from above) -
+    leaving out a grid under 3 cells a side (a frame folded into a 2 x 67 "globe" is full and no
+    picture); PROJECTIONS' order breaks what is left."""
+    n = len(pos)
+    best = None
+    for k, (name, _) in enumerate(PROJECTIONS[1:]):
+        w, h, _, lost = grid_layout(pos, cell, name)
+        thin = min(w, h) < 3
+        key = (lost, thin, -(n - lost) / max(1, w * h), k)
+        if best is None or key < best[1]:
+            best = (name, key)
+    return best[0]
+
+
+def grid_layout(pos, cell=1.0, projection="front"):
+    """The LEDs onto a w x h logical grid, a cell per pitch, seen as `projection` says (PROJECTIONS;
+    "front": X across, Z up): (w, h, map, collisions) where map[logical] = LED index or -1. Two LEDs
+    in one cell: the first keeps it, the rest are counted as collisions (the ledmap gives them no
+    pixel: they stay dark)."""
     if len(pos) == 0:
         return 1, 1, [-1], 0
-    x, z = pos[:, 0], pos[:, 2]
-    x0, z1 = x.min(), z.max()
-    cx = np.round((x - x0) / cell).astype(int)
-    cz = np.round((z1 - z) / cell).astype(int)
-    w, h = int(cx.max()) + 1, int(cz.max()) + 1
+    if projection == "auto":
+        projection = auto_projection(pos, cell)
+    cx, cz, w, h = _projected(np.asarray(pos), cell, projection)
     m = [-1] * (w * h)
     collisions = 0
     for i, (a, b) in enumerate(zip(cx, cz)):

@@ -59,6 +59,102 @@ def test_grid_layout_and_geometry():
     assert g2.describe() == g.describe() and g2.phys.tolist() == g.phys.tolist()
 
 
+def test_projections_put_every_led_in_a_cell():
+    """A tree, a column, a ball seen from the front lost their backs to the front's cells; unrolled
+    round the shape, or as a globe, every LED has a cell of its own - and the best fit finds that."""
+    tree, sphere = [shapes.new_part("tree")], [shapes.new_part("sphere")]
+    front = Geometry("shape", parts=tree, layout="grid")                       # a project from before: the front
+    assert front.projection == "front" and front.collisions > 0
+    around = Geometry("shape", parts=tree, layout="grid", projection="around")
+    assert around.collisions == 0 and (around.w, around.h) == (8, 30)           # the eight strands, thirty tiers
+    globe = Geometry("shape", parts=sphere, layout="grid", projection="globe")
+    assert globe.collisions == 0 and (globe.w, globe.h) == (24, 12)             # the sphere's own rows and columns
+    # the front, fitted: a frame's sides sit half a pitch off the grid, which np.round paired up (50 of 100 lost)
+    frame = Geometry("shape", parts=[shapes.new_part("frame")], layout="grid", projection="front")
+    assert frame.collisions == 0
+    for kind, want in (("tree", "around"), ("frame", "front"), ("star", "top"), ("panel", "front")):
+        g = Geometry("shape", parts=[shapes.new_part(kind)], layout="grid", projection="auto")
+        assert g.projection == want and g.collisions == 0, (kind, g.projection, g.collisions)
+    # a grid never past 256 a side, however dense the shape
+    dense = Geometry("shape", parts=[shapes.new_part("polyhedron", per_edge=20)], layout="grid", projection="globe")
+    assert dense.w <= 256 and dense.h <= 256
+    g2 = Geometry.from_json(Geometry("shape", parts=tree, layout="grid", projection="auto").to_json())
+    assert g2.projection == "around" and g2.collisions == 0
+
+
+def _nn(P):
+    D = np.linalg.norm(P[:, None] - P[None], axis=2)
+    np.fill_diagonal(D, np.inf)
+    return D.min(1)
+
+
+def test_face_outlines_sit_in_their_faces():
+    """A solid's faces outlined each on its own: two faces share every edge, so each outline is
+    inset into its own face (they were on the edges, every LED on top of the neighbour face's), each
+    LED flat in its face and facing the way it does (they faced out from the middle: 68 degrees off
+    on a tetrahedron)."""
+    for solid in ("tetrahedron", "cube", "octahedron", "icosahedron", "dodecahedron", "soccer ball"):
+        part = shapes.new_part("polyhedron", solid=solid, mode="faces", per_edge=5, radius=12.0, inset=0.5)
+        pos, nrm, _ = shapes.resolve([part])
+        pos, nrm = pos.astype(np.float64), nrm.astype(np.float64)
+        V, E, F = shapes.polyhedron(solid)
+        Vs = V * np.float32(12.0)
+        assert len(pos) == sum(len(f) for f in F) * 5
+        assert _nn(pos).min() > 0.1, solid                                      # none on another's spot
+        k = 0
+        for f in shapes.face_order(Vs, F):
+            B, Nb = pos[k:k + len(f) * 5], nrm[k:k + len(f) * 5]
+            c = B.mean(0)
+            n = np.linalg.svd(B - c)[2][-1]
+            n = n if np.dot(n, c) > 0 else -n
+            assert np.abs((B - c) @ n).max() < 1e-4, solid                      # flat in its face
+            assert np.allclose(Nb, n, atol=1e-3), solid                         # facing as its face does, outward
+            k += len(f) * 5
+        Vd = Vs.astype(np.float64)
+        for a_, b_ in E:                                                       # half a spacing in from every edge
+            A, AB = Vd[a_], Vd[b_] - Vd[a_]
+            t = np.clip(((pos - A) @ AB) / (AB @ AB), 0, 1)
+            assert np.linalg.norm(pos - (A + t[:, None] * AB), axis=1).min() > 0.49, solid
+    flat = shapes.new_part("polyhedron", solid="cube", mode="faces", per_edge=4, radius=6.0, inset=0.0)
+    p0, _, _ = shapes.resolve([flat])
+    assert _nn(p0.astype(np.float64)).min() < 1e-4                           # inset 0: on the edges, as before
+
+
+def test_a_mesh_surface_is_a_pitch_apart():
+    """LEDs over a mesh: a flat region a regular grid a pitch apart and half a pitch in from its
+    border (a 10 x 10 square: 100, not 153 a 0.77 apart); a triangulated cube the same as a cube of
+    squares; a thin triangle and a curved surface thinned, no two LEDs nearer than 0.98 of a pitch."""
+    def mesh(V, F):
+        m = shape_io.Mesh()
+        m.v = np.asarray(V, np.float32)
+        m.faces = [list(f) for f in F]
+        return m.finish()
+    sq = mesh([[0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0]], [[0, 1, 2], [0, 2, 3]])
+    P, N = shape_io.mesh_leds(sq, "surface", 1.0)
+    assert len(P) == 100 and abs(_nn(P.astype(np.float64)).min() - 1.0) < 1e-6
+    assert np.allclose(P[:, 0].min(), 0.5) and np.allclose(P[:, 0].max(), 9.5) and np.allclose(N, [0, 0, 1])
+    C = np.array([[0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0], [0, 0, 10], [10, 0, 10], [10, 10, 10], [0, 10, 10]], float)
+    Q = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
+    quads, _ = shape_io.mesh_leds(mesh(C, Q), "surface", 1.0)
+    tris, tn = shape_io.mesh_leds(mesh(C, [t for q in Q for t in ([q[0], q[1], q[2]], [q[0], q[2], q[3]])]), "surface", 1.0)
+    assert len(quads) == len(tris) == 600 and (np.einsum("ij,ij->i", tn, tris - 5.0) > 0).all()
+    thin, _ = shape_io.mesh_leds(mesh([[0, 0, 0], [20, 0, 0], [20, 2, 0]], [[0, 1, 2]]), "surface", 1.0)
+    assert _nn(thin.astype(np.float64)).min() >= 0.97 and 15 <= len(thin) <= 40
+    R, nu, nv = 5.0, 24, 12
+    V = [[0, 0, R]] + [[R * np.sin(np.pi * i / nv) * np.cos(2 * np.pi * j / nu), R * np.sin(np.pi * i / nv) * np.sin(2 * np.pi * j / nu),
+                        R * np.cos(np.pi * i / nv)] for i in range(1, nv) for j in range(nu)] + [[0, 0, -R]]
+    F = [[0, 1 + j, 1 + (j + 1) % nu] for j in range(nu)]
+    for i in range(nv - 2):
+        for j in range(nu):
+            a, b = 1 + i * nu + j, 1 + i * nu + (j + 1) % nu
+            F += [[a, a + nu, b + nu], [a, b + nu, b]]
+    F += [[len(V) - 1, 1 + (nv - 2) * nu + (j + 1) % nu, 1 + (nv - 2) * nu + j] for j in range(nu)]
+    ball, bn = shape_io.mesh_leds(mesh(V, F), "surface", 1.0)
+    d = _nn(ball.astype(np.float64))
+    assert d.min() >= 0.97 and np.median(d) < 1.15 and 200 <= len(ball) <= 330
+    assert np.abs(np.linalg.norm(ball, axis=1) - 5.0).max() < 0.15 and (np.einsum("ij,ij->i", bn, ball) > 0).all()
+
+
 def test_reference_draws_but_does_not_light():
     ref = shapes.new_part("reference", vertices=[[0, 0, 0], [1, 0, 0], [1, 1, 0]], edges=[[0, 1], [1, 2]], file="t.obj")
     ref["pos"] = [5, 0, 0]
@@ -104,7 +200,7 @@ def test_mesh_readers():
     pv, _ = shape_io.mesh_leds(m, "vertices", 1.0)
     pe, _ = shape_io.mesh_leds(m, "edges", 1.0)
     ps, ns = shape_io.mesh_leds(m, "surface", 1.0)
-    assert len(pv) == 4 and len(pe) == 16 and 20 <= len(ps) <= 30 and ns.shape == (len(ps), 3)
+    assert len(pv) == 4 and len(pe) == 16 and len(ps) == 16 and ns.shape == (len(ps), 3)     # 4 x 4 a pitch apart
     ply = _write("t.ply", "ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\n"
                           "element face 1\nproperty list uchar int vertex_indices\nend_header\n0 0 0\n2 0 0\n0 2 0\n3 0 1 2\n")
     m = shape_io.read_mesh(ply)

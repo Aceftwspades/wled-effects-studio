@@ -308,6 +308,12 @@ def build(app):
                 ("Export the positions...", lambda: dpg.show_item("shape_points_dialog"),
                  "every LED as a CSV row - x, y, z, its wiring index, its part - in wiring order, for any other tool"),
                 ("Generate a preview", lambda: generate_preview(app), "a turn of the shape: a GIF and a PNG in the export folder"),
+                ("Build sheet", lambda: open_build_sheet(app),
+                 "the page to take to the bench: a diagram, every part's LEDs and strip to cut, the outputs, where to feed power "
+                 "and with what wire, the checks still open - a printable page in the export folder"),
+                ("Print template (1:1 SVG)...", lambda: dpg.show_item("shape_template_dialog"),
+                 "the shape seen flat at its real size, every LED marked and numbered, a 100 mm bar to check the print - "
+                 "to build a sign or a panel on, or to drill"),
                 (None, None, None),
                 ("Clear the shape", lambda: _apply(app, parts=[], refit="all"), "every part gone (Undo brings them back)")):
             if label is None:
@@ -320,12 +326,29 @@ def build(app):
     from native import camera_map_ui
     camera_map_ui.build(app)                                # mapping lights by camera
     # the file dialogs: a mesh or model in (how a mesh becomes LEDs asked there), a shape file in or out
+    with dpg.file_dialog(directory_selector=False, show=False, tag="shape_template_dialog", width=px(700), height=px(460),
+                         default_filename="template.svg", callback=lambda s, a: export_template(app, a.get("file_path_name", ""))):
+        dpg.add_file_extension(".svg", color=(220, 140, 200))
+        with dpg.group(horizontal=True):
+            dpg.add_text("holes", color=c.DIM)
+            typeface.mono(dpg.add_input_float(tag="shape_tpl_hole", width=px(80), default_value=0.0, step=0, format="%.3g mm"))
+            c.tip("0: a cross at each LED to centre it on; a diameter: a hole that size, for a drilling template "
+                  "(12 mm for the common bullet pixels)")
     with dpg.file_dialog(directory_selector=False, show=False, tag="shape_import_dialog", width=px(700), height=px(460),
                          callback=lambda s, a: import_file(app, a.get("file_path_name", ""))):
         for ext, col in ((".obj", (120, 200, 120)), (".ply", (120, 200, 120)), (".stl", (120, 200, 120)),
-                         (".xmodel", (200, 180, 90)), (".xml", (200, 180, 90)), (".csv", (150, 150, 220)), (".txt", (150, 150, 220)), (".json", (150, 150, 220))):
+                         (".xmodel", (200, 180, 90)), (".xml", (200, 180, 90)), (".svg", (220, 140, 200)), (".csv", (150, 150, 220)),
+                         (".txt", (150, 150, 220)), (".json", (150, 150, 220))):
             dpg.add_file_extension(ext, color=col)
         with dpg.group(tag="shape_import_opts"):
+            dpg.add_text("an SVG drawing comes in:", color=c.DIM)
+            with dpg.group(horizontal=True):
+                dpg.add_combo(["at its real size", "fitted to a width"], tag="shape_svg_size", width=px(150), default_value="at its real size")
+                c.tip("its real size: as the file says it is (a sign drawn 600 mm wide is 600 mm wide); or fitted to the width typed")
+                typeface.mono(dpg.add_input_float(tag="shape_svg_width", width=px(80), default_value=500.0, step=0, format="%.4g"))
+                c.tip("the width to fit it to, in the shape's lengths (Shape frame: lengths in)")
+                dpg.add_combo(["shortest wiring", "the drawing's order"], tag="shape_svg_order", width=px(150), default_value="shortest wiring")
+                c.tip("the order the strokes are wired in: each next the nearest end to where the last finished, or the file's")
             dpg.add_text("a mesh (.obj, .ply, .stl) becomes LEDs:", color=c.DIM)
             dpg.add_combo([m[1] for m in MESH_MODES], tag="shape_mesh_mode", width=px(190), default_value=MESH_MODES[0][1])
             c.tip("one every spacing along its edges, one at each vertex, or spread over its surface")
@@ -515,22 +538,89 @@ def _shape_settings(app, P, sp):
     with form.row("lengths in", parent=P, tip="millimetres, centimetres or inches"):
         dpg.add_combo(list(units.UNITS), default_value=units.unit(sp), width=px(80), callback=lambda s, v: set_shape_option(app, unit=v))
     _heading(P, "THE EFFECTS SEE", "one strip in wiring order (what 1-D effects and the 3-D nodes work on), or a grid the LEDs are "
-             "projected onto from the front - or the grid an xLights model came with")
+             "projected onto, for WLED's 2-D effects - seen from the front, the side or above, unrolled round the shape "
+             "(a tree, a column: the picture runs all the way round), as a globe, or whichever fits best - or the grid "
+             "an xLights model came with")
     with form.row("layout", parent=P):
         dpg.add_combo(["strip", "grid"], tag="shape_layout", width=px(80), default_value=sp.get("layout", "strip"),
-                      callback=lambda s, v: _apply(app, layout=v))
+                      callback=lambda s, v: _apply(app, layout=v, **({"projection": "auto"} if v == "grid" and
+                                                                       "projection" not in sp else {})))
         dpg.add_button(label="Segment per part", small=True, callback=lambda: segments_per_part(app))
         c.tip("each part its own WLED segment - effect, palette, sliders - up to eight")
+    if sp.get("layout") == "grid" and not sp.get("grid"):
+        labels = dict(shapes.PROJECTIONS)
+        with form.row("projected", parent=P, tip="how the LEDs land on the grid: the best fit tries every way and keeps the "
+                      "one that gives the most LEDs a cell of their own"):
+            dpg.add_combo([lab for _, lab in shapes.PROJECTIONS], tag="shape_projection", width=px(150),
+                          default_value=labels.get(sp.get("projection", "front"), labels["front"]),
+                          callback=lambda s, v: _apply(app, projection=next(k for k, lab in shapes.PROJECTIONS if lab == v)))
+        with form.row("grid cell", parent=P, tip="a grid cell in LED spacings: under 1 for LEDs closer than a spacing "
+                      "(the grid grows, to 256 a side), over 1 for a coarser picture"):
+            typeface.mono(dpg.add_input_float(tag="shape_cell", default_value=float(sp.get("cell", 1.0)), width=px(80), step=0,
+                                              format="%.3g", on_enter=True,
+                                              callback=lambda s, v: _apply(app, cell=max(0.05, min(16.0, float(v))))))
+        g = app.project.geometry
+        lost = int(getattr(g, "collisions", 0) or 0)
+        how = labels.get(getattr(g, "projection", None) or "", "")
+        dpg.add_text(f"{g.w} x {g.h} grid" + (f", {how}" if sp.get("projection") == "auto" and how else "") + ": "
+                     + ("every LED a cell of its own" if not lost else
+                        f"{lost} LEDs share a cell with another and stay dark - try another way, or a smaller cell"),
+                     parent=P, color=c.DIM if not lost else c.AMBER, wrap=px(480))
     _heading(P, "WHILE YOU BUILD")
     with form.row("colours", parent=P, tip="what the 3-D view shows while you build: each part in a colour of its own (the selected "
                   "one bright, the rest dimmed, the wiring drawn on them), or the effect the sim runs"):
         dpg.add_combo(["the parts", "the effect"], tag="shape_colours", width=px(110),
                       default_value="the effect" if app.prefs.get("shape_colours") == "effect" else "the parts",
                       callback=lambda s, v: _shape_view().set_mode(app, "effect" if v == "the effect" else "parts"))
+    _power(app, P, sp)
     _by_hand(app, P)
     with dpg.group(parent=P):
         dpg.add_spacer(height=px(4))
         dpg.add_text("Click a part in the 3-D view (or its row above) for its sizes and place.", color=c.DIM, wrap=px(480))
+
+
+def _set_power(app, **kv):
+    """One of the power settings, kept in the shape's "power" options."""
+    g = app.project.geometry
+    pw = dict((g.params.get("power") or {}) if g.kind == "shape" else {})
+    if "volts" in kv and int(kv["volts"]) != int(pw.get("volts", 5)):
+        # another voltage: its own current, rail and allowed drop
+        for k in ("ma", "ohm_m", "drop"):
+            pw.pop(k, None)
+    pw.update(kv)
+    _apply(app, power=pw)
+
+
+def _power(app, P, sp):
+    """POWER: where the strips need feeding, the drop between feeds, the supply - power_plan.py."""
+    from native import power_plan
+    c = _c()
+    st = power_plan.settings(sp, app.project.options.get("outputs") or {})
+    _heading(P, "POWER", "where the strips need power fed in so no LED sags more than the drop allowed, how far they sag, "
+             "the supply and the wire - worked out from every run's length and LEDs (typical strip figures: change them "
+             "if your strip's sheet says otherwise)")
+    with form.row("strip", parent=P, tip="the strip's voltage: 12 V and 24 V strips go many times further between feeds"):
+        dpg.add_combo(["5 V", "12 V", "24 V"], tag="shape_pw_volts", width=px(70), default_value=f"{st['volts']} V",
+                      callback=lambda s, v: _set_power(app, volts=int(v.split()[0])))
+        typeface.mono(dpg.add_input_float(tag="shape_pw_ma", default_value=st["ma"], width=px(70), step=0, format="%.4g mA",
+                                          on_enter=True, callback=lambda s, v: _set_power(app, ma=max(0.1, float(v)))))
+        c.tip("an LED's current at full white: 55 mA for a 5 V WS2812B, about 15 for a 12 V WS2815")
+        typeface.mono(dpg.add_input_float(tag="shape_pw_ohm", default_value=st["ohm_m"], width=px(80), step=0, format="%.3g ohm/m",
+                                          on_enter=True, callback=lambda s, v: _set_power(app, ohm_m=max(0.001, float(v)))))
+        c.tip("both rails' resistance a metre: about 0.1 for a common 10 mm 5 V strip, less for a thick 2 oz one")
+    with form.row("plan for", parent=P, tip="the brightness the feeds and the supply are planned for (100 %: full white, "
+                  "the worst case) and the drop allowed before colours shift"):
+        typeface.mono(dpg.add_input_float(tag="shape_pw_bri", default_value=st["bri"] * 100, width=px(70), step=0, format="%.0f %%",
+                                          on_enter=True, callback=lambda s, v: _set_power(app, bri=max(1.0, min(100.0, float(v))) / 100.0)))
+        typeface.mono(dpg.add_input_float(tag="shape_pw_drop", default_value=st["drop"], width=px(80), step=0, format="%.2g V down",
+                                          on_enter=True, callback=lambda s, v: _set_power(app, drop=max(0.05, float(v)))))
+        dpg.add_checkbox(label="feeds on the shape", tag="shape_pw_show", default_value=bool(app.prefs.get("shape_feeds", True)),
+                         callback=lambda s, v: app.prefs.__setitem__("shape_feeds", bool(v)))
+        c.tip("the feed points drawn on the 3-D view while the Shape frame is open: where the power wires go")
+    pl = power_plan.for_geometry(app.project.geometry, app.project.options.get("outputs") or {})
+    if pl is not None:
+        for k, line in enumerate(pl.lines(sp)):
+            dpg.add_text(line, parent=P, color=c.TEXT if k == 0 else c.DIM, wrap=px(480))
 
 
 def _by_hand(app, P):
@@ -1234,6 +1324,8 @@ def import_file(app, path):
                 part["params"]["normals"] = nrm.tolist()
             part["name"] = f"{mesh.source} ({mode})"
             note = f"{len(pts)} LEDs {mode} of {mesh.source} ({len(mesh.v)} vertices, {len(mesh.edges)} edges, {len(mesh.faces)} faces)"
+        elif ext == ".svg":
+            part, note = _svg_part(app, path)
         elif ext == ".xml":
             new, notes = shape_io.read_layout(path)
             parts += new
@@ -1272,6 +1364,74 @@ def import_file(app, path):
     _set_sel(app, {len(parts) - 1})
     _apply(app, parts, refit="grow", **more)
     app.gp.status(note)
+
+
+def _svg_part(app, path):
+    """An SVG drawing as an outline part: its strokes at its real size (or fitted to the width typed),
+    and what it came to in words. Raises when there is nothing to light."""
+    from native import svg_import, outline
+    strokes, skipped = svg_import.read(path)
+    left_out = ", ".join(f"{n} {k}" for k, n in skipped.items())
+    if not strokes:
+        raise ValueError("no paths or shapes in it" + (f" - {left_out}: in Inkscape, Path > Object to Path first" if left_out else ""))
+    sp = app.project.geometry.params if app.project.geometry.kind == "shape" else {}
+    size = None
+    if dpg.does_item_exist("shape_svg_size") and dpg.get_value("shape_svg_size") == "fitted to a width":
+        size = units.from_unit(max(0.001, float(dpg.get_value("shape_svg_width") or 0.0)), sp)
+    paths, closed = outline.fit(strokes, unit_mm=units.mm(sp), size=size)
+    order = "drawing" if dpg.does_item_exist("shape_svg_order") and dpg.get_value("shape_svg_order") == "the drawing's order" else "shortest"
+    name = os.path.basename(path)
+    part = shapes.new_part("outline", paths=[[[round(x, 4), round(y, 4)] for x, y in P] for P in paths], closed=closed,
+                           order=order, source=name)
+    part["name"] = os.path.splitext(name)[0]
+    n, dots = outline.counts(paths, closed, 1.0)
+    allp = np.concatenate([np.asarray(P) for P in paths])
+    w, h = np.ptp(allp[:, 0]), np.ptp(allp[:, 1])
+    note = (f"{name}: {len(paths)} strokes, {n} LEDs, {units.show(w, sp)} x {units.show(h, sp)}"
+            + (f" ({dots} dot(s): one LED each)" if dots else "")
+            + (f"; left out: {left_out} (text: Path > Object to Path in Inkscape)" if left_out else ""))
+    return part, note
+
+
+def open_build_sheet(app):
+    """The build sheet (build_sheet.py) into the project's export folder, and open."""
+    from native import build_sheet, shape_checks
+    g = app.project.geometry
+    if g.kind != "shape" or not (g.params.get("parts") or []):
+        app.gp.status("a build sheet is for a shape built from parts: there are none yet"); return
+    try:
+        checks = [(c.kind, c.text) for c in shape_checks.run(app)]
+    except Exception:
+        checks = []
+    name = os.path.basename(os.path.normpath(app.project.path))
+    page = build_sheet.sheet(g, app.project.options.get("outputs") or {}, f"{name}: build sheet", checks, name)
+    out = os.path.join(app.project.path, "export")
+    os.makedirs(out, exist_ok=True)
+    path = os.path.join(out, "build_sheet.html")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(page)
+    app.gp.status(f"build sheet: {path}")
+    app.reveal(path)
+
+
+def export_template(app, path):
+    """The 1:1 template (build_sheet.template) to `path`."""
+    from native import build_sheet
+    if not path:
+        return
+    g = app.project.geometry
+    if g.kind != "shape":
+        app.gp.status("a template is for a shape built from parts"); return
+    hole = float(dpg.get_value("shape_tpl_hole") or 0.0) if dpg.does_item_exist("shape_tpl_hole") else 0.0
+    try:
+        svg, view, W, H = build_sheet.template(g, hole_mm=max(0.0, hole))
+    except ValueError as e:
+        app.gp.status(f"no template: {e}"); return
+    if not path.lower().endswith(".svg"):
+        path += ".svg"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(svg)
+    app.gp.status(f"template {os.path.basename(path)}: {W / 10:.1f} x {H / 10:.1f} cm, seen from the {view} - print at actual size")
 
 
 def export_xmodel(app, path):

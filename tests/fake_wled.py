@@ -16,8 +16,10 @@ What it models of WLED 16, faithfully where the studio was bitten:
   /presets.json the presets written so far (and fs.pmt in /json/info moves)
   /upload       any file into the fake's filesystem (studio.bin, ledmap.json,
                 geometry.bin, paletteN.json); GET /<name> serves it back
-  /json/cfg     GET the config (hw.led.ins, timers.ins, um.AudioReactive, hw.if.i2c-pin); POST merges timers,
-                the LED block, the audio usermod's block (a type or pin change counts a reboot as needed)
+  /json/cfg     GET the config (hw.led.ins, timers.ins, um.AudioReactive, um.CubeFXBank, hw.if.i2c-pin); POST
+                merges timers, the LED block, the audio usermod's block (a type or pin change counts a reboot as
+                needed); the effect bank's block is READ as the firmware reads it - a key missing from it takes its
+                default (a slot 0, six_faces off) - and a reboot ({"rb": true}) applies its slots to the effect list
                 (cleared, then the list) and the LED outputs
   DDP           a UDP socket on 4048 counting packets and frames
 
@@ -45,6 +47,10 @@ EFFECTS = ["Solid", "Blink", "Breathe", "Wipe", "Wipe Random", "Random Colors", 
            "Percent", "Ripple Rainbow", "Heartbeat", "Pacifica", "Candle Multi", "Solid Glitter", "Sunrise", "Phased",
            "Twinkleup", "Noise Pal", "Sine", "Phased Noise", "Flow", "Chunchun", "Dancing Shadows", "Washing Machine",
            "Blends", "TV Simulator", "Dynamic Smooth", "Ace 3-D Lichtenberg", "Ace 3-D Cube Axes", "Studio Script"]
+# the cube_fx effects the fake's firmware compiles (its bank's roster), and how many slots the bank has
+ROSTER = ["Ace 3-D Lichtenberg", "Ace 3-D Cube Axes", "Studio Script", "Ace 3-D Paintball", "Ace 3-D Murmuration",
+          "Ace 3-D Jelly Bounce"]
+BANK_SLOTS = 36
 PALETTES = ["Default", "* Random Cycle", "* Color 1", "* Colors 1&2", "* Color Gradient", "* Colors Only", "Party", "Cloud",
             "Lava", "Ocean", "Forest", "Rainbow", "Rainbow Bands", "Sunset", "Rivendell", "Breeze", "Red & Blue", "Yellowout",
             "Analogous", "Splash", "Pastel", "Sunset 2", "Beach", "Vintage", "Departure", "Landscape", "Beech", "Sherbet", "Hult",
@@ -76,6 +82,10 @@ class FakeWled:
                     "um": {"AudioReactive": {"enabled": True, "addPalettes": False, "digitalmic": {"type": 1, "pin": [13, 15, 14, -1]},
                                              "config": {"squelch": 10, "gain": 60, "AGC": 0}, "sync": {"port": 11988, "mode": 0}}}}
         self.cfg["hw"]["if"] = {"i2c-pin": [-1, -1]}
+        # the cube_fx bank: the effects compiled in (ROSTER, by name) and the slots choosing which are in the list;
+        # none chosen means all of them, in roster order, as the firmware does
+        self.cfg["um"]["CubeFXBank"] = self._bank_block({})
+        self.effects = list(EFFECTS)
         self.audio_level = 0.0                           # what /json/info reports as the input level (a test sets it)
         self.reboots = 0                                 # /json/state {"rb": true} counted
         self.reboot_needed = False                       # a new audio type or new pins were written
@@ -136,7 +146,10 @@ class FakeWled:
                         if k in pre:
                             st[k] = json.loads(json.dumps(pre[k]))
         gone = set()
-        for sg in d.get("seg") or []:
+        segs = d.get("seg") or []
+        if isinstance(segs, dict):                     # an object, not a list: every selected segment (here: all) takes it
+            segs = [dict(segs, id=k) for k in range(len(st["seg"]))] if "id" not in segs else [segs]
+        for sg in segs:
             i = int(sg.get("id", 0))
             stop = sg.get("stop")
             if stop is not None and int(stop) <= 0:
@@ -158,25 +171,58 @@ class FakeWled:
             self.files.pop(f"/palette{int(d['rmcpal'])}.json", None)
         if d.get("rb"):
             self.reboots += 1; self.reboot_needed = False
+            self._place_bank()
         if "psave" in d:
             pid = int(d["psave"])
             if 0 < pid < 251:
                 api = "o" in d and d["o"]
                 self.pending = (pid, d, api, time.time() + self.LOOP_DELAY)     # replaces one still pending, as WLED's does
 
+    # --- the effect bank ---------------------------------------------------------------------
+    @staticmethod
+    def bank_hash(name):
+        h = 0x1F35
+        for ch in name.split("@", 1)[0].encode():
+            h = ((h ^ ch) * 31 + 7) & 0xFFFF
+        return h or 1
+
+    def _bank_block(self, d):
+        """The bank block as readFromConfig() leaves it: each key from `d` or its default."""
+        out = {"enabled": bool(d.get("enabled", True)), "six_faces": bool(d.get("six_faces", False))}
+        for i in range(BANK_SLOTS):
+            try:
+                out[f"s{i:02d}"] = int(d.get(f"s{i:02d}", 0)) & 0xFFFF
+            except (TypeError, ValueError):
+                out[f"s{i:02d}"] = 0
+        return out
+
+    def _place_bank(self):
+        """The effect list a boot makes: the built-ins, then the bank's effects in slot order (all of the roster
+        when no slot is chosen or the bank is off)."""
+        b = self.cfg["um"]["CubeFXBank"]
+        slots = [b[f"s{i:02d}"] for i in range(BANK_SLOTS) if b[f"s{i:02d}"]]
+        by = {self.bank_hash(n): n for n in ROSTER}
+        if b["enabled"] and slots:
+            placed = [by[h] for h in slots if h in by]
+        else:
+            placed = list(ROSTER)
+        self.effects = [n for n in EFFECTS if n not in ROSTER] + placed
+
     def info(self):
         fx = self.state["seg"][self.state["mainseg"]]["fx"]
         ar = self.cfg["um"]["AudioReactive"]
         t = ar["digitalmic"]["type"]
-        sc = ["running" if EFFECTS[fx] == "Studio Script" else "idle"]
+        sc = ["running" if 0 <= fx < len(self.effects) and self.effects[fx] == "Studio Script" else "idle"]
         if self.script_vm > 1:
             sc.append(f" - script VM {self.script_vm}")        # firmware from 1.4.0 says which programs it runs
         u = {"Studio Script": sc,
              "AudioReactive": {"Audio Source": ["I2S digital" if t < 254 else "network only",
                                                 f" - peak {int(self.audio_level / 2.55):3d}%" if self.audio_level > 1 else " - quiet"],
                                "Input level": [round(self.audio_level), "/255"],
-                               "Sound Processing": ["running" if ar["enabled"] else "suspended"]}}
-        return {"ver": "16.0.1", "vid": 2605010, "name": "Fake WLED", "arch": "ESP32-S3", "fxcount": len(EFFECTS),
+                               "Sound Processing": ["running" if ar["enabled"] else "suspended"]},
+             "Cube FX slots": [f"{sum(1 for n in self.effects if n in ROSTER)} of {len(ROSTER)} placed", ""],
+             "Cube FX slots free": ["3  (220 modes, 0 gaps + 35 above)"]}
+        return {"ver": "16.0.1", "vid": 2605010, "name": "Fake WLED", "arch": "ESP32-S3", "fxcount": len(self.effects),
                 "palcount": len(PALETTES), "cpalcount": sum(1 for f in self.files if f.startswith("/palette")),
                 "mac": "aabbccddeeff", "uptime": int(time.time() - self.t0), "freeheap": 150000,
                 "leds": {"count": self.w * self.h, "pwr": 0, "fps": 40, "maxpwr": 0, "matrix": {"w": self.w, "h": self.h}, "lc": 1},
@@ -200,7 +246,7 @@ class FakeWled:
                 p = self.path.split("?")[0]
                 with fake._lock:
                     if p == "/json/info": return self._send(200, fake.info())
-                    if p == "/json/effects": return self._send(200, EFFECTS)
+                    if p == "/json/effects": return self._send(200, fake.effects)
                     if p == "/json/palettes": return self._send(200, PALETTES)
                     if p == "/json/nodes": return self._send(200, {"nodes": []})
                     if p == "/json/state": return self._send(200, fake.state)
@@ -246,6 +292,9 @@ class FakeWled:
                             fake.cfg["hw"]["led"].update(d["hw"]["led"])
                         if "hw" in d and "if" in d["hw"] and "i2c-pin" in d["hw"]["if"]:
                             fake.cfg["hw"]["if"]["i2c-pin"] = list(d["hw"]["if"]["i2c-pin"])
+                        bk = (d.get("um") or {}).get("CubeFXBank")
+                        if bk is not None:
+                            fake.cfg["um"]["CubeFXBank"] = fake._bank_block(bk)
                         ar = (d.get("um") or {}).get("AudioReactive")
                         if ar:
                             cur = fake.cfg["um"]["AudioReactive"]

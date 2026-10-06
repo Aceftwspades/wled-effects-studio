@@ -342,6 +342,7 @@ def build_menus(app):
             dpg.add_separator()
             _mi(app, "Snapshots...", "snapshots", callback=lambda: show_snapshots(app))
             _mi(app, "MIDI and OSC...", "midi", callback=lambda: app.run_action("midi"))
+            _mi(app, "Effect slots...", "bank", callback=lambda: app.run_action("bank"))
             dpg.add_menu_item(label="Message log...", callback=lambda: __import__("native.messages", fromlist=["x"]).show_log(app))
             dpg.add_separator()
             dpg.add_menu_item(label="Close every frame", callback=lambda: close_all_frames(app))
@@ -694,6 +695,9 @@ def build_dialogs(app):
     # MIDI: a controller's knobs onto the sliders (midi_ui.py)
     from native import midi_ui
     midi_ui.build(app)
+    # EFFECT SLOTS: which cube_fx effects the device lists, in what order (bank_ui.py)
+    from native import bank_ui
+    bank_ui.build(app)
     # HELP: the guide, the tutorial and the node reference in a window, and the first-run panel (reader_ui.py)
     from native import reader_ui
     reader_ui.build(app)

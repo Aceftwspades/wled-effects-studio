@@ -88,11 +88,13 @@ def run(app):
             out.append(Check("warn", f"the lead from {parts[k0].get('name', parts[k0]['kind'])} to {parts[k1].get('name', parts[k1]['kind'])} "
                              f"is {units.show(gap, sp)}: a data wire that long may want a buffer, or a sacrificial LED near the controller",
                              lambda e=ends, ks=(k0, k1): (shape_ui.select(app, list(ks)), view3d.frame_points(app, e))))
-    # a grid layout seen from the front: an LED behind another shares its cell, and the cell keeps the first
+    # a grid layout: an LED projected onto a cell another holds gets no pixel (the ledmap leaves it out: dark)
     lost = int(getattr(g, "collisions", 0) or 0) if sp.get("layout") == "grid" else 0
     if lost:
-        out.append(Check("warn", f"the grid layout puts {lost} LEDs behind others, seen from the front: they get no pixel and "
-                         "stay dark - a 3-D shape wants the strip layout (THE EFFECTS SEE), with effects made for any shape",
+        how = dict(shapes.PROJECTIONS).get(getattr(g, "projection", None) or sp.get("projection", "front"), "")
+        out.append(Check("warn", f"the grid layout puts {lost} LEDs on cells others hold{(', ' + how) if how else ''}: they get "
+                         "no pixel and stay dark - try the best fit or round the shape (THE EFFECTS SEE: projected), "
+                         "a smaller grid cell, or the strip layout with effects made for any shape",
                          lambda: shape_ui.select(app, [])))
     # the outputs' count
     S = app.project.options.get("outputs") or {}

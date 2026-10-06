@@ -337,6 +337,19 @@ STEPS = [
                 "and app._transition['style'] == 'swipe left'"},
       {"py": "(setattr(app, '_transition', None), app.on_effect(None, app._sm_fx))"}], 0.6),
     ([{"check": "app.eng.names[app.eng.idx] == app._sm_fx"}], 0.2),
+    # the effect slots (Window > Effect slots, against the fake): read, the fake's six effects written in an order
+    # and the fake rebooted with them; then a Program Change switches the sim AND the device's own effect
+    ([{"py": "bank_ui.show(app)"}, {"py": "bank_ui.read(app)"}], 1.0),
+    ([{"check": "'placed' in app._bank['status'] and not app._bank['busy']"},
+      {"py": "app._bank.update(slots=['Ace 3-D Lichtenberg', 'Ace 3-D Cube Axes', 'Studio Script', 'Ace 3-D Paintball', "
+             "'Ace 3-D Murmuration', 'Ace 3-D Jelly Bounce'])"}, {"py": "bank_ui.write(app)"}], 2.0),
+    ([{"check": "'rebooting' in app._bank['status']"}, {"py": "midi_ui._st(app).update(xfade=0.0)"}, {"midi": [0xC0, 0]}], 1.5),
+    ([{"check": "app.eng.names[app.eng.idx] == 'Ace 3-D Paintball' and "
+                "__import__('native.devices', fromlist=['d']).state('127.0.0.1:8770')['effect'] == 'Ace 3-D Paintball'"},
+      {"py": "app.on_effect(None, app._sm_fx)"}, {"py": "dpg.hide_item('bank_win')"}], 0.5),
+    # the setlist onto the device: a preset for each effect and the playlist stepping through them
+    ([{"py": "midi_ui.setlist_send(app)"}], 6.0),
+    ([{"expect": ["messages", "playlist 69 'Setlist' saved on the device"]}], 0.2),
     ([{"check": "app.osc.port is None and dpg.get_value('osc_state') == ''"},
       {"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
       {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),
@@ -756,6 +769,23 @@ STEPS = [
     ([{"check": "dpg.is_item_shown('fx_fit_note') and 'matrix' in dpg.get_value('fx_fit_note')"},
       {"geometry": {"kind": "shape", "params": {"parts": [_TREE], "layout": "grid"}}}], 1.0),
     ([{"check": "app.project.geometry.collisions > 0 and any('grid layout puts' in c.text for c in shape_checks.run(app))"},
+      {"geometry": {"kind": "shape", "params": {"parts": [_TREE], "layout": "grid", "projection": "auto"}}}], 1.0),
+    # the tree unrolled round itself (the best fit): every LED a cell of its own; then a sign - lettering, an SVG drawn
+    # in, the power plan's feeds on it, the build sheet and a 1:1 template written
+    ([{"check": "app.project.geometry.projection == 'around' and app.project.geometry.collisions == 0"},
+      {"geometry": {"kind": "shape", "params": {"parts": [{"kind": "text", "name": "text", "params": {"text": "OPEN", "height": 12.0,
+                    "style": "center", "font": "", "pitch": 1.0, "order": "shortest"}, "pos": [0, 0, 0], "rot": [0, 0, 0],
+                    "scale": 1.0, "reverse": False}]}}},
+      {"py": "open(__import__('os').path.join(app.project.path, 'export', '_smoke.svg'), 'w').write("
+             "'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200mm\" height=\"100mm\" viewBox=\"0 0 200 100\">"
+             "<circle cx=\"50\" cy=\"50\" r=\"40\"/><path d=\"M110 90 L150 10 L190 90\"/><text>x</text></svg>')"},
+      {"py": "shape_ui.import_file(app, __import__('os').path.join(app.project.path, 'export', '_smoke.svg'))"}], 2.0),
+    ([{"check": "[p['kind'] for p in app.project.geometry.params['parts']] == ['text', 'outline'] and app.project.geometry.count > 60"},
+      {"expect": ["messages", "_smoke.svg: 2 strokes"]}, {"expect": ["messages", "left out: 1 text"]},
+      {"check": "__import__('native.power_plan', fromlist=['p']).for_geometry(app.project.geometry).feeds() >= 1"},
+      {"py": "shape_ui.export_template(app, __import__('os').path.join(app.project.path, 'export', '_smoke_template.svg'))"}], 1.0),
+    ([{"check": "__import__('os').path.getsize(__import__('os').path.join(app.project.path, 'export', '_smoke_template.svg')) > 1000"},
+      {"expect": ["messages", "print at actual size"]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
     ([{"check": "not dpg.is_item_shown('fx_fit_note')"}, {"action": "tutorial_tree"}], 1.5),
     ([{"check": "dpg.is_item_shown('reader_win')"}, {"py": "chrome.close_dialog('reader_win') or dpg.hide_item('reader_win')"},

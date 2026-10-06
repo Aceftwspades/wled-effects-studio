@@ -452,6 +452,20 @@ def poll(app):
         tx = sx[i] + (r + px(3) if dx >= 0 else -(r + px(3) + tw))
         typeface.draw_text((tx, sy[i] - size / 2), word, size, color=col, parent=D)
         taken.append((min(tx, sx[i] - r), sy[i] - r, max(tx + tw, sx[i] + r), sy[i] + r))
+    # 2b. where power is fed in (power_plan.py): a ring and "+" at every feed after a run's first
+    if app.prefs.get("shape_feeds", True):
+        from native import power_plan
+        pl = getattr(app, "_feed_plan", None)
+        if pl is None or pl[0] is not g:                  # a geometry is made anew at every change: worked out once each
+            pl = app._feed_plan = (g, power_plan.for_geometry(g, app.project.options.get("outputs") or {}))
+        plan = pl[1]
+        if plan is not None:
+            amber = (255, 184, 70, 255)
+            for r in plan.runs:
+                for f in r["feeds"]:
+                    if f < n and good[f]:
+                        dpg.draw_circle((sx[f], sy[f]), px(6), color=amber, thickness=1.6, parent=D)
+                        typeface.draw_text((sx[f] + px(7), sy[f] - size - px(2)), "+", size, color=amber, parent=D)
     # 3. the leads between one part's last LED and the next's first: dashed, their length beside them
     order = sorted(R.items(), key=lambda kv: kv[1][0])
     lead_col = tuple(chrome.DIM[:3]) + (220,)

@@ -58,6 +58,8 @@ STEPS = [
     ([{"frame_walk": "outputs"}], 6.0),
     ([{"frame_walk": "audioin"}], 6.0),
     ([{"frame_walk": "keys_win"}, {"frame_walk": "appearance_win"}], 4.0),
+    # the effect slots, against the fake (its write reboots the fake); the device's switching follows MIDI there too
+    ([{"device": "127.0.0.1:8770"}, {"py": "bank_ui.show(app)"}, {"frame_walk": "bank_win"}], 6.0),
     ([{"frame_walk": "history_win"}, {"frame_walk": "undo_win"}, {"frame_walk": "about_win"}, {"frame_walk": "usermods_win"}], 4.0),
     ([{"frame_walk": "map_win"}, {"py": "camera_map_ui.stop(app)"}], 4.0),
     ([{"project": "default"}, {"layout": "both"}, {"graph_open": "box_fire.json"}, {"frame_walk": "root"}], 10.0),

@@ -444,7 +444,23 @@ effects, which is what the setlist is for. A pad's release never switches
 anything, and next and previous fire once on the press - or as a knob
 crosses its middle. **CROSSFADE** blends the effect going out into the one
 coming in over the seconds set, in any of the device's transition styles
-(fade, swipe, push, circular, fairy dust); 0 cuts. A drum machine's or a DAW's
+(fade, swipe, push, circular, fairy dust); 0 cuts. The **DEVICE** row's
+"switch it too" (on unless unticked) makes every MIDI switch set the active
+device's own effect as well - with the device's own defaults for it, and the
+crossfade as its transition - so the cube follows the controller with no
+stream running (while the sim is streamed to it, the stream is what it
+shows). The effect must have one of the device's effect slots (below).
+"Send the setlist" writes the setlist onto the device as presets (70 up) and
+a playlist (69) that steps through them every so many seconds, so it plays
+with the studio closed. **Window > Effect slots...** is the device's effect
+bank: which of the cube_fx effects the firmware compiles take one of its
+slots, in what order - the device lists only those, after its built-ins, in
+that order (and the on-cube menu with them). "Read the device" shows what it
+has; Add, Add the rest, Up, Down and Remove change it;
+"Write to the device and reboot" writes the slots (the rest of the
+device's settings kept) and reboots it, since effects join the list as it
+boots. A newly flashed effect
+needs a slot before the device lists it. A drum machine's or a DAW's
 **MIDI clock** on the port is followed while it plays (the window's CLOCK
 row turns it off): each of its beats fires the synth's, and its tempo is
 the synth's; stopped, the synth keeps its own beat again. It needs the optional
@@ -674,7 +690,11 @@ row onto another to wire it there; right-click it for its menu.
   **CORNERS**: x, y and z in the unit, **+** to put a corner halfway to the
   next, **x** to delete one, **reverse the path**, **draw on from its end**.
   A solid's edges can **split into parts** (a strip per edge, or a polygon
-  per face in faces mode, the LEDs where they were). Loose points have
+  per face in faces mode, the LEDs where they were). With LEDs on its
+  **faces**, every face is outlined on its own, **faces inset** (half a
+  spacing unless set) in from its edges - two faces share each edge, so
+  their strips lie side by side - and each LED faces the way its face
+  does. Loose points have
   their tools and **BY HAND**: tick "place", click the view and an LED
   lands on the working plane (choose x, y or z and a value in the unit);
   drag one to move it; "renumber: nearest chain" rewires them the way a
@@ -717,7 +737,10 @@ view builds in, and BY HAND.
 saves one, **imports** a model - `.obj`, `.ply` and `.stl` from Blender or
 any CAD program as LEDs **along the edges** at a spacing (a strip run round
 the outline, chained into as few runs as it can), one **per vertex**, or
-**over the surface** (asked in the import dialog); an xLights **`.xmodel`**
+**over the surface** (asked in the import dialog: each flat region - an
+STL's triangles of one plane joined back into a face - a regular grid a
+spacing apart, half a spacing in from its border; a curved surface spread
+evenly, no two LEDs nearer than a spacing); an xLights **`.xmodel`**
 custom model (the LEDs, their numbering and its grid); a whole xLights
 layout (`xlights_rgbeffects.xml`: every model a part where it stands -
 custom models, matrices, lines and poly lines exactly; trees, stars,
@@ -736,6 +759,48 @@ chase along the wiring - looping in the frame's PREVIEW fold and written as
 **Undo** and **Redo** step through every change, the handles' and keys'
 too (Ctrl+Z and Ctrl+Y while the frame has the keyboard).
 
+**Signs**: the add gallery's **lettering** part is words in any font on
+the computer, standing facing you - drawn as **one stroke a letter** (the
+line a neon tube follows: the letters thinned to their centre lines) or
+as **the letters' outlines** (channel letters, edge-lit acrylic) - with
+the letters' height, `\n` for a new line, and the wiring between strokes
+the **shortest** (each next stroke the nearest end to where the last
+finished) or in reading order. **An SVG drawing...** (the gallery's FROM A
+FILE, or File > Import) reads a sign, a logo or lettering drawn in
+Inkscape, Illustrator, Figma or a cutter's program: every path and shape -
+curves, arcs, transforms, groups, `<use>` - at the drawing's real size
+(its width and height in mm, cm or inches) or fitted to a width, as an
+**outline** part. Either way the LEDs go a strip's spacing apart along
+each stroke, the length left over split between a stroke's two ends (a
+closed one, an O or a circle, leaves it where the strip's ends meet); a
+mark shorter than half a spacing - an i's dot - is one LED. Text in an SVG
+has no shape until it is turned into paths (Inkscape: Path > Object to
+Path): the import says what it left out.
+
+**Power**: with nothing selected the frame's **POWER** works out where the
+strips need power fed in. A strip's thin copper rails drop the voltage
+along it - with the square of the length - and past about a tenth of the
+supply's voltage colours shift and the far LEDs brown out. It solves the
+voltage at every LED along the whole wiring (the leads between runs carry
+the power on) and places feeds - the first LED, then every so many -
+until none is more than the **drop allowed** down, for the **strip**'s
+voltage (5, 12 or 24 V), its current an LED at full white and its rails'
+resistance (typical figures; change them to your strip's sheet), at the
+brightness **planned for**. It says the draw, the supply to buy (a fifth
+to spare) and what the brightness limiter lets through when the Outputs
+frame has a supply set; **feeds on the shape** draws them on the 3-D view
+as amber rings.
+
+**At the bench**: File > **Build sheet** writes `build_sheet.html` to the
+export folder and opens it - a printable page with the shape's diagram
+(parts in their colours and numbers, the data in, the feeds, the leads),
+every part's LED numbers, strip to cut and where its data comes in, the
+outputs, the power plan with the wire for each feed, and the checks still
+open. **Print template (1:1 SVG)...** writes the shape seen flat at its
+real size - every LED marked (a cross, or a hole of the diameter typed, for
+a drilling template) and numbered, with a 100 mm bar to check the print -
+to print at actual size, tile, or cut on a plotter or a laser.
+
 **Parts in a graph**: the **Shape part** node says which part a pixel is
 in, where along it (0..1), how many parts there are, and gives a mask for
 a chosen part - one graph, the parts treated differently. **Segment per
@@ -744,11 +809,20 @@ effect, palette and sliders (the strip layout; up to eight).
 
 **Layout**: a shape is one logical strip in wiring order (what 1-D effects
 and the 3-D nodes work on), or, as "grid", a w x h matrix the LEDs are
-projected onto from the front - or the grid an xLights model came with.
-On a grid, two LEDs in one cell are reported: the cell keeps the first,
-and the other gets no pixel and stays dark - so a grid suits a flat shape
-(a window, a wall of strips), and a 3-D one (a tree, a sphere of parts)
-keeps the strip. Effects made for any shape run on the strip by the LEDs'
+projected onto for WLED's 2-D effects - or the grid an xLights model came
+with. **projected** says how: from the front, the side or above;
+**around (unrolled)**, the angle round the shape across and its height
+down, so a 2-D effect runs all the way round a tree, a column or a helix
+with its two edges meeting at the back; **as a globe**, longitude across
+and latitude down, for a ball or a dome; or **the best fit** (the
+default), which tries them all and keeps the one that gives the most LEDs
+a cell of their own, then the fullest grid. Each is fitted to the shape's
+own rows and columns - a sphere's latitudes, a tree's strands - not laid
+on round multiples of a spacing. Two LEDs in one cell are reported: the
+cell keeps the first, and the other gets no pixel and stays dark; **grid
+cell** under 1 makes the grid finer for LEDs closer than a spacing (to 256
+a side). A line under it says the grid's size and whether every LED has a
+cell. Effects made for any shape run on the strip by the LEDs'
 real positions: the project's own graphs, and WLED's 1-D effects along
 the wiring. An effect written for a matrix alone - WLED's 2-D effects and
 the cube's "Ace 3-D" ones - runs as one solid colour on LEDs laid out in
@@ -1237,6 +1311,7 @@ on and install what it carries.
 - **Window** › Audio input (mic / line-in) `Ctrl+Shift+M`
 - **Window** › Snapshots... `Ctrl+Shift+K`
 - **Window** › MIDI and OSC...
+- **Window** › Effect slots...
 - **Window** › Message log...
 - **Window** › Close every frame
 - **Settings** › Keyboard shortcuts... `Shift+F1`
@@ -1391,6 +1466,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Ctrl+P` | Command palette: every action and menu command by name | anywhere |
 | `Ctrl+Shift+K` | Snapshots: the graph's settings as named states | anywhere |
 | `—` | MIDI and OSC: knobs and faders onto the sliders | anywhere |
+| `—` | Effect slots: which cube_fx effects the device lists | anywhere |
 | `Ctrl+Alt+Z` | Undo history | anywhere |
 | `Ctrl+Shift+Y` | History of the current graph or code | anywhere |
 
@@ -1440,6 +1516,6 @@ Every button, with what its tooltip says.
 
 **Message log**: `close` — close (Esc while it has the focus); `copy all` — the log as text, to paste into an issue or a note; `clear` — empties the recent messages; the problems stay until they are fixed
 
-**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `pip_max`; `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play an audio file...`; `sec_video_arrow`; `Choose...` — a video file: mp4, mov, mkv, webm, avi, gif - read by ffmpeg; `Find` — the webcams ffmpeg can open on this computer, into the list; `Stop` — the source closed (a webcam switched off); the Video node goes black; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or an audio file - goes to it; `VIDEO` — VIDEO: a webcam, a video file or the test pattern, for the Video node - goes to it; `Panel` — Panel - brings it to the front; `Devices - brings it to the front`; `x` — close Devices (the menus open it again); `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
+**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `pip_max`; `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `sec_parameters_arrow`; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `sec_colours_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play an audio file...`; `sec_video_arrow`; `Choose...` — a video file: mp4, mov, mkv, webm, avi, gif - read by ffmpeg; `Find` — the webcams ffmpeg can open on this computer, into the list; `Stop` — the source closed (a webcam switched off); the Video node goes black; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or an audio file - goes to it; `VIDEO` — VIDEO: a webcam, a video file or the test pattern, for the Video node - goes to it; `Library - in the dock` — Library - in the dock: opens it beside the rail; `Panel` — Panel - brings it to the front; `Library - brings it to the front`; `x` — close Library (the menus open it again); `Devices - brings it to the front`; `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
 
 <!-- uiref end -->

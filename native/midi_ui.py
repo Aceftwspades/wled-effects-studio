@@ -16,7 +16,7 @@ from native import nodeface
 from native import num
 from native import typeface
 
-from native import midi, osc, weight, transition
+from native import midi, osc, weight, transition, bank
 
 TAG = "midi_win"
 
@@ -37,7 +37,9 @@ def build(app):
     app._midi_learn = None
     app._midi_opened = False
     app._osc_error = ""
-    with dpg.window(tag=TAG, label="MIDI and OSC", no_title_bar=True, show=False, width=px(600), height=px(640), no_collapse=True):
+    app.devfx = bank.Switcher()                           # the device's effect, switched with the sim's
+    app._sl_send = None                                   # the setlist going to the device: (thread result) when done
+    with dpg.window(tag=TAG, label="MIDI and OSC", no_title_bar=True, show=False, width=px(600), height=px(670), no_collapse=True):
         c.dialog_header(TAG, "MIDI and OSC")                    # one window style (C8): the frames' header
         dpg.add_text("", tag="midi_note", color=c.DIM, wrap=px(580))
         with dpg.group(horizontal=True):
@@ -102,6 +104,21 @@ def build(app):
             dpg.add_combo(transition.STYLES, tag="midi_xstyle", width=px(160), default_value="fade",
                           callback=lambda s, v: _set(app, "xstyle", v))
             c.tip("how the old effect gives way: a fade, a swipe, a push, a circle - the device's own transition styles")
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("DEVICE", color=c.ACCENT))
+            dpg.add_checkbox(label="switch it too", tag="midi_dev_on", default_value=True,
+                             callback=lambda s, v: _set(app, "device", bool(v)))
+            c.tip("each MIDI switch also sets the active device's own effect (with its own defaults, and the crossfade as "
+                  "its transition) - not while the sim is streamed to it. The effect must have one of the device's slots "
+                  "(Window > Effect slots...)")
+            dpg.add_button(label="Send the setlist", tag="midi_sl_send", callback=lambda: setlist_send(app))
+            weight.need(dpg.last_item(), "device")
+            c.tip("the setlist onto the device as presets and a playlist that steps through them - it plays with the "
+                  "studio closed. Presets from 70 up, the playlist 69")
+            typeface.mono(dpg.add_input_int(tag="midi_sl_dur", width=px(70), default_value=30, min_value=1, max_value=3600,
+                                            min_clamped=True, max_clamped=True, step=0, on_enter=True,
+                                            callback=lambda s, v: _set(app, "sl_dur", int(v))))
+            c.tip("seconds the playlist stays on each effect; Enter to set")
         typeface.label(dpg.add_text("MAPPINGS", color=c.ACCENT))
         with dpg.child_window(tag="midi_rows", height=-1, border=True):
             pass
@@ -112,7 +129,7 @@ def build(app):
 
 def show(app):
     refresh(app)
-    _c()._centre(TAG, 600, 640)
+    _c()._centre(TAG, 600, 670)
     dpg.show_item(TAG)
 
 
@@ -266,6 +283,8 @@ def refresh(app):
     dpg.set_value("midi_pc_on", bool(st.get("pc", True)))
     dpg.set_value("midi_xfade", float(st.get("xfade", 0.0)))
     dpg.set_value("midi_xstyle", st.get("xstyle", "fade") if st.get("xstyle") in transition.STYLES else "fade")
+    dpg.set_value("midi_dev_on", bool(st.get("device", True)))
+    dpg.set_value("midi_sl_dur", int(st.get("sl_dur", 30)))
     if not st["maps"]:
         weight.empty("midi_rows", "No knobs on anything yet: pick what above and Learn, then move a knob - or right-click "
                                   "a slider, or a pin in the graph.")
@@ -379,11 +398,63 @@ def switch_effect(app, name):
             prev = sequence.capture(app.eng, app.seg_cols, int(getattr(app, "bri", 128)))
         except Exception:
             prev = None
+    style = st.get("xstyle", "fade") if st.get("xstyle") in transition.STYLES else "fade"
     app.on_effect(None, name)
     if dpg.does_item_exist("fx_combo"):
         dpg.set_value("fx_combo", name)
     if prev is not None:
-        app.transition_start(prev, dur, st.get("xstyle", "fade") if st.get("xstyle") in transition.STYLES else "fade")
+        app.transition_start(prev, dur, style)
+    _device_follow(app, name, dur, style)
+
+
+def _device_follow(app, name, dur, style):
+    """The active device switched to the same effect - unless the setting is off, there is no device, or the
+    sim is being streamed to it (the stream overrides its effects anyway)."""
+    if not _st(app).get("device", True):
+        return
+    host = app.active_host()
+    d = getattr(app, "ddp", None)
+    if not host or (d is not None and getattr(d, "host", None) == host):
+        return
+    app.devfx.send(host, name, tt=int(round(dur * 10)), bs=transition.WLED_IDS.get(style))
+
+
+def setlist_send(app):
+    """The setlist onto the device as presets (70 up) and a playlist (69) stepping through them, on a thread."""
+    from native import sequence
+    import threading
+    st = _st(app)
+    host = app.active_host()
+    if not host or not st["setlist"] or app._sl_send is not None:
+        if not st["setlist"]:
+            app.gp.status("the setlist is empty: Add current puts the effect on screen in it")
+        return
+    names, dur = list(st["setlist"]), int(st.get("sl_dur", 30))
+    tt = int(round(float(st.get("xfade", 0.0) or 0.0) * 10))
+    app._sl_send = "running"
+    app.gp.status(f"sending the setlist ({len(names)} effects) to {host}...")
+
+    def go():
+        try:
+            dev = app.devfx.effect_names(host, fresh=True)
+            presets, ids, missing = {}, [], []
+            for k, n in enumerate(names):
+                if n not in dev:
+                    missing.append(n); continue
+                pid = 70 + len(ids)
+                presets[pid] = {"n": n, "on": True, "seg": [{"id": 0, "fx": dev.index(n), "fxdef": True}]}
+                ids.append(pid)
+            if not ids:
+                app._sl_send = (False, "none of the setlist's effects is on the device: give them slots (Window > Effect slots...)")
+                return
+            pl = {"n": "Setlist", "playlist": {"ps": ids, "dur": [dur * 10] * len(ids), "transition": [tt] * len(ids), "repeat": 0}}
+            ok, msg = sequence.send(host, presets, pl, 69)
+            if missing:
+                msg += f"; not on the device (no slot): {', '.join(missing)}"
+            app._sl_send = (ok, msg)
+        except Exception as e:
+            app._sl_send = (False, f"the setlist was not sent: {e}")
+    threading.Thread(target=go, daemon=True).start()
 
 
 def _set_range(app, k, key, v):
@@ -513,6 +584,12 @@ def poll(app):
             except Exception:
                 pass
     _clock(app, st)
+    for ok, msg in app.devfx.messages():
+        app.gp.status(f"MIDI: {msg}", "info" if ok else "warn")
+    if isinstance(app._sl_send, tuple):
+        ok, msg = app._sl_send
+        app._sl_send = None
+        app.gp.status(f"setlist: {msg}", "info" if ok else "warn")
     if getattr(app, "_osc_for", None) != app.project.path:
         app._osc_for = app.project.path                   # the project's OSC: opened as the studio starts, and as
         open_osc(app, quiet=True)                         # another project is opened - closed when its is off

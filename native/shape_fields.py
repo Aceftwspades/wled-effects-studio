@@ -63,7 +63,10 @@ FIELDS = {
     "polyhedron": [F("solid", "solid", "choice", "tetrahedron to icosahedron, and the soccer ball (a truncated icosahedron)", ask=True),
                    F("mode", "LEDs on", "choice", "edges: a strip along every edge; faces: every face outlined on its own", ask=True),
                    F("per_edge", "LEDs an edge", "count", ask=True, lo=1, hi=256),
-                   F("radius", "radius", "length", "from the middle to a corner", ask=True), F("_box", "size", "box")],
+                   F("radius", "radius", "length", "from the middle to a corner", ask=True),
+                   F("inset", "faces inset", "length", "with LEDs on the faces: how far each face's outline sits in from "
+                     "its edges - two faces share every edge, so their strips lie side by side (half a strip's width "
+                     "at the least)"), F("_box", "size", "box")],
     "polyline": [F("_count", "LEDs", "count", "how many along the path (it sets their spacing: LEDs at both ends)", lo=2, hi=4096),
                  _PITCH],
     "points": [],
@@ -103,7 +106,20 @@ FIELDS = {
                 F("x", "x =", "text", "t runs 0 to 1 along the LEDs, i is the LED (from 0), n the count; sin, cos, pi, tau, sqrt... (in LED spacings)", ask=True),
                 F("y", "y =", "text", ask=True), F("z", "z =", "text", ask=True)],
     "reference": [],
+    "text": [F("text", "text", "text", "the words; \\n for a new line - Enter takes it", ask=True),
+             F("font", "font", "choice", "any font on this computer", ask=True),
+             F("style", "drawn as", "choice", "center: one stroke a letter, the line a neon tube would follow; outline: the "
+               "letters' edges, as channel letters are lit", ask=True),
+             F("height", "letter height", "length", "a capital letter's height", ask=True),
+             F("order", "wiring", "choice", "shortest: each next stroke the nearest end to where the last finished (short "
+               "leads to solder); drawing: in reading order"), _PITCH, F("_box", "size", "box")],
+    "outline": [F("order", "wiring", "choice", "shortest: each next stroke the nearest end to where the last finished; "
+                  "drawing: in the file's order"), _PITCH, F("_box", "size", "box")],
 }
+
+# the fonts a text part can take: this computer's, read once (outline.fonts)
+from native import outline as _outline                       # noqa: E402
+shapes.CHOICES.setdefault("font", list(_outline.fonts()) or [""])
 
 
 def _eff(part):

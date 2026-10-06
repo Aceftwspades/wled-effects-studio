@@ -46,7 +46,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui, procs, reader_ui, room, weight, view3d, shape_tools
+from native import chrome, glow, device_ui, shape_ui, midi_ui, bank_ui, procs, reader_ui, room, weight, view3d, shape_tools
 from native.gpucube import CubeQuads
 from native import look
 from native import video_ui
@@ -3258,6 +3258,7 @@ class App(Features):
             "snapshots":    lambda: chrome.show_snapshots(self),
             "expr":         lambda: gp.expr_hovered(),
             "midi":         lambda: midi_ui.show(self),
+            "bank":         lambda: bank_ui.show(self),
             "undo_history": lambda: chrome.show_undo_history(self),
             "history":      lambda: chrome.show_history(self),
             "compare":      lambda: self.stop_ab() if self.ab else chrome.show_compare(self),
@@ -3358,7 +3359,7 @@ class App(Features):
                 x, y = x + ox, y + oy
         return (x, y, x + w, y + h)
 
-    FLOATING = ("keys_win", "flash_win", "where_win", "history_win", "history_diff_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "expr_win", "reader_win", "welcome_win", "reader_pic",
+    FLOATING = ("keys_win", "flash_win", "where_win", "history_win", "history_diff_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "bank_win", "expr_win", "reader_win", "welcome_win", "reader_pic",
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
@@ -4106,7 +4107,7 @@ def _hook_names(app):
     from native import camera_map, camera_map_ui
     from native import flash
     from native import library_ui, tutorials
-    return {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "video_ui": video_ui, "midi_ui": midi_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
+    return {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "video_ui": video_ui, "midi_ui": midi_ui, "bank_ui": bank_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
             "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,
@@ -5057,7 +5058,8 @@ SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "
                     "history_switch")                     # its rows would put the walked project's settings back: the smoke does, in its own
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
-               "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...")
+               "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...",
+               "Build sheet")
 
 
 def _close_dialogs(keep=()):
@@ -5317,6 +5319,7 @@ def main():
                 messages.poll(app)                   # a note's time on the footer's line; the open log follows
                 app.poll_present_hint()              # how to leave presentation, for a few seconds after entering it
                 midi_ui.poll(app)
+                bank_ui.poll(app)
                 reader_ui.poll(app)
                 room.poll(app)
                 weight.poll(app)                     # what has nothing to act on, greyed

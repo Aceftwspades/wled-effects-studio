@@ -24,9 +24,11 @@ TAG = "shape_gallery"
 GROUPS = (("LINES", ("strip", "polyline", "arch", "helix", "spiral")),
           ("FLAT", ("ring", "rings", "polygon", "star", "spokes", "frame", "panel")),
           ("SOLID", ("cube", "cylinder", "sphere", "tree", "polyhedron")),
+          ("SIGNS", ("text",)),
           ("FREE", ("points", "formula")))
 NAMES = {"polyline": "path", "points": "loose points", "rings": "rings in rings", "polyhedron": "a solid's edges",
-         "spokes": "spokes", "frame": "frame (window, door)", "helix": "helix (round a tube)", "spiral": "flat spiral"}
+         "spokes": "spokes", "frame": "frame (window, door)", "helix": "helix (round a tube)", "spiral": "flat spiral",
+         "text": "lettering (neon, sign)"}
 JOINED = ("strip", "polyline", "arch", "helix", "spiral")      # the kinds that carry on from the end of the selected part
 THUMB = 88
 
@@ -42,6 +44,8 @@ def _sample(kind):
         return shapes.new_part("points", points=np.round(rs.uniform(-6, 6, (18, 3)), 2).tolist())
     if kind == "polyline":
         return shapes.new_part("polyline", points=[[0, 0, 0], [8, 0, 0], [8, 8, 0], [16, 8, 4]])
+    if kind == "text":
+        return shapes.new_part("text", text="Ab", height=10.0)
     return shapes.new_part(kind)
 
 
@@ -55,7 +59,7 @@ def _picture(kind, size):
     acc = np.asarray(chrome.ACCENT[:3], np.float32)
     rgb = np.clip(acc * t + (255 - acc) * 0.25 * t, 0, 255).astype(np.uint8)
     yaw, pitch = (-0.6, 0.75)
-    if kind in ("panel", "arch", "frame"):
+    if kind in ("panel", "arch", "frame", "text"):
         yaw, pitch = (3.0, 0.35)                                # the upright ones from nearly the front
     img = render.render_points(pos, rgb, size, yaw, pitch, 4.2, led=0.34, bg=tuple(chrome.PANEL[:3]))
     return img
@@ -119,6 +123,9 @@ def _fill_tiles(app):
                    "layout (xlights_rgbeffects.xml): its trees, stars, arches, spinners and frames as the parts here; an x y z point list")
         dpg.add_button(label="A reference mesh...", callback=lambda: (dpg.hide_item(TAG), shape_ui._import(app, True)))
         chrome.tip("a mesh drawn in the 3-D view to place LEDs against, not LEDs: the tree, the house, the enclosure")
+        dpg.add_button(label="An SVG drawing...", callback=lambda: (dpg.hide_item(TAG), shape_ui._import(app, False)))
+        chrome.tip("a sign, a logo, lettering from Inkscape, Illustrator, Figma or a cutter's program: a strip along every "
+                   "stroke at the LED spacing, at the drawing's real size or fitted to a width")
 
 
 def choose(app, kind, preset=None):
@@ -153,7 +160,9 @@ def choose(app, kind, preset=None):
                 dpg.add_combo(shapes.CHOICES.get(f.key, [str(v)]), default_value=str(v), width=px(150), user_data=f,
                               callback=lambda s, a, u: _set(app, u, a))
             elif f.type == "text":
-                typeface.mono(dpg.add_input_text(default_value=str(v), width=px(150), user_data=f, callback=lambda s, a, u: _set(app, u, a)))
+                # lettering is traced from its font as it changes - on Enter, not at every key
+                typeface.mono(dpg.add_input_text(default_value=str(v), width=px(150), user_data=f, on_enter=(kind == "text"),
+                                                 callback=lambda s, a, u: _set(app, u, a)))
             elif f.type == "count":
                 num.add(None, int(v), f.lo or 1, f.hi or 4096, integer=True, wide=True, width=px(120), user_data=f,
                         callback=lambda s, a, u: _set(app, u, int(a)))

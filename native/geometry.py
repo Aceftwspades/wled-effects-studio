@@ -27,7 +27,8 @@ Kinds:
              placed, turned and scaled - or read from a mesh or an xLights
              model; the parts' order is the wiring. Logically a strip of n
              (`layout` "strip") or a w x h grid the LEDs are projected onto
-             ("grid", or the grid an xLights model came with)
+             ("grid", `projection` front, side, top, around or globe -
+             shapes.PROJECTIONS - or the grid an xLights model came with)
 
 A Geometry is plain data; to_json()/from_json() round-trip it for the project
 file. The engine only ever hears (w, h) via simInit; positions are for the
@@ -184,8 +185,12 @@ class Geometry:
             self.owner = owner[:n]
             self.collisions = 0
             grid = p.get("grid") if p.get("layout") == "grid" else None
+            self.projection = None
             if p.get("layout") == "grid" and not grid:
-                w, h, m, self.collisions = shapes.grid_layout(pos, float(p.get("cell", 1.0)) or 1.0)
+                proj = p.get("projection", "front")                 # a project from before projections: the front
+                cell = float(p.get("cell", 1.0)) or 1.0
+                self.projection = shapes.auto_projection(pos, cell) if proj == "auto" else proj
+                w, h, m, self.collisions = shapes.grid_layout(pos, cell, self.projection)
                 grid = (w, h, m)
             if grid:
                 w, h, m = int(grid[0]), int(grid[1]), [int(v) for v in grid[2]]
