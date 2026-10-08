@@ -3330,7 +3330,7 @@ LedFx have added that matters here, in the order it helps most.
       Tested: `test_stream.py` (ranges, padding, a device's own map, coverage,
       two listeners each getting their half) and the smoke (the fake and a
       second one on 127.0.0.2 - left out where the machine has no 127.0.0.2,
-      as macOS by default).
+      as macOS by default). Released as 1.11.0, with the flash work above.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
