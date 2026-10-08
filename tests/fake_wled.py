@@ -71,8 +71,8 @@ def _seg(i=0, start=0, stop=48, sy=0, sty=48):
 class FakeWled:
     LOOP_DELAY = 0.3                 # a psave is written this much later, from the "loop"
 
-    def __init__(self, port=8770, w=48, h=48, ddp_port=4048):
-        self.port, self.w, self.h, self.ddp_port = port, w, h, ddp_port
+    def __init__(self, port=8770, w=48, h=48, ddp_port=4048, ip="127.0.0.1"):
+        self.port, self.w, self.h, self.ddp_port, self.ip = port, w, h, ddp_port, ip
         self.state = {"on": False, "bri": 128, "transition": 7, "ps": -1, "pl": -1, "mainseg": 0, "seg": [_seg(0, 0, w, 0, h)]}
         self.presets = {"0": {}}
         self.files = {}                                  # name -> bytes
@@ -253,6 +253,11 @@ class FakeWled:
                     if p == "/json/si": return self._send(200, {"state": fake.state, "info": fake.info()})
                     if p == "/json/cfg": return self._send(200, fake.cfg)
                     if p == "/presets.json": return self._send(200, fake.presets)
+                    if p == "/cfg.json": return self._send(200, fake.cfg)
+                    if p == "/wsec.json": return self._send(200, {"nw": {"ins": [{"psk": "secret"}]}})   # never to be copied
+                    if p == "/edit" and "list=" in self.path:
+                        names = ["cfg.json", "presets.json", "wsec.json"] + [f.lstrip("/") for f in fake.files]
+                        return self._send(200, [{"type": "file", "name": n, "size": 1} for n in names])
                     if p in fake.files: return self._send(200, fake.files[p], "application/octet-stream")
                 self._send(404, {"error": 404})
 
@@ -276,7 +281,13 @@ class FakeWled:
                         name = head.split(b'filename="')[1].split(b'"')[0].decode()
                     body = rest.rsplit(b"\r\n--", 1)[0]
                     with fake._lock:
-                        fake.files[name] = body; fake.log.append(f"upload {name} {len(body)} bytes")
+                        if name == "/cfg.json":
+                            fake.cfg = json.loads(body.decode("utf-8"))            # a restored config: what boots next
+                        elif name == "/presets.json":
+                            fake.presets = json.loads(body.decode("utf-8"))
+                        else:
+                            fake.files[name] = body
+                        fake.log.append(f"upload {name} {len(body)} bytes")
                     return self._send(200, b"OK", "text/plain")
                 try:
                     d = json.loads(raw.decode("utf-8") or "{}")
@@ -312,7 +323,7 @@ class FakeWled:
                         fake.apply(d); return self._send(200, {"success": True})
                 self._send(404, {"error": 404})
 
-        self._srv = ThreadingHTTPServer(("127.0.0.1", self.port), H)
+        self._srv = ThreadingHTTPServer((self.ip, self.port), H)
         threading.Thread(target=self._srv.serve_forever, daemon=True).start()
         threading.Thread(target=self._loop, daemon=True).start()
         threading.Thread(target=self._ddp, daemon=True).start()
@@ -323,7 +334,7 @@ class FakeWled:
     def _udp(self, port, take):
         """A listener on 127.0.0.1:port handing each packet to take() under the lock."""
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", port)); s.settimeout(0.5)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind((self.ip, port)); s.settimeout(0.5)
         except OSError:
             return
         while self._srv is not None:
@@ -356,7 +367,7 @@ class FakeWled:
 
     def _ddp(self):
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", self.ddp_port)); s.settimeout(0.5)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind((self.ip, self.ddp_port)); s.settimeout(0.5)
         except OSError:
             return
         frame = bytearray()
@@ -386,7 +397,7 @@ class FakeWled:
 
     @property
     def host(self):
-        return f"127.0.0.1:{self.port}"
+        return f"{self.ip}:{self.port}"
 
 
 if __name__ == "__main__":

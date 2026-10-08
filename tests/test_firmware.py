@@ -182,6 +182,46 @@ def test_the_built_in_effects_one_by_one():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_a_build_with_no_project_effects():
+    """A project with nothing to ship (a new one, or "none" ticked): the studio's usermod is left out of the env -
+    with no effect in it, it would link nothing, and WLED's post-link check fails a usermod without symbols."""
+    import native.script
+    d = tempfile.mkdtemp()
+    was = (flash.ROOT, native.script.write_helpers)
+    try:
+        flash.ROOT = d
+        native.script.write_helpers = lambda *a, **k: None
+        os.makedirs(os.path.join(d, "usermods"))
+        open(os.path.join(d, "platformio.ini"), "w").write("[env:x]\ncustom_usermods = audioreactive\n")
+        exp = os.path.join(d, "export", flash.USERMOD)
+        os.makedirs(exp)
+
+        class P(_Project):
+            geometry = type("G", (), {"kind": "cube", "params": {}})()
+
+            def export(self, only=None):
+                return os.path.join(d, "export")
+
+            def build_files(self):
+                return ["fx_a.cpp"]
+
+            def effect_files(self):
+                return ["fx_a.cpp"]
+
+        def env_block():
+            text = open(os.path.join(d, "platformio_override.ini")).read()
+            return text[text.index("custom_usermods"):text.index(flash.MARK_END)]
+        p = P({"builtin_ship": []})
+        lines = []
+        assert flash.stage(p, "x", lines.append, only=[]) == "studio_x"
+        assert flash.USERMOD not in env_block() and "audioreactive" in env_block() and any("left out" in l for l in lines)
+        flash.stage(p, "x", print, only=["fx_a.cpp"])                          # one effect: the usermod is in again
+        assert flash.USERMOD in env_block()
+    finally:
+        flash.ROOT, native.script.write_helpers = was
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def test_one_generated_block_in_the_override():
     """platformio_override.ini keeps one studio block: an old one under the pre-rename markers (WLED Effect
     Studio) is replaced, not left beside the new one - two [env:] sections of one name stop every build."""

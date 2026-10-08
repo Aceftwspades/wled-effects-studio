@@ -92,8 +92,9 @@ class Features:
         except ValueError as e:
             self.gp.status(f"{host}'s wiring cannot be this {g.kind}'s: {e}"); return
         self.apply_geometry(new)
-        if getattr(self, "ddp", None) is not None and self.ddp.host == host:
-            self._stream_wiring = got                  # the stream to it follows at once
+        for t in self.streams:
+            if t.host == host:
+                t.wiring = got                         # the stream to it follows at once
         order = device_wiring.stream_order(got)
         self.gp.status(f"the {new.kind} wired as {host} has it: {words}; "
                        + ("a stream goes in its own order (it maps each pixel with its table)" if order == "logical"
@@ -691,117 +692,161 @@ class Features:
         self.prefs.setdefault("stream_out", {})[host] = {"protocol": proto, "universe": uni}
         save_prefs(self.prefs)
         device_ui.refresh_live(self)
-        d = getattr(self, "ddp", None)
-        if d is not None:
-            self.stream_start(host, fps=self._ddp_fps)
+        if self.streams:
+            self.stream_restart()
+
+    # The stream goes to one device (the active one) or, with "several devices" on in the LIVE row, to every
+    # device ticked there - each the whole frame or its own range of the LEDs. app.ddp is the first one's sender.
+    streams = ()
+
+    @property
+    def ddp(self):
+        return self.streams[0].out if self.streams else None
+
+    @property
+    def _stream_wiring(self):
+        return self.streams[0].wiring if self.streams else None
+
+    @_stream_wiring.setter
+    def _stream_wiring(self, info):
+        if self.streams:
+            self.streams[0].wiring = info
+
+    def stream_config(self):
+        """The project's choice of devices: {"multi": several or not, "targets": [{"host", "on", "mode",
+        "start", "count"}]} - kept with the project, as the ranges are its shape's."""
+        cfg = self.project.options.setdefault("stream_to", {})
+        cfg.setdefault("multi", False)
+        cfg.setdefault("targets", [])
+        return cfg
+
+    def stream_plan(self):
+        """[(host, mode, start, count)] the stream goes to: the ticked devices when several, else the active one."""
+        cfg = self.stream_config()
+        if cfg["multi"]:
+            known = {d["host"] for d in self.devices}
+            plan = [(t["host"], t.get("mode", "all"), int(t.get("start", 0)), int(t.get("count", 0)))
+                    for t in cfg["targets"] if t.get("on") and t.get("host") in known]
+            if plan:
+                return plan
+        host = devices.clean_host(self.active_host())
+        return [(host, "all", 0, 0)] if host else []
 
     def stream_start(self, host=None, fps=30):
-        """The sim's frames to the device as they are drawn, over DDP, E1.31 or Art-Net."""
-        host = devices.clean_host(host or self.active_host())
-        if not host:
+        """The sim's frames to the device (`host`), or to the devices the LIVE row chose, as they are drawn,
+        over DDP, E1.31 or Art-Net - each device its own protocol."""
+        plan = [(devices.clean_host(host), "all", 0, 0)] if host else self.stream_plan()
+        if not plan:
             device_ui.show(self, "devices"); self.gp.status("choose a device first"); return False
-        self.stream_stop()
-        proto, uni = self.stream_out(host)
-        self.ddp = live_out.make_out(proto, host, uni)
+        self.stream_stop(quiet=True)
+        targets = []
+        for h, mode, start, count in plan:
+            proto, uni = self.stream_out(h)
+            targets.append(live_out.Target(h, live_out.make_out(proto, h, uni), mode, start, count))
+        self.streams = targets
         self._ddp_fps = max(1.0, float(fps))
         self._ddp_next = 0.0
         self._stream_status_at = 0.0
-        self._stream_dev = None                         # (the device's fps, its answer in ms), every 2 s while this runs
-        self._stream_trace = []                         # a second at a time: the frames sent, the device's fps
-        self._stream_wiring = None                     # until the device says: WLED's default, its own map applied (logical order)
-        if proto == "ddp":
-            self.gp.status(f"streaming to {host} over DDP at {int(fps)} fps - the device shows the sim while this runs")
+        self._stream_trace = []                         # a second at a time: the frames sent, the devices' fps
+        self._stream_answers = []                       # (target, the device's wiring, an error) as each answers
+        first = targets[0]
+        if len(targets) > 1:
+            self.gp.status(f"streaming to {len(targets)} devices at {int(fps)} fps: "
+                           + "; ".join(f"{t.host} {t.out.NAME}, {t.describe()}" for t in targets))
+        elif first.out.NAME == "DDP":
+            self.gp.status(f"streaming to {first.host} over DDP at {int(fps)} fps - the device shows the sim while this runs")
         else:
+            uni = first.out.universe
             n = -(-len(live_out.stream_bytes(self.frame_rgb(), self.project.geometry, "logical")) // live_out.UNIVERSE_BYTES)
-            self.gp.status(f"streaming to {host} over {self.ddp.NAME}, universes {uni}..{uni + max(1, n) - 1}, at {int(fps)} fps - "
-                           f"the device needs {self.ddp.NAME.split()[0]} on in its Sync settings from universe {uni}, "
+            self.gp.status(f"streaming to {first.host} over {first.out.NAME}, universes {uni}..{uni + max(1, n) - 1}, at {int(fps)} fps - "
+                           f"the device needs {first.out.NAME.split()[0]} on in its Sync settings from universe {uni}, "
                            "170 LEDs a universe (WLED: DMX mode Multiple RGB)")
         device_ui.refresh_live(self)
-        d = self.ddp
 
-        def watch():
-            """The device's own fps and how long it takes to answer, while this stream runs."""
-            while getattr(self, "ddp", None) is d:
+        def watch(t):
+            """The device's own fps and how long it takes to answer, while the stream to it runs."""
+            while t in self.streams:
                 t0 = time.perf_counter()
                 try:
-                    st = devices.state(host, timeout=2.0)
+                    st = devices.state(t.host, timeout=2.0)
                 except Exception:
                     st = None
-                if getattr(self, "ddp", None) is not d:
+                if t not in self.streams:
                     break
-                self._stream_dev = ((st or {}).get("fps"), (time.perf_counter() - t0) * 1000.0 if st else None)
+                t.dev = ((st or {}).get("fps"), (time.perf_counter() - t0) * 1000.0 if st else None)
                 time.sleep(2.0)
-        threading.Thread(target=watch, daemon=True).start()
 
-        def ask():
+        def ask(t):
             from native import device_wiring
             try:
-                self._stream_wiring_got = (host, device_wiring.read(host, timeout=4.0), None)
+                self._stream_answers.append((t, device_wiring.read(t.host, timeout=4.0), None))
             except Exception as e:
-                self._stream_wiring_got = (host, None, str(e) or type(e).__name__)
-        threading.Thread(target=ask, daemon=True).start()
+                self._stream_answers.append((t, None, str(e) or type(e).__name__))
+        for t in targets:
+            threading.Thread(target=watch, args=(t,), daemon=True).start()
+            threading.Thread(target=ask, args=(t,), daemon=True).start()
         return True
 
+    def stream_restart(self):
+        """A running stream again with the devices and ranges chosen now."""
+        if self.streams:
+            self.stream_start(fps=self._ddp_fps)
+
     def stream_order(self):
-        """The order the stream is in: "logical" (the device maps it with its own ledmap or 2-D setup -
-        Respect LED maps, WLED's default) or "wiring" (it takes the pixels as they are wired)."""
+        """The order the stream (to the first device) is in: "logical" (the device maps it with its own ledmap
+        or 2-D setup - Respect LED maps, WLED's default) or "wiring" (it takes the pixels as they are wired)."""
         from native import device_wiring
-        return device_wiring.stream_order(getattr(self, "_stream_wiring", None))
+        return self.streams[0].order() if self.streams else device_wiring.stream_order(None)
 
     def stream_of_physical(self, rgb_by_led):
-        """A frame of (n, 3) colours by the device's LED number, as the stream must carry it: the same
-        in wiring order; in logical order, each at the place the device's table sends to that LED."""
-        cols = np.asarray(rgb_by_led, np.uint8).reshape(-1, 3)
-        info = getattr(self, "_stream_wiring", None)
-        if self.stream_order() == "wiring" or info is None:
-            return cols.tobytes()
-        from native import device_wiring
-        _, _, tab, _ = device_wiring.table(info)
-        tab = np.asarray(tab, int)
-        out = np.zeros((len(tab), 3), np.uint8)
-        ok = (tab >= 0) & (tab < len(cols))
-        out[ok] = cols[tab[ok]]
-        return out.tobytes()
+        """A frame of (n, 3) colours by the device's LED number, as the stream to the first device must carry it."""
+        if not self.streams:
+            return np.asarray(rgb_by_led, np.uint8).reshape(-1, 3).tobytes()
+        return self.streams[0].device_order(rgb_by_led)
 
     def poll_stream_wiring(self):
-        """The device's answer, once: the order the stream goes in from here, and a word when its layout is
-        not the studio's (the stream then cannot line up)."""
-        got = getattr(self, "_stream_wiring_got", None)
-        if got is None:
-            return
-        self._stream_wiring_got = None
-        host, info, err = got
-        d = getattr(self, "ddp", None)
-        if d is None or d.host != host:
-            return
-        if err:
-            self.gp.status(f"streaming to {host}; its settings could not be read ({err}) - the frames go as WLED takes them by default")
-            return
-        from native import device_wiring
-        self._stream_wiring = info
-        w, h, _, source = device_wiring.table(info)
-        g = self.project.geometry
-        order = device_wiring.stream_order(info)
-        words = (f"streaming to {host} in the device's own order: it maps each pixel to its LED with {source} (Respect LED maps)"
-                 if order == "logical" else f"streaming to {host} in wiring order: its Respect LED maps is off")
-        if order == "logical" and (info.get("ledmap") or info.get("panels")) and (w, h) != (g.w, g.h):
-            words += (f" - but it lays its pixels out {w} x {h} and this geometry is {g.w} x {g.h}: the picture will not line up"
-                      " (GEOMETRY > Read the device's wiring, or a geometry of its size)")
-        elif order == "wiring" and g.count != (info.get("total") or g.count):
-            words += f" - it drives {info.get('total')} LEDs and this geometry has {g.count}"
-        self.gp.status(words)
+        """Each device's answer, once: the order the stream to it goes in from here, and a word when its layout
+        is not the studio's (the stream then cannot line up)."""
+        answers = getattr(self, "_stream_answers", None)
+        while answers:
+            t, info, err = answers.pop(0)
+            if t not in self.streams:
+                continue
+            host = t.host
+            if err:
+                self.gp.status(f"streaming to {host}; its settings could not be read ({err}) - the frames go as WLED takes them by default")
+                continue
+            from native import device_wiring
+            t.wiring = info
+            w, h, _, source = device_wiring.table(info)
+            g = self.project.geometry
+            order = device_wiring.stream_order(info)
+            words = (f"streaming to {host} in the device's own order: it maps each pixel to its LED with {source} (Respect LED maps)"
+                     if order == "logical" else f"streaming to {host} in wiring order: its Respect LED maps is off")
+            if t.mode == "range":
+                if info.get("total") and info["total"] != t.count:
+                    words += f" - it drives {info['total']} LEDs and is sent {t.count} ({t.describe()})"
+            elif order == "logical" and (info.get("ledmap") or info.get("panels")) and (w, h) != (g.w, g.h):
+                words += (f" - but it lays its pixels out {w} x {h} and this geometry is {g.w} x {g.h}: the picture will not line up"
+                          " (GEOMETRY > Read the device's wiring, or a geometry of its size)")
+            elif order == "wiring" and g.count != (info.get("total") or g.count):
+                words += f" - it drives {info.get('total')} LEDs and this geometry has {g.count}"
+            self.gp.status(words)
 
-    def stream_stop(self):
-        d = getattr(self, "ddp", None)
-        if d is not None:
-            d.close(); self.ddp = None
-            self._stream_wiring = None
-            self.gp.status(f"stream stopped after {d.frames} frames; the device goes back to its effect in a couple of seconds")
+    def stream_stop(self, quiet=False):
+        if self.streams:
+            gone, self.streams = self.streams, ()
+            for t in gone:
+                t.out.close()
+            if not quiet:
+                self.gp.status(f"stream stopped after {gone[0].out.frames} frames; "
+                               + ("the devices go back to their effects" if len(gone) > 1 else "the device goes back to its effect")
+                               + " in a couple of seconds")
             device_ui.refresh_live(self)
 
     def poll_stream(self):
         """After each draw: the wiring test's pattern into the engine's
-        buffer (paused, so it stays), then the frame to the device."""
+        buffer (paused, so it stays), then the frame to the devices."""
         self.poll_transition()
         self.poll_power()
         wt = getattr(self, "wiring", None)
@@ -820,32 +865,50 @@ class Features:
             px[phys[:k]] = (cols[:k, 0].astype(np.uint32) << 16) | (cols[:k, 1].astype(np.uint32) << 8) | cols[:k, 2].astype(np.uint32)
             if dpg.does_item_exist("wt_status"):
                 dpg.set_value("wt_status", wt.describe())
-        d = getattr(self, "ddp", None)
-        if d is None:
+        targets = self.streams
+        if not targets:
             return
         now = time.perf_counter()
         if now < self._ddp_next:
             return
         self._ddp_next = now + 1.0 / self._ddp_fps
         own = getattr(self, "_map_frame", None)      # mapping by camera: the plan's own frame, by the device's LED numbers
-        d.send(self.stream_of_physical(own) if own is not None
-               else live_out.stream_bytes(self.frame_rgb(), self.project.geometry, self.stream_order()))
+        g = self.project.geometry
+        rgb = self.frame_rgb()
+        wired = None
+        if own is None and any(t.mode == "range" for t in targets):    # the wiring order once, for every range
+            wired = np.frombuffer(live_out.stream_bytes(rgb, g, "wiring"), np.uint8).reshape(-1, 3)
+        for t in targets:
+            t.send(rgb, g, own, wired)
         if now - getattr(self, "_stream_status_at", 0.0) >= 1.0:
             self._stream_status_at = now
-            fps, kbps = d.rate()
-            dev = getattr(self, "_stream_dev", None)
+            rates = [t.out.rate() for t in targets]
+            fps = min(r[0] for r in rates)
+            kbps = sum(r[1] for r in rates)
+            shown = [float(t.dev[0]) for t in targets if t.dev and t.dev[0] is not None]
             trace = getattr(self, "_stream_trace", [])
-            trace.append((fps, float(dev[0]) if dev and dev[0] is not None else 0.0))
+            trace.append((fps, min(shown) if shown else 0.0))
             del trace[:-60]
             self._stream_trace = trace
             if dpg.does_item_exist("live_status"):
-                words = f"{d.NAME}: {fps:.0f} of {self._ddp_fps:.0f} fps sent, {kbps:,.0f} kbit/s"
-                if dev and dev[0] is not None:
-                    words += f"; the device shows {dev[0]:.0f} fps, answers in {dev[1]:.0f} ms"
-                elif dev:
-                    words += "; the device does not answer"
-                if d.errors:
-                    words += f"; {d.errors} send errors: {d.last_error}"
+                if len(targets) == 1:
+                    d, dev = targets[0].out, targets[0].dev
+                    words = f"{d.NAME}: {fps:.0f} of {self._ddp_fps:.0f} fps sent, {kbps:,.0f} kbit/s"
+                    if dev and dev[0] is not None:
+                        words += f"; the device shows {dev[0]:.0f} fps, answers in {dev[1]:.0f} ms"
+                    elif dev:
+                        words += "; the device does not answer"
+                    if d.errors:
+                        words += f"; {d.errors} send errors: {d.last_error}"
+                else:
+                    words = f"{len(targets)} devices: {fps:.0f} of {self._ddp_fps:.0f} fps sent, {kbps:,.0f} kbit/s in all"
+                    for t in targets:
+                        dev = t.dev
+                        words += f"\n  {t.host} ({t.describe()}): " + (
+                            f"shows {dev[0]:.0f} fps, answers in {dev[1]:.0f} ms" if dev and dev[0] is not None
+                            else "does not answer" if dev else "asking...")
+                        if t.out.errors:
+                            words += f"; {t.out.errors} send errors: {t.out.last_error}"
                 dpg.set_value("live_status", words)
             if dpg.does_item_exist("live_trace"):
                 dpg.set_value("live_trace", [t[0] for t in trace] or [0.0])

@@ -5055,11 +5055,12 @@ def process_stats(app):
 SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
                     "map_cam_find", "map_calib", "map_live",  # the webcam: a camera turned on is not a test's to do
                     "geom_read_wiring",                   # a real device's wiring read: the smoke reads the fake's
+                    "flash_ports_refresh",                # the serial ports: a board plugged in is not a test's to probe
                     "history_switch")                     # its rows would put the walked project's settings back: the smoke does, in its own
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...",
-               "Build sheet")
+               "Build sheet", "Install PlatformIO", "Back up now")
 
 
 def _close_dialogs(keep=()):

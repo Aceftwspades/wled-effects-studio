@@ -3299,9 +3299,38 @@ LedFx have added that matters here, in the order it helps most.
       the writer did not know, so it added a second. `flash.put_block` takes
       out every studio block, old markers too, and writes one where the first
       was (`test_firmware.py`).
-- [ ] **A flaky test**: `test_a_bin_flashed_to_the_fake_device` failed once in
+- [x] **A flaky test**: `test_a_bin_flashed_to_the_fake_device` failed once in
       five runs on 2026-10-03 ("did not reboot": the fake's uptime did not start
-      over) and would not fail again; find why before it turns CI red.
+      over). The cause (2026-10-08): `verify_reboot` compared the uptime after
+      against the uptime before plus the wait, without the seconds between the
+      first read and the upload - on a slow run the device's new uptime could
+      exceed that. The uptime before now carries the time it was read, and the
+      check counts from there.
+- [x] **The flash, easier** (2026-10-08, `native/flash_tools.py`,
+      `test_flash_tools.py`): USB flashing through PlatformIO (port list, erase,
+      esptool's failures in plain words), the device's settings kept before an
+      OTA flash and restorable (never `wsec.json`), the last three images kept
+      per device with "Send it again", a build progress bar with an estimate
+      learnt from the last full build, PlatformIO's own installer from the
+      frame, and PlatformIO's daily upgrade check off for our runs (it cost 74 s).
+- [x] **A flash with no effects** (2026-10-08, a new project, "none" ticked,
+      built for the ESP32 test board) failed three ways: the Flash frame
+      refused it ("tick at least one effect") and left Start greyed; cube_fx's
+      bank read the Studio Script effect's frame-budget numbers, which do not
+      exist when that effect is left out (link error) - the bank now has weak
+      fallbacks and leaves the "Studio Script" info row out then; and the empty
+      `usermod_studio` failed WLED's post-link check, so `stage` leaves it out
+      of the env when no project effect ships (`test_firmware.py`). It builds
+      now: 1297 KB of 1536 KB. Not yet sent to the board.
+- [x] **Streaming to several devices** (2026-10-08, `live_out.Target`, the LIVE
+      row's "several devices"): one stream target a device, each the whole
+      frame or a range of the LEDs in wiring order (its own map applied when it
+      has one), the choice kept with the project; `app.ddp` is the first
+      target's sender, so everything that asked "is it streaming" still does.
+      Tested: `test_stream.py` (ranges, padding, a device's own map, coverage,
+      two listeners each getting their half) and the smoke (the fake and a
+      second one on 127.0.0.2 - left out where the machine has no 127.0.0.2,
+      as macOS by default).
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails

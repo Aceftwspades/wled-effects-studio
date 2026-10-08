@@ -100,6 +100,24 @@ LIVE_MAP_STEPS = [
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.8),
 ]
 
+_N = "app.project.geometry.count"
+_HALVES = (f"[{{'host': '127.0.0.1:8770', 'on': True, 'mode': 'range', 'start': 0, 'count': {_N} // 2}}, "
+           f"{{'host': '127.0.0.2:8771', 'on': True, 'mode': 'range', 'start': {_N} // 2, 'count': {_N} - {_N} // 2}}]")
+MULTI_STEPS = [
+    ([{"device": "127.0.0.1:8770"}, {"py": "app.add_device('127.0.0.2:8771')"},
+      {"py": f"app.stream_config().update(multi=True, targets={_HALVES})"}, {"py": "device_ui.refresh_live(app)"},
+      {"py": "app.stream_start(fps=30)"}], 3.0),
+    ([{"check": "len(app.streams) == 2 and [t.host for t in app.streams] == ['127.0.0.1:8770', '127.0.0.2:8771']"},
+      {"check": "all(t.out.frames >= 20 and not t.out.errors for t in app.streams)"},
+      # the second device's frame: its half of the wiring order, through its own map (the fake has a 2-D setup)
+      {"check": "app.streams[1].frame(app.frame_rgb(), app.project.geometry) == app.streams[1].device_order(np.frombuffer("
+                "__import__('native.live_out', fromlist=['x']).stream_bytes(app.frame_rgb(), app.project.geometry, 'wiring'), "
+                f"np.uint8).reshape(-1, 3)[{_N} // 2:]) and app.streams[1].wiring is not None"},
+      {"expect": ["live_status", "2 devices:"]}, {"expect": ["live_cover", "cover"]},
+      {"py": "device_ui._set_multi(app, False)"}], 1.0),
+    ([{"check": "len(app.streams) == 1 and app.streams[0].mode == 'all'"}, {"stream": False},
+      {"py": "app.remove_device('127.0.0.2:8771')"}], 0.5),
+]
 STEPS = [
     # the run's own project, from the examples; Maelstrom's graph compiled, built and put on the effects list
     # (a batch that starts with wait_build is taken once the build in hand is loaded, however long that is here)
@@ -796,6 +814,9 @@ STEPS = [
       {"wiring_test": "output"}, {"wiring_test": "white"}, {"wiring_test": "off"}], 4.0),
     ([{"check": "app._stream_wiring is not None and app.stream_order() == 'logical'"},
       {"expect": ["messages", "in the device's own order"]}, {"stream": False}], 1.0),
+    # several devices at once: the fake and a second one on 127.0.0.2, each half of the LEDs in wiring order; the
+    # health line names both, the ranges cover every LED; then back to one device (the fakes' frames: checked at the end)
+    *MULTI_STEPS,
     # the stream in E1.31 (sACN) from universe 3, then Art-Net from 0, kept for the device - each restarts it, the
     # health line names it and its rate (the fake keeps every universe: checked at the end), then back to DDP
     ([{"device": "127.0.0.1:8770"}, {"py": "app.set_stream_out(protocol='e131', universe=3)"}, {"stream": "127.0.0.1:8770"}], 2.5),
@@ -1054,6 +1075,12 @@ def main():
         os.remove(STUDIO_FILE)       # from no settings, as a CI runner starts: frames docked by an earlier run take the room the steps measure
     from fake_wled import FakeWled                          # the device every send goes to, and the DDP receiver
     ddp = FakeWled(port=8770, ddp_port=4048).start()
+    try:
+        ddp2 = FakeWled(port=8771, ddp_port=4048, ip="127.0.0.2").start()
+    except OSError:
+        ddp2 = None
+        print("no 127.0.0.2 on this machine: the steps streaming to two devices are left out")
+        STEPS[:] = [s for s in STEPS if s not in MULTI_STEPS]
     with open(LOG, "w") as log:
         # the console variant of the packaged app keeps its stdout, which is the log the test reads
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
@@ -1082,6 +1109,8 @@ def main():
             shutil.rmtree(tut_dir, ignore_errors=True)
     text = open(LOG, encoding="utf-8", errors="replace").read()
     ddp.stop()
+    if ddp2 is not None:
+        ddp2.stop()
     print(f"e1.31: {ddp.e131_packets} packets, universes {sorted(ddp.e131_univ)[:3]}...; "
           f"art-net: {ddp.artnet_packets} packets, universes {sorted(ddp.artnet_univ)[:3]}...")
     print(f"ddp: {ddp.ddp_packets} packets, {ddp.ddp_frames} frames received from the stream; "
@@ -1095,6 +1124,8 @@ def main():
                    "a buffered stdout, the wrong exe, or STUDIO_REMOTE_CONTROL not reaching it")
     if ddp.ddp_frames < 10:
         bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
+    if ddp2 is not None and (ddp2.ddp_frames < 10 or not getattr(ddp2, "ddp_last", b"") or len(ddp2.ddp_last) % 3):
+        bad.append(f"the second device got {ddp2.ddp_frames} frames ({len(getattr(ddp2, 'ddp_last', b''))} bytes the last); 10 or more expected")
     # the cube's net in logical order, 6912 bytes, is 14 universes of 510 (the last 282): from 3 in E1.31, from 0 in Art-Net
     for name, univ, first in (("E1.31", ddp.e131_univ, 3), ("Art-Net", ddp.artnet_univ, 0)):
         if sorted(univ) != list(range(first, first + 14)):

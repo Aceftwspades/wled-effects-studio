@@ -116,6 +116,52 @@ def test_the_rate_is_the_last_seconds():
     s.close()
 
 
+class _Geom:
+    """A strip of 8 wired backwards: wiring LED i is the effect's pixel 7 - i."""
+    phys = list(range(7, -1, -1))
+    phys_ids = None
+
+
+def test_a_target_takes_the_whole_frame_or_its_range():
+    import numpy as np
+    rgb = np.array([[k, 10 * k, 100 + k] for k in range(8)], np.uint8)
+    g = _Geom()
+    whole = L.Target("a", None, "all")
+    assert whole.frame(rgb, g) == rgb.tobytes()                           # logical order: the device maps it
+    mid = L.Target("b", None, "range", 2, 3)
+    assert mid.frame(rgb, g) == rgb[[5, 4, 3]].tobytes()                   # wiring LEDs 2..4, from its LED 0
+    wired = np.frombuffer(L.stream_bytes(rgb, g, "wiring"), np.uint8).reshape(-1, 3)
+    assert mid.frame(rgb, g, wired=wired) == mid.frame(rgb, g)             # the wiring order worked out once: the same
+    end = L.Target("c", None, "range", 6, 4)
+    assert end.frame(rgb, g) == rgb[[1, 0]].tobytes() + bytes(6)           # past the last LED: sent dark
+    # a device with its own ledmap (Respect LED maps): its range put where its table sends each LED
+    mapped = L.Target("d", None, "range", 0, 3)
+    mapped.wiring = {"ledmap": {"map": [2, 1, 0]}, "rlm": True, "total": 3}
+    assert mapped.frame(rgb, g) == wired[[2, 1, 0]].tobytes()
+    plan = np.zeros((8, 3), np.uint8); plan[4] = 255                        # the camera map's plan, by LED number
+    assert L.Target("e", None, "range", 4, 2).frame(rgb, g, by_led=plan) == bytes([255] * 3 + [0] * 3)
+    assert L.coverage([mid, end], 8) == (5, 0, 2)
+    assert L.coverage([mid, L.Target("f", None, "range", 0, 4)], 8) == (5, 2, 0)
+    assert L.coverage([whole], 8) == (0, 0, 0)                              # the whole frame is not a range
+
+
+def test_two_devices_each_get_their_half():
+    import numpy as np
+    rgb = np.array([[k, k, k] for k in range(8)], np.uint8)
+    g = _Geom()
+    socks = [_listener() for _ in range(2)]
+    ts = [L.Target("127.0.0.1", L.DdpOut("127.0.0.1", port=port), "range", 4 * k, 4) for k, (_, port) in enumerate(socks)]
+    for t in ts:
+        t.send(rgb, g)
+    wired = L.stream_bytes(rgb, g, "wiring")
+    for k, (s, _) in enumerate(socks):
+        p = _drain(s, 1)[0]
+        assert p[10:] == wired[12 * k:12 * k + 12] and p[0] & 0x01      # each its own LEDs, from its LED 0, pushed
+        s.close()
+    for t in ts:
+        t.out.close()
+
+
 def test_make_out_picks_the_protocol():
     assert isinstance(L.make_out("ddp", "127.0.0.1"), L.DdpOut)
     assert L.make_out("e131", "127.0.0.1:8080", 3).universe == 3 and L.make_out("e131", "127.0.0.1").universe == 1

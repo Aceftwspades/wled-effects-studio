@@ -484,7 +484,8 @@ STUDIO_FILE = os.path.join(PROJECTS, "studio.json")     # what is not any one pr
 
 
 # what a project zip leaves out: the history's copies, the export's build products
-ZIP_SKIP = ("history", "export", "__pycache__")
+# backups (a device's settings) and firmware (the images flashed, megabytes each) stay with the project, not in its zip
+ZIP_SKIP = ("history", "export", "__pycache__", "backups", "firmware")
 
 
 def zip_project(project, path=None):

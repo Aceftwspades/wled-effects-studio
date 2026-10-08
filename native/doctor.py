@@ -87,7 +87,7 @@ def check():
         out.append((False, "neither a WLED checkout nor runtime/: the engine cannot be built", "run  python build.py --runtime  from a checkout, or set WLED_ROOT"))
     # the flash
     pio = shutil.which("pio") or shutil.which("platformio") or next((p for p in (os.path.expanduser("~/.platformio/penv/Scripts/pio.exe"), os.path.expanduser("~/.platformio/penv/bin/pio")) if os.path.exists(p)), None)
-    out.append((None if not pio else True, f"PlatformIO: {pio or 'not found - the flash is off'}", "" if pio else "pip install platformio  (and a WLED checkout)"))
+    out.append((None if not pio else True, f"PlatformIO: {pio or 'not found - the flash is off'}", "" if pio else "Flash > Install PlatformIO  (or pip install platformio; and a WLED checkout)"))
     ff = shutil.which("ffmpeg")
     out.append((None if not ff else True, f"ffmpeg: {ff or 'not found - recordings are GIFs only'}", "" if ff else "install ffmpeg and put it on the path"))
     out.append((True, f"home (projects, build, captures): {paths.HOME}", ""))

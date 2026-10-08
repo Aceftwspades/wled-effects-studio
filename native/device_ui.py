@@ -18,6 +18,7 @@ moved by hand; floating, it can.
     poll(app)             # per frame: scans and probes finishing, grips on floating frames
 """
 import os
+import time
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
@@ -191,6 +192,17 @@ def build(app):
             typeface.mono(dpg.add_input_int(tag="live_universe", width=px(90), default_value=1, min_value=0, min_clamped=True,
                                             callback=lambda s, v: app.set_stream_out(universe=int(v)), on_enter=True))
         with dpg.group(horizontal=True):
+            dpg.add_checkbox(label="several devices", tag="live_multi", default_value=bool(app.stream_config()["multi"]),
+                             callback=lambda s, v: _set_multi(app, v))
+            c.tip("the stream to every device ticked below at once, instead of the active device alone")
+            c.info("Each device ticked gets the whole frame - every one the same picture - or a range of the LEDs in wiring "
+                   "order, the first of them its own LED 0: one shape spread over several controllers, a cube with a "
+                   "controller per face. Each goes over its own protocol (choose the device as the active one to set it). "
+                   "Fill from the LED outputs gives the ticked devices the outputs' ranges in turn.")
+            dpg.add_button(label="Fill from the LED outputs", tag="live_fill", small=True, show=False, callback=lambda: fill_from_outputs(app))
+            dpg.add_text("", tag="live_cover", color=c.DIM)
+        dpg.add_group(tag="live_targets", show=False)
+        with dpg.group(horizontal=True):
             dpg.add_text("", tag="live_status", color=c.DIM)
             dpg.add_simple_plot(tag="live_trace", default_value=[0.0], width=px(160), height=px(28), show=False)
         with dpg.group(horizontal=True):
@@ -294,6 +306,45 @@ def build_flash(app):
             c.info("what the firmware carries: untick what this device lacks and the build shrinks; Usermods... has WLED's own too")
         with dpg.child_window(tag="flash_features", height=px(118), border=True):
             pass
+        with dpg.group(horizontal=True, tag="flash_pio_row", show=False):
+            dpg.add_text("PlatformIO is not installed: the studio builds with it.", color=c.AMBER)
+            dpg.add_button(label="Install PlatformIO", tag="flash_pio_install", small=True, callback=lambda: install_pio(app))
+            c.tip("PlatformIO's own installer, downloaded and run with this computer's Python (a few minutes; it sets "
+                  "PlatformIO up in its own folder, ~/.platformio)")
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("SEND", color=c.ACCENT))
+            dpg.add_radio_button(["over the network", "over USB"], tag="flash_transport", horizontal=True,
+                                 default_value="over USB" if app.project.options.get("flash_transport") == "usb" else "over the network",
+                                 callback=lambda s, v: _set_transport(app, v))
+            c.info("Over the network: to the device's WLED, which takes the image and reboots - the device must be running "
+                   "WLED and on this network. Over USB: the whole flash written over a serial port - what a new board, a "
+                   "wiped one or one that will not boot needs. A build (the studio's or the checkout's) goes over USB; a "
+                   "release's or a file's .bin holds the application alone.")
+        with dpg.group(horizontal=True, tag="flash_usb_row", show=False):
+            form.inline("port")
+            dpg.add_combo([], tag="flash_port", width=px(300), callback=lambda s, v: _set_port(app, v))
+            dpg.add_button(label="Refresh", tag="flash_ports_refresh", small=True, callback=lambda: refresh_ports(app))
+            c.tip("the serial ports again - plug the board in first; ESP32 boards' USB chips are named and listed first")
+            dpg.add_checkbox(label="erase everything first", tag="flash_erase", default_value=False)
+            c.tip("the whole flash cleared before writing: the device's settings and presets go too (a clean start, or a "
+                  "board that will not boot)")
+        with dpg.group(horizontal=True, tag="flash_keep_row"):
+            typeface.label(dpg.add_text("SETTINGS", color=c.ACCENT))
+            dpg.add_text("", tag="flash_backup_text", color=c.DIM)
+            dpg.add_button(label="Back up now", small=True, callback=lambda: backup_now(app))
+            weight.need(dpg.last_item(), "device")
+            c.tip("the device's settings, presets, ledmap and shape table into the project now (a flash over the network "
+                  "keeps them first anyway); its Wi-Fi passwords are never copied")
+            dpg.add_button(label="Restore...", small=True, callback=lambda: restore_menu(app))
+            weight.need(dpg.last_item(), "device")
+            c.tip("a backup's files back onto the device, which reboots to read them")
+        with dpg.group(horizontal=True, tag="flash_prev_row"):
+            typeface.label(dpg.add_text("PREVIOUS FIRMWARE", color=c.ACCENT))
+            dpg.add_combo([], tag="flash_prev", width=px(320))
+            c.tip("the images flashed to this device from this project, newest first (the last three)")
+            dpg.add_button(label="Send it again", small=True, callback=lambda: send_previous(app))
+            weight.need(dpg.last_item(), "device")
+            c.tip("that image to the device again - undoing a flash that turned out badly")
         with dpg.group(horizontal=True):
             dpg.add_button(label="Start", tag="flash_start", callback=lambda: start_flash(app))
             weight.primary(dpg.last_item())
@@ -304,7 +355,8 @@ def build_flash(app):
             weight.quiet(dpg.last_item())
             dpg.add_button(label="Open the build folder", callback=lambda: app.reveal(os.path.join(flash.ROOT, ".pio", "build")))
         dpg.add_text("", tag="flash_status", color=c.DIM, wrap=0)
-        with dpg.child_window(tag="flash_log", height=-1, border=True):
+        dpg.add_progress_bar(tag="flash_progress", default_value=0.0, width=-1, show=False)
+        with dpg.child_window(tag="flash_log", height=px(200), border=True):     # the frame scrolls: the log a set height
             typeface.mono(dpg.last_container())         # a log: its lines in the monospace
             pass
     with dpg.file_dialog(directory_selector=False, show=False, tag="flash_bin_dialog", width=px(640), height=px(420),
@@ -312,7 +364,205 @@ def build_flash(app):
         dpg.add_file_extension(".bin", color=(120, 200, 120))
         dpg.add_file_extension(".gz", color=(120, 200, 120))
         dpg.add_file_extension(".*")
+    with dpg.window(tag="flash_restore_menu", show=False, no_title_bar=True, no_resize=True, no_move=True, autosize=True, popup=True):
+        pass
     _show_source(app)
+    _show_transport(app)
+    refresh_keep(app)
+
+
+# --- sending over USB, the settings kept, the previous firmware, PlatformIO ------------------------
+def _usb(app):
+    return app.project.options.get("flash_transport") == "usb"
+
+
+def _set_transport(app, v):
+    app.project.options["flash_transport"] = "usb" if v == "over USB" else "ota"
+    app.project.save()
+    _show_transport(app)
+    if _usb(app):
+        refresh_ports(app)
+
+
+def _show_transport(app):
+    if dpg.does_item_exist("flash_usb_row"):
+        dpg.configure_item("flash_usb_row", show=_usb(app))
+    if dpg.does_item_exist("flash_pio_row"):
+        dpg.configure_item("flash_pio_row", show=flash.pio_exe() is None)
+
+
+def _port_label(p):
+    return f"{p['port']}  -  {p['esp'] or p['description'] or 'serial port'}"
+
+
+def refresh_ports(app):
+    """The serial ports, listed on a thread (PlatformIO takes a moment)."""
+    import threading
+    from native import flash_tools
+    if not dpg.does_item_exist("flash_port"):
+        return
+    dpg.configure_item("flash_port", items=["(looking...)"])
+
+    def go():
+        app._flash_ports = flash_tools.serial_ports()
+    threading.Thread(target=go, daemon=True).start()
+
+
+def _poll_ports(app):
+    ports = getattr(app, "_flash_ports", None)
+    if ports is None or not dpg.does_item_exist("flash_port"):
+        return
+    app._flash_ports = None
+    items = [_port_label(p) for p in ports] or ["(no serial port: plug the board in, Refresh)"]
+    dpg.configure_item("flash_port", items=items)
+    want = app.project.options.get("flash_port", "")
+    pick = next((i for i in items if i.split()[0] == want), items[0])
+    dpg.set_value("flash_port", pick)
+
+
+def _set_port(app, v):
+    if v and not v.startswith("("):
+        app.project.options["flash_port"] = v.split()[0]
+        app.project.save()
+
+
+def _device_key(app):
+    from native import flash_tools
+    host = app.active_host()
+    return flash_tools.device_key(host, app.active_device()) if host else None
+
+
+def refresh_keep(app):
+    """The SETTINGS line (the last backup) and the PREVIOUS FIRMWARE list, for the active device."""
+    from native import flash_tools
+    if not dpg.does_item_exist("flash_backup_text"):
+        return
+    key = _device_key(app)
+    b = flash_tools.backups(app.project, key) if key else []
+    dpg.set_value("flash_backup_text", f"last kept {b[0][1].get('when', '?')} ({len(b[0][1].get('files', []))} files)"
+                  if b else ("none kept yet" if key else "no device chosen"))
+    k = flash_tools.kept(app.project, key) if key else []
+    app._flash_kept = k
+    items = [f"{info.get('when', '?')}  {info.get('what', '')}" for _, info in k] or ["(none yet)"]
+    dpg.configure_item("flash_prev", items=items)
+    dpg.set_value("flash_prev", items[0])
+
+
+def _job_on_thread(app, fn, done_words):
+    """A short network job beside the flash (a backup, a restore): its result into the status."""
+    import threading
+
+    def go():
+        try:
+            app._flash_side = fn()
+        except Exception as e:
+            app._flash_side = (False, f"{done_words}: {e}")
+    app._flash_side = None
+    threading.Thread(target=go, daemon=True).start()
+    dpg.set_value("flash_status", "working...")
+
+
+def backup_now(app):
+    from native import flash_tools
+    host = app.active_host()
+    if not host:
+        return
+
+    def run():
+        info = flash.device_info(host)
+        if not info:
+            return False, "the device did not answer"
+        folder, files = flash_tools.backup(host, app.project, info)
+        return True, f"settings kept: {', '.join(f.lstrip('/') for f in files)} in {folder}"
+    _job_on_thread(app, run, "the backup failed")
+
+
+def restore_menu(app):
+    """The backups of the active device, newest first, to choose one to restore."""
+    from native import flash_tools
+    c = _c()
+    key = _device_key(app)
+    dpg.delete_item("flash_restore_menu", children_only=True)
+    rows = flash_tools.backups(app.project, key) if key else []
+    if not rows:
+        dpg.add_text("no backup of this device yet", parent="flash_restore_menu", color=c.DIM)
+    for folder, meta in rows:
+        dpg.add_selectable(label=f"{meta.get('when', '?')}  -  {', '.join(f.lstrip('/') for f in meta.get('files', []))}",
+                           parent="flash_restore_menu", user_data=folder,
+                           callback=lambda s_, a_, u: (dpg.hide_item("flash_restore_menu"), _restore(app, u)))
+    x, y = dpg.get_mouse_pos(local=False)
+    dpg.configure_item("flash_restore_menu", show=True)
+    dpg.set_item_pos("flash_restore_menu", [x, y])
+
+
+def _restore(app, folder, confirmed=False):
+    from native import flash_tools
+    c = _c()
+    host = app.active_host()
+    if not confirmed:
+        c.confirm(app, "Restore these settings?",
+                  f"The settings kept in {os.path.basename(folder)} go back onto {host}, over what it has now, and it "
+                  "reboots to read them.", [("Restore", lambda: _restore(app, folder, True), "danger"), ("Cancel", None)])
+        return
+    _job_on_thread(app, lambda: flash_tools.restore(host, folder), "the restore failed")
+
+
+def send_previous(app, confirmed=False):
+    """A kept image to the device again, over the network."""
+    c = _c()
+    k = getattr(app, "_flash_kept", None) or []
+    label = dpg.get_value("flash_prev") or ""
+    pick = next((path for path, info in k if label.startswith(info.get("when", "\0"))), None)
+    host = app.active_host()
+    if not pick or not host:
+        dpg.set_value("flash_status", "no previous firmware kept for this device yet"); return
+    if app.flash_job and not app.flash_job.done:
+        return
+    if not confirmed:
+        c.confirm(app, "Send the previous firmware?", f"{label.strip()} to {host}, replacing what it runs now.",
+                  [("Send it", lambda: send_previous(app, True), "danger"), ("Cancel", None)])
+        return
+    dpg.delete_item("flash_log", children_only=True)
+    dpg.set_value("flash_status", "working...")
+    dpg.configure_item("flash_start", enabled=False)
+    dpg.configure_item("flash_cancel", enabled=True)
+    app.flash_job = flash.Job(app.project, "", host, build=False, upload=True, source="file", bin_path=pick)
+    app.flash_job.start()
+
+
+def install_pio(app):
+    """PlatformIO's installer on a thread, its lines into the log."""
+    import threading
+    from native import flash_tools
+    dpg.delete_item("flash_log", children_only=True)
+    app._pio_lines = []
+
+    def go():
+        app._flash_side = flash_tools.install_platformio(app._pio_lines.append)
+    app._flash_side = None
+    dpg.configure_item("flash_pio_install", enabled=False)
+    threading.Thread(target=go, daemon=True).start()
+    dpg.set_value("flash_status", "installing PlatformIO...")
+
+
+def _poll_side(app):
+    """A backup, a restore or the installer finished: said, and the rows refreshed."""
+    c = _c()
+    for line in (getattr(app, "_pio_lines", None) or [])[:]:
+        dpg.add_text(line, parent="flash_log", color=c.TEXT)
+        app._pio_lines.remove(line)
+    res = getattr(app, "_flash_side", None)
+    if res is None:
+        return
+    app._flash_side = None
+    ok, msg = res
+    dpg.set_value("flash_status", msg)
+    dpg.configure_item("flash_status", color=c.GREEN if ok else c.RED)
+    if dpg.does_item_exist("flash_pio_install"):
+        dpg.configure_item("flash_pio_install", enabled=True)
+    _show_transport(app)
+    refresh_keep(app)
+    app.gp.status(msg, "info" if ok else "warn")
 
 
 # --- the firmware's source -------------------------------------------------------------------
@@ -592,6 +842,7 @@ def _device_line(d):
 
 
 def refresh_devices(app):
+    refresh_live_targets(app)                       # the LIVE row's devices too
     if not dpg.does_item_exist("dev_rows"):
         return
     c = _c()
@@ -684,7 +935,108 @@ def refresh_send(app):
         dpg.configure_item("send_find", show=not host)             # no device: the way to one, beside the line that says so
 
 
+# --- the stream to several devices -----------------------------------------------------------
+TARGET_WORDS = (("all", "whole frame"), ("range", "a range"))
+
+
+def _set_multi(app, on):
+    app.stream_config()["multi"] = bool(on)
+    app.project.save()
+    refresh_live_targets(app)
+    app.stream_restart()
+
+
+def _target(app, host):
+    """The project's entry for a device, made on first use (unticked, the whole frame)."""
+    cfg = app.stream_config()
+    t = next((t for t in cfg["targets"] if t.get("host") == host), None)
+    if t is None:
+        t = {"host": host, "on": False, "mode": "all", "start": 0, "count": app.project.geometry.count}
+        cfg["targets"].append(t)
+    return t
+
+
+def _set_target(app, host, key, value):
+    t = _target(app, host)
+    t[key] = value
+    if key in ("start", "count"):
+        t[key] = max(0, int(value))
+    app.project.save()
+    refresh_live_targets(app)
+    app.stream_restart()
+
+
+def fill_from_outputs(app):
+    """The LED outputs frame's ranges to the ticked devices in turn (the first output to the first device...)."""
+    outs = (app.project.options.get("outputs") or {}).get("outs") or []
+    if not outs:
+        app.gp.status("no LED outputs to take ranges from: split the wiring in Window > LED outputs first"); return
+    ticked = [t for t in (_target(app, d["host"]) for d in app.devices) if t.get("on")]
+    if not ticked:
+        app.gp.status("tick the devices to stream to first"); return
+    for t, o in zip(ticked, outs):
+        t.update(mode="range", start=int(o.get("start", 0)), count=int(o.get("len", 0)))
+    app.project.save()
+    refresh_live_targets(app)
+    app.stream_restart()
+    app.gp.status(f"{min(len(ticked), len(outs))} device(s) given the outputs' ranges"
+                  + (f"; {len(outs) - len(ticked)} output(s) left without a device" if len(outs) > len(ticked) else "")
+                  + (f"; {len(ticked) - len(outs)} device(s) past the outputs keep what they had" if len(ticked) > len(outs) else ""))
+
+
+def refresh_live_targets(app):
+    """A row a known device: ticked or not, the whole frame or a range (from, count); and how the ranges cover the LEDs."""
+    if not dpg.does_item_exist("live_targets"):
+        return
+    c = _c()
+    multi = bool(app.stream_config()["multi"])
+    dpg.set_value("live_multi", multi)
+    dpg.configure_item("live_targets", show=multi)
+    dpg.configure_item("live_fill", show=multi)
+    dpg.delete_item("live_targets", children_only=True)
+    if not multi:
+        dpg.set_value("live_cover", "")
+        return
+    if not app.devices:
+        dpg.add_text("no devices yet: Window > Devices finds them", parent="live_targets", color=c.DIM)
+    rows = []
+    for d in app.devices:
+        host = d["host"]
+        t = _target(app, host)
+        with dpg.group(horizontal=True, parent="live_targets"):
+            dpg.add_checkbox(label=f"{d.get('name') or host}", default_value=bool(t.get("on")),
+                             callback=lambda s, v, h=host: _set_target(app, h, "on", bool(v)))
+            dpg.add_text(host, color=c.DIM)
+            dpg.add_combo([w for _, w in TARGET_WORDS], default_value=dict(TARGET_WORDS).get(t.get("mode"), "whole frame"),
+                          width=px(110), callback=lambda s, v, h=host: _set_target(app, h, "mode", next(k for k, w in TARGET_WORDS if w == v)))
+            if t.get("mode") == "range":
+                form.inline("from")
+                typeface.mono(dpg.add_input_int(default_value=int(t.get("start", 0)), width=px(90), min_value=0, min_clamped=True,
+                                                on_enter=True, callback=lambda s, v, h=host: _set_target(app, h, "start", v)))
+                form.inline("LEDs")
+                typeface.mono(dpg.add_input_int(default_value=int(t.get("count", 0)), width=px(90), min_value=0, min_clamped=True,
+                                                on_enter=True, callback=lambda s, v, h=host: _set_target(app, h, "count", v)))
+        if t.get("on"):
+            rows.append(live_out.Target(host, None, t.get("mode"), t.get("start", 0), t.get("count", 0)))
+    n = app.project.geometry.count
+    ranges = [r for r in rows if r.mode == "range"]
+    if not rows:
+        words = "no device ticked: the stream goes to the active device"
+    elif not ranges:
+        words = f"{len(rows)} device(s), each the whole frame"
+    else:
+        cov, twice, past = live_out.coverage(ranges, n)
+        words = f"the ranges cover {cov} of {n} LEDs"
+        if twice:
+            words += f"; {twice} go to two devices"
+        if past:
+            words += f"; {past} past the last LED (sent dark)"
+    dpg.set_value("live_cover", words)
+    dpg.configure_item("live_cover", color=c.AMBER if ranges and (cov < n or twice) else c.DIM)
+
+
 def refresh_live(app):
+    refresh_live_targets(app)
     if dpg.does_item_exist("live_on"):
         on = getattr(app, "ddp", None) is not None
         dpg.set_value("live_on", on)
@@ -940,7 +1292,11 @@ def start_flash(app, confirmed=False):
         dpg.set_value("flash_status", "no WLED checkout: set WLED_ROOT to one and start the app again"); return
     if not env:
         dpg.set_value("flash_status", "choose an environment"); return
-    if dpg.get_value("flash_upload") and not host:
+    usb = _usb(app)
+    port = (dpg.get_value("flash_port") or "").split()[0] if usb and dpg.get_value("flash_port") else ""
+    if usb and dpg.get_value("flash_upload") and (not port or port.startswith("(")):
+        dpg.set_value("flash_status", "choose the board's USB port (plug it in, Refresh)"); return
+    if dpg.get_value("flash_upload") and not host and not usb:
         dpg.set_value("flash_status", "no device chosen to send to (Window > Devices...), or untick sending"); return
     app.project.options["flash_env"] = env
     app.project.save()
@@ -951,11 +1307,10 @@ def start_flash(app, confirmed=False):
     dpg.set_value("flash_status", "working...")
     dpg.configure_item("flash_start", enabled=False)
     dpg.configure_item("flash_cancel", enabled=True)
-    only = _ship_files(app)
-    if not only:
-        dpg.set_value("flash_status", "tick at least one effect to ship"); return
+    only = _ship_files(app)                                    # none at all is fine: WLED and the built-ins ticked
     app.flash_job = flash.Job(app.project, env, host, build=dpg.get_value("flash_build"),
-                              upload=dpg.get_value("flash_upload"), only=only)
+                              upload=dpg.get_value("flash_upload"), only=only,
+                              transport="usb" if usb else "ota", port=port or None, erase=bool(dpg.get_value("flash_erase")))
     app.flash_job.start()
 
 
@@ -965,7 +1320,7 @@ def _start_other(app, src, env, host, confirmed):
     from native import paths
     c = _c()
     send = bool(dpg.get_value("flash_upload"))
-    if send and not host:
+    if send and not host and not (_usb(app) and src == "checkout"):
         dpg.set_value("flash_status", "no device chosen to send to (Window > Devices...), or untick sending"); return
     release = path = None
     if src == "release":
@@ -996,17 +1351,32 @@ def _start_other(app, src, env, host, confirmed):
     dpg.configure_item("flash_status", color=c.DIM)
     dpg.configure_item("flash_start", enabled=False)
     dpg.configure_item("flash_cancel", enabled=True)
+    usb = _usb(app) and src == "checkout"
+    port = (dpg.get_value("flash_port") or "").split()[0] if usb and dpg.get_value("flash_port") else None
     app.flash_job = flash.Job(app.project, env, host, build=bool(dpg.get_value("flash_build")), upload=send,
-                              source=src, release=release, bin_path=path)
+                              source=src, release=release, bin_path=path,
+                              transport="usb" if _usb(app) else "ota", port=port, erase=bool(dpg.get_value("flash_erase")))
     app.flash_job.start()
 
 
 def poll_flash(app):
-    """Every frame: the job's lines into the log, its end into the status."""
+    """Every frame: the job's lines into the log, its progress on the bar, its end into the status."""
     _poll_releases(app)
+    if dpg.does_item_exist("flash_log"):
+        _poll_ports(app)
+        _poll_side(app)
     job = getattr(app, "flash_job", None)
     if job is None or not dpg.does_item_exist("flash_log"):
         return
+    if dpg.does_item_exist("flash_progress"):
+        running = not job.done and (job.progress is not None or job.phase)
+        dpg.configure_item("flash_progress", show=bool(running))
+        if running:
+            p = job.progress
+            if p is None:                                           # no share to tell: a slow sweep, the phase in words
+                p = (time.time() % 4.0) / 4.0
+            dpg.set_value("flash_progress", float(p))
+            dpg.configure_item("flash_progress", overlay=job.phase)
     c = _c()
     n = 0
     while n < 60:
@@ -1032,6 +1402,7 @@ def poll_flash(app):
             refresh_flash(app)
         if job.ok and job.upload:
             app.refresh_devices_info(only=app.active_host())
+        refresh_keep(app)
 
 
 # --- per frame ---------------------------------------------------------------------------

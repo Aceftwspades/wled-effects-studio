@@ -56,6 +56,13 @@ def put_block(text, lines):
 # AI: end
 
 
+# PlatformIO's own chores kept out of a flash: its check for a newer PlatformIO runs after a build, and
+# timing out on a slow or blocked connection it held a build up 74 s after the firmware was ready
+# ("Failed to check for PlatformIO upgrades"); telemetry likewise. PLATFORMIO_SETTING_* overrides
+# a setting for this run only - the user's own PlatformIO keeps its settings.
+PIO_ENV = {"PLATFORMIO_SETTING_CHECK_PLATFORMIO_INTERVAL": "3650", "PLATFORMIO_SETTING_ENABLE_TELEMETRY": "No"}
+
+
 def pio_exe():
     """PlatformIO's command line, on the path or in its own virtualenv."""
     p = shutil.which("pio") or shutil.which("platformio")
@@ -439,8 +446,13 @@ def stage(project, base_env, log, only=None):
     else:
         log(f"staged {USERMOD} with its own bank")
     env = "studio_" + base_env
+    # No project effect shipped: the usermod would link nothing, and WLED's
+    # post-link check (validate_modules.py) fails a usermod with no symbols.
+    shipped = [f for f in (only if only is not None else project.build_files()) if f in project.effect_files()]
+    if not shipped:
+        log(f"no project effects shipped: {USERMOD} left out of the build")
     lines = [MARK_BEGIN, f"[env:{env}]", f"extends = env:{base_env}", "custom_usermods ="]
-    lines += [f"  {m}" for m in mods if m != USERMOD] + [f"  {USERMOD}"]
+    lines += [f"  {m}" for m in mods if m != USERMOD] + ([f"  {USERMOD}"] if shipped else [])
     flags = feature_flags(project)
     if flags:
         # the features left out, and a lit bottom face: the firmware's defaults, before its settings say otherwise
@@ -654,7 +666,7 @@ def manifest(project, base_env, only=None):
     feats = [(key, label, bool(f.get(key))) for key, label, _, _, _ in FEATURES]
     cat, chosen_b = builtin_catalog(), set(builtin_chosen(project))
     return {"wled": ver, "build_id": vid, "env": base_env, "studio_env": "studio_" + base_env, "chain": [e for e, _ in chain],
-            "board": board, "partitions": os.path.basename(parts), "usermods": staged_usermods(project, base_env) + [USERMOD],
+            "board": board, "partitions": os.path.basename(parts), "usermods": staged_usermods(project, base_env) + ([USERMOD] if ship else []),
             "flags": feature_flags(project), "features": feats, "audio": f["audio"],
             "audio_input": __import__("native.audioin", fromlist=["x"]).describe(project.options["audioin"]) if project.options.get("audioin") and f["audio"] != "none" else "",
             "effects": [(f_, project.effect_title(f_), known.get(f_)) for f_ in ship],
@@ -724,9 +736,30 @@ def last_flash(project, host=None, mac=None):
     return None
 
 
-def upload(host, path, log, timeout=180):
-    """POST the binary to /update. The device checks the subnet, its PIN
-    and its OTA lock, and reboots on success."""
+def _post_body(url, body, ctype, timeout, progress=None, chunk=16384):
+    """POST `body` to `url` a piece at a time, `progress(sent, total)` after each; (status, page text)."""
+    import http.client
+    from urllib.parse import urlsplit
+    u = urlsplit(url)
+    conn = http.client.HTTPConnection(u.hostname, u.port or 80, timeout=timeout)
+    try:
+        conn.putrequest("POST", u.path or "/")
+        conn.putheader("Content-Type", ctype)
+        conn.putheader("Content-Length", str(len(body)))
+        conn.endheaders()
+        for i in range(0, len(body), chunk):
+            conn.send(body[i:i + chunk])
+            if progress:
+                progress(min(len(body), i + chunk), len(body))
+        r = conn.getresponse()
+        return r.status, r.read().decode("utf-8", "replace")
+    finally:
+        conn.close()
+
+
+def upload(host, path, log, timeout=180, progress=None):
+    """POST the binary to /update - in pieces, `progress(sent, total)` told as they go. The device checks
+    the subnet, its PIN and its OTA lock, and reboots on success."""
     host = (host or "").strip().rstrip("/")
     if not host:
         return False, "no device address"
@@ -736,22 +769,20 @@ def upload(host, path, log, timeout=180):
     boundary = "----studio" + str(int(time.time()))
     body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"update\"; filename=\"firmware.bin\"\r\n"
             "Content-Type: application/octet-stream\r\n\r\n").encode() + data + f"\r\n--{boundary}--\r\n".encode()
-    req = urllib.request.Request(host + "/update", data=body,
-                                 headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
     log(f"sending {len(data) // 1024} KB to {host}/update ...")
     # The first POST after a while can be dropped by the device without an
     # answer (the connection closes mid-body; the same POST a moment later
     # goes through), so a closed connection gets one more try.
     for attempt in (1, 2, 3):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                page = r.read().decode("utf-8", "replace")
+            status, page = _post_body(host + "/update", body, f"multipart/form-data; boundary={boundary}", timeout, progress)
+            if status >= 400:
+                return False, f"the device answered {status}: " + _message(page)
             break
-        except urllib.error.HTTPError as e:
-            page = e.read().decode("utf-8", "replace")
-            return False, f"the device answered {e.code}: " + _message(page)
         except Exception as e:
-            if attempt < 3 and "closed connection" in str(e):
+            closed = any(w in str(e).lower() for w in ("closed connection", "connection aborted", "connection reset",
+                                                       "remote end closed"))
+            if attempt < 3 and closed:
                 log(f"the device closed the connection ({e}); trying again in 10 s")
                 time.sleep(10)
                 continue
@@ -820,7 +851,9 @@ def device_info(host, timeout=4):
     try:
         with urllib.request.urlopen(host + "/json/info", timeout=timeout) as r:
             import json
-            return json.loads(r.read().decode("utf-8", "replace"))
+            info = json.loads(r.read().decode("utf-8", "replace"))
+            info["_at"] = time.time()                       # when it said its uptime: verify_reboot needs it
+            return info
     except Exception:
         return None
 
@@ -837,8 +870,15 @@ def verify_reboot(host, before, log, timeout=90):
             was = (before or {}).get("vid")
             up, was_up = info.get("uptime"), (before or {}).get("uptime")
             # the build id is the tree's VERSION, which two builds of the same
-            # tree share; the uptime starting over is what says it rebooted
-            rebooted = up is not None and was_up is not None and up < was_up
+            # tree share; the uptime starting over is what says it rebooted -
+            # measured against what it would read had it NOT: the uptime before
+            # plus the time since. A plain "smaller than before" missed the
+            # reboot of a device only up a few seconds (a second flash right
+            # after a first: up 5 s before, 5 s again after) - the flaky
+            # "did not reboot" of test_a_bin_flashed_to_the_fake_device.
+            at = (before or {}).get("_at")
+            since = (time.time() - at) if at else 0.0
+            rebooted = up is not None and was_up is not None and up + 2 < was_up + since
             if was is not None and vid == was and not rebooted:
                 return False, f"the device is back on the SAME build ({ver}, {vid}) and did not reboot - the update did not take"
             if was is not None and vid == was:
@@ -1028,11 +1068,18 @@ class Job:
     Whatever it is, the binary's chip is checked against the device's before it is sent."""
 
     def __init__(self, project, base_env, host, build=True, upload=True, only=None, source="studio",
-                 release=None, bin_path=None):
+                 release=None, bin_path=None, transport="ota", port=None, erase=False):
         self.project, self.base_env, self.host = project, base_env, host
         self.build, self.upload = build, upload
         self.only = only
         self.source, self.release, self.bin_path = source, release, bin_path
+        # "ota": the image to a running WLED over the network; "usb": the whole flash over a serial port (a
+        # board with no WLED on it), `erase` first clearing everything
+        self.transport, self.port, self.erase = transport, port, erase
+        self.progress = None         # 0..1 when it can be told, for the frame's bar
+        self.phase = ""              # what it is doing, in words beside the bar
+        self.backup = None           # the settings kept before a flash: (folder, files)
+        self.kept = None             # the image kept after a flash
         self.stats = None            # after a build: partition, firmware size, each effect's size
         self.q = queue.Queue()
         self.done = False
@@ -1073,8 +1120,15 @@ class Job:
                     "state nodes (Reaction diffusion, Shells) in them.")
         return None
 
+    def _set(self, phase, progress=None):
+        self.phase, self.progress = phase, progress
+
     def _run(self):
         try:
+            if self.transport == "usb" and self.source in ("release", "file"):
+                self.result = ("USB flashes a build - the studio's or the checkout's: a release's or a file's .bin holds "
+                               "the application alone, which a blank board cannot start without its bootloader")
+                return
             if self.source in ("release", "file"):
                 self._send_binary(); return
             env = (stage_stock(self.base_env, self.log) if self.source == "checkout"
@@ -1086,7 +1140,10 @@ class Job:
                     return
                 self.log(f"{os.path.basename(pio)} run -e {env}   (in {ROOT})")
                 t0 = time.time()
-                self.proc = procs.popen([pio, "run", "-e", env], cwd=ROOT, stdout=subprocess.PIPE,
+                from native import flash_tools
+                est = flash_tools.BuildEstimate(self.project, env)
+                self._set("building" + (" (the first build of this environment: several minutes)" if not est.expected else ""))
+                self.proc = procs.popen([pio, "run", "-e", env], cwd=ROOT, stdout=subprocess.PIPE, env=dict(os.environ, **PIO_ENV),
                                         stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
                                         bufsize=1)
                 why = None
@@ -1096,6 +1153,13 @@ class Job:
                     line = line.rstrip()
                     if line:
                         self.log(line)
+                        if est.line(line):
+                            sh, left = est.share(), est.remaining()
+                            self._set(f"building: {est.units}" + (f" of about {est.expected}" if est.expected else "") + " units"
+                                      + (f", about {int(left // 60)} min {int(left % 60)} s left" if left else ""),
+                                      sh * 0.85 if sh is not None else None)
+                        elif line.startswith("Linking"):
+                            self._set("linking", 0.88 if est.expected else None)
                         why = why or self._diagnose(line)
                         m = re.search(r"Flash: \[.*?\]\s+[\d.]+% \(used (\d+) bytes from (\d+) bytes\)", line)
                         if m:
@@ -1106,6 +1170,7 @@ class Job:
                     if self._cancel:
                         break
                 rc = self.proc.wait()
+                est.finish(rc == 0 and not self._cancel)
                 sizes = effect_sizes(env)
                 if part and firm:
                     known = dict((self.project.options.get("flash_stats") or {}).get(self.base_env, {}).get("sizes") or {})
@@ -1120,6 +1185,8 @@ class Job:
                 if rc != 0:
                     self.result = why or f"build failed ({rc}) - the last lines above say why"; return
                 self.log(f"built in {time.time() - t0:.0f} s")
+            if self.transport == "usb" and self.upload:
+                self._usb(env); return
             bin_ = firmware_bin(env)
             if not os.path.exists(bin_):
                 self.result = f"no firmware at {bin_} - build first"; return
@@ -1133,7 +1200,8 @@ class Job:
                 self.log("manifest: " + " | ".join(manifest_text(manifest(self.project, self.base_env, self.only))[:5]))
                 if not self._chip_ok(bin_, before):
                     return
-                ok, msg = upload(self.host, bin_, self.log)
+                self._backup(before)
+                ok, msg = upload(self.host, bin_, self.log, progress=self._sending)
                 self.log(msg)
                 # The device can take the whole file and reboot without its
                 # answer reaching us (the reply times out, or the connection
@@ -1148,6 +1216,7 @@ class Job:
                     if ok:
                         rec = record_flash(self.project, manifest(self.project, self.base_env, self.only), bin_, self.host, before)
                         self.log(f"recorded: {rec['when']}, {len(rec['effects'])} studio effect(s), sha256 {rec.get('sha256', '?')}")
+                        self._keep(bin_, before, f"the studio's build ({self.base_env})")
                 self.result = msg
                 self.ok = ok
             else:
@@ -1202,7 +1271,8 @@ class Job:
             self.log(f"device before: WLED {before.get('ver', '?')}, build {before.get('vid', '?')}, {before.get('name', '')}")
         if not self._chip_ok(path, before):
             return
-        ok, msg = upload(self.host, path, self.log)
+        self._backup(before)
+        ok, msg = upload(self.host, path, self.log, progress=self._sending)
         self.log(msg)
         if ok or "timed out" in msg or "closed connection" in msg:
             self.log("waiting for the device to reboot...")
@@ -1224,4 +1294,75 @@ class Job:
                 self.project.options["flash_history"] = hist[-20:]
                 self.project.save()
                 self.log(f"recorded: {rec['when']}, {what}")
+                if self.source != "file" or "firmware" not in os.path.normpath(path).split(os.sep)[-3:-2]:
+                    self._keep(path, before, what)               # a kept image sent again is not kept twice
         self.result, self.ok = msg, ok
+
+    # --- the companions: the settings kept, the image kept, the bar while sending ----------------
+    def _sending(self, sent, total):
+        self._set(f"sending: {sent * 100 // max(1, total)} %", 0.9 + 0.08 * sent / max(1, total))
+
+    def _backup(self, before):
+        """The device's settings into the project before anything is sent; a device that will not give them is said,
+        and the flash goes on (OTA leaves them where they are)."""
+        from native import flash_tools
+        if not before:
+            return
+        self._set("keeping the device's settings", 0.9)
+        try:
+            folder, files = flash_tools.backup(self.host, self.project, before)
+            self.backup = (folder, files)
+            self.log(f"settings kept: {', '.join(f.lstrip('/') for f in files)} -> {folder}")
+        except Exception as e:
+            self.log(f"settings not kept ({e}): the flash goes on - an OTA leaves them on the device")
+
+    def _keep(self, path, before, what):
+        from native import flash_tools
+        try:
+            self.kept = flash_tools.keep_firmware(self.project, flash_tools.device_key(self.host, before), path, what)
+            self.log(f"kept for undoing: {self.kept}")
+        except Exception as e:
+            self.log(f"the image was not kept ({e})")
+
+    def _usb(self, env):
+        """The whole flash over USB: PlatformIO's upload (bootloader, partitions, application) to the port, after an
+        erase when asked. A fresh WLED then starts its own Wi-Fi to be set up from."""
+        from native import flash_tools
+        pio = pio_exe()
+        if not pio:
+            self.result = "PlatformIO not found: Install PlatformIO (the Flash frame's button), then try again"; return
+        if not self.port:
+            self.result = "choose the board's USB port (plug it in, Refresh)"; return
+        pe = dict(os.environ, **PIO_ENV)
+        steps = ([("erase", ["-t", "erase"])] if self.erase else []) + [("upload", ["-t", "upload"])]
+        why = None
+        for name, args in steps:
+            cmd = [pio, "run", "-e", env, *args, "--upload-port", self.port]
+            self.log(" ".join(os.path.basename(c) if i == 0 else c for i, c in enumerate(cmd)))
+            self._set("erasing the flash" if name == "erase" else "writing over USB", 0.9 if name == "erase" else 0.9)
+            self.proc = procs.popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=pe, text=True,
+                                    encoding="utf-8", errors="replace", bufsize=1)
+            for line in self.proc.stdout:
+                line = line.rstrip()
+                if not line:
+                    continue
+                self.log(line)
+                why = why or flash_tools.usb_advice(line)
+                w = flash_tools.writing_progress(line)
+                if w is not None and name == "upload":
+                    self._set(f"writing over USB: {int(w * 100)} %", 0.9 + 0.09 * w)
+                if self._cancel:
+                    break
+            rc = self.proc.wait()
+            if self._cancel:
+                self.result = "cancelled"; return
+            if rc != 0:
+                self.result = (why or f"the {name} failed ({rc}) - the lines above say why"); return
+        rec = record_flash(self.project, manifest(self.project, self.base_env, self.only), firmware_bin(env),
+                           f"usb:{self.port}", None)
+        self.log(f"recorded: {rec['when']} over USB ({self.port})")
+        ssid, pw = flash_tools.WLED_AP
+        self.result = (f"flashed over USB on {self.port}" + (" after erasing it" if self.erase else "") +
+                       f". A WLED that knows no Wi-Fi starts its own: join \"{ssid}\" (password {pw}), open "
+                       "http://4.3.2.1 and give it your network - then Window > Devices finds it")
+        self.ok = True

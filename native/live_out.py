@@ -216,6 +216,81 @@ def stream_bytes(rgb, geom, order="logical"):
     return out.tobytes()
 
 
+# --- several devices at once -----------------------------------------------------------
+TARGET_MODES = ("all", "range")
+
+
+class Target:
+    """One device a stream goes to: its sender (`out`), what it is sent - the whole frame ("all", every
+    device the same picture) or a range of the LEDs in wiring order ("range": `count` LEDs from `start`,
+    the first of them its LED 0 - one shape spread over several controllers) - and what the device has
+    said: its wiring settings (the order it takes pixels in), its own fps and answer time.
+
+        t = Target("192.168.1.20", DdpOut("192.168.1.20"), "range", 256, 256)
+        t.send(rgb, geom)
+    """
+    def __init__(self, host, out, mode="all", start=0, count=0):
+        self.host, self.out = host, out
+        self.mode = mode if mode in TARGET_MODES else "all"
+        self.start, self.count = max(0, int(start)), max(0, int(count))
+        self.wiring = None               # device_wiring.read(host), once it answers
+        self.dev = None                  # (its fps, its answer in ms), or (None, None) when it does not answer
+
+    def order(self):
+        from native import device_wiring
+        return device_wiring.stream_order(self.wiring)
+
+    def device_order(self, by_led):
+        """(n, 3) colours by this device's LED number as the stream carries them: as they are in wiring
+        order (or before the device has said); in logical order each at the place its table sends to that LED."""
+        cols = np.asarray(by_led, np.uint8).reshape(-1, 3)
+        if self.wiring is None or self.order() == "wiring":
+            return cols.tobytes()
+        from native import device_wiring
+        _, _, tab, _ = device_wiring.table(self.wiring)
+        tab = np.asarray(tab, int)
+        out = np.zeros((len(tab), 3), np.uint8)
+        ok = (tab >= 0) & (tab < len(cols))
+        out[ok] = cols[tab[ok]]
+        return out.tobytes()
+
+    def frame(self, rgb, geom, by_led=None, wired=None):
+        """This device's bytes for one frame of the engine's picture `rgb`. `by_led`: a frame already by LED
+        number to send instead (the camera map's plan); `wired`: the picture in wiring order, (n, 3), when
+        the caller has it (worked out once for every range)."""
+        if self.mode == "range":
+            src = by_led if by_led is not None else wired
+            if src is None:
+                src = np.frombuffer(stream_bytes(rgb, geom, "wiring"), np.uint8)
+            src = np.asarray(src, np.uint8).reshape(-1, 3)
+            part = np.zeros((self.count, 3), np.uint8)       # past the frame's end: dark, the device's LEDs all sent
+            got = src[self.start:self.start + self.count]
+            part[:len(got)] = got
+            return self.device_order(part)
+        if by_led is not None:
+            return self.device_order(by_led)
+        return stream_bytes(rgb, geom, self.order())
+
+    def send(self, rgb, geom, by_led=None, wired=None):
+        self.out.send(self.frame(rgb, geom, by_led, wired))
+
+    def describe(self):
+        return "the whole frame" if self.mode == "all" else f"LEDs {self.start}..{self.start + self.count - 1}"
+
+
+def coverage(targets, n):
+    """How a set of ranges covers n LEDs: (LEDs covered, LEDs sent to two devices or more, LEDs past n)."""
+    hit = np.zeros(n, np.int32)
+    past = 0
+    for t in targets:
+        if t.mode != "range":
+            continue
+        a, b = t.start, t.start + t.count
+        hit[min(a, n):min(b, n)] += 1
+        past += max(0, b - max(a, n))
+    return int((hit > 0).sum()), int((hit > 1).sum()), past
+
+
 def frame_bytes(rgb, phys):
     """The engine's (rows, cols, 3) picture as RGB bytes in wiring order."""
     flat = np.asarray(rgb, np.uint8).reshape(-1, 3)
