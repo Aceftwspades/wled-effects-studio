@@ -3392,6 +3392,8 @@ LedFx have added that matters here, in the order it helps most.
       into the properties' view, counts a pin as covered only when its whole
       readout is, and covers one itself where the layout has none. Still
       timing-sensitive at 1280 x 720 (a different check now and then).
+      Released as 1.12.0 (the tag moved once before its release was made: its
+      first run's Windows pointer test failed on the above).
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
