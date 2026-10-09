@@ -228,6 +228,17 @@ class App:
         time.sleep(0.3)
 
 
+def wait_for(app, expr, secs=3.0):
+    """expr asked until it is truthy or secs pass (a slow runner's frames come later than a fixed sleep allows);
+    its last answer."""
+    end = time.time() + secs
+    got = app.ask(expr)
+    while not got and time.time() < end:
+        time.sleep(0.2)
+        got = app.ask(expr)
+    return got
+
+
 def node_rect(app, nid):
     return app.ask(f"[int(v) for v in dpg.get_item_state('gnode_{nid}')['rect_min']] + "
                    f"[int(v) for v in dpg.get_item_state('gnode_{nid}')['rect_size']]")
@@ -421,8 +432,11 @@ def check_readouts(app, bad):
     buried = None
     for nid, name in probes:
         ax, ay = app.ask(f"[round(v) for v in app.gp._pin_point({nid}, 'out', {name!r})]")
-        over = [m for m in depth[depth.index(nid) + 1:] if m in rects and rects[m][0] <= ax - 30 <= rects[m][0] + rects[m][2]
-                and rects[m][1] <= ay <= rects[m][1] + rects[m][3]]
+        # a node over the whole of where the readout goes (left of the pin, a line tall): one over a corner of it
+        # leaves the readout shown, rightly, and the check would read that as drawn through
+        over = [m for m in depth[depth.index(nid) + 1:] if m in rects
+                and rects[m][0] <= ax - 90 and ax <= rects[m][0] + rects[m][2]
+                and rects[m][1] <= ay - 10 and ay + 10 <= rects[m][1] + rects[m][3]]
         if over and title_point(app, nid):
             buried = (nid, name, ax, ay)
             break
@@ -432,6 +446,7 @@ def check_readouts(app, bad):
         bad.append("no frame-scope output in Maelstrom's graph to put a node over"); return
     nid, name, ax, ay = buried
     row = lambda pts: [p for p in pts if p[0] < ax and abs(p[1] - ay) < 12]
+    wait_for(app, f"not [p for p in {READOUTS} if p[0] < {ax} and abs(p[1] - {ay}) < 12]", 1.5)   # a frame or two to settle
     if row(app.ask(READOUTS)):
         bad.append(f"node {nid}'s {name} readout drawn through the node over it: {row(app.ask(READOUTS))}")
     app.click(*title_point(app, nid))
@@ -458,13 +473,14 @@ def _bury_a_pin(app, probes):
         other = app.ask(f"next((n for n in app.gp.graph.nodes if n != {nid} and app.gp.graph.nodes[n]['type'] not in ('Frame', 'Note')), None)")
         if other is None:
             continue
-        app.send([{"py": f"(app.gp._sync_pos(), app.gp.graph.nodes[{other}].__setitem__('pos', [{gx - 90}, {gy - 24}]), app.gp.rebuild())"}], 1.0)
+        app.send([{"py": f"(app.gp._sync_pos(), app.gp.graph.nodes[{other}].__setitem__('pos', [{gx - 130}, {gy - 24}]), app.gp.rebuild())"}], 1.0)
         at = title_point(app, other)
         if not at:
             continue
         app.click(*at)
         app.hold(*empty_spot(app))
-        time.sleep(0.6)
+        if not wait_for(app, f"app.gp._depth[-1] == {other}"):    # clicked: on top in the drawing order
+            continue
         ax, ay = app.ask(f"[round(v) for v in app.gp._pin_point({nid}, 'out', {name!r})]")
         return nid, name, ax, ay
     return None
@@ -591,11 +607,20 @@ def check_painter(app, bad):
     app.up()
     if app.ask(row) != before:
         bad.append("a drag from the canvas across the Bitmap's painter painted it")
-    app.send([{"action": "select_none"}, {"graph_select": [29]}], 1.0)
+    app.send([{"action": "select_none"}, {"graph_select": [29]}], 0.5)
+    if not wait_for(app, "bool(app.gp._bitmap_ed) and dpg.does_item_exist(app.gp._bitmap_ed['tag'])"):
+        bad.append("the Bitmap reselected: its painter did not come back in its properties"); return
     app.send([{"py": "app.gp._bitmap_ed.__setitem__('pen', '5')"}], 0.3)
     ed = app.ask("(lambda e: [int(v) for v in dpg.get_item_state(e['tag'])['rect_min']] + [e['cell']])(app.gp._bitmap_ed)")
     gx, gy, cell = ed                                         # the properties made again: where the painter is now
     y = gy + 7 * cell + cell // 2
+    fly = app.rect("props_fly")
+    for _ in range(12):                                       # a short window: the row wheeled into the pane's view
+        if not fly or y + cell < fly[1] + fly[3] - 8:
+            break
+        app.wheel(fly[0] + fly[2] // 2, fly[1] + fly[3] // 2, -2)
+        gx, gy, cell = app.ask("(lambda e: [int(v) for v in dpg.get_item_state(e['tag'])['rect_min']] + [e['cell']])(app.gp._bitmap_ed)")
+        y = gy + 7 * cell + cell // 2
     app.hold(gx + cell + cell // 2, y, settle=0.4)
     app.click(gx + cell + cell // 2, y)                       # the row's second cell, a 1: painted a 5
     time.sleep(0.4)

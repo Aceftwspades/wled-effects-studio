@@ -78,6 +78,7 @@ class _State:
         self.fly_primed = 0      # the flyout's first appearance: 0 to come, 1 shown off the screen, 2 done
         self.float_in = None     # the window over the canvas the pointer is on, once the focus is settled there
         self.float_owner = None  # the window over the canvas last clicked in (None: the canvas, or elsewhere)
+        self.float_prev = None   # the window under the pointer the frame before (a click's owner is judged by it)
 
 
 S = _State()
@@ -760,8 +761,12 @@ def _poll_float_focus(app):
     (taking it would close them), or the last click was in that window
     (being worked in, a list of its own may be open)."""
     here = _floating_under_pointer()
+    before, S.float_prev = S.float_prev, here
     if any(dpg.is_mouse_button_clicked(b) for b in (0, 1, 2)):
-        S.float_owner = here                        # the window clicked in, or None: the canvas, a pane
+        # the window clicked in, or None: the canvas, a pane - as it was under the pointer before the click. A click
+        # on a node brings its properties up, and in a small window they open under the pointer that very frame:
+        # counted as clicked in, they never got the focus, and the next click on them went through to the canvas.
+        S.float_owner = before
     if here is None:
         S.float_in = None
         return

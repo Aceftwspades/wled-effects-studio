@@ -3382,6 +3382,16 @@ LedFx have added that matters here, in the order it helps most.
       two "see-through" flags (the 3-D view over the graph, the floating
       Sequence frame) checked by eye - both opaque, flat backgrounds over flat
       backgrounds. Its scripts stayed in the session's scratchpad.
+      Found by the 1.12.0 tag's Windows run, whose pointer test failed where
+      main's had passed: in a small window (1280 x 720) a node's properties open
+      under the pointer the frame it is clicked, were counted as "clicked in"
+      and never took the focus - the next click on them went through to the
+      canvas, and the selection and the properties were lost (1.11.0 too).
+      room._poll_float_focus judges a click's window by the frame before it.
+      The pointer test waits for state where it slept, wheels the Bitmap's row
+      into the properties' view, counts a pin as covered only when its whole
+      readout is, and covers one itself where the layout has none. Still
+      timing-sensitive at 1280 x 720 (a different check now and then).
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
