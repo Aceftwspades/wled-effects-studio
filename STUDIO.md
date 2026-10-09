@@ -3428,7 +3428,7 @@ LedFx have added that matters here, in the order it helps most.
       ramps, looks, the fingerprint), the smoke (seek, pause, duplicate, move,
       the sent marker), and 17 interactions through posted mouse and keys
       (the ruler, Space, the end and blend drags, moving a step, a
-      double-click, the menu, dragging a row, Delete, undo).
+      double-click, the menu, dragging a row, Delete, undo). Released as 1.13.0.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
