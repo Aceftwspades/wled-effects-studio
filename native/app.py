@@ -2803,8 +2803,17 @@ class App(Features):
             else:
                 self._dragging = True
                 self._yaw0, self._pitch0 = self.yaw, self.pitch
+        mx, my = dpg.get_mouse_pos(local=False)
         for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win") + tuple(t for t, _, _, _ in device_ui.FRAMES.values()):
-            if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.is_item_hovered(tag):
+            if not (dpg.does_item_exist(tag) and dpg.is_item_shown(tag)):
+                continue
+            hit = dpg.is_item_hovered(tag)
+            if not hit and tag in self.docked_tags():
+                # a docked frame by where it is: "hovered" is false over its list or its timeline (a child window,
+                # a drawlist), and a click there left the keyboard elsewhere - Undo, Space, Delete went past it
+                (x, y), (w, h) = dpg.get_item_pos(tag), dpg.get_item_state(tag).get("rect_size") or (0, 0)
+                hit = x <= mx <= x + w and y <= my <= y + h
+            if hit:
                 self.focus = tag                      # a docked frame counts: Undo then goes to it
                 break
         if self.layout == "graph" and not self.over_float():
@@ -3028,6 +3037,9 @@ class App(Features):
     def on_key(self, sender, app_data):
         if shape_tools.key(self, app_data):
             return                                       # a move, turn or scale under way has the keys: X Y Z, a number, Enter, Esc
+        from native import sequence_ui
+        if sequence_ui.key(self, app_data):
+            return                                       # the sequence frame's own: Space, Delete, Ctrl+D
         # Enter in the add menu's search adds the first match. The box gives up the keyboard on Enter before this
         # handler runs (it is called after the frame), so "active" is already false: deactivated this frame counts.
         if (app_data in (dpg.mvKey_Return, dpg.mvKey_NumPadEnter) and dpg.does_item_exist("graph_search")
@@ -3292,6 +3304,10 @@ class App(Features):
                 self._last_action = action
             fn()
 
+    def docked_tags(self):
+        """The windows of the frames in the dock now."""
+        return tuple(tag for slot, (tag, _, _, _) in device_ui.FRAMES.items() if self.docked(slot))
+
     def undo_target(self):
         """What Undo acts on: the frame with the keyboard (floating, or
         docked and last clicked in) - the shape, the sequence, the
@@ -3473,9 +3489,9 @@ class App(Features):
         if self._picker is not None and not dpg.does_item_exist(self._picker):
             self._picker = None
         if self.ui and self._picker is None:
-            shown = [t for t in ("graph_win", "edit_win", "net_win", "cube_win", "side_win")
+            shown = [t for t in ("graph_win", "edit_win", "net_win", "cube_win", "side_win") + self.docked_tags()
                      if dpg.does_item_exist(t) and dpg.is_item_shown(t)]
-            if self.focus not in shown:
+            if self.focus not in shown:                  # a docked frame clicked in keeps it (it was taken back each frame)
                 self.focus = shown[0] if shown else None
             if self.focus:
                 r = self._screen_rect(self.focus)
@@ -4316,7 +4332,7 @@ def service_command(app):
                 op = c["library"]
                 if op[0] == "previews": LU.generate_previews(app, op[1] if len(op) > 1 else None, op[2] if len(op) > 2 else None)
                 else: LU.refresh(app)
-            if "seq" in c:                              # test hook: ["add"] | ["update"] | ["load", i] | ["del", i] | ["play"] | ["stop"] | ["field", key, v]
+            if "seq" in c:                              # test hook: ["add"] | ["update"] | ["load", i] | ["del", i] | ["play", i?] | ["stop"] | ["field", key, v] | ["seek", t] | ["pause"] | ["dup", i] | ["move", i, j] | ["select", i]
                 from native import sequence_ui as SQ
                 op = c["seq"]
                 {"add": lambda: SQ.add_step(app), "update": lambda: SQ.update_step(app), "load": lambda: SQ.load_step(app, op[1]),
@@ -4325,7 +4341,9 @@ def service_command(app):
                  "wav_beats": lambda: SQ.beats_from_wav(app), "undo": lambda: SQ.undo(app), "redo": lambda: SQ.undo(app, True),
                  "ramp": lambda: SQ.set_ramp(app, op[1], op[2], op[3] if len(op) > 3 else None),   # [key, end, shape?]
                  "ramp_del": lambda: SQ.remove_ramp(app, op[1]),
-                 "del": lambda: SQ.del_step(app, op[1]), "play": lambda: SQ.play(app), "stop": lambda: SQ.stop(app),
+                 "del": lambda: SQ.del_step(app, op[1]), "play": lambda: SQ.play(app, *op[1:]), "stop": lambda: SQ.stop(app),
+                 "seek": lambda: SQ.seek(app, op[1]), "pause": lambda: SQ.play_pause(app), "dup": lambda: SQ.duplicate_step(app, op[1]),
+                 "move": lambda: SQ.move_to(app, op[1], op[2]), "select": lambda: SQ.select(app, op[1]),
                  "field": lambda: SQ.set_field(app, op[1], op[2])}[op[0]]()
             if "stream" in c:                           # test hook: a host to stream to over DDP, or false to stop
                 app.stream_start(c["stream"], 30) if c["stream"] else app.stream_stop()

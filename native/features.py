@@ -602,9 +602,20 @@ class Features:
     # the stream and the stats read the blended picture through here.
     def frame_rgb(self, eng=None):
         eng = eng or self.eng
-        tr = getattr(self, "_transition", None)
         if eng is not self.eng:
             return eng.rgb()
+        return self._seq_dim(self._frame_rgb_inner(eng))
+
+    def _seq_dim(self, rgb):
+        """The frame at a playing sequence's step brightness (WLED's presets set it: the sim shows what the device
+        will); as it is otherwise."""
+        bri = getattr(self, "_seq_bri", None)
+        if bri is None or bri >= 255:
+            return rgb
+        return (np.asarray(rgb, np.uint16) * int(max(0, bri)) // 255).astype(np.uint8)
+
+    def _frame_rgb_inner(self, eng):
+        tr = getattr(self, "_transition", None)
         if tr is None:
             return self._limited(eng.rgb())
         prog = (time.perf_counter() - tr["t0"]) / max(0.05, tr["dur"])

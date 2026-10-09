@@ -860,13 +860,22 @@ STEPS = [
     # a sequence: two steps from the sim, played, a step loaded back, one deleted
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},
       {"seq": ["field", "dur", 1.0]}, {"seq": ["play"]}], 3.0),
+    # the transport and the editing: the first step's look read as it played; a time sought, paused there; a copy
+    # made, moved to the top, deleted
+    ([{"check": "bool(app.project.options['sequence']['steps'][0].get('look'))"}, {"seq": ["seek", 10.5]}, {"seq": ["pause"]}], 0.6),
+    ([{"check": "app._seq_play['paused'] is not None and app._seq_play['i'] == 1"}, {"expect": ["seq_status", "paused at step 2"]},
+      {"seq": ["dup", 0]}, {"check": "len(app.project.options['sequence']['steps']) == 3"}, {"seq": ["move", 1, 0]},
+      {"check": "app.project.options['sequence']['steps'][0]['name'].endswith('(copy)')"}, {"seq": ["del", 0]},
+      {"check": "len(app.project.options['sequence']['steps']) == 2"}], 0.5),
     # the sequence and the schedule sent to the fake: presets, the playlist, the timers with their Off preset
     ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["ramp", "sx", 250]}, {"seq": ["ramp", "ix", 40, "up and back"]},
       {"check": "__import__('native.sequence', fromlist=['x']).ramp_of(app.project.options['sequence']['steps'][0], 'ix') == (40, 'up and back')"},
       {"seq": ["ramp_del", "ix"]}, {"check": "'ix' not in (app.project.options['sequence']['steps'][0].get('ramps') or {})"},
       {"seq": ["ramp", "ix", 40, "ease out"]},
       {"py": "__import__('native.sequence_ui', fromlist=['x']).send(app, run=True)"}], 22.0),
-    ([{"expect": ["seq_log", "saved on the device"]}, {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
+    ([{"expect": ["seq_log", "saved on the device"]}, {"expect": ["seq_sent", "as it is here"]},
+      {"seq": ["select", 0]}, {"seq": ["field", "trans", 1.5]}, {"expect": ["seq_sent", "changed since"]},
+      {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
       {"py": "__import__('native.sequence_ui', fromlist=['x']).send_timers(app)"}], 6.0),
     ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).read_timers(app)"}], 3.0),
     ([{"expect": ["seq_tlog", "read from the device"]}, {"seq": ["del", 1]}, {"seq": ["del", 0]}, {"seq": ["timer_del", 1]}, {"seq": ["timer_del", 0]},

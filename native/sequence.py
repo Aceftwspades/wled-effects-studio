@@ -20,10 +20,67 @@ import time
 import urllib.request
 
 
-def capture(eng, colours, bri=128, name="", dur=10.0, trans=0.7):
+def capture(eng, colours, bri=255, name="", dur=10.0, trans=0.7, rgb=None):
+    """A step: the engine's segments as they are now; `rgb`, the frame it shows (rows, cols, 3), gives it its look."""
     segs = eng.segments()
-    return {"name": name or (segs[0]["effect"] if segs else "step"), "dur": float(dur), "trans": float(trans),
-            "bri": int(bri), "colors": [int(c) for c in colours], "segments": segs, "cols": eng.cols, "rows": eng.rows}
+    st = {"name": name or (segs[0]["effect"] if segs else "step"), "dur": float(dur), "trans": float(trans),
+          "bri": int(bri), "colors": [int(c) for c in colours], "segments": segs, "cols": eng.cols, "rows": eng.rows}
+    if rgb is not None:
+        lk = look(rgb)
+        if lk:
+            st["look"] = lk
+    return st
+
+
+# --- a step's look: what it shows, as a strip of colours -------------------------------------------
+LOOK_N = 24                       # colours across a step's look
+
+
+def look(rgb, n=LOOK_N):
+    """The colours a frame shows - or a stack of frames over time, (T, rows, cols, 3) - left to right, as hex
+    ("rrggbb" n times): each of n bands across by the mean of its lit pixels' brighter part, so an effect's colours
+    rather than the black between them (a meteor's trail, a fire's flames). "" for nothing to read."""
+    import numpy as np
+    a = np.asarray(rgb, dtype=np.float32)
+    if a.ndim == 4:
+        a = a.reshape(-1, a.shape[2], 3)                   # the frames one above the other: the same bands over time
+    if a.ndim != 3 or a.shape[1] < 1:
+        return ""
+    cols = a.shape[1]
+    w = np.array([0.299, 0.587, 0.114], np.float32)
+    out = []
+    for k in range(n):
+        x0, x1 = k * cols // n, max(k * cols // n + 1, (k + 1) * cols // n)
+        px = a[:, x0:x1].reshape(-1, 3)
+        lum = px @ w
+        lit = px[lum > 12]                                 # the lit ones (a dark band stays dark)
+        if len(lit) == 0:
+            out.append("000000"); continue
+        llum = lit @ w
+        keep = lit[llum >= np.percentile(llum, 50)]
+        c = keep.mean(0)
+        out.append("%02x%02x%02x" % tuple(int(max(0, min(255, round(v)))) for v in c))
+    return "".join(out)
+
+
+def look_colours(step):
+    """A step's look as [(r, g, b)], or None when it has none yet."""
+    lk = str(step.get("look") or "")
+    if len(lk) < 6 or len(lk) % 6:
+        return None
+    try:
+        return [tuple(int(lk[i + j:i + j + 2], 16) for j in (0, 2, 4)) for i in range(0, len(lk), 6)]
+    except ValueError:
+        return None
+
+
+def fingerprint(S):
+    """What a send puts on the device, as a short hash: the steps (their looks aside) and the playlist's settings -
+    a send remembers it, and a change since shows as one."""
+    import hashlib
+    steps = [{k: v for k, v in st.items() if k != "look"} for st in S.get("steps") or []]
+    body = json.dumps([steps, S.get("base", 10), S.get("pid", 9), S.get("name", "Show"), S.get("repeat", 0)], sort_keys=True)
+    return hashlib.sha1(body.encode("utf-8")).hexdigest()[:12]
 
 
 def apply(eng, step):
@@ -83,6 +140,7 @@ def segment_json(k, sg, names, pals, is2d, colours):
 
 
 RAMP_KEYS = ("sx", "ix", "c1", "c2", "c3")
+BRI = "bri"                      # a ramp of the step's brightness (the whole show's, as WLED's presets set it)
 RAMP_SHAPES = ("linear", "ease in", "ease out", "ease in-out", "up and back", "step")
 
 
@@ -93,7 +151,9 @@ def ramp_key(seg, slider):
 
 
 def ramp_target(key):
-    """(segment, slider) a ramp's key names; (0, key) for a plain one."""
+    """(segment, slider) a ramp's key names; (0, key) for a plain one; (-1, "bri") for the brightness."""
+    if str(key) == BRI:
+        return -1, BRI
     if ":" in str(key):
         seg, slider = str(key).split(":", 1)
         try:
@@ -135,7 +195,10 @@ def ramp_value(step, key, t):
     step: from the step's value to the ramp's end, along the ramp's shape."""
     segs = step.get("segments") or []
     seg, slider = ramp_target(key)
-    start = int((segs[seg].get("params") or {}).get(slider, 128)) if seg < len(segs) else 128
+    if slider == BRI:
+        start = int(step.get("bri", 255))
+    else:
+        start = int((segs[seg].get("params") or {}).get(slider, 128)) if 0 <= seg < len(segs) else 128
     r = ramp_of(step, key)
     if r is None:
         return start
@@ -150,7 +213,7 @@ def sub_steps(step):
     playlist stays under its hundred entries."""
     segs = step.get("segments") or []
     ramps = {k: v for k, v in (step.get("ramps") or {}).items()
-             if ramp_target(k)[1] in RAMP_KEYS and ramp_target(k)[0] < len(segs)}
+             if k == BRI or (ramp_target(k)[1] in RAMP_KEYS and ramp_target(k)[0] < len(segs))}
     if not ramps or not segs:
         return [step]
     dur = float(step.get("dur", 10))
@@ -170,7 +233,10 @@ def sub_steps(step):
             q["trans"] = 0.0
         for k in ramps:
             seg, slider = ramp_target(k)
-            q["segments"][seg].setdefault("params", {})[slider] = ramp_value(step, k, t)
+            if slider == BRI:
+                q["bri"] = ramp_value(step, k, t)
+            else:
+                q["segments"][seg].setdefault("params", {})[slider] = ramp_value(step, k, t)
         q.pop("ramps", None)
         out.append(q)
     return out

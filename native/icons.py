@@ -149,6 +149,19 @@ def _pause(ic):
 def _step(ic):
     ic.rect(0.16, 0.16, 0.3, 0.84); ic.poly([(0.4, 0.16), (0.4, 0.84), (0.9, 0.5)])
 
+def _stop(ic):
+    ic.rect(0.22, 0.22, 0.78, 0.78)
+
+def _to_start(ic):
+    ic.rect(0.16, 0.18, 0.28, 0.82); ic.poly([(0.84, 0.18), (0.84, 0.82), (0.34, 0.5)])
+
+def _duplicate(ic):
+    ic.box(0.14, 0.14, 0.62, 0.62); ic.rect(0.38, 0.38, 0.88, 0.88); ic.cut(
+        (ic.x > 0.38 + W) & (ic.x < 0.88 - W) & (ic.y > 0.38 + W) & (ic.y < 0.88 - W)); ic.box(0.38, 0.38, 0.88, 0.88)
+
+def _loop(ic):
+    ic.arc((0.5, 0.5), 0.3, 200, 160, head="end")
+
 def _restart(ic):
     ic.arc((0.5, 0.52), 0.3, -50, 230, head="end")
 
@@ -474,6 +487,7 @@ ICONS = {
     "size_tl": _size_grip("tl"), "size_tr": _size_grip("tr"), "size_bl": _size_grip("bl"), "size_br": _size_grip("br"),
     "new": _new, "open": _open, "save": _save, "build": _build, "live": _live,
     "undo": _undo, "redo": _redo, "play": _play, "pause": _pause, "step": _step, "restart": _restart,
+    "stop": _stop, "to_start": _to_start, "duplicate": _duplicate, "loop": _loop,
     "net": _net, "cube": _cube, "both": _both, "code": _code, "graph": _graph,
     "zoom_in": _zoom_in, "zoom_out": _zoom_out, "frame_all": _frame_all,
     "camera": _camera, "record": _record, "trash": _trash, "arrange": _arrange, "fold": _fold,

@@ -926,42 +926,77 @@ Video node shows black there when it is flashed instead of streamed.
 
 Window > Sequence (Ctrl+Shift+Q). A **step** is what the sim
 shows when you add it - every segment's effect, sliders, palette, bounds,
-opacity and blend, the colours, the brightness - with a name, how long
-it is **held** and how long it **blends** in from the one before. "Update from the sim"
-recaptures it, "Load into the sim" puts it back to tweak; up /
-down reorder. The **timeline** under the list shows the steps as blocks
-along the time: click one to select it, drag the line between two to
-retime the one on the left; the faint lines are the bpm's bars, the
-ticks the beats found in the audio file, the wave the file itself (Play
-restarts the file with the sequence). **RAMP** moves one slider of a
-segment (each segment's sliders are listed, led by its number) over the step, from the step's value to the end value - in the
-sim as it plays; on the device as sub-steps in the playlist (a second
-apiece, up to twelve), since a preset cannot move a slider. **Play in
-the sim** runs the steps in turn, each change
-blended over its transition time in the style chosen (fade, swipes,
-pushes, outside-in, inside-out, circular, fairy dust - WLED's own; on the
-device the style is its blend-style setting). **Send presets + playlist**
-saves each step as a WLED preset (ids from "presets from", existing
-ones overwritten) and the sequence as a playlist preset with the
-durations and transitions - about a second a preset, since the device
-writes each one from its main loop and the next is only sent once it
-has; "Send and run it" starts it; "Save presets.json" writes the same
-for a device that is not on the network.
-Effects and palettes are matched by name against the device's own lists,
-and a step whose effect the device does not have is left out and named.
-**BEATS**: a bpm typed, tapped (Tap, on the beat), taken from the synth,
-or found in the audio file playing as live audio (the file's: the tempo
-and the beats themselves, from the loudness rising - rough the way tapping is),
-and "Snap durations to bars" rounds every step to whole bars of it, so
-the sequence changes on the music. **Render GIF** and **Render video**
-play the sequence once and record it into `captures/` - a GIF, or an
-mp4 (which needs ffmpeg on the path). The toolbar's record button and
-File > Record 15 s GIF / video do the same for whatever the sim shows.
-**SCHEDULE** under it is the device's timers: "+ run the playlist at"
-and "+ off at" add a row - a time of day, or sunrise / sunset with an
-offset in minutes, a preset, the days - "Send the schedule" writes them
-to the device (and saves an "Off" preset, id 250, for the
-off rows); "Read the device's" shows what it has.
+opacity and blend, the colours - with a name, how long it is **held**,
+how long it **blends** in from the one before, and a **brightness**.
+**+ Add from the sim** puts a new step after the selected one. Each
+step keeps a **look**: the colours its effect showed over the second and
+a half after it was added, a strip of them - its swatch in the list and
+the fill of its block on the timeline, so a fire step reads as fire. (A
+step made before looks gets one the first time it is shown.)
+
+The **transport** at the top: from the top, play from the selected step
+(Space with the frame's keyboard) - playing, the same button pauses and
+goes on - stop, and **loop** (round again after the last step; the
+device's playlist repeats too). The clock says where the show is.
+
+The **timeline**: the steps as blocks along the time, names and lengths
+on them, the blend into each a wedge of the colour before it, each
+ramp's curve across its lower half (the brightness's in gold); the
+ruler along the top with the time, or the bars numbered when a tempo is
+set; the beats found in an audio file as ticks along the bottom, the
+file's wave faint behind. Click the ruler to go to that time (hold and
+drag to scrub): the sim shows that moment, paused there until you play.
+Click a step to select it, double-click to show it in the sim, drag it
+to move it, drag the line after it to make it longer or shorter - on
+the beats when a tempo is set (Alt: anywhere) - and drag the small
+handle at the bottom of its blend to set the blend. Right-click a step
+for Play from here, Show it in the sim, Update from the sim, Add from
+the sim after it, Duplicate, Delete. The step playing is underlined.
+
+The **list** has a row a step: its swatch, name, effect, length (and
+bars, with a tempo), and buttons to duplicate or delete it. Drag a row
+by its name onto another to move it. With the frame's keyboard, Delete
+removes the selected step and Ctrl+D duplicates it; Ctrl+Z undoes.
+
+The selected step's card: Update from the sim (what the sim shows now,
+its own settings kept), Load into the sim, Duplicate, Delete; its name,
+held (in seconds, and in bars with a tempo), blend, **brightness** (its
+preset sets the device's; the sim shows it while the sequence plays).
+**RAMPS**: any slider of any segment - or the brightness - moving over
+the step from its value to an end value, in a shape (straight, eased,
+up and back, a jump half way); add one from "+ a ramp...", a row each.
+In the sim they move as it plays; on the device they become sub-steps
+in the playlist (about a second apiece, up to twelve), since a preset
+cannot move a slider.
+
+**BEATS**: the tempo the show is laid on - typed, tapped (Tap, on the
+beat), the synth's, or found in the audio file playing as live audio
+(the file's: the tempo and the beats themselves, from the loudness
+rising - rough the way tapping is), kept with the sequence. "Snap
+lengths to bars" rounds every step to whole bars; "drags on the beats"
+lands a dragged length on a beat. Transitions blend in the style chosen
+(fade, swipes, pushes, outside-in, inside-out, circular, fairy dust -
+WLED's own; on the device the style is its blend-style setting). **Render
+GIF** and **Render video** play the sequence once from the top and record
+it into `captures/` - a GIF, or an mp4 (which needs ffmpeg on the path).
+
+**ON THE DEVICE**: "Send and run it" saves each step as a WLED preset
+(ids from "presets from", existing ones overwritten) and the sequence as
+a playlist preset with the lengths and blends, then starts it - about a
+second a preset, since the device writes each one from its main loop
+and the next is only sent once it has; "Send presets + playlist" only
+saves them; "Save presets.json" writes the same for a device that is not
+on the network. Effects and palettes are matched by name against the
+device's own lists, and a step whose effect the device does not have is
+left out and named. The line under the buttons says whether the device
+has the show as it is here, or it has changed since it was sent there.
+
+**SCHEDULE** (folded away; its header says how many timers) is the
+device's timers: "+ run the playlist at" and "+ off at" add a row - a
+time of day, or sunrise / sunset with an offset in minutes, a preset,
+the days - "Send the schedule" writes them to the device (and saves an
+"Off" preset, id 250, for the off rows); "Read the device's" shows what
+it has.
 
 ## Getting it onto the cube
 
@@ -1517,7 +1552,7 @@ Every button, with what its tooltip says.
 
 **Shape frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Add part...` — a strip, a ring, a tree, a star... picked from pictures, its sizes asked first; it joins the end of the selected part (or goes beside it); `Draw a run` — click corners in the 3-D view and a strip is laid along them, an LED every spacing; double-click or Enter ends it, Backspace takes the last corner back, Esc leaves it; `File...` — open or save a shape; import a model, an xLights model or layout, a point list; a reference mesh; export an xLights model or the positions; a preview; `Undo`; `Redo`; `show me`; `the way its LEDs run along it` — the way its LEDs run along it: click to turn its wiring round; `shown` — shown: click to hide it while you build (it stays LEDs on the device); `click to lock it` — click to lock it: the view's clicks, handles and keys pass it by; `x` — delete the part (Undo brings it back); `delete the last`; `renumber: nearest chain from the first`; `turn into a path`; `X`; `Y`; `Z`; `+X`; `-X`; `+Y`; `-Y`; `+Z`; `-Z`; `aim outward`; `turn only`; `aim at the origin`; `from its place` — the direction and distance the part is at now, into the fields; `first`; `earlier`; `later`; `last`; `light it` — the wiring test lighting this part: in the sim, and on the device while the sim is streamed to it; `Generate a preview` — a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here; `Open the folder`
 
-**Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ Add from the sim` — a new step: what the sim shows now - effect, sliders, palette, colours, segments; `Update from the sim` — the selected step becomes what the sim shows now; `Load into the sim` — the sim shows the selected step; `Add what the sim shows`; `x` — this slider's ramp off (the others stay); `Play in the sim`; `Stop`; `Render GIF` — plays the sequence once and records it as a GIF, into captures/; `Render video` — plays the sequence once and records it as an mp4, into captures/ - needs ffmpeg on the path; `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap durations to bars` — every step's seconds rounded to whole bars, so the sequence changes on the music; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Send and run it`; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
+**Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `play from the top`; `play from the selected step` — play from the selected step (Space while the frame has the keyboard); playing, it pauses and goes on; `stop` — stop: the sim goes back to running on its own; `+ Add from the sim` — a new step after the selected one: what the sim shows now - effect, sliders, palette, colours, segments; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `Add what the sim shows`; `Update from the sim` — the selected step becomes what the sim shows now (its name, length, blend and ramps kept); `Load into the sim` — the sim shows the selected step (double-click it on the timeline does the same); `Duplicate` — a copy of the selected step, after it (Ctrl+D); `Delete` — the selected step away (Delete); undo brings it back; `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap lengths to bars` — every step's length rounded to whole bars, so the sequence changes on the music; `Render GIF` — plays the sequence once from the top and records it as a GIF, into captures/; `Render video` — plays the sequence once from the top and records it as an mp4, into captures/ - needs ffmpeg on the path; `Send and run it`; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 
 **Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `making...`; `not built yet`
 

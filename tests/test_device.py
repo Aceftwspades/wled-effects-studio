@@ -153,6 +153,36 @@ def test_ramps_become_sub_presets():
     assert sequence.ramp_key(1, "sx") == "1:sx" and sequence.ramp_key(0, "sx") == "sx" and sequence.ramp_target("sx") == (0, "sx")
 
 
+def test_brightness_ramps_looks_and_the_fingerprint():
+    """A ramp of the brightness: the device's sub-presets carry it, the slider stays; a step's look: a strip of the
+    colours a frame - or frames over time - shows, the lit part of each band (a dark band dark); the fingerprint of
+    what a send puts on the device: the same for the same show, a look aside, changed by a change."""
+    import numpy as np
+    st = {"name": "dim", "dur": 4.0, "rows": 48, "colors": [0, 0, 0], "bri": 200, "ramps": {"bri": {"end": 20, "shape": "linear"}},
+          "segments": [{"effect": "Rainbow", "params": {"sx": 99}, "bounds": [0, 0, 48, 48]}]}
+    presets, playlist = sequence.to_wled([st], EFFECTS, [], base=40, pid=39)
+    ids = sorted(k for k in presets if k is not None)
+    assert [presets[k]["bri"] for k in ids] == [200, 140, 80, 20]
+    assert all(presets[k]["seg"][0]["sx"] == 99 for k in ids)
+    assert sequence.ramp_target("bri") == (-1, "bri") and sequence.ramp_value(st, "bri", 0.5) == 110
+    # a look: red on the left, a sparse green on the right, black between
+    f = np.zeros((10, 40, 3), np.uint8)
+    f[:, :10] = (250, 0, 0)
+    f[::5, 30:] = (0, 200, 0)                                  # a few lit pixels in a dark band: their colour, not the black
+    lk = sequence.look(f, n=4)
+    cols = sequence.look_colours({"look": lk})
+    assert cols[0] == (250, 0, 0) and cols[1] == (0, 0, 0) and cols[3] == (0, 200, 0), cols
+    stack = np.stack([f, np.zeros_like(f)])                    # over time: a black frame does not wash it out
+    assert sequence.look_colours({"look": sequence.look(stack, n=4)})[0] == (250, 0, 0)
+    assert sequence.look_colours({"look": "zz"}) is None and sequence.look_colours({}) is None
+    S = {"steps": [st], "base": 10, "pid": 9, "name": "Show", "repeat": 0}
+    fp = sequence.fingerprint(S)
+    st["look"] = lk
+    assert sequence.fingerprint(S) == fp                       # a look is not what the device holds
+    st["dur"] = 5.0
+    assert sequence.fingerprint(S) != fp
+
+
 def test_push_every_segment():
     """What the sim shows becomes the device's: every segment with its bounds, effect, sliders, palette and own
     colours, the device's extra segments dropped; one segment over the whole picture spans the device's whole matrix."""

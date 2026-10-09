@@ -3394,6 +3394,41 @@ LedFx have added that matters here, in the order it helps most.
       timing-sensitive at 1280 x 720 (a different check now and then).
       Released as 1.12.0 (the tag moved once before its release was made: its
       first run's Windows pointer test failed on the above).
+- [x] **The sequencer, made over** (2026-10-09, `sequence_ui.py`, `sequence.py`):
+      - looks: each step keeps the colours its effect showed over 1.5 s after it
+        was added (`sequence.look`: each band's lit pixels, over the frames) -
+        its swatch in the list and the fill of its block; a step without one
+        gets it the first time it is shown; saved without an undo step;
+      - a transport (from the top, play from the selected step / pause / go
+        on, stop, loop, the clock); playing no longer moves the selection;
+      - the timeline 104 px tall: blocks in their looks, names and lengths
+        fitted ("..."), the blend as a wedge with a handle, the ramps' curves
+        in the lower half, a ruler with the time or the bars numbered, the
+        playhead; click the ruler to go to a time (held there when stopped),
+        drag a step's end (on the beats; Alt: free), its blend, the step
+        itself to move it; double-click shows it, right-click a menu;
+      - the list in columns (swatch, name fitted to its column, effect,
+        length and bars, duplicate / delete), rows dragged to move them;
+        added steps go after the selected one; Duplicate; Space, Delete,
+        Ctrl+D with the frame's keyboard;
+      - the step's brightness: it was always 128 (`app.bri` never set), so
+        every preset sent dimmed the device to half - new steps are 255, the
+        field edits it, the sim shows it while the sequence plays
+        (`Features._seq_dim`), and it ramps like a slider (key "bri");
+      - every ramp listed, a row each, added from a picker;
+      - the tempo kept with the sequence, lengths in bars beside seconds;
+      - "on the device as it is here" / "changed since it was sent"
+        (`sequence.fingerprint`, a look aside);
+      - the schedule folds away, its header counting the timers.
+      Found on the way: a click in a docked frame never gave it the keyboard -
+      "hovered" is false over its child windows, and the glow's poll took the
+      focus back to a pane every frame - so Ctrl+Z in a docked Sequence,
+      Shape or Palettes frame went to the graph. Docked frames are hit by
+      their rectangle and keep the focus. Tested: test_device.py (brightness
+      ramps, looks, the fingerprint), the smoke (seek, pause, duplicate, move,
+      the sent marker), and 17 interactions through posted mouse and keys
+      (the ruler, Space, the end and blend drags, moving a step, a
+      double-click, the menu, dragging a row, Delete, undo).
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
