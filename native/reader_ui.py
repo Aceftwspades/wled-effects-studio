@@ -27,6 +27,9 @@ SIZES = {"body": ("body", 16), "b": ("bold", 16), "h1": ("bold", 28), "h2": ("bo
 _fonts = {}
 
 
+TOC_W = 240                      # the contents column's width at the interface size
+
+
 def _c():
     from native import chrome
     return chrome
@@ -121,7 +124,7 @@ def build(app):
             dpg.add_button(label="Back to my project", tag="reader_tut_back", callback=lambda: _tut("back", app))
             c.tip("your own project again, with the graph you had open; the tutorial is left as it is")
         with dpg.group(horizontal=True):
-            with dpg.child_window(tag="reader_toc", width=px(240), height=-1, border=True):
+            with dpg.child_window(tag="reader_toc", width=px(TOC_W), height=-1, border=True):
                 pass
             with dpg.child_window(tag="reader_body", width=-1, height=-1, border=False):
                 pass
@@ -382,8 +385,13 @@ def render(app, name):
     dpg.add_spacer(height=px(200), parent=B)                     # the last heading can come to the top too
     # the contents: every heading down to the third level
     for k, level, text in reader.headings(S.blocks):
-        sel = dpg.add_selectable(label=("   " * max(0, level - 1)) + text, parent="reader_toc", width=px(220), user_data=k,
+        # the pane's width, scrollbar or not; a title too long for it ends in "...", the whole of it on hover
+        full = ("   " * max(0, level - 1)) + text
+        shown = _c()._fit_text(full, px(TOC_W - 30))
+        sel = dpg.add_selectable(label=shown, parent="reader_toc", user_data=k,
                                  callback=lambda s, a, u: (_remember(), _refresh_back(), scroll_to(u)))
+        if shown != full:
+            _c().tip(text, item=sel)
         S.toc.append((k, sel))
 
 

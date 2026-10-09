@@ -73,7 +73,7 @@
    "type": "Coords",
    "pos": [
     270,
-    300
+    458
    ],
    "params": {},
    "inputs": {}
@@ -83,7 +83,7 @@
    "type": "Remap",
    "pos": [
     270,
-    430
+    690
    ],
    "params": {
     "in_lo": 0.0,
@@ -98,7 +98,7 @@
    "type": "Remap",
    "pos": [
     270,
-    560
+    899
    ],
    "params": {
     "in_lo": 0.0,
@@ -123,7 +123,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    249
    ],
    "params": {
     "in_lo": 0.0,
@@ -226,7 +226,7 @@
    "type": "Multiply",
    "pos": [
     730,
-    430
+    557
    ],
    "params": {},
    "inputs": {}
@@ -291,7 +291,7 @@
    "type": "Add",
    "pos": [
     1880,
-    430
+    455
    ],
    "params": {},
    "inputs": {}

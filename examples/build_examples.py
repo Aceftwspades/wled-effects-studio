@@ -39,6 +39,7 @@ class GB:
     def save(self, fname):
         os.makedirs(OUT, exist_ok=True)
         G.migrate(self.g)          # builders written against the float pins get the vector ones
+        self.g.space_out()         # a grid row is shorter than a node with a curve under it: none runs into the next
         G.save(self.g, os.path.join(OUT, fname))
         return self.g
 

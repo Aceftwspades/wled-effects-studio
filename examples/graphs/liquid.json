@@ -122,7 +122,7 @@
    "type": "Position",
    "pos": [
     270,
-    820
+    1288
    ],
    "params": {},
    "inputs": {}
@@ -132,7 +132,7 @@
    "type": "Remap",
    "pos": [
     270,
-    430
+    667
    ],
    "params": {
     "in_lo": 0.0,
@@ -147,7 +147,7 @@
    "type": "Select",
    "pos": [
     270,
-    950
+    1466
    ],
    "params": {},
    "inputs": {
@@ -169,7 +169,7 @@
    "type": "Random hold",
    "pos": [
     500,
-    1080
+    1101
    ],
    "params": {},
    "inputs": {}
@@ -179,7 +179,7 @@
    "type": "Remap",
    "pos": [
     730,
-    1080
+    1101
    ],
    "params": {
     "in_lo": 0.0,
@@ -231,7 +231,7 @@
    "type": "Spring",
    "pos": [
     1190,
-    950
+    1086
    ],
    "params": {
     "hz": 1.1,
@@ -276,7 +276,7 @@
    "type": "Remap",
    "pos": [
     270,
-    300
+    458
    ],
    "params": {
     "in_lo": 0.0,
@@ -291,7 +291,7 @@
    "type": "Envelope",
    "pos": [
     270,
-    690
+    1085
    ],
    "params": {
     "attack": 30.0,
@@ -365,7 +365,7 @@
    "type": "Remap",
    "pos": [
     270,
-    560
+    876
    ],
    "params": {
     "in_lo": 0.0,
@@ -380,7 +380,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    170
+    243
    ],
    "params": {},
    "inputs": {
@@ -412,7 +412,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    300
+    394
    ],
    "params": {},
    "inputs": {
@@ -424,7 +424,7 @@
    "type": "Subtract",
    "pos": [
     730,
-    300
+    321
    ],
    "params": {},
    "inputs": {}
@@ -434,7 +434,7 @@
    "type": "Sine",
    "pos": [
     960,
-    300
+    325
    ],
    "params": {},
    "inputs": {}
@@ -484,7 +484,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    249
    ],
    "params": {
     "in_lo": 0.0,
@@ -549,7 +549,7 @@
    "type": "Remap",
    "pos": [
     2800,
-    950
+    1029
    ],
    "params": {
     "in_lo": 0.0,
@@ -629,7 +629,7 @@
    "type": "Colour",
    "pos": [
     3030,
-    690
+    742
    ],
    "params": {
     "rgb": [
@@ -677,7 +677,7 @@
    "type": "Vector",
    "pos": [
     1230,
-    950
+    1343
    ],
    "params": {},
    "inputs": {
@@ -699,7 +699,7 @@
    "type": "Vector",
    "pos": [
     1230,
-    770
+    908
    ],
    "params": {},
    "inputs": {

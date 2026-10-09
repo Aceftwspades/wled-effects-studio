@@ -94,7 +94,7 @@
    "type": "Effect settings",
    "pos": [
     40,
-    950
+    1077
    ],
    "params": {
     "palette": 12,
@@ -109,7 +109,7 @@
    "type": "Position",
    "pos": [
     270,
-    820
+    1178
    ],
    "params": {},
    "inputs": {}
@@ -143,7 +143,7 @@
    "type": "Multiply",
    "pos": [
     270,
-    170
+    191
    ],
    "params": {},
    "inputs": {
@@ -155,7 +155,7 @@
    "type": "Integrate",
    "pos": [
     500,
-    170
+    243
    ],
    "params": {
     "wrap": 1.0
@@ -167,7 +167,7 @@
    "type": "Rotate",
    "pos": [
     500,
-    820
+    1102
    ],
    "params": {},
    "inputs": {}
@@ -187,7 +187,7 @@
    "type": "Select",
    "pos": [
     960,
-    690
+    753
    ],
    "params": {},
    "inputs": {}
@@ -197,7 +197,7 @@
    "type": "Select",
    "pos": [
     960,
-    820
+    931
    ],
    "params": {},
    "inputs": {}
@@ -207,7 +207,7 @@
    "type": "Select",
    "pos": [
     960,
-    950
+    1109
    ],
    "params": {},
    "inputs": {}
@@ -217,7 +217,7 @@
    "type": "Remap",
    "pos": [
     270,
-    300
+    342
    ],
    "params": {
     "in_lo": 0.0,
@@ -232,7 +232,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    300
+    446
    ],
    "params": {},
    "inputs": {
@@ -266,7 +266,7 @@
    "type": "Remap",
    "pos": [
     270,
-    430
+    551
    ],
    "params": {
     "in_lo": 0.0,
@@ -281,7 +281,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    430
+    597
    ],
    "params": {},
    "inputs": {
@@ -293,7 +293,7 @@
    "type": "Add",
    "pos": [
     730,
-    430
+    451
    ],
    "params": {},
    "inputs": {
@@ -305,7 +305,7 @@
    "type": "Multiply",
    "pos": [
     960,
-    430
+    451
    ],
    "params": {},
    "inputs": {}
@@ -315,7 +315,7 @@
    "type": "Remap",
    "pos": [
     270,
-    560
+    760
    ],
    "params": {
     "in_lo": 0.0,
@@ -330,7 +330,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    560
+    748
    ],
    "params": {},
    "inputs": {
@@ -342,7 +342,7 @@
    "type": "Add",
    "pos": [
     730,
-    560
+    602
    ],
    "params": {},
    "inputs": {
@@ -354,7 +354,7 @@
    "type": "Multiply",
    "pos": [
     960,
-    560
+    602
    ],
    "params": {},
    "inputs": {}
@@ -374,7 +374,7 @@
    "type": "Multiply",
    "pos": [
     1190,
-    820
+    841
    ],
    "params": {},
    "inputs": {}
@@ -384,7 +384,7 @@
    "type": "Multiply",
    "pos": [
     1190,
-    950
+    992
    ],
    "params": {},
    "inputs": {}
@@ -394,7 +394,7 @@
    "type": "Remap",
    "pos": [
     270,
-    690
+    969
    ],
    "params": {
     "in_lo": 0.0,
@@ -409,7 +409,7 @@
    "type": "Integrate",
    "pos": [
     500,
-    690
+    899
    ],
    "params": {
     "wrap": 1.0
@@ -488,7 +488,7 @@
    "type": "Add",
    "pos": [
     1420,
-    820
+    841
    ],
    "params": {},
    "inputs": {}
@@ -498,7 +498,7 @@
    "type": "Sine",
    "pos": [
     1650,
-    820
+    845
    ],
    "params": {},
    "inputs": {}
@@ -508,7 +508,7 @@
    "type": "Multiply",
    "pos": [
     1880,
-    820
+    841
    ],
    "params": {},
    "inputs": {
@@ -520,7 +520,7 @@
    "type": "Add",
    "pos": [
     2110,
-    820
+    841
    ],
    "params": {},
    "inputs": {}
@@ -530,7 +530,7 @@
    "type": "Sine",
    "pos": [
     2340,
-    820
+    845
    ],
    "params": {},
    "inputs": {}
@@ -540,7 +540,7 @@
    "type": "Remap",
    "pos": [
     2570,
-    820
+    899
    ],
    "params": {
     "in_lo": -1.0,
@@ -555,7 +555,7 @@
    "type": "Add",
    "pos": [
     1420,
-    950
+    992
    ],
    "params": {},
    "inputs": {}
@@ -565,7 +565,7 @@
    "type": "Sine",
    "pos": [
     1650,
-    950
+    1000
    ],
    "params": {},
    "inputs": {}
@@ -575,7 +575,7 @@
    "type": "Multiply",
    "pos": [
     1880,
-    950
+    992
    ],
    "params": {},
    "inputs": {
@@ -587,7 +587,7 @@
    "type": "Add",
    "pos": [
     2110,
-    950
+    992
    ],
    "params": {},
    "inputs": {}
@@ -597,7 +597,7 @@
    "type": "Sine",
    "pos": [
     2340,
-    950
+    1000
    ],
    "params": {},
    "inputs": {}
@@ -607,7 +607,7 @@
    "type": "Remap",
    "pos": [
     2570,
-    950
+    1108
    ],
    "params": {
     "in_lo": -1.0,
@@ -646,7 +646,7 @@
    "type": "Multiply",
    "pos": [
     2800,
-    1080
+    1101
    ],
    "params": {},
    "inputs": {
@@ -668,7 +668,7 @@
    "type": "Add",
    "pos": [
     3030,
-    820
+    841
    ],
    "params": {},
    "inputs": {}
@@ -678,7 +678,7 @@
    "type": "Integrate",
    "pos": [
     3030,
-    950
+    992
    ],
    "params": {
     "wrap": 1.0
@@ -712,7 +712,7 @@
    "type": "Envelope",
    "pos": [
     270,
-    950
+    1356
    ],
    "params": {
     "attack": 30.0,
@@ -725,7 +725,7 @@
    "type": "Remap",
    "pos": [
     500,
-    950
+    1307
    ],
    "params": {
     "in_lo": 0.0,
@@ -750,7 +750,7 @@
    "type": "Add",
    "pos": [
     960,
-    1080
+    1287
    ],
    "params": {},
    "inputs": {

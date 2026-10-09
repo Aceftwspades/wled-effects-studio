@@ -5317,6 +5317,26 @@ class GraphPanel(Glyphs):
         self.rebuild()
         self.status("arranged")
 
+    def space_out(self):
+        """The nodes that run into the one above them in their column pushed down (the selection's, or all), the
+        layout otherwise kept - a graph laid out before its nodes grew a curve or a meter under their fields."""
+        if not self.graph:
+            return
+        sel = self._selected()
+        self.snapshot(); self._sync_pos()
+        heights, widths = {}, {}
+        if not self.overview():                       # stand-ins are smaller than the nodes: the model's sizes then
+            for nid in self.graph.nodes:
+                st = dpg.get_item_state(f"gnode_{nid}") if dpg.does_item_exist(f"gnode_{nid}") else {}
+                if st.get("rect_size") and st["rect_size"][0] > 0:
+                    widths[nid], heights[nid] = st["rect_size"][0] / self.zoom, st["rect_size"][1] / self.zoom
+        moved = self.graph.space_out(heights, widths, only=set(sel) if len(sel) >= 2 else None)
+        if moved:
+            self.rebuild()
+            self.status(f"spaced out: {len(moved)} node(s) moved down, clear of the one above")
+        else:
+            self.status("no node runs into another")
+
     def align(self, how):
         """The selected nodes on one edge or one centre line: left, right,
         top, bottom, centre_x, centre_y."""
@@ -5461,7 +5481,7 @@ class GraphPanel(Glyphs):
                         dpg.add_selectable(label=lbl, user_data=n,
                                            callback=lambda s, a, u: self.add_node_at_menu(u))
             if hidden:
-                dpg.add_text(f"{hidden} node(s) hidden: their feature is off in Flash > Features", color=DIM, wrap=px(220))
+                dpg.add_text(f"{hidden} node(s) hidden: their feature is off in Flash > Features", color=DIM, wrap=0)
         self._widgets.add("graph_search")
         self._desc_hint()
 

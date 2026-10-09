@@ -375,7 +375,10 @@ def refresh(app):
                     else:
                         words = ("making..." if tkey and tkey not in app._lib_thumbs and (key or _script_key(fn) in getattr(app, "_lib_scriptable", ()))
                                  else "not built\nyet" if fn and not key else "no picture")
-                        dpg.add_button(label=words, width=TILE, height=TILE, user_data=ud, callback=lambda s, a, u: open_tile(app, *u))
+                        # the size an image button comes to with its frame padding round the picture (7 by 4): a
+                        # tile without a picture as big as one with, the names under them in line
+                        dpg.add_button(label=words, width=TILE + 2 * px(7), height=TILE + 2 * px(4), user_data=ud,
+                                       callback=lambda s, a, u: open_tile(app, *u))
                     short = name.replace("Ace 3-D ", "")
                     dpg.add_text(short[:14], color=c.TEXT)
                     if tags:

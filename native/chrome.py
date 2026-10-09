@@ -160,7 +160,7 @@ def build_menus(app):
                 _mi(app, "Everything wired to it", "select_linked", callback=lambda: app.gp.select_linked("both"))
             dpg.add_separator()
             _mi(app, "Command palette...", "palette", callback=lambda: show_palette(app))
-            tip("every action and menu command by name: type a few letters, Enter runs the first")
+            tip("every action and menu command by name: type a few letters, Up / Down choose, Enter runs it")
             dpg.add_separator()
             _mi(app, "Find / replace in code", "find", callback=lambda: app.focus_find())
             _mi(app, "Open code in external editor", "external", callback=lambda: app.open_external())
@@ -283,6 +283,7 @@ def build_menus(app):
                 _mi(app, "Mute (pass through)", "mute", callback=lambda: app.gp.toggle_selected("muted"))
             with dpg.menu(label="Arrange"):
                 _mi(app, "Arrange (the selection, or all)", "arrange", callback=lambda: app.gp.arrange())
+                _mi(app, "Space out overlapping nodes", "space_out", callback=lambda: app.gp.space_out())
                 _mi(app, "Frame the selection", "frame_sel", callback=lambda: app.gp.frame_selection())
                 dpg.add_separator()
                 _mi(app, "Align left edges", "align_left", callback=lambda: app.gp.align("left"))
@@ -571,10 +572,11 @@ def light_frames(app):
 
 # --- dialogs ------------------------------------------------------------------------
 def build_dialogs(app):
-    with dpg.window(tag="name_dialog", label="Name", no_title_bar=True, modal=True, show=False, no_resize=True, width=px(360), height=px(118), no_collapse=True):
+    # sized to what it holds: a question's prompt can be one word or a paragraph (the device speed factor's)
+    with dpg.window(tag="name_dialog", label="Name", no_title_bar=True, modal=True, show=False, no_resize=True, autosize=True, no_collapse=True):
         dialog_header("name_dialog", "Name")                 # one window style (C8): the frames' header
-        dpg.add_text("", tag="name_prompt", color=DIM)
-        dpg.add_input_text(tag="name_input", width=-1, on_enter=True, callback=lambda: _name_ok(app))
+        dpg.add_text("", tag="name_prompt", color=DIM, wrap=px(380))
+        dpg.add_input_text(tag="name_input", width=px(380), on_enter=True, callback=lambda: _name_ok(app))
         with dpg.group(horizontal=True):
             weight.primary(dpg.add_button(label="OK", width=px(80), callback=lambda: _name_ok(app)))
             weight.quiet(dpg.add_button(label="Cancel", width=px(80), callback=lambda: dpg.hide_item("name_dialog")))
@@ -658,7 +660,7 @@ def build_dialogs(app):
                      "the sim runs are WLED's own, compiled from its sources; the firmware side lives in the fork.",
                      color=DIM, wrap=px(570))
         dpg.add_spacer(height=px(6))
-        typeface.mono(dpg.add_text("", tag="about_paths", color=DIM))
+        typeface.mono(dpg.add_text("", tag="about_paths", color=DIM, wrap=px(570)))     # a long install path wraps
     # UPDATE: what the check found, and the way to get it in
     with dpg.window(tag="update_win", label="Update", no_title_bar=True, show=False, width=px(560), height=px(360), no_collapse=True):
         dialog_header("update_win", "Update")                 # one window style (C8): the frames' header
@@ -776,10 +778,10 @@ def build_dialogs(app):
         tip("this version back in place of what is there now (which is kept first, as any restore keeps it)")
         with dpg.child_window(tag="history_diff_rows", height=-1, border=True):
             pass
-    # the command palette: every action and menu command by name, Enter runs the first hit
-    with dpg.window(tag="palette_win", show=False, no_title_bar=True, no_resize=True, no_move=True, width=px(460), height=px(380),
+    # the command palette: every action and menu command by name, Up / Down choose, Enter runs the chosen one
+    with dpg.window(tag="palette_win", show=False, no_title_bar=True, no_resize=True, no_move=True, width=px(PALETTE_W), height=px(380),
                     no_collapse=True):
-        dpg.add_input_text(tag="palette_text", hint="type an action (Esc closes)", width=px(440),
+        dpg.add_input_text(tag="palette_text", hint="type an action (Up / Down choose, Enter runs, Esc closes)", width=-1,
                            callback=lambda s, v: _palette_fill(app, v))
         with dpg.child_window(tag="palette_rows", height=-1, border=False):
             pass
@@ -797,7 +799,7 @@ def ask(app, title, prompt, default, cb):
     dpg.set_value("name_prompt", prompt)
     dpg.set_value("name_input", default or "")
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
-    dpg.configure_item("name_dialog", pos=(max(0, vw // 2 - 180), max(0, vh // 3)))
+    dpg.configure_item("name_dialog", pos=(max(0, vw // 2 - px(198)), max(0, vh // 3)))     # half its width (the box, its padding)
     dpg.show_item("name_dialog")
     dpg.focus_item("name_input")
 
@@ -1486,10 +1488,14 @@ def show_history(app, which=None):
     dpg.show_item("history_win")
 
 
+PALETTE_W = 560                   # the command palette's width at the interface size: its longest names and their keys
+PALETTE_KEY_W = 120               # the key column
+
+
 def show_palette(app):
     dpg.set_value("palette_text", "")
     _palette_fill(app, "")
-    _centre("palette_win", 460, 380)
+    _centre("palette_win", PALETTE_W, 380)
     dpg.show_item("palette_win")
     dpg.focus_item("palette_text")
 
@@ -1563,27 +1569,85 @@ def _palette_fill(app, text):
             app.run_action(u[1])
         elif dpg.does_item_exist(u[1]):
             run_menu_item(u[1])
+    # the names in a column that leaves the keys theirs: one too long ends in "...", the whole of it on hover
+    # (clipped at the key column, "else everyt F" read as one word)
+    col = px(PALETTE_W - PALETTE_KEY_W - 34)
     for _, label, what in rows[:60]:
         with dpg.group(horizontal=True, parent="palette_rows"):
-            dpg.add_selectable(label=label, width=px(330), user_data=what, callback=lambda s, a, u: go(u))
+            shown = _fit_text(label, col)
+            sel = dpg.add_selectable(label=shown, width=col, user_data=what, callback=lambda s, a, u: go(u))
+            if shown != label:
+                tip(label, item=sel)
             if what[0] == "action":
                 typeface.small(dpg.add_text(app.keys.label(what[1]), color=DIM))
+    app._pal_sel = 0
+    _palette_mark(app)
     if not rows:
         dpg.add_text("no action or menu command matches", parent="palette_rows", color=DIM)
 
 
-def palette_enter(app):
-    """Enter in the palette runs the first row."""
+def _fit_text(text, width):
+    """text shortened with "..." to fit `width` pixels in the current font (as it is, when it fits)."""
+    try:
+        if dpg.get_text_size(text)[0] <= width:
+            return text
+    except Exception:
+        return text                                     # before the first frame there is no font to measure with
+    lo, hi = 0, len(text)
+    while lo < hi:                                      # the longest start that fits with the dots
+        mid = (lo + hi + 1) // 2
+        if dpg.get_text_size(text[:mid].rstrip() + "...")[0] <= width:
+            lo = mid
+        else:
+            hi = mid - 1
+    return text[:lo].rstrip() + "..."
+
+
+def _palette_rows():
+    """The palette's selectable rows, in order."""
+    out = []
     for k in dpg.get_item_children("palette_rows", 1) or []:
         kids = dpg.get_item_children(k, 1) or []
-        u = dpg.get_item_user_data(kids[0]) if kids else None
-        if u:
-            dpg.hide_item("palette_win")
-            if u[0] == "action":
-                app.run_action(u[1])
-            elif dpg.does_item_exist(u[1]):
-                run_menu_item(u[1])
-            return
+        if kids and dpg.get_item_user_data(kids[0]):
+            out.append(kids[0])
+    return out
+
+
+def _palette_mark(app):
+    """The chosen row highlighted, and scrolled to when it is out of view."""
+    rows = _palette_rows()
+    for i, r in enumerate(rows):
+        dpg.set_value(r, i == getattr(app, "_pal_sel", 0))
+
+
+def palette_move(app, d):
+    """Up / Down in the palette: the chosen row moves, the typing stays in the box (keyboard navigation
+    would take the focus to the list and the next letters typed went nowhere)."""
+    rows = _palette_rows()
+    if rows:
+        app._pal_sel = max(0, min(len(rows) - 1, getattr(app, "_pal_sel", 0) + d))
+        _palette_mark(app)
+        y = app._pal_sel * px(28)                      # a row's height at the interface size, near enough to keep it in view
+        top = dpg.get_y_scroll("palette_rows")
+        h = dpg.get_item_rect_size("palette_rows")[1] or px(300)
+        if y < top:
+            dpg.set_y_scroll("palette_rows", y)
+        elif y + px(28) > top + h:
+            dpg.set_y_scroll("palette_rows", y + px(28) - h)
+    dpg.focus_item("palette_text")
+
+
+def palette_enter(app):
+    """Enter in the palette runs the chosen row (the first until Up / Down choose another)."""
+    rows = _palette_rows()
+    if not rows:
+        return
+    u = dpg.get_item_user_data(rows[min(getattr(app, "_pal_sel", 0), len(rows) - 1)])
+    dpg.hide_item("palette_win")
+    if u[0] == "action":
+        app.run_action(u[1])
+    elif dpg.does_item_exist(u[1]):
+        run_menu_item(u[1])
 
 
 def paths_captures():
@@ -1903,6 +1967,34 @@ def focused_dialog():
     return None
 
 
+def scrollbar_w(tag):
+    """The width a window's vertical scrollbar takes while it shows: what a control placed at the right edge
+    steps left by, so it is neither under the bar nor makes the window scroll sideways."""
+    try:
+        if dpg.get_item_configuration(tag).get("no_scrollbar") or dpg.get_y_scroll_max(tag) <= 0:
+            return 0
+    except Exception:
+        return 0
+    return px(10)
+
+
+_SIDEWAYS = ("root", "net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win")
+
+
+def pin_sideways():
+    """The panes, the frames and the dialogs held at no sideways scroll, unless they ask for a horizontal scrollbar.
+    Something a few pixels past a pane's edge - a framed header reaches half a padding past it (ImGui) - lets a
+    trackpad's sideways swipe or Shift+wheel shift the whole pane by that much, with no scrollbar to bring it back."""
+    from native import device_ui
+    for tag in _SIDEWAYS + tuple(t for t, _, _, _ in device_ui.FRAMES.values()) + tuple(DIALOGS):
+        try:
+            if (dpg.get_x_scroll(tag) > 0 and dpg.is_item_shown(tag)
+                    and not dpg.get_item_configuration(tag).get("horizontal_scrollbar")):
+                dpg.set_x_scroll(tag, 0)
+        except Exception:
+            pass                                   # not made yet, or gone
+
+
 def poll_dialogs():
     """Each dialog's close at its top right for its width; one that has
     grown past the window's bottom or right edge (an autosized dialog at a
@@ -1915,7 +2007,7 @@ def poll_dialogs():
             rw, rh = dpg.get_item_rect_size(tag)
             w = rw or dpg.get_item_configuration(tag).get("width") or 0
             if w:
-                dpg.set_item_pos(f"{tag}_x", [w - px(30), px(8)])
+                dpg.set_item_pos(f"{tag}_x", [w - scrollbar_w(tag) - px(30), px(8)])
             if rw and rh and vw > 0 and vh > 0 and not held:
                 x, y = dpg.get_item_pos(tag)
                 nx, ny = max(0, min(x, vw - rw)), max(0, min(y, vh - rh))

@@ -640,9 +640,9 @@ def poll(app):
     _poll_send(app)
     if dpg.is_item_shown(TAG):
         timeline_mouse(app)
-        fw = dpg.get_item_rect_size(TAG)[0]
-        if fw and fw != getattr(app, "_tl_frame_w", None):
-            app._tl_frame_w = fw; app._tl_dirty = True          # laid out, or resized: the timeline follows
+        fw = (dpg.get_item_rect_size(TAG)[0], _c().scrollbar_w(TAG))
+        if fw[0] and fw != getattr(app, "_tl_frame_w", None):
+            app._tl_frame_w = fw; app._tl_dirty = True          # laid out, resized, a scrollbar come or gone: it follows
         if getattr(app, "_seq_play", None) is not None or getattr(app, "_tl_dirty", True):
             draw_timeline(app); app._tl_dirty = False
     p = getattr(app, "_seq_play", None)
@@ -747,7 +747,7 @@ def draw_timeline(app):
         # the frame's width as drawn, or as configured before its first
         # layout (then it measures 0, and the timeline came out 200 px)
         fw = dpg.get_item_rect_size(TAG)[0] or dpg.get_item_configuration(TAG)["width"]
-        want = max(200, int(fw) - 24)
+        want = max(200, int(fw) - 24 - c.scrollbar_w(TAG))      # clear of the scrollbar too: past it, the frame scrolled sideways
         if abs(want - w) > 4:
             dpg.configure_item("seq_tl", width=want); w = want
     dpg.draw_rectangle((0, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 60), parent="seq_tl")

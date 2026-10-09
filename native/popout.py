@@ -218,6 +218,7 @@ def run(view, name, parent=0):
     with dpg.window(tag="root", no_scrollbar=True, no_scroll_with_mouse=True):
         pass
     dpg.set_primary_window("root", True)
+    dpg.configure_item("root", no_scrollbar=True, no_scroll_with_mouse=True)   # set_primary_window put its own flags in their place
 
     cam = [float(blk.f[0]), float(blk.f[1]), float(blk.f[2])]
     drag = {"on": False, "y0": 0.0, "p0": 0.0}

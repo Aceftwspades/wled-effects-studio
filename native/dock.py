@@ -148,11 +148,16 @@ def _float_window(app, slot):
     if not dpg.does_item_exist(tag):
         return
     was = dpg.is_item_shown(tag) and not in_dock(app, slot)
-    dpg.configure_item(tag, no_move=False, no_resize=False, width=px(w), height=px(h), show=True)
+    # no bigger than the studio's window: at 1280 x 720 the Flash frame's 660 ran off the bottom, its last rows and
+    # its resize corner out of reach (it scrolls instead)
+    vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+    fw = min(px(w), max(px(320), vw - px(40))) if vw > 0 else px(w)
+    fh = min(px(h), max(px(240), vh - px(80))) if vh > 0 else px(h)
+    dpg.configure_item(tag, no_move=False, no_resize=False, no_focus_on_appearing=False, width=fw, height=fh, show=True)
     device_ui.chrome_for(app, slot, docked=False)
     if not was:
-        chrome._centre(tag, w, h)
-    device_ui.place_header(tag, px(w), False)
+        chrome._centre(tag, fw / px(1000) * 1000, fh / px(1000) * 1000)     # _centre takes sizes at 100%
+    device_ui.place_header(tag, fw, False)
     try:
         dpg.set_y_scroll(tag, 0)
     except Exception:
@@ -337,7 +342,9 @@ def place(app, rect):
         if not dpg.does_item_exist(tag):
             continue
         if slot == a and app.ui:
-            dpg.configure_item(tag, show=True, no_move=True, no_resize=True, width=w, height=ch)
+            # a docked frame is a window placed as a pane: shown as its tab comes to the front, it must not take the
+            # focus - that brought it in front of a floating frame, which was then drawn under the one docked there
+            dpg.configure_item(tag, show=True, no_move=True, no_resize=True, no_focus_on_appearing=True, width=w, height=ch)
             dpg.set_item_pos(tag, [x, cy])
             device_ui.chrome_for(app, slot, docked=True)
             device_ui.place_header(tag, w, True)

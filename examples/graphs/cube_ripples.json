@@ -55,7 +55,7 @@
    "type": "Effect settings",
    "pos": [
     40,
-    560
+    687
    ],
    "params": {
     "palette": 11,
@@ -70,7 +70,7 @@
    "type": "Loudest bin",
    "pos": [
     270,
-    430
+    667
    ],
    "params": {
     "from": 1,
@@ -97,7 +97,7 @@
    "type": "Position",
    "pos": [
     270,
-    690
+    818
    ],
    "params": {},
    "inputs": {}
@@ -122,7 +122,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    249
    ],
    "params": {
     "in_lo": 0.0,
@@ -157,7 +157,7 @@
    "type": "Remap",
    "pos": [
     270,
-    300
+    458
    ],
    "params": {
     "in_lo": 0.0,
@@ -228,7 +228,7 @@
    "type": "Vector",
    "pos": [
     540,
-    560
+    689
    ],
    "params": {},
    "inputs": {}

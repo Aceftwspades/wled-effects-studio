@@ -3331,6 +3331,57 @@ LedFx have added that matters here, in the order it helps most.
       two listeners each getting their half) and the smoke (the fake and a
       second one on 127.0.0.2 - left out where the machine has no 127.0.0.2,
       as macOS by default). Released as 1.11.0, with the flash work above.
+- [x] **A UX sweep** (2026-10-08/09): every menu item and frame (docked and
+      floating) opened, and the studio driven by posted mouse, wheel, keys and
+      typing (the window's own messages: the real pointer stays put), each
+      window checked for scrollbars a few pixels deep, sideways scrolling, text
+      past its edge, see-through backgrounds and the turning frame over it, and
+      captured for review. What it found and what changed:
+      - the main window kept none of its own flags: set_primary_window puts its
+        flags in their place, so it scrolled 4 px down and 12 px across, a
+        scrollbar down the right edge and the wheel nudging everything (also the
+        pop-out's window); set again after it becomes primary;
+      - the 3-D view's pane scrolled 2 px under the wheel as it zoomed, a bar at
+        its edge: no scrollbar, no wheel scroll;
+      - a floating frame's close / dock / grip sat under its scrollbar when it
+        had one and made it scroll sideways: they step left of it (frames and
+        dialogs, chrome.scrollbar_w); the sequence timeline likewise;
+      - a frame floated over the dock was drawn under the docked frame shown
+        after it: a docked frame no longer takes the focus as it appears
+        (no_bring_to_front_on_focus was tried first - Dear PyGui puts such a
+        window behind the main one, and every docked frame vanished);
+      - rows too wide for their pane split or wrap: the Send frame's LIVE row,
+        the device rows (what a device is goes under its name), the code pane's
+        find / replace, the name box (sized to what it holds: the speed factor's
+        prompt was 247 px too wide), the node reference's and the tutorial's
+        contents, compiler messages under the code ("..." and the whole on
+        hover), the About box's paths;
+      - the command palette: names clipped into the key column ("else everyt F")
+        end in "..." now, and Up / Down choose a row while the typing stays in
+        the box - Enter runs the one chosen;
+      - Enter in the add-node search added nothing (the box gives up the keyboard
+        on Enter before the key handler runs): it adds the first match;
+      - nodes overlapped in 35 of the 36 examples: the layouts guessed a node's
+        height from its rows and left out the curve or meter drawn under them.
+        nodeface.node_height counts the glyph (one table for the canvas and the
+        layouts), Arrange uses it, Graph.space_out pushes overlapping nodes down
+        with the layout kept (Node > Arrange > Space out overlapping nodes), and
+        the examples are spaced out (positions only);
+      - the beat light under the audio levels, unlabelled, read as a stray
+        scrollbar: "beat", explained on hover; the library's "not built yet"
+        tile is a thumbnail's size; the shape frame's start gallery is as tall
+        as it comes out (it scrolled 10 px).
+      - the panes, frames and dialogs are held at no sideways scroll
+        (chrome.pin_sideways, each frame): a framed header reaches half a padding
+        past its pane in ImGui, and a trackpad's sideways swipe shifted the pane;
+      - a floating frame opens no bigger than the window (at 1280 x 720 the
+        Flash frame ran off the bottom, its resize corner out of reach);
+      - changing the active device left the LIVE row's protocol at the last
+        device's; with no device the row showed a universe box beside DDP.
+      The sweep's last run: no scrollbar, overflow or input finding left; its
+      two "see-through" flags (the 3-D view over the graph, the floating
+      Sequence frame) checked by eye - both opaque, flat backgrounds over flat
+      backgrounds. Its scripts stayed in the session's scratchpad.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails

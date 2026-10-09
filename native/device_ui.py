@@ -35,7 +35,7 @@ FRAMES = {"devices": ("devices_win", "Devices", 640, 420),
           "sequence": ("sequence_win", "Sequence", 640, 660),  # steps into presets and a playlist, and the schedule (sequence_ui.py)
           "library": ("library_win", "Library", 640, 520),     # the graphs as looping thumbnails (library_ui.py)
           "palettes": ("palettes_win", "Palettes", 560, 460),  # gradients of the project's own (palette_ui.py)
-          "outputs": ("outputs_win", "LED outputs", 680, 400),  # the wiring as the device's busses, and the power (outputs_ui.py)
+          "outputs": ("outputs_win", "LED outputs", 680, 420),  # the wiring as the device's busses, and the power (outputs_ui.py)
           "audioin": ("audioin_win", "Audio input", 640, 340)}  # the device's microphone or line-in module (audioin_ui.py)
 HEADER_H = 30
 
@@ -100,7 +100,10 @@ def place_header(tag, w, docked):
     """The dock button, the grip and the close button at the frame's top
     right for its width: [dock] [:::] [x]. They show while the frame
     floats - docked, its tab names it and the dock's strip closes and
-    floats it (chrome_for) - so the button is always the dock."""
+    floats it (chrome_for) - so the button is always the dock. Left of the
+    scrollbar when the frame has one: under it, the close was half hidden
+    and made the frame scroll sideways."""
+    w -= _c().scrollbar_w(tag)
     if dpg.does_item_exist(f"close_{tag}"):
         dpg.set_item_pos(f"close_{tag}", [w - px(30), px(8)])
     if dpg.does_item_exist(f"grip_{tag}"):
@@ -183,6 +186,7 @@ def build(app):
             form.inline("at")
             typeface.mono(dpg.add_combo(["15 fps", "30 fps", "60 fps"], tag="live_fps", width=px(96), default_value="30 fps",
                                         callback=lambda s, v: app.stream_start(fps=int(v.split()[0])) if getattr(app, "ddp", None) else None))
+        with dpg.group(horizontal=True):                   # a line of its own: one row overran the dock's width
             form.inline("over")
             dpg.add_combo([p[1] for p in live_out.PROTOCOLS], tag="live_proto", width=px(120), default_value="DDP",
                           callback=lambda s, v: app.set_stream_out(protocol=next(p[0] for p in live_out.PROTOCOLS if p[1] == v)))
@@ -200,7 +204,7 @@ def build(app):
                    "controller per face. Each goes over its own protocol (choose the device as the active one to set it). "
                    "Fill from the LED outputs gives the ticked devices the outputs' ranges in turn.")
             dpg.add_button(label="Fill from the LED outputs", tag="live_fill", small=True, show=False, callback=lambda: fill_from_outputs(app))
-            dpg.add_text("", tag="live_cover", color=c.DIM)
+        dpg.add_text("", tag="live_cover", color=c.DIM, wrap=0)
         dpg.add_group(tag="live_targets", show=False)
         with dpg.group(horizontal=True):
             dpg.add_text("", tag="live_status", color=c.DIM)
@@ -842,7 +846,7 @@ def _device_line(d):
 
 
 def refresh_devices(app):
-    refresh_live_targets(app)                       # the LIVE row's devices too
+    refresh_live(app)                               # the LIVE row too: the active device's protocol, the devices to stream to
     if not dpg.does_item_exist("dev_rows"):
         return
     c = _c()
@@ -858,15 +862,17 @@ def refresh_devices(app):
             dpg.add_checkbox(default_value=on, user_data=host, callback=lambda s, a, u: app.set_active_device(u if a else ""))
             dpg.add_text(d.get("name") or host, color=c.ACCENT if on else c.TEXT)
             dpg.add_text(host, color=c.DIM)
-            dpg.add_text(_device_line(d), color=c.TEXT if d.get("reachable", True) else c.RED)
-            with dpg.tooltip(dpg.last_item()):
-                dpg.add_text(f"release {d.get('release', '?')}, build {d.get('vid', '?')}, mac {d.get('mac', '?')}\n"
-                             f"last answered {d.get('seen', '?')}" + (f"\n{d['script_state']}" if d.get("script_state") else ""))
             if not d.get("reachable", True):
                 dpg.add_text("not answering", color=c.RED)
             dpg.add_button(label="use", small=True, user_data=host, callback=lambda s, a, u: app.set_active_device(u), show=not on)
             dpg.add_button(label="remove", small=True, user_data=host, callback=lambda s, a, u: app.remove_device(u))
             weight.danger(dpg.last_item())
+        # what it is, on a line of its own under its name: on one line with the buttons it ran past the frame's edge
+        dpg.add_text(_device_line(d), parent="dev_rows", indent=px(32), wrap=0,
+                     color=c.DIM if d.get("reachable", True) else c.RED)
+        with dpg.tooltip(dpg.last_item()):
+            dpg.add_text(f"release {d.get('release', '?')}, build {d.get('vid', '?')}, mac {d.get('mac', '?')}\n"
+                         f"last answered {d.get('seen', '?')}" + (f"\n{d['script_state']}" if d.get("script_state") else ""))
     n = len(app.devices)
     if not getattr(app, "_scan", None):
         dpg.set_value("dev_status", f"{n} device(s); active: {active or 'none'}")
@@ -993,6 +999,7 @@ def refresh_live_targets(app):
     dpg.set_value("live_multi", multi)
     dpg.configure_item("live_targets", show=multi)
     dpg.configure_item("live_fill", show=multi)
+    dpg.configure_item("live_cover", show=multi)                # a line of its own: no blank line while it says nothing
     dpg.delete_item("live_targets", children_only=True)
     if not multi:
         dpg.set_value("live_cover", "")
@@ -1044,10 +1051,11 @@ def refresh_live(app):
             dpg.set_value("live_status", "")
             if dpg.does_item_exist("live_trace"):
                 dpg.configure_item("live_trace", show=False)
-    # the active device's protocol and first universe (a universe only where there are universes)
+    # the active device's protocol and first universe (a universe only where there are universes - with no device
+    # chosen too: DDP then, and no universe box beside it)
     host = devices.clean_host(app.active_host()) if hasattr(app, "stream_out") else None
-    if host and dpg.does_item_exist("live_proto"):
-        proto, uni = app.stream_out(host)
+    if dpg.does_item_exist("live_proto"):
+        proto, uni = app.stream_out(host) if host else ("ddp", 0)
         dpg.set_value("live_proto", next(p[1] for p in live_out.PROTOCOLS if p[0] == proto))
         dpg.set_value("live_universe", uni)
         for tag in ("live_universe", "live_universe_label"):

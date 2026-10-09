@@ -397,6 +397,72 @@ def param_rows(n, d):
     return len(names) - sum(1 for a, b, _ in pairs(n["type"]) if a in names and b in names)
 
 
+# --- how tall a node is drawn ------------------------------------------------------------------
+# The glyph under a node's fields, at the interface size 1: what glyphs.py draws and what a layout must leave
+# room for (the layouts guessed from the rows alone, and a node with a curve under it ran into the next).
+GLYPH_W = 150                       # the glyph's width: the node's
+STRIP_NODES = ("Palette", "Colour ramp", "Blackbody", "Colour pick")
+GLYPH_H = {"strip": 10, "bars": 22, "wave": 22, "transfer": 28, "text": 22, "path": 36, "scope": 48, "spark": 22}
+PATCH = (120, 32)                   # a pattern's preview texture, px: shown the node's width, 32 of 120 as tall
+NODE_H0, ROW_H, GLYPH_GAP = 46, 27, 3   # a node's title and padding, a row, the space above a glyph (measured at 100%)
+
+
+def glyph_kind(t):
+    """The glyph a node type draws under its fields, or None (glyphs.Glyphs._glyph_widget's order)."""
+    if t in STRIP_NODES:
+        return "strip"
+    if t in ("Audio", "Spectrum", "FFT bin"):
+        return "bars"
+    if t == "Wave":
+        return "wave"
+    if t == "Noise" or t in PATTERNS or t == "Image":
+        return "patch"
+    if t in TRANSFER and TRANSFER[t][0]:
+        return "transfer"
+    if t in ("Bitmap", "States"):
+        return "bitmap"
+    if t == "Text":
+        return "text"
+    if t == "Path":
+        return "path"
+    if t == "Scope":
+        return "scope"
+    if t in SPARK:
+        return "spark"
+    return None
+
+
+def bitmap_cells(n, W, scale=1.0):
+    """The rows of a Bitmap (a States node's first state) and the cell size that fits them under the node: at most
+    10 px, at most 60 tall (at the interface size `scale`)."""
+    text = str(n["params"].get("rows" if n["type"] == "Bitmap" else "states", "")).split("|")[0].replace("\n", "/")
+    rows = [r for r in text.split("/")] or ["0"]
+    w = max(1, max(len(r) for r in rows))
+    cell = max(2, min(int(10 * scale), int(W / w), int(60 * scale / max(1, len(rows)))))
+    return rows, cell
+
+
+def glyph_height(n, W=GLYPH_W):
+    """The glyph's height at the interface size 1 (0: none)."""
+    k = glyph_kind(n["type"])
+    if k is None:
+        return 0
+    if k == "patch":
+        return int(W * PATCH[1] / PATCH[0])
+    if k == "bitmap":
+        rows, cell = bitmap_cells(n, W)
+        return max(2, cell * len(rows))
+    return GLYPH_H[k]
+
+
+def node_height(n, d):
+    """A node's height on the canvas at 100%, in graph units: its title, its rows (inputs, outputs, settings), its
+    glyph. Close to what is drawn (a multi-line field or a node's own extras can make it taller)."""
+    rows = len(d["inputs"]) + len(d["outputs"]) + param_rows(n, d)
+    g = 0 if n.get("collapsed") else glyph_height(n)
+    return NODE_H0 + ROW_H * max(1, rows) + (g + GLYPH_GAP if g else 0)
+
+
 def range_on_node(n, d):
     """True when the node's own fields show its output's range - Remap's out,
     Clamp's range: its curve then needs no numbers of its own."""

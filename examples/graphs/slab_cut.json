@@ -107,7 +107,7 @@
    "type": "Effect settings",
    "pos": [
     40,
-    1080
+    1207
    ],
    "params": {
     "palette": 11,
@@ -146,7 +146,7 @@
    "type": "Random hold",
    "pos": [
     270,
-    820
+    911
    ],
    "params": {},
    "inputs": {}
@@ -178,7 +178,7 @@
    "type": "Multiply",
    "pos": [
     730,
-    170
+    191
    ],
    "params": {},
    "inputs": {
@@ -212,7 +212,7 @@
    "type": "Position",
    "pos": [
     1190,
-    300
+    628
    ],
    "params": {},
    "inputs": {}
@@ -232,7 +232,7 @@
    "type": "Remap",
    "pos": [
     270,
-    300
+    400
    ],
    "params": {
     "in_lo": 0.0,
@@ -247,7 +247,7 @@
    "type": "Multiply",
    "pos": [
     270,
-    430
+    609
    ],
    "params": {},
    "inputs": {
@@ -259,7 +259,7 @@
    "type": "Multiply",
    "pos": [
     270,
-    560
+    760
    ],
    "params": {},
    "inputs": {
@@ -271,7 +271,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    560
+    581
    ],
    "params": {},
    "inputs": {}
@@ -291,7 +291,7 @@
    "type": "Multiply",
    "pos": [
     730,
-    560
+    608
    ],
    "params": {},
    "inputs": {
@@ -345,7 +345,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    191
    ],
    "params": {
     "in_lo": 0.0,
@@ -370,7 +370,7 @@
    "type": "Modulo",
    "pos": [
     2110,
-    300
+    352
    ],
    "params": {},
    "inputs": {
@@ -407,7 +407,7 @@
    "type": "Smoothstep",
    "pos": [
     2800,
-    300
+    342
    ],
    "params": {
     "e0": 0.0,
@@ -432,7 +432,7 @@
    "type": "Multiply",
    "pos": [
     2800,
-    170
+    191
    ],
    "params": {},
    "inputs": {}
@@ -442,7 +442,7 @@
    "type": "Floor",
    "pos": [
     2110,
-    430
+    534
    ],
    "params": {},
    "inputs": {}
@@ -452,7 +452,7 @@
    "type": "Multiply",
    "pos": [
     2340,
-    430
+    451
    ],
    "params": {},
    "inputs": {
@@ -464,7 +464,7 @@
    "type": "Integrate",
    "pos": [
     2340,
-    560
+    602
    ],
    "params": {
     "wrap": 1.0
@@ -478,7 +478,7 @@
    "type": "Add",
    "pos": [
     2570,
-    430
+    503
    ],
    "params": {},
    "inputs": {}
@@ -488,7 +488,7 @@
    "type": "Palette",
    "pos": [
     2800,
-    430
+    524
    ],
    "params": {},
    "inputs": {}
@@ -508,7 +508,7 @@
    "type": "Vector",
    "pos": [
     1230,
-    170
+    272
    ],
    "params": {},
    "inputs": {}
@@ -518,7 +518,7 @@
    "type": "Vector",
    "pos": [
     1230,
-    210
+    450
    ],
    "params": {},
    "inputs": {}

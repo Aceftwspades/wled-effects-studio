@@ -441,7 +441,9 @@ def refresh(app):
     _undo_buttons(app)
     from native import shape_checks, shape_start
     if not parts:
-        dpg.configure_item("shape_parts", height=px(300))
+        # as tall as the gallery comes out at the frame's width (two rows of objects, three in a narrow dock):
+        # a set 300 left it 10 px short, and a scrollbar down its side for them
+        dpg.configure_item("shape_parts", height=0, autosize_y=True)
         dpg.set_value("shape_desc", "no parts yet: start with an object, draw a run or import one - the geometry becomes "
                       "the shape when its first part goes in" if parts is None else "no parts yet: start with an object below")
         shape_start.fill(app, "shape_parts")
@@ -451,7 +453,7 @@ def refresh(app):
         if parts is not None:
             _shape_settings(app, "shape_fields", g.params)
         return
-    dpg.configure_item("shape_parts", height=px(150))
+    dpg.configure_item("shape_parts", autosize_y=False, height=px(150))
     sp = g.params
     dpg.set_value("shape_desc", f"{len(parts)} part(s), {g.count} LEDs  ·  {units.density(sp):g} LEDs a metre  ·  in {units.unit(sp)}"
                   + (f"  ·  {g.collisions} LEDs share a grid cell" if getattr(g, "collisions", 0) else ""))

@@ -23,7 +23,8 @@ from native.textures import registry
 
 HIST_N = 600            # samples kept per probe: ten seconds at 60 frames
 HIST_MAX = 256          # probes a build can plant (graph.py)
-PATCH = (120, 32)       # a pattern's preview texture, px: shown the node's width, 32 of 120 as tall
+PATCH = nodeface.PATCH  # a pattern's preview texture, px: shown the node's width, 32 of 120 as tall
+GH = nodeface.GLYPH_H   # each glyph's height at the interface size 1 (nodeface: the layouts leave room for it)
 GLOW_S = 0.15           # a light's afterglow, seconds
 
 
@@ -32,7 +33,7 @@ class Glyphs:
     GLYPHS = frozenset(["Palette", "Audio", "Spectrum", "FFT bin", "Wave", "Noise", "Colour ramp", "Blackbody", "Colour pick",
                         "Bitmap", "States", "Image", "Text", "Path", "Scope"]
                        + list(nodeface.PATTERNS) + [k for k, v in nodeface.TRANSFER.items() if v[0]] + list(nodeface.SPARK))
-    STRIPS = ("Palette", "Colour ramp", "Blackbody", "Colour pick")
+    STRIPS = nodeface.STRIP_NODES
 
     def _glyph_init(self):
         self._live_glyphs = {}          # nid -> kind: what _poll_glyphs updates
@@ -119,22 +120,22 @@ class Glyphs:
     def _glyph_widget(self, nid, n):
         """The glyph under the node's fields, made inside a static attribute."""
         t = n["type"]
-        W = self.px(150)
+        W = self.px(nodeface.GLYPH_W)
         d = self.graph.node_def(n)
         tag = f"gglyph_{nid}"
         if t in self.STRIPS:
-            with dpg.drawlist(width=W, height=self.px(10), tag=tag):
+            with dpg.drawlist(width=W, height=self.px(GH["strip"]), tag=tag):
                 pass
             self._live_glyphs[nid] = "strip"
         elif t in ("Audio", "Spectrum", "FFT bin"):
-            H = self.px(22)
+            H = self.px(GH["bars"])
             with dpg.drawlist(width=W, height=H, tag=tag):
                 for k in range(16):
                     x0 = k * W / 16
                     dpg.draw_rectangle((x0 + 1, H - 1), (x0 + W / 16 - 1, H - 1), color=(0, 0, 0, 0), fill=self.pal()["live_line"], tag=f"{tag}_{k}")
             self._live_glyphs[nid] = "bars"
         elif t == "Wave":
-            with dpg.drawlist(width=W, height=self.px(22), tag=tag):
+            with dpg.drawlist(width=W, height=self.px(GH["wave"]), tag=tag):
                 pass
             self._live_glyphs[nid] = "wave"
         elif t == "Noise" or t in nodeface.PATTERNS or t == "Image":
@@ -143,24 +144,24 @@ class Glyphs:
             if t == "Noise":
                 self._live_glyphs[nid] = "noise"
         elif t in nodeface.TRANSFER:
-            with dpg.drawlist(width=W, height=self.px(28), tag=tag):
+            with dpg.drawlist(width=W, height=self.px(GH["transfer"]), tag=tag):
                 pass
         elif t in ("Bitmap", "States"):
             rows, cell = self._bitmap_cells(n, W)
             with dpg.drawlist(width=W, height=max(2, cell * len(rows)), tag=tag):
                 pass
         elif t == "Text":
-            with dpg.drawlist(width=W, height=self.px(22), tag=tag):
+            with dpg.drawlist(width=W, height=self.px(GH["text"]), tag=tag):
                 pass
         elif t == "Path":
-            with dpg.drawlist(width=W, height=self.px(36), tag=tag):
+            with dpg.drawlist(width=W, height=self.px(GH["path"]), tag=tag):
                 pass
         elif t == "Scope":
-            with dpg.drawlist(width=W, height=self.px(48), tag=tag):
+            with dpg.drawlist(width=W, height=self.px(GH["scope"]), tag=tag):
                 pass
             self._live_glyphs[nid] = "scope"
         elif t in nodeface.SPARK:
-            with dpg.drawlist(width=W, height=self.px(22), tag=tag):
+            with dpg.drawlist(width=W, height=self.px(GH["spark"]), tag=tag):
                 pass
             self._live_glyphs[nid] = "spark"
         else:
@@ -305,11 +306,7 @@ class Glyphs:
     def _bitmap_cells(self, n, W):
         """The rows of a Bitmap (a States node's first state) and the cell
         size that fits them under the node: at most 10 px, at most 60 tall."""
-        text = str(n["params"].get("rows" if n["type"] == "Bitmap" else "states", "")).split("|")[0].replace("\n", "/")
-        rows = [r for r in text.split("/")] or ["0"]
-        w = max(1, max(len(r) for r in rows))
-        cell = max(2, min(self.px(10), int(W / w), int(self.px(60) / max(1, len(rows)))))
-        return rows, cell
+        return nodeface.bitmap_cells(n, W, self.px(1000) / 1000.0)
 
     def _draw_bitmap(self, nid, n, d):
         tag = f"gglyph_{nid}"

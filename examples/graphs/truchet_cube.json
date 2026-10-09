@@ -81,7 +81,7 @@
    "type": "Effect settings",
    "pos": [
     40,
-    820
+    947
    ],
    "params": {
     "palette": 11,
@@ -96,7 +96,7 @@
    "type": "Cube face",
    "pos": [
     270,
-    430
+    609
    ],
    "params": {},
    "inputs": {}
@@ -106,7 +106,7 @@
    "type": "Remap",
    "pos": [
     270,
-    300
+    400
    ],
    "params": {
     "in_lo": 0.0,
@@ -131,7 +131,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    430
+    455
    ],
    "params": {},
    "inputs": {}
@@ -141,7 +141,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    560
+    606
    ],
    "params": {},
    "inputs": {}
@@ -161,7 +161,7 @@
    "type": "Floor",
    "pos": [
     730,
-    560
+    585
    ],
    "params": {},
    "inputs": {}
@@ -171,7 +171,7 @@
    "type": "Fract",
    "pos": [
     730,
-    690
+    740
    ],
    "params": {},
    "inputs": {}
@@ -181,7 +181,7 @@
    "type": "Fract",
    "pos": [
     730,
-    820
+    895
    ],
    "params": {},
    "inputs": {}
@@ -191,7 +191,7 @@
    "type": "Random hold",
    "pos": [
     270,
-    690
+    868
    ],
    "params": {},
    "inputs": {}
@@ -201,7 +201,7 @@
    "type": "Select",
    "pos": [
     500,
-    690
+    757
    ],
    "params": {},
    "inputs": {
@@ -213,7 +213,7 @@
    "type": "Add",
    "pos": [
     500,
-    820
+    935
    ],
    "params": {},
    "inputs": {}
@@ -235,7 +235,7 @@
    "type": "Add",
    "pos": [
     960,
-    430
+    451
    ],
    "params": {},
    "inputs": {}
@@ -255,7 +255,7 @@
    "type": "Threshold",
    "pos": [
     1420,
-    430
+    451
    ],
    "params": {},
    "inputs": {
@@ -333,7 +333,7 @@
    "type": "Subtract",
    "pos": [
     1420,
-    950
+    1149
    ],
    "params": {},
    "inputs": {
@@ -345,7 +345,7 @@
    "type": "Length",
    "pos": [
     1650,
-    820
+    841
    ],
    "params": {},
    "inputs": {}
@@ -355,7 +355,7 @@
    "type": "Subtract",
    "pos": [
     1880,
-    820
+    845
    ],
    "params": {},
    "inputs": {
@@ -367,7 +367,7 @@
    "type": "Abs",
    "pos": [
     2110,
-    820
+    841
    ],
    "params": {},
    "inputs": {}
@@ -387,7 +387,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    191
    ],
    "params": {
     "in_lo": 0.0,
@@ -503,7 +503,7 @@
    "type": "Vector",
    "pos": [
     1230,
-    690
+    868
    ],
    "params": {},
    "inputs": {}
@@ -513,7 +513,7 @@
    "type": "Vector",
    "pos": [
     1460,
-    860
+    971
    ],
    "params": {},
    "inputs": {}

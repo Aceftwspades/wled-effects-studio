@@ -60,7 +60,7 @@
    "type": "Coords",
    "pos": [
     270,
-    300
+    458
    ],
    "params": {},
    "inputs": {}
@@ -70,7 +70,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    249
    ],
    "params": {
     "in_lo": 0.0,
@@ -85,7 +85,7 @@
    "type": "Floor",
    "pos": [
     500,
-    170
+    243
    ],
    "params": {},
    "inputs": {}
@@ -95,7 +95,7 @@
    "type": "Remap",
    "pos": [
     270,
-    430
+    690
    ],
    "params": {
     "in_lo": 0.0,
@@ -110,7 +110,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    300
+    398
    ],
    "params": {},
    "inputs": {
@@ -132,7 +132,7 @@
    "type": "Multiply",
    "pos": [
     730,
-    430
+    451
    ],
    "params": {},
    "inputs": {}
@@ -216,7 +216,7 @@
    "type": "Add",
    "pos": [
     1650,
-    430
+    482
    ],
    "params": {},
    "inputs": {}

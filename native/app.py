@@ -1397,8 +1397,17 @@ class App(Features):
             lines = dpg.get_value("code").split("\n")
             hits = [i for i, l in enumerate(lines) if needle.lower() in l.lower()]
         for li in hits[:40]:
-            dpg.add_selectable(label=f"{li + 1}: {lines[li].strip()[:100]}", parent="edit_errors", user_data=li + 1,
-                               callback=lambda s, a, u: self.goto_line(u))
+            self._error_row(f"{li + 1}: {lines[li].strip()}", li + 1, lambda s, a, u: self.goto_line(u))
+
+    def _error_row(self, text, user_data, callback):
+        """A row under the code (a compiler message, a find hit): as wide as the pane lets it be, ending in "..."
+        when longer, the whole of it on hover - at 140 characters a message ran past the pane, which scrolled."""
+        avail = (dpg.get_item_rect_size("edit_win")[0] or px(420)) - px(40)
+        shown = chrome._fit_text(text, avail)
+        row = dpg.add_selectable(label=shown, parent="edit_errors", user_data=user_data, callback=callback)
+        if shown != text:
+            chrome.tip(text, item=row)
+        return row
 
     def find_status(self):
         if self.code_ed is None:
@@ -1647,13 +1656,11 @@ class App(Features):
                 mine_file = fn == self.edit_file
                 nid, words = node_of(path, line)
                 if nid is not None:                              # a node's line: the row names it and goes to it
-                    row = dpg.add_selectable(label=f"{fn}:{line}  {words}: {msg}"[:140], parent="edit_errors",
-                                             user_data=self.gp.where(nid),
-                                             callback=lambda s, a, u: messages.goto(self, {"node": u}))
+                    row = self._error_row(f"{fn}:{line}  {words}: {msg}", self.gp.where(nid),
+                                          lambda s, a, u: messages.goto(self, {"node": u}))
                 else:
-                    row = dpg.add_selectable(label=f"{fn}:{line}  {msg}"[:140], parent="edit_errors",
-                                             user_data=int(line) if mine_file else None,
-                                             callback=lambda s, a, u: self.goto_line(u) if u else None)
+                    row = self._error_row(f"{fn}:{line}  {msg}", int(line) if mine_file else None,
+                                          lambda s, a, u: self.goto_line(u) if u else None)
                 with dpg.theme() as th:
                     with dpg.theme_component(dpg.mvSelectable):
                         dpg.add_theme_color(dpg.mvThemeCol_Text,
@@ -2529,11 +2536,11 @@ class App(Features):
                 dpg.set_item_pos(tag, [x, y])
                 # the grip at the pane's top right, clear of the scrollbar
                 if dpg.does_item_exist(f"grip_{tag}"):
-                    dpg.set_item_pos(f"grip_{tag}", [w - px(40), px(8)])
+                    dpg.set_item_pos(f"grip_{tag}", [w - px(46), px(8)])     # inside the padding: past it, the pane scrolled
             app_ed = getattr(self, "code_ed", None)
             if app_ed and show_edit and "main" in rects:
                 x, y, w, h = rects["main"]
-                app_ed.resize(w - px(18), h - px(164))
+                app_ed.resize(w - px(18), h - px(192))     # the rows above and below it: find and replace are two lines
             for kind, i, j, x, y, w, h in splits:
                 tag = f"{kind}split_{i}_{j}"
                 if dpg.does_item_exist(tag):
@@ -3021,6 +3028,13 @@ class App(Features):
     def on_key(self, sender, app_data):
         if shape_tools.key(self, app_data):
             return                                       # a move, turn or scale under way has the keys: X Y Z, a number, Enter, Esc
+        # Enter in the add menu's search adds the first match. The box gives up the keyboard on Enter before this
+        # handler runs (it is called after the frame), so "active" is already false: deactivated this frame counts.
+        if (app_data in (dpg.mvKey_Return, dpg.mvKey_NumPadEnter) and dpg.does_item_exist("graph_search")
+                and dpg.is_item_shown("graph_menu")
+                and (dpg.is_item_active("graph_search") or dpg.is_item_deactivated("graph_search"))):
+            self.gp._search_enter(None, dpg.get_value("graph_search"))
+            return
         if app_data == dpg.mvKey_Escape:
             self._picker = None
             if dpg.does_item_exist("expr_win") and dpg.is_item_shown("expr_win"):
@@ -3031,11 +3045,13 @@ class App(Features):
         # Not while a value is being typed. The handler is global, so without
         # this, typing into a box would also be driving the layout.
         if dpg.does_item_exist("palette_win") and dpg.is_item_shown("palette_win"):
-            # the palette has every key while it is up: Esc closes, Enter runs the first row
+            # the palette has every key while it is up: Esc closes, Up / Down choose a row, Enter runs it
             if app_data == dpg.mvKey_Escape:
                 dpg.hide_item("palette_win")
             elif app_data in (dpg.mvKey_Return, dpg.mvKey_NumPadEnter):
                 chrome.palette_enter(self)
+            elif app_data in (dpg.mvKey_Down, dpg.mvKey_Up):
+                chrome.palette_move(self, 1 if app_data == dpg.mvKey_Down else -1)
             return
         if self.layout == "edit" and self.code_ed is not None and self.code_ed.focus:
             ctrl_ = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
@@ -3208,6 +3224,7 @@ class App(Features):
                                                lambda v: gp.make_sub_from_selection(v)),
             "enter_sub":    self.enter_or_back,
             "arrange":      gp.arrange,
+            "space_out":    gp.space_out,
             "align_left":   lambda: gp.align("left"),
             "align_right":  lambda: gp.align("right"),
             "align_top":    lambda: gp.align("top"),
@@ -3795,7 +3812,9 @@ def build(app):
 
     self_app = [app]
     weight.ensure()                                  # the button weights' themes, before any button is weighed
-    with dpg.window(tag="root", no_scroll_with_mouse=True):
+    # no scrollbar: the panes are laid out to the window's size, and a few pixels of rounding past it put a
+    # scrollbar down the right edge, whose width then pushed the panes row past the right as well
+    with dpg.window(tag="root", no_scrollbar=True, no_scroll_with_mouse=True):
         chrome.build_menus(app)
         chrome.build_toolbar(app)
         with dpg.group(horizontal=True, tag="panes_row"):
@@ -3823,6 +3842,7 @@ def build(app):
                     chrome.tip("match the case as typed")
                     dpg.add_checkbox(label="word", tag="find_word", callback=lambda: app.find(False))
                     chrome.tip("whole words only")
+                with dpg.group(horizontal=True):              # a line of its own: with the find it ran 90 px past the pane
                     dpg.add_input_text(tag="replace_text", hint="replace with", width=px(130))
                     dpg.add_button(label="replace", callback=lambda: app.replace_one())
                     chrome.tip("the match the cursor is on, then the next is found")
@@ -3859,7 +3879,9 @@ def build(app):
             with dpg.child_window(tag="graph_win", width=px(420), height=px(470), show=False,
                                   no_scrollbar=True, no_scroll_with_mouse=True):
                 build_panel(app, app.gp)
-            with dpg.child_window(tag="cube_win", width=px(420), height=px(470)):
+            # no scrollbar, no wheel scroll: the wheel zooms the view, and the drawlist filling the pane overran
+            # it by a couple of pixels - a scrollbar at its edge, the view nudged by the wheel as it zoomed
+            with dpg.child_window(tag="cube_win", width=px(420), height=px(470), no_scrollbar=True, no_scroll_with_mouse=True):
                 chrome.grip("cube_win")
                 with dpg.group(horizontal=True):
                     dpg.add_text("3-D - drag to rotate, wheel to zoom",
@@ -3967,8 +3989,12 @@ def build(app):
                                              callback=lambda s, v, u: setattr(app.syn, u, bool(v)))
                     form.check("silence (mute all bands)",
                                callback=lambda s, v: setattr(app.syn, "muted", v))
-                    dpg.add_color_button(tag="beat_led", default_value=(42, 47, 58, 255),
-                                         width=px(280), height=px(6), no_border=True)
+                    # named and explained: unlabelled, the strip between beats read as a stray scrollbar
+                    with form.row("beat", tip="lights up on each beat the audio has (the synth's, a file's or live)"):
+                        with dpg.group():                       # level with the label's line: a 6 px strip sat at its top
+                            dpg.add_spacer(height=px(6))
+                            dpg.add_color_button(tag="beat_led", default_value=(42, 47, 58, 255),
+                                                 width=px(220), height=px(6), no_border=True)
                 with Section(app, "live", "LIVE AUDIO"):
                     try:
                         from native.audio import list_inputs
@@ -4070,6 +4096,9 @@ def build(app):
         for t in ("splice_a", "splice_b"):
             dpg.draw_bezier_cubic((0, 0), (0, 0), (0, 0), (0, 0), tag=t, show=False, thickness=px(4), color=tuple(chrome.ACCENT[:3]) + (235,))
     dpg.set_primary_window("root", True)
+    # set_primary_window puts its own window flags in place of the window's: no scrollbar and no wheel scroll again
+    # (without them the panes' few pixels of rounding past the window's size made it scroll, wheel and all)
+    dpg.configure_item("root", no_scrollbar=True, no_scroll_with_mouse=True)
     app.frames = glow.Frames()
     chrome.apply_frames(app)
     # Callbacks are taken off Dear PyGui's own schedule and run at the top of
@@ -5324,6 +5353,7 @@ def main():
                 reader_ui.poll(app)
                 room.poll(app)
                 weight.poll(app)                     # what has nothing to act on, greyed
+                chrome.pin_sideways()                # no pane nudged sideways by a few pixels of overrun
                 app.poll_calibration()
                 app.poll_wiring_read()
                 app.poll_stream_wiring()

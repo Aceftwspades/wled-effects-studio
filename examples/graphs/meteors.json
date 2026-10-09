@@ -60,7 +60,7 @@
    "type": "Coords",
    "pos": [
     270,
-    300
+    458
    ],
    "params": {},
    "inputs": {}
@@ -70,7 +70,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    249
    ],
    "params": {
     "in_lo": 0.0,
@@ -85,7 +85,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    170
+    243
    ],
    "params": {},
    "inputs": {}
@@ -118,7 +118,7 @@
    "type": "Hash",
    "pos": [
     960,
-    170
+    218
    ],
    "params": {},
    "inputs": {
@@ -249,7 +249,7 @@
    "type": "Remap",
    "pos": [
     270,
-    430
+    690
    ],
    "params": {
     "in_lo": 0.0,
@@ -274,7 +274,7 @@
    "type": "Threshold",
    "pos": [
     2570,
-    430
+    451
    ],
    "params": {},
    "inputs": {
@@ -286,7 +286,7 @@
    "type": "Select",
    "pos": [
     2800,
-    430
+    482
    ],
    "params": {},
    "inputs": {
@@ -309,7 +309,7 @@
    "type": "Colour",
    "pos": [
     3030,
-    430
+    464
    ],
    "params": {
     "rgb": [

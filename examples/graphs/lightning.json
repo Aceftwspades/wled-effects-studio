@@ -119,7 +119,7 @@
    "type": "Fract",
    "pos": [
     960,
-    170
+    195
    ],
    "params": {},
    "inputs": {}
@@ -167,7 +167,7 @@
    "type": "Remap",
    "pos": [
     500,
-    170
+    249
    ],
    "params": {
     "in_lo": 0.0,
@@ -182,7 +182,7 @@
    "type": "Subtract",
    "pos": [
     1190,
-    170
+    218
    ],
    "params": {},
    "inputs": {
@@ -194,7 +194,7 @@
    "type": "Power",
    "pos": [
     1420,
-    170
+    249
    ],
    "params": {},
    "inputs": {}
@@ -214,7 +214,7 @@
    "type": "Remap",
    "pos": [
     270,
-    430
+    532
    ],
    "params": {
     "in_lo": 0.0,
@@ -229,7 +229,7 @@
    "type": "Multiply",
    "pos": [
     500,
-    300
+    458
    ],
    "params": {},
    "inputs": {
@@ -257,7 +257,7 @@
    "type": "Subtract",
    "pos": [
     960,
-    300
+    350
    ],
    "params": {},
    "inputs": {
@@ -269,7 +269,7 @@
    "type": "Multiply",
    "pos": [
     1190,
-    300
+    369
    ],
    "params": {},
    "inputs": {}
@@ -279,7 +279,7 @@
    "type": "Add",
    "pos": [
     1420,
-    300
+    431
    ],
    "params": {},
    "inputs": {
@@ -301,7 +301,7 @@
    "type": "Abs",
    "pos": [
     1880,
-    300
+    321
    ],
    "params": {},
    "inputs": {}
@@ -324,7 +324,7 @@
    "type": "Smoothstep",
    "pos": [
     2110,
-    430
+    482
    ],
    "params": {
     "e0": 0.3,
@@ -337,7 +337,7 @@
    "type": "Multiply",
    "pos": [
     2340,
-    430
+    451
    ],
    "params": {},
    "inputs": {
@@ -369,7 +369,7 @@
    "type": "Colour",
    "pos": [
     2570,
-    430
+    451
    ],
    "params": {
     "rgb": [
@@ -385,7 +385,7 @@
    "type": "Colour",
    "pos": [
     2570,
-    560
+    575
    ],
    "params": {
     "rgb": [

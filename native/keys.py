@@ -94,6 +94,7 @@ ACTIONS = [
     ("fold",          "Fold the selection into a sub-graph",                 "Ctrl+G", "graph"),
     ("enter_sub",     "Enter the selected sub-graph / back out",             "Tab",    "graph"),
     ("arrange",       "Arrange (the selection, or the whole graph)",         "Ctrl+L", "graph"),
+    ("space_out",     "Space out nodes that overlap, the layout kept",       "",       "graph"),
     ("align_left",    "Align the selected nodes' left edges",                "Alt+Left", "graph"),
     ("align_right",   "Align their right edges",                             "Alt+Right", "graph"),
     ("align_top",     "Align their tops",                                    "Alt+Up", "graph"),

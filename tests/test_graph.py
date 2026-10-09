@@ -515,6 +515,28 @@ def test_arrange_spreads_by_depth():
     assert xs == sorted(xs) and len(set(xs)) == 4
 
 
+def test_space_out_clears_overlaps_and_keeps_the_layout():
+    """Nodes running into the one above them in a column pushed down, as little as it takes; the order down a
+    column, the columns and a node clear of the others kept; once spaced, nothing moves again. The height a node
+    is drawn at 100% (nodeface.node_height): a curve under its fields counted."""
+    g = G.Graph({"name": "t"}, lib=LIB)
+    r = g.add("Remap", (40, 40)); m = g.add("Multiply", (40, 140)); a = g.add("Add", (40, 230))
+    side = g.add("Add", (400, 140)); far = g.add("Add", (40, 900))
+    assert g.node_height(r) == g.node_height(m) + 27 + 28 + 3          # a row more, and its curve
+    moved = g.space_out(gap=24)
+    ys = [g.nodes[i]["pos"][1] for i in (r, m, a)]
+    assert set(moved) == {m, a} and ys == sorted(ys)
+    assert ys[1] == 40 + g.node_height(r) + 24 and ys[2] == ys[1] + g.node_height(m) + 24
+    assert g.nodes[side]["pos"] == [400, 140] and g.nodes[far]["pos"] == [40, 900]
+    assert all(g.nodes[i]["pos"][0] == 40 for i in (r, m, a))
+    assert g.space_out(gap=24) == []
+    # drawn sizes, where the canvas has them, win over the estimate
+    g2 = G.Graph({"name": "t"}, lib=LIB)
+    p = g2.add("Add", (0, 0)); q = g2.add("Add", (0, 200))
+    assert g2.space_out(gap=24) == [] and g2.space_out(heights={p: 300}, gap=24) == [q]
+    assert g2.nodes[q]["pos"][1] == 324
+
+
 def test_to_json_roundtrip_keeps_wire_meta_and_expose():
     g = starter()
     a = g.add("Coords", (0, 0)); n = g.add("Noise", (100, 0))

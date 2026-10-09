@@ -81,7 +81,7 @@
    "type": "Effect settings",
    "pos": [
     40,
-    820
+    947
    ],
    "params": {
     "palette": 11,
@@ -96,7 +96,7 @@
    "type": "Direction",
    "pos": [
     270,
-    690
+    876
    ],
    "params": {},
    "inputs": {}
@@ -118,7 +118,7 @@
    "type": "Divide",
    "pos": [
     730,
-    690
+    711
    ],
    "params": {},
    "inputs": {}
@@ -128,7 +128,7 @@
    "type": "Divide",
    "pos": [
     730,
-    820
+    862
    ],
    "params": {},
    "inputs": {}
@@ -138,7 +138,7 @@
    "type": "Remap",
    "pos": [
     960,
-    690
+    711
    ],
    "params": {
     "in_lo": -2.4,
@@ -153,7 +153,7 @@
    "type": "Remap",
    "pos": [
     960,
-    820
+    920
    ],
    "params": {
     "in_lo": -2.4,
@@ -183,7 +183,7 @@
    "type": "Envelope",
    "pos": [
     270,
-    820
+    1054
    ],
    "params": {
     "attack": 10.0,
@@ -242,7 +242,7 @@
    "type": "Remap",
    "pos": [
     270,
-    300
+    458
    ],
    "params": {
     "in_lo": 0.0,
@@ -301,7 +301,7 @@
    "type": "Multiply",
    "pos": [
     1420,
-    560
+    581
    ],
    "params": {},
    "inputs": {
@@ -313,7 +313,7 @@
    "type": "Exp",
    "pos": [
     1650,
-    560
+    585
    ],
    "params": {},
    "inputs": {}
@@ -323,7 +323,7 @@
    "type": "Multiply",
    "pos": [
     1880,
-    560
+    581
    ],
    "params": {},
    "inputs": {
@@ -347,7 +347,7 @@
    "type": "Add",
    "pos": [
     2340,
-    430
+    451
    ],
    "params": {},
    "inputs": {
@@ -359,7 +359,7 @@
    "type": "Multiply",
    "pos": [
     2340,
-    560
+    602
    ],
    "params": {},
    "inputs": {
@@ -384,7 +384,7 @@
    "type": "Remap",
    "pos": [
     270,
-    430
+    667
    ],
    "params": {
     "in_lo": 0.0,
@@ -399,7 +399,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    249
    ],
    "params": {
     "in_lo": 0.0,
@@ -447,7 +447,7 @@
    "type": "Integrate",
    "pos": [
     2800,
-    820
+    841
    ],
    "params": {
     "wrap": 1.0
@@ -461,7 +461,7 @@
    "type": "Add",
    "pos": [
     3030,
-    820
+    841
    ],
    "params": {},
    "inputs": {}

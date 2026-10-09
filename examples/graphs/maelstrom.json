@@ -94,7 +94,7 @@
    "type": "Effect settings",
    "pos": [
     40,
-    950
+    1077
    ],
    "params": {
     "palette": 11,
@@ -109,7 +109,7 @@
    "type": "Cube ring",
    "pos": [
     270,
-    690
+    1085
    ],
    "params": {},
    "inputs": {}
@@ -134,7 +134,7 @@
    "type": "Envelope",
    "pos": [
     270,
-    820
+    1209
    ],
    "params": {
     "attack": 10.0,
@@ -147,7 +147,7 @@
    "type": "Add",
    "pos": [
     500,
-    820
+    841
    ],
    "params": {},
    "inputs": {
@@ -159,7 +159,7 @@
    "type": "Integrate",
    "pos": [
     270,
-    950
+    1412
    ],
    "params": {
     "wrap": 0.0
@@ -173,7 +173,7 @@
    "type": "Smoothstep",
    "pos": [
     500,
-    950
+    992
    ],
    "params": {
     "e0": 2.0,
@@ -186,7 +186,7 @@
    "type": "Remap",
    "pos": [
     730,
-    950
+    996
    ],
    "params": {
     "in_lo": 0.0,
@@ -214,7 +214,7 @@
    "type": "Multiply",
    "pos": [
     730,
-    820
+    845
    ],
    "params": {},
    "inputs": {}
@@ -246,7 +246,7 @@
    "type": "Remap",
    "pos": [
     270,
-    300
+    458
    ],
    "params": {
     "in_lo": 0.0,
@@ -271,7 +271,7 @@
    "type": "Remap",
    "pos": [
     270,
-    560
+    876
    ],
    "params": {
     "in_lo": 0.0,
@@ -318,7 +318,7 @@
    "type": "Multiply",
    "pos": [
     960,
-    690
+    711
    ],
    "params": {},
    "inputs": {}
@@ -328,7 +328,7 @@
    "type": "Add",
    "pos": [
     1190,
-    560
+    602
    ],
    "params": {},
    "inputs": {}
@@ -348,7 +348,7 @@
    "type": "Remap",
    "pos": [
     270,
-    170
+    249
    ],
    "params": {
     "in_lo": 0.0,
@@ -363,7 +363,7 @@
    "type": "Band",
    "pos": [
     1650,
-    560
+    602
    ],
    "params": {},
    "inputs": {}
@@ -398,7 +398,7 @@
    "type": "Remap",
    "pos": [
     270,
-    430
+    667
    ],
    "params": {
     "in_lo": 0.0,
@@ -413,7 +413,7 @@
    "type": "Integrate",
    "pos": [
     500,
-    430
+    455
    ],
    "params": {
     "wrap": 1.0
@@ -447,7 +447,7 @@
    "type": "Multiply",
    "pos": [
     1190,
-    430
+    451
    ],
    "params": {},
    "inputs": {}
@@ -467,7 +467,7 @@
    "type": "Multiply",
    "pos": [
     1650,
-    430
+    451
    ],
    "params": {},
    "inputs": {

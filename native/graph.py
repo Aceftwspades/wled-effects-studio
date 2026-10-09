@@ -544,13 +544,46 @@ class Graph:
             for nid in ids:
                 n = self.nodes[nid]
                 n["pos"] = [ox + c * col_w, y]
-                try:
-                    from native import nodeface          # the rows the node spends: a pair is one, the effect's own none
-                    d = self.node_def(n)
-                    rows = len(d["inputs"]) + len(d["outputs"]) + nodeface.param_rows(n, d)
-                except GraphError:
-                    rows = 3
-                y += 56 + 27 * max(1, rows) + row_gap
+                y += self.node_height(nid) + row_gap
+
+    def node_height(self, nid):
+        """A node's height on the canvas at 100%, as near as the model can tell: its rows and the glyph under them
+        (nodeface.node_height)."""
+        from native import nodeface
+        n = self.nodes[nid]
+        try:
+            return nodeface.node_height(n, self.node_def(n))
+        except GraphError:
+            return nodeface.NODE_H0 + 3 * nodeface.ROW_H
+
+    def space_out(self, heights=None, widths=None, gap=24, only=None):
+        """Nodes that run into the one above them in their column pushed down, as little as it takes, the layout
+        otherwise kept: two nodes share a column when they overlap across. `heights` / `widths`: graph-unit sizes
+        where they are known (drawn), the model's estimate otherwise. Frames and notes stay. Returns the ids moved."""
+        heights, widths = heights or {}, widths or {}
+        ids = [nid for nid, n in self.nodes.items()
+               if n["type"] not in ("Frame", "Note") and (only is None or nid in only)]
+        ids.sort(key=lambda i: (self.nodes[i]["pos"][1], self.nodes[i]["pos"][0]))
+        placed, moved = [], []
+        for nid in ids:
+            n = self.nodes[nid]
+            x, y = n["pos"]
+            w = widths.get(nid) or 200
+            h = heights.get(nid) or self.node_height(nid)
+            top = y
+            again = True
+            while again:                                    # below every node of its column it runs into, in turn
+                again = False
+                for px0, px1, py0, py1 in placed:
+                    across = min(px1, x + w) - max(px0, x)
+                    if across > 10 and py0 < top + h + gap and top < py1 + gap:
+                        top = py1 + gap
+                        again = True
+            if top != y:
+                n["pos"] = [x, top]
+                moved.append(nid)
+            placed.append((x, x + w, top, top + h))
+        return moved
 
     def to_json(self):
         links = []
