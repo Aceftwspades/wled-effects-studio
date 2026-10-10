@@ -40,7 +40,8 @@ CLICK_S = 0.6            # ... within this long
 
 _specs = {}              # item id -> {"lo", "hi", "log", "int", "fill": the fill bar or None, "tag"}
 _press = {}              # item id -> (typing-capable press?, mouse x, mouse y, time)
-_typing = set()          # items focused for typing by a click: their next deactivation is the typed value's
+_typing = {}             # items focused for typing by a click -> when: their next deactivation is the typed value's
+_unflat = set()          # child windows a field has taken out of their parent's navigation (see _own_nav)
 _registry = None
 _themes = {}
 
@@ -108,7 +109,9 @@ def _on_activated(sender, item):
     """Pressed (or focused for typing): where and when, to tell a click from a drag."""
     item = _id(item)
     if item in _typing:
-        return                                        # the typing a click began
+        if time.time() - _typing[item] < CLICK_S:
+            return                                    # the typing a click began
+        _typing.pop(item, None)                       # a focus that never took: this is a press of its own
     ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
     by_mouse = dpg.is_mouse_button_down(dpg.mvMouseButton_Left) and not ctrl \
         and not dpg.is_mouse_button_double_clicked(dpg.mvMouseButton_Left)
@@ -121,7 +124,7 @@ def _on_deactivated(sender, item):
     typing, the number selected. A field's typing ends here too."""
     item = _id(item)
     if item in _typing:
-        _typing.discard(item)                         # the typed value is in (or Escape left it)
+        _typing.pop(item, None)                       # the typed value is in (or Escape left it)
         _press.pop(item, None)
         return
     p = _press.pop(item, None)
@@ -130,7 +133,7 @@ def _on_deactivated(sender, item):
     x, y = dpg.get_mouse_pos(local=False)
     if abs(x - p[1]) < px(CLICK_PX) and abs(y - p[2]) < px(CLICK_PX) and time.time() - p[3] < CLICK_S \
             and dpg.does_item_exist(item) and dpg.is_item_enabled(item):
-        _typing.add(item)
+        _typing[item] = time.time()
         dpg.focus_item(item)
 
 
@@ -232,7 +235,39 @@ def add(tag, value, lo=None, hi=None, *, integer=False, log=False, unit="", digi
     dpg.bind_item_theme(g, _tight_theme())
     dpg.bind_item_handler_registry(item, _handlers())
     _specs[_id(item)] = s
+    _own_nav(item)
     return tag
+
+
+def _own_nav(item):
+    """A field in a child window - a scrolling list's - takes that window out of its parent's keyboard navigation.
+    Dear PyGui flattens a child into its parent by default, and Dear ImGui keeps that for children that do not
+    scroll: in one that does, once a field of the parent had been typed in, focus_item on a field in the list put
+    the focus back on the parent's field, and a click on the list's numbers never turned into typing."""
+    p = dpg.get_item_parent(item)
+    while p:
+        if p not in _unflat and dpg.get_item_type(p).endswith("mvChildWindow"):
+            dpg.configure_item(p, flattened_navigation=False)
+            _unflat.add(p)
+        p = dpg.get_item_parent(p)
+
+
+def busy():
+    """A number being dragged or typed in, or a click just turned into typing (focused next frame): a frame
+    rebuilt under it now would take the field away."""
+    return any_active() or any(dpg.does_item_exist(i) for i in list(_typing))
+
+
+def any_active():
+    """Is a number field being dragged or typed into now? (Dear PyGui's focused item is not the field while it is
+    typed into, so the keys' "typing" test missed it: Delete, Space, "." went to the studio's shortcuts.)"""
+    for item in list(_specs):
+        try:
+            if dpg.does_item_exist(item) and dpg.is_item_active(item):
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def is_num(item):
@@ -279,13 +314,14 @@ def configure(tag, lo=None, hi=None):
 def forget(tag):
     """A field that is gone (its parent rebuilt): its record goes."""
     i = _id(tag)
-    _specs.pop(i, None); _press.pop(i, None); _typing.discard(i)
+    _specs.pop(i, None); _press.pop(i, None); _typing.pop(i, None)
 
 
 def prune():
     """Records of fields that no longer exist, dropped (a rebuild deletes them wholesale)."""
     for i in [i for i in _specs if not dpg.does_item_exist(i)]:
-        _specs.pop(i, None); _press.pop(i, None); _typing.discard(i)
+        _specs.pop(i, None); _press.pop(i, None); _typing.pop(i, None)
+    _unflat.difference_update([w for w in _unflat if not dpg.does_item_exist(w)])
 
 
 def hovered():

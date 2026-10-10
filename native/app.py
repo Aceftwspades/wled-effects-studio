@@ -3031,6 +3031,8 @@ class App(Features):
         f = dpg.get_focused_item()
         if f and dpg.does_item_exist(f) and dpg.get_item_type(f) in self.TYPING and dpg.is_item_active(f):
             return True
+        if num.any_active():                             # a number field typed into: not the focused item then
+            return True
         return any(dpg.does_item_exist(t) and dpg.is_item_active(t)
                    for t in tuple(self._inputs) + ("find_text", "replace_text", "dev_add_host", "name_input", "editor_cmd") + self.META_FIELDS)
 

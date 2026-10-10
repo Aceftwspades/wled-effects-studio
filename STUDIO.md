@@ -3429,6 +3429,37 @@ LedFx have added that matters here, in the order it helps most.
       the sent marker), and 17 interactions through posted mouse and keys
       (the ruler, Space, the end and blend drags, moving a step, a
       double-click, the menu, dragging a row, Delete, undo). Released as 1.13.0.
+- [x] **The sequencer's numbers, live** (2026-10-09, `sequence_ui.py`, `num.py`):
+      every number in the frame is a `num` field - a step's length in its list
+      row, held seconds and bars, blend, brightness, the show's length (new:
+      it scales every step), the tempo, the beats a bar, the preset ids, a
+      ramp's end. Dragged or typed, the rest follows as it moves (`_live`: the
+      rows, the card, the bars, the timeline, the "sent" line, the playing
+      step's time left) without rebuilding the list under the pointer; the
+      save waits until the numbers settle (`_queue_save`, flushed by the poll
+      and before an undo), so a drag is one undo step. The time fields drag
+      by their size (`wide`, `pace`: 0.1-600 s across a field was 2 s a pixel).
+      Found on the way:
+      - typing into a number fired the app's shortcuts - Delete removed the
+        step, Space played: `app.typing()` asks `num.any_active()` too;
+      - a number field hidden with `show=False` stays hidden: its group
+        (`<tag>__num`) is what shows and hides;
+      - a click on a field in a scrolling list (a child window) never turned
+        into typing once a field of the window around it had been typed in:
+        Dear PyGui flattens a child's navigation into its parent's by
+        default, and `focus_item` put the focus back on the parent's field.
+        `num.add` takes the child windows around a field out of that
+        (`flattened_navigation=False`), for every list in the studio; a click
+        whose focus never took no longer swallows the next one; and the
+        sequence list is not rebuilt (a look arriving, the next step playing)
+        while a number is dragged or typed (`num.busy`).
+      Tested: test_num.py (a field in a scrolling list types after one above
+      it - fails without the fix - and the swallowed click), the unit tests,
+      the smoke, the walk, the pointer test, and through posted mouse and
+      keys: the held seconds dragged (bars, row and show length follow, one
+      undo step), bars typed, a row's length typed, the show's length doubled,
+      a blend clamped, the tempo dragged, the brightness dragged, and the 17
+      sequencer interactions again.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails

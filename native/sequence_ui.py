@@ -52,8 +52,126 @@ def _dev_steps(app):
 
 
 def _save(app):
+    app._seq_save_at = None
     app.project.save()
     refresh(app)
+
+
+# --- the numbers, live -------------------------------------------------------------------------
+def _nset(tag, v):
+    """A number field's value from outside - not the one being dragged or typed in (it has its own)."""
+    if dpg.does_item_exist(tag) and not dpg.is_item_active(tag):
+        num.set(tag, v)
+
+
+def _queue_save(app):
+    """Saved once the numbers settle: a drag is one undo step, not one a frame."""
+    app._seq_save_at = time.perf_counter() + 0.5
+
+
+def _flush_save(app, now=False):
+    due = getattr(app, "_seq_save_at", None)
+    if due is not None and (now or time.perf_counter() >= due):
+        app._seq_save_at = None
+        app.project.save()
+
+
+def _live(app):
+    """Every number that follows from the steps, as they are now - the list's lengths and bars, the selected step's
+    fields, the show's length - the timeline redrawn and the device line said again, the list not rebuilt (the
+    field being dragged keeps its place)."""
+    S = _steps(app)
+    steps = S["steps"]
+    for i, st in enumerate(steps):
+        _nset(f"seq_len_{i}", float(st.get("dur", 10)))
+        if dpg.does_item_exist(f"seq_bars_{i}"):
+            dpg.set_value(f"seq_bars_{i}", _bars_words(app, st.get("dur", 10)))
+    sel = getattr(app, "_seq_sel", 0)
+    if 0 <= sel < len(steps):
+        st = steps[sel]
+        _nset("seq_dur", float(st.get("dur", 10)))
+        bl = _barlen(app)
+        if bl:
+            _nset("seq_dur_bars", round(float(st.get("dur", 10)) / bl, 2))
+        _nset("seq_trans", float(st.get("trans", 0.7)))
+        _nset("seq_bri", int(st.get("bri", 255)))
+    _, total = _starts(app)
+    _nset("seq_len_all", round(total, 1))
+    app._tl_dirty = True
+    refresh_sent(app)
+
+
+def _num_changed(app, key, v, i=None):
+    """A step's number changed (the selected step's, or row i's): held seconds, bars, blend, brightness."""
+    S = _steps(app)
+    steps = S["steps"]
+    i = getattr(app, "_seq_sel", 0) if i is None else int(i)
+    if not (0 <= i < len(steps)):
+        return
+    st = steps[i]
+    was = float(st.get("dur", 10))
+    if key == "dur":
+        st["dur"] = round(max(0.1, float(v)), 3)
+    elif key == "bars":
+        bl = _barlen(app)
+        if not bl:
+            return
+        st["dur"] = round(max(0.1, float(v) * bl), 3)
+    elif key == "trans":
+        st["trans"] = round(max(0.0, min(float(v), float(st.get("dur", 10)))), 2)
+    elif key == "bri":
+        st["bri"] = int(v)
+    _follow_playing(app, i, float(st.get("dur", 10)) - was)
+    _live(app)
+    _queue_save(app)
+
+
+def _follow_playing(app, i, delta):
+    """The step playing made longer or shorter: its time left follows (it ends where its new length says)."""
+    p = getattr(app, "_seq_play", None)
+    if not delta or p is None or p["i"] != i:
+        return
+    if p.get("paused") is not None:
+        p["paused"] = max(0.05, p["paused"] + delta)
+    else:
+        p["next"] = max(time.perf_counter() + 0.05, p["next"] + delta)
+
+
+def _total_changed(app, v):
+    """The show's length set: every step scaled with it, in proportion."""
+    steps = _steps(app)["steps"]
+    _, total = _starts(app)
+    if not steps or total <= 0:
+        return
+    k = max(0.1, float(v)) / total
+    for i, st in enumerate(steps):
+        old = float(st.get("dur", 10))
+        st["dur"] = round(max(0.1, old * k), 3)
+        _follow_playing(app, i, st["dur"] - old)
+    _live(app)
+    _queue_save(app)
+
+
+def _tempo_changed(app, bpm=None, bar=None):
+    """The tempo or the beats a bar: the bars everywhere follow; a tempo come or gone shows or hides them."""
+    S = _steps(app)
+    had = bool(_barlen(app))
+    if bpm is not None:
+        S["bpm"] = round(max(0.0, float(bpm)), 2)
+    if bar is not None:
+        S["bar"] = max(1, min(16, int(bar)))
+    if bool(_barlen(app)) != had:
+        _queue_save(app)
+        refresh(app)
+        return
+    _live(app)
+    _queue_save(app)
+
+
+def _id_changed(app, key, v):
+    _steps(app)[key] = int(v)
+    refresh_sent(app)
+    _queue_save(app)
 
 
 def _fmt_t(t):
@@ -87,6 +205,7 @@ def _bars_words(app, dur):
 def undo(app, redo=False):
     """The steps or the schedule back a step - whichever changed last (the
     project journals both); Ctrl+Z with the frame focused, or its button."""
+    _flush_save(app, now=True)                            # a change still settling: saved first, so it is the one undone
     p = app.project
     keys = [k for k in ("sequence", "schedule") if (p.can_redo(k) if redo else p.can_undo(k))]
     if not keys:
@@ -131,10 +250,14 @@ def build(app):
             dpg.add_button(label="undo", small=True, callback=lambda: undo(app))
             c.tip("the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes")
             dpg.add_text("", tag="seq_total", color=c.DIM)
+            num.add("seq_len_all", 0.0, 0.1, 3600, unit="s", digits=1, width=px(100), wide=True, pace=60,
+                    callback=lambda s, v: _total_changed(app, v))
+            c.tip("the whole show's length: changed, every step stretches or shrinks with it, in proportion")
             c.info("Steps of what the sim shows, each held for a while: played here, and on the device as presets run by a "
-                   "playlist. On the timeline: click the ruler to go to a time, click a step to select it, drag a step to "
-                   "move it, drag the line after a step to make it longer or shorter (on the beats when a tempo is set; "
-                   "Alt: free), drag the little handle at a step's start for its blend. Double-click a step to show it in "
+                   "playlist. Every number here is live: drag it sideways or click it and type, and the rest follows - the "
+                   "list, the timeline, the bars, the show's length. On the timeline: click the ruler to go to a time, click "
+                   "a step to select it, drag a step to move it, drag the line after a step to make it longer or shorter (on "
+                   "the beats when a tempo is set; Alt: free), drag the little handle where a step's blend ends to set it. Double-click a step to show it in "
                    "the sim, right-click for more. In the list, drag a row by its name to move it. With the frame's "
                    "keyboard: Space plays and pauses, Delete removes the selected step, Ctrl+D duplicates it.")
         # the timeline: the steps as blocks of their own colours along the time, the ruler, bars, beats, the WAV
@@ -163,20 +286,20 @@ def build(app):
             form.inline("name")
             dpg.add_input_text(tag="seq_name", width=px(170), on_enter=True, callback=lambda s, v: set_field(app, "name", v))
             form.inline("held")
-            dpg.add_input_float(tag="seq_dur", width=px(76), step=0, format="%.1f s", on_enter=True,
-                                callback=lambda s, v: set_field(app, "dur", max(0.1, float(v))))
-            c.tip("how long the step is shown, seconds")
-            dpg.add_input_float(tag="seq_dur_bars", width=px(80), step=0, format="%g bars", on_enter=True, show=False,
-                                callback=lambda s, v: set_bars(app, v))
-            c.tip("how long the step is shown, in bars of the tempo (BEATS below)")
+            num.add("seq_dur", 10.0, 0.1, 600, unit="s", digits=1, width=px(96), wide=True, pace=10,
+                    callback=lambda s, v: _num_changed(app, "dur", v))
+            c.tip("how long the step is shown, seconds - the bars beside it follow")
+            num.add("seq_dur_bars", 4.0, 0.25, 128, unit="bars", digits=2, width=px(96), show=False, wide=True, pace=4,
+                    callback=lambda s, v: _num_changed(app, "bars", v))
+            c.tip("how long the step is shown, in bars of the tempo (BEATS below) - the seconds follow")
             form.inline("blend")
-            dpg.add_input_float(tag="seq_trans", width=px(70), step=0, format="%.1f s", on_enter=True,
-                                callback=lambda s, v: set_field(app, "trans", max(0.0, float(v))))
-            c.tip("seconds of blend into this step (drag the handle at the step's start on the timeline)")
+            num.add("seq_trans", 0.7, 0.0, 30.0, unit="s", digits=1, width=px(86), wide=True, pace=1,
+                    callback=lambda s, v: _num_changed(app, "trans", v))
+            c.tip("seconds of blend into this step (or drag the handle where it ends on the timeline)")
         form.mono_values(_row)
         with dpg.group(horizontal=True):
             form.inline("brightness")
-            num.add("seq_bri", 255, 0, 255, integer=True, width=px(200), callback=lambda s, v: set_field(app, "bri", int(v)))
+            num.add("seq_bri", 255, 0, 255, integer=True, width=px(200), callback=lambda s, v: _num_changed(app, "bri", v))
             c.tip("the step's brightness: its preset sets the device's, and the sim shows it so while the sequence plays")
         dpg.add_text("", tag="seq_step_desc", color=c.DIM, wrap=0)
         # the step's ramps: each a slider (or the brightness) moving over the step
@@ -193,8 +316,8 @@ def build(app):
         # the tempo: bars on the timeline, lengths in bars, drags on the beats
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("BEATS", color=c.ACCENT))
-            typeface.mono(dpg.add_input_float(tag="seq_bpm", width=px(96), step=0, format="%.1f bpm", default_value=0.0,
-                                              on_enter=True, callback=lambda s, v: set_tempo(app, bpm=v)))
+            num.add("seq_bpm", 0.0, 0.0, 300.0, unit="bpm", digits=1, width=px(110), wide=True, pace=120,
+                    callback=lambda s, v: _tempo_changed(app, bpm=v))
             c.tip("the tempo the steps are laid on: bars on the timeline, lengths in bars, drags on the beats (0: none)")
             dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
             c.tip("tap tempo: tap on the beat, the bpm from the gaps")
@@ -203,8 +326,7 @@ def build(app):
             dpg.add_button(label="the file's", small=True, callback=lambda: beats_from_wav(app))
             c.tip("the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file)")
             form.inline("beats a bar")
-            typeface.mono(dpg.add_input_int(tag="seq_bar", width=px(40), step=0, default_value=4, min_value=1, max_value=16, min_clamped=True,
-                                            max_clamped=True, on_enter=True, callback=lambda s, v: set_tempo(app, bar=v)))
+            num.add("seq_bar", 4, 1, 16, integer=True, width=px(60), callback=lambda s, v: _tempo_changed(app, bar=v))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Snap lengths to bars", small=True, callback=lambda: snap_durations(app))
             weight.need(dpg.last_item(), lambda a: _has_steps(a) and bool(_barlen(a)))
@@ -228,12 +350,10 @@ def build(app):
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
             form.inline("presets from")
-            typeface.mono(dpg.add_input_int(tag="seq_base", width=px(50), step=0, default_value=10, min_value=1, max_value=240, min_clamped=True,
-                                            callback=lambda s, v: (_steps(app).__setitem__("base", int(v)), _save(app))))
+            num.add("seq_base", 10, 1, 240, integer=True, width=px(70), callback=lambda s, v: _id_changed(app, "base", v))
             c.tip("each step is saved as a preset, ids from here up; ones already there are overwritten")
             form.inline("playlist")
-            typeface.mono(dpg.add_input_int(tag="seq_pid", width=px(50), step=0, default_value=9, min_value=1, max_value=250, min_clamped=True,
-                                            callback=lambda s, v: (_steps(app).__setitem__("pid", int(v)), _save(app))))
+            num.add("seq_pid", 9, 1, 250, integer=True, width=px(70), callback=lambda s, v: _id_changed(app, "pid", v))
             c.tip("the preset id the playlist is saved as")
             form.inline("named")
             dpg.add_input_text(tag="seq_show", width=px(110), default_value="Show", on_enter=True,
@@ -307,7 +427,7 @@ def refresh(app):
     playing = _play_i(app)
     # the name's column: what the frame's width leaves after the fixed ones (and the list's padding and scrollbar)
     fw = dpg.get_item_rect_size(TAG)[0] or dpg.get_item_configuration(TAG)["width"]
-    name_w = max(px(60), int(fw) - px(16 + 52 + 110 + 118 + 48) - px(90))
+    name_w = max(px(60), int(fw) - px(16 + 52 + 110 + 132 + 48) - px(90))
     if steps:
         with dpg.table(parent="seq_rows", header_row=False, policy=dpg.mvTable_SizingFixedFit, borders_innerH=False,
                        pad_outerX=False, no_host_extendX=True):
@@ -315,7 +435,7 @@ def refresh(app):
             dpg.add_table_column(width_fixed=True, init_width_or_weight=px(52))      # the look
             dpg.add_table_column(width_stretch=True, init_width_or_weight=1.0)       # the name
             dpg.add_table_column(width_fixed=True, init_width_or_weight=px(110))     # the effect
-            dpg.add_table_column(width_fixed=True, init_width_or_weight=px(118))     # the length
+            dpg.add_table_column(width_fixed=True, init_width_or_weight=px(132))     # the length, live, and its bars
             dpg.add_table_column(width_fixed=True, init_width_or_weight=px(48))      # duplicate, delete
             for i, st in enumerate(steps):
                 fx = ", ".join(sg.get("effect", "?") for sg in st.get("segments") or [])
@@ -336,11 +456,10 @@ def refresh(app):
                     t_ = dpg.add_text(_c()._fit_text(fx, px(106)), color=c.TEXT if i != playing else c.ACCENT)
                     if len(st.get("segments") or []) > 1:
                         c.tip(fx, item=t_)
-                    words = f"{float(st.get('dur', 0)):.1f} s"
-                    bw = _bars_words(app, st.get("dur", 0))
-                    if bw:
-                        words += f"  {bw}"
-                    typeface.mono(dpg.add_text(words, color=c.DIM))
+                    with dpg.group(horizontal=True, horizontal_spacing=px(4)):
+                        num.add(f"seq_len_{i}", float(st.get("dur", 10)), 0.1, 600, unit="s", digits=1, width=px(72), wide=True, pace=10,
+                                user_data=i, callback=lambda s, v, u: _num_changed(app, "dur", v, u))
+                        dpg.add_text(_bars_words(app, st.get("dur", 0)), tag=f"seq_bars_{i}", color=c.DIM)
                     with dpg.group(horizontal=True, horizontal_spacing=px(4)):
                         b = dpg.add_image_button(texture("duplicate", px(13)), width=px(13), height=px(13), user_data=i,
                                                  callback=lambda s, a, u: duplicate_step(app, u))
@@ -355,23 +474,24 @@ def refresh(app):
     # the list as tall as its steps, four to eight rows
     dpg.configure_item("seq_rows", height=px(ROW_H * max(3, min(8, len(steps))) + 20))    # the cells' padding: no scrollbar for 8 px
     app._tl_dirty = True
-    dpg.set_value("seq_total", f"{len(steps)} step{'s' if len(steps) != 1 else ''}, {_fmt_t(total)}" if steps else "")
-    dpg.set_value("seq_base", int(S.get("base", 10))); dpg.set_value("seq_pid", int(S.get("pid", 9)))
+    dpg.set_value("seq_total", f"{len(steps)} step{'s' if len(steps) != 1 else ''}, the show" if steps else "")
+    dpg.configure_item("seq_len_all__num", show=bool(steps)); _nset("seq_len_all", round(total, 1))
+    _nset("seq_base", int(S.get("base", 10))); _nset("seq_pid", int(S.get("pid", 9)))
     dpg.set_value("seq_show", S.get("name", "Show")); dpg.set_value("seq_repeat", int(S.get("repeat", 0)) == 0)
     dpg.set_value("seq_style", S.get("style", "fade"))
-    dpg.set_value("seq_bpm", float(S.get("bpm") or 0)); dpg.set_value("seq_bar", int(S.get("bar") or 4))
+    _nset("seq_bpm", float(S.get("bpm") or 0)); _nset("seq_bar", int(S.get("bar") or 4))
     dpg.set_value("seq_snap", bool(S.get("snap", True)))
     has_tempo = bool(_barlen(app))
     dpg.configure_item("seq_step_card", show=bool(steps))
-    dpg.configure_item("seq_dur_bars", show=has_tempo)
+    dpg.configure_item("seq_dur_bars__num", show=has_tempo)          # a number field shows and hides by its group
     if 0 <= sel < len(steps):
         st = steps[sel]
         dpg.set_value("seq_step_title", f"STEP {sel + 1}")
-        dpg.set_value("seq_name", st.get("name", "")); dpg.set_value("seq_dur", float(st.get("dur", 10)))
-        dpg.set_value("seq_trans", float(st.get("trans", 0.7)))
+        dpg.set_value("seq_name", st.get("name", "")); _nset("seq_dur", float(st.get("dur", 10)))
+        _nset("seq_trans", float(st.get("trans", 0.7)))
         if has_tempo:
-            dpg.set_value("seq_dur_bars", round(float(st.get("dur", 10)) / _barlen(app), 2))
-        num.set("seq_bri", int(st.get("bri", 255)))
+            _nset("seq_dur_bars", round(float(st.get("dur", 10)) / _barlen(app), 2))
+        _nset("seq_bri", int(st.get("bri", 255)))
         segs = st.get("segments") or []
         words = [_slider_words(app, sg.get("effect")) for sg in segs]    # each segment's sliders by its effect's words (C9)
         dpg.set_value("seq_step_desc", f"{len(segs)} segment(s): " + "; ".join(
@@ -670,7 +790,7 @@ def set_ramp(app, key, end=None, shape=None):
     cur = sequence.ramp_of(st, key) or (sequence.ramp_value(st, key, 0), "linear")
     st.setdefault("ramps", {})[key] = {"end": int(end if end is not None else cur[0]),
                                        "shape": str(shape if shape is not None else cur[1])}
-    app.project.save(); _ramp_desc(app, st); app._tl_dirty = True
+    _queue_save(app); _ramp_desc(app, st); app._tl_dirty = True; refresh_sent(app)
 
 
 def remove_ramp(app, key):
@@ -781,12 +901,6 @@ def set_field(app, key, value):
     if 0 <= i < len(S["steps"]):
         S["steps"][i][key] = value
         _save(app)
-
-
-def set_bars(app, bars):
-    bl = _barlen(app)
-    if bl:
-        set_field(app, "dur", round(max(0.25, float(bars)) * bl, 3))
 
 
 # --- beats: the steps on the music's bars --------------------------------------------------------
@@ -1000,6 +1114,7 @@ def _apply_ramps(app, i, t):
 
 
 def poll(app):
+    _flush_save(app)
     _poll_send(app)
     _take_look(app)
     if dpg.is_item_shown(TAG):
@@ -1008,7 +1123,7 @@ def poll(app):
         if fw[0] and fw != getattr(app, "_tl_frame_w", None):
             app._tl_frame_w = fw; app._tl_dirty = True          # laid out, resized, a scrollbar come or gone: it follows
             app._seq_rows_dirty = True                          # the names fitted to the new width too
-        if getattr(app, "_seq_rows_dirty", False):
+        if getattr(app, "_seq_rows_dirty", False) and not num.busy():   # not under a number being typed in: it waits
             app._seq_rows_dirty = False; refresh(app)
         if getattr(app, "_seq_play", None) is not None or getattr(app, "_tl_dirty", True) or getattr(app, "_tl_hover_was", None) != getattr(app, "_tl_hover", None):
             draw_timeline(app); app._tl_dirty = False; app._tl_hover_was = getattr(app, "_tl_hover", None)
@@ -1328,13 +1443,15 @@ def timeline_mouse(app):
                 if beat and _steps(app).get("snap", True) and not alt:
                     end = round(end / beat) * beat                   # on the beat
                 if 0 <= i < len(steps):
+                    was = float(steps[i].get("dur", 10))
                     steps[i]["dur"] = round(max(0.25, end - start), 3)
-                    app._tl_dirty = True
+                    _follow_playing(app, i, steps[i]["dur"] - was)
+                    _live(app)                                   # the fields and the list follow the drag
             elif kind == "blend":
                 i, start = drag[1], drag[2]
                 if 0 <= i < len(steps):
                     steps[i]["trans"] = round(max(0.0, min(float(steps[i].get("dur", 10)), t_at - start)), 2)
-                    app._tl_dirty = True
+                    _live(app)
             elif kind in ("block", "move"):
                 if kind == "block" and abs(mx - drag[2]) > px(6):
                     app._tl_drag = drag = ("move", drag[1], drag[2], None)
@@ -1347,7 +1464,7 @@ def timeline_mouse(app):
             if kind == "move" and drag[3] is not None and drag[3] != drag[1]:
                 move_to(app, drag[1], drag[3])
             elif kind in ("end", "blend"):
-                app.project.save(); refresh(app)
+                _save(app)
             elif kind == "block":
                 select(app, drag[1])
             app._tl_dirty = True

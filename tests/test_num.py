@@ -5,6 +5,7 @@ moved is a drag). Run with python tests/test_num.py  (or pytest).
 """
 import os
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -117,6 +118,13 @@ def test_a_click_turns_into_typing_and_a_drag_does_not():
         stub["down"] = False; stub["pos"] = (140.0, 50.0)
         num._on_deactivated(None, i)
         assert focused == [i]
+        # a click whose focus never took (the field never became active): the next press is a press, not swallowed
+        stub["down"] = True; stub["pos"] = (100.0, 50.0)
+        num._typing[i] = time.time() - 5
+        num._on_activated(None, i)
+        stub["down"] = False
+        num._on_deactivated(None, i)
+        assert focused == [i, i] and i in num._typing
     finally:
         (dpg.is_mouse_button_down, dpg.get_mouse_pos, dpg.focus_item, dpg.is_mouse_button_double_clicked, dpg.is_key_down) = real
         dpg.destroy_context()
@@ -144,6 +152,41 @@ def test_focus_puts_a_drag_field_into_typing():
         assert dpg.is_item_active("d") and dpg.is_item_focused("d")
     finally:
         dpg.destroy_context()
+
+
+def test_a_field_in_a_scrolling_list_types_after_one_above_it():
+    """A field in a child window (a scrolling list) under a window whose own field was typed in last: focus_item
+    puts it into typing too - Dear PyGui flattens a child's navigation into its parent's, and then the parent's
+    field took the focus back (checked on frames drawn off screen)."""
+    if sys.platform != "win32":
+        return
+    dpg.create_context()
+    typeface._scale = 1.0
+    typeface._at.clear(); typeface._fonts.clear()
+    try:
+        with dpg.window(tag="w", width=300, height=300):
+            with dpg.child_window(tag="kid", height=80):
+                for k in range(8):
+                    num.add(f"row{k}", 2.0, 0.1, 600, unit="s", digits=1, width=80, wide=True)
+            num.add("below", 1.0, 0.0, 30.0, unit="s", digits=1, width=80, wide=True)
+        assert not dpg.get_item_configuration("kid")["flattened_navigation"]
+        dpg.create_viewport(title="num", width=320, height=320, x_pos=-4000, y_pos=0)
+        dpg.setup_dearpygui()
+        dpg.show_viewport()
+        for _ in range(3):
+            dpg.render_dearpygui_frame()
+        dpg.focus_item("below")
+        for _ in range(3):
+            dpg.render_dearpygui_frame()
+        assert dpg.is_item_active("below")
+        dpg.focus_item("row1")
+        for _ in range(3):
+            dpg.render_dearpygui_frame()
+        assert dpg.is_item_active("row1") and not dpg.is_item_active("below")
+    finally:
+        dpg.destroy_context()
+        num._specs.clear(); num._press.clear(); num._typing.clear(); num._unflat.clear()
+        num._registry = None; num._themes.clear()
 
 
 if __name__ == "__main__":

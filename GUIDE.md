@@ -957,6 +957,16 @@ The **list** has a row a step: its swatch, name, effect, length (and
 bars, with a tempo), and buttons to duplicate or delete it. Drag a row
 by its name onto another to move it. With the frame's keyboard, Delete
 removes the selected step and Ctrl+D duplicates it; Ctrl+Z undoes.
+Beside the step count, the **show's length**: change it and every step
+stretches or shrinks with it, in proportion.
+
+**Every number is live.** A step's length in its row, its held seconds
+and bars, its blend and brightness, the show's length, the tempo and the
+beats a bar, the preset ids, a ramp's end: drag one sideways, or click
+it and type, and everything that follows from it moves as you go - the
+row, the card, the bars, the timeline, the show's length, the clock of
+the step playing. A drag is one undo step, not one a frame. A blend
+longer than its step is cut to the step.
 
 The selected step's card: Update from the sim (what the sim shows now,
 its own settings kept), Load into the sim, Duplicate, Delete; its name,
