@@ -3459,7 +3459,7 @@ LedFx have added that matters here, in the order it helps most.
       keys: the held seconds dragged (bars, row and show length follow, one
       undo step), bars typed, a row's length typed, the show's length doubled,
       a blend clamped, the tempo dragged, the brightness dragged, and the 17
-      sequencer interactions again.
+      sequencer interactions again. Released as 1.13.1.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
