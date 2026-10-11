@@ -6,8 +6,8 @@
     2. runtime/: the firmware files the engine compiles from, copied out of
        the checkout, so building an effect needs no WLED tree
     3. PyInstaller (studio.spec): the app, its packages, the resources
-    4. the engine copied in beside the exe (build/), an app icon drawn from
-       the studio's own cube icon
+    4. the engine copied in beside the exe (build/), the app icon made from
+       docs/brand/icon_cube.png (tests/make_icon.py draws that)
     5. --toolchain: a folder with a compiler copied in as toolchain/, so
        effects build anywhere; the studio finds it there before it looks
        for one installed. A full MinGW-w64 (winlibs' zip, unpacked) is cut
@@ -47,34 +47,38 @@ def run(cmd, **kw):
         sys.exit(f"package: failed: {cmd}")
 
 
+ICON_ART = os.path.join(HERE, "docs", "brand", "icon_cube.png")    # the Voronoi cube, lit: tests/make_icon.py
+ICON_ICO = os.path.join(HERE, "docs", "brand", "app.ico")           # the exe's, the shortcut's and the window's
+
+
 def icon_image(px):
-    """The toolbar's cube icon at px square, in the accent colour on a rounded square of the panel colour."""
-    sys.path.insert(0, HERE)
-    from native.icons import Icon, ICONS
+    """The app icon at px square: the lit cube (ICON_ART) on a rounded square of the panel's dark, a little
+    lighter behind the cube."""
     from PIL import Image
     import numpy as np
-    ic = Icon(px); ICONS["cube"](ic)
-    a = np.array(ic.data(), np.float32).reshape(px, px, 4)[:, :, 3]
-    img = np.zeros((px, px, 4), np.uint8)
-    img[:, :, 0], img[:, :, 1], img[:, :, 2] = 24, 27, 33          # the panel's dark
-    img[:, :, 3] = 255
-    # a rounded square behind, the icon in the accent
-    yy, xx = np.mgrid[0:px, 0:px]
-    r = px * 0.22
-    inside = ((np.clip(np.abs(xx - px / 2 + 0.5) - (px / 2 - r), 0, None)) ** 2 + (np.clip(np.abs(yy - px / 2 + 0.5) - (px / 2 - r), 0, None)) ** 2) <= r * r
-    img[~inside, 3] = 0
-    col = np.array([90, 169, 230], np.float32)
-    for c in range(3):
-        img[:, :, c] = np.where(inside, img[:, :, c] * (1 - a) + col[c] * a, 0).astype(np.uint8)
-    return Image.fromarray(img, "RGBA")
+    S = 1024                                                       # drawn large, then made small in one step
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float32)
+    g = np.zeros((S, S, 3), np.float32) + (20, 23, 30)
+    g += np.exp(-((xx - S / 2) ** 2 + (yy - S / 2) ** 2) / (S / 2) ** 2 / 0.35)[:, :, None] * np.array((34, 38, 58), np.float32)
+    r = S * 0.22
+    inside = ((np.clip(np.abs(xx - S / 2 + 0.5) - (S / 2 - r), 0, None)) ** 2
+              + (np.clip(np.abs(yy - S / 2 + 0.5) - (S / 2 - r), 0, None)) ** 2) <= r * r
+    tile = np.concatenate([g, inside[:, :, None] * 255.0], axis=2)
+    img = Image.fromarray(np.clip(tile, 0, 255).astype(np.uint8), "RGBA")
+    art = Image.open(ICON_ART).convert("RGBA").resize((S, S), Image.LANCZOS)
+    img.alpha_composite(art, (0, int(S * 0.015)))
+    a = np.asarray(img).copy()
+    a[:, :, 3] = np.minimum(a[:, :, 3], inside * 255)            # the cube's glow kept inside the tile
+    return Image.fromarray(a, "RGBA").resize((px, px), Image.LANCZOS)
 
 
 def icon_file():
-    """An .ico from the toolbar's cube icon, in the accent colour on the panel colour."""
+    """The .ico (256 down to 16): docs/brand/app.ico, which the app's window takes, and build/app.ico for the exe."""
+    frames = [icon_image(px) for px in (256, 128, 64, 48, 32, 16)]
+    frames[0].save(ICON_ICO, format="ICO", sizes=[(f.width, f.height) for f in frames], append_images=frames[1:])
     out = os.path.join(HERE, "build", "app.ico")
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    frames = [icon_image(px) for px in (256, 128, 64, 48, 32, 16)]
-    frames[0].save(out, format="ICO", sizes=[(f.width, f.height) for f in frames], append_images=frames[1:])
+    shutil.copyfile(ICON_ICO, out)
     return out
 
 

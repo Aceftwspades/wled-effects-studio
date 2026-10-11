@@ -3460,6 +3460,60 @@ LedFx have added that matters here, in the order it helps most.
       undo step), bars typed, a row's length typed, the show's length doubled,
       a blend clamped, the tempo dragged, the brightness dragged, and the 17
       sequencer interactions again. Released as 1.13.1.
+- [x] **A new app icon: the lit Voronoi cube** (2026-10-11): the toolbar's cube
+      glyph in the accent gave way to the studio's own Ace 3-D Voronoi at four
+      seconds, its net folded into an isometric cube of lit LEDs with a glow
+      (`tests/make_icon.py` -> `docs/brand/icon_cube.png`; the same cube is the
+      Reddit icon and the banner's left end). `package.py` puts it on the
+      rounded tile of the panel's dark and writes `docs/brand/app.ico` (256 to
+      16) - the exe's (studio.spec), the desktop shortcut's, and now the
+      window's and the taskbar's too (`create_viewport`'s small and large
+      icons, on Windows and macOS; none was set before) - and the Linux
+      launcher's PNG. Checked: the exe's icon
+      read back from the built package, the window's WM_GETICON (big and
+      small), every size from 256 to 16 on light and dark.
+- [x] **The footer's stats button jumped about** (2026-10-11): it sat after the
+      footer's figures, which change length every frame - the LED under the
+      pointer is added to them while it crosses the cube, and the current's
+      digits - so the button, and the popover placed over it each frame, moved
+      sideways with every LED (five places between x 327 and 579 in one
+      crossing). The button is first in the row now, the figures after it.
+      Checked through posted pointer moves across the cube with the popover
+      open: 24 different footer lines, the button and popover in one place
+      (the old order, put back in the running app: five).
+- [x] **The splice preview drew off the canvas** (2026-10-11): a node dragged
+      onto a wire shows the wiring the drop would make as two curves, on a
+      viewport drawlist in front of everything and unclipped. Zoomed in, with
+      the wire's other end off the canvas, a curve ran from that end across
+      the pane's frame - and, by where the node lay, over the toolbar, the
+      menus, the side rail, the properties and the 3-D view. The curves are
+      drawn now as the runs of them that are on the canvas
+      (`graph_ui._splice_draw`): inside the editor, out from under the windows
+      floating over it (`overlay_holes`) and the minimap - still over the
+      nodes, as before. Checked through a posted drag at 250% on box_fire's
+      longest wire, its source off the canvas and then its end: every point
+      of the preview on the canvas, none under the properties, the 3-D view or
+      the minimap, and the drop still splices.
+- [x] **The shape's own settings, always in reach** (2026-10-11): the Shape
+      frame showed the whole shape's settings - real sizes, the layout the
+      effects see (strip or grid, how a grid is projected), power - only with
+      nothing selected, and a part is selected from the start, so the grid
+      for 2-D effects was found only by those who knew to click on nothing
+      (the owner did not, until told). Now:
+      - a **Shape | Part** tab bar over the settings: the Shape tab whatever
+        is selected (the selection left as it is), the part's tab named
+        ("Part 1: ring 1", "3 parts"), brought forward when a part is picked,
+        away with nothing selected;
+      - the side panel's GEOMETRY, for a shape: **effects see** (strip / grid)
+        and the grid's size, and **Shape settings...**, the frame on its
+        Shape tab;
+      - the warning under a matrix effect on a strip-laid shape has a button,
+        **Lay the shape out as a grid** (the best fit), the fix a click away.
+      `shape_ui.set_layout` is the one way in for all three. Checked through
+      posted clicks: the tabs both ways with a part selected, a part picked
+      bringing its tab back, nothing selected, the grid button (a grid, the
+      best fit, the warning gone, the panel's row following), undo, and the
+      panel's Shape settings with part 2 selected.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails

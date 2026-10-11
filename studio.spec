@@ -43,7 +43,7 @@ if sys.platform.startswith("linux"):
     # compiler, and an engine a newer gcc made needs its newer libstdc++ - an older copy loaded first
     # would refuse it (GLIBCXX_3.4.x not found). Every Linux with a compiler has them.
     a.binaries = [b for b in a.binaries if not os.path.basename(b[0]).startswith(("libstdc++.so", "libgcc_s.so"))]
-icon = os.path.join(HERE, "build", "app.ico")                      # an .ico: Windows; macOS wants .icns, Linux has none
+icon = os.path.join(HERE, "docs", "brand", "app.ico")              # an .ico (package.py): Windows; macOS wants .icns, Linux has none
 common = dict(exclude_binaries=True, debug=False, bootloader_ignore_signals=False, strip=False, upx=False,
               icon=icon if os.path.exists(icon) and sys.platform.startswith("win") else None)
 exe = EXE(pyz, a.scripts, [], name="WLED Effects Studio", console=False, **common)

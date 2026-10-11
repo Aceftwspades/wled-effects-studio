@@ -269,9 +269,16 @@ def build(app):
             dpg.add_text("the parts in the order the LEDs are wired: drag a row to move it", tag="shape_list_hint", color=c.DIM)
         with dpg.child_window(tag="shape_parts", height=px(150), border=True):
             pass
-        with dpg.group(horizontal=True):
-            typeface.label(dpg.add_text("SHAPE", tag="shape_part_title", color=c.ACCENT))
-            dpg.add_text("", tag="shape_part_kind", color=c.DIM)
+        # the settings below: the whole shape's (its sizes, what the effects see - strip or grid -, power) or the
+        # selected part's. A tab each, so the shape's own are a click away whatever is selected (they used to show
+        # only with nothing selected, and a part is selected from the start)
+        with dpg.tab_bar(tag="shape_tabs", callback=lambda s, a: _pick_tab(app, a)):
+            dpg.add_tab(label="Shape", tag="shape_tab_shape")
+            c.tip("the whole shape's settings: its real sizes, what the effects see (one strip, or a grid for 2-D "
+                  "effects), power - whatever part is selected")
+            dpg.add_tab(label="Part", tag="shape_tab_part")
+            c.tip("the selected part's sizes and place (click a part in the 3-D view, or its row above)")
+        dpg.add_text("", tag="shape_part_kind", color=c.DIM)
         with dpg.child_window(tag="shape_fields", height=-30, border=False):
             pass
         # PREVIEW: a turntable of the shape, rendered off screen, looping here and saved as a GIF - folded away until wanted
@@ -447,7 +454,7 @@ def refresh(app):
         dpg.set_value("shape_desc", "no parts yet: start with an object, draw a run or import one - the geometry becomes "
                       "the shape when its first part goes in" if parts is None else "no parts yet: start with an object below")
         shape_start.fill(app, "shape_parts")
-        dpg.set_value("shape_part_title", "SHAPE"); dpg.set_value("shape_part_kind", "")
+        _show_tab(app, "shape", None); dpg.set_value("shape_part_kind", "")
         if dpg.does_item_exist("shape_checks"):
             dpg.delete_item("shape_checks", children_only=True)
         if parts is not None:
@@ -502,18 +509,61 @@ def refresh(app):
         start += n
     shape_checks.refresh(app)
     P = "shape_fields"
-    if not chosen:
-        dpg.set_value("shape_part_title", "SHAPE"); dpg.set_value("shape_part_kind", "- nothing selected: the shape's own settings")
+    # a part picked (another than before): its tab comes forward - the Shape tab stays a click away
+    picked = (frozenset(chosen), sel)
+    if picked != getattr(app, "_shape_tab_for", None):
+        app._shape_tab_for = picked
+        if chosen:
+            app._shape_tab = "part"
+    tab = getattr(app, "_shape_tab", "part") if chosen else "shape"
+    if len(chosen) == 1 and 0 <= sel < len(parts):
+        part_label = f"Part {sel + 1}: {parts[sel].get('name', parts[sel]['kind'])}"
+    else:
+        part_label = f"{len(chosen)} parts"
+    _show_tab(app, tab, part_label if chosen else None)
+    if tab == "shape":
+        dpg.set_value("shape_part_kind", "the shape's own settings - its sizes, what the effects see, power"
+                      + ("" if chosen else " (no part selected)"))
         _shape_settings(app, P, sp)
     elif len(chosen) == 1 and 0 <= sel < len(parts):
         part = parts[sel]
-        dpg.set_value("shape_part_title", f"PART {sel + 1}: {part.get('name', part['kind'])}")
-        dpg.set_value("shape_part_kind", f"- {part['kind']}, {counts[sel]} LEDs")
+        dpg.set_value("shape_part_kind", f"{part['kind']}, {counts[sel]} LEDs")
         _part_settings(app, P, sel, part, sp)
     else:
-        dpg.set_value("shape_part_title", f"{len(chosen)} PARTS")
-        dpg.set_value("shape_part_kind", f"- {sum(counts[i] for i in chosen)} LEDs; part {sel + 1} the active one (the last picked)")
+        dpg.set_value("shape_part_kind", f"{sum(counts[i] for i in chosen)} LEDs; part {sel + 1} the active one (the last picked)")
         _several_settings(app, P, sorted(chosen), sp)
+
+
+def _show_tab(app, tab, part_label):
+    """The tab bar as the settings below are: the Shape tab or the part's, the part's named (or away with none)."""
+    if not dpg.does_item_exist("shape_tabs"):
+        return
+    dpg.configure_item("shape_tab_part", show=part_label is not None, label=part_label or "Part")
+    dpg.set_value("shape_tabs", "shape_tab_part" if tab == "part" and part_label else "shape_tab_shape")
+
+
+def _pick_tab(app, tab):
+    """A tab clicked: the shape's settings or the selected part's below (the selection is left as it is)."""
+    alias = dpg.get_item_alias(tab) if isinstance(tab, int) else tab
+    app._shape_tab = "part" if alias == "shape_tab_part" else "shape"
+    refresh(app)
+
+
+def show_settings(app):
+    """The Shape frame, open on the whole shape's settings (the side panel's way to them)."""
+    from native import device_ui
+    app._shape_tab = "shape"
+    device_ui.show(app, "shape")
+    refresh(app)
+
+
+def set_layout(app, layout):
+    """What the effects see: one strip in wiring order, or a grid the LEDs are projected onto (WLED's 2-D effects);
+    a grid laid out for the first time takes the best fit."""
+    g = app.project.geometry
+    if g.kind != "shape" or g.params.get("layout", "strip") == layout:
+        return
+    _apply(app, layout=layout, **({"projection": "auto"} if layout == "grid" and "projection" not in g.params else {}))
 
 
 def _heading(P, text, info=None):
@@ -545,8 +595,7 @@ def _shape_settings(app, P, sp):
              "an xLights model came with")
     with form.row("layout", parent=P):
         dpg.add_combo(["strip", "grid"], tag="shape_layout", width=px(80), default_value=sp.get("layout", "strip"),
-                      callback=lambda s, v: _apply(app, layout=v, **({"projection": "auto"} if v == "grid" and
-                                                                       "projection" not in sp else {})))
+                      callback=lambda s, v: set_layout(app, v))
         dpg.add_button(label="Segment per part", small=True, callback=lambda: segments_per_part(app))
         c.tip("each part its own WLED segment - effect, palette, sliders - up to eight")
     if sp.get("layout") == "grid" and not sp.get("grid"):

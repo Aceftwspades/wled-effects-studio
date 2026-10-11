@@ -21,6 +21,7 @@ if defined PYW (
   set "ARGS=%HERE%run_studio.pyw"
 )
 if exist "%HERE%build\app.ico" set "ICON=%HERE%build\app.ico"
+if exist "%HERE%docs\brand\app.ico" set "ICON=%HERE%docs\brand\app.ico"
 :make
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$d = [Environment]::GetFolderPath('Desktop');" ^

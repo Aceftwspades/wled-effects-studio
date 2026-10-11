@@ -1030,8 +1030,21 @@ class App(Features):
                            "(where the first LED is, rows or columns, serpentine, panels, gaps), else a strip - over this "
                            f"{g.kind}: a cube's faces, their order and turns. Read only; the device is not changed.")
         if g.kind == "shape":                             # the description line below says what it is
+            with form.row("effects see", parent="geom_fields",
+                          tip="one strip in wiring order (1-D effects, the 3-D nodes), or a grid the LEDs are projected "
+                              "onto, for WLED's 2-D effects and the matrix ones - how it is projected is in the Shape "
+                              "frame's Shape tab"):
+                dpg.add_combo(["strip", "grid"], tag="geom_layout", width=px(80), default_value=g.params.get("layout", "strip"),
+                              callback=lambda s, v: shape_ui.set_layout(self, v))
+            if g.params.get("layout") == "grid":
+                lost = int(getattr(g, "collisions", 0) or 0)
+                form.note(f"a {g.w} x {g.h} grid" + (f": {lost} LEDs share a cell and stay dark" if lost else ""),
+                          parent="geom_fields", **({"color": chrome.AMBER} if lost else {}))
             with form.under(parent="geom_fields"):
                 dpg.add_button(label="Edit the shape...", callback=lambda: device_ui.show(self, "shape"))
+                dpg.add_button(label="Shape settings...", callback=lambda: shape_ui.show_settings(self))
+                chrome.tip("the Shape frame on the whole shape's settings: its sizes, what the effects see and how a grid "
+                           "is projected, power")
         if g.kind == "cube" and g.params.get("map") is not None:
             # wired by a device's own map, which the settings below cannot say: they come back on request
             with form.under(parent="geom_fields"):
@@ -1739,9 +1752,11 @@ class App(Features):
         if bad:
             dpg.set_value("fx_fit_note", "an effect for a matrix: on this shape's one-row (strip) layout it shows one colour - "
                                          "pick one made for any shape (the project's own, a 1-D one), or lay the shape out as a "
-                                         "grid in the Shape frame (THE EFFECTS SEE)" if g.kind == "shape" else
+                                         "grid" if g.kind == "shape" else
                           "an effect for a matrix: on a single row of LEDs it shows one colour - pick a 1-D effect, or one for both")
         dpg.configure_item("fx_fit_note", show=bad)
+        if dpg.does_item_exist("fx_fit_grid"):
+            dpg.configure_item("fx_fit_grid", show=bad and g.kind == "shape")
 
     def rebuild_params(self, meta=None):
         """Sliders are labelled from the effect's own metadata, as the web UI is
@@ -3809,7 +3824,9 @@ class App(Features):
 def build(app):
     typeface.dpi_aware()                     # drawn at the monitor's size, not stretched to it
     dpg.create_context()
-    dpg.create_viewport(title="WLED Effects Studio", width=px(1280), height=px(800), vsync=False)
+    ico = os.path.join(_paths.RES, "docs", "brand", "app.ico")          # the lit cube, as the exe's (package.py)
+    ico = ico if sys.platform in ("win32", "darwin") and os.path.exists(ico) else ""
+    dpg.create_viewport(title="WLED Effects Studio", width=px(1280), height=px(800), vsync=False, small_icon=ico, large_icon=ico)
     typeface.fonts()
     typeface.bind()                          # the interface face; the monospace where code and numbers are
 
@@ -3927,6 +3944,10 @@ def build(app):
                                       default_value=app.eng.names[app.eng.idx], width=-1,
                                       callback=app.on_effect)
                     form.note("", tag="fx_fit_note", show=False, color=chrome.AMBER)
+                    with form.under(tag="fx_fit_grid", show=False):
+                        dpg.add_button(label="Lay the shape out as a grid", small=True, callback=lambda: shape_ui.set_layout(app, "grid"))
+                        chrome.tip("the shape's LEDs projected onto a grid (the best fit), so a matrix effect draws on it - "
+                                   "the Shape frame's Shape tab says how, and can change it")
                     with form.row("palette"):
                         dpg.add_combo([p[0] for p in PALETTES],
                                       default_value=app.palette_name_for(app.eng.pal),
@@ -4054,10 +4075,12 @@ def build(app):
                 app.sec_apply_order()
         with dpg.group(tag="footer"):
           with dpg.group(horizontal=True, tag="stat_row"):
-              typeface.mono(dpg.add_text("", tag="stat_txt"))     # power and the device's fps (C18)
+              # the button first: the figures after it change length every frame (the LED under the pointer, the
+              # current), and a button after them - and its popover, placed over it - jumped about with them
               dpg.add_button(label="stats", tag="stat_more", small=True, callback=lambda: chrome.toggle_stats(app))
               chrome.tip("every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, "
                          "the device's and the studio's time; the current and the limiter - live while open")
+              typeface.mono(dpg.add_text("", tag="stat_txt"))     # power and the device's fps (C18)
           messages.build(app, "footer")               # the latest message, the problems that stay, the log (C10)
     chrome.build_dialogs(app)
     chrome.build_stats_popover(app)                  # the footer's stats button's figures (C18)
@@ -4110,9 +4133,9 @@ def build(app):
         dpg.draw_rectangle((0, 0), (10, 10), tag="ghost_rect", show=False, thickness=2, rounding=5,
                            color=tuple(chrome.ACCENT[:3]) + (200,), fill=tuple(chrome.ACCENT[:3]) + (28,))
         typeface.draw_text((0, 0), "", px(14), tag="ghost_text", show=False, color=tuple(chrome.ACCENT[:3]) + (230,))
-        # the wiring a dragged node would splice into: two curves, drawn while the pointer is on the wire
-        for t in ("splice_a", "splice_b"):
-            dpg.draw_bezier_cubic((0, 0), (0, 0), (0, 0), (0, 0), tag=t, show=False, thickness=px(4), color=tuple(chrome.ACCENT[:3]) + (235,))
+        # the wiring a dragged node would splice into: two curves, drawn while the pointer is on the wire, as the
+        # runs of them on the canvas (graph_ui._splice_draw)
+        dpg.add_draw_node(tag="splice_lines")
     dpg.set_primary_window("root", True)
     # set_primary_window puts its own window flags in place of the window's: no scrollbar and no wheel scroll again
     # (without them the panes' few pixels of rounding past the window's size made it scroll, wheel and all)
