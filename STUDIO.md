@@ -3513,7 +3513,8 @@ LedFx have added that matters here, in the order it helps most.
       posted clicks: the tabs both ways with a part selected, a part picked
       bringing its tab back, nothing selected, the grid button (a grid, the
       best fit, the warning gone, the panel's row following), undo, and the
-      panel's Shape settings with part 2 selected.
+      panel's Shape settings with part 2 selected. Released as 1.13.2, with the
+      icon, the stats button and the splice preview above.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
