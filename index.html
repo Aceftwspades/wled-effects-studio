@@ -20,23 +20,32 @@
   .pane h2 { font-size:11px; margin:0 0 8px; color:var(--dim); font-weight:600;
              text-transform:uppercase; letter-spacing:.06em;
              display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .fxnav { display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .fxnav label { display:inline-flex; gap:4px; align-items:center; cursor:pointer; }
+  .fxname { color:var(--tx); margin-left:8px; text-transform:none; letter-spacing:0; }
+  .fxname:not(:empty)::before { content:'· '; color:var(--dim); }
   .fsbtn { font-size:10px; padding:1px 6px; text-transform:none; letter-spacing:0; }
 
   /* Fullscreen. The PANE goes fullscreen rather than the bare canvas, so the
      exit control and the title stay on screen - a fullscreened canvas leaves
      nothing to click and only Escape to get out. */
-  .pane:fullscreen { padding:0; border:0; border-radius:0; background:#000;
-                     display:flex; align-items:center; justify-content:center; }
-  .pane:fullscreen h2 { position:fixed; top:8px; left:14px; right:14px; margin:0;
-                        z-index:2; opacity:.55; pointer-events:none; }
-  .pane:fullscreen h2 .fsbtn { pointer-events:auto; }
-  /* The net is square at every face size, so vmin gives the largest square that
-     fits whatever the screen shape is. Pixelated is inherited, so it scales up
-     as hard pixels rather than a blur. */
-  .pane:fullscreen #net { width:100vmin; height:100vmin; max-width:100vmin; border-radius:0; }
+  .pane.fs { padding:0; border:0; border-radius:0; background:#000;
+             display:flex; align-items:center; justify-content:center; }
+  /* No Fullscreen API (iPhone Safari, an embedding iframe) or the request was
+     refused: the same layout, pinned over the whole viewport instead. */
+  .pane.fs.fake { position:fixed; inset:0; z-index:100; }
+  .pane.fs h2 { position:fixed; top:8px; left:14px; right:14px; margin:0;
+                z-index:2; opacity:.55; pointer-events:none; }
+  .pane.fs h2 .fsbtn { pointer-events:auto; }
+  /* The grid is not always square (the cylinder, sphere and torus are 2:1), so
+     the canvas takes the whole screen and object-fit keeps its proportions.
+     Pixelated is inherited, so it scales up as hard pixels rather than a blur. */
+  .pane.fs #net { width:100vw; height:100vh; object-fit:contain; border-radius:0; }
+  @supports (height:100dvh) { .pane.fs #net { height:100dvh; } }
   /* The cube gets the whole screen and a real aspect ratio - fit() reads the
      client box, so it stops forcing square as soon as this applies. */
-  .pane:fullscreen #gl { width:100vw; height:100vh; aspect-ratio:auto; border-radius:0; }
+  .pane.fs #gl { width:100vw; height:100vh; aspect-ratio:auto; border-radius:0; }
+  @supports (height:100dvh) { .pane.fs #gl { height:100dvh; } .pane.fs.fake { height:100dvh; } }
   canvas { display:block; width:100%; height:auto; border-radius:4px; background:#000; }
   #net { image-rendering:pixelated; }
   #gl { aspect-ratio:1/1; cursor:grab; } #gl:active { cursor:grabbing; }
@@ -65,16 +74,27 @@
   <button id="play">pause</button>
   <button id="step">step</button>
   <button id="reset">restart fx</button>
+  <span class="fxnav">
+    <button id="prev" title="Previous effect (←)">‹ prev</button>
+    <button id="next" title="Next effect (→)">next ›</button>
+    <button id="shuf" title="Jump to a random effect (s)">shuffle</button>
+    <label><input type="checkbox" id="auto"> auto-advance</label>
+    <select id="autosec" title="Seconds on each effect">
+      <option value="5">5 s</option><option value="10" selected>10 s</option>
+      <option value="20">20 s</option><option value="30">30 s</option><option value="60">60 s</option></select>
+    <label title="Advance to a random effect, never repeating until all have played">
+      <input type="checkbox" id="autorand" checked> random order</label>
+  </span>
   <span id="stat" style="color:var(--dim)"></span>
 </header>
 
 <div id="err" hidden></div>
 
 <main>
-  <div class="pane" id="paneNet"><h2><span id="netTitle">Unfolded net</span>
+  <div class="pane" id="paneNet"><h2><span id="netTitle">Unfolded net</span><span class="fxname" id="netFx"></span>
     <button class="fsbtn" data-fs="paneNet" title="Fullscreen (n) — Esc to exit">⛶ full</button></h2>
     <canvas id="net"></canvas></div>
-  <div class="pane" id="paneGl"><h2><span id="glTitle">Cube</span> — drag to rotate, wheel to zoom
+  <div class="pane" id="paneGl"><h2><span id="glTitle">Cube</span><span class="fxname" id="glFx"></span> — drag to rotate, wheel to zoom
     <button class="fsbtn" data-fs="paneGl" title="Fullscreen (f) — Esc to exit">⛶ full</button></h2>
     <canvas id="gl"></canvas></div>
   <div class="pane side">
@@ -547,25 +567,53 @@ addEventListener('resize', fit);
 // ===========================================================================
 // Fullscreen
 // ===========================================================================
+// The pane carries a class, `fs`, for as long as it is fullscreen, so the layout
+// does not depend on which flavour of the API is in play: unprefixed, WebKit's
+// prefix (older Safari), or none at all (iPhone, which only fullscreens video) -
+// in which case the pane is pinned over the viewport instead (`fake`).
+let fsPane = null;
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+function setFs(pane) {
+  if (fsPane && fsPane !== pane) fsPane.classList.remove('fs', 'fake');
+  fsPane = pane;
+  if (pane) pane.classList.add('fs');
+  fit(); requestAnimationFrame(fit);
+}
+function exitFs() {
+  if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  if (fsPane) { fsPane.classList.remove('fs', 'fake'); fsPane = null; }
+  fit(); requestAnimationFrame(fit);
+}
+function enterFs(pane) {
+  const rq = pane.requestFullscreen || pane.webkitRequestFullscreen;
+  const fake = () => { pane.classList.add('fake'); setFs(pane); };
+  if (!rq) { fake(); return; }
+  setFs(pane);
+  try {
+    const r = rq.call(pane);
+    if (r && r.catch) r.catch(fake);          // refused: fall back to the overlay
+  } catch (e) { fake(); }
+}
 function toggleFs(id) {
   const pane = el(id);
   if (!pane) return;
-  if (document.fullscreenElement === pane) { document.exitFullscreen(); return; }
-  // Leaving one pane and entering the other in the same gesture needs the exit
-  // to settle first, or the second request is rejected.
-  const go = () => pane.requestFullscreen && pane.requestFullscreen().catch(() => {});
-  if (document.fullscreenElement) document.exitFullscreen().then(go).catch(go);
-  else go();
+  if (fsPane === pane) exitFs(); else enterFs(pane);
 }
 document.querySelectorAll('.fsbtn').forEach(b =>
   b.onclick = e => { e.stopPropagation(); toggleFs(b.dataset.fs); });
 
-// The 3D canvas changes size on the way in AND on the way out, and three.js
-// only learns about it when told. Fitted twice on purpose: the event can arrive
-// before the new layout has been applied, in which case the first call measures
-// the OLD box and the cube renders letterboxed into a corner until something
-// else happens to resize it.
-document.addEventListener('fullscreenchange', () => { fit(); requestAnimationFrame(fit); });
+// The user left real fullscreen with Escape or the browser's own control.
+function fsChanged() {
+  if (!fsEl() && fsPane && !fsPane.classList.contains('fake')) { fsPane.classList.remove('fs'); fsPane = null; }
+  // The 3D canvas changes size on the way in AND on the way out, and three.js
+  // only learns about it when told. Fitted twice on purpose: the event can arrive
+  // before the new layout has been applied, in which case the first call measures
+  // the OLD box and the cube renders letterboxed into a corner until something
+  // else happens to resize it.
+  fit(); requestAnimationFrame(fit);
+}
+document.addEventListener('fullscreenchange', fsChanged);
+document.addEventListener('webkitfullscreenchange', fsChanged);
 
 addEventListener('keydown', e => {
   // Never steal a key from a slider or a select the user is driving.
@@ -574,6 +622,10 @@ addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'f') toggleFs('paneGl');
   else if (e.key === 'n') toggleFs('paneNet');
+  else if (e.key === 'Escape' && fsPane) exitFs();         // the overlay has no browser Escape of its own
+  else if (e.key === 'ArrowRight') advance(1);
+  else if (e.key === 'ArrowLeft') advance(-1);
+  else if (e.key === 's') shuffle();
 });
 
 // ===========================================================================
@@ -635,6 +687,10 @@ function loop(t) {
   // fast-forwarded in one burst the moment it came back.
   if (dtReal > 250) dtReal = 250;
   if (playing) {
+    if (M && el('auto').checked) {
+      autoAcc += dtReal;
+      if (autoAcc >= +el('autosec').value * 1000) autoNext();
+    }
     tAcc += dtReal;
     let steps = 0;
     while (tAcc >= 23 && steps < 6) { pushAudio(); frame(23); tAcc -= 23; steps++; }
@@ -654,6 +710,38 @@ function loop(t) {
 // `python build.py`, and you end up staring at an unchanged effect wondering why
 // your edit did nothing - which is the exact failure mode this tool exists to
 // remove.
+// ---------------------------------------------------------------------------
+// Effect picking: next / previous, shuffle, and auto-advance
+// ---------------------------------------------------------------------------
+// Shuffle deals from a shuffled deck rather than rolling a die each time, so a
+// run through every effect never repeats one until the whole roster has played.
+let deck = [], autoAcc = 0;
+function showEffectName() {
+  const n = meta[effIdx] ? meta[effIdx].name : '';
+  el('netFx').textContent = n; el('glFx').textContent = n;
+}
+function selectEffect(i) {
+  effIdx = i; el('fx').value = i;
+  M.ccall('simSelect'); buildControls(); showEffectName();
+  autoAcc = 0;                                 // a manual pick restarts the auto-advance timer
+}
+function shuffle() {
+  if (!meta.length) return;
+  if (!deck.length) {
+    deck = meta.map((_, i) => i).filter(i => i !== effIdx);
+    for (let i = deck.length - 1; i > 0; i--) {          // Fisher-Yates
+      const j = (Math.random() * (i + 1)) | 0;
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+  }
+  if (deck.length) selectEffect(deck.pop());
+}
+function advance(d) {
+  if (!meta.length) return;
+  selectEffect((effIdx + d + meta.length) % meta.length);
+}
+const autoNext = () => el('autorand').checked ? shuffle() : advance(1);
+
 const bust = '?t=' + Date.now();
 function loadGlue() {
   return new Promise((res, rej) => {
@@ -674,15 +762,19 @@ loadGlue().then(() => CubeFX({ locateFile: p => p + bust })).then(mod => {
     const o = document.createElement('option'); o.value = i; o.textContent = meta[i].name;
     sel.appendChild(o);
   }
-  sel.onchange = () => { effIdx = +sel.value; M.ccall('simSelect'); buildControls(); };
+  sel.onchange = () => selectEffect(+sel.value);
   el('bsel').onchange = e => { M.ccall('simSelect'); resize(+e.target.value); buildControls(); };
   el('gsel').onchange = e => { setGeometry(e.target.value); buildControls(); };
   el('pal').onchange = push;
   el('play').onclick  = e => { playing = !playing; e.target.textContent = playing ? 'pause' : 'play'; };
   el('step').onclick  = () => { pushAudio(); frame(23); };
   el('reset').onclick = () => M.ccall('simSelect');
+  el('prev').onclick  = () => advance(-1);
+  el('next').onclick  = () => advance(1);
+  el('shuf').onclick  = shuffle;
+  el('auto').onchange = el('autosec').onchange = () => { autoAcc = 0; };
 
-  setGeometry('cube'); buildAudio(); buildControls(); fit();
+  setGeometry('cube'); buildAudio(); buildControls(); showEffectName(); fit();
   requestAnimationFrame(loop);
 }).catch(e => {
   el('err').hidden = false;
