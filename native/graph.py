@@ -48,6 +48,18 @@ class GraphError(ValueError):
     pass
 
 
+def _meta_text(s, drop=""):
+    """User text (the effect's name, a slider's label, the colours' names) as it can stand in the effect's
+    metadata: a C string literal WLED reads as Name@labels;colours;... - a quote or a backslash ended the
+    literal (the build failed), a line break left the generated file's header comment, and @ ; (and `drop`,
+    a label's comma) split it where they should not."""
+    s = "".join(" " if ord(ch) < 32 else ch for ch in str(s))
+    s = s.replace('"', "'").replace("\\", "/").replace("@", " ").replace(";", " ")
+    for ch in drop:
+        s = s.replace(ch, " ")
+    return s
+
+
 def _ident(name):
     s = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_").lower()
     if not s or s[0].isdigit():
@@ -1038,7 +1050,7 @@ class Graph:
             return self._compile_as(self.flatten(), title, profile)
         if self.has_sends():
             return self._compile_as(self.resolve_sends(), title, profile)
-        title = title or self.name
+        title = _meta_text(title or self.name)
         ident = _ident(title)
         outs = [n for n in self.nodes.values() if n["type"] == "Output"]
         if not outs:
@@ -1257,7 +1269,7 @@ class Graph:
         defaults = {"sx": 128, "ix": 128}
         for n in self.nodes.values():
             if n["type"] in slot:
-                labels[slot[n["type"]]] = str(n["params"].get("label", n["type"])).replace(",", " ").replace(";", " ")
+                labels[slot[n["type"]]] = _meta_text(n["params"].get("label", n["type"]), drop=",")
                 if "default" in n["params"]:
                     v = n["params"]["default"]
                     defaults[dkey[n["type"]]] = int(bool(v)) if isinstance(v, bool) else int(v)
@@ -1265,8 +1277,8 @@ class Graph:
         defaults["pal"] = int(settings.get("palette", 11))
         dims = {"both": "12", "1-D": "1", "2-D": "2"}.get(str(settings.get("dimensions", "both")), "12")
         aud = {"volume": "v", "frequency": "f"}.get(str(settings.get("audio", "none")), "")
-        cols = str(settings.get("colours", "")).replace(";", " ")
-        meta = (f'{title.replace(chr(34), chr(39))}@{",".join(labels)};{cols};!;{dims}{aud};'
+        cols = _meta_text(settings.get("colours", ""))
+        meta = (f'{title}@{",".join(labels)};{cols};!;{dims}{aud};'
                 + ",".join(f"{k}={v}" for k, v in defaults.items()))
 
         state = ""
