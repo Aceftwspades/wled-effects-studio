@@ -51,6 +51,25 @@ def test_path_grammar():
     assert abs(s[0].length() - math.pi * 10) < 0.1
 
 
+def test_drawings_that_hung_or_failed_the_import():
+    """Numbers after a closepath ("Z 5 5") repeated the Z, which takes none: the import never ended. A group
+    using itself twice doubled at every level - 2^40 visits. A path starting with S or T raised a TypeError
+    the import did not catch, and the whole file failed. Each is read now, in a subprocess so a hang fails."""
+    import subprocess
+    cases = {
+        "after a closepath": '<path d="M0 0 L10 0 L10 10 Z 5 5"/>',
+        "a group using itself": '<g id="a"><path d="M0 0 L10 0"/><use href="#a"/><use href="#a"/></g>',
+        "S first": '<path d="S 10 10 20 0"/><path d="M0 0 L5 5"/>',
+        "T first": '<path d="T 10 10"/><path d="M0 0 L5 5"/>',
+    }
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for what, body in cases.items():
+        code = ("import sys; sys.path.insert(0, %r); from native import svg_import; "
+                "st, sk = svg_import.parse(%r); print(len(st))") % (root, SVG.format(size='width="100mm" height="100mm" viewBox="0 0 100 100"', body=body))
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
+        assert r.returncode == 0 and int(r.stdout.strip() or 0) >= 1, (what, r.stderr[-400:])
+
+
 def test_units_transforms_and_what_is_left_out():
     s, _ = _strokes('<line x1="0" y1="0" x2="96" y2="0"/>', size="")              # no size: CSS pixels
     assert abs(s[0].length() - 25.4) < 1e-9

@@ -260,7 +260,7 @@ def path_strokes(d, M, tol, name=""):
     strokes = []
     cur = []                                                # the subpath so far, user units
     x = y = sx = sy = 0.0
-    prev_ctrl, prev_cmd = None, None
+    prev_ctrl, prev_cmd = None, ""                         # "": an S or T first has no command before it
 
     def finish(closed):
         nonlocal cur
@@ -289,6 +289,9 @@ def path_strokes(d, M, tol, name=""):
             if cmd is None or not r.more():
                 break
             c = cmd                                         # a repeat: the command again with new numbers
+            if c in "Zz":
+                break                                       # numbers after a closepath: an error in SVG, where the
+                                                            # path ends (a Z repeated took none of them: no end)
             if c in "Mm":
                 c = "L" if c == "M" else "l"                # a moveto's extra pairs are lines
         cmd = c
@@ -439,6 +442,8 @@ def parse(text, tol=0.05):
             ids[el.get("id")] = el
     strokes, skipped = [], {}
 
+    expanding = set()                                       # the use targets being drawn now (their ids)
+
     def walk(el, M, depth=0):
         if depth > 40:
             return
@@ -464,16 +469,22 @@ def parse(text, tol=0.05):
         if tag == "use":
             ref = el.get("href") or el.get("{http://www.w3.org/1999/xlink}href") or ""
             target = ids.get(ref.lstrip("#"))
-            if target is None or target is el:
+            # a use inside what it uses (directly or further down) is drawn once, not again: two of them in a
+            # group that uses itself doubled at every level - 2^40 visits before the depth limit, a hang
+            if target is None or target is el or id(target) in expanding:
                 return
             T = np.eye(3)
             T[0, 2], T[1, 2] = _num(el.get("x")), _num(el.get("y"))
             M2 = M @ T
-            if _tag(target) == "symbol":
-                for ch in target:
-                    walk(ch, M2, depth + 1)
-            else:
-                walk(target, M2, depth + 1)
+            expanding.add(id(target))
+            try:
+                if _tag(target) == "symbol":
+                    for ch in target:
+                        walk(ch, M2, depth + 1)
+                else:
+                    walk(target, M2, depth + 1)
+            finally:
+                expanding.discard(id(target))
             return
         name = el.get("id") or tag
         if tag == "path":
