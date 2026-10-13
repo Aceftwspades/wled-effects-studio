@@ -205,7 +205,13 @@ class Geometry:
                         self.pos[li] = pos[led]; self.lit[li] = True; order.append((led, li))
                         if nrm is not None:
                             self.nrm[li] = nrm[led]
-                self.phys = np.asarray([li for _, li in sorted(order)], int)
+                order.sort()
+                self.phys = np.asarray([li for _, li in order], int)
+                # an LED that lost its cell to another is still on the strip: the ones after it keep their
+                # own numbers (phys_ids, for the ledmap and the stream), and owner follows the lit ones in
+                # wiring order, as phys does - each by its rank, as everything reading them counts
+                self.phys_ids = np.asarray([led for led, _ in order], int)
+                self.owner = np.asarray(self.owner, int)[self.phys_ids] if len(self.owner) else self.owner
             else:
                 self.w, self.h = n, 1
                 self.pos, self.nrm = pos, nrm

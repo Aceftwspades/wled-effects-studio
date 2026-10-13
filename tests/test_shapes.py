@@ -495,6 +495,23 @@ def test_points_that_are_not_numbers_are_left_out():
     assert g.count == 2 and g.skipped == 2
 
 
+def test_a_grid_keeps_each_leds_own_number_past_a_collision():
+    """An LED that loses its cell to another is still on the strip: the ones wired after it keep their numbers
+    in the ledmap, the points and the xmodel, and their parts (three 3-LED strips, the first two on one row)."""
+    def strip(y, z=0.0):
+        p = shapes.new_part("strip"); p["params"]["n"] = 3; p["pos"] = [0.0, y, z]; return p
+    g = Geometry("shape", parts=[strip(0.0), strip(3.0), strip(0.0, 5.0)], layout="grid", projection="front")
+    assert g.collisions == 3 and g.count == 6
+    assert sorted(v for v in g.ledmap()["map"] if v >= 0) == [0, 1, 2, 6, 7, 8]
+    assert list(g.owner) == [0, 0, 0, 2, 2, 2]
+    with tempfile.TemporaryDirectory() as d:
+        shape_io.write_points(g, os.path.join(d, "p.csv"))
+        idx = [int(l.split(",")[3]) for l in open(os.path.join(d, "p.csv")) if not l.startswith("#")]
+        assert idx == [0, 1, 2, 6, 7, 8]
+        shape_io.write_xmodel(g, os.path.join(d, "m.xmodel"))
+        assert "9" in open(os.path.join(d, "m.xmodel")).read().split('CustomModel="')[1].split('"')[0].replace(";", ",").split(",")
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

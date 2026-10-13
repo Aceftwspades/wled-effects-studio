@@ -701,8 +701,9 @@ def write_xmodel(geom, path, name=None):
     if g.kind == "shape" and g.params.get("layout") == "grid":
         w, h = g.w, g.h
         cells = {}
-        for led, li in enumerate(np.asarray(g.phys, int)):
-            cells[(int(li % w), int(li // w))] = led + 1
+        ids = getattr(g, "phys_ids", None)
+        for k, li in enumerate(np.asarray(g.phys, int)):
+            cells[(int(li % w), int(li // w))] = (int(ids[k]) if ids is not None else k) + 1   # the LED's own number
     else:
         pos = np.asarray(g.pos, np.float32)
         phys = np.asarray(g.phys, int)
@@ -739,6 +740,7 @@ def write_points(geom, path):
     phys = list(np.asarray(geom.phys, int)) if getattr(geom, "phys", None) is not None else list(range(len(pos)))
     parts = (geom.params.get("parts") or []) if geom.kind == "shape" else []
     owner = list(np.asarray(getattr(geom, "owner", []), int)) if geom.kind == "shape" else []
+    ids = getattr(geom, "phys_ids", None)                # an LED's own number where some have no place (a grid's)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(f"# {geom.describe()}\n# x, y, z, index (wiring order), part, part name\n")
         n = 0
@@ -748,7 +750,7 @@ def write_points(geom, path):
                 continue
             part = int(owner[k]) if k < len(owner) else 0
             name = parts[part].get("name", "") if part < len(parts) else ""
-            f.write(f"{x:.4f},{y:.4f},{z:.4f},{k},{part},{name}\n")
+            f.write(f"{x:.4f},{y:.4f},{z:.4f},{int(ids[k]) if ids is not None else k},{part},{name}\n")
             n += 1
     return n
 
