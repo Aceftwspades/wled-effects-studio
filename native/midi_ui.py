@@ -663,17 +663,18 @@ def apply_target(app, t, v, full=127.0, ctl=None):
             return
         app.eng.fx[key] = 1 if val else 0
         app.eng.push()
-        if dpg.does_item_exist("params"):
-            for ch in dpg.get_item_children("params", 1):
-                if dpg.get_item_user_data(ch) == key:
-                    dpg.set_value(ch, val)
+        for tag in (f"inp_chk_{key}", f"seqp_chk_{key}"):          # the panel's checkbox, and the step card's
+            if dpg.does_item_exist(tag):
+                dpg.set_value(tag, bool(val))
     elif kind == "palette":
-        from native import app as appmod
-        names = [p[0] for p in appmod.PALETTES]
+        # the engine's list, not native.app's PALETTES: run as `python -m native.app` (run_studio.pyw, the
+        # tests) the app is __main__, and importing native.app here made a second copy whose list was empty
+        pals = app.eng.palette_list()
+        names = [p[0] for p in pals]
         if not names:
             return
         name = names[int(round(val * (len(names) - 1)))]
-        if dict(appmod.PALETTES)[name] != app.eng.pal:
+        if dict(pals)[name] != app.eng.pal:
             app.on_palette(None, name)
             if dpg.does_item_exist("pal_combo"):
                 dpg.set_value("pal_combo", name)
