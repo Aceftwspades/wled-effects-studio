@@ -869,6 +869,8 @@ def _build_fx(app, c):
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("EFFECT", color=c.ACCENT))
             dpg.add_text("", tag="seq_fx_note", color=c.DIM)
+        body = dpg.add_group(tag="seq_fx_body")
+        dpg.push_container_stack(body)
         with form.row("layer", tip="the step's segments - layers, each its own effect, drawn one over another; the "
                                    "controls below are the chosen one's"):
             dpg.add_combo([], tag="seq_layer", width=-px(70), callback=lambda s, v: (app.seg_pick(v), refresh_fx(app)))
@@ -882,6 +884,7 @@ def _build_fx(app, c):
             dpg.add_combo([], tag="seq_pal_combo", width=-1, callback=lambda s, v: _set_palette(app, v))
         dpg.add_group(tag="seq_params")
         dpg.add_group(tag="seq_opts")
+        dpg.pop_container_stack()
 
 
 def _set_effect(app, v):
@@ -983,6 +986,8 @@ def _editable(app):
 
 
 def toggle_edit(app, on):
+    if not on:
+        edit_commit(app)                                  # a change of the last quarter second: kept
     app._seq_edit = bool(on)
     app._seq_edit_step = None                             # loaded on the next poll
     if dpg.does_item_exist("seq_fx"):
@@ -999,16 +1004,26 @@ def _edit_poll(app):
     engine's state written into it when it changes, both views kept to the engine."""
     if not getattr(app, "_seq_edit", False):
         return
+    if not (app.docked("sequence") or (dpg.does_item_exist(TAG) and dpg.is_item_shown(TAG))):
+        # the frame closed: off - the side panel went on writing into a step nothing on screen showed
+        if dpg.does_item_exist("seq_edit"):
+            dpg.set_value("seq_edit", False)
+        toggle_edit(app, False)
+        return
     if dpg.does_item_exist("seq_edit") and not dpg.get_value("seq_edit"):
         dpg.set_value("seq_edit", True)
     steps = _steps(app)["steps"]
     sel = getattr(app, "_seq_sel", 0)
     if not (0 <= sel < len(steps)) or not _editable(app):
         app._seq_look_due = None                          # playing or seeking: no look of an edit gathered meanwhile
+        app._seq_edit_step = None                         # (play and seek kept the last change): loaded after Stop
+        _fx_body(app, False, sel)
         return
+    _fx_body(app, True, sel)
     st = steps[sel]
     now = time.perf_counter()
     if getattr(app, "_seq_edit_step", None) is not st:
+        edit_commit(app)                                  # another step selected: the last change kept in the one left
         _flush_save(app, now=True)
         load_step(app, sel, quiet=True)
         app._seq_edit_step = st
@@ -1027,6 +1042,16 @@ def _edit_poll(app):
             app._seq_look["edit"] = True
         return
     app._seq_edit_at = now
+    edit_commit(app)
+
+
+def edit_commit(app):
+    """The engine's segments and colours into the step being edited, when they changed since last time: from
+    the poll (a quarter second apart), and from whatever is about to load something else into the sim - another
+    step selected, editing turned off, play and seek - so the last change before it is kept."""
+    st = getattr(app, "_seq_edit_step", None)
+    if st is None or not getattr(app, "_seq_edit", False) or not any(s is st for s in _steps(app)["steps"]):
+        return
     cur = (app.eng.segments(), [int(c) for c in app.seg_cols])
     if cur == getattr(app, "_seq_edit_base", None):
         return
@@ -1037,10 +1062,20 @@ def _edit_poll(app):
     st["colors"] = list(cols)
     if st.get("name") == old and segs:                    # a name that was its effect's follows the effect
         st["name"] = segs[0].get("effect") or st.get("name")
-    app._seq_look_due = now + 1.2
+    app._seq_look_due = time.perf_counter() + 1.2
     _queue_save(app)
     app._tl_dirty = True
     app._seq_rows_dirty = True
+
+
+def _fx_body(app, editable, sel):
+    """The EFFECT controls shown while they edit the step; while the sequence plays or is held at a time they
+    edit nothing (what is changed then is lost at Stop), so they are put away and the note says so."""
+    if not dpg.does_item_exist("seq_fx_body") or dpg.is_item_shown("seq_fx_body") == editable:
+        return
+    dpg.configure_item("seq_fx_body", show=editable)
+    dpg.set_value("seq_fx_note", f"step {sel + 1}, live - here or in the side panel" if editable else
+                  "the sequence is playing or held at a time - Stop, and the selected step is edited again")
 
 
 def _gather_look(app, st):
@@ -1212,6 +1247,7 @@ def position(app):
 
 def play(app, i=0, offset=0.0):
     """The show from step i (offset seconds into it), the sim following it."""
+    edit_commit(app)                                      # the step being edited keeps its last change first
     S = _steps(app)
     if not S["steps"]:
         app.gp.status("no steps to play"); return
@@ -1249,6 +1285,7 @@ def play_pause(app):
 
 def seek(app, t):
     """The show at t seconds: its step in the sim, playing on from there (or held there while paused or stopped)."""
+    edit_commit(app)
     S = _steps(app)
     starts, total = _starts(app)
     if not S["steps"] or total <= 0:
@@ -1374,6 +1411,7 @@ def poll(app):
                 live.t0 = now                                # round again: the WAV from its start with it
         prev = steps[p["i"]] if 0 <= p["i"] < len(steps) else None
         p["i"] = i
+        p["st"], p["n"] = steps[i], len(steps)
         p["next"] = now + float(steps[i].get("dur", 10))
         if prev is not None and float(steps[i].get("trans", 0)) > 0:
             app.transition_start(prev, float(steps[i]["trans"]), S.get("style", "fade"))
@@ -1411,7 +1449,6 @@ def _tl_geometry(app):
     cfg = dpg.get_item_configuration("seq_tl")
     # the size it was given, not the one last drawn: drawn before its first
     # layout it measured 0 high, and its text sat above its own top edge
-        p["st"], p["n"] = steps[i], len(steps)
     (x0, y0) = st.get("rect_min") or (0, 0)
     w, h = cfg["width"], cfg["height"]
     steps = _steps(app)["steps"]
