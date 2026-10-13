@@ -242,12 +242,36 @@ def sub_steps(step):
     return out
 
 
+LAST_PRESET = 250          # WLED keeps presets 1..250 (presets.cpp: 251-254 are refused, 255 is a temporary one)
+OFF_PRESET = 250           # the schedule's "Off" preset: never a step's
+MAX_ENTRIES = 100          # a playlist's entries the device plays (playlist.cpp cuts the rest)
+
+
+def preset_ids(n, base, pid):
+    """n preset ids from `base` up, past the playlist's own id and the Off preset; ValueError when they
+    would run past the device's last one (steps would have overwritten the playlist, or been refused)."""
+    ids, k = [], max(1, int(base))
+    while len(ids) < n:
+        if k > LAST_PRESET - 1:
+            raise ValueError(f"{n} presets from id {base} run past {LAST_PRESET - 1} (the playlist is {pid}, "
+                             f"the Off preset {OFF_PRESET}): start lower, or fewer steps or ramps")
+        if k not in (int(pid), OFF_PRESET):
+            ids.append(k)
+        k += 1
+    return ids
+
+
 def to_wled(steps, names, pals, base=10, pid=9, name="Show", repeat=0):
     """(presets, playlist): the presets as {id: state} and the playlist
     preset, ready for psave or a presets.json. Steps with no effect the
     device has are left out (returned in presets[None] as a list of names);
-    a step with a ramp becomes its sub-steps."""
+    a step with a ramp becomes its sub-steps. ValueError when the device
+    could not hold it: ids past its last, or more entries than it plays."""
     steps = [q for st in steps for q in sub_steps(st)]
+    if len(steps) > MAX_ENTRIES:
+        raise ValueError(f"{len(steps)} entries (ramps play as a step a second): a WLED playlist plays "
+                         f"{MAX_ENTRIES} - fewer or shorter ramped steps")
+    slot = preset_ids(len(steps), base, pid)
     presets, ids, missing = {}, [], []
     for i, st in enumerate(steps):
         is2d = int(st.get("rows", 1)) > 1
@@ -255,11 +279,11 @@ def to_wled(steps, names, pals, base=10, pid=9, name="Show", repeat=0):
         if not segs or any(s is None for s in segs):
             missing.append(st.get("name", f"step {i + 1}"))
             continue
-        pid_i = base + i
+        pid_i = slot[i]
         presets[pid_i] = {"n": st.get("name", f"step {i + 1}"), "on": True, "bri": int(st.get("bri", 128)),
                           "transition": int(round(float(st.get("trans", 0.7)) * 10)), "mainseg": 0, "seg": segs}
         ids.append(pid_i)
-    kept = [st for i, st in enumerate(steps) if base + i in presets]
+    kept = [st for i, st in enumerate(steps) if slot[i] in presets]
     playlist = {"n": name, "playlist": {"ps": ids, "dur": [max(1, int(round(float(st["dur"]) * 10))) for st in kept],
                                         "transition": [int(round(float(st.get("trans", 0.7)) * 10)) for st in kept],
                                         "repeat": int(repeat), "end": 0, "r": False}}

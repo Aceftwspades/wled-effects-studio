@@ -565,7 +565,7 @@ def _timers(app):
     return app.project.options.setdefault("schedule", [])
 
 
-OFF_PRESET = 250          # the "Off" preset the off timers call: high, out of the steps' way
+OFF_PRESET = sequence.OFF_PRESET          # the "Off" preset the off timers call: high, out of the steps' way
 
 
 def add_timer(app, what):
@@ -1734,7 +1734,10 @@ def _resolve(app):
         pals = devices._get(host, "/json/palettes", 5)
     except Exception as e:
         return None, None, f"could not read the device's lists: {e}"
-    presets, playlist = sequence.to_wled(S["steps"], names, pals, int(S.get("base", 10)), int(S.get("pid", 9)), S.get("name", "Show"), int(S.get("repeat", 0)))
+    try:
+        presets, playlist = sequence.to_wled(S["steps"], names, pals, int(S.get("base", 10)), int(S.get("pid", 9)), S.get("name", "Show"), int(S.get("repeat", 0)))
+    except ValueError as e:
+        return None, None, str(e)                            # the device could not hold it: said, nothing sent
     return presets, playlist, None
 
 
@@ -1823,10 +1826,15 @@ def save_file(app, path):
         return
     S = _steps(app)
     presets, playlist, err = _resolve(app) if app.active_host() else (None, None, "no device")
+    if err and presets is None and app.active_host() and not err.startswith("could not read"):
+        app.gp.status(f"not saved: {err}"); return
     if err:
         # no device to resolve names against: the sim's own effect list, which matches a device flashed from this project
         names, pals = app.eng.names, list(range(256))
-        presets, playlist = sequence.to_wled(S["steps"], names, pals, int(S.get("base", 10)), int(S.get("pid", 9)), S.get("name", "Show"), int(S.get("repeat", 0)))
+        try:
+            presets, playlist = sequence.to_wled(S["steps"], names, pals, int(S.get("base", 10)), int(S.get("pid", 9)), S.get("name", "Show"), int(S.get("repeat", 0)))
+        except ValueError as e:
+            app.gp.status(f"not saved: {e}"); return
         note = " (effect ids are the sim's: right for a device flashed from this project)"
     else:
         note = " (effect ids resolved against the device)"
