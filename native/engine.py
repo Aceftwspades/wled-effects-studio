@@ -156,6 +156,10 @@ class Engine:
         self.meta = [parse_meta(L.simEffectMeta(i).decode("utf-8", "replace"))
                      for i in range(self.count)]
         self.names = [m["name"] for m in self.meta]
+        if not 0 <= self.idx < self.count:
+            # a library with fewer effects (another project's, one un-imported): the old index is past its end,
+            # and set_geometry selects it - reload() then picks the effect again by name
+            self.idx = 0
         if self.geom is not None:
             self.set_geometry(self.geom)
         else:
@@ -167,7 +171,7 @@ class Engine:
         and geometry. The effect restarts from nothing, which is what an edit
         to it means anyway."""
         dll = dll or default_library()
-        want = self.names[self.idx] if self.names else None
+        want = self.names[self.idx] if 0 <= self.idx < len(self.names) else None
         fx, pal, cols = dict(self.fx), self.pal, self._colors
         segs = self.segments() if self.seg_count() > 1 else None
         old = self.lib

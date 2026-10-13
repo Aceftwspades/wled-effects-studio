@@ -48,6 +48,15 @@ def test_reload_swaps_the_build_and_keeps_the_effect():
         e.reload(c)                                   # and again: unloads b
         e.frame()
         assert e.library == c
+        # an index the new library does not reach (a project with fewer effects): it raised IndexError from
+        # set_geometry's select before reload could pick the effect by name, leaving the old library loaded
+        e.idx = e.count + 3
+        e.load(c)                                     # as reload does, the index from a longer library
+        assert 0 <= e.idx < e.count
+        e.idx = e.count + 3
+        e.reload(c)
+        assert 0 <= e.idx < e.count
+        e.frame()
         if os.name == "nt":
             # Windows holds a loaded DLL's file open: gone only when FreeLibrary worked
             os.remove(a)
