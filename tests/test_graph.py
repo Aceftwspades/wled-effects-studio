@@ -639,6 +639,10 @@ def test_segment_options_follow_the_firmware():
     base = run()
     assert run(rev=True) == base[::-1]
     assert run(of=3) == base[-3:] + base[:-3]
+    # an offset of a turn or more rolls it as the rest of a turn does (it wrote past the strip, and from
+    # 65535 on a long segment past the engine's buffer), mirrored too
+    assert run(of=16 * 7 + 3) == run(of=3) and run(of=65535) == run(of=65535 % 16)
+    assert run(of=16 * 2 + 5, mi=True) == run(of=5, mi=True)
     assert run(grp=2, spc=1).startswith("RR.RR.")
     assert e.segments()[0]["options"]["grp"] == 2
     e.set_geometry(Geometry("matrix", w=8, h=4))

@@ -476,6 +476,9 @@ static uint32_t simSegBlend(uint8_t mode, uint32_t t, uint32_t b) {
 static inline void simSegLand(const SimSeg &S, int x, int y, uint32_t c) {
   const int sw = S.x1 - S.x0, sh = S.y1 - S.y0, gl = S.groupLength();
   if (!S.is2D()) {
+    // the offset as a place on the segment: one subtraction wraps only an offset under its length, and
+    // the settings take any up to 65535 - more wrote past the segment and past gPixels
+    const int off = sw > 0 ? S.offset % sw : 0;
     int i = x;
     if (S.reverse) i = S.vw() - i - 1;
     i *= gl;
@@ -483,10 +486,10 @@ static inline void simSegLand(const SimSeg &S, int x, int y, uint32_t c) {
       int set = i + j;
       if (set < 0 || set >= sw) continue;
       if (S.mirror) {
-        int mir = sw - set - 1 + S.offset; if (mir >= sw) mir -= sw;
+        int mir = sw - set - 1 + off; if (mir >= sw) mir -= sw;
         uint32_t &d = gPixels[S.y0 * gStripW + S.x0 + mir]; d = color_blend(d, simSegBlend(S.blend, c, d), S.opacity);
       }
-      set += S.offset; if (set >= sw) set -= sw;
+      set += off; if (set >= sw) set -= sw;
       uint32_t &d = gPixels[S.y0 * gStripW + S.x0 + set]; d = color_blend(d, simSegBlend(S.blend, c, d), S.opacity);
     }
     return;
