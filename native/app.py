@@ -1601,12 +1601,19 @@ class App(Features):
         thread by poll_build(), because reloading the engine while a frame is
         being drawn from it is not something to do from another thread."""
         if self.building:
+            # asked again while one runs (a project switch, an import toggled, Live): kept, and run when it is
+            # done - it was dropped, and the running build's library (another project's) was loaded as the result
+            self._build_again = True
             return
         self.edit_save()
         self.building = True
         self.build_msg = "compiling..."
         dpg.set_value("edit_status", self.build_msg)
         dpg.delete_item("edit_errors", children_only=True)
+
+        # what to build, read here on the main thread: the worker read self.project and edit_file as it ran,
+        # and a project switched meanwhile built the new project's files under the old one's build
+        files = [self.project.effect_path(f) for f in self.project.build_files(self.edit_file)]
 
         def work():
             import build as B
@@ -1615,8 +1622,7 @@ class App(Features):
             buf = _io.StringIO()
             try:
                 with contextlib.redirect_stdout(buf):
-                    srcs = B.engine_sources([self.project.effect_path(f)
-                                             for f in self.project.build_files(self.edit_file)])
+                    srcs = B.engine_sources(files)
                 inc = B.include_dirs()
                 rep = build_engine(srcs, inc, log=lambda *a: None)
             except Exception as e:
@@ -1632,6 +1638,14 @@ class App(Features):
         except queue.Empty:
             return
         self.building = False
+        try:
+            self._build_done(kind, payload)
+        finally:
+            if self.__dict__.pop("_build_again", False):
+                self.edit_build()                        # one asked for while this one ran: now, with what is there now
+
+    def _build_done(self, kind, payload):
+        """A build's result on the main thread: the errors shown, or the engine swapped for the new library."""
         if kind == "exception":
             dpg.set_value("edit_status", f"build failed: {payload}")
             messages.post(self, f"build failed: {payload}", "error", key="build:")
