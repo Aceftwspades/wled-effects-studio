@@ -1729,12 +1729,12 @@ class App(Features):
         self.eng.push()
 
     # --- the one slider shape used everywhere ---------------------------------
-    def pair(self, parent, key, label, value, lo, hi, setter, is_float=False, unit=""):
+    def pair(self, parent, key, label, value, lo, hi, setter, is_float=False, unit="", prefix="inp_"):
         """A row of the panel: its label, then the one number control
         (num.py) - the value on the track, drag it, click it to type, a thin
         fill for where it sits. It was a slider showing no number beside a
-        box that did (C7). The field is inp_<key>."""
-        it = f"inp_{key}"
+        box that did (C7). The field is <prefix><key>: inp_<key> in the panel."""
+        it = f"{prefix}{key}"
         self._inputs.add(it)
         with form.row(label, parent=parent):                 # the label first, in the panel's column (C6)
             num.add(it, value, lo, hi, integer=not is_float, digits=1 if is_float else None, unit=unit, width=-1,
@@ -1764,6 +1764,12 @@ class App(Features):
         graph's edit until its build lands)."""
         self.fx_fit(meta)                                # the effect or the geometry changed: whether it can show here
         dpg.delete_item("params", children_only=True)
+        self.param_rows("params", meta=meta)
+
+    def param_rows(self, parent, prefix="inp_", meta=None):
+        """The current effect's sliders and checkboxes into `parent`, labelled and ranged from its metadata: the
+        panel's (prefix inp_) and the sequencer's step card's (seqp_) are built by this one - the same rows both
+        places. A slider is <prefix><key>, a checkbox <prefix>chk_<key>."""
         m = meta or self.eng.meta[self.eng.idx]
         generic = {"sx": "Speed", "ix": "Intensity", "c1": "Custom 1",
                    "c2": "Custom 2", "c3": "Custom 3"}
@@ -1776,13 +1782,13 @@ class App(Features):
             # offers settings the cube cannot hold - which is exactly how
             # fourteen effects came to be tuned against values they never got.
             hi = 31 if k == "c3" else 255
-            self.pair("params", k, lab, self.eng.fx[k], 0, hi,
-                      lambda v, k=k: self._set_param(k, v))
+            self.pair(parent, k, lab, self.eng.fx[k], 0, hi,
+                      lambda v, k=k: self._set_param(k, v), prefix=prefix)
         for i, k in enumerate(("o1", "o2", "o3")):
             lab = (m["labels"][5 + i] if 5 + i < len(m["labels"]) else "").strip()
             if not lab:
                 continue
-            form.check(lab, parent="params", default_value=bool(self.eng.fx[k]),
+            form.check(lab, parent=parent, default_value=bool(self.eng.fx[k]), tag=f"{prefix}chk_{k}",
                        user_data=k, callback=self.on_check)
 
     # --- layout --------------------------------------------------------------

@@ -3515,6 +3515,26 @@ LedFx have added that matters here, in the order it helps most.
       best fit, the warning gone, the panel's row following), undo, and the
       panel's Shape settings with part 2 selected. Released as 1.13.2, with the
       icon, the stats button and the splice preview above.
+- [x] **A step edited from the sequencer** (2026-10-13): changing a step's
+      effect meant loading it into the sim, changing it in the side panel and
+      pressing Update from the sim; the owner asked for the parameters, the
+      mirroring and the layers in the sequencer itself, "keep the parity".
+      The step card has an **edit live** checkbox: on, the sim is the
+      selected step, and the card shows an **EFFECT** section - the layer
+      (pick, +, -), effect, palette, the sliders and checkboxes, mirror,
+      reverse, swap XY, mirror Y and reverse Y on a 2-D layer, opacity and
+      blend with more than one layer. Both the card and the side panel call
+      the same handlers, so there is one state - the engine's - and
+      `sequence_ui._edit_poll` keeps the step to it: every quarter second the
+      engine's segments and colours, when changed, go into the step (one undo
+      step a drag, the save queued as the numbers' are), its look gathered
+      again once the changes settle, and both views' controls set to the
+      engine's values except the one being dragged. The panel's rows and the
+      card's come from one builder, `app.param_rows` (`inp_` and `seqp_`
+      tags). Nothing is written while the sequence plays, is paused on a seek
+      or blends, and an edit's look being gathered then is dropped; after
+      stop the selected step is loaded again. Off, the sim is free, for Add
+      from the sim.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails

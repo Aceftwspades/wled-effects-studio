@@ -282,6 +282,10 @@ def build(app):
             weight.danger(dpg.last_item())
             weight.need(dpg.last_item(), _has_sel)
             c.tip("the selected step away (Delete); undo brings it back")
+            dpg.add_checkbox(label="edit live", tag="seq_edit", callback=lambda s, v: toggle_edit(app, v))
+            c.tip("the sim shows the selected step, and every change - here or in the side panel: its effect, "
+                  "sliders, palette, layers, mirroring - goes into the step as you make it. Off, the sim is free to "
+                  "set up something new for Add from the sim")
         with dpg.group(horizontal=True) as _row:
             form.inline("name")
             dpg.add_input_text(tag="seq_name", width=px(170), on_enter=True, callback=lambda s, v: set_field(app, "name", v))
@@ -301,6 +305,7 @@ def build(app):
             form.inline("brightness")
             num.add("seq_bri", 255, 0, 255, integer=True, width=px(200), callback=lambda s, v: _num_changed(app, "bri", v))
             c.tip("the step's brightness: its preset sets the device's, and the sim shows it so while the sequence plays")
+        _build_fx(app, c)
         dpg.add_text("", tag="seq_step_desc", color=c.DIM, wrap=0)
         # the step's ramps: each a slider (or the brightness) moving over the step
         with dpg.group(horizontal=True):
@@ -825,6 +830,197 @@ def load_step(app, i=None, quiet=False):
             app.gp.status(f"the sim shows step {i + 1}: {S['steps'][i].get('name')}")
 
 
+# --- editing a step live: the card's EFFECT, the side panel's twin -----------------------------------
+# With "edit live" on, the sim IS the selected step: it is loaded, and whatever then changes in the engine - from the
+# card's EFFECT here or from the side panel, they call the same handlers - is written back into the step once it
+# settles (one undo step a drag, as the numbers are). Both views show the engine; each takes the values it is not
+# itself being dragged in. Off, the sim is free again (Add from the sim needs it so). Playback, a seek and a blend
+# between steps load other states into the engine: nothing is written while they run, and the step is loaded again
+# after.
+SYNC_EVERY = 0.25                                         # s between looks at the engine for changes to keep
+
+
+def _build_fx(app, c):
+    """The card's EFFECT section (hidden until editing): the layers, the effect and palette, the sliders and checks,
+    the layer's mirroring and blend - the side panel's controls, for the selected step."""
+    with dpg.group(tag="seq_fx", show=False):
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("EFFECT", color=c.ACCENT))
+            dpg.add_text("", tag="seq_fx_note", color=c.DIM)
+        with form.row("layer", tip="the step's segments - layers, each its own effect, drawn one over another; the "
+                                   "controls below are the chosen one's"):
+            dpg.add_combo([], tag="seq_layer", width=-px(70), callback=lambda s, v: (app.seg_pick(v), refresh_fx(app)))
+            dpg.add_button(label="+", small=True, callback=lambda: (app.seg_add(), refresh_fx(app)))
+            c.tip("a layer more (the right half, as the side panel adds one)")
+            dpg.add_button(label="-", small=True, callback=lambda: (app.seg_remove(), refresh_fx(app)))
+            c.tip("the last layer away")
+        with form.row("effect"):
+            dpg.add_combo([], tag="seq_fx_combo", width=-1, callback=lambda s, v: _set_effect(app, v))
+        with form.row("palette"):
+            dpg.add_combo([], tag="seq_pal_combo", width=-1, callback=lambda s, v: _set_palette(app, v))
+        dpg.add_group(tag="seq_params")
+        dpg.add_group(tag="seq_opts")
+
+
+def _set_effect(app, v):
+    app.on_effect(None, v)
+    if dpg.does_item_exist("fx_combo"):
+        dpg.set_value("fx_combo", v)                      # the panel's combo: its callback did not run, ours did
+    refresh_fx(app)
+
+
+def _set_palette(app, v):
+    app.on_palette(None, v)
+    app.sync_palette_combo()
+
+
+def _set_option(app, key, val):
+    app.on_seg_option(key, val)
+    app.rebuild_seg_fields()                              # the panel's own checkboxes show it too
+
+
+def _fx_sig(app):
+    """What the card's controls are built for: the effect, the layer and how many, whether the layer is 2-D."""
+    e = app.eng
+    try:
+        x0, y0, x1, y1, op, fx, bm = e.seg_get(e.seg)
+    except Exception:
+        y0 = y1 = 0
+    return (e.idx, e.seg, e.seg_count(), y1 - y0 > 1, len(e.names))
+
+
+def refresh_fx(app):
+    """The card's EFFECT built again for what the engine holds now (the values then follow in _sync_fx)."""
+    if not dpg.does_item_exist("seq_fx"):
+        return
+    e = app.eng
+    labels = app.seg_labels()
+    dpg.configure_item("seq_layer", items=labels)
+    dpg.set_value("seq_layer", labels[e.seg] if e.seg < len(labels) else "")
+    dpg.configure_item("seq_fx_combo", items=e.names)
+    dpg.set_value("seq_fx_combo", e.names[e.idx] if 0 <= e.idx < len(e.names) else "")
+    dpg.configure_item("seq_pal_combo", items=[p[0] for p in e.palette_list()])
+    dpg.set_value("seq_pal_combo", app.palette_name_for(e.pal))
+    dpg.delete_item("seq_params", children_only=True)
+    dpg.delete_item("seq_opts", children_only=True)
+    num.prune()
+    app.param_rows("seq_params", prefix="seqp_")
+    x0, y0, x1, y1, op, fx, bm = e.seg_get(e.seg)
+    is2d = y1 - y0 > 1
+    o = e.seg_options(e.seg)
+    rows = [(("mi", "mirror"), ("rev", "reverse")) + ((("tp", "swap XY"),) if is2d else ())]
+    if is2d:
+        rows.append((("mY", "mirror Y"), ("rY", "reverse Y")))
+    for row in rows:
+        with form.under(parent="seq_opts"):
+            for key, label in row:
+                dpg.add_checkbox(label=label, tag=f"seqo_{key}", default_value=bool(o[key]), user_data=key,
+                                 callback=lambda s, v, u: _set_option(app, u, bool(v)))
+    if e.seg_count() > 1:
+        with form.row("opacity", parent="seq_opts"):
+            num.add("seqo_opacity", op, 0, 255, integer=True, width=-1,
+                    callback=lambda s, v: app.on_seg_field(s, v, "opacity"))
+        modes = e.BLEND_MODES
+        with form.row("blend mode", parent="seq_opts", tip="how this layer lands on the ones under it"):
+            dpg.add_combo(modes, tag="seqo_blend", width=-1, default_value=modes[bm if bm < len(modes) else 0],
+                          callback=lambda s, v: (app.on_seg_blend(modes.index(v)), app.rebuild_seg_fields()))
+    app._seq_fx_sig = _fx_sig(app)
+
+
+def _sync_fx(app):
+    """Both views to the engine's values: the card's and the panel's sliders, checks, palette and the layer's
+    options - each one not being dragged or typed in. An effect, a layer or the layers changed: the card again."""
+    e = app.eng
+    if _fx_sig(app) != getattr(app, "_seq_fx_sig", None):
+        refresh_fx(app)
+    for k in ("sx", "ix", "c1", "c2", "c3"):
+        v = int(e.fx.get(k, 0))
+        for tag in (f"inp_{k}", f"seqp_{k}"):
+            if dpg.does_item_exist(tag) and not dpg.is_item_active(tag) and int(dpg.get_value(tag)) != v:
+                num.set(tag, v)
+    for k in ("o1", "o2", "o3"):
+        v = bool(e.fx.get(k, 0))
+        for tag in (f"inp_chk_{k}", f"seqp_chk_{k}"):
+            if dpg.does_item_exist(tag) and bool(dpg.get_value(tag)) != v:
+                dpg.set_value(tag, v)
+    name = app.palette_name_for(e.pal)
+    for tag in ("seq_pal_combo", "pal_combo"):
+        if dpg.does_item_exist(tag) and dpg.get_value(tag) != name:
+            dpg.set_value(tag, name)
+    o = e.seg_options(e.seg)
+    for key in ("mi", "rev", "tp", "mY", "rY"):
+        tag = f"seqo_{key}"
+        if dpg.does_item_exist(tag) and bool(dpg.get_value(tag)) != bool(o[key]):
+            dpg.set_value(tag, bool(o[key]))
+
+
+def _editable(app):
+    """Editing, with the selected step the sim's to show: not while playing, paused on a seek or blending."""
+    return (getattr(app, "_seq_edit", False) and _play_i(app) is None and getattr(app, "_seq_play", None) is None
+            and getattr(app, "_transition", None) is None)
+
+
+def toggle_edit(app, on):
+    app._seq_edit = bool(on)
+    app._seq_edit_step = None                             # loaded on the next poll
+    if dpg.does_item_exist("seq_fx"):
+        dpg.configure_item("seq_fx", show=bool(on))
+    if on:
+        app.gp.status("editing the selected step live: the sim shows it, and changes here or in the side panel go into it")
+    else:
+        _flush_save(app, now=True)
+        app.gp.status("the sim is free again: the step keeps what it was given")
+
+
+def _edit_poll(app):
+    """The step and the sim kept as one while editing: the selected step loaded when it is not the one shown, the
+    engine's state written into it when it changes, both views kept to the engine."""
+    if not getattr(app, "_seq_edit", False):
+        return
+    if dpg.does_item_exist("seq_edit") and not dpg.get_value("seq_edit"):
+        dpg.set_value("seq_edit", True)
+    steps = _steps(app)["steps"]
+    sel = getattr(app, "_seq_sel", 0)
+    if not (0 <= sel < len(steps)) or not _editable(app):
+        app._seq_look_due = None                          # playing or seeking: no look of an edit gathered meanwhile
+        return
+    st = steps[sel]
+    now = time.perf_counter()
+    if getattr(app, "_seq_edit_step", None) is not st:
+        _flush_save(app, now=True)
+        load_step(app, sel, quiet=True)
+        app._seq_edit_step = st
+        app._seq_edit_base = (app.eng.segments(), [int(c) for c in app.seg_cols])
+        app._seq_edit_at = now
+        refresh_fx(app)
+        if dpg.does_item_exist("seq_fx_note"):
+            dpg.set_value("seq_fx_note", f"step {sel + 1}, live - here or in the side panel")
+        return
+    _sync_fx(app)
+    if now - getattr(app, "_seq_edit_at", 0.0) < SYNC_EVERY:
+        due = getattr(app, "_seq_look_due", None)
+        if due is not None and now >= due and not num.busy():
+            app._seq_look_due = None
+            _gather_look(app, st)                         # its look again, once the changes have settled
+            app._seq_look["edit"] = True
+        return
+    app._seq_edit_at = now
+    cur = (app.eng.segments(), [int(c) for c in app.seg_cols])
+    if cur == getattr(app, "_seq_edit_base", None):
+        return
+    app._seq_edit_base = cur
+    segs, cols = cur
+    old = (st.get("segments") or [{}])[0].get("effect")
+    st["segments"] = json.loads(json.dumps(segs))
+    st["colors"] = list(cols)
+    if st.get("name") == old and segs:                    # a name that was its effect's follows the effect
+        st["name"] = segs[0].get("effect") or st.get("name")
+    app._seq_look_due = now + 1.2
+    _queue_save(app)
+    app._tl_dirty = True
+    app._seq_rows_dirty = True
+
+
 def _gather_look(app, st):
     """The sim's frames for a moment, from now, as the step's look - while the sim goes on showing the effect it
     showed when this began (another effect picked meanwhile: the gathering stops, the look as it was)."""
@@ -834,6 +1030,9 @@ def _gather_look(app, st):
 def _take_look(app):
     g = getattr(app, "_seq_look", None)
     if g is None:
+        return
+    if g.get("edit") and not _editable(app):
+        app._seq_look = None                              # an edit's look, and the sim taken over meanwhile: dropped
         return
     now = time.perf_counter()
     if app.eng.idx != g["idx"]:
@@ -1069,6 +1268,7 @@ def render(app, fmt="gif"):
 def stop(app):
     app._transition = None
     app._seq_bri = None
+    app._seq_edit_step = None                             # editing: the selected step shown again (not the last played)
     if getattr(app, "_seq_play", None) is not None:
         app._seq_play = None
         app.playing = True
@@ -1115,6 +1315,7 @@ def _apply_ramps(app, i, t):
 
 def poll(app):
     _flush_save(app)
+    _edit_poll(app)
     _poll_send(app)
     _take_look(app)
     if dpg.is_item_shown(TAG):
