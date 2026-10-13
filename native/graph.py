@@ -1594,8 +1594,10 @@ def load(path, lib=None, resolver=None):
 
 
 def save(graph, path):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(graph.to_json(), f, indent=1)
+    """Whole or not at all (a live compile saves on every settled edit): a graph cut short by a crash did not
+    read again - and as a sub-graph it stopped the studio's start."""
+    from native.project import write_atomic
+    write_atomic(path, json.dumps(graph.to_json(), indent=1))
 
 
 def starter(name="New Graph", lib=None, resolver=None):

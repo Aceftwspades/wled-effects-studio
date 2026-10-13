@@ -97,8 +97,12 @@ def write_atomic(path, text):
     the disk, then moved over the file - a crash or a power cut mid-write
     leaves the old file, never half of the new one (issue #5). On Windows a
     virus scanner or a sync tool can hold the file for a moment: the move is
-    tried a few times, then the file is written in place rather than not."""
-    tmp = path + ".tmp"
+    tried a few times, then the file is written in place rather than not.
+    The temporary file is this write's own: two saves at once (a flash's
+    worker and the panel) shared one <path>.tmp and could interleave."""
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), prefix=os.path.basename(path) + ".", suffix=".tmp")
+    os.close(fd)
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
         f.flush()
@@ -329,8 +333,7 @@ class Project:
                 old = ""
             if old != text:
                 history.keep(self, "effects", os.path.splitext(fname)[0], ".cpp", old)
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(text)
+        write_atomic(path, text)                         # whole or not at all, as project.json is
 
     # --- the effects list -----------------------------------------------------------
     def is_imported(self, fname):
@@ -376,12 +379,15 @@ class Project:
             edge = lambda w: r"(?<![A-Za-z0-9])" + re.escape(w) + r"(?![A-Za-z0-9])"
             src = re.sub(edge(old), ident, src)
             src = re.sub(edge(old.upper()), ident.upper(), src)
+        self.write_effect(new, src)                      # the new file first: the old one goes once it is there
         if new != fname:
-            os.remove(self.effect_path(fname))
+            # (a name that differs only in case is the same file on Windows and macOS: kept, not removed)
+            if os.path.normcase(self.effect_path(new)) != os.path.normcase(self.effect_path(fname)) and \
+                    not os.path.samefile(self.effect_path(new), self.effect_path(fname)):
+                os.remove(self.effect_path(fname))
             if fname in self.imported:
                 self.imported = [new if f == fname else f for f in self.imported]
                 self.save()
-        self.write_effect(new, src)
         return new
 
     def effect_title(self, fname):
@@ -566,16 +572,28 @@ def list_projects():
 
 
 def _studio():
+    """studio.json: the prefs, the last project and the recent ones. One that does not read is put aside as
+    studio.json.bad-<time> (as a project.json is) - it read as {}, and the next save wrote that over it."""
     try:
-        return json.load(open(STUDIO_FILE, encoding="utf-8"))
+        with open(STUDIO_FILE, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except FileNotFoundError:
+        return {}
     except Exception:
+        try:
+            os.replace(STUDIO_FILE, f"{STUDIO_FILE}.bad-{time.strftime('%Y%m%d-%H%M%S')}")
+        except OSError:
+            pass
         return {}
 
 
 def _studio_save(d):
+    """Whole or not at all: made into text first (a value json cannot write - a numpy number - raised once
+    the file was already emptied), then written by write_atomic."""
     os.makedirs(PROJECTS, exist_ok=True)
-    with open(STUDIO_FILE, "w", encoding="utf-8") as f:
-        json.dump(d, f, indent=1)
+    text = json.dumps(d, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o))
+    write_atomic(STUDIO_FILE, text)
 
 
 def last_project():

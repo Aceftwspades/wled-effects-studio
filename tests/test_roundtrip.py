@@ -417,6 +417,29 @@ def test_history_says_what_changed():
     assert history.changes("project", json.dumps(p_old), json.dumps(p_new))[0][1].startswith("no change")
 
 
+def test_settings_and_files_are_written_whole():
+    """studio.json was rewritten in place: a value json cannot write (a numpy number) raised with the file
+    already emptied, and one that did not read came back as {} - the next save wrote that over the prefs,
+    the last project and the recent list. Graphs and effects were written in place too."""
+    from native import project as PR
+    d = tempfile.mkdtemp(prefix="studio_whole_")
+    keep = PR.STUDIO_FILE, PR.PROJECTS
+    try:
+        PR.PROJECTS, PR.STUDIO_FILE = d, os.path.join(d, "studio.json")
+        PR._studio_save({"ui": {"zoom": np.float32(1.5)}, "last": "x"})
+        assert PR._studio() == {"ui": {"zoom": 1.5}, "last": "x"}
+        open(PR.STUDIO_FILE, "w").write('{"last": "x", "ui": {"zo')            # cut short
+        assert PR._studio() == {}
+        assert any(f.startswith("studio.json.bad-") for f in os.listdir(d)) and not os.path.exists(PR.STUDIO_FILE)
+        g = G.Graph({"name": "w"}, lib=library()); g.add("Speed", (0, 0))
+        G.save(g, os.path.join(d, "w.json"))
+        assert json.load(open(os.path.join(d, "w.json")))["name"] == "w"
+        assert not [f for f in os.listdir(d) if f.endswith(".tmp")]           # no temporary file left
+    finally:
+        PR.STUDIO_FILE, PR.PROJECTS = keep
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0
