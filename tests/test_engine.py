@@ -45,9 +45,16 @@ def test_reload_swaps_the_build_and_keeps_the_effect():
         for _ in range(3):
             e.frame()
         assert e.rgb().shape == (8, 16, 3)
+        # what lives in the library's statics comes along: a custom palette (its id showed a stock palette after
+        # every build), the audio palettes' source, and a lone segment's options and blend (kept only with two)
+        e.custom_palettes([{"name": "red", "stops": [[0, 255, 0, 0], [255, 255, 0, 0]]}])
+        e.pal_source = 2
+        e.seg_set_options(0, mi=True, grp=2); e.seg_blend(0, 2)
         e.reload(c)                                   # and again: unloads b
         e.frame()
         assert e.library == c
+        assert e.palette_swatch(200)[0] == (255, 0, 0) and e.pal_source == 2
+        assert e.seg_options(0)["mi"] and e.seg_options(0)["grp"] == 2 and e.seg_get(0)[6] == 2
         # an index the new library does not reach (a project with fewer effects): it raised IndexError from
         # set_geometry's select before reload could pick the effect by name, leaving the old library loaded
         e.idx = e.count + 3

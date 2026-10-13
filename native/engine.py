@@ -174,15 +174,33 @@ class Engine:
         want = self.names[self.idx] if 0 <= self.idx < len(self.names) else None
         fx, pal, cols = dict(self.fx), self.pal, self._colors
         segs = self.segments() if self.seg_count() > 1 else None
+        # what lives in the library's own statics and a new one starts without: the custom palettes (their ids
+        # would show the stock ones there), the audio palettes' source, and a lone segment's options and blend
+        custom = getattr(self, "_custom_pals", None)
+        try:
+            source = self.pal_source
+        except AttributeError:
+            source = None
+        one = (self.seg_options(0), self.seg_get(0)[6]) if not segs else None
         old = self.lib
         self.load(dll)
         if old is not None and old is not self.lib:
             _unload(old)
+        if custom is not None:
+            self.custom_palettes(custom)
+        if source is not None:
+            try:
+                self.pal_source = source
+            except AttributeError:
+                pass
         if want in self.names:
             self.select(self.names.index(want), params=dict(fx, pal=pal))
         self.colors(*cols)
         if segs:
             self.load_segments(segs)
+        elif one:
+            self.seg_set_options(0, **one[0])
+            self.seg_blend(0, one[1])
 
     # --- geometry ------------------------------------------------------------
     def resize(self, B):
@@ -430,6 +448,7 @@ class Engine:
             return False
         self.lib.simCustomPaletteClear()
         self.custom_names = []
+        self._custom_pals = [dict(p) for p in pals]         # sent again by reload(): a new library starts without them
         for i, p in enumerate(pals[:10]):
             stops = sorted([[int(q[0]), int(q[1]), int(q[2]), int(q[3])] for q in (p.get("stops") or [])], key=lambda q: q[0])
             if len(stops) < 2:
