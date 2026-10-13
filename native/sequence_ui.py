@@ -207,10 +207,9 @@ def undo(app, redo=False):
     project journals both); Ctrl+Z with the frame focused, or its button."""
     _flush_save(app, now=True)                            # a change still settling: saved first, so it is the one undone
     p = app.project
-    keys = [k for k in ("sequence", "schedule") if (p.can_redo(k) if redo else p.can_undo(k))]
-    if not keys:
+    key = p.latest(("sequence", "schedule"), redo=redo)    # whichever changed last (it read a stamp nothing wrote)
+    if key is None:
         app.gp.status("nothing to " + ("redo" if redo else "undo") + " in the sequence"); return
-    key = keys[0] if len(keys) == 1 else max(keys, key=lambda k: getattr(app, "_seq_touched", {}).get(k, 0))
     (p.redo if redo else p.undo)(key)
     app._tl_dirty = True
     refresh(app); refresh_timers(app)

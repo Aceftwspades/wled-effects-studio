@@ -213,6 +213,10 @@ class Project:
         self._undo = {k: [] for k in self.UNDO_KEYS}
         self._redo = {k: [] for k in self.UNDO_KEYS}
         self._last = {k: json.dumps(self.options.get(k), sort_keys=True) for k in self.UNDO_KEYS}
+        # when each entry was made, by one count across the keys: which of two stacks changed last
+        self._undo_t = {k: [] for k in self.UNDO_KEYS}
+        self._redo_t = {k: [] for k in self.UNDO_KEYS}
+        self._tick = 0
         self._restoring = False
 
     def _journal(self):
@@ -225,6 +229,9 @@ class Project:
                 if not self._restoring:
                     self._undo[k].append(self._last[k]); del self._undo[k][:-self.UNDO_MAX]
                     self._redo[k].clear()
+                    self._tick += 1
+                    self._undo_t[k].append(self._tick); del self._undo_t[k][:-self.UNDO_MAX]
+                    self._redo_t[k].clear()
                 self._last[k] = cur
 
     def can_undo(self, key):
@@ -237,17 +244,28 @@ class Project:
         """The option back to what it was before its last change; the
         caller then shows it (the frame's refresh, the engine's segments).
         True when there was something to undo."""
-        return self._step(key, self._undo, self._redo)
+        return self._step(key, self._undo, self._redo, self._undo_t, self._redo_t)
 
     def redo(self, key):
-        return self._step(key, self._redo, self._undo)
+        return self._step(key, self._redo, self._undo, self._redo_t, self._undo_t)
 
-    def _step(self, key, take, give):
+    def latest(self, keys, redo=False):
+        """Of `keys`, the one whose next undo (or redo) is the latest change - so one Ctrl+Z over two
+        journals (the sequence and its schedule) takes back what was done last. None when neither has one."""
+        if not hasattr(self, "_last"):
+            self._journal_reset()
+        stamps = self._redo_t if redo else self._undo_t
+        have = [k for k in keys if (self.can_redo(k) if redo else self.can_undo(k))]
+        return max(have, key=lambda k: stamps[k][-1] if stamps.get(k) else 0) if have else None
+
+    def _step(self, key, take, give, take_t=None, give_t=None):
         if not hasattr(self, "_last"):
             self._journal_reset()
         if not take.get(key):
             return False
         give[key].append(self._last[key])
+        if take_t is not None:
+            give_t[key].append(take_t[key].pop() if take_t[key] else 0)
         val = json.loads(take[key].pop())
         if val is None:
             self.options.pop(key, None)

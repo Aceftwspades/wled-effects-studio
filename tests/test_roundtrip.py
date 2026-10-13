@@ -440,6 +440,26 @@ def test_settings_and_files_are_written_whole():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_one_undo_over_two_journals_takes_back_the_latest():
+    """The Sequence frame's Ctrl+Z covers the steps and the schedule: it chose between them by a stamp
+    nothing wrote, so a timer added after a step edit stayed and the step edit was undone. The project's
+    journal stamps each change now, and the latest one is undone (and redone) first."""
+    from native import project as PR
+    d = tempfile.mkdtemp(prefix="journal_")
+    try:
+        p = PR.Project(os.path.join(d, "j"))
+        p.options["sequence"] = {"steps": [{"name": "a"}]}; p.save()
+        p.options["schedule"] = [{"time": "20:00"}]; p.save()
+        assert p.latest(("sequence", "schedule")) == "schedule"
+        p.undo("schedule")
+        assert p.latest(("sequence", "schedule")) == "sequence"
+        assert p.latest(("sequence", "schedule"), redo=True) == "schedule"
+        p.options["sequence"] = {"steps": [{"name": "b"}]}; p.save()           # a new change: redo gone there
+        assert p.latest(("sequence", "schedule")) == "sequence"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0
