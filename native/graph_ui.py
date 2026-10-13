@@ -618,7 +618,10 @@ class GraphPanel(Glyphs):
         n = self.graph.nodes.get(nid) if self.graph else None
         if n is None:
             return [], []
-        d = self.graph.node_def(n)
+        try:
+            d = self.graph.node_def(n)
+        except G.GraphError:
+            return [], []                                 # a type that is not there (its file gone): nothing to set
         wired = {l[3] for l in self.graph.links if l[2] == nid}
         params = [p for p in d.get("params", []) if p["type"] in self.PROP_KINDS]
         inputs = [i for i in d.get("inputs", []) if i["name"] not in wired and i["type"] in ("float", "bool", "vector", "color")
@@ -727,7 +730,13 @@ class GraphPanel(Glyphs):
         n = self.graph.nodes.get(nid)
         if not n:
             return
-        d = self.graph.node_def(n)
+        try:
+            d = self.graph.node_def(n)
+        except G.GraphError as e:
+            # selected, a node whose type is not there: said here - it raised every frame, in the main loop
+            typeface.heading(dpg.add_text(f"{n['type']} #{nid}", parent="graph_props"))
+            dpg.add_text(f"{e} - put the file back, or delete the node", parent="graph_props", color=DIM, wrap=0)
+            return
         title = f"{n.get('label') or d.get('label') or n['type']} #{nid}"
         if n.get("label"):
             title += f"  ({n['type']})"
@@ -1422,6 +1431,8 @@ class GraphPanel(Glyphs):
         self.snapshot("nudge")
         for nid in sel:
             t = f"gnode_{nid}"
+            if not dpg.does_item_exist(t):
+                continue                                  # a node of a type that is not there: not drawn, not moved
             x, y = dpg.get_item_pos(t)
             dpg.set_item_pos(t, [x + dx * self.zoom, y + dy * self.zoom])
         self._sync_pos()
@@ -1757,6 +1768,7 @@ class GraphPanel(Glyphs):
                 continue
             new = self.graph.add(t, (n["pos"][0] + dx, n["pos"][1] + dy), dict(n.get("params", {})))
             self.graph.nodes[new]["inputs"] = dict(n.get("inputs", {}))
+            self.graph.nodes[new].update(_node_extras(n))        # before the wires: an exposed pin is one
             ids[n["id"]] = new
         for a, o, b, i in clip["links"]:
             if a in ids and b in ids:
@@ -1768,7 +1780,6 @@ class GraphPanel(Glyphs):
         self.status(f"pasted {len(ids)} node(s)")
 
     # --- live preview ------------------------------------------------------------------
-            self.graph.nodes[new].update(_node_extras(n))        # before the wires: an exposed pin is one
     # Every edit marks the graph dirty; poll() - called each frame from the
     # main loop - waits until the edits pause for a moment, then compiles and
     # builds on the worker exactly as the button does. The 3-D view keeps
@@ -1995,14 +2006,19 @@ class GraphPanel(Glyphs):
         self._frame_last = {nid: tuple(self._disp(n["pos"])) for nid, n in self.graph.nodes.items() if n["type"] == "Frame"}
         self._frame_drag.clear()
         # a wire to a pin that no longer exists - a sub-graph's input was
-        # renamed or removed - is dropped rather than kept invisibly
-        stale = [l for l in self.graph.links
-                 if (l[0], "out", l[1]) not in self._pins or (l[2], "in", l[3]) not in self._pins]
+        # renamed or removed - is dropped rather than kept invisibly. A node
+        # whose type is not there (its sub-graph or user node file gone) has
+        # no pins drawn at all: its wires are kept, undrawn, as Graph keeps
+        # them - dropped and saved, they were gone when the file came back
+        drawn = {nid for nid in self.graph.nodes if dpg.does_item_exist(f"gnode_{nid}")}
+        stale = [l for l in self.graph.links if l[0] in drawn and l[2] in drawn and
+                 ((l[0], "out", l[1]) not in self._pins or (l[2], "in", l[3]) not in self._pins)]
         if stale:
             self.graph.links = [l for l in self.graph.links if l not in stale]
             self.status(f"dropped {len(stale)} wire(s) to pins that no longer exist")
         for a, out, b, inp in self.graph.links:
-            self._make_link(a, out, b, inp)
+            if a in drawn and b in drawn:
+                self._make_link(a, out, b, inp)
         self._mark_problems()
         # imnodes keeps its selection as slots in its node pool, and the
         # pool hands freed slots to the new nodes - so after a rebuild its
@@ -6039,7 +6055,11 @@ class GraphPanel(Glyphs):
 
     def type_names(self):
         cats = {}
+        # editing a sub-graph: neither itself nor one that holds it is offered - either made it contain itself
+        here = self.file[:-5] if self.cur_dir == self.sub_dir and self.file else None
         for n, d in self.lib.items():
+            if here and n.startswith(G.SUB) and (n[len(G.SUB):] == here or self._contains(n[len(G.SUB):], here)):
+                continue
             cats.setdefault(d["cat"], []).append(n)
         out = []
         for c in ("controls", "signals", "coords", "generate", "maths", "colour", "graph", "subgraphs", "custom", "output"):
@@ -6047,6 +6067,15 @@ class GraphPanel(Glyphs):
         for c, ns in sorted(cats.items()):
             out += [f"{c} / {n}" for n in sorted(ns)]
         return out
+
+
+def _node_extras(n):
+    """What a node carries besides its type, place, settings and typed inputs - exposed pins, mute, label,
+    colour, folded, hidden pins, a modulator, and whatever is added later - as copies. Paste and folding into
+    a sub-graph rebuilt nodes from the four alone: an exposed pin was gone (and the wire to it dropped), and a
+    muted node folded away ran."""
+    import copy
+    return {k: copy.deepcopy(v) for k, v in n.items() if k not in ("id", "type", "pos", "params", "inputs")}
 
 
 def build_panel(app, panel):
@@ -6057,11 +6086,7 @@ def build_panel(app, panel):
     from native.chrome import grip
     grip("graph_win")
     with dpg.group(horizontal=True):
-        # editing a sub-graph: neither itself nor one that holds it is offered - either made it contain itself
-        here = self.file[:-5] if self.cur_dir == self.sub_dir and self.file else None
         dpg.add_button(label="< back", tag="graph_back", show=False, callback=lambda: panel.back())
-            if here and n.startswith(G.SUB) and (n[len(G.SUB):] == here or self._contains(n[len(G.SUB):], here)):
-                continue
         with dpg.group(horizontal=True, tag="graph_crumbs", show=False):     # inside a sub-graph: the trail down to it
             pass
         dpg.add_combo(panel.files(), tag="graph_file", width=px(220), default_value=panel.file or "",
@@ -6069,15 +6094,6 @@ def build_panel(app, panel):
     with dpg.file_dialog(directory_selector=False, show=False, tag="graph_import_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: panel.import_bundle(a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(120, 200, 120))
-def _node_extras(n):
-    """What a node carries besides its type, place, settings and typed inputs - exposed pins, mute, label,
-    colour, folded, hidden pins, a modulator, and whatever is added later - as copies. Paste and folding into
-    a sub-graph rebuilt nodes from the four alone: an exposed pin was gone (and the wire to it dropped), and a
-    muted node folded away ran."""
-    import copy
-    return {k: copy.deepcopy(v) for k, v in n.items() if k not in ("id", "type", "pos", "params", "inputs")}
-
-
         dpg.add_file_extension(".*")
     # The description box: a fixed height, whatever the text - a line that
     # grew and shrank with each hover moved the editor under the pointer.
