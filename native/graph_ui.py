@@ -498,6 +498,7 @@ class GraphPanel(Glyphs):
             n = g.nodes[nid]
             smap[nid] = sub.add(n["type"], (n["pos"][0] - x0 + 260, n["pos"][1] - y0 + 40), dict(n.get("params", {})))
             sub.nodes[smap[nid]]["inputs"] = dict(n.get("inputs", {}))
+            sub.nodes[smap[nid]].update(_node_extras(n))
         for a, o, b, i in g.links:
             if a in S and b in S:
                 sub.link(smap[a], o, smap[b], i)
@@ -1767,6 +1768,7 @@ class GraphPanel(Glyphs):
         self.status(f"pasted {len(ids)} node(s)")
 
     # --- live preview ------------------------------------------------------------------
+            self.graph.nodes[new].update(_node_extras(n))        # before the wires: an exposed pin is one
     # Every edit marks the graph dirty; poll() - called each frame from the
     # main loop - waits until the edits pause for a moment, then compiles and
     # builds on the worker exactly as the button does. The 3-D view keeps
@@ -6067,6 +6069,15 @@ def build_panel(app, panel):
     with dpg.file_dialog(directory_selector=False, show=False, tag="graph_import_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: panel.import_bundle(a.get("file_path_name", ""))):
         dpg.add_file_extension(".json", color=(120, 200, 120))
+def _node_extras(n):
+    """What a node carries besides its type, place, settings and typed inputs - exposed pins, mute, label,
+    colour, folded, hidden pins, a modulator, and whatever is added later - as copies. Paste and folding into
+    a sub-graph rebuilt nodes from the four alone: an exposed pin was gone (and the wire to it dropped), and a
+    muted node folded away ran."""
+    import copy
+    return {k: copy.deepcopy(v) for k, v in n.items() if k not in ("id", "type", "pos", "params", "inputs")}
+
+
         dpg.add_file_extension(".*")
     # The description box: a fixed height, whatever the text - a line that
     # grew and shrank with each hover moved the editor under the pointer.
