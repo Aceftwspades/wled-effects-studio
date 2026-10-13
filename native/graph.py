@@ -954,24 +954,7 @@ class Graph:
             w = d.get("wired")
             if w and (nid, w[0]) not in src_of:
                 raise GraphError(f"{d['name']} #{nid}: {w[0]} must be wired from {w[1]}")
-        scope = {}
-        for nid in order:
-            d = defs[nid]
-            ups = [src_of[(nid, i["name"])][0] for i in d["inputs"] if (nid, i["name"]) in src_of]
-            per_pixel_in = any(scope.get(u) == "pixel" for u in ups)
-            per_pixel_in = per_pixel_in or bool(self.implicit_pins(nid, src_of))    # an unwired coordinate reads the pixel
-            if d.get("late") and per_pixel_in:
-                raise GraphError(f"{d['name']} #{nid} remembers one value for the next frame, so its input "
-                                 f"cannot come from a per-pixel node")
-            if d["scope"] == "frame":
-                if per_pixel_in and d.get("state"):
-                    raise GraphError(f"{d['name']} #{nid} keeps one value per frame, so its inputs "
-                                     f"cannot come from a per-pixel node (Coords, Noise...)")
-                scope[nid] = "pixel" if per_pixel_in else "frame"; continue
-            bare = re.sub(r"\$(in|out|p|st)\.[\w ]+", "", d["code"])
-            if PIXEL_NAMES.search(bare) or d.get("codegen"):
-                scope[nid] = "pixel"; continue
-            scope[nid] = "pixel" if per_pixel_in else "frame"
+        scope = self._scopes(order, defs, src_of)
         slots, nstate = {}, 0
         for nid in order:
             st = defs[nid].get("state")
@@ -979,6 +962,39 @@ class Graph:
                 slots[nid] = nstate
                 nstate += len(st) if isinstance(st, (list, tuple)) else int(st)
         return order, defs, scope, src_of, slots, nstate
+
+    def _scopes(self, order, defs, src_of):
+        """Each node's scope in `order`: "frame" (once a frame) or "pixel" (once a pixel) - frame nodes, then
+        anything hoistable whose inputs are all frame. A late node (Delay) is ordered before what feeds it (it
+        reads last frame's value), so whether its input is per-pixel is judged once every scope is known: in
+        order it passed unseen, by node id, and the frame block then read a per-pixel variable."""
+        scope, late = {}, []
+        for nid in order:
+            d = defs[nid]
+            ups = [src_of[(nid, i["name"])][0] for i in d["inputs"] if (nid, i["name"]) in src_of]
+            per_pixel_in = any(scope.get(u) == "pixel" for u in ups)
+            per_pixel_in = per_pixel_in or bool(self.implicit_pins(nid, src_of))    # an unwired coordinate reads the pixel
+            if d.get("late"):
+                late.append((nid, ups))
+                per_pixel_in = bool(self.implicit_pins(nid, src_of))
+            if d["scope"] == "frame":
+                # a frame node fed a per-pixel value follows it down, unless it
+                # keeps state - one value for the whole effect cannot be per pixel
+                if per_pixel_in and d.get("state"):
+                    raise GraphError(f"{d['name']} #{nid} keeps one value per frame, so its inputs "
+                                     f"cannot come from a per-pixel node (Coords, Noise...)")
+                scope[nid] = "pixel" if per_pixel_in else "frame"; continue
+            # the template's own words decide, not its pins: a pin called v or r
+            # is not the pixel's v or r
+            bare = re.sub(r"\$(in|out|p|st)\.[\w ]+", "", d["code"])
+            if PIXEL_NAMES.search(bare) or d.get("codegen"):
+                scope[nid] = "pixel"; continue
+            scope[nid] = "pixel" if per_pixel_in else "frame"
+        for nid, ups in late:
+            if scope.get(nid) == "pixel" or any(scope.get(u) == "pixel" for u in ups):
+                raise GraphError(f"{defs[nid]['name']} #{nid} remembers one value for the next frame, so its input "
+                                 f"cannot come from a per-pixel node")
+        return scope
 
     def scene_names(self, node=None):
         """The snapshots a Scenes node fades between, in order: those its setting names (comma
@@ -1076,28 +1092,7 @@ class Graph:
                 raise GraphError(f"{d['name']} #{nid}: {w[0]} must be wired from {w[1]}")
 
         # scope: frame nodes, then anything hoistable whose inputs are all frame
-        scope = {}
-        for nid in order:
-            d = defs[nid]
-            ups = [src_of[(nid, i["name"])][0] for i in d["inputs"] if (nid, i["name"]) in src_of]
-            per_pixel_in = any(scope.get(u) == "pixel" for u in ups)
-            per_pixel_in = per_pixel_in or bool(self.implicit_pins(nid, src_of))    # an unwired coordinate reads the pixel
-            if d.get("late") and per_pixel_in:
-                raise GraphError(f"{d['name']} #{nid} remembers one value for the next frame, so its input "
-                                 f"cannot come from a per-pixel node")
-            if d["scope"] == "frame":
-                # a frame node fed a per-pixel value follows it down, unless it
-                # keeps state - one value for the whole effect cannot be per pixel
-                if per_pixel_in and d.get("state"):
-                    raise GraphError(f"{d['name']} #{nid} keeps one value per frame, so its inputs "
-                                     f"cannot come from a per-pixel node (Coords, Noise...)")
-                scope[nid] = "pixel" if per_pixel_in else "frame"; continue
-            # the template's own words decide, not its pins: a pin called v or r
-            # is not the pixel's v or r
-            bare = re.sub(r"\$(in|out|p|st)\.[\w ]+", "", d["code"])
-            if PIXEL_NAMES.search(bare) or d.get("codegen"):
-                scope[nid] = "pixel"; continue
-            scope[nid] = "pixel" if per_pixel_in else "frame"
+        scope = self._scopes(order, defs, src_of)
 
         def var(nid, out):
             return f"n{nid}_{re.sub(r'[^A-Za-z0-9]', '_', out)}"

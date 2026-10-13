@@ -39,6 +39,26 @@ def test_user_text_cannot_break_the_effect_metadata():
     assert "Two lines" in head and name == "Two lines 'quoted'"
 
 
+def test_a_delay_fed_per_pixel_is_refused_whatever_its_id():
+    """A Delay keeps one value for the next frame, so a per-pixel input is refused. It is ordered before its
+    input (it reads last frame's value), and the check read that input's scope before it was known: with the
+    Delay added first it compiled, putting a variable of the pixel loop into the frame block - the build
+    failed on an undeclared name. Either way round it is refused now."""
+    for delay_first in (True, False):
+        g = starter()
+        if delay_first:
+            d = g.add("Delay", (100, 0)); n = g.add("Noise", (0, 0))
+        else:
+            n = g.add("Noise", (0, 0)); d = g.add("Delay", (100, 0))
+        p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+        g.link(n, LIB["Noise"]["outputs"][0]["name"], d, "x"); g.link(d, "value", p, "index"); g.link(p, "color", o, "color")
+        try:
+            g.compile()
+            raise AssertionError(f"a Delay fed by Noise compiled (Delay added first: {delay_first})")
+        except G.GraphError as e:
+            assert "next frame" in str(e)
+
+
 def test_library_is_documented():
     from native import nodedocs
     assert nodedocs.gaps() == []
