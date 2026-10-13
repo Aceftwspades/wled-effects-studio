@@ -86,10 +86,19 @@ def _ident(name):
     return s
 
 
+def as_float(v):
+    """A typed value as a float pin reads it: a vector or colour kept from when the pin was another type (a
+    node changed type, a sub-graph's input retyped) gives its first component - float() of it raised, and the
+    graph then failed every compile and every draw."""
+    if isinstance(v, (list, tuple)):
+        return float(v[0]) if v else 0.0
+    return float(v)
+
+
 def _lit(t, v):
     """A C++ literal of type t for default/param value v."""
     if t == "float":
-        return f"{float(v)}f"
+        return f"{as_float(v)}f"
     if t == "bool":
         return "true" if v else "false"
     if t == "color":
@@ -98,7 +107,7 @@ def _lit(t, v):
             return f"0x{(r << 16) | (g << 8) | b:06X}u"
         return f"{int(v)}u"
     if t == "int":
-        return str(int(v))
+        return str(int(as_float(v)))
     if t == "vector":
         if isinstance(v, (list, tuple)):
             x, y, z = (float(c) for c in (list(v) + [0, 0, 0])[:3])
@@ -398,7 +407,13 @@ class Graph:
                 new["params"][k] = v
         in_types = {i["name"]: i["type"] for i in nd["inputs"]}
         out_types = {o["name"]: o["type"] for o in nd["outputs"]}
-        new["inputs"] = {k: v for k, v in (n.get("inputs") or {}).items() if k in in_types}
+        try:
+            old_in = {i["name"]: i["type"] for i in self.node_def(n)["inputs"]}
+        except GraphError:
+            old_in = {}
+        # a typed value kept only where the pin keeps its type, as the settings are: a vector on a pin that
+        # is a float now was kept by name, and the graph could neither compile nor be drawn again
+        new["inputs"] = {k: v for k, v in (n.get("inputs") or {}).items() if k in in_types and old_in.get(k) == in_types[k]}
         into = [l for l in self.links if l[2] == nid]
         outof = [l for l in self.links if l[0] == nid]
         self.links = [l for l in self.links if l[0] != nid and l[2] != nid]

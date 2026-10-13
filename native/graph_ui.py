@@ -657,7 +657,7 @@ class GraphPanel(Glyphs):
         if t == "bool":
             w = dpg.add_checkbox(default_value=bool(v), user_data=ud, callback=cb)
         elif kind == "input" and t == "float":
-            w = self._number_widget(s, float(v), None, ud, cb, True, fw, words=self._implicit_words(nid, s["name"]))
+            w = self._number_widget(s, G.as_float(v), None, ud, cb, True, fw, words=self._implicit_words(nid, s["name"]))
         elif kind == "input" and t == "vector" and self._implicit_words(nid, s["name"]):
             w = self._implicit_button(self._implicit_words(nid, s["name"]), None, ud, fw, True)
         elif kind == "input" and t == "vector":
@@ -3193,7 +3193,7 @@ class GraphPanel(Glyphs):
         fw = width or self.px(96)
         words = self._implicit_words(nid, i["name"])        # the pin reads the pixel: its field says from where
         if i["type"] == "float":
-            w = self._number_widget(i, float(v), tag, ud, self._on_input, show, fw, words=words)
+            w = self._number_widget(i, G.as_float(v), tag, ud, self._on_input, show, fw, words=words)
         elif i["type"] == "vector" and words:
             w = self._implicit_button(words, tag, ud, fw, show)
         elif i["type"] == "bool":
@@ -3626,7 +3626,7 @@ class GraphPanel(Glyphs):
         """A setting's field, `fw` wide, after its name: a number the one
         control; a choice, a colour, a text, a file as their own."""
         if p["type"] == "float":
-            w = self._number_widget(p, float(v), None, ud, cb, True, fw)
+            w = self._number_widget(p, G.as_float(v), None, ud, cb, True, fw)
         elif p["type"] == "int" and n["type"] == "Effect settings" and p["name"] == "palette":
             # the default palette by name, not by number
             names = [f"{i}  {name}" for name, i in self._palette_names()]

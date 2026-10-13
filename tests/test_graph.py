@@ -88,6 +88,21 @@ def test_a_sub_graph_passing_its_input_through_keeps_the_signal():
     assert flat.nodes[feed]["type"] == "Graph input" and flat.nodes[feed]["params"]["default"] == 0.9
 
 
+def test_a_retyped_node_keeps_only_the_typed_values_that_fit():
+    """Changing a node's type kept its typed values by pin name: a vector typed on Vector math's a stayed on
+    Add's a, a float pin, and float() of it raised - the graph failed every compile from then on (and every
+    draw of the node). A value is kept only where the pin keeps its type; one that is still stale (a
+    sub-graph's input retyped under a parent's typed value) compiles as its first component."""
+    g = starter()
+    v = g.add("Vector math", (0, 0)); g.nodes[v]["inputs"] = {"a": [1.0, 2.0, 3.0], "scale": 0.5}
+    g.retype(v, "Add")
+    assert "a" not in g.nodes[v]["inputs"]
+    k = g.add("Knot colour", (0, 100)); g.nodes[k]["inputs"] = {"in": [10, 200, 30]}
+    g.retype(k, "Knot")
+    assert g.nodes[k]["inputs"] == {}
+    assert G.as_float([0.7, 1, 2]) == 0.7 and G._lit("float", [0.25, 0, 0]) == "0.25f"
+
+
 def test_library_is_documented():
     from native import nodedocs
     assert nodedocs.gaps() == []
