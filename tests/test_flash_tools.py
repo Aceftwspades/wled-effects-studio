@@ -214,6 +214,40 @@ def test_an_ota_flash_keeps_the_settings_and_the_image():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_a_connection_the_device_drops_is_known_by_its_kind():
+    """A device that takes the image and reboots resets the connection; on Windows that reads "An existing
+    connection was forcibly closed by the remote host" (WinError 10054), in the system's language, so the
+    upload knew it by no word of it and called a flash that worked failed. Now by the exception's kind: the
+    upload tries again, then says so, and the job goes on to check the reboot."""
+    import socket
+    import struct as _st
+    import threading
+    assert flash._closed(ConnectionResetError(10054, "An existing connection was forcibly closed by the remote host"))
+    assert flash._closed(ConnectionAbortedError(10053, "Eine bestehende Verbindung wurde abgebrochen"))
+    assert not flash._closed(OSError("no route to host"))
+    srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(4)
+    port, hits = srv.getsockname()[1], []
+
+    def serve():                                      # read the headers, then reset - as a rebooting device does
+        while len(hits) < 3:
+            try:
+                c, _ = srv.accept()
+            except OSError:
+                return
+            c.recv(4096); hits.append(1)
+            c.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, _st.pack("ii", 1, 0)); c.close()
+    threading.Thread(target=serve, daemon=True).start()
+    with tempfile.TemporaryDirectory() as d:
+        img = os.path.join(d, "firmware.bin"); open(img, "wb").write(b"x" * 200000)
+        sleep, flash.time.sleep = flash.time.sleep, lambda s: None
+        try:
+            ok, msg = flash.upload(f"127.0.0.1:{port}", img, lambda *a: None, timeout=5)
+        finally:
+            flash.time.sleep = sleep
+    srv.close()
+    assert not ok and flash.CLOSED in msg and len(hits) == 3, (msg, len(hits))
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

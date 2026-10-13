@@ -780,14 +780,27 @@ def upload(host, path, log, timeout=180, progress=None):
                 return False, f"the device answered {status}: " + _message(page)
             break
         except Exception as e:
-            closed = any(w in str(e).lower() for w in ("closed connection", "connection aborted", "connection reset",
-                                                       "remote end closed"))
+            closed = _closed(e)
             if attempt < 3 and closed:
                 log(f"the device closed the connection ({e}); trying again in 10 s")
                 time.sleep(10)
                 continue
-            return False, f"upload failed: {e}"
+            return False, f"upload failed: {CLOSED + ': ' if closed else ''}{e}"
     return True, _message(page) or "sent - the device is rebooting"
+
+
+CLOSED = "closed connection"                     # in upload()'s message when the device dropped it: Job then checks the reboot
+
+
+def _closed(e):
+    """The device dropped the connection (a reset, an abort, no answer) - by the exception's type: Windows
+    says "An existing connection was forcibly closed by the remote host" (WinError 10054), and in the
+    system's own language, so the words were no test."""
+    import http.client
+    return (isinstance(e, (ConnectionError, http.client.RemoteDisconnected, http.client.IncompleteRead,
+                           http.client.BadStatusLine))
+            or any(w in str(e).lower() for w in ("closed connection", "connection aborted", "connection reset",
+                                                  "remote end closed")))
 
 
 def send_script(host, prog, log=lambda m: None):
@@ -1206,7 +1219,7 @@ class Job:
                 # The device can take the whole file and reboot without its
                 # answer reaching us (the reply times out, or the connection
                 # closes); what it runs afterwards is what counts.
-                if ok or "timed out" in msg or "closed connection" in msg:
+                if ok or "timed out" in msg or CLOSED in msg:
                     self.log("waiting for the device to reboot...")
                     back, msg2 = verify_reboot(self.host, before, self.log)
                     if back or ok:
@@ -1274,7 +1287,7 @@ class Job:
         self._backup(before)
         ok, msg = upload(self.host, path, self.log, progress=self._sending)
         self.log(msg)
-        if ok or "timed out" in msg or "closed connection" in msg:
+        if ok or "timed out" in msg or CLOSED in msg:
             self.log("waiting for the device to reboot...")
             back, msg2 = verify_reboot(self.host, before, self.log)
             ok, msg = (back, msg2) if (back or ok) else (False, msg + "; " + msg2)
