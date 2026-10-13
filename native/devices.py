@@ -199,27 +199,37 @@ def mdns_scan(seconds=2.5, log=lambda m: None):
         log(f"mDNS query failed: {e}")
         return []
     t0 = time.time()
-    while time.time() - t0 < seconds:
-        try:
-            data, addr = s.recvfrom(9000)
-        except socket.timeout:
-            continue
-        except Exception:
-            break
-        recs = _dns_records(data)
-        names = [_dns_name(r[3], 0)[0] for r in recs if r[1] == 12 and r[0].lower() == SERVICE]
-        if not names:
-            continue
-        a = {r[0].lower(): socket.inet_ntoa(r[3]) for r in recs if r[1] == 1 and len(r[3]) == 4}
-        for inst in names:
-            target = None
-            for r in recs:
-                if r[1] == 33 and r[0].lower() == inst.lower() and len(r[3]) >= 6:   # SRV: target after 6 bytes
-                    target, _ = _dns_name(data, r[2] + 6)
-            ip = a.get((target or "").lower()) or addr[0]
-            found[ip] = inst.split("._")[0]
-    s.close()
+    try:
+        while time.time() - t0 < seconds:
+            try:
+                data, addr = s.recvfrom(9000)
+            except socket.timeout:
+                continue
+            except Exception:
+                break
+            try:
+                _answer(data, addr, found)
+            except (IndexError, struct.error, ValueError, OSError):
+                continue                                    # one reply that does not parse: the next is read
+    finally:
+        s.close()
     return sorted(found.items())
+
+
+def _answer(data, addr, found):
+    """One mDNS reply's WLED instances into `found` ({ip: name})."""
+    recs = _dns_records(data)
+    # the PTR's name read in the packet, at its offset: a responder compresses it (avahi, mDNSResponder), and
+    # a pointer read in the record's bytes alone pointed off their end - an IndexError ended the whole scan
+    names = [_dns_name(data, r[2])[0] for r in recs if r[1] == 12 and r[0].lower() == SERVICE]
+    a = {r[0].lower(): socket.inet_ntoa(r[3]) for r in recs if r[1] == 1 and len(r[3]) == 4}
+    for inst in names:
+        target = None
+        for r in recs:
+            if r[1] == 33 and r[0].lower() == inst.lower() and len(r[3]) >= 6:   # SRV: target after 6 bytes
+                target, _ = _dns_name(data, r[2] + 6)
+        ip = a.get((target or "").lower()) or addr[0]
+        found[ip] = inst.split("._")[0]
 
 
 def nodes_of(host, timeout=3.0):

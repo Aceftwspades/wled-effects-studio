@@ -143,6 +143,21 @@ def test_preset_ids_stay_where_the_device_keeps_them():
             pass
 
 
+def test_an_mdns_answer_with_a_compressed_name():
+    """avahi and mDNSResponder compress a PTR answer's name (a pointer back into the packet). It was read in
+    the record's own bytes, where the pointer points off the end: an IndexError ended the whole scan."""
+    import struct as _st
+
+    def name(n):
+        return b"".join(bytes([len(p)]) + p.encode() for p in n.split(".")) + b"\x00"
+    head = _st.pack("!HHHHHH", 0, 0x8400, 0, 1, 0, 0)
+    rdata = bytes([8]) + b"wled-abc" + b"\xc0\x0c"           # "wled-abc" then a pointer to offset 12: the service
+    answer = name(devices.SERVICE) + _st.pack("!HHIH", 12, 1, 120, len(rdata)) + rdata
+    found = {}
+    devices._answer(head + answer, ("10.0.0.7", 5353), found)
+    assert found == {"10.0.0.7": "wled-abc"}, found
+
+
 def test_ramps_become_sub_presets():
     st = {"name": "fade", "dur": 4.0, "rows": 48, "colors": [0, 0, 0], "ramps": {"ix": 250},
           "segments": [{"effect": "Rainbow", "params": {"ix": 10}, "bounds": [0, 0, 48, 48]}]}
