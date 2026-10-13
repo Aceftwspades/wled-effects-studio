@@ -99,6 +99,8 @@ def download(asset, progress=None):
             f.write(chunk); done += len(chunk)
             if progress:
                 progress(done, total)
+    from native.firmware import _whole
+    _whole(out + ".part", done, total)                   # cut short: thrown away and said, not unpacked
     os.replace(out + ".part", out)
     return out
 

@@ -264,6 +264,33 @@ def test_a_bin_flashed_to_the_fake_device():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_a_download_cut_short_is_not_kept():
+    """A connection cut before Content-Length ends as an end of file, not an error: the short file was
+    cached as the release (its header reads, so it would be flashed). Now it is thrown away and said."""
+    import socket
+    import threading
+    srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+    port = srv.getsockname()[1]
+
+    def serve():
+        c, _ = srv.accept(); c.recv(4096)
+        c.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\nConnection: close\r\n\r\n" + b"x" * 30000)
+        c.close()
+    threading.Thread(target=serve, daemon=True).start()
+    cache = firmware.CACHE
+    with tempfile.TemporaryDirectory() as d:
+        firmware.CACHE = d
+        try:
+            firmware.download("vTest", {"url": f"http://127.0.0.1:{port}/WLED_test.bin", "name": "WLED_test.bin"})
+            raise AssertionError("a short download was kept")
+        except OSError as e:
+            assert "30000 of 100000" in str(e), e
+        finally:
+            firmware.CACHE = cache
+        assert not any(f.startswith("WLED_test.bin") for _, _, fs in os.walk(d) for f in fs)
+    srv.close()
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

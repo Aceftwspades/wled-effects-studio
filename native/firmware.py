@@ -173,5 +173,17 @@ def download(tag, asset, progress=None):
             done += len(b)
             if progress:
                 progress(done, total)
+    _whole(out + ".part", done, total or asset.get("size") or 0)
     os.replace(out + ".part", out)
     return out
+
+
+def _whole(part, done, want):
+    """A download cut short ends as an end of file, not an error: one shorter than it was said to be is
+    thrown away and said, not cached as the file (its header still reads, so it would have been flashed)."""
+    if want and done != want:
+        try:
+            os.remove(part)
+        except OSError:
+            pass
+        raise OSError(f"the download stopped at {done} of {want} bytes - try again")
