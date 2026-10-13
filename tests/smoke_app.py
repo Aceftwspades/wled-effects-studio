@@ -118,6 +118,20 @@ MULTI_STEPS = [
     ([{"check": "len(app.streams) == 1 and app.streams[0].mode == 'all'"}, {"stream": False},
       {"py": "app.remove_device('127.0.0.2:8771')"}], 0.5),
 ]
+def _holds(other):
+    """A sub-graph whose output is fed by a node of `other` - wired, so loading it resolves `other`."""
+    return json.dumps({"name": "x", "nodes": [{"id": 1, "type": "sub:" + other, "pos": [0, 0], "params": {}, "inputs": {}},
+                                              {"id": 2, "type": "Graph output", "pos": [200, 0],
+                                               "params": {"name": "out", "type": "float"}, "inputs": {}}],
+                       "links": [[1, "out", 2, "value"]]})
+
+
+_SUBS = {"smoke_bad": "{broken", "smoke_a": _holds("smoke_b"), "smoke_b": _holds("smoke_a")}
+_SUBS_WRITE = ("(lambda os: (os.makedirs(app.gp.sub_dir, exist_ok=True), [open(os.path.join(app.gp.sub_dir, k + '.json'), 'w').write(v) "
+               f"for k, v in {_SUBS!r}.items()]))(__import__('os'))")
+_SUBS_REMOVE = ("(lambda os: [os.remove(os.path.join(app.gp.sub_dir, k + '.json')) for k in "
+                f"{list(_SUBS)!r} if os.path.exists(os.path.join(app.gp.sub_dir, k + '.json'))])(__import__('os'))")
+
 STEPS = [
     # the run's own project, from the examples; Maelstrom's graph compiled, built and put on the effects list
     # (a batch that starts with wait_build is taken once the build in hand is loaded, however long that is here)
@@ -1020,6 +1034,14 @@ STEPS = [
       {"check": "any(f.startswith('project.json.bad-') for f in __import__('os').listdir(app.project.path))"},
       {"py": "dpg.hide_item('confirm_dialog')"}, {"project": SMOKE}], 2.0),
     ([{"check": f"app.project.path.endswith({SMOKE!r}) and 'project:load' not in messages.HELD"}], 0.5),
+    # sub-graph files that do not read, or hold each other (a in b in a): said and left out - either raised through
+    # refresh_lib, and the studio could not start - and editing one, neither it nor one holding it is offered to add
+    ([{"py": _SUBS_WRITE}, {"py": "app.gp.refresh_lib()"}], 1.0),
+    ([{"check": "'subgraph:smoke_bad' in messages.HELD and 'subgraph:smoke_a' in messages.HELD"},
+      {"check": "(lambda d, f: (setattr(app.gp, 'cur_dir', app.gp.sub_dir), setattr(app.gp, 'file', 'smoke_a.json'), "
+                "[n for n in app.gp.type_names() if n.endswith(('sub:smoke_a', 'sub:smoke_b'))], setattr(app.gp, 'cur_dir', d), setattr(app.gp, 'file', f))[2])"
+                "(app.gp.cur_dir, app.gp.file) == []"},
+      {"py": _SUBS_REMOVE}, {"py": "app.gp.refresh_lib()"}], 0.5),
 ]
 
 

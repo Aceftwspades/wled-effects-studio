@@ -259,14 +259,44 @@ class GraphPanel(Glyphs):
     # --- sub-graphs as node types ------------------------------------------------------
     def resolve_sub(self, ident):
         """The Graph for a sub-graph node type, by file stem. Cached until
-        refresh_lib(), which runs whenever one is saved."""
+        refresh_lib(), which runs whenever one is saved. None for one that is
+        not there, does not read, or is met again while it is being read (a
+        sub-graph inside itself, or A in B in A): said, and left out - one of
+        them raised through refresh_lib, and so through the studio's start."""
         if ident not in self._subs:
             path = os.path.join(self.sub_dir, ident + ".json")
             if not os.path.exists(path):
                 return None
-            self._subs[ident] = G.load(path, lib=self.lib, resolver=self.resolve_sub)
-            self._subs[ident].project_dir = self.app.project.path
+            loading = self.__dict__.setdefault("_sub_loading", set())
+            if ident in loading:
+                self.status(f"sub-graph '{ident}' contains itself - it is left out where it does", "error",
+                            key=f"subgraph:{ident}")
+                return None
+            loading.add(ident)
+            try:
+                g = G.load(path, lib=self.lib, resolver=self.resolve_sub)
+            except Exception as e:
+                self.status(f"sub-graph '{ident}' does not read ({e}): left out - its file is subgraphs/{ident}.json",
+                            "error", key=f"subgraph:{ident}")
+                return None
+            finally:
+                loading.discard(ident)
+            g.project_dir = self.app.project.path
+            self._subs[ident] = g
         return self._subs[ident]
+
+    def _contains(self, ident, target, seen=None):
+        """Whether sub-graph `ident` holds a `target` sub node, at any depth."""
+        seen = set() if seen is None else seen
+        if ident in seen:
+            return False
+        seen.add(ident)
+        g = self._subs.get(ident)
+        for n in (g.nodes.values() if g is not None else ()):
+            t = n.get("type", "")
+            if t.startswith(G.SUB) and (t[len(G.SUB):] == target or self._contains(t[len(G.SUB):], target, seen)):
+                return True
+        return False
 
     def refresh_lib(self):
         """Rebuild the library: the built-ins, the user nodes, and one node
@@ -6025,7 +6055,11 @@ def build_panel(app, panel):
     from native.chrome import grip
     grip("graph_win")
     with dpg.group(horizontal=True):
+        # editing a sub-graph: neither itself nor one that holds it is offered - either made it contain itself
+        here = self.file[:-5] if self.cur_dir == self.sub_dir and self.file else None
         dpg.add_button(label="< back", tag="graph_back", show=False, callback=lambda: panel.back())
+            if here and n.startswith(G.SUB) and (n[len(G.SUB):] == here or self._contains(n[len(G.SUB):], here)):
+                continue
         with dpg.group(horizontal=True, tag="graph_crumbs", show=False):     # inside a sub-graph: the trail down to it
             pass
         dpg.add_combo(panel.files(), tag="graph_file", width=px(220), default_value=panel.file or "",
