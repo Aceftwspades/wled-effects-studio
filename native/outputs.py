@@ -28,6 +28,19 @@ TYPES = [(22, "WS2812 / WS2815 RGB", 3), (30, "SK6812 RGBW", 4), (24, "WS2811 40
          (51, "APA102 (data + clock)", 3), (50, "WS2801 (data + clock)", 3)]
 ORDERS = [(0, "GRB"), (1, "RGB"), (2, "BRG"), (3, "RBG"), (4, "BGR"), (5, "GBR")]
 DEFAULT_PINS = [16, 17, 18, 19, 21, 22, 23, 25, 26, 27]        # an ESP32's usual free outputs, first come first served
+CLOCKED = {t for t, name, _ in TYPES if "clock" in name}        # two-wire (SPI) types: a data pin and a clock pin
+KEPT = ("drv", "freq", "rgbwm", "ref", "text")                  # a device's own output settings the studio does not edit:
+                                                               # read with the outputs, sent back as they were
+
+
+def needs_clock(o):
+    return int(o.get("type", 22)) in CLOCKED
+
+
+def free_pin(outs):
+    """The first of DEFAULT_PINS no output uses yet, as a data or a clock pin."""
+    used = {int(o["pin"]) for o in outs} | {int(o["clock"]) for o in outs if o.get("clock") is not None}
+    return next((p for p in DEFAULT_PINS if p not in used), DEFAULT_PINS[-1])
 MAX_BUSSES = 10
 LED_MA_DEFAULT = 55
 MAX_MA_DEFAULT = 850
@@ -68,10 +81,15 @@ def wled_cfg(outs, ma_per_led=LED_MA_DEFAULT, max_ma=MAX_MA_DEFAULT):
     """The /json/cfg body that sets the device's outputs (hw.led.ins) and its power limit."""
     ins = []
     total = 0
-    for o in outs:
-        d = {"start": int(o["start"]), "len": int(o["len"]), "pin": [int(o["pin"])] + ([int(o["clock"])] if o.get("clock") is not None else []),
+    for k, o in enumerate(outs):
+        # a two-wire type with one pin is a bus WLED drops ("pins provided < pins required"): said here, not sent
+        if needs_clock(o) and o.get("clock") is None:
+            raise ValueError(f"output {k + 1} ({o.get('name', '')}): a data + clock type needs its clock pin")
+        d = {"start": int(o["start"]), "len": int(o["len"]),
+             "pin": [int(o["pin"])] + ([int(o["clock"])] if o.get("clock") is not None else []),
              "order": int(o.get("order", 0)), "rev": bool(o.get("rev")), "skip": int(o.get("skip", 0)), "type": int(o.get("type", 22)),
              "ref": False, "rgbwm": 0, "freq": 0, "ledma": int(ma_per_led), "maxpwr": 0}
+        d.update({key: v for key, v in (o.get("device") or {}).items() if key in KEPT})
         ins.append(d); total = max(total, d["start"] + d["len"])
     for d in ins:                                              # each output's share of the limit, as WLED computes it without one
         d["maxpwr"] = int(max_ma * d["len"] / max(1, total))
@@ -88,6 +106,9 @@ def from_wled_cfg(cfg):
         o.update({"type": int(e.get("type", 22)) & 0x7F, "order": int(e.get("order", 0)) & 0x0F, "rev": bool(e.get("rev")), "skip": int(e.get("skip", 0))})
         if len(pins) > 1:
             o["clock"] = pins[1]
+        dev = {key: e[key] for key in KEPT if key in e}
+        if dev:
+            o["device"] = dev
         outs.append(o)
     return outs, int(led.get("ledma", LED_MA_DEFAULT) or LED_MA_DEFAULT), int(led.get("maxpwr", MAX_MA_DEFAULT) or 0)
 

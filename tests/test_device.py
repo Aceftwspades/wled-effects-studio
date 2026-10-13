@@ -124,6 +124,25 @@ def test_pio_references_are_expanded():
     assert _pio_expand("${sysenv.STUDIO_TEST_VAR}", (a, b)) == "abc"
 
 
+def test_preset_ids_stay_where_the_device_keeps_them():
+    """The steps' presets skip the playlist's own id and the Off preset (250), and a show the device could
+    not hold - ids past its last, more entries than a playlist plays - is refused before anything is sent
+    (base + i ran over the playlist and past 250, where WLED refuses a save)."""
+    st = {"name": "s", "dur": 5.0, "rows": 1, "colors": [0, 0, 0],
+          "segments": [{"effect": "Rainbow", "params": {}, "bounds": [0, 0, 30, 1]}]}
+    presets, playlist = sequence.to_wled([dict(st) for _ in range(12)], EFFECTS, [], base=1, pid=9)
+    ids = playlist["playlist"]["ps"]
+    assert 9 not in ids and len(ids) == 12 and ids == sorted(k for k in presets if k is not None)
+    assert sequence.preset_ids(2, 248, 9) == [248, 249] and sequence.preset_ids(2, 8, 9) == [8, 10]
+    for steps, base in (([dict(st) for _ in range(10)], 245),                      # past 249
+                        ([dict(st, dur=12.0, ramps={"ix": 250}) for _ in range(10)], 10)):   # 120 entries
+        try:
+            sequence.to_wled(steps, EFFECTS, [], base=base, pid=9)
+            raise AssertionError(f"a show the device cannot hold was made (base {base})")
+        except ValueError:
+            pass
+
+
 def test_ramps_become_sub_presets():
     st = {"name": "fade", "dur": 4.0, "rows": 48, "colors": [0, 0, 0], "ramps": {"ix": 250},
           "segments": [{"effect": "Rainbow", "params": {"ix": 10}, "bounds": [0, 0, 48, 48]}]}
@@ -235,6 +254,19 @@ def test_outputs_round_trip():
     _post("/json/cfg", body)
     got, ledma, maxma = outputs.from_wled_cfg(DEV.cfg)
     assert [o["len"] for o in got] == [768, 768, 768] and ledma == 40 and maxma == 5000
+    # a data + clock type is refused without its clock pin (WLED would drop the bus, and the frame said "sent"),
+    # sent with both pins when it has one; the device's own settings come back as they went
+    apa = dict(got[0], type=51)
+    try:
+        outputs.wled_cfg([apa]); raise AssertionError("an APA102 without a clock pin was sent")
+    except ValueError as e:
+        assert "clock" in str(e)
+    apa["clock"] = outputs.free_pin(got)
+    assert apa["clock"] not in [o["pin"] for o in got]
+    assert outputs.wled_cfg([apa])["hw"]["led"]["ins"][0]["pin"] == [apa["pin"], apa["clock"]]
+    cfg = {"hw": {"led": {"ins": [dict(outputs.wled_cfg(outs[:1])["hw"]["led"]["ins"][0], freq=2000, rgbwm=3, drv=1, text="porch")]}}}
+    sent = outputs.wled_cfg(outputs.from_wled_cfg(cfg)[0])["hw"]["led"]["ins"][0]
+    assert (sent["freq"], sent["rgbwm"], sent["drv"], sent["text"]) == (2000, 3, 1, "porch")
 
 
 def test_palette_upload_and_removal():

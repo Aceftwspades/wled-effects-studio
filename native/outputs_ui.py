@@ -96,8 +96,9 @@ def refresh(app):
         with dpg.table(parent="out_rows", header_row=True, policy=dpg.mvTable_SizingStretchProp, borders_innerH=False,
                        borders_outerH=False, borders_innerV=False, borders_outerV=False, pad_outerX=True) as tbl:
             # the figures' columns fixed; the name and the type share what is left, so the table fits the frame
-            for name, w, stretch in (("", 22, False), ("name", 1.0, True), ("pin", 48, False), ("start", 62, False),
-                                     ("LEDs", 62, False), ("type", 1.5, True), ("order", 66, False), ("reverse", 60, False),
+            clocked = any(outputs.needs_clock(o) for o in outs)        # the clock column only when an output has one
+            for name, w, stretch in (("", 22, False), ("name", 1.0, True), ("pin", 48, False)) + ((("clock", 48, False),) if clocked else ()) + (
+                                     ("start", 62, False), ("LEDs", 62, False), ("type", 1.5, True), ("order", 66, False), ("reverse", 60, False),
                                      ("", 24, False)):
                 if stretch:
                     dpg.add_table_column(label=name, width_stretch=True, init_width_or_weight=w)
@@ -108,6 +109,11 @@ def refresh(app):
                     typeface.small(dpg.add_text(f"{k + 1:2d}", color=c.DIM))
                     dpg.add_input_text(width=-1, default_value=o.get("name", ""), user_data=(k, "name"), on_enter=True, callback=cb)
                     dpg.add_input_int(width=-1, step=0, default_value=int(o["pin"]), min_value=0, max_value=48, user_data=(k, "pin"), on_enter=True, callback=cb)
+                    if clocked and outputs.needs_clock(o):
+                        dpg.add_input_int(width=-1, step=0, default_value=int(o.get("clock") if o.get("clock") is not None else 0),
+                                          min_value=0, max_value=48, user_data=(k, "clock"), on_enter=True, callback=cb)
+                    elif clocked:
+                        dpg.add_text("")
                     dpg.add_input_int(width=-1, step=0, default_value=int(o["start"]), min_value=0, user_data=(k, "start"), on_enter=True, callback=cb)
                     dpg.add_input_int(width=-1, step=0, default_value=int(o["len"]), min_value=1, user_data=(k, "len"), on_enter=True, callback=cb)
                     dpg.add_combo(types, width=-1, default_value=next((t[1] for t in outputs.TYPES if t[0] == o.get("type", 22)), types[0]),
@@ -131,9 +137,11 @@ def _field(app, k, key, value):
     o = S["outs"][k]
     if key == "type":
         o["type"] = next((t[0] for t in outputs.TYPES if t[1] == value), 22)
+        if outputs.needs_clock(o) and o.get("clock") is None:
+            o["clock"] = outputs.free_pin(S["outs"])              # a data + clock type: a free pin for its clock, to change
     elif key == "order":
         o["order"] = next((i for i, n in outputs.ORDERS if n == value), 0)
-    elif key in ("pin", "start", "len"):
+    elif key in ("pin", "clock", "start", "len"):
         o[key] = int(value)
     elif key == "rev":
         o["rev"] = bool(value)
@@ -200,7 +208,10 @@ def send(app):
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
     if not S["outs"]:
         dpg.set_value("out_log", "no outputs to send"); return
-    body = outputs.wled_cfg(S["outs"], int(S.get("ma_per_led", 55)), int(S.get("max_ma", 850)))
+    try:
+        body = outputs.wled_cfg(S["outs"], int(S.get("ma_per_led", 55)), int(S.get("max_ma", 850)))
+    except ValueError as e:
+        dpg.set_value("out_log", f"not sent: {e}"); app.gp.status(f"not sent: {e}"); return
     h = host if host.startswith("http") else "http://" + host
     req = urllib.request.Request(h + "/json/cfg", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
     try:
