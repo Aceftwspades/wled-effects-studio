@@ -1580,7 +1580,7 @@ def _palette_fill(app, text):
                 tip(label, item=sel)
             if what[0] == "action":
                 typeface.small(dpg.add_text(app.keys.label(what[1]), color=DIM))
-    app._pal_sel = 0
+    app._cmd_sel = 0                                   # its own: _pal_sel is the Palettes frame's chosen palette
     _palette_mark(app)
     if not rows:
         dpg.add_text("no action or menu command matches", parent="palette_rows", color=DIM)
@@ -1617,7 +1617,7 @@ def _palette_mark(app):
     """The chosen row highlighted, and scrolled to when it is out of view."""
     rows = _palette_rows()
     for i, r in enumerate(rows):
-        dpg.set_value(r, i == getattr(app, "_pal_sel", 0))
+        dpg.set_value(r, i == getattr(app, "_cmd_sel", 0))
 
 
 def palette_move(app, d):
@@ -1625,9 +1625,9 @@ def palette_move(app, d):
     would take the focus to the list and the next letters typed went nowhere)."""
     rows = _palette_rows()
     if rows:
-        app._pal_sel = max(0, min(len(rows) - 1, getattr(app, "_pal_sel", 0) + d))
+        app._cmd_sel = max(0, min(len(rows) - 1, getattr(app, "_cmd_sel", 0) + d))
         _palette_mark(app)
-        y = app._pal_sel * px(28)                      # a row's height at the interface size, near enough to keep it in view
+        y = app._cmd_sel * px(28)                      # a row's height at the interface size, near enough to keep it in view
         top = dpg.get_y_scroll("palette_rows")
         h = dpg.get_item_rect_size("palette_rows")[1] or px(300)
         if y < top:
@@ -1642,7 +1642,7 @@ def palette_enter(app):
     rows = _palette_rows()
     if not rows:
         return
-    u = dpg.get_item_user_data(rows[min(getattr(app, "_pal_sel", 0), len(rows) - 1)])
+    u = dpg.get_item_user_data(rows[min(getattr(app, "_cmd_sel", 0), len(rows) - 1)])
     dpg.hide_item("palette_win")
     if u[0] == "action":
         app.run_action(u[1])
