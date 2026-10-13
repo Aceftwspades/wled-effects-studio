@@ -86,7 +86,7 @@ LIVE_MAP_STEPS = [
     ([{"expect": ["map_cam_words", "found of 60 LEDs"]}, {"check": "app.wiring is not None and app.wiring.mode == 'mask'"},
       {"check": "int(np.frombuffer(app._map_frame, np.uint8).max()) == 200"}, {"py": "camera_map_ui.calibrate(app)"}], 0.3),
     ([{"check": "app._map['calib'] is None and app.wiring is None and app._map_frame is None"},
-      {"py": "camera_map_ui.live(app)"}], 4.0),
+      {"py": "camera_map_ui.live(app)"}], 8.0),                  # a frame a step of the plan: at ~16 fps 4 s was not always enough
     ([{"check": "app._map['live'] is None and app._map['busy'] is None and not app._map['queue']"},
       {"check": "len(app._map['sides'][-1]['found']) >= 58"}, {"check": "app._map['sides'][-1]['words'].startswith('the webcam')"},
       {"py": "camera_map_ui.export_csv(app)"}], 0.5),
@@ -379,7 +379,8 @@ STEPS = [
       {"py": "reader_ui.search(app, needle='snapshot')"}], 0.8),
     ([{"check": "reader_ui.S.hit is not None and dpg.does_item_exist(reader_ui.S.hit)"},
       {"check": "dpg.get_value('reader_found').startswith('1 of ')"}, {"check": "dpg.get_y_scroll('reader_body') > 100"},
-      {"graph_open": "box_fire.json"}, {"graph_selected": [12]}, {"action": "node_help"}, {"graph_selected": []}], 1.5),
+      {"graph_open": "box_fire.json"}, {"graph_selected": [12]}, {"action": "node_help"}, {"graph_selected": []}], 3.0),
+    # (the reference's long page is laid out over frames - up to 30 before the jump to Noise lands: 1.5 s was short at ~16 fps)
     ([{"check": "reader_ui.S.doc == 'NODES.md'"},
       {"check": "reader_ui.S.here == reader_ui.reader.heading_index(reader_ui.S.blocks, 'Noise')"},
       {"check": "reader_ui.S.history[-1][0] == 'GUIDE.md'"}, {"py": "reader_ui.back(app)"}], 1.0),
@@ -827,10 +828,11 @@ STEPS = [
       {"py": "app.set_stream_out(protocol='ddp')"}, {"stream": False}], 1.0),
     ([{"check": "app.ddp is None and app.stream_out('127.0.0.1:8770')[0] == 'ddp'"}], 0.2),
     # the synth's sound sent as audio sync - unicast to the fake on this machine (never multicast: the network's WLEDs
-    # would hear it), from the panel's combo; off again closes it
+    # would hear it), from the panel's combo; off again closes it. A packet goes a frame at most, so the count is
+    # the frame rate's: a few are enough to say it flows (the rate itself is test_audio_sync's, on a set clock)
     ([{"device": "127.0.0.1:8770"}, {"check": "app.active_host().endswith('127.0.0.1:8770')"},
-      {"py": "app.set_audio_sync('unicast')"}], 1.0),
-    ([{"check": "app.audio_sync.addr == '127.0.0.1' and app.audio_sync.sent > 15 and app.audio_sync.error is None"},
+      {"py": "app.set_audio_sync('unicast')"}], 2.0),
+    ([{"check": "app.audio_sync.addr == '127.0.0.1' and app.audio_sync.sent > 5 and app.audio_sync.error is None"},
       {"check": "dpg.get_value('audio_sync_mode') == 'unicast'"}, {"expect": ["audio_sync_msg", "127.0.0.1:11988"]},
       {"py": "app.set_audio_sync('off')"}], 0.2),
     ([{"check": "app.audio_sync is None and dpg.get_value('audio_sync_msg') == 'off'"}], 0.1),
