@@ -53,8 +53,30 @@ def _dev_steps(app):
 
 def _save(app):
     app._seq_save_at = None
+    _follow(app)
     app.project.save()
     refresh(app)
+
+
+def _follow(app):
+    """The step playing kept as the one playing when the list changes under it (a step added, duplicated,
+    moved or deleted before it): the play state holds its index, which then named another step - the
+    highlight jumped, the blend came from the wrong step and one was skipped. Found again by identity; gone
+    with the list another length (deleted), playing stops; gone with the same length (an undo made new
+    copies of the steps), the index stays."""
+    p = getattr(app, "_seq_play", None)
+    if p is None or p.get("st") is None:
+        return
+    steps = _steps(app)["steps"]
+    k = next((k for k, st in enumerate(steps) if st is p["st"]), None)
+    if k is not None:
+        p["i"] = k
+    elif len(steps) != p.get("n", len(steps)) or not 0 <= p["i"] < len(steps):
+        stop(app); app.gp.status("the step playing was removed: stopped")
+        return
+    else:
+        p["st"] = steps[p["i"]]
+    p["n"] = len(steps)
 
 
 # --- the numbers, live -------------------------------------------------------------------------
@@ -211,6 +233,7 @@ def undo(app, redo=False):
     if key is None:
         app.gp.status("nothing to " + ("redo" if redo else "undo") + " in the sequence"); return
     (p.redo if redo else p.undo)(key)
+    _follow(app)                                          # the steps are new copies now: the playing one kept
     app._tl_dirty = True
     refresh(app); refresh_timers(app)
     app.gp.status(f"{'schedule' if key == 'schedule' else 'sequence'}: {'redo' if redo else 'undo'}")
@@ -1195,7 +1218,8 @@ def play(app, i=0, offset=0.0):
     i = max(0, min(len(S["steps"]) - 1, int(i)))
     dur = float(S["steps"][i].get("dur", 10))
     app._transition = None
-    app._seq_play = {"i": i, "next": time.perf_counter() + max(0.05, dur - offset), "paused": None}
+    app._seq_play = {"i": i, "next": time.perf_counter() + max(0.05, dur - offset), "paused": None,
+                     "st": S["steps"][i], "n": len(S["steps"])}
     app.playing = True
     live = getattr(app, "live", None)
     if live is not None and hasattr(live, "t0"):
@@ -1238,7 +1262,8 @@ def seek(app, t):
     if p is None or p["i"] != i:
         load_step(app, i, quiet=True)
         app._transition = None
-    app._seq_play = {"i": i, "next": time.perf_counter() + left, "paused": left if held else None}
+    app._seq_play = {"i": i, "next": time.perf_counter() + left, "paused": left if held else None,
+                     "st": S["steps"][i], "n": len(S["steps"])}
     app.playing = not held
     live = getattr(app, "live", None)
     if live is not None and hasattr(live, "t0"):
@@ -1386,6 +1411,7 @@ def _tl_geometry(app):
     cfg = dpg.get_item_configuration("seq_tl")
     # the size it was given, not the one last drawn: drawn before its first
     # layout it measured 0 high, and its text sat above its own top edge
+        p["st"], p["n"] = steps[i], len(steps)
     (x0, y0) = st.get("rect_min") or (0, 0)
     w, h = cfg["width"], cfg["height"]
     steps = _steps(app)["steps"]
