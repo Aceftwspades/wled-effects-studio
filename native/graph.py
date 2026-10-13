@@ -60,6 +60,25 @@ def _meta_text(s, drop=""):
     return s
 
 
+def _boundary(nodes, inner_ids, sub_node, src_in, out_src):
+    """A sub-graph's boundary as it is placed (unfold, flatten), in place: an output fed straight by a Graph
+    input takes what feeds that pin outside (a pass-through gave the input's default instead of the parent's
+    signal), and a value typed on an unwired pin of the sub node becomes that Graph input's default (it was
+    left out). `inner_ids`: the sub-graph's nodes under their new ids."""
+    typed = sub_node.get("inputs") or {}
+    for k in inner_ids:
+        bn = nodes.get(k)
+        if bn is None or bn["type"] != "Graph input":
+            continue
+        pin = bn["params"].get("name", "in")
+        if pin not in src_in and pin in typed:
+            bn["params"]["default"] = typed[pin]
+    for pin, (a, o) in list(out_src.items()):
+        an = nodes.get(a)
+        if an is not None and an["type"] == "Graph input" and an["params"].get("name", "in") in src_in:
+            out_src[pin] = src_in[an["params"].get("name", "in")]
+
+
 def _ident(name):
     s = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_").lower()
     if not s or s[0].isdigit():
@@ -464,6 +483,7 @@ class Graph:
         for a, o, b, i in inner:
             if self.nodes[b]["type"] == "Graph output":
                 out_src[self.nodes[b]["params"].get("name", "out")] = (a, o)
+        _boundary(self.nodes, smap.values(), n, src_in, out_src)
         rewired = []
         for a, o, b, i in inner:
             if self.nodes[a]["type"] == "Graph input":
@@ -905,6 +925,7 @@ class Graph:
                 bn = flat.nodes[b]
                 if bn["type"] == "Graph output":
                     out_src[bn["params"].get("name", "out")] = (a, o)
+            _boundary(flat.nodes, smap.values(), n, src_in, out_src)
             # rewire: links inside from a Graph input -> from the outside source (or keep the
             # boundary node, which then yields its default)
             rewired = []

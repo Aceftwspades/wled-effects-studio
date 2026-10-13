@@ -59,6 +59,35 @@ def test_a_delay_fed_per_pixel_is_refused_whatever_its_id():
             assert "next frame" in str(e)
 
 
+def test_a_sub_graph_passing_its_input_through_keeps_the_signal():
+    """A sub-graph whose Graph output is fed straight by a Graph input: the parent's signal goes through (it
+    was replaced by the input's default), in the flattened graph and when the node is unfolded. And a value
+    typed on an unwired pin of a sub node is that input's value inside (it was left out)."""
+    sub = G.Graph({"name": "pass"}, lib=LIB)
+    gi = sub.add("Graph input", (0, 0), {"name": "a", "type": "float", "default": 0.25})
+    go = sub.add("Graph output", (200, 0), {"name": "r", "type": "float"})
+    sub.link(gi, "value", go, "value")
+
+    def parent():
+        g = G.Graph({"name": "t"}, lib=LIB, resolver=lambda name: {"pass": sub}.get(name))
+        sp = g.add("Speed", (0, 0)); sn = g.add(G.SUB + "pass", (100, 0)); pa = g.add("Palette", (300, 0)); o = g.add("Output", (400, 0))
+        g.link(sp, LIB["Speed"]["outputs"][0]["name"], sn, "a"); g.link(sn, "r", pa, "index"); g.link(pa, "color", o, "color")
+        return g, sp, sn, pa
+    g, sp, sn, pa = parent()
+    flat = g.flatten()
+    assert [(a, b) for a, _, b, i in flat.links if b == pa and i == "index"] == [(sp, pa)], flat.links
+    g, sp, sn, pa = parent()
+    g.unfold(sn)
+    assert [(a, b) for a, _, b, i in g.links if b == pa and i == "index"] == [(sp, pa)], g.links
+    # the pin unwired, a value typed on it
+    g, sp, sn, pa = parent()
+    g.links = [l for l in g.links if l[2] != sn]
+    g.nodes[sn]["inputs"] = {"a": 0.9}
+    flat = g.flatten()
+    feed = next(a for a, _, b, i in flat.links if b == pa and i == "index")
+    assert flat.nodes[feed]["type"] == "Graph input" and flat.nodes[feed]["params"]["default"] == 0.9
+
+
 def test_library_is_documented():
     from native import nodedocs
     assert nodedocs.gaps() == []
