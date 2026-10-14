@@ -158,6 +158,17 @@ def test_an_mdns_answer_with_a_compressed_name():
     assert found == {"10.0.0.7": "wled-abc"}, found
 
 
+def test_a_step_without_its_own_values_is_the_same_on_the_device():
+    """A step from an older or hand-edited project, without a brightness, length or blend: the device was sent
+    128 and a 0.7 s blend where the sim showed 255 and no blend, and a missing length raised. One set of
+    defaults now - what a new step is given."""
+    st = {"name": "old", "rows": 1, "colors": [0, 0, 0], "segments": [{"effect": "Rainbow", "params": {}, "bounds": [0, 0, 30, 1]}]}
+    presets, playlist = sequence.to_wled([st], EFFECTS, [], base=40, pid=39)
+    assert presets[40]["bri"] == sequence.BRI_DEFAULT == 255
+    assert playlist["playlist"]["dur"] == [int(sequence.DUR_DEFAULT * 10)]
+    assert playlist["playlist"]["transition"] == [int(round(sequence.TRANS_DEFAULT * 10))]
+
+
 def test_ramps_become_sub_presets():
     st = {"name": "fade", "dur": 4.0, "rows": 48, "colors": [0, 0, 0], "ramps": {"ix": 250},
           "segments": [{"effect": "Rainbow", "params": {"ix": 10}, "bounds": [0, 0, 48, 48]}]}

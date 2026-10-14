@@ -242,6 +242,11 @@ def sub_steps(step):
     return out
 
 
+# what a step without its own value has - what a new step is given (sequence_ui.add_step): the device and the
+# sim read the same, where an older or hand-edited project left one out (128 / 0.7 s on the device, 255 / no
+# blend in the sim, and a missing length raised in the export)
+BRI_DEFAULT, DUR_DEFAULT, TRANS_DEFAULT = 255, 10.0, 0.7
+
 LAST_PRESET = 250          # WLED keeps presets 1..250 (presets.cpp: 251-254 are refused, 255 is a temporary one)
 OFF_PRESET = 250           # the schedule's "Off" preset: never a step's
 MAX_ENTRIES = 100          # a playlist's entries the device plays (playlist.cpp cuts the rest)
@@ -280,12 +285,12 @@ def to_wled(steps, names, pals, base=10, pid=9, name="Show", repeat=0):
             missing.append(st.get("name", f"step {i + 1}"))
             continue
         pid_i = slot[i]
-        presets[pid_i] = {"n": st.get("name", f"step {i + 1}"), "on": True, "bri": int(st.get("bri", 128)),
-                          "transition": int(round(float(st.get("trans", 0.7)) * 10)), "mainseg": 0, "seg": segs}
+        presets[pid_i] = {"n": st.get("name", f"step {i + 1}"), "on": True, "bri": int(st.get("bri", BRI_DEFAULT)),
+                          "transition": int(round(float(st.get("trans", TRANS_DEFAULT)) * 10)), "mainseg": 0, "seg": segs}
         ids.append(pid_i)
     kept = [st for i, st in enumerate(steps) if slot[i] in presets]
-    playlist = {"n": name, "playlist": {"ps": ids, "dur": [max(1, int(round(float(st["dur"]) * 10))) for st in kept],
-                                        "transition": [int(round(float(st.get("trans", 0.7)) * 10)) for st in kept],
+    playlist = {"n": name, "playlist": {"ps": ids, "dur": [max(1, int(round(float(st.get("dur", DUR_DEFAULT)) * 10))) for st in kept],
+                                        "transition": [int(round(float(st.get("trans", TRANS_DEFAULT)) * 10)) for st in kept],
                                         "repeat": int(repeat), "end": 0, "r": False}}
     if missing:
         presets[None] = missing

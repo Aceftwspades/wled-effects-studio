@@ -450,7 +450,7 @@ def refresh(app):
     sel = min(getattr(app, "_seq_sel", 0), len(steps) - 1)
     app._seq_sel = max(0, sel)
     dpg.delete_item("seq_rows", children_only=True)
-    total = sum(float(s.get("dur", 0)) for s in steps)
+    total = sum(float(s.get("dur", sequence.DUR_DEFAULT)) for s in steps)
     playing = _play_i(app)
     # the name's column: what the frame's width leaves after the fixed ones (and the list's padding and scrollbar)
     fw = dpg.get_item_rect_size(TAG)[0] or dpg.get_item_configuration(TAG)["width"]
@@ -486,7 +486,7 @@ def refresh(app):
                     with dpg.group(horizontal=True, horizontal_spacing=px(4)):
                         num.add(f"seq_len_{i}", float(st.get("dur", 10)), 0.1, 600, unit="s", digits=1, width=px(72), wide=True, pace=10,
                                 user_data=i, callback=lambda s, v, u: _num_changed(app, "dur", v, u))
-                        dpg.add_text(_bars_words(app, st.get("dur", 0)), tag=f"seq_bars_{i}", color=c.DIM)
+                        dpg.add_text(_bars_words(app, st.get("dur", sequence.DUR_DEFAULT)), tag=f"seq_bars_{i}", color=c.DIM)
                     with dpg.group(horizontal=True, horizontal_spacing=px(4)):
                         b = dpg.add_image_button(texture("duplicate", px(13)), width=px(13), height=px(13), user_data=i,
                                                  callback=lambda s, a, u: duplicate_step(app, u))
@@ -1413,8 +1413,9 @@ def poll(app):
         p["i"] = i
         p["st"], p["n"] = steps[i], len(steps)
         p["next"] = now + float(steps[i].get("dur", 10))
-        if prev is not None and float(steps[i].get("trans", 0)) > 0:
-            app.transition_start(prev, float(steps[i]["trans"]), S.get("style", "fade"))
+        trans = float(steps[i].get("trans", sequence.TRANS_DEFAULT))       # as the device's playlist blends it
+        if prev is not None and trans > 0:
+            app.transition_start(prev, trans, S.get("style", "fade"))
         load_step(app, i, quiet=True)
         app._seq_rows_dirty = True
     i = p["i"]
@@ -1454,7 +1455,7 @@ def _tl_geometry(app):
     steps = _steps(app)["steps"]
     spans, t = [], 0.0
     for s in steps:
-        d = float(s.get("dur", 10)); spans.append((t, d, float(s.get("trans", 0)))); t += d
+        d = float(s.get("dur", 10)); spans.append((t, d, float(s.get("trans", sequence.TRANS_DEFAULT)))); t += d
     return x0, y0, w, h, t, spans
 
 
