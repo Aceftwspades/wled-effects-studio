@@ -39,6 +39,21 @@ E131_PORT, ARTNET_PORT = 5568, 6454
 UNIVERSE_BYTES = 510                # 170 RGB pixels a universe: WLED's "Multiple RGB", xLights' and Falcon's default
 
 
+def resolve(name):
+    """A device's name ("wled-cube.local") as its address, looked up once - a sender given the name made the
+    system resolve it for every packet, on the main loop (30 frames a second, several packets each), and a .local
+    name that stopped answering stalled each one. A name that does not resolve is kept: its sends fail, counted."""
+    try:
+        socket.inet_aton(name)
+        return name                                   # an address already
+    except OSError:
+        pass
+    try:
+        return socket.gethostbyname(name)
+    except OSError:
+        return name
+
+
 class _UdpOut:
     """What every sender shares: a non-blocking UDP socket to the device's IP (a host written
     with its web port, "192.168.1.17:8080" or the tests' fake, takes the protocol's own port),
@@ -48,6 +63,7 @@ class _UdpOut:
     def __init__(self, host, port):
         self.host, self.port = host, port
         self.ip = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+        self._to = (resolve(self.ip), self.port)      # resolved once: sendto with a name looked it up every packet
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setblocking(False)
         self.frames = 0
@@ -58,7 +74,7 @@ class _UdpOut:
 
     def _put(self, pkt):
         try:
-            self.sock.sendto(pkt, (self.ip, self.port))
+            self.sock.sendto(pkt, self._to)
             self.bytes += len(pkt)
             return True
         except OSError as e:

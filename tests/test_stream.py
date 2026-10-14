@@ -169,6 +169,20 @@ def test_make_out_picks_the_protocol():
     assert isinstance(o, L.ArtNetOut) and o.universe == 0 and o.ip == "127.0.0.1" and o.port == L.ARTNET_PORT
 
 
+def test_a_device_name_is_resolved_once():
+    """A sender given a name ("wled-cube.local") made the system look it up for every packet, on the main loop;
+    it is resolved once, when the stream starts. An address stays as it is; a name that does not resolve is kept
+    (its sends fail and are counted, as before)."""
+    assert L.resolve("10.0.0.5") == "10.0.0.5"
+    assert L.resolve("localhost") == "127.0.0.1"
+    assert L.resolve("no-such-device.invalid") == "no-such-device.invalid"
+    d = L.DdpOut("localhost:80", port=4048)
+    assert d._to == ("127.0.0.1", 4048) and d.ip == "localhost"
+    from native import audio_sync
+    a = audio_sync.AudioSyncSender("unicast", host="localhost")
+    assert a._to == ("127.0.0.1", audio_sync.PORT) and a.addr == "localhost"
+
+
 if __name__ == "__main__":                        # without pytest: every test_ function, in order
     import inspect
     bad = 0

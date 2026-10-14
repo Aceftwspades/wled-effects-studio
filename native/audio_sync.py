@@ -58,6 +58,8 @@ class AudioSyncSender:
             raise ValueError("unicast audio sync needs a device")
         self.mode, self.port = mode, int(port)
         self.addr = {"multicast": GROUP, "broadcast": "255.255.255.255"}.get(mode) or _host_only(host)
+        from native.live_out import resolve
+        self._to = (resolve(self.addr), self.port)       # once, not each of fifty packets a second
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         if mode == "multicast":
             self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)   # the local network only
@@ -80,7 +82,7 @@ class AudioSyncSender:
         freq, mag = getattr(eng, "last_peak", (0.0, 0.0))
         data = packet(vol, vol, self._peak_held, eng.fft, mag, freq)
         try:
-            self.sock.sendto(data, (self.addr, self.port))
+            self.sock.sendto(data, self._to)
             self.sent += 1
             self.error = None
         except OSError as e:                            # no network, a host gone: said, and tried again next time
