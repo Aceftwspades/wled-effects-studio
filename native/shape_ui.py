@@ -67,14 +67,14 @@ def _apply(app, parts=None, undo_from=None, refit=None, **more):
     stack = getattr(app, "_shape_undo", None)
     if stack is None:
         stack = app._shape_undo = []
-    before = undo_from or json.dumps(g.params if g.kind == "shape" else {"parts": []})
+    before = undo_from or _state_of(g)
     stack.append(before)
     del stack[:-40]
     names = getattr(app, "_shape_undo_names", None)
     if names is None:
         names = app._shape_undo_names = []
     after = dict(g.params if g.kind == "shape" else {}, **({"parts": parts} if parts is not None else {}), **more)
-    names.append(step_name(json.loads(before), after))
+    names.append(step_name(_params_of(before), after))
     del names[:-40]
     app._shape_redo = []                                    # a new step: the steps undone are gone
     app._shape_redo_names = []
@@ -88,12 +88,49 @@ def _apply(app, parts=None, undo_from=None, refit=None, **more):
         view3d.refit(app, grow=(refit == "grow"))
 
 
+def _state_of(g):
+    """A geometry as an undo step: a shape's settings, or - a cube, a matrix, before the first part was added -
+    the whole geometry (it was kept as an empty shape, and undoing the first part left one, not the cube)."""
+    return json.dumps(g.params) if g.kind == "shape" else json.dumps({"geometry": g.to_json()})
+
+
+def _params_of(state):
+    p = json.loads(state)
+    return {"parts": []} if "geometry" in p and "parts" not in p else p
+
+
+def _geometry_of(state):
+    p = json.loads(state)
+    return Geometry.from_json(p["geometry"]) if "geometry" in p and "parts" not in p else Geometry("shape", **p)
+
+
+def _restore(app, state):
+    """An undo or redo step back as the geometry - a shape's, or the cube or matrix it was before."""
+    g = _geometry_of(state)
+    was = app.project.geometry.kind
+    app.apply_geometry(g)
+    if was != g.kind and dpg.does_item_exist("geom_kind"):
+        dpg.set_value("geom_kind", g.kind); app.rebuild_geom_fields()
+
+
 def _names(app, which):
     n = getattr(app, which, None)
     if n is None:
         n = []
         setattr(app, which, n)
     return n
+
+
+# the editor's state that belongs to one project's shape
+PROJECT_STATE = ("_shape_undo", "_shape_redo", "_shape_undo_names", "_shape_redo_names", "_shape_sels", "_shape_sel",
+                 "_shape_pending", "_shape_pre", "_shape_drag", "_shape_drag_to", "_shape_hover")
+
+
+def forget(app):
+    """Another project opened: the shape editor's undo steps, selection and a drag under way are the last
+    project's - Ctrl+Z here put the other project's shape into this one, and saved it."""
+    for k in PROJECT_STATE:
+        app.__dict__.pop(k, None)
 
 
 def undo(app):
@@ -104,12 +141,11 @@ def undo(app):
     redo_stack = getattr(app, "_shape_redo", None)
     if redo_stack is None:
         redo_stack = app._shape_redo = []
-    redo_stack.append(json.dumps(g.params if g.kind == "shape" else {"parts": []}))
+    redo_stack.append(_state_of(g))
     names, rnames = _names(app, "_shape_undo_names"), _names(app, "_shape_redo_names")
     what = names.pop() if len(names) == len(stack) and names else "a change"
     rnames.append(what)
-    p = json.loads(stack.pop())
-    app.apply_geometry(Geometry("shape", **p))
+    _restore(app, stack.pop())
     refresh(app)
     app.gp.status(f"undone: {what}")
 
@@ -122,12 +158,11 @@ def redo(app):
     undo_stack = getattr(app, "_shape_undo", None)
     if undo_stack is None:
         undo_stack = app._shape_undo = []
-    undo_stack.append(json.dumps(g.params if g.kind == "shape" else {"parts": []}))
+    undo_stack.append(_state_of(g))
     names, rnames = _names(app, "_shape_undo_names"), _names(app, "_shape_redo_names")
     what = rnames.pop() if len(rnames) == len(stack) and rnames else "a change"
     names.append(what)
-    p = json.loads(stack.pop())
-    app.apply_geometry(Geometry("shape", **p))
+    _restore(app, stack.pop())
     refresh(app)
     app.gp.status(f"redone: {what}")
 

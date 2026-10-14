@@ -1182,6 +1182,8 @@ class App(Features):
             self.gp.save()
         self.project = Project(path)
         messages.clear(self, "")                         # the last project's problems are not this one's
+        shape_ui.forget(self)                            # nor its shape's undo steps and selection
+        self._code_undo, self._code_redo = [], []        # nor the code pane's (they reached the next file opened)
         self.report_project_load()
         if create:
             from native import flash
