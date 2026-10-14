@@ -248,6 +248,36 @@ def test_a_connection_the_device_drops_is_known_by_its_kind():
     assert not ok and flash.CLOSED in msg and len(hits) == 3, (msg, len(hits))
 
 
+def test_cancel_stops_what_the_tool_started():
+    """Cancelling stopped pio.exe alone, a launcher: the compiler and esptool under it ran on, holding the port.
+    kill_tree stops the child and what it started - by process id."""
+    import subprocess
+    from native import procs
+    child = "import time; time.sleep(60)"
+    parent = ("import subprocess, sys, time; c = subprocess.Popen([sys.executable, '-c', %r]); "
+              "print(c.pid, flush=True); time.sleep(60)") % child
+    p = procs.popen([sys.executable, "-c", parent], stdout=subprocess.PIPE, text=True)
+    pid = int(p.stdout.readline())
+
+    def alive(k):
+        if os.name == "nt":
+            out = subprocess.run(["tasklist", "/FI", f"PID eq {k}", "/NH"], capture_output=True, text=True).stdout
+            return str(k) in out
+        try:
+            os.kill(k, 0)
+            return True
+        except OSError:
+            return False
+    assert alive(pid)
+    procs.kill_tree(p)
+    p.wait(10)
+    for _ in range(50):
+        if not alive(pid):
+            break
+        time.sleep(0.1)
+    assert not alive(pid), "the grandchild outlived the cancel"
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

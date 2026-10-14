@@ -75,3 +75,22 @@ def run(*args, **kw):
 
 def popen(*args, **kw):
     return subprocess.Popen(*args, **kwargs(kw))
+
+
+def kill_tree(proc):
+    """A child stopped with everything it started - by its process id, never by name. terminate() alone
+    stopped pio.exe, a launcher: the python, scons, compiler and esptool under it ran on (a USB write kept
+    the port, a build kept compiling into .pio), while the job said cancelled."""
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, timeout=10)
+        else:
+            run(["pkill", "-TERM", "-P", str(proc.pid)], capture_output=True, timeout=10)
+    except Exception:
+        pass
+    try:
+        proc.terminate()
+    except Exception:
+        pass

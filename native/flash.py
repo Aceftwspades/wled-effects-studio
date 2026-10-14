@@ -1109,11 +1109,7 @@ class Job:
 
     def cancel(self):
         self._cancel = True
-        if self.proc and self.proc.poll() is None:
-            try:
-                self.proc.terminate()
-            except Exception:
-                pass
+        procs.kill_tree(self.proc)                    # pio and everything under it (esptool holds the port)
 
     @staticmethod
     def _diagnose(line):
