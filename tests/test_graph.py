@@ -103,6 +103,17 @@ def test_a_retyped_node_keeps_only_the_typed_values_that_fit():
     assert G.as_float([0.7, 1, 2]) == 0.7 and G._lit("float", [0.25, 0, 0]) == "0.25f"
 
 
+def test_a_bundle_is_checked_whole_before_it_is_imported():
+    """A bundle's sub-graph names become file names: one climbing out of its folder (dot-dot) was written outside the project. And a bundle
+    wrong part way left the files written before it. It is checked whole first; a problem is said, nothing written."""
+    from native.graph_ui import _bundle_problem as problem
+    ok = {"graph": {"nodes": [], "links": []}, "subgraphs": {"glow": {"nodes": [], "links": []}}, "nodes": {}}
+    assert problem(ok) is None and problem(dict(ok, subgraphs={"Glow": ok["graph"]})) is None
+    for bad in (dict(ok, subgraphs={".." + chr(92) + ".." + chr(92) + "x": ok["graph"]}), dict(ok, subgraphs={"a/b": ok["graph"]}),
+                dict(ok, nodes=[1]), dict(ok, graph=[]), dict(ok, subgraphs={"glow": {"nodes": 5}})):
+        assert problem(bad), bad
+
+
 def test_library_is_documented():
     from native import nodedocs
     assert nodedocs.gaps() == []

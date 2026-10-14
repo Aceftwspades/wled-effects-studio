@@ -5849,16 +5849,23 @@ class GraphPanel(Glyphs):
             b = {"graph": b, "subgraphs": {}, "nodes": {}} if isinstance(b, dict) and "nodes" in b else None
             if b is None:
                 self.status("not a graph file"); return
+        why = _bundle_problem(b)
+        if why:
+            # checked whole before anything is written: a sub-graph named "..\..\x" was written outside the
+            # project, and a bundle wrong part way left the files written before it
+            self.status(f"not imported: {why}", "error"); return
+        from native.project import write_atomic
         udir = os.path.join(self.app.project.path, "nodes")
         for name, d in b.get("nodes", {}).items():
             os.makedirs(udir, exist_ok=True)
             p = os.path.join(udir, G._ident(name) + ".json")
             if not os.path.exists(p):
-                json.dump(d, open(p, "w", encoding="utf-8"), indent=1)
+                write_atomic(p, json.dumps(d, indent=1))
         for ident, d in b.get("subgraphs", {}).items():
             p = os.path.join(self.sub_dir, ident + ".json")
             if not os.path.exists(p):
-                json.dump(d, open(p, "w", encoding="utf-8"), indent=1)
+                os.makedirs(self.sub_dir, exist_ok=True)
+                write_atomic(p, json.dumps(d, indent=1))
             # an existing one of the same name is kept: the import uses it
         g = b["graph"]
         name = g.get("name") or os.path.splitext(os.path.basename(path))[0]
@@ -6067,6 +6074,26 @@ class GraphPanel(Glyphs):
         for c, ns in sorted(cats.items()):
             out += [f"{c} / {n}" for n in sorted(ns)]
         return out
+
+
+def _bundle_problem(b):
+    """What makes a bundle unsafe or unreadable to import, in words - None when it is fine. Its sub-graphs'
+    names become file names, and its graph references them by those names: they must be plain names."""
+    def graph_ok(g):
+        return isinstance(g, dict) and isinstance(g.get("nodes", []), list) and isinstance(g.get("links", []), list)
+    if not graph_ok(b.get("graph")):
+        return "its graph is not one"
+    if not isinstance(b.get("nodes", {}), dict) or not isinstance(b.get("subgraphs", {}), dict):
+        return "its nodes or sub-graphs are not lists of them"
+    for ident, d in b.get("subgraphs", {}).items():
+        if not isinstance(ident, str) or not ident or G._ident(ident) != ident.lower():    # no folder, no dots
+            return f"a sub-graph's name, {ident!r}, is not a plain name"
+        if not graph_ok(d):
+            return f"sub-graph {ident!r} is not a graph"
+    for name, d in b.get("nodes", {}).items():
+        if not isinstance(d, dict):
+            return f"node {name!r} is not a node definition"
+    return None
 
 
 def _node_extras(n):
