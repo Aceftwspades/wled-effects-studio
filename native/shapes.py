@@ -77,6 +77,23 @@ AXIS = {"strip": (1.0, 0.0, 0.0), "panel": (0.0, -1.0, 0.0), "polyline": (1.0, 0
 LINEAR = ("strip", "ring", "polygon", "polyline", "star", "helix", "spiral", "arch", "frame")
 
 
+
+MAX_COUNT = 256 * 256          # LEDs in a part at most: the engine's own limit (Geometry.MAX_PIXELS)
+MAX_SIDE = 1024                # a dimension that multiplies (a panel's w and h, a cube's B, strands, spokes...)
+_SIDES = {"w", "h", "B", "strands", "sides", "spokes", "points"}
+
+
+def _count(p, key, default, lo):
+    """A part's whole-number setting, at least `lo`, and no more than a part can hold: a count typed or read
+    from a file (1e9 as a strip's length / pitch, a panel 100000 wide) ran the studio out of memory, after the
+    edit's undo step was already taken."""
+    hi = MAX_SIDE if key in _SIDES else MAX_COUNT
+    try:
+        v = int(p.get(key, default))
+    except (TypeError, ValueError, OverflowError):
+        v = int(default)
+    return max(lo, min(hi, v))
+
 def new_part(kind, **params):
     p = dict(KINDS[kind][0])
     p.update(params)
@@ -193,23 +210,23 @@ def _part_points(part):
     k, p = part["kind"], part.get("params", {})
     pitch = float(p.get("pitch", 1.0)) or 1.0
     if k == "strip":
-        n = max(1, int(p.get("n", 30)))
+        n = _count(p, "n", 30, 1)
         t = np.arange(n, dtype=np.float32) - (n - 1) / 2.0
         return np.stack([t * pitch, np.zeros(n), np.zeros(n)], 1), np.tile([0.0, -1.0, 0.0], (n, 1))
     if k == "ring":
-        n = max(1, int(p.get("n", 24)))
+        n = _count(p, "n", 24, 1)
         r = float(p.get("radius", 0.0)) or n * pitch / (2 * math.pi)
         a = np.radians(float(p.get("start_deg", 0.0))) + np.arange(n) * (2 * math.pi / n)
         pos = np.stack([np.cos(a) * r, np.sin(a) * r, np.zeros(n)], 1)
         return pos, np.stack([np.cos(a), np.sin(a), np.zeros(n)], 1)
     if k == "panel":
-        w, h = max(1, int(p.get("w", 8))), max(1, int(p.get("h", 8)))
+        w, h = _count(p, "w", 8, 1), _count(p, "h", 8, 1)
         ys, xs = np.mgrid[0:h, 0:w]
         pos = np.stack([(xs.ravel() - (w - 1) / 2.0) * pitch, np.zeros(w * h), ((h - 1) / 2.0 - ys.ravel()) * pitch], 1)
         order = _matrix_order(w, h, bool(p.get("serpentine", True)), bool(p.get("vertical", False)))
         return pos[order], np.tile([0.0, -1.0, 0.0], (w * h, 1))
     if k == "cylinder":
-        w, h = max(3, int(p.get("w", 24))), max(1, int(p.get("h", 8)))
+        w, h = _count(p, "w", 24, 3), _count(p, "h", 8, 1)
         ys, xs = np.mgrid[0:h, 0:w]
         a = xs.ravel() * (2 * math.pi / w)
         r = w * pitch / (2 * math.pi)
@@ -217,7 +234,7 @@ def _part_points(part):
         order = _matrix_order(w, h, bool(p.get("serpentine", False)), False)
         return pos[order], np.stack([np.cos(a), np.sin(a), np.zeros(w * h)], 1)[order]
     if k == "sphere":
-        w, h = max(3, int(p.get("w", 24))), max(2, int(p.get("h", 12)))
+        w, h = _count(p, "w", 24, 3), _count(p, "h", 12, 2)
         ys, xs = np.mgrid[0:h, 0:w]
         a = xs.ravel() * (2 * math.pi / w)
         lat = (ys.ravel() + 0.5) / h * math.pi - math.pi / 2
@@ -226,7 +243,7 @@ def _part_points(part):
         order = _matrix_order(w, h, bool(p.get("serpentine", False)), False)
         return (nrm * R)[order], nrm[order]
     if k == "cube":
-        B = max(2, int(p.get("B", 8)))
+        B = _count(p, "B", 8, 2)
         six = bool(p.get("six", False))
         pos, nrm = [], []
         # faces in the cube_fx wiring order: N, W, T, E, S (, B); each a B x B raster
@@ -244,7 +261,7 @@ def _part_points(part):
                 pos.append(f(a, b)); nrm.append(n)
         return np.asarray(pos, np.float32), np.asarray(nrm, np.float32)
     if k == "polygon":
-        sides, m = max(3, int(p.get("sides", 5))), max(1, int(p.get("per_side", 6)))
+        sides, m = _count(p, "sides", 5, 3), _count(p, "per_side", 6, 1)
         side = m * pitch                                                # LEDs a pitch apart along each side
         r = float(p.get("radius", 0.0)) or side / (2.0 * math.sin(math.pi / sides))
         a0 = math.radians(float(p.get("start_deg", 0.0)))
@@ -256,7 +273,7 @@ def _part_points(part):
     if k == "polyhedron":
         V, E, F = polyhedron(p.get("solid", "soccer ball"))
         V = V * float(p.get("radius", 12.0))
-        m = max(1, int(p.get("per_edge", 5)))
+        m = _count(p, "per_edge", 5, 1)
         t = (np.arange(m) + 0.5) / m
         if p.get("mode", "edges") == "faces":
             # every face outlined on its own: two faces share each edge, so each outline is pulled into its
@@ -311,7 +328,7 @@ def _part_points(part):
             out.append(pts[i] + seg[i] * t)
         return np.asarray(out, np.float32), None
     if k == "tree":
-        S, m = max(1, int(p.get("strands", 8))), max(2, int(p.get("per_strand", 30)))
+        S, m = _count(p, "strands", 8, 1), _count(p, "per_strand", 30, 2)
         H = float(p.get("height", 30.0)) or 30.0
         B, T = max(0.0, float(p.get("base", 18.0))), max(0.0, float(p.get("top", 0.0)))
         turns, deg = float(p.get("turns", 0.0)), float(p.get("degrees", 360.0)) or 360.0
@@ -328,7 +345,7 @@ def _part_points(part):
             nrm.append(_radial(L, (B - T) / (2 * H) * max(1e-6, np.hypot(L[:, 0], L[:, 1]).max())))
         return np.concatenate(out).astype(np.float32), np.concatenate(nrm).astype(np.float32)
     if k == "star":
-        npts, m = max(3, int(p.get("points", 5))), max(1, int(p.get("per_edge", 6)))
+        npts, m = _count(p, "points", 5, 3), _count(p, "per_edge", 6, 1)
         inner = min(0.95, max(0.05, float(p.get("inner", 0.4))))
         edge = m * pitch
         R = float(p.get("radius", 0.0)) or edge / math.sqrt(1 + inner * inner - 2 * inner * math.cos(math.pi / npts))
@@ -340,7 +357,7 @@ def _part_points(part):
         pos = np.concatenate([corners[i] + (corners[i + 1] - corners[i]) * tt[:, None] for i in range(2 * npts)])
         return pos.astype(np.float32), _radial(pos).astype(np.float32)
     if k == "helix":
-        n = max(2, int(p.get("n", 60)))
+        n = _count(p, "n", 60, 2)
         r = float(p.get("radius", 3.0)) or 3.0
         L = (n - 1) * pitch
         H = min(abs(float(p.get("height", 12.0))), L)
@@ -350,7 +367,7 @@ def _part_points(part):
         pos = np.stack([np.cos(ang) * r, np.sin(ang) * r, t * H - H / 2], 1)
         return pos.astype(np.float32), _radial(pos).astype(np.float32)
     if k == "spiral":
-        n = max(2, int(p.get("n", 120)))
+        n = _count(p, "n", 120, 2)
         gap = float(p.get("gap", 2.0)) or 2.0
         r0 = max(0.0, float(p.get("inner", 1.0)))
         need = (n - 1) * pitch
@@ -365,7 +382,7 @@ def _part_points(part):
         pos = _evenly(P, spacing=pitch)[:n]
         return pos.astype(np.float32), _radial(pos).astype(np.float32)
     if k == "arch":
-        n = max(2, int(p.get("n", 30)))
+        n = _count(p, "n", 30, 2)
         span, rise = float(p.get("span", 0.0)), float(p.get("rise", 0.0))
         if span <= 0:
             span = 2 * (n - 1) * pitch / math.pi                   # a half circle as long as the strip
@@ -376,7 +393,9 @@ def _part_points(part):
         return pos.astype(np.float32), np.tile([0.0, -1.0, 0.0], (n, 1)).astype(np.float32)
     if k == "rings":
         counts = [int(c) for c in str(p.get("counts", "1,8,12,16,24,32")).replace(";", ",").split(",") if c.strip().isdigit()]
-        counts = [max(1, c) for c in counts] or [1, 8, 12, 16, 24, 32]
+        counts = [max(1, min(MAX_COUNT, c)) for c in counts] or [1, 8, 12, 16, 24, 32]
+        while sum(counts) > MAX_COUNT and len(counts) > 1:
+            counts.pop()                                  # rings past the engine's limit left off (typed: 1,8,50000000)
         gap = float(p.get("gap", 0.0))
         a0 = math.radians(float(p.get("start_deg", 0.0)))
         rings = list(enumerate(counts))
@@ -390,7 +409,7 @@ def _part_points(part):
         pos = np.concatenate(out)
         return pos.astype(np.float32), np.tile([0.0, 0.0, 1.0], (len(pos), 1)).astype(np.float32)
     if k == "frame":
-        w, h = max(1, int(p.get("w", 30))), max(1, int(p.get("h", 20)))
+        w, h = _count(p, "w", 30, 1), _count(p, "h", 20, 1)
         W, Hh = w * pitch, h * pitch
         bl, tl, tr, br = [np.array(c, np.float64) for c in ((-W / 2, 0, -Hh / 2), (-W / 2, 0, Hh / 2), (W / 2, 0, Hh / 2), (W / 2, 0, -Hh / 2))]
         sides = [(bl, tl, h), (tl, tr, w), (tr, br, h), (br, bl, w)]    # clockwise from the bottom left
@@ -410,7 +429,7 @@ def _part_points(part):
         pos = np.concatenate(out)
         return pos.astype(np.float32), np.tile([0.0, -1.0, 0.0], (len(pos), 1)).astype(np.float32)
     if k == "spokes":
-        S, m = max(1, int(p.get("spokes", 8))), max(1, int(p.get("per_spoke", 15)))
+        S, m = _count(p, "spokes", 8, 1), _count(p, "per_spoke", 15, 1)
         inner = max(0.0, float(p.get("inner", 1.0)))
         a0 = math.radians(float(p.get("start_deg", 0.0)))
         out = []
@@ -781,7 +800,7 @@ def split_part(part):
     p = part.get("params", {})
     V, E, F = polyhedron(p.get("solid", "soccer ball"))
     V = V * float(p.get("radius", 12.0))
-    m = max(1, int(p.get("per_edge", 5)))
+    m = _count(p, "per_edge", 5, 1)
     Rp = rotation(*part.get("rot", [0, 0, 0]))
     sc = part.get("scale", 1.0); sc = float(sc[0] if isinstance(sc, list) else sc)
     at = np.asarray(part.get("pos", [0, 0, 0]), np.float64)

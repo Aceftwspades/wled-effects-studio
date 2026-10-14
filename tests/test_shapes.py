@@ -512,6 +512,30 @@ def test_a_grid_keeps_each_leds_own_number_past_a_collision():
         assert "9" in open(os.path.join(d, "m.xmodel")).read().split('CustomModel="')[1].split('"')[0].replace(";", ",").split(",")
 
 
+def test_counts_past_what_a_part_holds_are_capped():
+    """A count typed or read from a file had no ceiling: a strip's length typed as 1e9 made 600 million LEDs, a
+    rings count of 50000000 ran out of memory - after the edit's undo step was taken. Each part holds at most the
+    engine's limit (a dimension that multiplies, 1024), and a drawing with no width fitted to a width is fitted
+    by its height (its 1e-9 width scaled it to 2.5e13 units)."""
+    from native import shape_fields, outline, units
+    strip = shapes.new_part("strip"); strip["params"]["n"] = 10 ** 9
+    pos, _ = shapes.resolve([strip])[:2]
+    assert len(pos) == shapes.MAX_COUNT
+    rings = shapes.new_part("rings"); rings["params"]["counts"] = "1,8,50000000"
+    assert len(shapes.resolve([rings])[0]) <= shapes.MAX_COUNT
+    panel = shapes.new_part("panel"); panel["params"].update(w=100000, h=100000)
+    assert len(shapes.resolve([panel])[0]) <= shapes.MAX_SIDE ** 2
+    f = next(f for f in shape_fields.FIELDS["strip"] if f.key == "_length")
+    q = shape_fields.put(strip, f, 1e12, {"unit": "mm"})
+    assert q["params"]["n"] == shapes.MAX_COUNT
+    from native import svg_import
+    st, _ = svg_import.parse('<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">'
+                             '<path d="M50 10 L50 90"/></svg>')
+    paths, closed = outline.fit(st, 1.0, size=200.0)
+    ys = [pt[1] for path in paths for pt in path]
+    assert abs((max(ys) - min(ys)) - 200.0) < 1e-6, (min(ys), max(ys))
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

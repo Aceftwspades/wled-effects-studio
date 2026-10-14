@@ -144,7 +144,11 @@ def fit(strokes, unit_mm, size=None):
     mid = (lo + hi) / 2.0
     k = 1.0 / unit_mm
     if size:
-        k = float(size) / max(float(hi[0] - lo[0]), 1e-9)
+        # fitted to a width: a drawing with none (one vertical line) by its height instead - its width of 1e-9
+        # scaled it to 2.5e13 units, and counting LEDs along that ran out of memory ("could not read" a good file)
+        span = max(float(hi[0] - lo[0]), float(hi[1] - lo[1]))
+        if span > 1e-6:
+            k = float(size) / (float(hi[0] - lo[0]) if float(hi[0] - lo[0]) > 1e-6 else span)
     paths = [[[(p[0] - mid[0]) * k, -(p[1] - mid[1]) * k] for p in s.points] for s in strokes]
     return paths, [bool(s.closed) for s in strokes]
 

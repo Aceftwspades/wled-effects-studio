@@ -187,7 +187,7 @@ def put(part, f, v, sp):
         p["pitch"] = round(units.density(sp) / d, 6)
     elif k == "_length":
         pitch = float(p.get("pitch", 1.0)) or 1.0
-        p["n"] = max(1, int(round(units.from_unit(float(v), sp) / pitch)))
+        p["n"] = max(1, min(shapes.MAX_COUNT, int(round(min(units.from_unit(float(v), sp) / pitch, 1e9)))))
     elif k == "_count":
         pts = np.asarray(p.get("points") or [[0, 0, 0]], np.float32).reshape(-1, 3)
         total = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum()) if len(pts) > 1 else 0.0
