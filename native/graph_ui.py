@@ -327,6 +327,7 @@ class GraphPanel(Glyphs):
     def open(self, fname, sub=False):
         if not fname:
             return
+        self._keep_open_one()
         self.refresh_lib()
         if self.graph is None:
             from native import typeface          # no zoom kept yet: the interface's size, to the nearest step
@@ -351,6 +352,24 @@ class GraphPanel(Glyphs):
                     + (f" - {len(stray)} wire(s) to nodes or pins that are not there dropped" if stray else ""),
                     "warn" if stray else "info")
         self.app.refresh_import_buttons()
+
+    def _keep_open_one(self):
+        """The graph open now saved before another replaces it, when it has changes: New graph, a library tile,
+        a where-used row or an import replaced it unsaved (with Live off, the edits were gone, and its undo with
+        them). Not one whose file is gone (renamed, deleted): that is not written back."""
+        if self.graph is None or not self.file:
+            return
+        path = os.path.join(self.cur_dir or self.dir, self.file)
+        if not os.path.exists(path):
+            return
+        self._sync_pos()
+        try:
+            with open(path, encoding="utf-8") as f:
+                same = f.read() == json.dumps(self.graph.to_json(), indent=1)
+        except OSError:
+            same = False
+        if not same:
+            self.save()
 
     def save(self):
         if not self.graph:
