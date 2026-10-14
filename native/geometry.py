@@ -83,8 +83,14 @@ class Geometry:
         """A WLED ledmap.json (with width and height for a matrix)."""
         m = d.get("map") or []
         w, h = int(d.get("width") or 0), int(d.get("height") or 0)
+        # larger than the studio holds: said, not clamped - the size was cut to the limit but the map kept, so a
+        # 300 x 300 map was read 256 wide (every row scrambled) and a 3000-LED strip lost its last thousand quietly
         if w > 0 and h > 0:
+            if w > cls.LIMITS["w"][1] or h > cls.LIMITS["h"][1]:
+                raise ValueError(f"it is {w} x {h}: the studio holds a matrix of {cls.LIMITS['w'][1]} x {cls.LIMITS['h'][1]} at most")
             return cls("matrix", w=w, h=h, map=list(m), source=source)
+        if len(m) > cls.LIMITS["n"][1]:
+            raise ValueError(f"it has {len(m)} LEDs: the studio holds a strip of {cls.LIMITS['n'][1]} at most")
         return cls("strip", n=len(m), map=list(m), source=source)
 
     # --- construction -------------------------------------------------------

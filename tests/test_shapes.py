@@ -536,6 +536,19 @@ def test_counts_past_what_a_part_holds_are_capped():
     assert abs((max(ys) - min(ys)) - 200.0) < 1e-6, (min(ys), max(ys))
 
 
+def test_a_ledmap_larger_than_the_studio_holds_is_refused():
+    """A ledmap past the limits had its size clamped and its map kept: a 300 x 300 map was read 256 wide (every
+    row scrambled), a 3000-LED strip lost its last thousand LEDs quietly. It is refused, saying why."""
+    g = Geometry.from_ledmap({"width": 16, "height": 16, "map": list(range(256))})
+    assert (g.w, g.h) == (16, 16)
+    for d in ({"width": 300, "height": 300, "map": list(range(90000))}, {"map": list(range(3000))}):
+        try:
+            Geometry.from_ledmap(d)
+            raise AssertionError("a ledmap past the limits was taken")
+        except ValueError as e:
+            assert "at most" in str(e)
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0
