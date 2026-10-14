@@ -1786,10 +1786,11 @@ def key(app, code):
 
 
 # --- the device --------------------------------------------------------------------------------
-def _resolve(app):
-    """(presets, playlist) against the active device's own effect and palette lists."""
-    S = _steps(app)
-    host = app.active_host()
+def _resolve(app, host=None, S=None):
+    """(presets, playlist, error) against the device's own effect and palette lists - the active device and the
+    project's steps, or a host and a copy of the steps given (from a worker, which reads nothing of the app)."""
+    S = _steps(app) if S is None else S
+    host = app.active_host() if host is None else host
     from native import devices
     try:
         names = devices._get(host, "/json/effects", 5)
@@ -1816,13 +1817,10 @@ def send(app, run=False):
         app.gp.status("no steps to send"); return
     if getattr(app, "_seq_send", None) is not None and app._seq_send.is_alive():
         app.gp.status("a send is still going"); return
-    presets, playlist, err = _resolve(app)
-    if err:
-        dpg.set_value("seq_log", err); return
+    snap = json.loads(json.dumps(S))                      # the steps as they are now: the worker reads its copy
     pid = int(S.get("pid", 9))
-    n = sum(1 for k in presets if k is not None)
     fp = sequence.fingerprint(S)
-    dpg.set_value("seq_log", f"sending {n} preset(s) and the playlist to {host}...")
+    dpg.set_value("seq_log", f"sending the presets and the playlist to {host}...")
     for t in ("seq_send", "seq_send_run"):
         if dpg.does_item_exist(t):
             dpg.configure_item(t, enabled=False)
@@ -1830,6 +1828,12 @@ def send(app, run=False):
     def work():
         sent = None
         try:
+            # the device's lists read here too: two requests of up to 5 s each, on the main loop, froze the studio
+            presets, playlist, err = _resolve(app, host, snap)
+            if err:
+                app._seq_sent_now = None
+                app._seq_send_result = err
+                return
             ok, msg = sequence.send(host, presets, playlist, pid)
             if ok:
                 sent = (host, fp)

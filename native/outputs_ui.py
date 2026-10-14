@@ -189,14 +189,23 @@ def read_device(app):
     host = app.active_host()
     if not host:
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
-    try:
-        cfg = devices._get(host, "/json/cfg", 6)
-    except Exception as e:
-        dpg.set_value("out_log", f"could not read the device's config: {e}"); return
-    outs, ledma, maxma = outputs.from_wled_cfg(cfg)
-    S = _state(app); S["outs"] = outs; S["ma_per_led"] = ledma; S["max_ma"] = maxma
-    app.project.save(); refresh(app)
-    dpg.set_value("out_log", f"the device's {len(outs)} output(s) read: " + ", ".join(f"pin {o['pin']} x{o['len']}" for o in outs))
+    from native import tasks
+
+    def work():                                           # on a worker: a device that does not answer froze the studio
+        try:
+            return True, devices._get(host, "/json/cfg", 6)
+        except Exception as e:
+            return False, e
+
+    def done(r):
+        ok, cfg = r
+        if not ok:
+            dpg.set_value("out_log", f"could not read the device's config: {cfg}"); return
+        outs, ledma, maxma = outputs.from_wled_cfg(cfg)
+        S = _state(app); S["outs"] = outs; S["ma_per_led"] = ledma; S["max_ma"] = maxma
+        app.project.save(); refresh(app)
+        dpg.set_value("out_log", f"the device's {len(outs)} output(s) read: " + ", ".join(f"pin {o['pin']} x{o['len']}" for o in outs))
+    tasks.run(app, "send:outputs", f"reading {host}'s outputs", work, done)
 
 
 def send(app):
@@ -212,15 +221,22 @@ def send(app):
         body = outputs.wled_cfg(S["outs"], int(S.get("ma_per_led", 55)), int(S.get("max_ma", 850)))
     except ValueError as e:
         dpg.set_value("out_log", f"not sent: {e}"); app.gp.status(f"not sent: {e}"); return
+    from native import tasks
     h = host if host.startswith("http") else "http://" + host
     req = urllib.request.Request(h + "/json/cfg", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=8) as r:
-            r.read()
-        msg = f"{len(S['outs'])} output(s), {body['hw']['led']['total']} LEDs, {S.get('max_ma', 0)} mA limit sent to {host}"
-    except Exception as e:
-        msg = f"the device refused the config: {e}"
-    dpg.set_value("out_log", msg); app.gp.status(msg); device_ui.send_log(app, msg)
+    n = len(S["outs"])
+
+    def work():                                           # on a worker: a device that does not answer froze the studio
+        try:
+            with urllib.request.urlopen(req, timeout=8) as r:
+                r.read()
+            return f"{n} output(s), {body['hw']['led']['total']} LEDs, {S.get('max_ma', 0)} mA limit sent to {host}"
+        except Exception as e:
+            return f"the device refused the config: {e}"
+
+    def done(msg):
+        dpg.set_value("out_log", msg); app.gp.status(msg); device_ui.send_log(app, msg)
+    tasks.run(app, "send:outputs", f"sending the outputs to {host}", work, done)
 
 
 def poll(app):

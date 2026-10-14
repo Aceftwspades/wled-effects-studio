@@ -46,7 +46,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui, bank_ui, procs, reader_ui, room, weight, view3d, shape_tools
+from native import chrome, glow, device_ui, shape_ui, midi_ui, bank_ui, procs, reader_ui, room, weight, view3d, shape_tools, tasks
 from native.gpucube import CubeQuads
 from native import look
 from native import video_ui
@@ -1239,10 +1239,14 @@ class App(Features):
                            "positions table the effects read. Its wiring changes with the ledmap. Send both?",
                            [("Send", lambda: self.send_shape(True), "danger"), ("Cancel", None)])
             return
-        msg = self.project.send_ledmap(host)
-        ok, msg2 = flash.send_geometry(host, g)
-        msg = msg + "; " + msg2
-        dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
+        def work():                                   # on a worker: a device that does not answer froze the studio
+            msg = self.project.send_ledmap(host)
+            ok, msg2 = flash.send_geometry(host, g)
+            return msg + "; " + msg2
+
+        def done(msg):
+            dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
+        tasks.run(self, "send:shape", f"sending the shape to {host}", work, done)
 
     def new_project(self, name):
         name = (name or "").strip()
@@ -5405,6 +5409,7 @@ def main():
                     app.code_ed.poll()
                 app.poll_glow()
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
+                tasks.poll(app)                      # what a device answered, from the workers (native/tasks.py)
                 dock.poll(app)                       # a frame's tab closed by its x
                 chrome.poll_dialogs()                # the dialogs' closes at their top right
                 chrome.poll_placed_tips()            # the words of controls placed at their own position (their tooltips never show)

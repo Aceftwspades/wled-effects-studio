@@ -413,16 +413,21 @@ def send(app, all_):
     host = app.active_host()
     if not host:
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
+    from native import tasks
     pals = _pals(app); sel = _sel(app)
-    todo = list(enumerate(pals)) if all_ else ([(sel, pals[sel])] if sel >= 0 else [])
-    n = 0
-    for i, p in todo:
-        ok, msg = flash.send_file(host, f"/palette{i}.json", wled_json(p).encode())
-        if not ok:
-            dpg.set_value("pal_log", msg); app.gp.status(msg); return
-        n += 1
-    msg = f"{n} palette(s) sent to {host}; the device reloaded its custom palettes (ids {200 - todo[0][0]}..{200 - todo[-1][0]})" if todo else "nothing to send"
-    dpg.set_value("pal_log", msg); app.gp.status(msg); device_ui.send_log(app, msg)
+    todo = [(i, wled_json(p).encode()) for i, p in (list(enumerate(pals)) if all_ else ([(sel, pals[sel])] if sel >= 0 else []))]
+
+    def work():                                           # on a worker: a device that does not answer froze the studio
+        for i, data in todo:
+            ok, msg = flash.send_file(host, f"/palette{i}.json", data)
+            if not ok:
+                return msg
+        return (f"{len(todo)} palette(s) sent to {host}; the device reloaded its custom palettes "
+                f"(ids {200 - todo[0][0]}..{200 - todo[-1][0]})" if todo else "nothing to send")
+
+    def done(msg):
+        dpg.set_value("pal_log", msg); app.gp.status(msg); device_ui.send_log(app, msg)
+    tasks.run(app, "send:palettes", f"sending palettes to {host}", work, done)
 
 
 def remove_there(app):
@@ -430,12 +435,18 @@ def remove_there(app):
     host = app.active_host(); sel = _sel(app)
     if not host or sel < 0:
         return
+    from native import tasks
     h = host if host.startswith("http") else "http://" + host
     req = urllib.request.Request(h + "/json/state", data=json.dumps({"rmcpal": sel}).encode(), headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=6) as r:
-            r.read()
-        msg = f"palette slot {sel} removed from the device"
-    except Exception as e:
-        msg = f"could not remove it: {e}"
-    dpg.set_value("pal_log", msg); app.gp.status(msg)
+
+    def work():
+        try:
+            with urllib.request.urlopen(req, timeout=6) as r:
+                r.read()
+            return f"palette slot {sel} removed from the device"
+        except Exception as e:
+            return f"could not remove it: {e}"
+
+    def done(msg):
+        dpg.set_value("pal_log", msg); app.gp.status(msg)
+    tasks.run(app, "send:palettes", f"removing palette slot {sel} from {host}", work, done)

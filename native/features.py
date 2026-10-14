@@ -35,19 +35,35 @@ class Features:
         self.apply_geometry(Geometry(g.kind, **params))
     def import_ledmap(self, path=None, host=None):
         """A WLED ledmap, from a file or fetched from the device, becomes the
-        geometry: a matrix with its gaps and wiring, or a strip."""
+        geometry: a matrix with its gaps and wiring, or a strip. A device's is
+        fetched on a worker (one that does not answer froze the studio)."""
+        if host:
+            import urllib.request
+            from native import tasks
+            host = host.strip().rstrip("/")
+            if not host.startswith("http"):
+                host = "http://" + host
+
+            def work():
+                try:
+                    with urllib.request.urlopen(host + "/ledmap.json", timeout=5) as r:
+                        return json.loads(r.read().decode("utf-8", "replace"))
+                except Exception as e:
+                    return e
+            tasks.run(self, "send:shape", f"reading {host}'s ledmap", work,
+                      lambda d: self._ledmap_in(d, host + "/ledmap.json"))
+            return
         try:
-            if host:
-                import urllib.request
-                host = host.strip().rstrip("/")
-                if not host.startswith("http"):
-                    host = "http://" + host
-                with urllib.request.urlopen(host + "/ledmap.json", timeout=5) as r:
-                    d = json.loads(r.read().decode("utf-8", "replace"))
-                source = host + "/ledmap.json"
-            else:
-                d = json.load(open(path, encoding="utf-8"))
-                source = os.path.basename(path)
+            d = json.load(open(path, encoding="utf-8"))
+        except Exception as e:
+            d = e
+        self._ledmap_in(d, os.path.basename(path))
+
+    def _ledmap_in(self, d, source):
+        """A ledmap read (or the error reading it) as the geometry."""
+        try:
+            if isinstance(d, Exception):
+                raise d
             g = Geometry.from_ledmap(d, source)
         except Exception as e:
             msg = f"could not read the ledmap: {e}"
@@ -460,33 +476,45 @@ class Features:
             return
         # a program with the second VM's ops needs firmware from 1.4.0: an older VM refuses it and shows its
         # breathing dot, with nothing to say why - so the device is asked first, and a flash suggested
-        from native import script
+        from native import script, tasks
         from native.graph import SUB
         need = script.program_version(prog)
+        used = []
         if need > 1:
-            dev = devices.probe(host, timeout=3.0, effects=False)
-            have = (dev or {}).get("script_vm") or 1
-            if dev is not None and have < need:
-                g = self.gp.graph
-                nodes = g.flatten().nodes if any(n["type"].startswith(SUB) for n in g.nodes.values()) else g.nodes
-                used = sorted({n["type"] for n in nodes.values() if n["type"] in script.V2_NODES})
-                msg = (f"not sent: {', '.join(used) or 'some of its nodes'} need the device's Studio Script to be version "
-                       f"{need} (firmware from studio 1.4.0), and it runs version {have} - flash the firmware once "
-                       "(Build > Flash firmware), then send the script")
-                self.gp.status(msg, "warning"); device_ui.send_log(self, msg)
-                return
-        ok, msg = flash.send_script(host, prog)
-        self.gp.status(msg)
-        if not ok:
-            device_ui.send_log(self, msg); return
+            g = self.gp.graph
+            nodes = g.flatten().nodes if any(n["type"].startswith(SUB) for n in g.nodes.values()) else g.nodes
+            used = sorted({n["type"] for n in nodes.values() if n["type"] in script.V2_NODES})
+        # what the device is sent, read here: the waiting on it goes to a worker (native/tasks.py)
         st = settings_of(self.gp.graph)
         params = {k: st[k] for k in ("sx", "ix", "c1", "c2", "c3")}
         params.update({k: bool(st[k]) for k in ("o1", "o2", "o3")})
-        pal = self.palette_name_for(st["pal"])
-        ok2, msg2 = flash.push_settings(host, "Studio Script", params, pal, self.seg_cols)
-        msg = msg + ("; " + msg2 if not ok2 else "; the device is running it")
-        self.gp.status(msg); device_ui.send_log(self, msg)
-        self.probe_active()
+        pal, cols = self.palette_name_for(st["pal"]), list(self.seg_cols)
+
+        def work():
+            if need > 1:
+                # a program with the second VM's ops needs firmware from 1.4.0: an older VM refuses it and shows its
+                # breathing dot, with nothing to say why - so the device is asked first, and a flash suggested
+                dev = devices.probe(host, timeout=3.0, effects=False)
+                have = (dev or {}).get("script_vm") or 1
+                if dev is not None and have < need:
+                    return ("old", have)
+            ok, msg = flash.send_script(host, prog)
+            if not ok:
+                return ("failed", msg)
+            ok2, msg2 = flash.push_settings(host, "Studio Script", params, pal, cols)
+            return ("sent", msg + ("; " + msg2 if not ok2 else "; the device is running it"))
+
+        def done(r):
+            if r[0] == "old":
+                msg = (f"not sent: {', '.join(used) or 'some of its nodes'} need the device's Studio Script to be version "
+                       f"{need} (firmware from studio 1.4.0), and it runs version {r[1]} - flash the firmware once "
+                       "(Build > Flash firmware), then send the script")
+                self.gp.status(msg, "warning"); device_ui.send_log(self, msg)
+                return
+            self.gp.status(r[1]); device_ui.send_log(self, r[1])
+            if r[0] == "sent":
+                self.probe_active()
+        tasks.run(self, "send:script", f"sending the script to {host}", work, done)
     def push_settings(self):
         """What the sim shows becomes the active device's: every segment -
         its effect, sliders, checkboxes, palette and colours, its bounds,
@@ -497,13 +525,21 @@ class Features:
         host = self.active_host()
         if not host:
             device_ui.show(self, "devices"); self.gp.status("choose a device first"); return
+        from native import tasks
         if self.eng.seg_count() > 1:
             self.save_segments()                          # what the current segment has now is in the project too
-        ok, msg = flash.push_segments(host, self.eng.segments(), self.seg_cols, (self.eng.cols, self.eng.rows),
-                                      self.palette_name_for,
-                                      six=self.eng.six if self.project.geometry.kind == "cube" else None)
-        dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
-        self.probe_active()
+        segs, cols, size = self.eng.segments(), list(self.seg_cols), (self.eng.cols, self.eng.rows)
+        six = self.eng.six if self.project.geometry.kind == "cube" else None
+        names = {int(s.get("pal", 0)): self.palette_name_for(int(s.get("pal", 0))) for s in segs}
+
+        def done(r):
+            msg = r[1]
+            dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
+            self.probe_active()
+        # on a worker: a device that does not answer froze the studio for the timeouts
+        tasks.run(self, "send:settings", f"sending the settings to {host}",
+                  lambda: flash.push_segments(host, segs, cols, size, lambda p: names.get(int(p)) or self.palette_name_for(p), six=six),
+                  done)
 
     def overlay_holes(self, over=None):
         """The screen rectangles nothing may be drawn over: every window
