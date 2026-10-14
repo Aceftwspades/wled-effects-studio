@@ -460,6 +460,20 @@ def test_one_undo_over_two_journals_takes_back_the_latest():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_a_project_name_is_a_project_not_a_folder_of_the_same_name():
+    """A bare name that was also a folder where the studio started ("docs", "tests") opened that folder as a
+    project and wrote the project's folders and files into it. A name is a project under projects/; a path
+    (absolute, or with a folder in it) is the path."""
+    from native import project as PR
+    assert PR.project_path("docs") == os.path.join(PR.PROJECTS, "docs")
+    assert PR.project_path("tests") == os.path.join(PR.PROJECTS, "tests")
+    d = tempfile.mkdtemp(prefix="named_")
+    try:
+        assert PR.project_path(d) == os.path.abspath(d)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0

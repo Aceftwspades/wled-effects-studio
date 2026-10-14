@@ -641,10 +641,14 @@ def save_prefs(prefs):
 
 
 def project_path(name_or_path):
-    """A project folder from what was typed: an existing directory as it
-    is, else a name under projects/."""
-    if os.path.isdir(name_or_path) or os.path.isabs(name_or_path):
-        return os.path.abspath(name_or_path)
+    """A project folder from what was typed: a path (absolute, or with a
+    folder in it) as it is, else a name under projects/. A bare name that
+    happened to be a folder where the studio was started ("docs", "tests",
+    "native") was taken as that folder, and the project's folders and
+    files were written into it."""
+    s = str(name_or_path)
+    if os.path.isabs(s) or ((os.sep in s or "/" in s) and os.path.isdir(s)):
+        return os.path.abspath(s)
     return os.path.join(PROJECTS, _ident(name_or_path) or "default")
 
 
