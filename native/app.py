@@ -1989,6 +1989,9 @@ class App(Features):
             x, y = self.gp.editor_origin()
             w, h = dpg.get_item_rect_size("node_editor")
             self.gp._menu_pos = self.gp._to_graph((x + w * 0.4, y + h * 0.3))
+            # a plain add: a "change type" or a wire dropped on the canvas, its menu dismissed, was still pending -
+            # and the node picked here replaced that node, or was wired to that old output
+            self.gp._pending = None
             self.gp.show_add_menu((x + w * 0.4, y + h * 0.3))
 
     def add_node_from_menu(self, type_):
