@@ -3722,6 +3722,12 @@ class App(Features):
         # the last seconds of frames are kept while playing; paused, the
         # scrub slider picks one of them to show instead of the live one
         rgb = None
+        if getattr(self, "_history_geom", None) is not self.project.geometry:
+            # kept on another geometry (applied, another project, a cube resized): their sizes are not the
+            # textures' now - a scrub back pushed an old-size frame into them - so they go, and the scrub with them
+            self.history_frames.clear(); self.history_rgb = []; self.history_t.clear()
+            self.scrub = None
+            self._history_geom = self.project.geometry
         if self.playing:
             now = time.perf_counter()
             if now - getattr(self, "_scrub_at", 0.0) >= self.SCRUB_EVERY:
