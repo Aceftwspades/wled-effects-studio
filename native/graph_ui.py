@@ -1048,7 +1048,9 @@ class GraphPanel(Glyphs):
                 self.touch(); self.snapshot(("curve", ed["nid"], ed["name"], ed["drag"], "move"))
             ed["drag"] = None
             self._sync_pos(); self.rebuild()
-        if (rpressed or (rdown and not ed["rwas"])) and inside and len(pts) > 2:
+        # not while a point is dragged: taking one away shortened the list under the dragged index, and each frame
+        # then raised IndexError in the main loop until the button was let go
+        if (rpressed or (rdown and not ed["rwas"])) and inside and len(pts) > 2 and ed["drag"] is None:
             k = nearest()
             if k is not None:
                 self.touch(); self.snapshot(("curve", ed["nid"], ed["name"], k, "del"))
