@@ -1564,7 +1564,7 @@ def migrate(g):
             if key not in joins:
                 pos = g.nodes[b]["pos"]
                 joins[key] = g.add("Vector", (pos[0] - 190, pos[1] + 40 * len(joins)))
-                g.nodes[b]["inputs"].pop(vpin, None)
+                g.nodes[b].setdefault("inputs", {}).pop(vpin, None)
                 new_links.append((joins[key], "v", b, vpin))
             if (at, o) in MIGRATE_OUT:
                 svpin, scomp = MIGRATE_OUT[(at, o)]
@@ -1613,7 +1613,15 @@ def load(path, lib=None, resolver=None):
             d = json.load(f)
         if not isinstance(d, dict):
             raise ValueError("not a JSON object")
-        return migrate(Graph(d, lib=lib, resolver=resolver))
+        g = Graph(d, lib=lib, resolver=resolver)
+        # the wires migrate() upgrades (into the float pins a vector replaced) are stray to the graph as it is
+        # now, and the constructor had set them aside before migrate could see them: the old graphs lost them
+        old = [l for l in g.stray if (g.nodes.get(l[2], {}).get("type"), l[3]) in MIGRATE
+               or (g.nodes.get(l[0], {}).get("type"), l[1]) in MIGRATE_OUT]
+        if old:
+            g.links += [tuple(l[:4]) for l in old]
+            g.stray = [l for l in g.stray if l not in old]
+        return migrate(g)
     except GraphError:
         raise
     except (ValueError, KeyError, TypeError, AttributeError, IndexError) as e:

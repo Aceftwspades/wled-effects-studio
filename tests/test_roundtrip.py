@@ -524,6 +524,24 @@ def test_prefs_of_another_shape_do_not_stop_the_start():
         assert x > -10000 and y > -10000
 
 
+def test_an_old_graph_keeps_its_wires_into_the_old_float_pins():
+    """A graph saved before the vector type wired floats into Length's x, y, z. The constructor dropped those
+    wires as stray before migrate() could turn them into a Vector node's: the old graphs lost them."""
+    d = tempfile.mkdtemp(prefix="migrate_")
+    try:
+        path = os.path.join(d, "old.json")
+        json.dump({"name": "old", "nodes": [{"id": 1, "type": "Coords", "pos": [0, 0], "params": {}},
+                                            {"id": 2, "type": "Length", "pos": [300, 0], "params": {}}],
+                   "links": [[1, "u", 2, "x"], [1, "v", 2, "y"]]}, open(path, "w"))
+        g = G.load(path, lib=library())
+        vec = [nid for nid, n in g.nodes.items() if n["type"] == "Vector"]
+        assert len(vec) == 1 and not g.stray, (g.links, g.stray)
+        v = vec[0]
+        assert (1, "u", v, "x") in g.links and (1, "v", v, "y") in g.links and (v, "v", 2, "v") in g.links, g.links
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0
