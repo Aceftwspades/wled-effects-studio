@@ -53,15 +53,19 @@ def _parts(app):
     return g.params.get("parts") if g.kind == "shape" else None
 
 
-def _apply(app, parts=None, undo_from=None, refit=None, **more):
+def _apply(app, parts=None, undo_from=None, refit=None, replace=False, **more):
     """The parts (and any other shape option) into a new geometry, with an
     undo step kept (`undo_from`: the params to go back to, when the
     geometry already moved on - a drag). `refit`: "grow" when parts came
     in (the view's held frame grows to take them), "all" when the shape
     was replaced (fitted afresh); a move never refits."""
     g = app.project.geometry
-    p = dict(g.params) if g.kind == "shape" else {}
+    # replace: a shape opened is that shape - merged, the last one's layout, projection, units and an xmodel's
+    # grid map stayed (its new parts were laid through the old grid)
+    p = dict(g.params) if g.kind == "shape" and not replace else {}
     if parts is not None:
+        if "grid" in p and _leds_of(parts) != _leds_of(g.params.get("parts") or []):
+            p.pop("grid")                                 # an imported grid map names LEDs by number: other LEDs, not theirs
         p["parts"] = parts
     p.update(more)
     stack = getattr(app, "_shape_undo", None)
@@ -86,6 +90,11 @@ def _apply(app, parts=None, undo_from=None, refit=None, **more):
     if refit:
         from native import view3d
         view3d.refit(app, grow=(refit == "grow"))
+
+
+def _leds_of(parts):
+    """The parts' LEDs as a grid map numbers them: each part's kind and count, in order."""
+    return [(q.get("kind"), shapes.part_count(q)) for q in parts]
 
 
 def _state_of(g):
@@ -1562,7 +1571,7 @@ def open_shape(app, path):
     except Exception as e:
         app.gp.status(f"could not open {os.path.basename(path)}: {e}"); return
     _set_sel(app, {0})
-    _apply(app, refit="all", **g.params)
+    _apply(app, refit="all", replace=True, **g.params)
 
 
 # --- the 3-D view: the selection, placing and dragging LEDs by hand -------------------------
