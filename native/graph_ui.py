@@ -4443,13 +4443,32 @@ class GraphPanel(Glyphs):
                 inp = next((i["name"] for i in d["inputs"] if compatible(t, i["type"])), None)
             if inp is None:
                 self.status("no input there takes it"); return
+            if self._would_loop([(frm[0], frm[1], nid, inp)]):
+                self.status("that would make a loop - a value can only come round through a Delay (wire it to an input, and one goes on it)", "warning"); return
             self.snapshot(); self.graph.link(frm[0], frm[1], nid, inp)
         else:
             out = next((o["name"] for o in d["outputs"] if compatible(o["type"], t)), None)
             if out is None:
                 self.status("no output there fits"); return
+            if self._would_loop([(nid, out, frm[0], frm[1])]):
+                self.status("that would make a loop - a value can only come round through a Delay (wire it to an input, and one goes on it)", "warning"); return
             self.snapshot(); self.graph.link(nid, out, frm[0], frm[1])
         self.rebuild()
+
+    def _would_loop(self, links):
+        """Whether these wires would close a loop with no Delay in it - tried, then taken back. A splice or a
+        wire dropped on a node's body linked as it was: the graph then failed every compile ("cycle through
+        node ...") until undone; a wire dropped on a pin gets a Delay instead (link_with_delay)."""
+        saved, meta = list(self.graph.links), dict(self.graph.link_meta)
+        for l in links:
+            self.graph.link(*l)
+        try:
+            self.graph._order()
+            loop = False
+        except G.GraphError:
+            loop = True
+        self.graph.links, self.graph.link_meta = saved, meta
+        return loop
 
     def _wire_points(self, lid):
         """A wire's polyline on screen, sampled along the curve imnodes draws."""
@@ -4612,6 +4631,8 @@ class GraphPanel(Glyphs):
         self._splice_clear()
         if nid not in self.graph.nodes or a not in self.graph.nodes or b not in self.graph.nodes:
             return
+        if self._would_loop([(a, out, nid, my_in), (nid, my_out, b, inp)]):
+            self.status("that would make a loop - a value can only come round through a Delay (wire it to an input, and one goes on it)", "warning"); return
         self.snapshot(); self._sync_pos()
         self.graph.link(a, out, nid, my_in)
         self.graph.link(nid, my_out, b, inp)
