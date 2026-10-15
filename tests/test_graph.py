@@ -114,6 +114,26 @@ def test_a_bundle_is_checked_whole_before_it_is_imported():
         assert problem(bad), bad
 
 
+def test_text_with_a_backslash_does_not_break_the_script_compiler():
+    """A text setting was substituted with re.sub using the text as the replacement: a backslash in it (an
+    Expression's text) was read as a regex escape - re.error, not a message. And scriptable() let any error but
+    GraphError through. It answers now, whatever the expression."""
+    import re
+    from native import script
+    g = starter()
+    c = g.add("Coords", (0, 0)); e = g.add("Expression", (100, 0)); p = g.add("Palette", (200, 0)); o = g.add("Output", (300, 0))
+    g.nodes[e]["params"]["expr"] = "a + " + chr(92) + "x"
+    g.link(c, "u", e, "a"); g.link(e, "result", p, "index"); g.link(p, "color", o, "color")
+    try:
+        script.compile_script(g)
+    except re.error as err:
+        raise AssertionError(f"the text was read as a regex: {err}")
+    except Exception:
+        pass                                              # an expression it cannot take: said by the compiler
+    ok, why = script.scriptable(g)
+    assert isinstance(ok, bool)
+
+
 def test_library_is_documented():
     from native import nodedocs
     assert nodedocs.gaps() == []

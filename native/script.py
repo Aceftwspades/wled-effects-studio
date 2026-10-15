@@ -1300,7 +1300,10 @@ def compile_script(graph):
                 for k, c in zip("rgb", rgb):
                     subst = re.sub(r"\$p\." + re.escape(p["name"] + "_" + k) + r"(?![A-Za-z0-9_])", str(int(c)), subst)
             elif p["type"] in ("choice", "text", "file"):
-                subst = re.sub(r"\$p\." + re.escape(p["name"]) + r"(?![A-Za-z0-9_])", str(v).replace('"', "'"), subst)
+                text = str(v).replace('"', "'")
+                # a function, not the text, as the replacement: a backslash in it (an Expression's "\x") was read
+                # as a regex escape and raised re.error
+                subst = re.sub(r"\$p\." + re.escape(p["name"]) + r"(?![A-Za-z0-9_])", lambda m, t=text: t, subst)
             elif p["type"] in ("ramp", "curve"):
                 raise ScriptError(f"{label}: a table the device cannot hold")
             elif p["type"] == "bool":
@@ -1379,6 +1382,8 @@ def scriptable(graph):
         return True, len(compile_script(graph))
     except GraphError as e:
         return False, str(e)
+    except Exception as e:                                # an expression the compiler cannot take (an overflow, a
+        return False, f"{type(e).__name__}: {e}"          # stray operator): not scriptable, said - it raised
 
 
 # --- the helpers header the VM effect includes -----------------------------------------
