@@ -787,7 +787,8 @@ def matched(parts, idxs, ref, what="scale"):
             if what == "rot":
                 out[i]["rot"] = list(out[ref].get("rot") or [0.0, 0.0, 0.0])
             else:
-                out[i]["scale"] = float(out[ref].get("scale", 1.0))
+                sc = out[ref].get("scale", 1.0)               # one number, or x, y, z (an xLights Window Frame's):
+                out[i]["scale"] = [float(v) for v in sc] if isinstance(sc, (list, tuple)) else float(sc)   # float() of that raised
     return out
 
 
