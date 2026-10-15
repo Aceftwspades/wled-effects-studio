@@ -105,6 +105,31 @@ def test_the_synth_plays_a_chord_a_bar():
     assert syn.chroma()[0].max() == 0.0
 
 
+def test_a_live_input_gone_quiet_reads_as_silence():
+    """A live input that stops calling back (a device unplugged; a loopback with nothing playing) left its last
+    chunk in place: the bands, the level and the beat froze on it, still "capturing". Half a second without a
+    callback reads as silence. (A file source shares the analysis: its last callback set long ago stands in.)"""
+    import tempfile, time, wave
+    from native.engine import Engine
+    tmp = tempfile.mkdtemp()
+    rate = 22050
+    x = (0.5 * np.sin(2 * np.pi * 440 * np.arange(rate * 2) / rate)).astype(np.float32)
+    pcm = os.path.join(tmp, "tone.wav")
+    with wave.open(pcm, "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+        w.writeframes((x * 32767).astype(np.int16).tobytes())
+    e = Engine()
+    src = A.FileAudio(pcm)
+    src._last_cb = time.perf_counter()
+    for _ in range(5):
+        src.push(e)
+    assert max(e.fft) > 0
+    src._last_cb = time.perf_counter() - 5.0
+    for _ in range(5):
+        src.push(e)
+    assert max(e.fft) == 0, list(e.fft)
+
+
 if __name__ == "__main__":                        # without pytest: every test_ function, in order
     import inspect
     bad = 0

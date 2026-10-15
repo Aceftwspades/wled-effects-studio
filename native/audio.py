@@ -92,6 +92,7 @@ class LiveAudio:
         if a.size >= self.chunk:
             self._buf = a[-self.chunk:].copy()
         self._hist = _append(self._hist, a)
+        self._last_cb = time.perf_counter()
         return (None, pyaudio.paContinue)
 
     def push(self, eng):
@@ -223,6 +224,9 @@ def _chroma(hist, rate, floor=1.0 / 32768.0):
     return (e / top).astype(np.float32), top
 
 
+STALE_S = 0.5                     # seconds without a callback before the live input reads as silence
+
+
 def _push(self, eng):
     """Fill the engine's FFT bins from the most recent audio, and detect onsets.
 
@@ -242,6 +246,11 @@ def _push(self, eng):
     looking for. The floor attacks fast and decays slowly, so sustained bass
     stops triggering while a kick over it still does.
     """
+    last = getattr(self, "_last_cb", None)
+    if last is not None and time.perf_counter() - last > STALE_S:
+        # no sound has come in (a device unplugged; a loopback with nothing playing, which Windows stops calling
+        # back): silence - the last chunk was held, and the bands, the level and the beat froze on it
+        self._buf = np.zeros_like(self._buf)
     spec = np.abs(np.fft.rfft(self._buf * self._win))
     raw = np.empty(self.BANDS, np.float32)
     for i in range(self.BANDS):
@@ -306,6 +315,7 @@ class LiveInput:
         if a.size >= self.chunk:
             self._buf = a[-self.chunk:].copy()
         self._hist = _append(self._hist, a)
+        self._last_cb = time.perf_counter()
 
     def push(self, eng):
         return _push(self, eng)
