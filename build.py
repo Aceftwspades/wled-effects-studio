@@ -505,6 +505,8 @@ def main():
     want = set(sys.argv[1:]) or {"--wasm", "--native"}
     if "--wasm-only" in want:   want = {"--wasm"}
     if "--native-only" in want: want = {"--native"}
+    if not want & {"--wasm", "--native", "--runtime"}:
+        want |= {"--wasm", "--native"}                     # --force alone built nothing and said "build OK"
     if "--runtime" in want:                                # the firmware files out of the checkout, for a packaged app
         write_runtime(); return
 
