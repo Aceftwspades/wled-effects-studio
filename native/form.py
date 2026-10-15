@@ -145,7 +145,7 @@ def parse_hex(text):
     if "," in s:
         try:
             parts = [int(float(p)) for p in s.split(",")]
-        except ValueError:
+        except (ValueError, OverflowError):                  # "1e999,0,0" overflowed int(), out of the callback
             return None
         return tuple(max(0, min(255, p)) for p in parts[:3]) if len(parts) >= 3 else None
     s = s.lstrip("#")

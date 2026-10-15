@@ -421,7 +421,7 @@ def follow(app, target):
         rest = target[len(SCHEME):]
         stem, _, k = rest.partition("/")
         node = by_ident(stem)                # a link names the node by its file stem: Markdown targets have no spaces
-        try_it(app, node, int(k) if k else None)
+        try_it(app, node, int(k) if k.isdigit() else None)     # a hand-written link's "x": the lesson, not a raise
         return True
     if target == "studio:tutorial/back":
         back(app); return True

@@ -316,7 +316,7 @@ class Glyphs:
         dpg.configure_item(tag, height=max(2, cell * len(rows)))
         for r, row in enumerate(rows):
             for c, ch in enumerate(row):
-                on = ch.isdigit()
+                on = ch in "0123456789"                      # isdigit() takes "²" too, and int() of it raised
                 fill = self.TINTS[int(ch)] + (255,) if on else (28, 30, 36, 255)
                 dpg.draw_rectangle((c * cell, r * cell), ((c + 1) * cell - 1, (r + 1) * cell - 1), color=(0, 0, 0, 0), fill=fill, parent=tag)
 
