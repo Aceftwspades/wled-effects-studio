@@ -340,7 +340,14 @@ class App(Features):
         except RuntimeError as e:
             print(e); sys.exit(str(e))
         self.eng = Engine(lib)
-        self.eng.set_geometry(self.project.geometry)
+        try:
+            self.eng.set_geometry(self.project.geometry)
+        except Exception as e:
+            # a saved geometry the engine refuses (more pixels than it holds): the cube, said - it raised here,
+            # and the studio did not open until project.json was mended by hand
+            print(f"the project's geometry cannot be used ({e}): the 16-pixel cube instead")
+            self.project.geometry = Geometry("cube", B=16)
+            self.eng.set_geometry(self.project.geometry)
         # --- the editor ------------------------------------------------------
         self.edit_file = None       # file name in the project's effects/
         self.edit_dirty = False
@@ -960,12 +967,24 @@ class App(Features):
     def apply_geometry(self, geom):
         """A new geometry: into the engine, into the project, views resized.
         The effect restarts, so its sliders are rebuilt from the engine."""
+        before = self.eng.geom                           # set_geometry keeps the new one even when it refuses it
         try:
             self.eng.set_geometry(geom)
         except Exception as e:
-            # the engine said no (too many pixels): keep what was there
-            self.eng.set_geometry(self.project.geometry)
-            dpg.set_value("geom_desc", f"cannot use that geometry: {e}")
+            # the engine said no (too many pixels): keep what was there - the engine's last one, since a project
+            # switched to already holds the refused one (re-applying that raised again, out of switch_project)
+            for back in (before, self.project.geometry if self.project.geometry is not geom else None, Geometry("cube", B=16)):
+                if back is None:
+                    continue
+                try:
+                    self.eng.set_geometry(back)
+                    break
+                except Exception:
+                    continue
+            if self.project.geometry is geom:
+                self.project.geometry = self.eng.geom
+            if dpg.does_item_exist("geom_desc"):
+                dpg.set_value("geom_desc", f"cannot use that geometry: {e}")
             return
         self.project.geometry = geom
         self.project.save()
