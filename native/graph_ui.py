@@ -6183,7 +6183,7 @@ def build_panel(app, panel):
     # The description box: a fixed height, whatever the text - a line that
     # grew and shrank with each hover moved the editor under the pointer.
     # The bar under it drags to resize; the height is remembered.
-    with dpg.child_window(tag="graph_help_box", height=int(app.prefs.get("help_h", HELP_H)), border=False,
+    with dpg.child_window(tag="graph_help_box", height=int(__import__("native.project", fromlist=["x"]).pref_num(app.prefs, "help_h", HELP_H)), border=False,
                           no_scrollbar=True, no_scroll_with_mouse=True):
         dpg.add_text("", tag="graph_help", color=(170, 178, 192), wrap=0)
     dpg.add_button(label="", tag="help_split", width=-1, height=px(5))

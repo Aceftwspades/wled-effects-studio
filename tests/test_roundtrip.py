@@ -501,6 +501,29 @@ def test_a_bad_graph_or_project_file_is_said_not_raised():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_prefs_of_another_shape_do_not_stop_the_start():
+    """studio.json from a hand edit or another version: keys as a list, a binding a number, "ui" a list, a zoom a
+    word - each raised where it was read, the first ones at the start (the studio did not open). The defaults
+    instead. And a pop-out closed minimized (-32000) or on a monitor since gone opens on a screen there is."""
+    from native.keys import Keymap
+    from native import project as PR, popout
+    Keymap({"keys": [1]}); Keymap({"keys": {"save": 5}}); Keymap({"keys": "x"})
+    assert PR.pref_num({"z": "big"}, "z", 1.5) == 1.5 and PR.pref_num({"z": [1]}, "z", 2) == 2.0
+    assert PR.pref_num({"z": 3}, "z", 1) == 3.0 and PR.pref_num({"z": float("nan")}, "z", 1) == 1.0
+    keep = PR.STUDIO_FILE, PR.PROJECTS
+    d = tempfile.mkdtemp(prefix="prefs_")
+    try:
+        PR.PROJECTS, PR.STUDIO_FILE = d, os.path.join(d, "studio.json")
+        open(PR.STUDIO_FILE, "w").write('{"ui": [1, 2]}')
+        assert PR.load_prefs() == {}
+    finally:
+        PR.STUDIO_FILE, PR.PROJECTS = keep
+        shutil.rmtree(d, ignore_errors=True)
+    x, y = popout._on_screen(-32000, -32000, 400, 300)
+    if sys.platform == "win32":
+        assert x > -10000 and y > -10000
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0

@@ -647,7 +647,18 @@ def recent_projects():
 def load_prefs():
     """UI preferences that belong to the app, not a project: pane splits,
     the side panel's width, the node editor's zoom."""
-    return dict(_studio().get("ui", {}))
+    ui = _studio().get("ui", {})
+    return dict(ui) if isinstance(ui, dict) else {}           # another shape: the defaults, not a raise at the start
+
+
+def pref_num(prefs, key, default):
+    """A number from the prefs, the default when it is not one (a hand edit, another version): float() of a
+    string or a list raised where it was read - in the start, a draw."""
+    try:
+        v = float(prefs.get(key, default))
+        return v if v == v and abs(v) != float("inf") else float(default)
+    except (TypeError, ValueError, OverflowError):
+        return float(default)
 
 
 def save_prefs(prefs):

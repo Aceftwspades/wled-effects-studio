@@ -606,7 +606,7 @@ class Features:
                 w, h = im.size
                 side = min(w, h)
                 im = im.crop(((w - side) // 2, (h - side) // 2, (w - side) // 2 + side, (h - side) // 2 + side)).resize((int(size), int(size)), Image.BILINEAR)
-                cache[key] = (np.asarray(im, np.float32) * float(self.prefs.get("view_bg_dim", 0.45))).astype(np.uint8)
+                cache[key] = (np.asarray(im, np.float32) * __import__("native.project", fromlist=["x"]).pref_num(self.prefs, "view_bg_dim", 0.45)).astype(np.uint8)
             except Exception as e:
                 self.gp.status(f"background not read: {e}")
                 cache[key] = (0, 0, 0)

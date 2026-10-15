@@ -43,7 +43,7 @@ import threading
 from native.engine import Engine, stats
 from native.synth import Synth
 from native.geometry import Geometry, KINDS
-from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS,
+from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS, pref_num,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
 from native import chrome, glow, device_ui, shape_ui, midi_ui, bank_ui, procs, reader_ui, room, weight, view3d, shape_tools, tasks
@@ -2813,7 +2813,7 @@ class App(Features):
         if room.press(self):
             return                                       # the 3-D view's ::: or size handle, over the graph
         if dpg.does_item_exist("help_split") and dpg.is_item_shown("help_split") and dpg.is_item_hovered("help_split"):
-            self._split_drag = ("help_split", dpg.get_mouse_pos(local=False)[1], int(self.prefs.get("help_h", 46)))
+            self._split_drag = ("help_split", dpg.get_mouse_pos(local=False)[1], int(pref_num(self.prefs, "help_h", 46)))
             return
         for slot in self._rects:
             grip = f"grip_{self.pane_of(slot)}"
@@ -2995,7 +2995,7 @@ class App(Features):
             vw = max(640, dpg.get_viewport_client_width())
             if tag == "help_split":
                 new = int(max(20, min(240, v0 + (my - x0))))
-                if new != int(self.prefs.get("help_h", 46)):
+                if new != int(pref_num(self.prefs, "help_h", 46)):
                     self.prefs["help_h"] = new
                     dpg.configure_item("graph_help_box", height=new)
                 return
@@ -3843,7 +3843,7 @@ class App(Features):
         if self.rec_msg:
             dpg.set_value("rec_msg", self.rec_msg)
 
-        factor = float(self.prefs.get("device_factor", 60.0))
+        factor = pref_num(self.prefs, "device_factor", 60.0)
         dev_fps = 1000.0 / max(0.001, self.frame_ms * factor) if self.frame_ms > 0 else None
         pw = getattr(self, "_power", None)
         power = ""

@@ -230,8 +230,10 @@ class Keymap:
         self.defaults = {a: d for a, _, d, _ in ACTIONS}
         self.context = {a: c for a, _, _, c in ACTIONS}
         self.bind = dict(self.defaults)
-        for a, b in (prefs.get("keys") or {}).items():
-            if a in self.bind and (b == "" or valid(b)):
+        keys = prefs.get("keys")
+        # prefs of another shape (a hand edit, another version): ignored, not raised - the studio did not start
+        for a, b in (keys.items() if isinstance(keys, dict) else ()):
+            if a in self.bind and isinstance(b, str) and (b == "" or valid(b)):
                 self.bind[a] = b
 
     def label(self, action):

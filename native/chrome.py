@@ -2392,7 +2392,7 @@ def refresh(app):
     if dpg.does_item_exist("menu_snap"):
         dpg.set_value("menu_snap", bool(app.prefs.get("snap")))
     from native.graph_ui import OVERVIEW_CHOICES, OVERVIEW_ZOOM
-    ov = float(app.prefs.get("overview_zoom", OVERVIEW_ZOOM))
+    ov = __import__("native.project", fromlist=["x"]).pref_num(app.prefs, "overview_zoom", OVERVIEW_ZOOM)
     for z, _ in OVERVIEW_CHOICES:
         if dpg.does_item_exist(f"menu_ov_{int(z * 100)}"):
             dpg.set_value(f"menu_ov_{int(z * 100)}", abs(z - ov) < 1e-6)
