@@ -722,7 +722,8 @@ def write_xmodel(geom, path, name=None):
         rows.append(",".join(str(cells.get((x, y), "")) for x in range(w)))
     data = ";".join(rows)
     name = name or os.path.splitext(os.path.basename(path))[0]
-    xml = (f'<?xml version="1.0" encoding="UTF-8"?>\n<custommodel name="{name}" parm1="{w}" parm2="{h}" Depth="1" '
+    from xml.sax.saxutils import quoteattr                 # "Tom&Jerry" made XML that did not parse
+    xml = (f'<?xml version="1.0" encoding="UTF-8"?>\n<custommodel name={quoteattr(name)} parm1="{w}" parm2="{h}" Depth="1" '
            f'StringType="RGB Nodes" Transparency="0" PixelSize="2" ModelBrightness="" Antialias="1" StrandNames="" NodeNames="" '
            f'CustomModel="{data}" SourceVersion="WLED Effects Studio" />\n')
     open(path, "w", encoding="utf-8", newline="\n").write(xml)
