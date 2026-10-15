@@ -111,6 +111,10 @@ class FfmpegSource:
         self.cmd = [exe, "-v", "error", "-nostdin"] + pre + list(input_args) + ["-vf", vf, "-an", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
         from native import procs
         self.proc = procs.popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # ffmpeg's messages read as they come, the last few kept for the error: read only after the video ended,
+        # a webcam's "buffer too full" lines filled the pipe, ffmpeg blocked on it, and the picture froze unsaid
+        self._errs = []
+        threading.Thread(target=self._drain, daemon=True).start()
         self.thread = threading.Thread(target=self._read, daemon=True)
         self.thread.start()
 
@@ -131,11 +135,17 @@ class FfmpegSource:
         except Exception as e:
             self.error = str(e)
         if not self._stop.is_set() and self.error is None:
-            try:
-                err = self.proc.stderr.read().decode("utf-8", "replace").strip()
-            except Exception:
-                err = ""
-            self.error = (err.splitlines()[-1] if err else "the video ended")
+            time.sleep(0.1)                                  # the last message, after the picture stopped
+            err = [l for l in list(self._errs) if l.strip()]
+            self.error = (err[-1].strip() if err else "the video ended")
+
+    def _drain(self):
+        try:
+            for line in iter(self.proc.stderr.readline, b""):
+                self._errs.append(line.decode("utf-8", "replace"))
+                del self._errs[:-20]
+        except Exception:
+            pass
 
     def latest(self):
         return self._frame, self.n
