@@ -225,9 +225,10 @@ def extract(log=print):
     fx2d = os.path.join(GEN, "wled_fx.cpp")
     if os.path.exists(fx2d):
         t2 = open(fx2d, encoding="utf-8").read()
-        for name, *_ in items:
-            if re.search(r"\b(?:uint16_t|void)\s+" + name + r"\s*\(", t2):
-                already.add(name)
+        # every function the file defines, in one pass: a search per effect over the whole file (344 of them)
+        # was 0.4 s of every build, a Live edit's included
+        defined = set(re.findall(r"\b(?:uint16_t|void)\s+(\w+)\s*\(", t2))
+        already = {name for name, *_ in items if name in defined}
     out = os.path.join(GEN, "wled_fx1d.cpp")
     cache = os.path.join(GEN, "stock1d_skip.json")
     key = f"{os.path.getmtime(fxpath)}|{os.path.getmtime(shim)}|{os.path.getmtime(__file__)}"
