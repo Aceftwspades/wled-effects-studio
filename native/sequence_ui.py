@@ -80,6 +80,13 @@ def _follow(app):
 
 
 # --- the numbers, live -------------------------------------------------------------------------
+def _tset(tag, v):
+    """A text field's value from outside - not while it is being typed in: the refresh that follows a step
+    change while playing, or a look gathered after Add, put the old name back over a name half typed."""
+    if dpg.does_item_exist(tag) and not dpg.is_item_active(tag):
+        dpg.set_value(tag, v)
+
+
 def _nset(tag, v):
     """A number field's value from outside - not the one being dragged or typed in (it has its own)."""
     if dpg.does_item_exist(tag) and not dpg.is_item_active(tag):
@@ -504,7 +511,7 @@ def refresh(app):
     dpg.set_value("seq_total", f"{len(steps)} step{'s' if len(steps) != 1 else ''}, the show" if steps else "")
     dpg.configure_item("seq_len_all__num", show=bool(steps)); _nset("seq_len_all", round(total, 1))
     _nset("seq_base", int(S.get("base", 10))); _nset("seq_pid", int(S.get("pid", 9)))
-    dpg.set_value("seq_show", S.get("name", "Show")); dpg.set_value("seq_repeat", int(S.get("repeat", 0)) == 0)
+    _tset("seq_show", S.get("name", "Show")); dpg.set_value("seq_repeat", int(S.get("repeat", 0)) == 0)
     dpg.set_value("seq_style", S.get("style", "fade"))
     _nset("seq_bpm", float(S.get("bpm") or 0)); _nset("seq_bar", int(S.get("bar") or 4))
     dpg.set_value("seq_snap", bool(S.get("snap", True)))
@@ -514,7 +521,7 @@ def refresh(app):
     if 0 <= sel < len(steps):
         st = steps[sel]
         dpg.set_value("seq_step_title", f"STEP {sel + 1}")
-        dpg.set_value("seq_name", st.get("name", "")); _nset("seq_dur", float(st.get("dur", 10)))
+        _tset("seq_name", st.get("name", "")); _nset("seq_dur", float(st.get("dur", 10)))
         _nset("seq_trans", float(st.get("trans", 0.7)))
         if has_tempo:
             _nset("seq_dur_bars", round(float(st.get("dur", 10)) / _barlen(app), 2))
