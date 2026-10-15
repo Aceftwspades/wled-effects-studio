@@ -404,7 +404,8 @@ def refresh(app):
 
 def _texture(app, key, frames):
     """A dynamic texture for an effect's thumbnail; its frames follow the newest kept."""
-    tag = f"lib_tex_{abs(hash(key)) % 10**8}"
+    ids = app.__dict__.setdefault("_lib_tex_ids", {})      # a number of its own: two keys whose hashes met shared one
+    tag = f"lib_tex_{ids.setdefault(key, len(ids))}"        # texture and showed each other's frames
     h, w = frames[0].shape[:2]
     old = app._lib_tex.get(tag)
     if old and old[1] == (w, h) and dpg.does_item_exist(tag):

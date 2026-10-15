@@ -336,6 +336,8 @@ def finish(img, lk, seed=None, light=None):
         return img
     from PIL import Image, ImageFilter
     h, w = img.shape[:2]
+    if h == 0 or w == 0:
+        return img                                         # a view of no size (a pane closed to nothing): PIL raised
     spill = float(lk.get("spill", 0)) if light is not None else 0.0
     b = float(lk.get("bloom", 0.0))
     if spill > 0 or b > 0:                                     # light added: in float, once

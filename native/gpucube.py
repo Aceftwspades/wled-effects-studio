@@ -360,7 +360,7 @@ class PointQuads:
         from native.look import SPRITE_K
         pos = np.asarray(pos, np.float32).reshape(-1, 3)
         n = len(pos)
-        if n != self.n:
+        if n != self.n or getattr(self, "cols", None) is None:    # first with none: built (colours() then had nothing)
             for q in self.items + self.dot_items + self.floor_items + self.mirror_items:
                 dpg.delete_item(q)
             if self.mirror_layer is not None and dpg.does_item_exist(self.mirror_layer):
