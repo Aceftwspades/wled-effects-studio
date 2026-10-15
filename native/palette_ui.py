@@ -270,8 +270,9 @@ def poll(app):
         k = nearest()
         if k is None and len(stops) < MAX_STOPS:
             col = sample(stops, 256)[pos]
-            stops.append([pos, int(col[0]), int(col[1]), int(col[2])]); stops.sort(key=lambda q: q[0])
-            k = next(i for i, q in enumerate(stops) if q[0] == pos)
+            new = [pos, int(col[0]), int(col[1]), int(col[2])]
+            stops.append(new); stops.sort(key=lambda q: q[0])
+            k = next(i for i, q in enumerate(stops) if q is new)
             p["stops"] = stops
             _changed(app)
         if k is not None:
@@ -280,9 +281,12 @@ def poll(app):
     elif down and ed["drag"] is not None:
         k = ed["drag"]
         if 0 <= k < len(stops) and stops[k][0] != pos:
-            stops[k][0] = pos
+            moved = stops[k]
+            moved[0] = pos
             stops.sort(key=lambda q: q[0])
-            k = next(i for i, q in enumerate(stops) if q[0] == pos); ed["drag"] = k; app._pal_stop = k
+            # found again as itself, not by its place: at another stop's place, the other one was taken, and the
+            # drag went on moving that one
+            k = next(i for i, q in enumerate(stops) if q is moved); ed["drag"] = k; app._pal_stop = k
             p["stops"] = stops; ed["moved"] = True
             _changed(app, save=False); draw_bar(app); dpg.set_value("pal_pos", pos)
     elif not down and ed["drag"] is not None:
