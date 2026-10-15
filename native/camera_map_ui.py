@@ -631,6 +631,13 @@ def poll(app):
         _poll_calib(app)
     if s["live"] is not None:
         _poll_live(app)
+    if not dpg.is_item_shown(TAG) and (s["calib"] is not None or s["live"] is not None):
+        # the window closed with a calibration or a live plan running: stopped - the camera stayed open and the
+        # streamed device lit (every LED at full, for a calibration) until the window was opened again
+        if s["calib"] is not None:
+            _stop_calib(app)
+        if s["live"] is not None:
+            _end_live(app, "stopped: the window was closed")
     if s["cam"] is not None and s["calib"] is None and s["live"] is None and not dpg.is_item_shown(TAG):
         _close_cam(app)                                      # the window closed: the camera off
     box = s["busy"]
