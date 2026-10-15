@@ -173,41 +173,58 @@ class Frames:
         frame, radius the framed thing's corner rounding, own the hole of
         the window the framed thing floats in: every other frame keeps off
         that window, its own is drawn round it. holes: rectangles (windows
-        over the top) the strips are cut around."""
+        over the top) the strips are cut around.
+
+        The pieces (strips cut round the holes, the corners) are worked out
+        when the rects or the holes change, not every frame - they were a
+        millisecond of each; a turning gradient then only turns its uvs, and
+        a still frame that has not changed is left as it is."""
         glow = self.style != "outline"
-        th = (time.perf_counter() * TURNS_PER_S * 2 * math.pi) % (2 * math.pi) if self.style == "turning" else 0.0
+        turning = self.style == "turning"
+        th = (time.perf_counter() * TURNS_PER_S * 2 * math.pi) % (2 * math.pi) if turning else 0.0
         c, s = math.cos(th), math.sin(th)
+        key = (tuple(tuple(r) for r in rects), tuple(holes), self.style)
+        if key != getattr(self, "_key", None):
+            self._key, self._pieces, self._drawn = key, self._pieces_of(rects, holes, glow), False
+        elif self._drawn and not turning:
+            return                                        # nothing moved, nothing turns
         used = {k: 0 for k in self.quads}
-        all_holes = holes
+        for kind, cx, cy, size, pts, a in self._pieces:
+            quads = self.quads[kind]
+            k = used[kind]
+            if k >= len(quads):
+                continue
+            uvs = [(0.5 + 0.3 * (((px - cx) / size) * c - ((py - cy) / size) * s),
+                    0.5 + 0.3 * (((px - cx) / size) * s + ((py - cy) / size) * c)) for px, py in pts]
+            dpg.configure_item(quads[k], p1=pts[0], p2=pts[1], p3=pts[2], p4=pts[3],
+                               uv1=uvs[0], uv2=uvs[1], uv3=uvs[2], uv4=uvs[3], color=(255, 255, 255, a), show=True)
+            used[kind] = k + 1
+        self._drawn = True
+        for kind, quads in self.quads.items():
+            for j in range(used[kind], self.shown[kind]):
+                dpg.configure_item(quads[j], show=False)
+            self.shown[kind] = used[kind]
+
+    def _pieces_of(self, rects, all_holes, glow):
+        """(kind, cx, cy, size, (p1..p4), alpha 0..255) for every piece of every rect's frame, in drawing order."""
+        out = []
         for rect in rects:
             x0, y0, x1, y1, clip, alpha, kind = rect[:7]
             radius = rect[7] if len(rect) > 7 else RADIUS
             own = rect[8] if len(rect) > 8 else None
             holes = all_holes if own is None else [h for h in all_holes if h != own]
-            quads = self.quads.get(kind)
-            if quads is None:
+            if self.quads.get(kind) is None:
                 continue
             cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
             size = max(1.0, max(x1 - x0, y1 - y0))
-
-            def uv(px, py):
-                dx, dy = (px - cx) / size, (py - cy) / size
-                return (0.5 + 0.3 * (dx * c - dy * s), 0.5 + 0.3 * (dx * s + dy * c))
-
             for (sx0, sy0, sx1, sy1, a) in self._strips(x0, y0, x1, y1, radius, glow):
                 if clip:
                     sx0, sy0 = max(sx0, clip[0]), max(sy0, clip[1])
                     sx1, sy1 = min(sx1, clip[2]), min(sy1, clip[3])
                     if sx1 <= sx0 or sy1 <= sy0:
                         continue
-                for (sx0, sy0, sx1, sy1) in self._subtract((sx0, sy0, sx1, sy1), holes):
-                    k = used[kind]
-                    if k >= len(quads):
-                        break
-                    dpg.configure_item(quads[k], p1=(sx0, sy0), p2=(sx1, sy0), p3=(sx1, sy1), p4=(sx0, sy1),
-                                       uv1=uv(sx0, sy0), uv2=uv(sx1, sy0), uv3=uv(sx1, sy1), uv4=uv(sx0, sy1),
-                                       color=(255, 255, 255, int(a * alpha)), show=True)
-                    used[kind] = k + 1
+                for (qx0, qy0, qx1, qy1) in self._subtract((sx0, sy0, sx1, sy1), holes):
+                    out.append((kind, cx, cy, size, ((qx0, qy0), (qx1, qy0), (qx1, qy1), (qx0, qy1)), int(a * alpha)))
             # the corners: a piece is drawn whole or not at all - one outside
             # the clip, or under a window, is left out
             for (p1, p2, p3, p4, a) in self._corners(x0, y0, x1, y1, radius, glow):
@@ -217,13 +234,5 @@ class Frames:
                     continue
                 if any(not (hx1 <= bx0 or hx0 >= bx1 or hy1 <= by0 or hy0 >= by1) for (hx0, hy0, hx1, hy1) in holes):
                     continue
-                k = used[kind]
-                if k >= len(quads):
-                    break
-                dpg.configure_item(quads[k], p1=p1, p2=p2, p3=p3, p4=p4, uv1=uv(*p1), uv2=uv(*p2), uv3=uv(*p3), uv4=uv(*p4),
-                                   color=(255, 255, 255, int(a * alpha)), show=True)
-                used[kind] = k + 1
-        for kind, quads in self.quads.items():
-            for j in range(used[kind], self.shown[kind]):
-                dpg.configure_item(quads[j], show=False)
-            self.shown[kind] = used[kind]
+                out.append((kind, cx, cy, size, (p1, p2, p3, p4), int(a * alpha)))
+        return out
