@@ -134,6 +134,21 @@ def test_text_with_a_backslash_does_not_break_the_script_compiler():
     assert isinstance(ok, bool)
 
 
+def test_an_exposed_colour_compiles():
+    """A colour setting exposed as a pin left its channels in the template ($p.rgb_r...), a setting no longer
+    there: the compile failed, in C++ and in the script. It is read whole as the pin now; a template that keeps
+    its colours in a static table (Colour pick) does not offer them as pins."""
+    from native import script
+    g = starter()
+    k = g.add("Colour", (0, 0)); g.nodes[k]["expose"] = ["rgb"]
+    h = g.add("HSV", (-200, 0)); o = g.add("Output", (300, 0))
+    g.link(h, "color", k, "rgb"); g.link(k, "color", o, "color")
+    src = g.compile()
+    assert "rgb_r" not in src
+    script.compile_script(g)
+    assert "rgb" in G.exposable(LIB["Colour"]) and not [x for x in G.exposable(LIB["Colour pick"]) if x.startswith("c")]
+
+
 def test_library_is_documented():
     from native import nodedocs
     assert nodedocs.gaps() == []

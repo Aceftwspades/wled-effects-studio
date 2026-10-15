@@ -204,7 +204,20 @@ def exposable(d):
     itself)."""
     if d.get("codegen"):
         return []
-    return [p["name"] for p in d["params"] if p["type"] in EXPOSABLE]
+    return [p["name"] for p in d["params"] if p["type"] in EXPOSABLE
+            and (p["type"] != "color" or _whole_colour(d["code"], p["name"]) is not None)]
+
+
+def _whole_colour(code, name):
+    """A template with its colour setting `name` read whole - RGBW32($p.name_r, $p.name_g, $p.name_b, 0) - as
+    $in.name; None when it reads a channel alone, or keeps the colour in a static table (set once: a wire into
+    it would be read on the first frame only). Its channels were left as $p.name_r, a setting no longer there:
+    the compile failed ("template refers to unknown $p.rgb_r"), in C++ and in the script both."""
+    pat = (r"RGBW32\(\s*\$p\.{n}_r\s*,\s*\$p\.{n}_g\s*,\s*\$p\.{n}_b\s*,\s*0\s*\)").replace("{n}", re.escape(name))
+    whole = re.sub(pat, lambda m: "$in." + name, code)
+    if re.search(r"\$p\." + re.escape(name) + r"(_[rgb])?(?![A-Za-z0-9_])", whole) or ("static" in code and whole != code):
+        return None
+    return whole
 
 
 def exposed_def(base, n):
@@ -225,7 +238,10 @@ def exposed_def(base, n):
                 v = list(v)
             ins.append({"name": p["name"], "type": EXPOSABLE[p["type"]], "default": v,
                         "doc": (p.get("doc") or "") + " (a setting, exposed as a pin)"})
-            code = _sub(code, "p", p["name"], "$in." + p["name"])
+            if p["type"] == "color":
+                code = _whole_colour(code, p["name"])
+            else:
+                code = _sub(code, "p", p["name"], "$in." + p["name"])
     d["inputs"] = ins
     d["code"] = code
     return d
