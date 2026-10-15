@@ -102,6 +102,46 @@ def test_segments_past_the_last_are_not_selected():
     assert e.seg == 0 and sorted(e._segstate) == [0]
 
 
+def test_only_a_unit_opening_with_wled_h_takes_the_precompiled_header():
+    """Something defined before wled.h could change what it means, so such a unit compiles from source."""
+    from native import toolchain as T
+    cases = {"// a comment\n/* and a block\n */\n#include \"wled.h\"\nint a;\n": True,
+             "#include \"wled.h\"\n#define X 1\n": True,
+             "#define CFX_SRC 6\n#include \"wled.h\"\n": False,
+             "#include <math.h>\n#include \"wled.h\"\n": False,
+             "#include \"fastled_slim.h\"\n": False}
+    d = tempfile.mkdtemp()
+    try:
+        for i, (text, want) in enumerate(cases.items()):
+            f = os.path.join(d, f"case_{i}.cpp")
+            with open(f, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            assert T._uses_pch(f) is want, (text, want)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_a_compile_failing_over_the_precompiled_header_is_tried_again():
+    from native import toolchain as T
+    assert T._pch_failed("fatal error: file 'x/wled.h' has been modified since the precompiled header 'x/wled.pch' was built")
+    assert T._pch_failed("error: input is not a PCH file: 'x/wled.pch'")
+    assert T._pch_failed("x/wled.h.gch: not used because `CFX_SIM' not defined [-Werror=invalid-pch]")
+    assert not T._pch_failed("aurora_drift.cpp:12:3: error: use of undeclared identifier 'foo'")
+
+
+def test_the_precompiled_header_is_made_once_for_what_it_was_made_from():
+    import build as B
+    from native import toolchain as T
+    comp, env = T.find_compiler()
+    inc = B.include_dirs()
+    hstamp, cid = T._header_stamp(inc), T._compiler_id(comp, env)
+    flags = T.build_pch(comp, env, inc, hstamp, cid)
+    assert flags, "no precompiled header"
+    made = flags[1] if flags[0] == "-include-pch" else os.path.join(flags[1], "wled.h.gch")
+    assert os.path.exists(made), made
+    assert T.build_pch(comp, env, inc, hstamp, cid) == flags          # the same one, not made again
+
+
 if __name__ == "__main__":
     bad = 0
     for name, fn in list(globals().items()):
