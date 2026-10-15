@@ -327,7 +327,7 @@ class GraphPanel(Glyphs):
     def open(self, fname, sub=False):
         if not fname:
             return
-        self._keep_open_one()
+        self._keep_open_one(os.path.join(self.sub_dir if sub else self.dir, fname))
         self.refresh_lib()
         if self.graph is None:
             from native import typeface          # no zoom kept yet: the interface's size, to the nearest step
@@ -360,7 +360,7 @@ class GraphPanel(Glyphs):
         self.app.refresh_import_buttons()
         return True
 
-    def _keep_open_one(self):
+    def _keep_open_one(self, opening=None):
         """The graph open now saved before another replaces it, when it has changes: New graph, a library tile,
         a where-used row or an import replaced it unsaved (with Live off, the edits were gone, and its undo with
         them). Not one whose file is gone (renamed, deleted): that is not written back."""
@@ -369,6 +369,9 @@ class GraphPanel(Glyphs):
         path = os.path.join(self.cur_dir or self.dir, self.file)
         if not os.path.exists(path):
             return
+        if opening and os.path.normcase(os.path.abspath(opening)) == os.path.normcase(os.path.abspath(path)):
+            return                                        # the same file opened again: a reload (a lesson reset,
+                                                          # a restore) - the file is what is wanted, not saved over
         self._sync_pos()
         try:
             with open(path, encoding="utf-8") as f:
