@@ -725,6 +725,22 @@ class App(Features):
         except Exception as e:
             self.rec_msg = f"video failed: {e}"; return None
 
+    def _rec_fit(self, frame):
+        """A recorded frame at the recording's first size: the window resized or a view turned on or off changed
+        it, and the GIF writer raised on the mix (the recording lost) while the mp4 got short rows (garbage,
+        said to be done). Another size is centred on a canvas of the first, cut where larger."""
+        if not self.rec:
+            return frame.copy()
+        h0, w0 = self.rec[0].shape[:2]
+        if frame.shape[:2] == (h0, w0):
+            return frame.copy()
+        out = np.zeros((h0, w0, 3), np.uint8)
+        h, w = min(h0, frame.shape[0]), min(w0, frame.shape[1])
+        oy, ox = (h0 - h) // 2, (w0 - w) // 2
+        fy, fx = (frame.shape[0] - h) // 2, (frame.shape[1] - w) // 2
+        out[oy:oy + h, ox:ox + w] = frame[fy:fy + h, fx:fx + w, :3]
+        return out
+
     def rec_frame(self, net_img, cube_img):
         """Offered every drawn frame; takes one only when the clock says so."""
         if self.shot_req:
@@ -746,9 +762,15 @@ class App(Features):
         now = time.perf_counter()
         if now < self.rec_next:
             return
-        self.rec_next += 1.0 / self.REC_FPS
+        # behind the clock (a frame rate under REC_FPS): the frame taken now stands for the ones missed, so the
+        # file's time is the clock's - it played fast and ended early, and a sequence's render froze on its end
+        k = 1 + max(0, int((now - self.rec_next) * self.REC_FPS))
+        self.rec_next += k / self.REC_FPS
         parts = [p for p in (net_img, cube_img) if p is not None]
         if not parts:
+            # nothing drawn to record (both views hidden or popped out): it waited for ever, and no other could start
+            self.rec = None
+            self.rec_msg = "recording stopped: no view is showing - show the net or the 3-D view"
             return
         if len(parts) == 1:
             frame = parts[0]
@@ -760,8 +782,9 @@ class App(Features):
                 y = (h - p.shape[0]) // 2
                 frame[y:y + p.shape[0], x:x + p.shape[1]] = p
                 x += p.shape[1] + 8
-        self.rec.append(frame.copy())
-        self.rec_left -= 1.0 / self.REC_FPS
+        frame = self._rec_fit(frame)
+        self.rec.extend([frame] * k)
+        self.rec_left -= k / self.REC_FPS
         if self.rec_left > 0:
             self.rec_msg = f"recording {self.rec_left:4.1f} s..."
             return
