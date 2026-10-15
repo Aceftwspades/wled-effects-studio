@@ -357,6 +357,9 @@ SIM_API void simInit(int w, int h) {
   SimSeg &S = gSegs[0];
   S.x0 = 0; S.y0 = 0; S.x1 = w; S.y1 = h; S.used = true; S.opacity = 255;
   simSegBuffer(S);
+  // a buffer kept from a larger geometry still holds its picture: an effect that fades or paints some pixels
+  // read it back at the new stride - a ghost of the old size for a moment
+  memset(S.buf, 0, sizeof(uint32_t) * (size_t)w * h);
   _segPtr = &S.seg;
   strip._currentSegment = &S.seg;
   strip.isMatrix = (h > 1);
