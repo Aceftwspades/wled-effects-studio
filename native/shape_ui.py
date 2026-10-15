@@ -1156,6 +1156,11 @@ def nudge(app, i, **fields):
         if g2.count == g.count:
             app.project.geometry = g2                        # the views draw project.geometry
             return
+        if dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
+            # another count (a grid layout where moving changes which LEDs share a cell): shown as it goes, still
+            # one undo step for the drag when it lets go - an apply a frame pushed a step a frame, 40 gone at once
+            app.apply_geometry(g2)
+            return
     except Exception:
         pass
     _poll_pending(app, force=True)
