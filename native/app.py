@@ -1880,6 +1880,31 @@ class App(Features):
         else:
             go()
 
+    def quit_studio(self):
+        """File > Quit and the window's close: the open graph and the prefs saved, and the code's unsaved
+        edits saved too if you say so - nothing asked before, and they were lost (as were a graph's edits with
+        Live off). Whatever goes wrong in the saving, it quits: a close that could fail would keep the window."""
+        def go(save=False):
+            try:
+                if save and self.edit_dirty:
+                    self.edit_save()
+                if self.gp.graph is not None:
+                    self.gp.save()
+                save_prefs(self.prefs)
+            except Exception:
+                import traceback
+                traceback.print_exc()
+            dpg.stop_dearpygui()
+        try:
+            if self.edit_dirty and self.edit_file:
+                chrome.confirm(self, "Quit the studio", f"{self.edit_file} has changes that are not saved.",
+                               [("Save and quit", lambda: go(True)), ("Quit without saving", lambda: go(False), "danger"),
+                                ("Cancel", None)])
+                return
+        except Exception:
+            pass
+        go()
+
     def save_current(self):
         if self.layout == "edit":
             self.edit_save()
@@ -3884,7 +3909,10 @@ def build(app):
     dpg.create_context()
     ico = os.path.join(_paths.RES, "docs", "brand", "app.ico")          # the lit cube, as the exe's (package.py)
     ico = ico if sys.platform in ("win32", "darwin") and os.path.exists(ico) else ""
-    dpg.create_viewport(title="WLED Effects Studio", width=px(1280), height=px(800), vsync=False, small_icon=ico, large_icon=ico)
+    # the close button asks first (app.quit_studio), as File > Quit does: the viewport does not close by itself
+    dpg.create_viewport(title="WLED Effects Studio", width=px(1280), height=px(800), vsync=False, small_icon=ico, large_icon=ico,
+                        disable_close=True)
+    dpg.set_exit_callback(lambda: app.quit_studio())
     typeface.fonts()
     typeface.bind()                          # the interface face; the monospace where code and numbers are
 

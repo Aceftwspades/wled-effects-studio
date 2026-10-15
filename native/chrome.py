@@ -136,7 +136,7 @@ def build_menus(app):
             _mi(app, "Record 15 s GIF", "record", callback=lambda: app.start_rec(15.0))
             _mi(app, "Record 15 s video", "record_video", callback=lambda: app.start_rec(15.0, "mp4"))
             dpg.add_separator()
-            dpg.add_menu_item(label="Quit", callback=lambda: dpg.stop_dearpygui())
+            dpg.add_menu_item(label="Quit", callback=lambda: app.quit_studio())
         with dpg.menu(label="Edit"):
             _mi(app, "Undo", "undo", callback=lambda: app.run_action("undo"))
             _mi(app, "Redo", "redo", callback=lambda: app.run_action("redo"))
