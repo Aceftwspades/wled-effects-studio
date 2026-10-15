@@ -1302,6 +1302,11 @@ def chain_part(app, i):
         nr = parts[i]["params"].get("normals")
         if nr and len(nr) == len(pts):
             parts[i]["params"]["normals"] = np.asarray(nr, np.float32)[order].tolist()
+        if parts[i].get("guessed"):
+            # the camera map's estimates name LEDs by their place: renumbered with them (the wrong ones were
+            # ringed as estimates after, and the checks reported those)
+            new_of = {int(old): new for new, old in enumerate(order)}
+            parts[i]["guessed"] = sorted(new_of[g] for g in parts[i]["guessed"] if g in new_of)
         _apply(app, parts)
 
 
