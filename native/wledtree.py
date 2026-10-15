@@ -70,6 +70,8 @@ def fetch(dest, log=print):
             top = z.namelist()[0].split("/")[0]
             z.extractall(parent)
         os.remove(tmp)
+        if os.path.isdir(dest) and not os.listdir(dest):
+            os.rmdir(dest)                                 # an empty one is taken; os.replace onto it: "Access is denied"
         os.replace(os.path.join(parent, top), dest)
     if not os.path.isdir(os.path.join(dest, "wled00")):
         raise RuntimeError(f"{dest} has no wled00/ - not a WLED tree")
