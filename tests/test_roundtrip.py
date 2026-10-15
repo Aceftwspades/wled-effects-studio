@@ -474,6 +474,33 @@ def test_a_project_name_is_a_project_not_a_folder_of_the_same_name():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_a_bad_graph_or_project_file_is_said_not_raised():
+    """A graph file without node ids, nodes as null, a link of two: KeyError, TypeError, ValueError raised raw
+    (at the start, the studio did not open). A project.json with "imported": null raised at the start too, and
+    a geometry that did not read was quietly the cube, saved over the original. Now: a GraphError naming the
+    file; the project opens, says so, and keeps a copy."""
+    from native import project as PR
+    d = tempfile.mkdtemp(prefix="badfiles_")
+    try:
+        for body in ('{"nodes": [{"type": "Noise"}]}', '{"nodes": null}', '{"nodes": [], "links": [[1, 2]]}', '[1]', '{cut'):
+            path = os.path.join(d, "g.json"); open(path, "w").write(body)
+            try:
+                G.load(path, lib=library())
+                raise AssertionError(f"{body} loaded")
+            except G.GraphError as e:
+                assert "g.json" in str(e), e
+        pj = os.path.join(d, "p"); os.makedirs(pj)
+        open(os.path.join(pj, "project.json"), "w").write('{"imported": null, "geometry": {"kind": "matrix", "params": {"w": "x"}}}')
+        p = PR.Project(pj)
+        assert p.imported == []
+        p2 = os.path.join(d, "q"); os.makedirs(p2)
+        open(os.path.join(p2, "project.json"), "w").write('{"geometry": {"kind": "shape", "params": {"parts": 5}}}')
+        q = PR.Project(p2)
+        assert "geometry" in (q.load_error or "") and any(f.startswith("project.json.bad-") for f in os.listdir(p2))
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0

@@ -179,12 +179,18 @@ class Project:
             return
         try:
             self.geometry = Geometry.from_json(d.get("geometry", {}))
-        except Exception:
+        except Exception as e:
+            # it was reset to the cube without a word, and the next save wrote the cube over it: a copy is kept
             self.geometry = Geometry("cube", B=16)
+            bad = self._keep_copy()
+            self.load_error = (f"the project's geometry could not be read ({type(e).__name__}: {e}), and it starts as "
+                               f"the 16-pixel cube. " + (f"The file as it was is kept as {os.path.basename(bad)} in "
+                               f"{self.path}." if bad else "It could not be copied, so nothing is saved over it."))
         self.selected = d.get("selected", "") if isinstance(d.get("selected", ""), str) else ""
         opts = d.get("options", {})
         self.options = opts if isinstance(opts, dict) else {}
-        self.imported = [f for f in d.get("imported", []) if isinstance(f, str)]
+        imp = d.get("imported")                           # null or not a list (a hand edit) raised at the start
+        self.imported = [f for f in imp if isinstance(f, str)] if isinstance(imp, list) else []
         self._journal_reset()
 
     def _set_aside(self, err):
@@ -194,20 +200,28 @@ class Project:
         file is copied to project.json.bad-<time> first and load_error says
         where; when it cannot even be copied, nothing is saved over it."""
         why = f"{type(err).__name__}: {err}" if not isinstance(err, ValueError) else str(err)
+        bad = self._keep_copy()
+        if bad is None:
+            self.load_error = (f"{self.file} could not be read ({why}), nor copied. The studio will not save "
+                               "over it: close the studio, see to the file, and start it again.")
+            return
+        self.load_error = (f"project.json could not be read ({why}). It was kept as {os.path.basename(bad)} in "
+                           f"{self.path}, and the project starts from the defaults: put the settings back by fixing "
+                           "that file and copying it over project.json, or from File > History.")
+
+    def _keep_copy(self):
+        """project.json copied to project.json.bad-<time>, before anything is saved over it: the copy's path, or
+        None when it could not be made (then nothing is saved over it: save_blocked)."""
         bad = f"{self.file}.bad-{time.strftime('%Y%m%d-%H%M%S')}"
         k = 2
         while os.path.exists(bad):
             bad = f"{self.file}.bad-{time.strftime('%Y%m%d-%H%M%S')}-{k}"; k += 1
         try:
             shutil.copy2(self.file, bad)
-        except OSError as e:
+            return bad
+        except OSError:
             self.save_blocked = True
-            self.load_error = (f"{self.file} could not be read ({why}), nor copied ({e}). The studio will not save "
-                               "over it: close the studio, see to the file, and start it again.")
-            return
-        self.load_error = (f"project.json could not be read ({why}). It was kept as {os.path.basename(bad)} in "
-                           f"{self.path}, and the project starts from the defaults: put the settings back by fixing "
-                           "that file and copying it over project.json, or from File > History.")
+            return None
 
     def _journal_reset(self):
         self._undo = {k: [] for k in self.UNDO_KEYS}

@@ -1606,7 +1606,19 @@ def migrate(g):
 
 
 def load(path, lib=None, resolver=None):
-    return migrate(Graph(json.load(open(path, encoding="utf-8")), lib=lib, resolver=resolver))
+    """A graph file. One that does not read as a graph - JSON cut short, nodes without ids, links of the wrong
+    length - is a GraphError naming the file (it raised as a KeyError, a TypeError, a ValueError)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        if not isinstance(d, dict):
+            raise ValueError("not a JSON object")
+        return migrate(Graph(d, lib=lib, resolver=resolver))
+    except GraphError:
+        raise
+    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as e:
+        import os
+        raise GraphError(f"{os.path.basename(path)} does not read as a graph ({type(e).__name__}: {e})") from e
 
 
 def save(graph, path):
