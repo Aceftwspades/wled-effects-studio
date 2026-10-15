@@ -150,6 +150,8 @@ def _num_changed(app, key, v, i=None):
         st["trans"] = round(max(0.0, min(float(v), float(st.get("dur", 10)))), 2)
     elif key == "bri":
         st["bri"] = int(v)
+    if key in ("dur", "bars") and float(st.get("trans", 0)) > st["dur"]:
+        st["trans"] = round(st["dur"], 2)                 # a step made shorter: its blend no longer outlasts it
     _follow_playing(app, i, float(st.get("dur", 10)) - was)
     _live(app)
     _queue_save(app)

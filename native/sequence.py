@@ -220,7 +220,9 @@ def sub_steps(step):
     n = max(2, min(12, int(dur)))
     shapes = {ramp_of(step, k)[1] for k in ramps}
     if "up and back" in shapes:
-        n = max(n, 7) if n % 2 == 0 or n < 7 else n          # an odd count lands a sample on the top of the curve
+        n = max(n, 7)
+        if n % 2 == 0:                                       # an odd count lands a sample on the top of the curve:
+            n = n + 1 if n < 12 else n - 1                   # 8, 10 and 12 stayed even and peaked short of it
     elif "ease in-out" in shapes:
         n = max(n, 6)                                        # a curve needs the samples to read as one
     out = []
@@ -375,7 +377,7 @@ def presets_file(presets, playlist, pid):
     for k, state in presets.items():
         if k is not None:
             out[str(k)] = state
-    out[str(pid)] = playlist
+    out[str(pid)] = dict(playlist, on=True)              # as send() saves it: the playlist switches the lights on
     return json.dumps(out, indent=1)
 
 

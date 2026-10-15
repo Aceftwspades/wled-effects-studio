@@ -169,6 +169,18 @@ def test_a_step_without_its_own_values_is_the_same_on_the_device():
     assert playlist["playlist"]["transition"] == [int(round(sequence.TRANS_DEFAULT * 10))]
 
 
+def test_up_and_back_peaks_and_the_file_switches_on():
+    """An up-and-back ramp over 8, 10 or 12 s took an even number of samples and peaked short of its end on the
+    device; and presets.json's playlist lacked the "on" Send gives it."""
+    st = {"name": "r", "dur": 8.0, "rows": 1, "colors": [0, 0, 0], "ramps": {"ix": {"end": 200, "shape": "up and back"}},
+          "segments": [{"effect": "Rainbow", "params": {"ix": 0}, "bounds": [0, 0, 30, 1]}]}
+    for d in (8.0, 10.0, 12.0):
+        st["dur"] = d
+        assert max(q["segments"][0]["params"]["ix"] for q in sequence.sub_steps(st)) == 200, d
+    presets, playlist = sequence.to_wled([dict(st, ramps={})], EFFECTS, [], base=40, pid=39)
+    assert json.loads(sequence.presets_file(presets, playlist, 39))["39"]["on"] is True
+
+
 def test_ramps_become_sub_presets():
     st = {"name": "fade", "dur": 4.0, "rows": 48, "colors": [0, 0, 0], "ramps": {"ix": 250},
           "segments": [{"effect": "Rainbow", "params": {"ix": 10}, "bounds": [0, 0, 48, 48]}]}
