@@ -163,6 +163,24 @@ class Popouts:
 
 
 # --- the window ---------------------------------------------------------------------
+
+def _on_screen(x, y, w, h):
+    """A window's place kept on the screens there are now: one closed on a monitor since unplugged opened
+    off every screen (and its pane stayed hidden in the main window). Windows: the virtual screen; else as is."""
+    if sys.platform != "win32":
+        return x, y
+    try:
+        import ctypes
+        m = ctypes.windll.user32.GetSystemMetrics
+        vx, vy, vw, vh = m(76), m(77), m(78), m(79)       # SM_X/YVIRTUALSCREEN, SM_CX/CYVIRTUALSCREEN
+        if vw <= 0 or vh <= 0:
+            return x, y
+        x = max(vx, min(x, vx + vw - min(w, vw)))
+        y = max(vy, min(y, vy + vh - min(h, vh)))
+    except Exception:
+        pass
+    return x, y
+
 def _pos_file(view):
     return scratch.path(f"popout_{view}.json")
 
@@ -346,7 +364,8 @@ def run(view, name, parent=0):
     kw = dict(title=f"WLED Effects Studio - {TITLES.get(view, view)}", width=w0, height=h0, clear_color=(0, 0, 0, 255),
               min_width=160, min_height=160)
     if "x" in cfg and "y" in cfg:
-        kw.update(x_pos=int(cfg["x"]), y_pos=int(cfg["y"]))
+        x, y = _on_screen(int(cfg["x"]), int(cfg["y"]), w0, h0)
+        kw.update(x_pos=x, y_pos=y)
     dpg.create_viewport(**kw)
     dpg.setup_dearpygui()
     dpg.show_viewport()
@@ -379,8 +398,11 @@ def run(view, name, parent=0):
     finally:
         try:
             x, y = dpg.get_viewport_pos()
-            scratch.write_text(_pos_file(view), json.dumps({"x": int(x), "y": int(y), "w": int(dpg.get_viewport_width()),
-                                                            "h": int(dpg.get_viewport_height())}))
+            w, h = int(dpg.get_viewport_width()), int(dpg.get_viewport_height())
+            # minimized, Windows places a window at about -32000 with no size: not kept - the next pop-out
+            # opened there, off every screen
+            if x > -10000 and y > -10000 and w >= 160 and h >= 160:
+                scratch.write_text(_pos_file(view), json.dumps({"x": int(x), "y": int(y), "w": w, "h": h}))
         except Exception:
             pass
         dpg.destroy_context()
