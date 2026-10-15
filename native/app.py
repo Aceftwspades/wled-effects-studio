@@ -3600,22 +3600,22 @@ class App(Features):
                 clip = (pane[0] + 9, pane[3] - 9 - eh, pane[2] - 9, pane[3] - 9)
                 pad = self.gp.px(8)
                 sel = self.gp._selected()
-                boxes = []
-                for nid in sel:
+                boxes, ids = [], []                  # ids beside the boxes: a node skipped (scrolled out, folded)
+                for nid in sel:                      # shifted every pairing after it, and the frames jumped
                     tag = f"gnode_{nid}"
                     if not dpg.does_item_exist(tag):
                         continue
                     st = dpg.get_item_state(tag)
                     (x0, y0), (x1, y1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
                     if x1 > x0 and y1 > y0:          # the content rect; the node is a padding wider
-                        boxes.append((x0 - pad, y0 - pad, x1 + pad, y1 + pad))
+                        boxes.append((x0 - pad, y0 - pad, x1 + pad, y1 + pad)); ids.append(nid)
                 # A node's rectangle is last frame's; while it is being
                 # dragged the frame would trail it by a frame, so the mouse's
                 # movement since then is added - imnodes moves the selection
                 # by exactly that. Selected nodes are drawn on top, so
                 # nothing but a window ever covers their frames.
                 mx, my = dpg.get_mouse_pos(local=False)
-                now = {n: b for n, b in zip(sel, boxes)}
+                now = {n: b for n, b in zip(ids, boxes)}
                 moved = any(self._glow_rects.get(n) not in (None, b) for n, b in now.items())
                 if moved and (self.gp.dragging_nodes() or self.gp.panning()) and self._glow_mouse is not None:
                     # only once the nodes really are moving: a press on a
