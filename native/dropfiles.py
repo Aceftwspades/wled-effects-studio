@@ -38,7 +38,7 @@ class DropFiles:
         import ctypes
         from ctypes import wintypes
         u32, s32 = ctypes.windll.user32, ctypes.windll.shell32
-        hwnd = u32.FindWindowW(None, title)
+        hwnd = _own_window(u32, wintypes, title)
         if not hwnd:
             raise RuntimeError("viewport window not found")
         s32.DragAcceptFiles(hwnd, True)
@@ -76,6 +76,28 @@ class DropFiles:
             out, self.paths = self.paths, []
         return out
 
+
+
+def _own_window(u32, wintypes, title):
+    """This process's top-level window of that title. FindWindowW took the first window of the title anywhere -
+    an Explorer window open on a folder named "WLED Effects Studio", another studio - and drops then never came."""
+    import ctypes
+    import os
+    found = []
+    EnumProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def each(h, _):
+        pid = wintypes.DWORD()
+        u32.GetWindowThreadProcessId(h, ctypes.byref(pid))
+        if pid.value == os.getpid():
+            buf = ctypes.create_unicode_buffer(512)
+            u32.GetWindowTextW(h, buf, 512)
+            if buf.value == title:
+                found.append(h)
+                return False
+        return True
+    u32.EnumWindows(EnumProc(each), 0)
+    return found[0] if found else None
 
 def classify(path):
     """What a dropped file is, by its name and a look inside: graph, code,
