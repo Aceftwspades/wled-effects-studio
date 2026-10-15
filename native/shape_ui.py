@@ -1560,8 +1560,11 @@ def save_shape(app, path):
     if not path or _parts(app) is None:
         return
     g = app.project.geometry
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({"studio_shape": 1, "geometry": g.to_json()}, f, indent=1)
+    from native.project import write_atomic
+    try:
+        write_atomic(path, json.dumps({"studio_shape": 1, "geometry": g.to_json()}, indent=1))
+    except OSError as e:                                     # a folder it may not write: said (it raised in the callback,
+        app.gp.status(f"could not save the shape: {e}", "error"); return     # the file left emptied)
     app.gp.status(f"shape saved to {os.path.basename(path)}")
 
 
