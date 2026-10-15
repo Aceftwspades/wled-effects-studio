@@ -87,6 +87,21 @@ def test_unload_takes_a_full_width_handle():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_segments_past_the_last_are_not_selected():
+    """seg_select(k) past the last segment: the engine ignored it, and this side then edited segment 0 believing
+    it k. seg_truncate kept the removed segment's state (selecting first saved it again), so a segment added
+    there later started as the removed one."""
+    e = Engine(); e.set_geometry(Geometry("matrix", w=16, h=8))
+    try:
+        e.seg_select(5)
+        raise AssertionError("segment 5 of 1 selected")
+    except IndexError:
+        pass
+    e.seg_config(1, 8, 0, 16, 8); e.seg_config(2, 0, 4, 8, 8); e.seg_select(2)
+    e.seg_truncate(1)
+    assert e.seg == 0 and sorted(e._segstate) == [0]
+
+
 if __name__ == "__main__":
     bad = 0
     for name, fn in list(globals().items()):

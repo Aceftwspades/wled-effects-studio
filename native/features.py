@@ -350,6 +350,8 @@ class Features:
             k = int(str(label).split(":")[0])
         except ValueError:
             return
+        if not 0 <= k < self.eng.seg_count():
+            return                                        # a label from before a segment was removed
         self.eng.seg_select(k)
         if self.eng.seg_count() > 1:
             self.save_segments()                          # what was changed on the one left (its sliders, colours) kept

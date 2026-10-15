@@ -297,17 +297,20 @@ class Engine:
 
     def seg_truncate(self, n):
         self.lib.simSegTruncate(int(n))
+        if self.seg >= n:
+            self.seg_select(n - 1)                 # first: selecting kept the removed segment's state again
         for k in list(self._segstate):
             if k >= n:
-                self._segstate.pop(k)
-        if self.seg >= n:
-            self.seg_select(n - 1)
+                self._segstate.pop(k)              # (a segment added there later started as the removed one)
 
     def seg_select(self, k):
         """Make segment k the one the effect, sliders and colours refer to."""
         k = int(k)
         if k == self.seg:
             return
+        if not 0 <= k < self.seg_count():
+            # the engine ignores a segment it has not got, and this side then edited segment 0 believing it k
+            raise IndexError(f"no segment {k}: there are {self.seg_count()}")
         self._segstate[self.seg] = {"idx": self.idx, "fx": dict(self.fx), "pal": self.pal, "colors": self._colors}
         self.seg = k
         self.lib.simSegSelect(k)
