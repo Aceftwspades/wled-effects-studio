@@ -1396,8 +1396,14 @@ def poll(app):
             app._seq_rows_dirty = True                          # the names fitted to the new width too
         if getattr(app, "_seq_rows_dirty", False) and not num.busy():   # not under a number being typed in: it waits
             app._seq_rows_dirty = False; refresh(app)
-        if getattr(app, "_seq_play", None) is not None or getattr(app, "_tl_dirty", True) or getattr(app, "_tl_hover_was", None) != getattr(app, "_tl_hover", None):
+        pl = getattr(app, "_seq_play", None)
+        state = (pl is not None, pl is not None and pl.get("paused") is not None, pl["i"] if pl is not None else None)
+        if getattr(app, "_tl_dirty", True) or getattr(app, "_tl_hover_was", None) != getattr(app, "_tl_hover", None)                 or state != getattr(app, "_tl_state_was", None) or (pl is not None and not dpg.does_item_exist("seq_tl_head")):
             draw_timeline(app); app._tl_dirty = False; app._tl_hover_was = getattr(app, "_tl_hover", None)
+            app._tl_state_was = state
+        elif getattr(app, "_seq_play", None) is not None:
+            _move_head(app)                                 # playing: the playhead moves, the rest stays (redrawn every
+                                                            # frame it was 2 ms of each)
         _show_position(app)
     p = getattr(app, "_seq_play", None)
     if p is None:
@@ -1421,6 +1427,7 @@ def poll(app):
         prev = steps[p["i"]] if 0 <= p["i"] < len(steps) else None
         p["i"] = i
         p["st"], p["n"] = steps[i], len(steps)
+        app._tl_dirty = True                                # the step playing is underlined: drawn again
         p["next"] = now + float(steps[i].get("dur", 10))
         trans = float(steps[i].get("trans", sequence.TRANS_DEFAULT))       # as the device's playlist blends it
         if prev is not None and trans > 0:
@@ -1636,15 +1643,30 @@ def draw_timeline(app):
         dpg.draw_line((x, top - 2), (x, bot + 2), color=c.ACCENT, thickness=px(3), parent=dl)
     # the playhead, with its time
     at = position(app)
+    app._tl_scale = (sx, h)                                 # for _move_head, between redraws
     if at is not None:
         x = at * sx
-        dpg.draw_line((x, 0), (x, h), color=(255, 255, 255, 240), thickness=2, parent=dl)
-        dpg.draw_triangle((x - px(5), 0), (x + px(5), 0), (x, px(7)), color=(0, 0, 0, 0), fill=(255, 255, 255, 240), parent=dl)
+        dpg.draw_line((x, 0), (x, h), color=(255, 255, 255, 240), thickness=2, parent=dl, tag="seq_tl_head")
+        dpg.draw_triangle((x - px(5), 0), (x + px(5), 0), (x, px(7)), color=(0, 0, 0, 0), fill=(255, 255, 255, 240), parent=dl,
+                          tag="seq_tl_head_tri")
     elif hover and hover[0] == "ruler":
         x = hover[1] * sx
         dpg.draw_line((x, 0), (x, h), color=(255, 255, 255, 90), thickness=1, parent=dl)
         lab = _fmt_t(hover[1])
         typeface.draw_text((min(x + 3, w - px(30)), rb + 2), lab, px(10), face="mono", color=(255, 255, 255, 200), parent=dl)
+
+
+def _move_head(app):
+    """The playhead to where the show is now, the rest of the timeline as it was drawn."""
+    at, sh = position(app), getattr(app, "_tl_scale", None)
+    if at is None or sh is None or not dpg.does_item_exist("seq_tl_head"):
+        app._tl_dirty = True
+        return
+    sx, h = sh
+    x = at * sx
+    dpg.configure_item("seq_tl_head", p1=(x, 0), p2=(x, h))
+    if dpg.does_item_exist("seq_tl_head_tri"):
+        dpg.configure_item("seq_tl_head_tri", p1=(x - px(5), 0), p2=(x + px(5), 0), p3=(x, px(7)))
 
 
 def _fit_measured(text, width, size):
