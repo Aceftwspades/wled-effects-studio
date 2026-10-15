@@ -2847,6 +2847,9 @@ class GraphPanel(Glyphs):
                                                  frame_title=title + " frame"))
             except Exception as e:
                 job["result"] = ("error", f"could not measure: {e}")
+            finally:
+                app.building = False                      # an import failing before the build left it set for good:
+                                                          # every build after was refused as "a build is running"
         self._cost_job = job
         app.building = True
         import threading
