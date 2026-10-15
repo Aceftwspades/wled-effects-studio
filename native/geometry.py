@@ -184,7 +184,10 @@ class Geometry:
         elif k == "shape":
             from native import shapes
             pos, nrm, owner = shapes.resolve(p.get("parts") or [])
-            pos, nrm = pos[:self.MAX_PIXELS], nrm[:self.MAX_PIXELS] if nrm is not None else None
+            # one under the engine's limit: laid as a strip, the width is the count, and the table's header holds
+            # it in 16 bits - 65536 LEDs raised struct.error and the shape was not applied, without a word
+            cap = self.MAX_PIXELS - 1
+            pos, nrm = pos[:cap], nrm[:cap] if nrm is not None else None
             n = len(pos)
             if n == 0:
                 pos = np.zeros((1, 3), np.float32); nrm = None; n = 1
@@ -227,7 +230,7 @@ class Geometry:
             pts = np.asarray(p.get("points", []), dtype=np.float64).reshape(-1, 3)
             # a bad row is dropped, not drawn: a NaN, and an inf too - one inf made every
             # position NaN in the centring below, and the device a geometry of zeros (issue #7)
-            pts = pts[np.isfinite(pts).all(1)][:self.MAX_PIXELS]
+            pts = pts[np.isfinite(pts).all(1)][:self.MAX_PIXELS - 1]          # (the table's 16-bit width, as above)
             n = len(pts)
             if n == 0:
                 pts = np.zeros((1, 3), np.float64); n = 1
