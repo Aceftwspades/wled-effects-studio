@@ -121,6 +121,10 @@ def write_atomic(path, text):
         pass
 
 
+import threading
+_SAVE_LOCK = threading.RLock()
+
+
 class Project:
     def __init__(self, path):
         self.path = os.path.abspath(path)
@@ -299,13 +303,24 @@ class Project:
     def save(self):
         if getattr(self, "save_blocked", False):
             return                      # the file on disk could not be read or copied: left as it is
-        self._journal()
-        d = {"geometry": self.geometry.to_json(), "selected": self.selected,
-             "options": self.options, "imported": self.imported,
-             "saved": time.strftime("%Y-%m-%d %H:%M:%S")}
-        text = json.dumps(d, indent=1)
-        self._keep_history()
-        write_atomic(self.file, text)
+        # a flash's worker saves its record while the panel saves its edits: one at a time (the journal and the
+        # file interleaved), and a setting changed on the main thread mid-way through serialising tried again -
+        # "dictionary changed size during iteration" failed the save, and a flash that worked was called failed
+        with _SAVE_LOCK:
+            self._journal()
+            d = {"geometry": self.geometry.to_json(), "selected": self.selected,
+                 "options": self.options, "imported": self.imported,
+                 "saved": time.strftime("%Y-%m-%d %H:%M:%S")}
+            for attempt in range(8):
+                try:
+                    text = json.dumps(d, indent=1)
+                    break
+                except RuntimeError:
+                    if attempt == 7:
+                        raise
+                    time.sleep(0.01)
+            self._keep_history()
+            write_atomic(self.file, text)
 
     def _keep_history(self):
         """What project.json held before this save, into history/project/ -
