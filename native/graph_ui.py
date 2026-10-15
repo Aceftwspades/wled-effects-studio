@@ -335,7 +335,14 @@ class GraphPanel(Glyphs):
             self.zoom = min(ZOOMS[-1], max(ZOOMS[0], float(self.app.prefs.get("zoom", first))))
         self.offset = [0.0, 0.0]
         d = self.sub_dir if sub else self.dir
-        self.graph = G.load(os.path.join(d, fname), lib=self.lib, resolver=self.resolve_sub)
+        try:
+            g = G.load(os.path.join(d, fname), lib=self.lib, resolver=self.resolve_sub)
+        except (G.GraphError, OSError) as e:
+            # said, and the graph open now left as it is - at the start it raised, and the studio did not open
+            self.status(f"{e} - the file is graphs/{fname}" if not sub else f"{e} - the file is subgraphs/{fname}",
+                        "error", key=f"graph:{fname}")
+            return False
+        self.graph = g
         self.graph.project_dir = self.app.project.path
         self.graph.features = self.features()
         self.file = fname
@@ -345,13 +352,13 @@ class GraphPanel(Glyphs):
         self.rebuild()
         dpg.configure_item("graph_file", items=self.files())
         dpg.set_value("graph_file", fname if not sub else "")
-        dpg.configure_item("graph_back", show=bool(self.stack))
-        self._crumbs()
+        self._trail()
         stray = getattr(self.graph, "stray", None) or []
         self.status(("opened the sub-graph " if sub else "opened ") + fname
                     + (f" - {len(stray)} wire(s) to nodes or pins that are not there dropped" if stray else ""),
                     "warn" if stray else "info")
         self.app.refresh_import_buttons()
+        return True
 
     def _keep_open_one(self):
         """The graph open now saved before another replaces it, when it has changes: New graph, a library tile,
@@ -458,8 +465,10 @@ class GraphPanel(Glyphs):
         if not n or not n["type"].startswith(G.SUB):
             return
         self.save()
-        self.stack.append((self.cur_dir, self.file))
-        self.open(n["type"][len(G.SUB):] + ".json", sub=True)
+        here = (self.cur_dir, self.file)
+        if self.open(n["type"][len(G.SUB):] + ".json", sub=True):
+            self.stack.append(here)                       # only once it opened: a failed one left a Back to nowhere
+            self._trail()
 
     def back(self, levels=1):
         """Up one sub-graph (or `levels`), to where the trail came from."""
@@ -471,6 +480,11 @@ class GraphPanel(Glyphs):
                 break
             d, f = self.stack.pop()
         self.open(f, sub=(d == self.sub_dir))
+
+    def _trail(self):
+        """The Back button and the breadcrumbs, from the stack as it is now."""
+        dpg.configure_item("graph_back", show=bool(self.stack))
+        self._crumbs()
 
     def _crumbs(self):
         """The breadcrumbs: every graph on the way down, each a button
@@ -599,15 +613,16 @@ class GraphPanel(Glyphs):
             d = self.sub_dir if sub else self.dir
             if not os.path.exists(os.path.join(d, fname)):
                 self.status(f"{fname} is not in this project any more"); return
-            if sub:
-                if self.graph is not None:
-                    self.save()
-                    self.stack.append((self.cur_dir, self.file))
-            else:
-                if self.graph is not None:
-                    self.save()
+            here = (self.cur_dir, self.file) if self.graph is not None else None
+            if self.graph is not None:
+                self.save()
+            if not self.open(fname, sub=bool(sub)):
+                return                                    # said by open; the trail left as it was
+            if sub and here:
+                self.stack.append(here)
+            elif not sub:
                 self.stack.clear()
-            self.open(fname, sub=bool(sub))
+            self._trail()
         self.app.show_pane("graph")
         if nid is None:
             if self.graph and self.graph.nodes:
