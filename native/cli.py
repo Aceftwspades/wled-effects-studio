@@ -148,7 +148,8 @@ def main():
     try:
         _pairs(a.set)
         sweep = _sweep(a.sweep) if a.sweep else None
-        times = [int(x) for x in a.at.split(",") if x.strip()] or [8000]
+        times = sorted({int(x) for x in a.at.split(",") if x.strip()}) or [8000]   # in order: one taken out of order was
+                                                                                   # named for its time and held another's
     except ValueError as e:
         ap.error(str(e) if "--" in str(e) else f"--at: {a.at!r} - times in ms, whole numbers, comma separated")
 
