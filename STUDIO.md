@@ -3535,6 +3535,25 @@ LedFx have added that matters here, in the order it helps most.
       or blends, and an edit's look being gathered then is dropped; after
       stop the selected step is loaded again. Off, the sim is free, for Add
       from the sim.
+- [x] **The crashes-and-correctness review** (2026-10-13 to 15): eight reviewers
+      read the studio area by area (the graph editor, app.py, the engine
+      boundary, the graph model and codegen, devices and the network, the
+      sequencer with audio and video, shapes, the UI's infrastructure); each
+      finding was traced or reproduced before it was fixed, and fixed with a
+      test that fails without it where one could. About 85 findings; the fixes
+      are a commit each, from 433f694 on. The ones that mattered most: a shape
+      on a grid sent LEDs past an overlap to the wrong addresses; a segment
+      offset of twice its length wrote past the pixel buffer; a flash that
+      worked was called failed on Windows; a cut download was flashed; a bad or
+      self-holding sub-graph, a corrupt graph or prefs file stopped the start;
+      custom palettes were lost after every build; a device that did not
+      answer froze the whole studio (native/tasks.py runs that waiting on a
+      worker now); paste, fold and a missing node type lost wires and settings;
+      settings files were written in place; the sequencer lost its place when
+      steps moved while playing. Quit now asks before losing the code's edits.
+      Left: WLED's own Flow effect divides by zero on a 1-pixel segment
+      (FX.cpp, upstream). The smoke test's waits were made to hold at a low
+      frame rate (47c27f7), and it checks bad and self-holding sub-graphs.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
