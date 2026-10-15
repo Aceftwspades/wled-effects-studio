@@ -278,6 +278,26 @@ def test_cancel_stops_what_the_tool_started():
     assert not alive(pid), "the grandchild outlived the cancel"
 
 
+def test_a_flash_without_a_build_records_what_the_image_holds():
+    """With "build" off, the image already there was flashed and recorded with the project's effects as they
+    were then - not necessarily the image's. The build keeps its manifest beside the image; without one (or for
+    another image), the record says it is not known."""
+    from native.project import Project
+    d = tempfile.mkdtemp(prefix="manifest_")
+    try:
+        p = Project(os.path.join(d, "p"))
+        b = os.path.join(d, "firmware.bin"); open(b, "wb").write(b"image one")
+        flash._keep_manifest(b, {"effects": [["fire.cpp", "Fire", 100]], "builtin": [], "env": "e", "wled": "", "build_id": "",
+                                 "board": "", "usermods": [], "features": [], "audio": "", "flags": []})
+        assert flash._built_manifest(b, p, "esp32dev", None)["effects"] == [["fire.cpp", "Fire", 100]]
+        open(b, "wb").write(b"image two")                           # another image: its manifest is not known
+        m = flash._built_manifest(b, p, "esp32dev", None)
+        rec = flash.record_flash(p, m, b, "127.0.0.1")
+        assert rec.get("unknown") and rec["effects"] == []
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

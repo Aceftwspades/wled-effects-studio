@@ -1245,7 +1245,11 @@ def refresh_manifest(app, env=None):
                      parent="flash_manifest", color=c.DIM, wrap=0)
         gone = [e for e in rec["effects"] if e not in [t for _, t, _ in m["effects"]]]
         new = [t for _, t, _ in m["effects"] if t not in rec["effects"]]
-        if gone or new:
+        if rec.get("unknown"):
+            # flashed without a build, an image whose build the studio did not keep: no comparison to make
+            dpg.add_text("what that flash held is not known (flashed without building, from an image built earlier)",
+                         parent="flash_manifest", color=c.DIM, wrap=0)
+        elif gone or new:
             dpg.add_text("this flash would " + (f"add {', '.join(new)}" if new else "") + (" and " if new and gone else "")
                          + (f"drop {', '.join(gone)}" if gone else ""), parent="flash_manifest", color=c.AMBER, wrap=0)
     elif app.active_host():

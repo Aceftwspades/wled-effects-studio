@@ -12,6 +12,7 @@ the dialog drains.
     while not job.done: line = job.q.get_nowait() ...
 """
 import configparser
+import json
 import os
 import queue
 import shutil
@@ -708,6 +709,35 @@ def manifest_text(m, device=None):
     return L
 
 
+def _keep_manifest(bin_path, m):
+    """What a build put in its firmware.bin, beside it: a flash later without building (the image already there)
+    records what the image holds, not what the project holds then."""
+    try:
+        import hashlib
+        data = open(bin_path, "rb").read()
+        with open(bin_path + ".studio.json", "w", encoding="utf-8") as f:
+            json.dump({"sha256": hashlib.sha256(data).hexdigest(), "manifest": m}, f)
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def _built_manifest(bin_path, project, base_env, only):
+    """The manifest the image at bin_path was built with: kept beside it by the build that made it (and only if it
+    is still that image). Otherwise the project's now, marked unknown - it was recorded as the image's, and the
+    \"this flash would add/drop\" comparison trusted effects the image need not hold."""
+    try:
+        import hashlib
+        kept = json.load(open(bin_path + ".studio.json", encoding="utf-8"))
+        if kept.get("sha256") == hashlib.sha256(open(bin_path, "rb").read()).hexdigest():
+            return kept["manifest"]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    m = dict(manifest(project, base_env, only))
+    m["unknown"] = True
+    m["effects"] = []
+    return m
+
+
 def record_flash(project, m, bin_path, host, device=None):
     """What went on the device, kept in the project: the manifest plus the
     binary's size and hash and when."""
@@ -716,6 +746,8 @@ def record_flash(project, m, bin_path, host, device=None):
            "env": m["env"], "wled": m["wled"], "build_id": m["build_id"], "board": m["board"],
            "usermods": m["usermods"], "features": {k: v for k, _, v in m["features"]}, "audio": m["audio"], "flags": m["flags"],
            "effects": [t for _, t, _ in m["effects"]], "builtin": len(m["builtin"])}
+    if m.get("unknown"):
+        rec["unknown"] = True                              # what the image was built with is not known
     try:
         data = open(bin_path, "rb").read()
         rec["size"] = len(data); rec["sha256"] = hashlib.sha256(data).hexdigest()[:16]
@@ -1194,6 +1226,8 @@ class Job:
                 if rc != 0:
                     self.result = why or f"build failed ({rc}) - the last lines above say why"; return
                 self.log(f"built in {time.time() - t0:.0f} s")
+                if self.source != "checkout":
+                    _keep_manifest(firmware_bin(env), manifest(self.project, self.base_env, self.only))
             if self.transport == "usb" and self.upload:
                 self._usb(env); return
             bin_ = firmware_bin(env)
@@ -1223,8 +1257,10 @@ class Job:
                     else:
                         msg = msg + "; " + msg2
                     if ok:
-                        rec = record_flash(self.project, manifest(self.project, self.base_env, self.only), bin_, self.host, before)
-                        self.log(f"recorded: {rec['when']}, {len(rec['effects'])} studio effect(s), sha256 {rec.get('sha256', '?')}")
+                        rec = record_flash(self.project, _built_manifest(bin_, self.project, self.base_env, self.only),
+                                           bin_, self.host, before)
+                        self.log(f"recorded: {rec['when']}, {len(rec['effects'])} studio effect(s), sha256 {rec.get('sha256', '?')}"
+                                 + (" - what it was built with is not known (built before the studio kept it)" if rec.get("unknown") else ""))
                         self._keep(bin_, before, f"the studio's build ({self.base_env})")
                 self.result = msg
                 self.ok = ok
