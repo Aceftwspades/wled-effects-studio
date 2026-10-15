@@ -438,12 +438,23 @@ class Project:
         return new
 
     def effect_title(self, fname):
-        """The name the effect registers, from its metadata string."""
+        """The name the effect registers, from its metadata string - kept until the file changes: the live
+        glyphs asked every frame, and each time the file was read again."""
+        try:
+            mt = os.path.getmtime(self.effect_path(fname))
+        except OSError:
+            mt = None
+        cache = self.__dict__.setdefault("_titles", {})
+        hit = cache.get(fname)
+        if hit and hit[0] == mt and mt is not None:
+            return hit[1]
         try:
             m = re.search(r'PROGMEM\s*=\s*"([^@"]+)', self.read_effect(fname))
-            return m.group(1) if m else fname
+            title = m.group(1) if m else fname
         except Exception:
-            return fname
+            title = fname
+        cache[fname] = (mt, title)
+        return title
 
     # --- export ---------------------------------------------------------------------
     def export(self, files=None, deps=(), requires=()):
