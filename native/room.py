@@ -79,7 +79,8 @@ class _State:
         self.float_in = None     # the window over the canvas the pointer is on, once the focus is settled there
         self.float_owner = None  # the window over the canvas last clicked in (None: the canvas, or elsewhere)
         self.float_prev = None   # the window under the pointer the frame before (a click's owner is judged by it)
-        self.float_wait = 0.0    # when a focus held back (a button down, a menu up) is tried again
+        self.float_wait = 0.0    # when a focus held back (a box typed in, a menu up) is tried again
+        self.float_came = 0.0    # when the pointer came onto the window under it
 
 
 S = _State()
@@ -723,7 +724,8 @@ def poll(app):
 
 
 FLOATING = ("props_fly", "pip_win", "pip_tab")     # the windows over the canvas that take clicks
-FLOAT_RETRY_S = 0.1                                # a held-back focus is tried again this often
+FLOAT_RETRY_S = 0.1                                # a held-back focus is tried again this often...
+FLOAT_EAGER_S = 0.5                                # ...once the pointer has rested this long: till then, every frame
 
 
 def _floating_under_pointer():
@@ -737,11 +739,14 @@ def _floating_under_pointer():
     return None
 
 
-def _others_up(app):
+def _others_up(app, here=None):
     """A window with the focus that is not the canvas's (a menu, a dialog),
-    or a menu bar menu open: the focus is theirs to keep."""
+    or a menu bar menu open: the focus is theirs to keep. The window under
+    the pointer is not another: a dialog that closed hands the focus on to
+    it, and counted, the try was held back for good."""
     root = dpg.get_alias_id("root")
-    if any(w != root and dpg.get_item_state(w).get("focused") for w in dpg.get_windows()):
+    mine = dpg.get_alias_id(here) if isinstance(here, str) and dpg.does_alias_exist(here) else here
+    if any(w != root and w != mine and dpg.get_item_state(w).get("focused") for w in dpg.get_windows()):
         return True
     return any((dpg.get_item_state(m).get("rect_size") or (0, 0))[0] > 0
                for m in (getattr(app, "_menus", None) or ()) if dpg.does_item_exist(m))
@@ -761,7 +766,7 @@ def _poll_float_focus(app):
     here = _floating_under_pointer()
     before, S.float_prev = S.float_prev, here
     if here != before:
-        S.float_wait = 0.0                          # another window under the pointer: tried at once
+        S.float_wait, S.float_came = 0.0, time.monotonic()    # another window under the pointer: tried at once
     if any(dpg.is_mouse_button_clicked(b) for b in (0, 1, 2)):
         # the window clicked in, or None: the canvas, a pane - as it was under the pointer before the click. A click
         # on a node brings its properties up, and in a small window they open under the pointer that very frame:
@@ -775,18 +780,17 @@ def _poll_float_focus(app):
     if here == S.float_owner:
         S.float_in = here
         return
-    if dpg.get_item_state(here).get("focused"):
-        S.float_in = here                           # it has it already (a dialog closed handed it on): settled
-        return
     if any(dpg.is_mouse_button_down(b) for b in (0, 1, 2)):
         return                                      # tried again next frame: the button up
     now = time.monotonic()
     if now < S.float_wait:
         return
-    if app.typing() or app.gp.typing() or _others_up(app):
-        # tried again shortly - the box left, the menu gone: these ask every window and box (1.4 ms), and
-        # they were asked again every frame for as long as the pointer rested there
-        S.float_wait = now + FLOAT_RETRY_S
+    if app.typing() or app.gp.typing() or _others_up(app, here):
+        # tried again - the box left, the menu gone: every frame just after the pointer came (a click follows
+        # soon, and at a low frame rate a 0.1 s wait let it through to the canvas first), then every
+        # FLOAT_RETRY_S - these ask every window and box (1.4 ms) for as long as the pointer rests there
+        if now - S.float_came >= FLOAT_EAGER_S:
+            S.float_wait = now + FLOAT_RETRY_S
         return
     dpg.focus_item(here)
     S.float_in = here
