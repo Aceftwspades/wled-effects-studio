@@ -49,16 +49,18 @@ from native import look
 from native import video_ui
 from native.textures import registry as tex_registry
 from native.features import Features
+from native.recorder import Recorder, GIF_DIR
+from native.edit_build import EditBuild
+from native import paths as _paths
 from native.popout import Popouts
 from native.dropfiles import DropFiles
 from native.codeedit import CodeEditor
 from native.keys import Keymap, combo as key_combo
-from native import render, gif
+from native import render
 from native.apiref import API
 from native import scratch
 from native.remote import SHOT_DIR, SHOT_REQ, SHOT_PNG, CMD_FILE, REMOTE, service_capture, service_command
 import shutil
-import subprocess
 import sys
 
 STEP = 23
@@ -330,7 +332,7 @@ class Section:
         dpg.pop_container_stack()                     # the section
 
 
-class App(Features):
+class App(Features, Recorder, EditBuild):
     def __init__(self):
         self.project = default_project()
         from native.engine import ensure_library
@@ -684,137 +686,6 @@ class App(Features):
         self.live = None
         dpg.configure_item("live_btn", label="use live audio")
 
-    # --- recording ------------------------------------------------------------
-    REC_FPS = 15
-
-    def start_rec(self, secs=15.0, fmt="gif"):
-        """A recording of the views for `secs`: a GIF, or an mp4 (fmt "mp4",
-        which needs ffmpeg on the path)."""
-        if self.rec is not None:
-            return
-        if fmt == "mp4" and not self.has_ffmpeg():
-            self.rec_msg = "a video needs ffmpeg on the path - not found"
-            self.gp.status(self.rec_msg); return
-        self.rec = []
-        self.rec_fmt = fmt
-        self.rec_left = secs
-        self.rec_next = time.perf_counter()
-        self.rec_msg = f"recording {secs:.0f} s ({fmt})..."
-
-    @staticmethod
-    def has_ffmpeg():
-        import shutil
-        return bool(shutil.which("ffmpeg"))
-
-    def _encode(self, frames, path, fmt="gif"):
-        """Runs on a worker thread: encoding 225 frames takes several seconds
-        and the window must keep drawing while it does. A GIF by the studio's
-        own writer; an mp4 by ffmpeg (a GIF of a minute is huge, an mp4 is not)."""
-        try:
-            if fmt == "mp4":
-                if self.write_video(frames, path):
-                    self.rec_msg = f"{os.path.basename(path)}  {os.path.getsize(path)/1024:.0f} KB"
-                return
-            n = gif.write(path, frames, fps=self.REC_FPS)
-            self.rec_msg = f"{os.path.basename(path)}  {n/1024:.0f} KB"
-        except Exception as e:
-            self.rec_msg = f"{fmt} failed: {e}"
-
-    def write_video(self, frames, path, fps=None):
-        """The frames as an mp4 through ffmpeg (raw RGB piped in, H.264 out,
-        yuv420p so anything plays it). None without ffmpeg on the path."""
-        import shutil
-        ff = shutil.which("ffmpeg")
-        if not ff or not frames:
-            return None
-        h, w = frames[0].shape[:2]
-        w2, h2 = w - w % 2, h - h % 2                     # yuv420p wants even sides
-        cmd = [ff, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w2}x{h2}",
-               "-r", str(fps or self.REC_FPS), "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", path]
-        try:
-            proc = procs.popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-            for f in frames:
-                proc.stdin.write(np.ascontiguousarray(f[:h2, :w2, :3]).tobytes())
-            proc.stdin.close()
-            err = proc.stderr.read().decode("utf-8", "replace")
-            if proc.wait() != 0:
-                self.rec_msg = f"ffmpeg: {err.strip()[-120:]}"; return None
-            return path
-        except Exception as e:
-            self.rec_msg = f"video failed: {e}"; return None
-
-    def _rec_fit(self, frame):
-        """A recorded frame at the recording's first size: the window resized or a view turned on or off changed
-        it, and the GIF writer raised on the mix (the recording lost) while the mp4 got short rows (garbage,
-        said to be done). Another size is centred on a canvas of the first, cut where larger."""
-        if not self.rec:
-            return frame.copy()
-        h0, w0 = self.rec[0].shape[:2]
-        if frame.shape[:2] == (h0, w0):
-            return frame.copy()
-        out = np.zeros((h0, w0, 3), np.uint8)
-        h, w = min(h0, frame.shape[0]), min(w0, frame.shape[1])
-        oy, ox = (h0 - h) // 2, (w0 - w) // 2
-        fy, fx = (frame.shape[0] - h) // 2, (frame.shape[1] - w) // 2
-        out[oy:oy + h, ox:ox + w] = frame[fy:fy + h, fx:fx + w, :3]
-        return out
-
-    def rec_frame(self, net_img, cube_img):
-        """Offered every drawn frame; takes one only when the clock says so."""
-        if self.shot_req:
-            self.shot_req = False
-            img = cube_img if cube_img is not None else net_img
-            if img is not None:
-                try:
-                    from PIL import Image
-                    d = os.path.join(self.project.path, "export", "shots")
-                    os.makedirs(d, exist_ok=True)
-                    name = "".join(c if c.isalnum() else "_" for c in self.eng.names[self.eng.idx])
-                    path = os.path.join(d, f"{name}_{int(time.time())}.png")
-                    Image.fromarray(np.ascontiguousarray(img)).save(path)
-                    self.rec_msg = f"saved {os.path.relpath(path, self.project.path)}"
-                except Exception as e:
-                    self.rec_msg = f"screenshot failed: {e}"
-        if self.rec is None:
-            return
-        now = time.perf_counter()
-        if now < self.rec_next:
-            return
-        # behind the clock (a frame rate under REC_FPS): the frame taken now stands for the ones missed, so the
-        # file's time is the clock's - it played fast and ended early, and a sequence's render froze on its end
-        k = 1 + max(0, int((now - self.rec_next) * self.REC_FPS))
-        self.rec_next += k / self.REC_FPS
-        parts = [p for p in (net_img, cube_img) if p is not None]
-        if not parts:
-            # nothing drawn to record (both views hidden or popped out): it waited for ever, and no other could start
-            self.rec = None
-            self.rec_msg = "recording stopped: no view is showing - show the net or the 3-D view"
-            return
-        if len(parts) == 1:
-            frame = parts[0]
-        else:
-            h = max(p.shape[0] for p in parts)
-            frame = np.zeros((h, sum(p.shape[1] for p in parts) + 8, 3), np.uint8)
-            x = 0
-            for p in parts:
-                y = (h - p.shape[0]) // 2
-                frame[y:y + p.shape[0], x:x + p.shape[1]] = p
-                x += p.shape[1] + 8
-        frame = self._rec_fit(frame)
-        self.rec.extend([frame] * k)
-        self.rec_left -= k / self.REC_FPS
-        if self.rec_left > 0:
-            self.rec_msg = f"recording {self.rec_left:4.1f} s..."
-            return
-        frames, self.rec = self.rec, None
-        fmt = getattr(self, "rec_fmt", "gif")
-        name = "".join(c if c.isalnum() else "_" for c in self.eng.names[self.eng.idx])
-        os.makedirs(GIF_DIR, exist_ok=True)
-        path = os.path.join(GIF_DIR, f"{name}_{int(time.time())}.{fmt}")
-        self.rec_msg = f"encoding {len(frames)} frames ({fmt})..."
-        import threading
-        threading.Thread(target=self._encode, args=(frames, path, fmt), daemon=True).start()
-
     def toggle_live(self):
         self.stop_live() if self.live else self.start_live()
 
@@ -1039,7 +910,6 @@ class App(Features):
         if key in ("faces", "rots") and not params.get("faces"):
             params["faces"] = "N,W,T,E,S,B" if params.get("six") else "N,W,T,E,S"   # a wiring is being set: leave the raster order
         self.apply_geometry(Geometry(g.kind, **params))
-
 
 
     def on_xyz_file(self, s, app_data):
@@ -1654,128 +1524,6 @@ class App(Features):
         if fname:
             self.layout = "edit"; self.ui = True; self.request_layout()
             self.edit_open(fname)
-
-    def edit_build(self):
-        """Save, then compile on a worker; the result is applied on the main
-        thread by poll_build(), because reloading the engine while a frame is
-        being drawn from it is not something to do from another thread."""
-        if self.building:
-            # asked again while one runs (a project switch, an import toggled, Live): kept, and run when it is
-            # done - it was dropped, and the running build's library (another project's) was loaded as the result
-            self._build_again = True
-            return
-        self.edit_save()
-        self.building = True
-        self.build_msg = "compiling..."
-        dpg.set_value("edit_status", self.build_msg)
-        dpg.delete_item("edit_errors", children_only=True)
-
-        # what to build, read here on the main thread: the worker read self.project and edit_file as it ran,
-        # and a project switched meanwhile built the new project's files under the old one's build
-        files = [self.project.effect_path(f) for f in self.project.build_files(self.edit_file)]
-
-        def work():
-            import build as B
-            from native.toolchain import build_engine
-            import contextlib, io as _io
-            buf = _io.StringIO()
-            try:
-                with contextlib.redirect_stdout(buf):
-                    srcs = B.engine_sources(files)
-                inc = B.include_dirs()
-                rep = build_engine(srcs, inc, log=lambda *a: None)
-            except Exception as e:
-                rep = None
-                self.build_q.put(("exception", str(e)))
-                return
-            self.build_q.put(("report", rep))
-        threading.Thread(target=work, daemon=True).start()
-
-    def poll_build(self):
-        try:
-            kind, payload = self.build_q.get_nowait()
-        except queue.Empty:
-            return
-        self.building = False
-        try:
-            self._build_done(kind, payload)
-        finally:
-            if self.__dict__.pop("_build_again", False):
-                self.edit_build()                        # one asked for while this one ran: now, with what is there now
-
-    def _build_done(self, kind, payload):
-        """A build's result on the main thread: the errors shown, or the engine swapped for the new library."""
-        if kind == "exception":
-            dpg.set_value("edit_status", f"build failed: {payload}")
-            messages.post(self, f"build failed: {payload}", "error", key="build:")
-            return
-        rep = payload
-        if not rep.ok:
-            # Errors first; warnings only from the project's own files - a
-            # warning inside a shared header is not the user's to fix.
-            mine = set(self.project.effect_files())
-            errs = [e for e in rep.error_lines()
-                    if e[2].startswith("error") or os.path.basename(e[0]) in mine]
-            errs.sort(key=lambda e: 0 if e[2].startswith("error") else 1)
-            dpg.set_value("edit_status", f"{len(errs)} problem(s)")
-            # a graph's own C++: an error on a line a node wrote is that node's (an Expression's
-            # typed C++, most often) - it goes to the node, and the message points there
-            placed = self.gp.build_failed(self.edit_file, errs) if self.edit_file else {}
-
-            def node_of(path, line):
-                nid = placed.get((os.path.basename(path), int(line)))
-                return (nid, f"{self.gp.graph.nodes[nid]['type']} #{nid}") if nid is not None and self.gp.graph else (None, "")
-            first = errs[0] if errs else None
-            nid0, words0 = node_of(first[0], first[1]) if first else (None, "")
-            if nid0 is not None:
-                messages.post(self, f"{self.edit_file}: {len(errs)} problem(s) in the build - {words0}: {first[2]}",
-                              "error", key="build:", node=self.gp.where(nid0))
-            else:
-                messages.post(self, f"{self.edit_file}: {len(errs)} problem(s) in the build" + (f" - {os.path.basename(first[0])}:{first[1]} {first[2]}" if first else ""),
-                              "error", key="build:", code=(os.path.basename(first[0]), int(first[1])) if first else None)
-            if self.code_ed is not None:
-                self.code_ed.err_lines = {int(line) - 1 for path, line, msg in errs
-                                          if os.path.basename(path) == self.edit_file and msg.startswith("error")}
-                self.code_ed._dirty = True
-            for path, line, msg in errs[:30]:
-                fn = os.path.basename(path)
-                mine_file = fn == self.edit_file
-                nid, words = node_of(path, line)
-                if nid is not None:                              # a node's line: the row names it and goes to it
-                    row = self._error_row(f"{fn}:{line}  {words}: {msg}", self.gp.where(nid),
-                                          lambda s, a, u: messages.goto(self, {"node": u}))
-                else:
-                    row = self._error_row(f"{fn}:{line}  {msg}", int(line) if mine_file else None,
-                                          lambda s, a, u: self.goto_line(u) if u else None)
-                with dpg.theme() as th:
-                    with dpg.theme_component(dpg.mvSelectable):
-                        dpg.add_theme_color(dpg.mvThemeCol_Text,
-                                            (235, 120, 110) if msg.startswith("error") else (200, 190, 120))
-                dpg.bind_item_theme(row, th)
-            if not errs and rep.link_output:
-                dpg.add_text(rep.link_output[-600:], parent="edit_errors", color=(235, 120, 110), wrap=0)
-            return
-        # success: swap the engine, keep everything the user had
-        want = self.project.effect_title(self.edit_file) if self.edit_file else self.project.selected
-        sub = self.gp.standin_on()                       # the edit shown at once as a script (graph_ui.standin)
-        clock = self.eng.clock()
-        self.eng.reload(rep.library)
-        self._ab_reloaded(rep.library)
-        dpg.configure_item("fx_combo", items=self.eng.names)
-        if not (sub and self.gp.standin_stays(want, self.eng.names) and self.gp.standin_reload(clock)):
-            if want in self.eng.names:
-                self.eng.select(self.eng.names.index(want))
-            if sub:
-                self.eng.set_clock(clock)                # the build takes the stand-in's place at the same moment
-            self.gp.standin_done(sub)
-            dpg.set_value("fx_combo", self.eng.names[self.eng.idx])
-            self.rebuild_params()
-            self.sync_palette_combo()
-        dpg.set_value("edit_status", f"loaded {os.path.basename(rep.library)}  ({self.eng.count} effects)")
-        messages.clear(self, "build:")                       # it builds: the build's problem is gone
-        if self.edit_file:
-            self.gp.build_ok(self.edit_file)                 # and the nodes it was on are clear
-        messages.post(self, f"built: {self.eng.count} effects")
 
     def on_color(self, i, rgb):
         """A segment colour from its swatch or its hex (0..255 each)."""
@@ -3520,7 +3268,6 @@ class App(Features):
                 "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
 
 
-
     def poll_view_mode(self):
         """The 3-D view is remade when what it should draw changes: flat
         mode toggled, A/B started or stopped, the GPU view switched."""
@@ -3687,24 +3434,6 @@ class App(Features):
         self._holes = holes
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     def toggle_pane(self, which):
         """C and G: the pane, or back to the two views if it is already up."""
         self.layout = "both" if self.layout == which else which
@@ -3775,8 +3504,6 @@ class App(Features):
             self.hint_presentation((f"{key} again or Esc: back to the panels" if key else "Esc: back to the panels")
                                    + f"  ·  {self.keys.label('presentation') or 'H'}: the controls over the picture")
         self.request_layout()
-
-
 
 
     def step_sim(self):
@@ -4292,15 +4019,6 @@ def build(app):
     # Both views follow the window from here on. Without this, maximising left
     # two small pictures marooned in the corner of a large empty panel.
     dpg.set_viewport_resize_callback(lambda s, d: app.request_layout())
-
-
-# Recordings go in the REPO, not in the temp directory the IPC lives in. The two
-# are different kinds of file: capture.request and crash.txt are scratch that
-# nobody minds losing, whereas a recording is a thing you made and meant to
-# keep, and Windows is entitled to empty %TEMP% whenever it likes. Gitignored,
-# so keeping them here does not mean committing them.
-from native import paths as _paths
-GIF_DIR = _paths.CAPTURES
 
 
 class _Tail:
