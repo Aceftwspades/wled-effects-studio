@@ -230,7 +230,7 @@ def theme(app):
     the others on the controls' shade, their names dim. (Dear PyGui's own
     tab bar gave its first tab all the width the others left.)"""
     from native import chrome
-    from native.app import theme_colors
+    from native.theme import theme_colors
     cols = theme_colors(app.prefs)
     panel, frame = tuple(cols["panel"]), tuple(cols["frame"])
     acc, dim, text = tuple(chrome.ACCENT[:3]), tuple(cols["dim"]), tuple(cols["text"])

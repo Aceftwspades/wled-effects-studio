@@ -1084,7 +1084,7 @@ def _strip(stops, mirror, width=None, height=None, parent=None):
 
 def _appearance_colours(app):
     """Appearance's Colours tab: a preset, its seven colours, the nodes' colours by category."""
-    from native.app import THEME_PRESETS, THEME_ROLES
+    from native.theme import THEME_PRESETS, THEME_ROLES
     dpg.add_text("The look: a preset to start from, then any of its seven colours - the change shows as you make it "
                  "and is kept.", color=DIM, wrap=px(540))
     typeface.label(dpg.add_text("THEME", color=ACCENT))
@@ -1910,7 +1910,7 @@ def refresh_appearance(app):
         dock.theme(app)                              # the dock's tabs in the new colours
     if not dpg.does_item_exist("app_preset"):
         return
-    from native.app import theme_colors, THEME_PRESETS
+    from native.theme import theme_colors, THEME_PRESETS
     t = app.prefs.get("theme") or {}
     cols = theme_colors(app.prefs)
     name = t.get("preset") or ("light" if t.get("light") else "dark")

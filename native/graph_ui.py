@@ -52,7 +52,7 @@ def minimap_faint(prefs, faint):
     """The minimap drawn faint or full: the app theme's colours for it set
     in place (a theme bound to the node editor does not reach imnodes'
     minimap; set_value on the app theme's items does, the next frame)."""
-    from native.app import minimap_colours
+    from native.theme import minimap_colours
     for t, c in minimap_colours(prefs, faint):
         it = MINIMAP_ITEMS.get(t)
         if it is not None and dpg.does_item_exist(it):
@@ -1114,7 +1114,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu):
 
     # --- colours for the theme in force ---------------------------------------------------
     def _light(self):
-        from native.app import theme_is_light
+        from native.theme import theme_is_light
         return theme_is_light(self.app.prefs)
 
     @staticmethod
@@ -1128,7 +1128,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu):
         """What the graph draws with, for the theme in force: readouts,
         glyph lines and labels, plot boxes, the wire labels, the range bars.
         On a dark theme these are the colours they always were."""
-        from native.app import theme_colors
+        from native.theme import theme_colors
         cols = theme_colors(self.app.prefs)
         light = self._light()
         key = (tuple(cols["frame"]), tuple(cols["line"]), tuple(cols["text"]), tuple(cols["dim"]), tuple(cols["accent"]), light)
@@ -2464,7 +2464,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu):
         light = self._light()
         th = self._node_themes.get(("dim", self.zoom, light))
         if th is None:
-            from native.app import theme_colors
+            from native.theme import theme_colors
             cols = theme_colors(self.app.prefs)
             bg, frame, line, dim = (tuple(cols[k]) for k in ("bg", "frame", "line", "dim"))
             # faded toward the canvas: what is out of focus sinks into the ground
@@ -2547,7 +2547,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu):
 
     def set_wire_light(self, on):
         """View > Light a node's wires, kept in the prefs."""
-        from native.app import save_prefs
+        from native.project import save_prefs
         self.app.prefs["wire_light"] = bool(on)
         save_prefs(self.app.prefs)
         self._wires_lit = _STALE
@@ -3632,7 +3632,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu):
         translucent bar so the value written across it stays readable.
         One theme per colour scheme; remade when the scheme changes."""
         from native import chrome
-        from native.app import theme_colors, theme_is_light
+        from native.theme import theme_colors, theme_is_light
         cols = theme_colors(self.app.prefs); light = theme_is_light(self.app.prefs)
         key = (cols["frame"], cols["accent"], light)
         th = self._field_themes.get(key)

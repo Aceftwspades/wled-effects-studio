@@ -444,7 +444,7 @@ def apply_minimap(app):
 
 def set_minimap(app, show=None, corner=None):
     """View > Minimap: shown or not, and its corner - kept in the prefs."""
-    from native.app import save_prefs
+    from native.project import save_prefs
     if show is not None:
         app.prefs["minimap"] = bool(show)
     if corner is not None:
