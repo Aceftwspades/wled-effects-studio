@@ -3293,8 +3293,11 @@ class App(Features, Recorder, EditBuild):
         """The hole of the window a pane floats in (the 3-D view over the
         graph is in pip_win), or None for a pane among the panes. Every
         frame keeps off that window but the pane's own, which is drawn round
-        the window itself: cut by it, only scraps of the glow were left."""
-        item = dpg.get_item_parent(tag) if dpg.does_item_exist(tag) else None
+        the window itself: cut by it, only scraps of the glow were left. A
+        pane that is a window of its own (a frame in the dock: the library,
+        the sequence...) is its own host - from its parent on, its frame was
+        cut by itself, 4 of its 48 pieces left and a sliver at its left."""
+        item = tag if dpg.does_item_exist(tag) else None
         while item is not None:
             if dpg.get_item_type(item).endswith("::mvWindowAppItem"):
                 return None if dpg.get_item_alias(item) == "root" else self._window_hole(item)
