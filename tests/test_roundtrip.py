@@ -147,6 +147,27 @@ def test_project_round_trip():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_an_effect_title_follows_the_file():
+    """The studio's own write is seen at once; a change made outside it once the title is looked at again."""
+    import time
+    from native.project import Project
+    tmp = tempfile.mkdtemp()
+    try:
+        p = Project(os.path.join(tmp, "t"))
+        f = p.new_effect("First Name")
+        assert p.effect_title(f) == "First Name"
+        p.write_effect(f, p.read_effect(f).replace("First Name", "Second Name"))
+        assert p.effect_title(f) == "Second Name"
+        src = p.read_effect(f).replace("Second Name", "Third Name")
+        with open(p.effect_path(f), "w", encoding="utf-8") as fh:
+            fh.write(src)
+        os.utime(p.effect_path(f), (time.time() + 5, time.time() + 5))       # a time the cache has not seen
+        time.sleep(p.TITLE_RECHECK_S + 0.05)
+        assert p.effect_title(f) == "Third Name"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_project_option_undo():
     """Every save that changes the sequence, the schedule, the palettes or
     the segments keeps what it was: undo and redo walk them, per option,

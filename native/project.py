@@ -381,6 +381,7 @@ class Project:
             if old != text:
                 history.keep(self, "effects", os.path.splitext(fname)[0], ".cpp", old)
         write_atomic(path, text)                         # whole or not at all, as project.json is
+        self.__dict__.get("_titles", {}).pop(fname, None)
 
     # --- the effects list -----------------------------------------------------------
     def is_imported(self, fname):
@@ -432,28 +433,36 @@ class Project:
             if os.path.normcase(self.effect_path(new)) != os.path.normcase(self.effect_path(fname)) and \
                     not os.path.samefile(self.effect_path(new), self.effect_path(fname)):
                 os.remove(self.effect_path(fname))
+                self.__dict__.get("_titles", {}).pop(fname, None)
             if fname in self.imported:
                 self.imported = [new if f == fname else f for f in self.imported]
                 self.save()
         return new
 
+    TITLE_RECHECK_S = 0.5                                # a file changed outside the studio: its new title this soon
+
     def effect_title(self, fname):
         """The name the effect registers, from its metadata string - kept until the file changes: the live
-        glyphs asked every frame, and each time the file was read again."""
+        glyphs asked every frame, and each time the file was read again. Its time is looked at again only
+        after TITLE_RECHECK_S (a stat is 0.1 ms on Windows, every frame); the studio's own writes forget it."""
+        cache = self.__dict__.setdefault("_titles", {})
+        hit = cache.get(fname)
+        now = time.monotonic()
+        if hit and now - hit[2] < self.TITLE_RECHECK_S:
+            return hit[1]
         try:
             mt = os.path.getmtime(self.effect_path(fname))
         except OSError:
             mt = None
-        cache = self.__dict__.setdefault("_titles", {})
-        hit = cache.get(fname)
         if hit and hit[0] == mt and mt is not None:
+            cache[fname] = (mt, hit[1], now)
             return hit[1]
         try:
             m = re.search(r'PROGMEM\s*=\s*"([^@"]+)', self.read_effect(fname))
             title = m.group(1) if m else fname
         except Exception:
             title = fname
-        cache[fname] = (mt, title)
+        cache[fname] = (mt, title, now)
         return title
 
     # --- export ---------------------------------------------------------------------
