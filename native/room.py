@@ -79,6 +79,7 @@ class _State:
         self.float_in = None     # the window over the canvas the pointer is on, once the focus is settled there
         self.float_owner = None  # the window over the canvas last clicked in (None: the canvas, or elsewhere)
         self.float_prev = None   # the window under the pointer the frame before (a click's owner is judged by it)
+        self.float_wait = 0.0    # when a focus held back (a button down, a menu up) is tried again
 
 
 S = _State()
@@ -726,6 +727,7 @@ def poll(app):
 
 
 FLOATING = ("props_fly", "pip_win", "pip_tab")     # the windows over the canvas that take clicks
+FLOAT_RETRY_S = 0.1                                # a held-back focus is tried again this often
 
 
 def _floating_under_pointer():
@@ -762,6 +764,8 @@ def _poll_float_focus(app):
     (being worked in, a list of its own may be open)."""
     here = _floating_under_pointer()
     before, S.float_prev = S.float_prev, here
+    if here != before:
+        S.float_wait = 0.0                          # another window under the pointer: tried at once
     if any(dpg.is_mouse_button_clicked(b) for b in (0, 1, 2)):
         # the window clicked in, or None: the canvas, a pane - as it was under the pointer before the click. A click
         # on a node brings its properties up, and in a small window they open under the pointer that very frame:
@@ -775,8 +779,19 @@ def _poll_float_focus(app):
     if here == S.float_owner:
         S.float_in = here
         return
-    if any(dpg.is_mouse_button_down(b) for b in (0, 1, 2)) or app.typing() or app.gp.typing() or _others_up(app):
-        return                                      # tried again next frame: the button up, the menu gone
+    if dpg.get_item_state(here).get("focused"):
+        S.float_in = here                           # it has it already (a dialog closed handed it on): settled
+        return
+    if any(dpg.is_mouse_button_down(b) for b in (0, 1, 2)):
+        return                                      # tried again next frame: the button up
+    now = time.monotonic()
+    if now < S.float_wait:
+        return
+    if app.typing() or app.gp.typing() or _others_up(app):
+        # tried again shortly - the box left, the menu gone: these ask every window and box (1.4 ms), and
+        # they were asked again every frame for as long as the pointer rested there
+        S.float_wait = now + FLOAT_RETRY_S
+        return
     dpg.focus_item(here)
     S.float_in = here
 
