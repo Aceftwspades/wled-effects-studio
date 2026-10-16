@@ -7,7 +7,6 @@ import os
 import socket
 import struct
 import sys
-import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))

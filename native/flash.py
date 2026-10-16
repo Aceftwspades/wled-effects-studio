@@ -600,11 +600,6 @@ def builtin_catalog():
 _CATALOG = {}
 
 
-def builtin_effects():
-    """The names of the cube_fx effects a build carries."""
-    return [e["name"] for e in builtin_catalog()]
-
-
 def builtin_chosen(project):
     """The built-in effect files this project ships - all of them unless it has chosen."""
     cat = [e["file"] for e in builtin_catalog()]

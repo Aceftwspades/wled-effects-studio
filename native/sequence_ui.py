@@ -1143,10 +1143,6 @@ def del_step(app, i):
         _save(app)
 
 
-def move_step(app, i, d):
-    move_to(app, i, i + d)
-
-
 def move_to(app, i, j):
     """Step i to place j (the others shifting), the selection with it."""
     S = _steps(app)
@@ -1681,12 +1677,6 @@ def _fit_measured(text, width, size):
         else:
             hi = mid - 1
     return text[:lo].rstrip() + "..." if lo else ""
-
-
-def _hsv(h, s, v):
-    import colorsys
-    r, g, b = colorsys.hsv_to_rgb((h % 360) / 360.0, s, v)
-    return (int(r * 255), int(g * 255), int(b * 255))
 
 
 def _hit(app, g, mx, my):

@@ -1112,25 +1112,6 @@ def del_part(app, i):
         _apply(app, parts)
 
 
-def dup_part(app, i):
-    parts = list(_parts(app) or [])
-    if 0 <= i < len(parts):
-        q = json.loads(json.dumps(parts[i]))
-        q["name"] = q.get("name", q["kind"]) + " copy"
-        parts.insert(i + 1, q)
-        _set_sel(app, {i + 1})
-        _apply(app, parts, refit="grow")
-
-
-def move_part(app, i, d):
-    parts = list(_parts(app) or [])
-    j = i + d
-    if 0 <= i < len(parts) and 0 <= j < len(parts):
-        parts[i], parts[j] = parts[j], parts[i]
-        _set_sel(app, {j})
-        _apply(app, parts)
-
-
 def set_part(app, i, **fields):
     parts = json.loads(json.dumps(_parts(app) or []))
     if 0 <= i < len(parts):
@@ -1175,17 +1156,6 @@ def _poll_pending(app, force=False):
     app._shape_pending = None
     pre = getattr(app, "_shape_pre", None); app._shape_pre = None
     _apply(app, parts, undo_from=pre)
-
-
-def set_polyline_count(app, i, n):
-    """A path's LED count: the pitch that gives it, LEDs at both ends."""
-    parts = json.loads(json.dumps(_parts(app) or []))
-    if 0 <= i < len(parts) and parts[i]["kind"] == "polyline":
-        pts = np.asarray(parts[i]["params"].get("points") or [[0, 0, 0]], np.float32).reshape(-1, 3)
-        total = float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum()) if len(pts) > 1 else 0.0
-        if total > 0 and n >= 2:
-            parts[i]["params"]["pitch"] = round(total / (n - 1) - 1e-6, 5)
-            _apply(app, parts)
 
 
 def split_polyhedron(app, i):

@@ -199,14 +199,6 @@ class CubeQuads:
                                                  uv3=(u1, v1), uv4=(u0, v1), show=False))
         return quads
 
-    def set_texture(self, texture):
-        if texture == self.texture:
-            return
-        self.texture = texture
-        for quads in list(self.items.values()) + list(self.mirror.values()):
-            for q in quads:
-                dpg.configure_item(q, texture_tag=texture)
-
     def resize(self, size, w=None, h=None):
         """The cube's square, and the drawlist it sits centred in (a
         drawlist ignores a position, so it fills its pane instead)."""

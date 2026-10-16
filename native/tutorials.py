@@ -391,7 +391,6 @@ def back(app):
 def copy_to_project(app):
     """The lesson's graph, as it is now, into the person's own project as a new graph; then
     back there with it open."""
-    from native import graph as G
     t = active(app)
     if t is None or app.gp.graph is None:
         return False

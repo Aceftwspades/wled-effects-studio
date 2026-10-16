@@ -847,12 +847,6 @@ class Features:
         from native import device_wiring
         return self.streams[0].order() if self.streams else device_wiring.stream_order(None)
 
-    def stream_of_physical(self, rgb_by_led):
-        """A frame of (n, 3) colours by the device's LED number, as the stream to the first device must carry it."""
-        if not self.streams:
-            return np.asarray(rgb_by_led, np.uint8).reshape(-1, 3).tobytes()
-        return self.streams[0].device_order(rgb_by_led)
-
     def poll_stream_wiring(self):
         """Each device's answer, once: the order the stream to it goes in from here, and a word when its layout
         is not the studio's (the stream then cannot line up)."""

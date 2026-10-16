@@ -187,10 +187,6 @@ def set_tucked(app, v):
     app.request_layout()
 
 
-def maxed(app):
-    return pip_on(app) and bool(pip(app)["max"])
-
-
 def set_max(app, v):
     """The 3-D view over the whole canvas, or back in its corner at its size."""
     pip(app)["max"] = bool(v)

@@ -11,7 +11,6 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-import numpy as np                                      # noqa: E402
 from native.engine import Engine                         # noqa: E402
 from native.synth import Synth                           # noqa: E402
 from native import library_ui                            # noqa: E402

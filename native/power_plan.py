@@ -134,7 +134,6 @@ class Plan:
 
     def lines(self, sp):
         """The plan in words, for the Shape frame and the build sheet."""
-        from native import units
         st = self.settings
         out = [f"{self.volts} V strip, {st['ma']:g} mA an LED at full white, planned at {st['bri'] * 100:.0f} %: "
                f"{self.amps:.1f} A in all ({self.amps * self.volts:.0f} W)"]

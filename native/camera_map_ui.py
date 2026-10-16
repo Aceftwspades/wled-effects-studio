@@ -37,11 +37,6 @@ def _state(app):
     return s
 
 
-def webcam_ok():
-    """A webcam can be read: through ffmpeg (the video module's), no OpenCV needed."""
-    return bool(video.ffmpeg())
-
-
 METHODS = (("sequence", "one LED at a time"), ("binary", "every LED at once, by code"))
 CAM_W, CAM_H = 320, 240               # the camera's picture as mapping reads it (all of it, barred where narrower)
 

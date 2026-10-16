@@ -104,7 +104,3 @@ def grid(params, extent, frac=0.45):
     floor's lines, a drag's snap."""
     return round_step(extent * frac, params)
 
-
-def density_label(params):
-    d = density(params)
-    return f"{d:g} a metre ({show(1.0, dict(params or {}, unit='mm'), exact=True)} apart)"

@@ -409,7 +409,6 @@ def render_points(pos, rgb, size, yaw, pitch, dist, fov=38.0, bg=(0, 0, 0), led=
         st, org = floor_step or (FLOOR_STEP, (0.0, 0.0))
         _floor(out, cam, fz, step=st, origin=org)
     lk = lk or {}
-    from native import look as _look
     sprites = lk.get("glow", 0) > 0 or lk.get("diffuse", 0) > 0
     rgb = np.asarray(rgb)
     if lk.get("reflect", 0) > 0 and cam.eye[2] > fz + 0.02:

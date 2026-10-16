@@ -2905,7 +2905,7 @@ class GraphPanel(Glyphs):
             if nid not in self.graph.nodes or not dpg.does_item_exist(tag):
                 continue
             st = dpg.get_item_state(tag)
-            (nx0, ny0), (nx1, ny1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
+            (nx0, ny0), (nx1, _) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
             if nx1 <= nx0:
                 continue
             text = f"{share * 100:.0f}%  ~{ms * factor:.1f} ms" if share >= 0.005 else "<1%"
@@ -6111,17 +6111,6 @@ class GraphPanel(Glyphs):
             except Exception as e:
                 self.status(f"{fname}: {e}")
         return done
-
-    def import_effect(self):
-        """The graph's effect joins the list - generated first if it has not
-        been - or leaves it."""
-        f = self.effect_file()
-        if not f:
-            return
-        if f not in self.app.project.effect_files() and not self.app.project.is_imported(f):
-            if self.compile(and_build=False) is None:
-                return
-        self.app.toggle_import(f)
 
     def type_names(self):
         cats = {}

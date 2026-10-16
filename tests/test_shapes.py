@@ -517,7 +517,7 @@ def test_counts_past_what_a_part_holds_are_capped():
     rings count of 50000000 ran out of memory - after the edit's undo step was taken. Each part holds at most the
     engine's limit (a dimension that multiplies, 1024), and a drawing with no width fitted to a width is fitted
     by its height (its 1e-9 width scaled it to 2.5e13 units)."""
-    from native import shape_fields, outline, units
+    from native import shape_fields, outline
     strip = shapes.new_part("strip"); strip["params"]["n"] = 10 ** 9
     pos, _ = shapes.resolve([strip])[:2]
     assert len(pos) == shapes.MAX_COUNT

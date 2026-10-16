@@ -307,14 +307,6 @@ def coverage(targets, n):
     return int((hit > 0).sum()), int((hit > 1).sum()), past
 
 
-def frame_bytes(rgb, phys):
-    """The engine's (rows, cols, 3) picture as RGB bytes in wiring order."""
-    flat = np.asarray(rgb, np.uint8).reshape(-1, 3)
-    idx = np.asarray(phys, int)
-    idx = idx[(idx >= 0) & (idx < len(flat))]
-    return flat[idx].tobytes()
-
-
 # --- the wiring test -------------------------------------------------------------------
 MODES = ("off", "chase", "index", "part", "parts in turn", "output", "red", "green", "blue", "white", "alternate", "twinkle")
 

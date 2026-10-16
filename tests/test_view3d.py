@@ -2,7 +2,6 @@
 projection (perspective and orthographic, panned), its rays, the floor
 on round distances, and the colours and picking of a shape's parts.
 Run with  python -m pytest tests  from studio (or the functions by hand)."""
-import math
 import os
 import sys
 

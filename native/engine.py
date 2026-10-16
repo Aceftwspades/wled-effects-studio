@@ -241,10 +241,6 @@ class Engine:
         self.map1d2d = int(mode)
         self.lib.simSetMap1D2D(self.map1d2d)
 
-    @property
-    def is_cube(self):
-        return self.geom is not None and self.geom.kind == "cube"
-
     def find(self, needle):
         n = needle.lower()
         for i, name in enumerate(self.names):

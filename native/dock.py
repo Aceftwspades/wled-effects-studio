@@ -361,12 +361,3 @@ def hide(app):
         tag = _frames()[slot][0]
         if dpg.does_item_exist(tag):
             dpg.configure_item(tag, show=False)
-
-
-def rect_of_tabs():
-    """The strip's rectangle on the screen, or None (for drops and holes)."""
-    if not dpg.does_item_exist("dock_tabs") or not dpg.is_item_shown("dock_tabs"):
-        return None
-    x, y = dpg.get_item_pos("dock_tabs")
-    w, h = dpg.get_item_rect_size("dock_tabs")
-    return x, y, x + w, y + h

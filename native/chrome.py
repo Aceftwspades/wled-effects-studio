@@ -1316,12 +1316,6 @@ def _gc_save(app, use=None):
     dpg.set_value("gc_status", f"saved {name}" + (f" - in use for the {dict(FRAME_KINDS)[use].lower()}" if use else ""))
 
 
-def _gc_save_named(app, name, use=None):
-    dpg.set_value("gc_name", name)
-    app._gc["name"] = name
-    _gc_save(app, use)
-
-
 def _gc_delete(app):
     name = app._gc.get("name")
     grads = app.prefs.get("gradients") or {}
