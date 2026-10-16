@@ -3583,6 +3583,8 @@ LedFx have added that matters here, in the order it helps most.
       5300 from 6200. No panel imports app.py now: run as __main__, that was a
       second copy of it at every start. Left together on purpose: the panes'
       arrangement and the mouse handlers that drag them (one state, two halves).
+      Released as 1.14.0, with the step card's edit live, the review above and
+      a docked frame's focus outline drawn whole.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
