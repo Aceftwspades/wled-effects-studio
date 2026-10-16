@@ -2080,8 +2080,17 @@ def poll_placed_tips():
     """Per frame: the words of the placed control under the pointer, beside it once it has rested there;
     away as soon as it leaves or a button goes down (a grip being dragged)."""
     over = None
+    s = _placed
     if not any(dpg.is_mouse_button_down(b) for b in (dpg.mvMouseButton_Left, dpg.mvMouseButton_Right, dpg.mvMouseButton_Middle)):
-        for item in tuple(PLACED):
+        # With the pointer where it was and the same controls, only the one under it can have changed (gone,
+        # hidden): that one is asked, not all sixty - their states were 0.2 ms a frame.
+        still = (tuple(dpg.get_mouse_pos(local=False)), len(PLACED))
+        if still == s.get("still"):
+            cands = (s["item"],) if s["item"] is not None and s["item"] in PLACED else ()
+        else:
+            cands = tuple(PLACED)
+        s["still"] = still
+        for item in cands:
             try:
                 st = dpg.get_item_state(item)
             except Exception:
@@ -2090,7 +2099,8 @@ def poll_placed_tips():
             if st.get("hovered") and st.get("visible", True):
                 over = item
                 break
-    s = _placed
+    else:
+        s["still"] = None                              # a button down: look at them all once it is up
     if over != s["item"]:
         s["item"], s["since"] = over, time.time()
         if s["shown"]:
