@@ -476,6 +476,18 @@ class App(Features):
         np.take(_LUT, img, out=buf[..., :3])
         return buf.reshape(-1)
 
+    def _rgba_scaled(self, key, img, k):
+        """_rgba of img scaled k times, each pixel a k x k block - the same values. The lookup on the small
+        picture and the blocks written by broadcasting: repeating the uint8 picture first and looking up the big
+        one cost seven times as much (11 ms at 12x, the net's texture every frame)."""
+        h, w, _ = img.shape
+        buf = self._bufs.get(key)
+        if buf is None or buf.shape[:2] != (h * k, w * k):
+            buf = np.ones((h * k, w * k, 4), np.float32)
+            self._bufs[key] = buf
+        buf.reshape(h, k, w, k, 4)[..., :3] = np.take(_LUT, img)[:, None, :, None, :]
+        return buf.reshape(-1)
+
     def net_image(self, eng=None):
         """The logical view: the segment as the effect sees it. A 1-D strip is
         one row, drawn tall enough to look at."""
@@ -3529,7 +3541,7 @@ class App(Features):
         holes = []
         if self._file_dialogs is None:
             self._file_dialogs = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("mvFileDialog")]
-        tags = [w for w in dpg.get_windows() if dpg.get_item_alias(w) != "root"] + self._file_dialogs + list(self.FLOATING)
+        tags = self._hole_tags()
         # An open menu is an ImGui popup, not a window: it is found by its
         # items being visible, and its box is theirs plus the padding.
         if self._menus is None or any(not dpg.does_item_exist(m) for m in self._menus):
@@ -3560,6 +3572,23 @@ class App(Features):
                 if hole:
                     holes.append(hole)
         return holes
+
+    def _hole_tags(self):
+        """The windows that can float over the panes, once each: get_windows() also lists every theme, font
+        and handler registry and drawlist (160 items for 53 windows), and the file dialogs and FLOATING named
+        some again - a visibility check each, every frame, was 2 ms of it. Kept until the item count changes."""
+        wins = dpg.get_windows()
+        key = (len(wins), len(self._file_dialogs or []), len(self.FLOATING))
+        if getattr(self, "_hole_key", None) != key:
+            seen, out = set(), []
+            real = [w for w in wins if dpg.get_item_type(w).endswith(("::mvWindowAppItem", "::mvFileDialog"))]
+            for t in real + list(self._file_dialogs or []) + list(self.FLOATING):
+                i = dpg.get_alias_id(t) if isinstance(t, str) and dpg.does_alias_exist(t) else t
+                if i in seen or not dpg.does_item_exist(i) or dpg.get_item_alias(i) == "root":
+                    continue
+                seen.add(i); out.append(dpg.get_item_alias(i) or i)   # by tag where it has one: one made again keeps it
+            self._hole_key, self._hole_list = key, out
+        return self._hole_list
 
     @staticmethod
     def _window_hole(tag):
@@ -3828,7 +3857,7 @@ class App(Features):
         if self.net_on():
             if self.gpu_net:
                 k = self.NET_SRC_SCALE
-                dpg.set_value("net_tex", self._rgba("net", net.repeat(k, 0).repeat(k, 1)))
+                dpg.set_value("net_tex", self._rgba_scaled("net", net, k))
                 if self.shot_req or self.rec is not None:
                     big = net.repeat(self.net_scale, 0).repeat(self.net_scale, 1)
             else:
@@ -3839,7 +3868,12 @@ class App(Features):
             src = net if net.shape[0] == self.eng.rows else self.net_image()
             unlit, floor = self.view_extras()
             lk = self.view_look()
-            dpg.set_value("cube_src_tex", self._rgba("cube_src", look.led_texture(look.tone(src, lk), k, lk, unlit, B=self.eng.B)))
+            toned = look.tone(src, lk)
+            if unlit is None and float(lk.get("glow", 0.0)) <= 0.0 and not (float(lk.get("diffuse", 0.0)) > 0 and self.eng.B):
+                # the plain look: led_texture is the net in k x k blocks - made by broadcasting, as the net's is
+                dpg.set_value("cube_src_tex", self._rgba_scaled("cube_src", toned, k))
+            else:
+                dpg.set_value("cube_src_tex", self._rgba("cube_src", look.led_texture(toned, k, lk, unlit, B=self.eng.B)))
             cq = self.cube_quads
             cq.reflect = lk["reflect"]
             cq.layers.update(lk, look.mean_light(src) if lk["spill"] > 0 else None, cq.size, cq.w, cq.h)
