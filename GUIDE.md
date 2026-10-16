@@ -1208,8 +1208,8 @@ on and install what it carries.
 
 ## When something is wrong
 
-- The example graphs in `projects/default/graphs` are twenty-two effects
-  rebuilt from the firmware's own; `python examples/build_examples.py
+- The example graphs in `examples/graphs` (a new project starts with a copy
+  in its `graphs/`) are effects rebuilt from the firmware's own; `python examples/build_examples.py
   --check` compiles, builds and runs them all (and every scriptable one in
   the Script effect). `python tests/smoke_app.py` drives the app through
   its main flows and fails on any traceback; `python tests/walk_menus.py`

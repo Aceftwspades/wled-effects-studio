@@ -10,9 +10,10 @@ loop is "change a line, see it" and has to close in about a second.
 
 Two changes make the editor loop possible:
 
-  1. Objects are cached. A translation unit is recompiled only when it, or a
-     header it can see, is newer than its object. Editing one effect is one
-     compile plus one link.
+  1. Objects are cached. A translation unit is recompiled only when what it
+     was made from changes - its source's contents, the digest of the headers
+     it can see, the compiler and its flags. Editing one effect is one compile
+     plus one link, and wled.h comes precompiled (build/pch/).
 
   2. Output is versioned. Each link writes build/cubefx_<n>.dll and points
      build/latest at it. The app loads whatever latest names, and a fresh link

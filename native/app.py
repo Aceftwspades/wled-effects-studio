@@ -19,9 +19,6 @@ Two things here are deliberate and easy to undo by accident:
     machine. Fixed steps also keep runs reproducible, which is what lets the
     measurement numbers mean anything.
 
-  * The palette comes from the selector, never from an effect's metadata
-    default. The simulator carries six palettes where WLED has seventy-odd, so
-    a default like pal=11 lands on something unrelated.
 """
 import os
 import re

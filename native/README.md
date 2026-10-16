@@ -1,6 +1,6 @@
-# Native simulator — phase 1
+# Native simulator
 
-The engine, headless. No window yet; that is phase 2.
+The engine, and the command line that runs it headless; the window is `native/app.py`.
 
 This exists because the browser build could not do two things: reach the system
 audio properly, and keep time. `getDisplayMedia` is the only route a page has to
@@ -12,12 +12,14 @@ which silently invalidated measurements more than once.
 
 ```
 python build.py                 # both targets
-python build.py --native-only   # just cubefx.dll
+python build.py --native-only   # just the engine: build/cubefx_<n>.dll, build/latest names it
 python build.py --wasm-only     # just the browser build
 ```
 
-Requires the **MSVC Build Tools** (for headers and import libraries) and the
-clang that already ships inside **emsdk**. Nothing else to install.
+Needs a C++ compiler: the one bundled in `toolchain/` beside the app (a MinGW-w64
+g++ or a clang++), else clang++ or g++ on PATH (or `SIM_CLANG`). On Windows
+without either it falls back to emsdk's clang with the **MSVC Build Tools**
+(for headers and import libraries).
 
 Compiled with clang rather than MSVC deliberately. `CFX_NET_PREP` declares
 `uint8_t _outCol[cols]` — a variable-length array, a GCC/clang extension MSVC
@@ -35,6 +37,7 @@ python -m native.cli --measure soap --sweep c3=50,120,210
 python -m native.cli --measure "black hole" --set sx=200,o1=1 --faceB 8
 python -m native.cli --snapshot "spectral wormhole" --at 6000,14000 --scale 6 --out shot
 python -m native.cli --live 10
+python -m native.cli --gif "spectral fountain" --secs 15 --view both
 ```
 
 `--measure` reports the same five figures the browser harness reports — mean,
@@ -105,10 +108,10 @@ as an ordinary pointer.
 ## Recording a GIF
 
 **Record 15 s GIF** (the toolbar's red dot, or File) captures the next fifteen seconds and
-writes them beside the frame captures, named after the effect:
+writes them into `captures/` beside the app, named after the effect:
 
 ```
-%TEMP%\cubefx\Ace_3_D_Maelstrom_1788732215.gif
+captures/Ace_3_D_Maelstrom_1788732215.gif
 ```
 
 Frames come from the LIVE run, not a re-simulation. What you get is what was on
@@ -123,7 +126,7 @@ window keeps drawing through it; the line beside the button counts down and
 then names the file.
 
 For a repeatable clip of a known effect at known settings, use the headless
-`--gif` above instead - that one IS a re-simulation, which is the point.
+`--gif` (under Use) instead - that one IS a re-simulation, which is the point.
 
 ## Frame capture
 

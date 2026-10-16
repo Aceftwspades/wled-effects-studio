@@ -4209,7 +4209,7 @@ shortcuts (F1) lists them and lets you change any of them. Keys: **G** node grap
 (again returns to the panels), **H** hide the controls, **space** pause, **Ctrl+N / Ctrl+S / F2 / F5** new, save, rename, build. In the graph: **Delete** removes selected nodes,
 **Ctrl+Z / Ctrl+Y** undo / redo, **Ctrl+C / X / V** copy, cut, paste, **wheel / Ctrl+= / Ctrl+- / Ctrl+0** zoom,
 **M** mute, **Shift+D** duplicate with inputs, **Ctrl+L** arrange, **Ctrl+H** hide unwired pins, **F** connect two
-selected nodes, **Alt+click** detach a node. Projects live in `studio/projects/<name>/`;
+selected nodes, **Alt+click** detach a node. Projects live in `projects/<name>/` beside the app;
 the default one is created on first run.
 
 ## Compatibility rules for this branch
