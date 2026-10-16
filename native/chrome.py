@@ -309,7 +309,6 @@ def build_menus(app):
             _mi(app, "Step one frame", "step", callback=lambda: app.step_once())
             with dpg.menu(label="Speed", tag="menu_speed"):
                 for v in app.SPEEDS:
-                    from native.app import speed_label
                     dpg.add_menu_item(label=speed_label(v), check=True, tag=f"menu_speed_{v:g}", default_value=(v == 1.0),
                                       user_data=v, callback=lambda s, a, u: app.set_speed(u))
                 dpg.add_separator()
@@ -2441,3 +2440,8 @@ def refresh(app):
 def poll(app):
     if getattr(app, "_chrome_sig", None) != _signature(app):
         refresh(app)
+
+
+def speed_label(v):
+    """1/4x, 1/2x, 1x, 2x, 4x."""
+    return {0.25: "1/4x", 0.5: "1/2x"}.get(v, f"{v:g}x")

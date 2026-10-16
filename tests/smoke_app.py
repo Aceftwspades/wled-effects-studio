@@ -1,6 +1,6 @@
 """Drive the running app through its main flows and fail on any traceback.
 
-The app takes commands from a JSON file (native/app.py service_command),
+The app takes commands from a JSON file (native/remote.py service_command),
 which is how every panel here was checked without a hand on the mouse.
 This launches the app, walks the layouts, opens a graph and a code effect,
 exercises the editor, segments, A/B, sweep, the script preview, the

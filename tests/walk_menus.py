@@ -4,7 +4,7 @@ every keymap action, invoked, and the log read for failures.
     python tests/walk_menus.py          # from studio; ~3 min; exits 1 on a FAIL or a traceback
 
 Like smoke_app.py it drives the running app through its JSON command file
-(native/app.py service_command): `menu_walk` calls each item of the menu
+(native/remote.py service_command): `menu_walk` calls each item of the menu
 bar in turn (a few are skipped: Quit, the 15 s recording, fullscreen, and
 the ones that hand a path to the desktop), `ctx_walk` each row of a node's,
 an input's and an output's context menu with the graph put back after each,

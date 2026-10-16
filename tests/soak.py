@@ -7,7 +7,7 @@ sampled along the way, and the run failing if any of them keeps growing.
     python tests/soak.py --minutes 2    # a quick one
 
 Like smoke_app.py it drives the app through its JSON command file
-(native/app.py service_command); the `stats` hook prints one line per
+(native/remote.py service_command); the `stats` hook prints one line per
 sample. Growth is judged on the second half of the run against the
 first, so the warm-up (fonts, textures, the first builds) does not
 count: more than 60 MB or 25% of RSS, or more than 200 items, is a leak.

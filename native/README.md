@@ -146,7 +146,7 @@ exists so the window can be looked at without a screen grab.
 `$TMPDIR/cubefx-<uid>`, on Linux and macOS - made readable by its owner
 alone, and not used when it is anyone else's. `crash.txt` goes there too. The
 same switch turns on the remote control the tests drive the app with
-(`<scratch>/command.json`, `service_command` in app.py): it runs Python, so
+(`<scratch>/command.json`, `service_command` in remote.py): it runs Python, so
 it is off in everyday use - never where another account could write the file.
 
 It uses `dpg.output_frame_buffer`, which returns the frame Dear PyGui just
