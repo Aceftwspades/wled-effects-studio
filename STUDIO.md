@@ -3554,6 +3554,35 @@ LedFx have added that matters here, in the order it helps most.
       Left: WLED's own Flow effect divides by zero on a 1-pixel segment
       (FX.cpp, upstream). The smoke test's waits were made to hold at a low
       frame rate (47c27f7), and it checks bad and self-holding sub-graphs.
+- [x] **The speed pass** (2026-10-15 to 16): measured first, workload by workload
+      (the cube, both views, the graph, Live, the shape cloud, a DDP stream, the
+      sequence playing), each change compared before and after. The studio's
+      own work a frame came down by a quarter to a half (the cube 7.3 to 5.7
+      ms, the shape cloud 14 to 7.7, the sequence playing 14.6 to 6.7): the
+      focus frames' holes and pieces kept until they change, the textures
+      scaled by broadcasting, the playing timeline moving its playhead
+      instead of drawing itself again,
+      fewer per-frame state reads (an effect's title, the placed controls'
+      words, a held-back focus over the canvas), from 01d3134 on. A Live edit
+      is 1.3 s from 2.3: wled.h is precompiled once and used by every unit
+      that opens with it (14e5f8a) - one effect compiles in 0.46 s from 1.14
+      with clang, 0.85 from 1.21 with the shipped g++, and the build gathers
+      its sources in 0.08 s from 0.5. Left as it is: the windows' visibility
+      for the frames (a cheaper read lags a frame, and the frame would show
+      over a dialog as it opens).
+- [x] **The maintainability pass** (2026-10-16): sixteen functions nothing
+      called and the unused imports went (bf72e9e); six statements in the docs
+      the code no longer bore out were put right (15722a6). app.py and
+      graph_ui.py lost the parts that keep to themselves, moved as they were:
+      the remote control and the walkers (native/remote.py, walk.py), the
+      recorder and the code pane's build as mixins of App (recorder.py,
+      edit_build.py), the theme as data (theme.py), and as mixins of
+      GraphPanel the snapshots and bundles, node costs, the context menu and
+      the properties pane (graph_files.py, graph_costs.py, graph_menu.py,
+      graph_props.py). app.py is about 4150 lines from 5600, graph_ui.py about
+      5300 from 6200. No panel imports app.py now: run as __main__, that was a
+      second copy of it at every start. Left together on purpose: the panes'
+      arrangement and the mouse handlers that drag them (one state, two halves).
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
