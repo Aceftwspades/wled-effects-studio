@@ -82,6 +82,12 @@ def chrome_for(app, slot, docked):
     for t in (f"{tag}_title", f"dock_{tag}", f"grip_{tag}", f"close_{tag}"):
         if dpg.does_item_exist(t):
             dpg.configure_item(t, show=not docked)
+    from native import dock
+    if dpg.does_item_exist(f"dock_{tag}_tip"):
+        if dock.paned(app, slot):                    # among the panes, its button takes it out over them
+            dpg.set_value(f"dock_{tag}_tip", "float: out over the panes (or drag the grip to another place)")
+        else:
+            _dock_tip(tag)
 
 
 def focused_frame(app):

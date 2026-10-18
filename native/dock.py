@@ -70,6 +70,19 @@ def in_dock(app, slot):
     return slot in state(app)["tabs"]
 
 
+def paned(app, slot):
+    """Whether the frame is placed among the panes - a pane of the arrangement, as the 3-D view is."""
+    return any(slot in c for c in getattr(app, "arrangement", None) or ())
+
+
+def take(app, slot):
+    """A frame out of the dock's tabs and the floating list: it is going among the panes."""
+    st = state(app)
+    _leave(app, slot)
+    if slot in st["float"]:
+        st["float"].remove(slot)
+
+
 def floats(app, slot):
     """Whether the frame opens floating (it was floated, and not docked since)."""
     return slot in state(app)["float"]
@@ -106,8 +119,13 @@ def _show_column(app):
 
 
 def open_frame(app, slot):
-    """A frame asked for (the menus, the toolbar): into the dock, its tab in
-    front - or its window, if it floats."""
+    """A frame asked for (the menus, the toolbar): where it was put - among
+    the panes, in the dock with its tab in front, or its window if it floats."""
+    if paned(app, slot):
+        if not app.ui:
+            app.ui = True
+        app.request_layout()
+        return
     if floats(app, slot):
         _float_window(app, slot)
         return
@@ -118,6 +136,8 @@ def dock_frame(app, slot):
     """A frame into the dock, its tab in front."""
     if slot not in _frames():
         return
+    if paned(app, slot):
+        app.unplace(slot)                             # from among the panes into the dock
     st = state(app)
     if slot not in st["tabs"]:
         st["tabs"].append(slot)
@@ -133,6 +153,8 @@ def float_frame(app, slot):
     """A docked frame out into a window of its own, over the panes; it opens so until docked again."""
     if slot not in _frames():
         return                                        # the panel's tab in front: nothing to float (a press as the strip changes)
+    if paned(app, slot):
+        app.unplace(slot)
     st = state(app)
     _leave(app, slot)
     if slot not in st["float"]:
@@ -181,6 +203,8 @@ def close_frame(app, slot):
     if slot not in _frames():
         return
     tag = _frames()[slot][0]
+    if paned(app, slot):
+        app.unplace(slot)
     _leave(app, slot)
     _save(app)
     if dpg.does_item_exist(tag):
@@ -200,19 +224,19 @@ def activate(app, key):
     app.request_layout()
 
 
-def migrate(app, arrangement):
-    """Frames an older arrangement placed among the panes: into the dock,
-    and the arrangement without them."""
+def settle(app, arrangement, before=()):
+    """A frame placed among the panes is a pane, not a tab or a window as well: out of the dock's tabs and the
+    floating list. One the arrangement had (`before`) and has no longer - a preset chosen - goes into the dock
+    rather than nowhere. Returns the arrangement."""
     frames = _frames()
-    moved = [s for c in arrangement for s in c if s in frames]
-    if not moved:
-        return arrangement
+    placed = {s for c in arrangement for s in c if s in frames}
+    for s in placed:
+        take(app, s)
     st = state(app)
-    for s in moved:
-        if s not in st["tabs"]:
+    for s in before:
+        if s in frames and s not in placed and s not in st["tabs"]:
             st["tabs"].append(s)
-    cols = [[s for s in c if s not in frames] for c in arrangement]
-    return [c for c in cols if c]
+    return arrangement
 
 
 # --- the tab strip ---------------------------------------------------------------------------

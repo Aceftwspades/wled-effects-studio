@@ -295,7 +295,7 @@ class App(Features, Recorder, EditBuild):
         # where the panes sit: columns of rows of slots (see PRESETS), the
         # columns' shares of the width per layout mode, the rows' of a column
         self.arrangement = self._valid_arrangement(self.prefs.get("arrangement")) or [list(c) for c in self.PRESETS[0][1]]
-        self.arrangement = dock.migrate(self, self.arrangement)     # frames an older layout placed among the panes: in the dock
+        dock.settle(self, self.arrangement)                          # a frame among the panes is not a tab or a window too
         self.colw = {k: dict(v) for k, v in (self.prefs.get("colw") or {}).items()}
         self.rowh = dict(self.prefs.get("rowh") or {})
         self._rects = {}             # slot -> (x, y, w, h) as last laid out
@@ -1874,9 +1874,15 @@ class App(Features, Recorder, EditBuild):
         return cols
 
     def docked(self, slot):
-        """Whether a Device frame sits in the dock (native/dock.py) - a tab
-        beside the side panel's - rather than floating."""
-        return dock.in_dock(self, slot)
+        """Whether a frame is part of the layout - a tab in the dock beside
+        the side panel's (native/dock.py), or a pane among the panes - rather
+        than floating."""
+        return dock.in_dock(self, slot) or dock.paned(self, slot)
+
+    def unplace(self, slot):
+        """A frame out from among the panes (to be closed, floated or docked by the caller)."""
+        if dock.paned(self, slot):
+            self.set_arrangement([[s for s in c if s != slot] for c in self.arrangement], to_dock=False)
 
     def dock_slot(self, slot):
         """A frame into the dock, its tab in front."""
@@ -1891,11 +1897,14 @@ class App(Features, Recorder, EditBuild):
             return
         dock.float_frame(self, slot)
 
-    def set_arrangement(self, arr):
-        arr = dock.migrate(self, [list(c) for c in arr])     # a frame dropped among the panes goes into the dock
-        cols = self._valid_arrangement(arr)
+    def set_arrangement(self, arr, to_dock=True):
+        """The panes' places. A frame the arrangement had and this one has not (a preset chosen) goes into the
+        dock - unless `to_dock` is off (its caller closes, floats or docks it)."""
+        cols = self._valid_arrangement([[s for s in c] for c in arr if c])
         if cols is None:
             raise ValueError(f"not an arrangement: {arr!r}")
+        before = [s for c in self.arrangement for s in c if s in self.OPTIONAL] if to_dock else ()
+        dock.settle(self, cols, before)
         self.arrangement = cols
         self.prefs["arrangement"] = cols
         save_prefs(self.prefs)
@@ -1904,11 +1913,15 @@ class App(Features, Recorder, EditBuild):
     def move_slot(self, slot, target, zone):
         """`slot` dropped on `target`: beside it (left, right), above or below
         it (top, bottom), or in its place (centre - the two swap)."""
-        if slot in self.OPTIONAL:
-            dock.dock_frame(self, slot)              # a frame's grip dropped on the panes: into the dock, its tab in front
+        if slot in self.OPTIONAL and target == "side" and zone == "centre":
+            dock.dock_frame(self, slot)              # a frame's grip dropped on the panel: into the dock, its tab in front
             return
         if slot == target or slot not in self.SLOTS or target not in self.SLOTS or zone is None:
             return
+        if zone == "centre" and slot in self.OPTIONAL and target in self.CORE:
+            return                                   # a frame does not swap with the panes it sits among (drop_zone offers none)
+        if slot in self.OPTIONAL:
+            dock.take(self, slot)                    # among the panes, where it was dropped: not a tab or a window too
         arr = [list(c) for c in self.arrangement]
         if zone == "centre":
             arr = [[target if s == slot else slot if s == target else s for s in c] for c in arr]
@@ -1939,6 +1952,18 @@ class App(Features, Recorder, EditBuild):
             return f"{slot}_win"
         return {"edit": "edit_win", "graph": "graph_win"}.get(self.layout, "net_win")
 
+    def _place_frame(self, slot, rect):
+        """A frame among the panes: its window held at the pane's place and size, with its own header - the title,
+        and at the right float, the grip (to move it again) and close - since no tab strip names it."""
+        tag = device_ui.FRAMES[slot][0]
+        if not dpg.does_item_exist(tag):
+            return
+        x, y, w, h = rect
+        dpg.configure_item(tag, show=True, no_move=True, no_resize=True, no_focus_on_appearing=True, width=w, height=h)
+        dpg.set_item_pos(tag, [x, y])
+        device_ui.chrome_for(self, slot, docked=False)
+        device_ui.place_header(tag, w, False)
+
     def slot_of(self, pane):
         return next((s for s in self.SLOTS if self.pane_of(s) == pane), None)
 
@@ -1953,7 +1978,7 @@ class App(Features, Recorder, EditBuild):
         if not self.ui:
             return False
         if slot in self.OPTIONAL:
-            return False                             # frames are the dock's (or float), never panes
+            return True                              # a frame placed among the panes (one in the dock or floating is not in the arrangement)
         if slot == "props":
             return self.layout == "graph" and self.props and not room.active(self)     # canvas first: over the canvas
         if slot == "side":
@@ -2062,15 +2087,17 @@ class App(Features, Recorder, EditBuild):
             if dpg.does_item_exist(t):
                 dpg.configure_item(t, show=False)
 
-    def drop_zone(self, mx, my):
+    def drop_zone(self, mx, my, frame=False):
         """What a dragged pane would do if let go here: (slot, zone) for the
-        pane under the pointer - the edge it is nearest, or the centre."""
+        pane under the pointer - the edge it is nearest, or the centre. A
+        frame (`frame`) has a centre only on the panel - into the dock - or
+        on another frame (the two swap): on the others, the nearest edge."""
         for slot, (x, y, w, h) in self._rects.items():
             if not (x <= mx < x + w and y <= my < y + h):
                 continue
             rx, ry = (mx - x) / max(1, w), (my - y) / max(1, h)
             d = min(rx, 1 - rx, ry, 1 - ry)
-            if d > 0.3:
+            if d > 0.3 and not (frame and slot in self.CORE and slot != "side"):
                 return slot, "centre"
             if d == rx:
                 return slot, "left"
@@ -2286,6 +2313,9 @@ class App(Features, Recorder, EditBuild):
         dpg.configure_item("props_win", show=self.slot_shown("props") or room.active(self))   # over the canvas: its window decides
         if not (self.ui and self.side and not room.folded(self)) or "side" not in rects:
             dock.hide(self)                          # the dock's column is away: its strip and frames with it
+        for slot in self.OPTIONAL:
+            if dock.paned(self, slot) and slot not in rects and dpg.does_item_exist(self.pane_of(slot)):
+                dpg.configure_item(self.pane_of(slot), show=False)     # a frame among the panes, while they are away
         # The menu bar is the window's: a hidden mvMenuBar still draws its
         # strip, the window flag takes it away.
         dpg.configure_item("root", menubar=self.ui)
@@ -2335,6 +2365,9 @@ class App(Features, Recorder, EditBuild):
                     continue
                 if slot == "side":
                     dock.place(self, (x, y, w, h))             # the panel, or the frame whose tab is in front
+                    continue
+                if slot in self.OPTIONAL:
+                    self._place_frame(slot, (x, y, w, h))      # a frame among the panes
                     continue
                 tag = self.pane_of(slot)
                 dpg.configure_item(tag, width=w, height=h)
@@ -2715,7 +2748,7 @@ class App(Features, Recorder, EditBuild):
             # the pane under the pointer lights up where the drop would go
             self._ghost_move()
             mx, my = dpg.get_mouse_pos(local=False)
-            target = self.drop_zone(mx, my)
+            target = self.drop_zone(mx, my, frame=self._pane_drag in self.OPTIONAL)
             if target and target[0] == self._pane_drag:
                 target = None
             if target != self._pane_target:
