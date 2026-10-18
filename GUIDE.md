@@ -859,7 +859,11 @@ their tags - what nodes they use, audio, 3-D, script), **Usermod effects**
 (WLED's own). The bank in front is drawn first; a bar under the banks
 shows how far the thumbnails have got. Type to search; click a tile to
 run its effect in the sim (a graph is built first if it never was) - the
-layout stays as it is, and a graph is waiting in the graph pane (G). A
+layout stays as it is, and a graph is waiting in the graph pane (G). Drag
+a tile onto the Sequence's list of steps to add a step of that effect
+there - on a row, in its place; below the rows, at the end - with the
+Library and the Sequence both on screen (one among the panes or floating,
+the other in the dock). A
 graph not built yet shows as its script runs it, when the script can.
 Every thumbnail and preview starts from a clean cube - the pixels and the
 effect's memory cleared, the clock at 0 - hearing the synth, so nothing
@@ -1041,7 +1045,12 @@ column is as wide as the frame in front wants, and dragging its edge sets
 that frame's width, kept. **float** at the strip's right takes the frame
 in front out into a window of its own over the panes - it opens so until
 it is docked again, by **dock** at its top right or by dropping its :::
-grip on the panes; its **x** (or Esc while it has the focus) closes it.
+grip on the side panel; its **x** (or Esc while it has the focus) closes it.
+Dropped on another pane's edge instead - above the 3-D view, beside the
+logical view - the frame becomes a pane there, as the outline shows while
+you drag: laid out with the others, its own header at its top right (float,
+its grip to move it again, close). Floated, closed or docked, it leaves the
+panes; a preset arrangement puts it back in the dock.
 While the graph has the room, the dock is the drawer beside the rail,
 and the rail carries the docked frames' icons. Every window - a frame
 floating, a dialog - wears the same header: its title, and its close at

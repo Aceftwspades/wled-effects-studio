@@ -374,21 +374,26 @@ def refresh(app):
                     tex = _texture(app, tkey, frames) if frames else None
                     ud = (key, fn)
                     if tex:
-                        dpg.add_image_button(tex, width=TILE, height=TILE, user_data=ud, callback=lambda s, a, u: open_tile(app, *u))
+                        tile = dpg.add_image_button(tex, width=TILE, height=TILE, user_data=ud, callback=lambda s, a, u: open_tile(app, *u))
                     else:
                         words = ("making..." if tkey and tkey not in app._lib_thumbs and (key or _script_key(fn) in getattr(app, "_lib_scriptable", ()))
                                  else "not built\nyet" if fn and not key else "no picture")
                         # the size an image button comes to with its frame padding round the picture (7 by 4): a
                         # tile without a picture as big as one with, the names under them in line
-                        dpg.add_button(label=words, width=TILE + 2 * px(7), height=TILE + 2 * px(4), user_data=ud,
-                                       callback=lambda s, a, u: open_tile(app, *u))
+                        tile = dpg.add_button(label=words, width=TILE + 2 * px(7), height=TILE + 2 * px(4), user_data=ud,
+                                              callback=lambda s, a, u: open_tile(app, *u))
+                    if key:
+                        # dragged onto the Sequence's list of steps: a step of it there (sequence_ui.dropped)
+                        with dpg.drag_payload(parent=tile, drag_data=("fx", key, fn or ""), payload_type="seq_step"):
+                            dpg.add_text(f"{name}: drop it on the sequence's steps")
                     short = name.replace("Ace 3-D ", "")
                     dpg.add_text(short[:14], color=c.TEXT)
                     if tags:
                         typeface.small(dpg.add_text(", ".join(tags)[:16], color=c.DIM))
                     with dpg.tooltip(dpg.last_item()):
                         dpg.add_text(f"{name}" + (f"\n{fn}\ntags: {', '.join(tags) or 'none'}" if fn else "")
-                                     + ("\nnot built yet: shown as the script runs it; a click builds it" if fn and not key and tex else ""),
+                                     + ("\nnot built yet: shown as the script runs it; a click builds it" if fn and not key and tex else "")
+                                     + ("\ndrag its tile onto the Sequence's steps: a step of it there" if key else ""),
                                      wrap=px(300))
     if not rows:
         if q:
