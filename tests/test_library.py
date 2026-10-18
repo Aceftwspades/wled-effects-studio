@@ -115,6 +115,22 @@ def test_a_thumbnail_from_a_clean_cube():
     assert max(int(f.max()) for f in strobe) > 30                         # its flashes, every frame sampled
 
 
+def test_a_graph_with_a_missing_sub_graph_still_has_its_tags():
+    """A node whose definition cannot be found (its sub-graph's file gone) gives no category, rather than taking
+    the Library's refresh down with it - the frame then failed every time it looked at the project's graphs."""
+    from native import graph as G
+
+    class Gr:
+        nodes = {1: {"id": 1, "type": "Position"}, 8: {"id": 8, "type": "sub:brokensub"}}
+
+        def node_def(self, n):
+            if n["type"].startswith("sub:"):
+                raise G.GraphError(f"node {n['id']}: sub-graph 'brokensub' not found")
+            return {"cat": "Input"}
+    tags = library_ui.tags_of(None, Gr())
+    assert "3-D" in tags and "Input" in tags, tags
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

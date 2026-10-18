@@ -170,7 +170,10 @@ def tags_of(app, g):
     from native.nodedefs import NEEDS
     tags = set()
     for n in g.nodes.values():
-        d = g.node_def(n) if hasattr(g, "node_def") else None
+        try:
+            d = g.node_def(n) if hasattr(g, "node_def") else None
+        except G.GraphError:
+            d = None                                     # its sub-graph's file gone: no category, the rest still tagged
         if d and d.get("cat"):
             tags.add(d["cat"])
         if NEEDS.get(n["type"]) == "audio":
