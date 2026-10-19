@@ -102,6 +102,35 @@ def test_segments_past_the_last_are_not_selected():
     assert e.seg == 0 and sorted(e._segstate) == [0]
 
 
+def _left_half(other_params, frames=30):
+    """Segment 0 (the left half) running Voronoi at one set of sliders while segment 1 (the right half) runs it at
+    `other_params`: the left half's pictures, frame by frame."""
+    e = Engine(); e.set_geometry(Geometry("matrix", w=32, h=16))
+    k = e.find("Voronoi")
+    assert k is not None, "no Voronoi in the roster"
+    mine = dict(sx=60, ix=200, c1=40, c2=90, c3=6)
+    e.seg_config(0, 0, 0, 16, 16); e.seg_config(1, 16, 0, 32, 16)
+    e.seg_select(1); e.select(k, dict(other_params))
+    e.seg_select(0); e.select(k, dict(mine))
+    out = []
+    for _ in range(frames):
+        e.frame(23)
+        out.append(e.rgb()[:, :16].copy())
+    _unload(e)
+    return out
+
+
+def test_two_segments_running_voronoi_keep_their_own_sliders():
+    """Voronoi kept its two pages of sliders at file scope: a segment that had its second page up (check 1) wrote
+    its sliders there, and every other segment running Voronoi drew with them - its swell, relax, warp, wander and
+    hue were the other segment's. Each segment has its own pages now: the left half draws the same whatever the
+    right half does with its second page."""
+    same = _left_half(dict(sx=60, ix=200, c1=40, c2=90, c3=6))
+    other = _left_half(dict(sx=250, ix=10, c1=230, c2=5, c3=31, o1=1))
+    differ = [i for i, (a, b) in enumerate(zip(same, other)) if (a != b).any()]
+    assert not differ, f"the left half changed with the right half's sliders, from frame {differ[0]}"
+
+
 def test_only_a_unit_opening_with_wled_h_takes_the_precompiled_header():
     """Something defined before wled.h could change what it means, so such a unit compiles from source."""
     from native import toolchain as T

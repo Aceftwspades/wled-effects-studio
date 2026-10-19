@@ -843,7 +843,8 @@ class WS2812FX {
   Segment &getSegment(int)        { return *_currentSegment; }
   unsigned getSegmentsNum() const { return 1; }
   unsigned getMainSegmentId() const { return 0; }
-  unsigned getCurrSegmentId() const { return 0; }
+  unsigned _segIndex = 0;               // the segment being drawn (sim_main.cpp sets it): FX.h's _segment_index
+  unsigned getCurrSegmentId() const { return _segIndex; }
   unsigned getActiveSegmentsNum() const { return 1; }
   // FX.h: the strip's brightness - the sim draws at full brightness, the
   // picture before the global brightness is put on it (Colortwinkle paces its

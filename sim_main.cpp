@@ -417,6 +417,7 @@ SIM_API void simSegSelect(int k) {
   gCurSeg = k;
   _segPtr = &gSegs[k].seg;
   strip._currentSegment = &gSegs[k].seg;
+  strip._segIndex = (unsigned)k;
 }
 
 SIM_API void simSegEffect(int k, int idx) {
@@ -668,14 +669,14 @@ SIM_API void simFrame(int idx, int dtMs) {
     strip.isMatrix = (Segment::_vh > 1);
     S.seg.reverse = S.reverse; S.seg.mirror = S.mirror; S.seg.reverse_y = S.reverseY; S.seg.mirror_y = S.mirrorY;
     S.seg.start = 0; S.seg.stop = (uint16_t)Segment::_vw; S.seg.offset = S.offset;
-    _segPtr = &S.seg; strip._currentSegment = &S.seg;
+    _segPtr = &S.seg; strip._currentSegment = &S.seg; strip._segIndex = (unsigned)k;
     gRunFx = S.fx;
     cfxBankRoster()[S.fx].fn();
     gRunFx = -1;
     S.seg.call++;
   }
   gCurSeg = keep;
-  _segPtr = &gSegs[keep].seg; strip._currentSegment = &gSegs[keep].seg;
+  _segPtr = &gSegs[keep].seg; strip._currentSegment = &gSegs[keep].seg; strip._segIndex = (unsigned)keep;
   Segment::_vw = gSegs[keep].vw(); Segment::_vh = gSegs[keep].vh();
   Segment::map1D2D = gSegs[keep].map1d2d;
   simComposite();
