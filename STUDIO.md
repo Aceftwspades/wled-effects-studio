@@ -3585,6 +3585,15 @@ LedFx have added that matters here, in the order it helps most.
       arrangement and the mouse handlers that drag them (one state, two halves).
       Released as 1.14.0, with the step card's edit live, the review above and
       a docked frame's focus outline drawn whole.
+- [x] **Frames among the panes, and the Library into the Sequence** (2026-10-18): a
+      floating frame's grip dropped on a pane's edge made the outline promise a place
+      there and then went into the dock (every drop on the panes meant the dock since
+      C8); now the frame becomes a pane there, in the arrangement, with its own header
+      (float, grip, close), and only the side panel's middle docks it (540ee50). A
+      Library tile dragged onto the Sequence's steps is a step of its effect, on a row
+      or at the end (27d474d). The Library's refresh no longer fails on a graph whose
+      sub-graph is missing (58a3a96), and its tiles are not remade under a held button,
+      which lost drags while thumbnails came in (c9f84d4). Released as 1.15.0.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
