@@ -82,6 +82,37 @@ def test_a_count_from_the_program_cannot_hang_the_frame():
     assert got == "loaded", got
 
 
+def test_each_segment_running_the_script_has_its_own_clock():
+    """The Studio Script effect kept its frame clock in one static: the first segment running it moved it on, and
+    every segment after it in the same frame was told no time had passed (dt 0) - a program integrating dt froze
+    on all but the first. A program that shows dt (Time's dt as a grey's value: white when time passes) lights
+    both halves of a strip split in two segments."""
+    from native import graph as G
+    from native.nodedefs import library
+    from native.script import compile_script
+    from native.engine import Engine, _unload
+    from native.geometry import Geometry
+    g = G.Graph(lib=library())
+    t = g.add("Time"); h = g.add("HSV"); o = g.add("Output")
+    g.nodes[h].setdefault("inputs", {})["s"] = 0.0
+    g.link(t, "dt", h, "v"); g.link(h, "color", o, "color")
+    prog = bytes(compile_script(g))
+    e = Engine(); e.set_geometry(Geometry("matrix", w=16, h=8))
+    try:
+        assert e.script(prog)
+        si = e.script_effect()
+        e.seg_config(0, 0, 0, 8, 8); e.seg_config(1, 8, 0, 16, 8)
+        for k in (1, 0):
+            e.seg_select(k); e.select(si)
+        for _ in range(5):
+            e.frame(23)
+        px = e.rgb()
+        left, right = int(px[:, :8].max()), int(px[:, 8:].max())
+        assert left > 200 and right > 200, f"dt as each half sees it: left {left}, right {right} (0 means no time passed)"
+    finally:
+        _unload(e)
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0
