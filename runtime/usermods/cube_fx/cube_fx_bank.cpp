@@ -127,6 +127,14 @@ class CubeFxBankUsermod : public Usermod {
     // whole point of the bank is that this is a decision rather than a surprise.
     const uint16_t missing = (uint16_t)(cfxBankCount() - cfxBankPlacedCount());
     s.add(missing ? F(" - reboot to apply changes") : F(""));
+    // A build with more effects than the roster holds, or two names with one
+    // hash, loses effects without a word otherwise.
+    if (cfxBankLost() || cfxBankClash()) {
+      JsonArray w = user.createNestedArray(F("Cube FX roster"));
+      snprintf_P(buf, sizeof(buf), PSTR("%u left off (CFX_BANK_MAX_FX %u), %u hash clash"),
+                 (unsigned)cfxBankLost(), (unsigned)CFX_BANK_MAX_FX, (unsigned)cfxBankClash());
+      w.add(buf);
+    }
 
     // How much room is actually left on THIS build, counted rather than guessed.
     //

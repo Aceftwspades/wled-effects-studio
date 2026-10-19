@@ -213,7 +213,7 @@ static FX_RET mode_mario_block() {
     shrink   = 256 - (u * 190) / 255;                         // sprite flies outward
     dropout  = (u > 60) ? ((u - 60) * 255) / 195 : 0;
     whiteout = (u < 40) ? (255 - (u * 255) / 40) : 0;
-    if (SEGMENT.custom3) dropout = (dropout * (int)SEGMENT.custom3) / 31;
+    dropout = (dropout * (int)SEGMENT.custom3) / 31;           // Shatter: 0 none (it was skipped at 0 - the most)
   } else if (phase == MQ_P_SPIN) {
     const int32_t uu = ((int32_t)elp << 8) / (spinMs ? spinMs : 1);  // 0..256
     const int32_t inv = 256 - ((uu > 256) ? 256 : uu);

@@ -117,14 +117,12 @@ static FX_RET mode_cube_chladni() {
 
   const bool full = SEGMENT.check2;
 
-  uint8_t colBlk[cols];
-  if (cube) for (int x = 0; x < cols; x++) colBlk[x] = (uint8_t)(x / B);
 
   size_t i = 0;
   for (int y = 0; y < rows; y++) {
     const uint8_t byb = cube ? (uint8_t)(y / B) : 1;
     for (int x = 0; x < cols; x++, i++) {
-      if (cube && cfx_gapBlock(colBlk[x], byb)) continue;
+      if (cube && cfx_gapBlock(CFX_COLBLK(x), byb)) continue;
 
       const int ux = (int)cx[i] + 128, uy = (int)cy[i] + 128, uz = (int)cz[i] + 128;
       const int lx = (int)tl[ux] - 128, ly = (int)tl[uy] - 128, lz = (int)tl[uz] - 128;
@@ -137,7 +135,7 @@ static FX_RET mode_cube_chladni() {
              - (int32_t)mx * ly * nzc
              - (int32_t)lx * ny * mz
              - (int32_t)nx * my * lz
-             + (int32_t)mx * ny * lz;        // restores the pair used above
+             + 2 * (int32_t)mx * ny * lz;    // cancels the pair's -mx ny lz and adds the determinant's +lz mx ny
         psi /= 2;                            // keep the range comparable
       }
 

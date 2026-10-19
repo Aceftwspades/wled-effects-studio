@@ -78,9 +78,9 @@ static FX_RET mode_cube_edges() {
   // Hard gate: fx_lowBeat already one-shots and requires the low bins to carry
   // the transient, but this additionally demands a genuinely STRONG kick and a
   // refractory window, so busy passages can't chain pulses together.
-  // nowT counts 16 ms TICKS, not milliseconds - 14 ticks is ~220 ms. Writing
-  // 220 here made the refractory window three and a half seconds, which is
-  // what detached the bloom from the beat entirely.
+  // nowT counts 16 ms TICKS, not milliseconds - 10 ticks is 160 ms. Writing
+  // milliseconds here made the refractory window seconds long, which is what
+  // detached the bloom from the beat entirely.
   const uint16_t lastP = (uint16_t)st[14] | ((uint16_t)st[15] << 8);
   const bool rising = (peak > 64) && ((uint16_t)(nowT - lastP) > 10);
   if (rising && SEGMENT.check1) {
@@ -128,14 +128,12 @@ static FX_RET mode_cube_edges() {
     pulseT[pulseN++] = trav;
   }
 
-  uint8_t colBlk[cols];
-  if (cube) for (int x = 0; x < cols; x++) colBlk[x] = (uint8_t)(x / B);
 
   size_t i = 0;
   for (int y = 0; y < rows; y++) {
     const uint8_t byb = cube ? (uint8_t)(y / B) : 1;
     for (int x = 0; x < cols; x++, i++) {
-      if (cube && cfx_gapBlock(colBlk[x], byb)) continue;  // gap corner - skip the work
+      if (cube && cfx_gapBlock(CFX_COLBLK(x), byb)) continue;  // gap corner - skip the work
       const int d = (int)ed[i];
 
       // The wave DISPLACES the lit line instead of dimming it: the line sits

@@ -106,6 +106,10 @@ struct LtState {
   uint16_t reseed;              // frames until the medium is checked again
   uint16_t U[LT_CELLS];
   uint16_t V[LT_CELLS];
+  // lt_step's next generation. Here, not static, so the 1.5 KB goes back with
+  // the segment's data when the effect is not running.
+  uint16_t nU[LT_CELLS];
+  uint16_t nV[LT_CELLS];
 };
 
 static void lt_seed(LtState *s) {
@@ -126,7 +130,7 @@ static void lt_seed(LtState *s) {
 
 // One Gray-Scott step. Wraps along the tunnel, mirrors across the wedge.
 static void lt_step(LtState *s, int F, int K) {
-  static uint16_t nu[LT_CELLS], nv[LT_CELLS];
+  uint16_t *nu = s->nU, *nv = s->nV;
   for (int u = 0; u < LT_NU; u++) {
     const int um = ((u - 1 + LT_NU) % LT_NU) * LT_NV;
     const int up = ((u + 1) % LT_NU) * LT_NV;
@@ -150,8 +154,8 @@ static void lt_step(LtState *s, int F, int K) {
       nu[c] = (uint16_t)a; nv[c] = (uint16_t)b;
     }
   }
-  memcpy(s->U, nu, sizeof(nu));
-  memcpy(s->V, nv, sizeof(nv));
+  memcpy(s->U, s->nU, sizeof(s->U));
+  memcpy(s->V, s->nV, sizeof(s->V));
 }
 
 static FX_RET mode_liquidtunnel() {

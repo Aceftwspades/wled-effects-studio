@@ -199,7 +199,7 @@ static FX_RET mode_spectral_bloom() {
   const size_t m   = cfx_litCount(cols, rows, B, cube);
 
   const size_t need = sizeof(SbState) + 3 * m + 3 * m + 3 * m
-                    + lut * sizeof(uint16_t);
+                    + lut * sizeof(uint16_t) + CFX_ALIGN_PAD;
   if (!SEGENV.allocateData(need)) { SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
 
   SbState *s   = (SbState *)SEGENV.data;
@@ -208,7 +208,7 @@ static FX_RET mode_spectral_bloom() {
   int8_t  *cz  = cy + m;
   uint8_t *pix = (uint8_t *)(cz + m);
   uint8_t *nxt = pix + 3 * m;
-  uint16_t *rev = (uint16_t *)(nxt + 3 * m);
+  uint16_t *rev = cfx_align16(nxt + 3 * m);           // even: m can be odd
 
   const uint8_t want = (uint8_t)(cube ? 1 : 2);
   const bool init = (SEGENV.call == 0 || s->mode != want);

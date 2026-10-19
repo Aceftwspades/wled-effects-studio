@@ -325,8 +325,11 @@ inline CfxBarState &cfx_bar(const CfxTempoState &t) {
   }
 
   // Rolling decay, per-second so the window doesn't depend on frame rate.
+  // At least one a frame: a score under FX_BAR_DECAY_MS / dtMs (about 250 at
+  // 60 fps) decayed by nothing and stayed, so an old downbeat held its slot.
   for (int i = 0; i < FX_BAR_BEATS; i++) {
-    const uint32_t d = ((uint32_t)score[i] * dtMs) / FX_BAR_DECAY_MS;
+    uint32_t d = ((uint32_t)score[i] * dtMs) / FX_BAR_DECAY_MS;
+    if (!d && dtMs) d = 1;
     score[i] = (uint16_t)((score[i] > d) ? (score[i] - d) : 0);
   }
 

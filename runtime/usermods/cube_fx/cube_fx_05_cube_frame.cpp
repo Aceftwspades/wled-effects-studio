@@ -91,14 +91,12 @@ static FX_RET mode_cube_frame() {
   const uint8_t drive = cfx_drive(vol, 2.0f, 70);
   const uint8_t hue   = (uint8_t)(strip.now >> 7);
 
-  uint8_t colBlk[cols];
-  if (cube) for (int x = 0; x < cols; x++) colBlk[x] = (uint8_t)(x / B);
 
   size_t i = 0;
   for (int y = 0; y < rows; y++) {
     const uint8_t byb = cube ? (uint8_t)(y / B) : 1;
     for (int x = 0; x < cols; x++, i++) {
-      if (cube && cfx_gapBlock(colBlk[x], byb)) continue;
+      if (cube && cfx_gapBlock(CFX_COLBLK(x), byb)) continue;
       const int px = cx[i], py = cy[i], pz = cz[i];
       const int rx = (int)((m00 * px + m01 * py + m02 * pz) / 256);
       const int ry = (int)((m10 * px + m11 * py + m12 * pz) / 256);

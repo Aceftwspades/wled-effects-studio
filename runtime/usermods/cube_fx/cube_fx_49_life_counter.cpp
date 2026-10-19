@@ -152,6 +152,9 @@ static FX_RET mode_lifecounter() {
     // A panel: four numbers in a 2 x 2 grid, each cell scaled from 8 x 8.
     const int cw = cols / 2, ch = rows / 2;
     for (int y = 0; y < rows; y++) for (int x = 0; x < cols; x++) {
+      // an odd panel's last column or row is a gutter: x / cw made it a third cell, and `& 3` drew it as
+      // another player's number
+      if (x >= 2 * cw || y >= 2 * ch) { SEGMENT.setPixelColorXY(x, y, 0); continue; }
       const int qx = x / cw, qy = y / ch;
       const int p  = (qy * 2 + qx) & 3;
       const int gx = ((x % cw) * 8) / cw, gy = ((y % ch) * 8) / ch;
@@ -180,6 +183,8 @@ static FX_RET mode_lifecounter() {
       if (bx == 1 && by == 1) {
         // TOP: X = a (right = +x), Y = -b (north = -y). Drawn north-up.
         if (lc_symPix(sym, px, py)) c = mq_scale(srgb, symBri);
+      } else if (bx == 2 && by == 2) {
+        // a six-faced cube's bottom faces the table: dark (the walls' else drew player 4's number there too)
       } else {
         // Each wall: (gx right, gy down) for the viewer facing it, from the
         // cfx_pos frame. up = +Z, right = facing x up.

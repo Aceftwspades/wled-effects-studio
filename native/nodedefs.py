@@ -32,7 +32,7 @@ The per-pixel prologue the compiler emits provides, for a template to use:
 
 And at frame scope:
 
-    t             seconds, as a float, from strip.now
+    t             seconds, as a float, from strip.now (wraps every hour)
     dt            milliseconds since the previous frame (uint16_t)
 
 User nodes live in <project>/nodes/*.json with the same shape and are merged

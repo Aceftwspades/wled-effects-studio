@@ -144,12 +144,12 @@ static FX_RET mode_maelstrom() {
   // built across the full rectangle and squeezed down afterwards - which is
   // the step that has to be done one array at a time to be safe, and is not
   // worth doing at all when the arithmetic is this cheap.
-  const size_t need = sizeof(MsState) + m + 2 * m;
+  const size_t need = sizeof(MsState) + m + 2 * m + CFX_ALIGN_PAD;
   if (!SEGENV.allocateData(need)) { SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
 
   MsState  *s   = (MsState *)SEGENV.data;
   uint8_t  *az  = (uint8_t *)(s + 1);
-  uint16_t *lr  = (uint16_t *)(az + m);
+  uint16_t *lr  = cfx_align16(az + m);           // even: m can be odd
 
   const uint8_t want = (uint8_t)(cube ? 1 : 2);
   const bool fresh = (SEGENV.call == 0 || s->mode != want);

@@ -110,7 +110,7 @@ static FX_RET mode_warp() {
   const size_t lut = cube ? (size_t)6 * Bq * Bq : 0;
   const size_t m   = cube ? (size_t)cfx_faces() * B * B : n;
 
-  const size_t need = sizeof(WpState) + 3 * m + 3 * m + 3 * m + lut * sizeof(uint16_t);
+  const size_t need = sizeof(WpState) + 3 * m + 3 * m + 3 * m + lut * sizeof(uint16_t) + CFX_ALIGN_PAD;
   if (!SEGENV.allocateData(need)) { SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
 
   WpState  *s   = (WpState *)SEGENV.data;
@@ -119,7 +119,7 @@ static FX_RET mode_warp() {
   int8_t   *cz  = cy + m;
   uint8_t  *pix = (uint8_t *)(cz + m);
   uint8_t  *nxt = pix + 3 * m;
-  uint16_t *rev = (uint16_t *)(nxt + 3 * m);
+  uint16_t *rev = cfx_align16(nxt + 3 * m);     // even: m can be odd
 
   const uint8_t want = (uint8_t)(cube ? 1 : 2);
   if (SEGENV.call == 0 || s->mode != want) {

@@ -102,7 +102,7 @@ static FX_RET mode_watershed() {
   const size_t m  = cfx_litCount(cols, rows, B, cube);
 
   const size_t need = sizeof(WsState) + lut * sizeof(uint16_t)
-                    + 9 * m + 2 * m * sizeof(uint16_t);
+                    + 9 * m + 2 * m * sizeof(uint16_t) + CFX_ALIGN_PAD;
   if (!SEGENV.allocateData(need)) { SEGMENT.fill(SEGCOLOR(0)); FX_DONE; }
 
   WsState  *s   = (WsState *)SEGENV.data;
@@ -116,7 +116,7 @@ static FX_RET mode_watershed() {
   uint8_t  *acc = w2 + m;                     // the channel, lit by use
   uint8_t  *hue = acc + m;                    // whose storm this water is
   uint8_t  *az  = hue + m;                    // azimuth about the vertical, 0..255
-  int16_t  *h   = (int16_t *)(az + m);        // working height, eroded
+  int16_t  *h   = (int16_t *)cfx_align16(az + m);   // working height, eroded (even: m can be odd)
   uint16_t *dn  = (uint16_t *)(h + m);        // steepest-descent neighbour
 
   const uint8_t want = (uint8_t)(cube ? 1 : 2);

@@ -176,6 +176,12 @@ class CfxPalettes : public Usermod {
     CfxTempoState tempo = {0, 0, 0, 0, 0, 0};
     CfxDropState  drop  = {0, 0, 0, 0, 256, false};
 
+    // gap * dt / tau, but never zero while gap is not.
+    static inline int cfx_ease(int gap, uint16_t dt, int tau) {
+      const int step = (gap * (int)dt) / tau;
+      return step ? step : (gap > 0) - (gap < 0);
+    }
+
     static um_data_t *audio() {
       um_data_t *um = nullptr;
       if (!UsermodManager::getUMData(&um, USERMOD_ID_AUDIOREACTIVE)) return nullptr;
@@ -285,8 +291,6 @@ class CfxPalettes : public Usermod {
 
     void loop() override {
       if (!registered) return;
-      um_data_t *um = audio();
-      if (!um) return;
 
       // strip.now, NOT millis(). WLED sets strip.now = millis() every service,
       // so on the device they are the same number - but the simulator advances
@@ -307,6 +311,11 @@ class CfxPalettes : public Usermod {
         if (source != builtFor || c[0] != builtCols[0] ||
             c[1] != builtCols[1] || c[2] != builtCols[2]) buildSource();
       }
+
+      // No AudioReactive in the build: the palettes show their source, as
+      // they do in silence, instead of staying the black they start as.
+      um_data_t *um = audio();
+      if (!um) { passThrough(); return; }
 
       const float   vol  = *(float *)um->u_data[0];
       const uint8_t *fft = (uint8_t *)um->u_data[2];
@@ -372,10 +381,12 @@ class CfxPalettes : public Usermod {
       {
         const int denom = (int)bass + (int)treb + 1;
         const int want  = 128 + (((int)treb - (int)bass) * 127) / denom;
-        tilt = (uint8_t)(tilt + ((want - (int)tilt) * (int)dt) / 260);
+        // At least one step whenever there is a gap: a step under one (a gap
+        // under 13 for the tilt, 25 for the loudness at 50 Hz) truncated to
+        // nothing, and both stalled short of where they were heading.
+        tilt = (uint8_t)(tilt + cfx_ease(want - (int)tilt, dt, 260));
         int lw = (int)(vol * 2.2f); if (lw > 255) lw = 255;
-        loud = (uint8_t)((lw > (int)loud) ? lw
-                         : (int)loud - (((int)loud - lw) * (int)dt) / 500);
+        loud = (uint8_t)((lw > (int)loud) ? lw : (int)loud + cfx_ease(lw - (int)loud, dt, 500));
       }
 
       // --- Arc's shift budget ---------------------------------------------

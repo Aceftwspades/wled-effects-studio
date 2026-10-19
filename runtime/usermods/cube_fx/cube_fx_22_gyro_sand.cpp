@@ -87,6 +87,13 @@ struct SdGrain {
   uint8_t set;                        // 1 = settled into the pile, not simulated
 };
 
+// floor((x + r) / 23), r in 0..22: x / 23 rounded by the offset r, with no
+// pull toward zero for either sign.
+static inline int sdDiv23(int x, int r) {
+  x += r;
+  return x >= 0 ? x / 23 : -((22 - x) / 23);
+}
+
 // st[] layout
 #define SD_ST_MODE  0
 #define SD_ST_AXIS  1                 // gravity axis code: idx*2 + (sign<0)
@@ -239,14 +246,21 @@ static FX_RET mode_gyro_sand() {
   int deposit = ((int)SD_HG * SD_HG * SD_FILL_TARGET) / (active < 1 ? 1 : active);
   if (deposit < 2) deposit = 2;
 
+  // Velocities are per 23 ms and frames are shorter, so every step divides by
+  // 23. Truncated, the lowest pour rate (1 x 16 ms) gave no fall at all and a
+  // grain under 2 units/step never moved. Each grain rounds by its own offset
+  // instead, changing every frame: right on average, and a fraction of a step
+  // still adds up.
+  const uint32_t salt = strip.now >> 4;
   for (int i = 0; i < active; i++) {
     SdGrain &q = g[i];
     if (q.set) continue;
+    const int r = (int)(((uint32_t)i * 29u + salt * 7u) % 23u);
 
-    q.v[hIdx] = (int8_t)sdClampV((int)q.v[hIdx] + (gSgn * accel * dt) / 23);
+    q.v[hIdx] = (int8_t)sdClampV((int)q.v[hIdx] + sdDiv23(gSgn * accel * dt, r));
 
     for (int a = 0; a < 3; a++) {
-      int np = (int)q.p[a] + ((int)q.v[a] * dt) / 23;
+      int np = (int)q.p[a] + sdDiv23((int)q.v[a] * dt, r);
       if (np >  SD_LIM) { np =  SD_LIM; q.v[a] = (int8_t)(-(int)q.v[a] * bounce / 32); }
       if (np < -SD_LIM) { np = -SD_LIM; q.v[a] = (int8_t)(-(int)q.v[a] * bounce / 32); }
       q.p[a] = (int16_t)np;

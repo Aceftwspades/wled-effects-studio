@@ -1471,7 +1471,7 @@ static FX_RET mode_{ident}() {{
   const int  B    = cube ? (W / 3) : 1;
   static uint8_t clk_[2] = {{0, 0}};
   const uint16_t dt = fx_dt8(clk_);
-  const float t = (float)strip.now * 0.001f;
+  const float t = (float)(strip.now % 3600000u) * 0.001f;   // wraps hourly, as the script effect: a float keeps ms to ~4.6 h
   (void)N; (void)dt; (void)t;
 {state}
   // --- frame scope -----------------------------------------------------------

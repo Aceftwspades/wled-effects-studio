@@ -110,7 +110,9 @@ static void cf_buildMap(uint8_t *col, uint8_t *dep, int cols, int rows,
 
       if (!cube) {                                     // flat: bottom-up fire
         col[i] = (uint8_t)(((uint32_t)x * 256u) / (uint32_t)cols);
-        dep[i] = (uint8_t)(((uint32_t)(rows - 1 - y) * 255u) / (uint32_t)(rows > 1 ? rows - 1 : 1));
+        // the row is the depth: 0 the flame's tip at the top, rows - 1 (dmax) the source at the bottom - it was
+        // inverted and scaled to 255, every row past the first clamped to the source: a wall, dark at the foot
+        dep[i] = (uint8_t)(y < 255 ? y : 255);
         continue;
       }
 
