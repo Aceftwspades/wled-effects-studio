@@ -345,6 +345,9 @@ static inline void  hsv2rgb(const CHSV32 &hsv, uint32_t &rgb) { rgb = CRGBW(hsv)
 // Fireworks size their particles from it)
 #define NUM_COLORS        3
 #define MAX_NUM_SEGMENTS  32
+// fcn_declare.h's allocators (PSRAM first on a board that has it): the heap here
+inline void *p_malloc(size_t n) { return malloc(n); }
+inline void p_free(void *p) { free(p); }
 #define MAX_SEGMENT_DATA  (64 * 1024)
 #define FAIR_DATA_PER_SEG (MAX_SEGMENT_DATA / MAX_NUM_SEGMENTS)
 
