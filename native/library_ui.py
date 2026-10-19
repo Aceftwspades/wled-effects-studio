@@ -574,7 +574,10 @@ def poll(app):
     if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG):
         return
     now = time.time()
-    if getattr(app, "_lib_dirty", False) and now - getattr(app, "_lib_redraw", 0.0) > 1.5:
+    # not while a button is down: the tiles made again under a drag took the tile being dragged away, and the
+    # drop onto the Sequence's steps never came (thumbnails still arriving, the first minutes after a build)
+    if getattr(app, "_lib_dirty", False) and now - getattr(app, "_lib_redraw", 0.0) > 1.5 \
+            and not dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
         app._lib_dirty = False; app._lib_redraw = now
         refresh(app)
     if now - getattr(app, "_lib_tick", 0.0) < 0.08:
