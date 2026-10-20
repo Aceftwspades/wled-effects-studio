@@ -882,7 +882,7 @@ first here replaces whatever the device had as palette 0). "From the
 sim's palette" starts from whatever the sim shows.
 
 **The library** (Window > Library) shows every effect in the sim as a
-looping thumbnail, in three banks: **Graphs** (the project's graphs, with
+looping thumbnail, in banks: **Graphs** (the project's graphs, with
 their tags - what nodes they use, audio, 3-D, script), **Usermod effects**
 (cube_fx, the project's code effects, the Studio Script) and **Stock**
 (WLED's own). The bank in front is drawn first; a bar under the banks
@@ -897,6 +897,21 @@ graph not built yet shows as its script runs it, when the script can.
 Every thumbnail and preview starts from a clean cube - the pixels and the
 effect's memory cleared, the clock at 0 - hearing the synth, so nothing
 of the effect before shows through.
+
+The fourth bank, **Gallery**, is other people's graphs, online
+([the gallery](https://github.com/Aceftwspades/wled-effects-gallery)): a
+tile each, its preview turning on a cube, its author, what it is and its
+tags on hover. A click fetches it into this project - checked against
+the gallery's list, and asked first, since an effect is code that runs on
+this computer when it is built - and it opens in the graph pane.
+**Read it again** reads the list anew; **The gallery's page** opens it in the
+browser. **Share this graph...** makes the graph open now into what you
+send to add it: name it, say what it is in a sentence, tag it, sign it,
+show its effect in the sim, and **Make the folder** puts its bundle, a
+preview (the effect on screen, turning) and its entry in
+`captures/gallery-share/<name>/`, then opens the folder and the gallery's
+page, whose README says how to send it (a pull request, which a check
+looks over).
 **Generate previews** renders a turn of the 3-D view for every effect of
 the bank in front (or only the tiles shown) on the project's shape, each
 with the graph's own settings - a GIF and a PNG per effect in

@@ -1099,6 +1099,24 @@ STEPS = [
                 "[n for n in app.gp.type_names() if n.endswith(('sub:smoke_a', 'sub:smoke_b'))], setattr(app.gp, 'cur_dir', d), setattr(app.gp, 'file', f))[2])"
                 "(app.gp.cur_dir, app.gp.file) == []"},
       {"py": _SUBS_REMOVE}, {"py": "app.gp.refresh_lib()"}], 0.5),
+    # the gallery (a fake one on disk, STUDIO_GALLERY_URL): its bank in the Library, its two entries and their
+    # previews; one fetched - asked first - and in the project; the open graph made into a folder to share
+    ([{"frame": "library"}, {"py": "__import__('native.library_ui', fromlist=['x'])._set_bank(app, 'gallery')"}], 2.5),
+    ([{"check": "len(app._web_gallery['entries']) == 2 and not app._web_gallery['error']"},
+      {"check": "dpg.does_item_exist('gal_share') and 'from the gallery' in dpg.get_value('lib_status')"},
+      {"py": "setattr(app, '_gal_files', set(app.gp.files()))"},
+      {"py": "__import__('native.gallery_ui', fromlist=['x']).get(app, app._web_gallery['entries'][0])"}], 1.5),
+    ([{"check": "len(app._web_gallery['frames']) == 2 and all(len(f) == 4 for f in app._web_gallery['frames'].values())"},
+      {"check": "dpg.is_item_shown('confirm_dialog') and 'trust where it came from' in dpg.get_value('confirm_text')"},
+      {"confirm": 0}], 1.5),
+    ([{"check": "len(set(app.gp.files()) - app._gal_files) == 1"}, {"py": "app.gp.compile()"}], 1.5),   # built now: Share shows its effect
+    ([{"wait_build": True}, {"check": "len(set(app.gp.files()) - app._gal_files) == 1"},
+      {"py": "dpg.hide_item('confirm_dialog')"}, {"effect": "Spirals (gallery)"}], 1.0),
+    ([{"check": "__import__('native.gallery_ui', fromlist=['x']).share(app, 'Smoke Share', 'From the smoke test.', ['test'], "
+                "'smoke', open_after=False) is not None"},
+      {"check": "__import__('os').path.exists(__import__('os').path.join(__import__('native.paths', fromlist=['x']).CAPTURES, "
+                "'gallery-share', 'smoke-share', 'entry.json'))"},
+      {"py": "__import__('native.library_ui', fromlist=['x'])._set_bank(app, 'graphs')"}], 0.5),
 ]
 
 
@@ -1175,6 +1193,10 @@ def main():
         # the console variant of the packaged app keeps its stdout, which is the log the test reads
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
         env = dict(os.environ, STUDIO_NO_UPDATE_CHECK="1", STUDIO_NO_WELCOME="1", STUDIO_REMOTE_CONTROL="1")
+        # the gallery the Library's Gallery bank reads: one on disk (tests/fake_gallery.py), not the network's
+        import fake_gallery, tempfile
+        gallery_dir = tempfile.mkdtemp(prefix="smoke_gallery_")
+        env["STUDIO_GALLERY_URL"] = fake_gallery.make(gallery_dir)
         proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env)
     early = None
     try:

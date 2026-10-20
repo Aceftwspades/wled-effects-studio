@@ -36,7 +36,8 @@ from native import graph as G, render, paths
 TAG = "library_win"
 FRAMES = 24
 TILE = 96
-BANKS = (("graphs", "Graphs"), ("usermod", "Usermod effects"), ("stock", "Stock"))
+BANKS = (("graphs", "Graphs"), ("usermod", "Usermod effects"), ("stock", "Stock"),
+         ("gallery", "Gallery"))                       # the shared library online (gallery_ui.py)
 
 
 def _c():
@@ -59,7 +60,8 @@ def build(app):
             c.info("Every effect of the sim as a looping thumbnail, in three banks: the project's graphs, the usermod effects "
                    "(the cube effects and the project's code effects) and WLED's stock ones. Each is made on a clean cube, "
                    "hearing the synth's beat. Click a tile: its effect runs in the sim; a graph's waits in the graph pane "
-                   "(built first if it never was).")
+                   "(built first if it never was). The Gallery is other people's graphs, online: a click fetches one into "
+                   "this project, and Share this graph... makes yours ready to send.")
         with dpg.group(horizontal=True):
             dpg.add_button(label="Generate previews", tag="lib_gen", small=True, callback=lambda: generate_previews(app))
             c.tip("a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each "
@@ -143,7 +145,7 @@ def banks(app):
             usermod.append((n, n, None))
         else:
             stock.append((n, n, None))
-    return {"graphs": graphs, "usermod": usermod, "stock": stock}
+    return {"graphs": graphs, "usermod": usermod, "stock": stock, "gallery": []}   # the gallery's are its own
 
 
 def _graph_name(app, fn):
@@ -352,9 +354,20 @@ def refresh(app):
     q = (dpg.get_value("lib_search") or "").strip().lower()
     dpg.delete_item("lib_tiles", children_only=True)
     b = banks(app)
+    from native import gallery_ui
+    gal = (app.__dict__.get("_web_gallery") or {}).get("entries")
     for key, words in BANKS:
         if dpg.does_item_exist(f"lib_bank_{key}"):
-            dpg.configure_item(f"lib_bank_{key}", label=f"{words} ({len(b[key])})")
+            n = (len(gal) if gal is not None else None) if key == "gallery" else len(b[key])
+            dpg.configure_item(f"lib_bank_{key}", label=f"{words} ({n})" if n is not None else words)
+    if app._lib_bank == "gallery":
+        # other people's graphs, online: tiles of their own (gallery_ui.py)
+        shown = gallery_ui.refresh(app, "lib_tiles", q)
+        app._lib_shown = []
+        dpg.set_value("lib_status", f"{shown} shown from the gallery ({gallery_ui.gallery.page_url()}); "
+                                    "a click fetches one into this project")
+        _thumb_worker(app)
+        return
     rows = []
     for key, name, fn in b[app._lib_bank]:
         tags = app.__dict__.get("_lib_tags", {}).get(fn, []) if fn else []
@@ -569,6 +582,8 @@ def poll(app):
         app._lib_thumbs, app._lib_tags = {}, {}
     _poll_thumbs(app)
     _poll_previews(app)
+    from native import gallery_ui
+    gallery_ui.poll(app)                                  # the gallery's list and previews as they arrive
     if dpg.does_item_exist("lib_progress_row"):
         _poll_progress(app)
     if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG):

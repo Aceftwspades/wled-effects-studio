@@ -23,3 +23,6 @@ captures/
 
 # WLED firmware downloaded by the Flash frame (native/firmware.py)
 firmware/
+
+# the gallery's downloads (native/gallery.py), kept where the studio runs from
+gallery/

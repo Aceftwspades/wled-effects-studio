@@ -9,6 +9,7 @@ __version__ = "1.16.0"
 REPO = "Aceftwspades/wled-effects-studio"            # owner/name on GitHub: the releases the update check reads
 WLED_REPO = "Aceftwspades/WLED"                       # the WLED fork the firmware side lives in (branch playground)
 WLED_UPSTREAM = "Aircoookie/WLED"                     # the WLED project itself
+GALLERY_REPO = "Aceftwspades/wled-effects-gallery"   # the shared library online: graphs to browse in the Library
 
 
 def parse(tag):

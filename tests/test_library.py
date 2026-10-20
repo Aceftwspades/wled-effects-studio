@@ -92,7 +92,7 @@ class _App:
 def test_every_effect_in_its_bank():
     app = _App()
     b = library_ui.banks(app)
-    assert set(b) == {"graphs", "usermod", "stock"}
+    assert set(b) == {"graphs", "usermod", "stock", "gallery"} and b["gallery"] == []     # the gallery's tiles are its own (gallery_ui)
     assert len(b["graphs"]) == 3 and all(fn for _, _, fn in b["graphs"])
     keys = [k for bank in b.values() for k, _, _ in bank if k]
     assert len(keys) == len(set(keys)) and set(keys) <= set(app.eng.names)
