@@ -24,6 +24,15 @@ from native.geometry import Geometry
 from native.dropfiles import classify
 
 
+def _same_file(a, b):
+    """Whether two files hold the same bytes."""
+    import filecmp
+    try:
+        return filecmp.cmp(a, b, shallow=False)
+    except OSError:
+        return False
+
+
 class Features:
     def on_geom_wiring(self, sender, val):
         """A panel option on the cube: the wiring changes, the picture does not."""
@@ -163,7 +172,14 @@ class Features:
             os.makedirs(adir, exist_ok=True)
             dst = os.path.join(adir, name)
             if os.path.abspath(dst) != os.path.abspath(path):
-                shutil.copyfile(path, dst)
+                # another picture of the same name is not written over (an Image node elsewhere shows it): this one
+                # gets a number, as a dropped .cpp or graph does; the same picture again is used as it is
+                stem, ext = os.path.splitext(name)
+                n = 2
+                while os.path.exists(dst) and not _same_file(dst, path):
+                    name = f"{stem}_{n}{ext}"; dst = os.path.join(adir, name); n += 1
+                if not os.path.exists(dst):
+                    shutil.copyfile(path, dst)
             if not self.gp.graph:
                 self.gp.status(f"{name} copied to assets/ - open a graph to place it"); return
             self.show_layout("graph")

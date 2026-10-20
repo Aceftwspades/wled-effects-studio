@@ -563,6 +563,33 @@ def test_an_old_graph_keeps_its_wires_into_the_old_float_pins():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_a_dropped_picture_does_not_replace_another_of_its_name():
+    """A picture dropped on the studio is copied into the project's assets/. One of the same name already there
+    was written over - an Image node elsewhere showed the new one. A different picture now gets a number, as a
+    dropped .cpp or graph does; the same picture dropped again is used as it is."""
+    import types
+    from native.features import Features
+    d = tempfile.mkdtemp()
+    try:
+        proj, desk = os.path.join(d, "proj"), os.path.join(d, "desk")
+        os.makedirs(os.path.join(proj, "assets")); os.makedirs(desk)
+        old = os.path.join(proj, "assets", "logo.png")
+        open(old, "wb").write(b"old picture")
+        said = []
+        app = types.SimpleNamespace(project=types.SimpleNamespace(path=proj),
+                                    gp=types.SimpleNamespace(graph=None, status=lambda m, *a: said.append(m)))
+        new = os.path.join(desk, "logo.png")
+        open(new, "wb").write(b"new picture")
+        Features.take_file(app, new)
+        assert open(old, "rb").read() == b"old picture"
+        assert open(os.path.join(proj, "assets", "logo_2.png"), "rb").read() == b"new picture"
+        Features.take_file(app, new)                       # the same picture again: no logo_3
+        assert sorted(os.listdir(os.path.join(proj, "assets"))) == ["logo.png", "logo_2.png"]
+        assert any("logo_2.png" in m for m in said), said
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0
