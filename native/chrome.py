@@ -100,6 +100,7 @@ def build_menus(app):
         with dpg.menu(label="File"):
             _mi(app, "New graph effect...", "new", callback=lambda: app.new_effect("graph"))
             dpg.add_menu_item(label="New code effect...", callback=lambda: app.new_effect("code"))
+            dpg.add_menu_item(label="New effect from a shader...", callback=lambda: __import__("native.shader_ui", fromlist=["x"]).show(app))
             with dpg.menu(label="Open graph", tag="menu_open_graph"):
                 pass
             with dpg.menu(label="Open code effect", tag="menu_open_code"):
@@ -699,6 +700,9 @@ def build_dialogs(app):
     # EFFECT SLOTS: which cube_fx effects the device lists, in what order (bank_ui.py)
     from native import bank_ui
     bank_ui.build(app)
+    # SHADERS IN: a Shadertoy shader made into a code effect (shader_ui.py, glsl.py)
+    from native import shader_ui
+    shader_ui.build(app)
     # HELP: the guide, the tutorial and the node reference in a window, and the first-run panel (reader_ui.py)
     from native import reader_ui
     reader_ui.build(app)

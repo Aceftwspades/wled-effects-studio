@@ -368,6 +368,17 @@ STEPS = [
       {"py": "(phone_ui.apply(app, {'a': 'blackout', 'v': 0}), phone_ui.apply(app, {'a': 'bri', 'v': 255}))"},
       {"py": "phone_ui._st(app).update(host='', port=8765)"}, {"py": "phone_ui.set_on(app, False)"}], 0.3),
     ([{"check": "not app.phone.is_open and not app.blackout and app.master_bri == 255"}], 0.1),
+    # a shader in: File > New effect from a shader... - one with a texture refused with its line, the example made
+    # into a code effect, built, and drawing; then the code pane's effect is the one before again
+    ([{"py": "__import__('native.shader_ui', fromlist=['x']).show(app)"}, {"check": "dpg.is_item_shown('shader_dialog')"},
+      {"check": "__import__('native.shader_ui', fromlist=['x']).make(app, 'Smoke Texture', "
+                "'void mainImage(out vec4 o, vec2 u) {\\n o = texture(iChannel0, u);\\n}') is None"},
+      {"expect": ["shader_msg", "line 2: a texture"]},
+      {"py": "setattr(app, '_shader_f', __import__('native.shader_ui', fromlist=['x']).make(app, 'Smoke Shader', "
+             "__import__('native.shader_ui', fromlist=['x']).EXAMPLE))"}], 1.0),
+    ([{"wait_build": True}, {"check": "app._shader_f and 'Smoke Shader' in app.eng.names and not dpg.is_item_shown('shader_dialog')"},
+      {"effect": "Smoke Shader"}], 1.0),
+    ([{"check": "int(app.frame_rgb().max()) > 40"}], 0.1),
     # live effect switching: a Program Change picks from the setlist with nothing learnt; next learnt on a pad
     # (learning it steps once, wrapping); a release alone switches nothing, a press and release in one frame steps
     # once; with a crossfade set, a switch blends from the effect going out; the effect put back

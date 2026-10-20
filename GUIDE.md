@@ -373,6 +373,22 @@ narrow it) and replace - one at the cursor, or all. A graph can
 also be handed to the code pane (File > Open graph as code) when the nodes
 cannot reach something.
 
+**From a shader.** File > New effect from a shader... takes a Shadertoy
+image shader - paste the "Image" tab's code, or **Open a file...** (.glsl,
+.frag, .txt) - and **Make the effect** turns it into a code effect of the
+project, opened in the code pane and built. Every LED runs the shader's
+`mainImage` at its own place (the matrix, or the cube's net, as one
+picture; y up as on Shadertoy), with `iTime` (scaled by Speed),
+`iResolution`, `iFrame` and `iTimeDelta`; Intensity is the brightness.
+The file carries the small vector library it needs (vec2 to vec4, mat2,
+mat3, the GLSL functions), so it builds into any firmware like any code
+effect - read it as GLSL in C++: swizzles are methods (`p.xy()`), the
+functions are `gl_` named. What an LED cannot have - textures and buffers
+(`iChannel0`, `texture()`), derivatives, `ivec` and `mat4` - is refused
+with its line. A device runs it in floats, pixel by pixel, where a GPU
+runs thousands at once: keep a shader light (few loops, few octaves) for
+the cube.
+
 **Draft vs. list.** A new effect is a draft: built and shown only while
 you edit it. File > "Add to the effects list" (Ctrl+I) makes it part of the
 project: always built, exported, shipped.
@@ -1283,6 +1299,7 @@ on and install what it carries.
 
 - **File** › New graph effect... `Ctrl+N`
 - **File** › New code effect...
+- **File** › New effect from a shader...
 - **File** › Open graph › … the project's graphs
 - **File** › Open code effect › … the project's code effects
 - **File** › Save `Ctrl+S`

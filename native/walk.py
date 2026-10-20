@@ -243,7 +243,7 @@ def process_stats(app):
 # buttons a walk leaves alone: a flash or a firmware build, a render or a preview that takes minutes,
 # a clone or a download from the network, a restart, a program opened on the desktop, a key capture,
 # the clipboard (the log's copy: what the user had copied stays)
-SKIP_BUTTON_TAGS = ("flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
+SKIP_BUTTON_TAGS = ("shader_make", "flash_start", "shape_prev_go", "wled_go", "wled_restart", "app_ui_restart", "rec_btn", "log_copy",
                     "map_cam_find", "map_calib", "map_live",  # the webcam: a camera turned on is not a test's to do
                     "geom_read_wiring",                   # a real device's wiring read: the smoke reads the fake's
                     "flash_ports_refresh",                # the serial ports: a board plugged in is not a test's to probe
