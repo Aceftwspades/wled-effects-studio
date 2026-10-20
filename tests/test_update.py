@@ -87,6 +87,40 @@ def test_the_packaged_linux_apps_children_get_their_own_libraries():
     assert procs.child_env(None, frozen=False, platform="linux") is None
 
 
+def test_the_update_goes_in_whatever_the_folders_are_called():
+    """apply()'s script, run for real on Windows (the restart left out): the zip unpacked and copied over an app
+    folder whose name has an accent, an apostrophe and a % in it, the projects folder left as it was. Written
+    straight into the batch file, a José was not found (cmd reads the file in the console's code page) and an
+    O'Brien ended the quote of PowerShell's command, which then did not parse: the update never went in."""
+    if not sys.platform.startswith("win"):
+        return
+    import shutil, subprocess, zipfile
+    base = tempfile.mkdtemp(prefix="studio_upd_")
+    try:
+        app = os.path.join(base, "José O'Brien 100%", "WLED Effects Studio")
+        os.makedirs(os.path.join(app, "projects"))
+        pathlib.Path(app, "projects", "mine.json").write_text("keep", encoding="utf-8")
+        pathlib.Path(app, "old.txt").write_text("old", encoding="utf-8")
+        updates = os.path.join(base, "José O'Brien 100%", "updates")
+        os.makedirs(updates)
+        zp = os.path.join(updates, "WLED_Effects_Studio.zip")
+        with zipfile.ZipFile(zp, "w") as z:
+            z.writestr("WLED Effects Studio/WLED Effects Studio.exe", "new exe")
+            z.writestr("WLED Effects Studio/new.txt", "new")
+            z.writestr("WLED Effects Studio/projects/mine.json", "the zip's")
+        script = os.path.join(updates, "apply.cmd")
+        with open(script, "w", encoding="utf-8", newline="\r\n") as f:
+            f.write(update.apply_script(zp, app, 0x7FFFFFF0, restart=False))      # a process that is not there: no wait
+        r = subprocess.run(["cmd", "/c", script], cwd=updates, capture_output=True, timeout=120)
+        assert r.returncode == 0, (r.returncode, r.stdout[-400:], r.stderr[-400:])
+        assert pathlib.Path(app, "new.txt").read_text(encoding="utf-8") == "new"
+        assert pathlib.Path(app, "WLED Effects Studio.exe").read_text(encoding="utf-8") == "new exe"
+        assert pathlib.Path(app, "projects", "mine.json").read_text(encoding="utf-8") == "keep"
+        assert not os.path.exists(os.path.join(updates, "unpacked"))
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import inspect
     failed = 0
