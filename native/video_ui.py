@@ -1,6 +1,7 @@
 """The side panel's VIDEO section: where the Video node's picture comes from -
-a webcam, a video file, the screen (a monitor, or a window), or the test
-pattern - its size, play and pause,
+a webcam, a video file, the screen (a monitor, or a window), the phone's
+camera (the phone remote's camera page), a stream on the network (rtsp,
+rtmp, srt, http), or the test pattern - its size, play and pause,
 and a little preview. Each engine frame the newest video frame goes into
 the engine's video slot (push, from App.audio_push). The choices are kept
 in the project (options["video"]); nothing starts by itself when a project
@@ -20,7 +21,7 @@ from native import form, video
 from native.typeface import px
 
 KINDS = (("none", "none"), ("test", "test pattern"), ("file", "a video file"), ("webcam", "a webcam"),
-         ("screen", "the screen"))
+         ("screen", "the screen"), ("phone", video.PHONE), ("stream", "a network stream"))
 EXTS = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".gif", ".mpg")
 PREVIEW_W, PREVIEW_H = video.WIDTH, video.HEIGHT
 
@@ -54,6 +55,14 @@ def build(app):
                       default_value=o.get("screen", ""), callback=lambda s, v: _set_screen(app, v))
         dpg.add_button(label="Find", tag="video_find_screen", callback=lambda: find_screens(app))
         _tip("the whole desktop, each monitor and the windows on screen (by their titles), into the list")
+    with form.row("address", tag="video_url_row"):
+        dpg.add_input_text(tag="video_url", width=-1, default_value=o.get("url", ""),
+                           hint="rtsp://, rtmp://, srt:// or http://...", on_enter=True,
+                           callback=lambda s, v: _set_url(app, v))
+        _tip("a stream on the network, read by ffmpeg: a phone camera app's (IP Webcam, DroidCam, Larix), OBS's, "
+             "an IP camera's - Enter to play it")
+    with form.under(tag="video_phone_row"):
+        dpg.add_text("", tag="video_phone_words", wrap=0)
     with dpg.file_dialog(directory_selector=False, show=False, tag="video_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: _chosen(app, a.get("file_path_name", ""))):
         dpg.add_file_extension("{" + ",".join(EXTS) + "}", color=(120, 200, 120))
@@ -102,6 +111,8 @@ def _show_rows(app):
         dpg.configure_item("video_loop", show=kind == "file")
         dpg.configure_item("video_cam_row", show=kind == "webcam")
         dpg.configure_item("video_screen_row", show=kind == "screen")
+        dpg.configure_item("video_url_row", show=kind == "stream")
+        dpg.configure_item("video_phone_row", show=kind == "phone")
 
 
 def _chosen(app, path):
@@ -135,6 +146,12 @@ def find_screens(app):
     return names
 
 
+def _set_url(app, url):
+    _set(app, "url", url.strip())
+    if getattr(app, "video_src", None) is not None or url.strip():
+        start(app)                                   # Enter on an address: it plays
+
+
 def _set_screen(app, name):
     _set(app, "screen", name)
     if getattr(app, "video_src", None) is not None:
@@ -156,7 +173,7 @@ def start(app, kind=None):
         _words(app); return False
     w = int(o["width"]); h = max(2, int(round(w * 9 / 16)) // 2 * 2)
     try:
-        app.video_src = video.open_source(o["kind"], path=o.get("path"),
+        app.video_src = video.open_source(o["kind"], path=o.get("url") if o["kind"] == "stream" else o.get("path"),
                                           name=o.get("screen") if o["kind"] == "screen" else o.get("name"),
                                           width=w, height=h, loop=bool(o["loop"]))
     except Exception as e:
@@ -199,10 +216,28 @@ def push(app):
         app._video_n = n
         app.eng.video(frame)
         _preview(frame)
+    if src.kind == "phone":                          # its line says whether frames come: once a second
+        import time
+        now = time.monotonic()
+        if now - getattr(app, "_video_words_at", 0.0) >= 1.0:
+            app._video_words_at = now
+            _words(app)
     err = getattr(src, "error", None)
     if err:                                          # ffmpeg ended (the file's end without loop, a camera gone, an error)
         stop(app, quiet=True)
         _words(app, f"stopped: {err}")
+
+
+def phone_words(app):
+    """Where the phone's camera comes from: the camera page's link, or how to serve it."""
+    r = getattr(app, "phone", None)
+    if r is None or not r.is_open:
+        return ("The phone's camera comes from the phone remote's page: turn the remote on (Window > MIDI, OSC and "
+                "phone: the PHONE row, with HTTPS), open its link on the phone, then Camera and Start.")
+    if not r.tls:
+        return ("The phone remote is served over plain HTTP, and a phone's browser offers the camera only over "
+                "HTTPS: tick HTTPS in its row (Window > MIDI, OSC and phone).")
+    return f"On the phone: {r.camera_url()} - then Start (the browser asks for the camera; allow it)."
 
 
 def _preview(frame):
@@ -227,9 +262,11 @@ def _words(app, extra=None):
     else:
         state = "stopped"
     tail = " The Video node shows it; Device > Stream sends the picture to the LEDs (video cannot play on the device by itself)."
-    if not video.ffmpeg() and _opts(app)["kind"] in ("file", "webcam", "screen"):
-        tail += " Files, webcams and the screen need ffmpeg on the PATH (ffmpeg.org)."
+    if not video.ffmpeg() and _opts(app)["kind"] in ("file", "webcam", "screen", "stream"):
+        tail += " Files, webcams, the screen and streams need ffmpeg on the PATH (ffmpeg.org)."
     dpg.set_value("video_msg", (extra + " - " if extra else "") + state + "." + tail)
+    if dpg.does_item_exist("video_phone_words"):
+        dpg.set_value("video_phone_words", phone_words(app))
     if dpg.does_item_exist("video_play"):
         dpg.configure_item("video_play", label="Pause" if src is not None and not src.paused else "Play")
 # AI: end

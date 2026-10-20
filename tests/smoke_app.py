@@ -88,7 +88,7 @@ LIVE_MAP_STEPS = [
     ([{"check": "app._map['calib'] is None and app.wiring is None and app._map_frame is None"},
       {"py": "camera_map_ui.live(app)"}], 8.0),                  # a frame a step of the plan: at ~16 fps 4 s was not always enough
     ([{"check": "app._map['live'] is None and app._map['busy'] is None and not app._map['queue']"},
-      {"check": "len(app._map['sides'][-1]['found']) >= 58"}, {"check": "app._map['sides'][-1]['words'].startswith('the webcam')"},
+      {"check": "len(app._map['sides'][-1]['found']) >= 58"}, {"check": "app._map['sides'][-1]['words'].startswith('the camera')"},
       {"py": "camera_map_ui.export_csv(app)"}], 0.5),
     ([{"check": "open(" + _EXPORT + ").readline().strip() == 'address,x,y,z'"},
       {"check": "len(open(" + _EXPORT + ").read().split()) == app.project.geometry.count + 1"},
@@ -354,7 +354,8 @@ STEPS = [
     ([{"check": "app.eng.fx['ix'] == 51"}, {"py": "midi_ui.set_osc(app, on=False)"}], 0.3),
     # the phone remote, on the loopback: its page's state is the studio's, a slider and the master brightness
     # moved from it, a blackout darkens the picture every view and the stream read, then off again
-    ([{"py": "phone_ui._st(app).update(host='127.0.0.1', port=0)"}, {"py": "phone_ui.set_on(app, True)"}], 0.6),
+    ([{"py": "setattr(app, '_https_was', phone_ui._st(app)['https'])"},
+      {"py": "phone_ui._st(app).update(host='127.0.0.1', port=0, https=False)"}, {"py": "phone_ui.set_on(app, True)"}], 0.6),
     ([{"check": "app.phone.is_open and app.phone.key in dpg.get_value('phone_url')"},
       {"check": "__import__('json').loads(__import__('urllib.request', fromlist=['x']).urlopen("
                 "f'http://127.0.0.1:{app.phone.port}/state?k={app.phone.key}', timeout=5).read())['effect'] "
@@ -366,7 +367,7 @@ STEPS = [
       {"py": "phone_ui.apply(app, {'a': 'blackout', 'v': 1})"}], 0.3),
     ([{"check": "int(app.frame_rgb().max()) == 0"},
       {"py": "(phone_ui.apply(app, {'a': 'blackout', 'v': 0}), phone_ui.apply(app, {'a': 'bri', 'v': 255}))"},
-      {"py": "phone_ui._st(app).update(host='', port=8765)"}, {"py": "phone_ui.set_on(app, False)"}], 0.3),
+      {"py": "phone_ui._st(app).update(host='', port=8765, https=app._https_was)"}, {"py": "phone_ui.set_on(app, False)"}], 0.3),
     ([{"check": "not app.phone.is_open and not app.blackout and app.master_bri == 255"}], 0.1),
     # a shader in: File > New effect from a shader... - one with a texture refused with its line, the example made
     # into a code effect, built, and drawing; then the code pane's effect is the one before again
@@ -1046,6 +1047,27 @@ STEPS = [
     ([{"check": "not app._scr or __import__('sys').platform == 'darwin' or "
                 "(app.video_src is not None and app._video_n > 2 and 'playing - the whole' in dpg.get_value('video_msg'))"},
       {"py": "video_ui.stop(app)"}, {"py": "video_ui._set_kind(app, 'test pattern')"}], 0.3),
+    # the phone's camera as the source: the panel says to serve the remote, then (served, plain HTTP on the
+    # loopback) that it needs HTTPS; a JPEG sent to the camera page's endpoint reaches the Video node
+    ([{"py": "video_ui._set_kind(app, __import__('native.video', fromlist=['v']).PHONE)"}, {"py": "video_ui.start(app)"}], 0.3),
+    ([{"check": "dpg.is_item_shown('video_phone_row') and not dpg.is_item_shown('video_url_row')"},
+      {"check": "'turn the remote on' in dpg.get_value('video_phone_words')"},
+      {"check": "'waiting for the phone' in dpg.get_value('video_msg')"},
+      {"py": "setattr(app, '_https_was', phone_ui._st(app)['https'])"},
+      {"py": "phone_ui._st(app).update(host='127.0.0.1', port=0, https=False)"}, {"py": "phone_ui.set_on(app, True)"}], 0.5),
+    ([{"py": "(lambda io, I: (lambda b: (I.new('RGB', (640, 360), (230, 40, 20)).save(b, 'JPEG'), "
+             "__import__('urllib.request', fromlist=['x']).urlopen(__import__('urllib.request', fromlist=['x']).Request("
+             "f'http://127.0.0.1:{app.phone.port}/cam?k={app.phone.key}', data=b.getvalue(), "
+             "headers={'Content-Type': 'image/jpeg'}), timeout=5).read()))(io.BytesIO()))"
+             "(__import__('io'), __import__('PIL.Image', fromlist=['Image']))"}], 1.2),
+    ([{"check": "app.video_src is not None and app._video_n >= 1 and 'waiting' not in dpg.get_value('video_msg')"},
+      {"check": "'HTTPS' in dpg.get_value('video_phone_words')"},
+      {"py": "video_ui.stop(app)"}, {"py": "video_ui._set_kind(app, 'a network stream')"}], 0.3),
+    ([{"check": "dpg.is_item_shown('video_url_row') and not dpg.is_item_shown('video_phone_row')"},
+      {"py": "video_ui._set_url(app, 'file:///nothing')"}], 0.3),
+    ([{"check": "app.video_src is None and 'not a stream address' in dpg.get_value('video_msg')"},
+      {"py": "video_ui._set(app, 'url', '')"}, {"py": "video_ui._set_kind(app, 'test pattern')"},
+      {"py": "phone_ui._st(app).update(host='', port=8765, https=app._https_was)"}, {"py": "phone_ui.set_on(app, False)"}], 0.3),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": f"projects/{SMOKE}/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     # a graph or a project from elsewhere is code: asked first, nothing written on Cancel, imported on the answer

@@ -7,3 +7,5 @@ sounddevice>=0.4
 pyaudiowpatch>=0.2.12; sys_platform == "win32"
 # optional: a MIDI controller's knobs on the sliders (Playback > MIDI controller)
 python-rtmidi>=1.5
+# optional: the phone remote over HTTPS, which a phone's browser asks before it offers the camera
+cryptography>=41

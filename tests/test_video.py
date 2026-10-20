@@ -140,6 +140,73 @@ def test_a_file_through_ffmpeg():
         src.close()
 
 
+def test_a_stream_address_is_a_network_one():
+    for url in ("rtsp://192.168.1.20:8554/live", "http://10.0.0.2:8080/video", "srt://host:9000", "rtmp://h/app/key"):
+        args = video.stream_args(url)
+        assert args[-2:] == ["-i", url] and "nobuffer" in args, args
+    assert "-rtsp_transport" in video.stream_args("rtsp://h/x")
+    for url in ("", "clip.mp4", "file:///etc/passwd", "concat:a.mp4|b.mp4", "subfile,,start,0,end,0,,:x", "http://"):
+        try:
+            video.stream_args(url)
+            raise AssertionError(f"{url!r} was taken as a stream")
+        except ValueError as e:
+            assert "not a stream address" in str(e)
+
+
+def test_a_stream_through_ffmpeg():
+    """A network stream: ffmpeg serving its test picture as MJPEG over HTTP on the loopback (as a phone camera
+    app does), read as a "stream" source - and by the camera list's entry, as mapping opens it."""
+    if not shutil.which("ffmpeg"):
+        print("     (no ffmpeg: the stream test is left out)")
+        return
+    import socket
+    s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
+    url = f"http://127.0.0.1:{port}/video"
+    srv = subprocess.Popen([shutil.which("ffmpeg"), "-v", "error", "-re", "-f", "lavfi", "-i",
+                            "testsrc=size=160x120:rate=15", "-f", "mpjpeg", "-listen", "1", url])
+    src = None
+    try:
+        end = time.time() + 15
+        while True:                       # opened again until the server is up (it takes one connection: no probe)
+            src = video.open_camera(video.STREAM + url, width=64, height=48, fit=True)
+            assert src.kind == "stream" and src.label == video.STREAM + url
+            while src.latest()[1] < 3 and time.time() < end and not src.error:
+                time.sleep(0.05)
+            if src.latest()[1] >= 3 or time.time() >= end:
+                break
+            src.close()
+            time.sleep(0.2)
+        frame, n = src.latest()
+        assert n >= 3 and frame.shape == (48, 64, 3) and frame.max() > 100, (n, src.error)
+    finally:
+        if src is not None:
+            src.close()
+        srv.kill()
+        srv.wait(5)
+
+
+def test_the_phones_camera():
+    """The phone remote's camera as a source: nothing until a frame comes, then the newest, filled or fitted."""
+    import io
+    from PIL import Image
+    from native import phone
+    hub = phone.CameraHub()
+    src = video.PhoneSource(hub, 96, 54)
+    assert src.latest() == (None, 0) and "waiting for the phone" in src.describe()
+    buf = io.BytesIO()
+    Image.new("RGB", (480, 640), (20, 200, 40)).save(buf, "JPEG")         # a phone held upright
+    hub.put(buf.getvalue())
+    frame, n = src.latest()
+    assert frame.shape == (54, 96, 3) and n == 1 and frame[0, 0, 1] > 150   # filled: green to the corners
+    assert src.latest()[1] == 1                                             # the same frame: not made again
+    fit = video.PhoneSource(hub, 96, 54, fit=True).latest()[0]
+    assert fit[27, 0].max() < 10 and fit[27, 48, 1] > 150                   # fitted: barred at the sides
+    src.pause(True)
+    hub.put(buf.getvalue())
+    assert src.latest()[1] == 1 and src.paused                              # paused: the picture holds
+    assert video.open_camera(video.PHONE).kind == "phone"
+
+
 def test_the_monitors_xrandr_lists():
     """X11's monitors, from `xrandr --listmonitors`: the name, the size and where each one sits."""
     text = ("Monitors: 2\n 0: +*HDMI-0 1920/598x1080/336+0+0  HDMI-0\n"

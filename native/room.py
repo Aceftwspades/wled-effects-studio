@@ -55,7 +55,7 @@ TIP = {"effect": "EFFECT: the project, the effect and its palette",
        "parameters": "PARAMETERS: the effect's sliders and checkboxes",
        "audio": "AUDIO: the synthetic audio's levels",
        "live": "LIVE: audio from a line in, a microphone or an audio file",
-       "video": "VIDEO: a webcam, a video file or the test pattern, for the Video node"}
+       "video": "VIDEO: a webcam, a file, the screen, a phone or a stream, for the Video node"}
 
 
 class _State:

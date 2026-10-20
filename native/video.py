@@ -6,6 +6,8 @@ stream (Device > Stream), which sends the sim's picture as it is.
     src = video.open_source("file", path="clip.mp4", width=96, loop=True)
     src = video.open_source("webcam", name="Integrated Camera")
     src = video.open_source("screen", name="the whole desktop")   # a name from screens()
+    src = video.open_source("stream", path="rtsp://192.168.1.20:8554/live")   # a phone app's, OBS's, an IP camera's
+    src = video.open_source("phone")             # the phone remote's camera page (native/phone.py), no ffmpeg
     src = video.open_source("test")              # no ffmpeg needed
     frame, n = src.latest()                      # (h, w, 3) uint8 and its number, or (None, 0)
     src.close()
@@ -320,11 +322,97 @@ def screen_note():
     return None
 
 
+# --- the phone's camera, and a stream from the network --------------------------------------------
+PHONE = "the phone's camera"        # its entry in the camera lists (the mapping window's too)
+STREAM = "stream: "                 # a network stream's entry in the mapping window's list: its address after this
+STREAM_SCHEMES = ("rtsp", "rtsps", "rtmp", "rtmps", "http", "https", "srt", "udp", "rtp", "tcp")
+STALE_S = 2.0                       # the phone's camera is said to be waiting when no frame came for this long
+
+
+class PhoneSource:
+    """The phone remote's camera page (native/phone.py's CAMERA): its newest frame, fitted to the size asked."""
+    kind = "phone"
+
+    def __init__(self, hub, width=WIDTH, height=HEIGHT, fit=False):
+        self.hub = hub
+        self.label = PHONE
+        self.w, self.h = int(width), int(height) // 2 * 2
+        self.fit = fit
+        self.error = None
+        self.n = 0
+        self._seen = -1
+        self._frame = None
+        self._paused = False
+
+    def describe(self):
+        age = self.hub.age()
+        wait = (" - waiting for the phone: its remote page's Camera link, then Start" if age is None else
+                f" - no frame for {int(age)} s" if age > STALE_S else "")
+        return f"{PHONE}, {self.w} x {self.h}{wait}"
+
+    def latest(self):
+        img, count = self.hub.newest()
+        if img is not None and count != self._seen and not self._paused:
+            from PIL import Image, ImageOps
+            self._seen = count
+            size = (self.w, self.h)
+            img = (ImageOps.pad(img, size, Image.BILINEAR, color=(0, 0, 0)) if self.fit       # all of it (mapping)
+                   else ImageOps.fit(img, size, Image.BILINEAR))                                # the frame filled
+            self._frame = np.asarray(img, np.uint8)
+            self.n = count                    # the frames the phone sent: mapping's frame skip counts them all
+        return self._frame, self.n
+
+    def pause(self, on=True):
+        self._paused = bool(on)
+
+    @property
+    def paused(self):
+        return self._paused
+
+    def close(self):
+        pass
+
+
+def stream_args(url):
+    """ffmpeg's input for a stream at `url` - a network address only (rtsp, rtmp, srt, http(s) and the
+    like: a phone camera app's, OBS's, an IP camera's), read with as little buffering as it allows. ValueError
+    for anything else: a file goes in as a file, and ffmpeg's other protocols are not opened from here."""
+    from urllib.parse import urlparse
+    url = (url or "").strip()
+    u = urlparse(url)
+    if u.scheme.lower() not in STREAM_SCHEMES or not u.netloc:
+        raise ValueError(f"not a stream address: {url!r} - one like rtsp://192.168.1.20:8554/live or "
+                         "http://192.168.1.20:8080/video")
+    scheme = u.scheme.lower()
+    low = ["-fflags", "nobuffer", "-flags", "low_delay", "-probesize", "500000", "-analyzeduration", "500000"]
+    if scheme.startswith("rtsp"):
+        return low + ["-rtsp_transport", "tcp", "-timeout", "5000000", "-i", url]
+    if scheme in ("http", "https", "rtmp", "rtmps", "tcp"):
+        return low + ["-rw_timeout", "5000000", "-i", url]
+    return low + ["-i", url]
+
+
+def open_camera(name, width=WIDTH, height=HEIGHT, fit=False):
+    """A camera by its entry in a camera list: PHONE, STREAM + an address, or a webcam's name (the mapping
+    window's list holds all three)."""
+    if name == PHONE:
+        return open_source("phone", width=width, height=height, fit=fit)
+    if name and name.startswith(STREAM):
+        return open_source("stream", path=name[len(STREAM):], width=width, height=height, fit=fit)
+    return open_source("webcam", name=name, width=width, height=height, fit=fit)
+
+
 def open_source(kind, path=None, name=None, width=WIDTH, height=HEIGHT, loop=True, fit=False):
-    """A video source: kind "test", "file" (path), "webcam" (name, from webcams()) or "screen" (name, from
-    screens())."""
+    """A video source: kind "test", "file" (path), "webcam" (name, from webcams()), "screen" (name, from
+    screens()), "phone" (the phone remote's camera page) or "stream" (path: a network address)."""
     if kind == "test":
         return TestPattern(width, height)
+    if kind == "phone":
+        from native import phone
+        return PhoneSource(phone.CAMERA, width, height, fit=fit)
+    if kind == "stream":
+        args = stream_args(path)
+        return FfmpegSource(args, STREAM + path.strip(), "stream", width, height, realtime=False, fit=fit)
     if kind == "file":
         import os
         if not path or not os.path.exists(path):
