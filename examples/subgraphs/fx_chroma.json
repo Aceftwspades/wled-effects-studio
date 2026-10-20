@@ -1,0 +1,394 @@
+{
+ "name": "FX Chroma Split",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "amount",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "t",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.005,
+    "out_hi": 0.06
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Wave",
+   "pos": [
+    270,
+    509
+   ],
+   "params": {
+    "shape": "sine"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Remap",
+   "pos": [
+    500,
+    451
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.5,
+    "out_hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Multiply",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Add",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Subtract",
+   "pos": [
+    730,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Add",
+   "pos": [
+    730,
+    711
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Video",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Video",
+   "pos": [
+    960,
+    353
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Video",
+   "pos": [
+    960,
+    666
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Split",
+   "pos": [
+    1190,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Split",
+   "pos": [
+    1190,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Split",
+   "pos": [
+    1190,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Combine",
+   "pos": [
+    1420,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "Red, green and blue pulled apart, the way a cheap lens or a glitch does - amount is how far, and they breathe with t."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   3,
+   "value",
+   5,
+   "x"
+  ],
+  [
+   4,
+   "value",
+   6,
+   "x"
+  ],
+  [
+   6,
+   "value",
+   7,
+   "x"
+  ],
+  [
+   5,
+   "result",
+   8,
+   "a"
+  ],
+  [
+   7,
+   "result",
+   8,
+   "b"
+  ],
+  [
+   1,
+   "value",
+   9,
+   "a"
+  ],
+  [
+   8,
+   "result",
+   9,
+   "b"
+  ],
+  [
+   1,
+   "value",
+   10,
+   "a"
+  ],
+  [
+   8,
+   "result",
+   10,
+   "b"
+  ],
+  [
+   2,
+   "value",
+   11,
+   "a"
+  ],
+  [
+   8,
+   "result",
+   11,
+   "b"
+  ],
+  [
+   9,
+   "result",
+   12,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   12,
+   "v"
+  ],
+  [
+   1,
+   "value",
+   13,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   13,
+   "v"
+  ],
+  [
+   10,
+   "result",
+   14,
+   "u"
+  ],
+  [
+   11,
+   "result",
+   14,
+   "v"
+  ],
+  [
+   12,
+   "color",
+   15,
+   "color"
+  ],
+  [
+   13,
+   "color",
+   16,
+   "color"
+  ],
+  [
+   14,
+   "color",
+   17,
+   "color"
+  ],
+  [
+   15,
+   "r",
+   18,
+   "r"
+  ],
+  [
+   16,
+   "g",
+   18,
+   "g"
+  ],
+  [
+   17,
+   "b",
+   18,
+   "b"
+  ],
+  [
+   18,
+   "color",
+   19,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

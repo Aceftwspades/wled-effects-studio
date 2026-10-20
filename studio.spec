@@ -16,6 +16,7 @@ def folder(name, dest=None):
 
 datas = [folder("shim"), folder("gen"), folder("runtime"),
          folder(os.path.join("examples", "graphs")), folder(os.path.join("examples", "assets")),
+         folder(os.path.join("examples", "subgraphs")),       # the sub-graphs the examples use (a new project gets them)
          folder("docs"),
          (os.path.join(HERE, "sim_main.cpp"), "."),
          (os.path.join(HERE, "GUIDE.md"), "."), (os.path.join(HERE, "NODES.md"), "."),

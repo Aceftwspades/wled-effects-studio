@@ -1,0 +1,323 @@
+{
+ "name": "VS Source",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "spin",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "kaleidoscope",
+    "type": "bool",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Coords",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Remap",
+   "pos": [
+    270,
+    272
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 0.6
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Integrate",
+   "pos": [
+    500,
+    191
+   ],
+   "params": {
+    "wrap": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Subtract",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 7,
+   "type": "Subtract",
+   "pos": [
+    500,
+    394
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 8,
+   "type": "Rotate",
+   "pos": [
+    730,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Abs",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Abs",
+   "pos": [
+    960,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Add",
+   "pos": [
+    1190,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.2
+   }
+  },
+  {
+   "id": 12,
+   "type": "Add",
+   "pos": [
+    1190,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.2
+   }
+  },
+  {
+   "id": 13,
+   "type": "Select",
+   "pos": [
+    1420,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Select",
+   "pos": [
+    1420,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Graph output",
+   "pos": [
+    1650,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Graph output",
+   "pos": [
+    1650,
+    300
+   ],
+   "params": {
+    "name": "v",
+    "type": "float"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Note",
+   "pos": [
+    730,
+    430
+   ],
+   "params": {
+    "text": "Where each pixel looks on the video: its own place, or (kaleidoscope) a copy turned by spin and folded into a mirror - every look reads the frame through these u and v."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   4,
+   "x"
+  ],
+  [
+   4,
+   "result",
+   5,
+   "rate"
+  ],
+  [
+   3,
+   "u",
+   6,
+   "a"
+  ],
+  [
+   3,
+   "v",
+   7,
+   "a"
+  ],
+  [
+   6,
+   "result",
+   8,
+   "x"
+  ],
+  [
+   7,
+   "result",
+   8,
+   "y"
+  ],
+  [
+   5,
+   "value",
+   8,
+   "turns"
+  ],
+  [
+   8,
+   "x",
+   9,
+   "x"
+  ],
+  [
+   8,
+   "y",
+   10,
+   "x"
+  ],
+  [
+   9,
+   "result",
+   11,
+   "a"
+  ],
+  [
+   10,
+   "result",
+   12,
+   "a"
+  ],
+  [
+   2,
+   "value",
+   13,
+   "on"
+  ],
+  [
+   3,
+   "u",
+   13,
+   "a"
+  ],
+  [
+   11,
+   "result",
+   13,
+   "b"
+  ],
+  [
+   2,
+   "value",
+   14,
+   "on"
+  ],
+  [
+   3,
+   "v",
+   14,
+   "a"
+  ],
+  [
+   12,
+   "result",
+   14,
+   "b"
+  ],
+  [
+   13,
+   "result",
+   15,
+   "value"
+  ],
+  [
+   14,
+   "result",
+   16,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

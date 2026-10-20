@@ -1,0 +1,330 @@
+{
+ "name": "FX Imprint",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "amount",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "t",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Graph input",
+   "pos": [
+    40,
+    752
+   ],
+   "params": {
+    "name": "motion",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Video",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Multiply",
+   "pos": [
+    270,
+    562
+   ],
+   "params": {},
+   "inputs": {
+    "b": 3.0
+   }
+  },
+  {
+   "id": 8,
+   "type": "Clamp",
+   "pos": [
+    500,
+    560
+   ],
+   "params": {
+    "lo": 0.0,
+    "hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Levels",
+   "pos": [
+    500,
+    170
+   ],
+   "params": {},
+   "inputs": {
+    "brightness": 1.6
+   }
+  },
+  {
+   "id": 10,
+   "type": "Mask",
+   "pos": [
+    730,
+    191
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Remap",
+   "pos": [
+    270,
+    353
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.9,
+    "out_hi": 0.99
+   },
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Previous",
+   "pos": [
+    500,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Fade",
+   "pos": [
+    730,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Blend",
+   "pos": [
+    960,
+    170
+   ],
+   "params": {
+    "mode": "max"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Fade",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "keep": 0.25
+   }
+  },
+  {
+   "id": 16,
+   "type": "Blend",
+   "pos": [
+    1190,
+    170
+   ],
+   "params": {
+    "mode": "max"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "Afterimages: what moves is stamped in its own colours and stays, fading slowly, over a faint copy of the video - a dancer leaves copies of themselves. amount is how long they stay. motion comes from VS Motion."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   6,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   6,
+   "v"
+  ],
+  [
+   5,
+   "value",
+   7,
+   "a"
+  ],
+  [
+   7,
+   "result",
+   8,
+   "x"
+  ],
+  [
+   6,
+   "color",
+   9,
+   "color"
+  ],
+  [
+   9,
+   "color",
+   10,
+   "color"
+  ],
+  [
+   8,
+   "result",
+   10,
+   "mask"
+  ],
+  [
+   3,
+   "value",
+   11,
+   "x"
+  ],
+  [
+   12,
+   "color",
+   13,
+   "color"
+  ],
+  [
+   11,
+   "result",
+   13,
+   "keep"
+  ],
+  [
+   13,
+   "color",
+   14,
+   "under"
+  ],
+  [
+   10,
+   "color",
+   14,
+   "over"
+  ],
+  [
+   6,
+   "color",
+   15,
+   "color"
+  ],
+  [
+   15,
+   "color",
+   16,
+   "under"
+  ],
+  [
+   14,
+   "color",
+   16,
+   "over"
+  ],
+  [
+   16,
+   "color",
+   17,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

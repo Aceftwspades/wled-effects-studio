@@ -1,0 +1,237 @@
+{
+ "name": "FX Melt",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "amount",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "t",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Coords",
+   "pos": [
+    270,
+    509
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.01,
+    "out_hi": 0.06
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Subtract",
+   "pos": [
+    500,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Previous at",
+   "pos": [
+    730,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Fade",
+   "pos": [
+    960,
+    430
+   ],
+   "params": {},
+   "inputs": {
+    "keep": 0.93
+   }
+  },
+  {
+   "id": 10,
+   "type": "Video",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Blend",
+   "pos": [
+    1190,
+    170
+   ],
+   "params": {
+    "mode": "max"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "The picture runs down like wax: every pixel takes the brighter of the video and what was just above it last frame, a little dimmer - amount is how fast it drips. It reads the LEDs' last frame, so the other deck's look melts with it while they mix."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   3,
+   "value",
+   6,
+   "x"
+  ],
+  [
+   5,
+   "v",
+   7,
+   "a"
+  ],
+  [
+   6,
+   "result",
+   7,
+   "b"
+  ],
+  [
+   5,
+   "u",
+   8,
+   "u"
+  ],
+  [
+   7,
+   "result",
+   8,
+   "v"
+  ],
+  [
+   8,
+   "color",
+   9,
+   "color"
+  ],
+  [
+   1,
+   "value",
+   10,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   10,
+   "v"
+  ],
+  [
+   10,
+   "color",
+   11,
+   "under"
+  ],
+  [
+   9,
+   "color",
+   11,
+   "over"
+  ],
+  [
+   11,
+   "color",
+   12,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

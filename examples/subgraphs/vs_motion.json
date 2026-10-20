@@ -1,0 +1,811 @@
+{
+ "name": "VS Motion",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "sensitivity",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "hold",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Video",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Field",
+   "pos": [
+    500,
+    170
+   ],
+   "params": {
+    "field": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Mix",
+   "pos": [
+    500,
+    348
+   ],
+   "params": {},
+   "inputs": {
+    "t": 0.25
+   }
+  },
+  {
+   "id": 8,
+   "type": "Field write",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {
+    "field": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Subtract",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Abs",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Remap",
+   "pos": [
+    730,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.15,
+    "out_hi": 0.01
+   },
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Subtract",
+   "pos": [
+    1190,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Multiply",
+   "pos": [
+    1420,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "b": 14.0
+   }
+  },
+  {
+   "id": 14,
+   "type": "Clamp",
+   "pos": [
+    1650,
+    40
+   ],
+   "params": {
+    "lo": 0.0,
+    "hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Field",
+   "pos": [
+    1420,
+    300
+   ],
+   "params": {
+    "field": 1
+   },
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Remap",
+   "pos": [
+    1190,
+    430
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.88,
+    "out_hi": 0.985
+   },
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Multiply",
+   "pos": [
+    1650,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Max",
+   "pos": [
+    1880,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Field write",
+   "pos": [
+    2110,
+    170
+   ],
+   "params": {
+    "field": 1
+   },
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Coords",
+   "pos": [
+    1650,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 21,
+   "type": "Multiply",
+   "pos": [
+    2110,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 22,
+   "type": "Multiply",
+   "pos": [
+    2110,
+    581
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 23,
+   "type": "Field write",
+   "pos": [
+    2340,
+    430
+   ],
+   "params": {
+    "field": 2
+   },
+   "inputs": {}
+  },
+  {
+   "id": 24,
+   "type": "Field write",
+   "pos": [
+    2340,
+    560
+   ],
+   "params": {
+    "field": 3
+   },
+   "inputs": {}
+  },
+  {
+   "id": 25,
+   "type": "Statistics",
+   "pos": [
+    2340,
+    820
+   ],
+   "params": {
+    "field": 1
+   },
+   "inputs": {}
+  },
+  {
+   "id": 26,
+   "type": "Statistics",
+   "pos": [
+    2340,
+    998
+   ],
+   "params": {
+    "field": 2
+   },
+   "inputs": {}
+  },
+  {
+   "id": 27,
+   "type": "Statistics",
+   "pos": [
+    2340,
+    1176
+   ],
+   "params": {
+    "field": 3
+   },
+   "inputs": {}
+  },
+  {
+   "id": 28,
+   "type": "Max",
+   "pos": [
+    2570,
+    841
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.0005
+   }
+  },
+  {
+   "id": 29,
+   "type": "Divide",
+   "pos": [
+    2800,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 30,
+   "type": "Divide",
+   "pos": [
+    2800,
+    1101
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 31,
+   "type": "Multiply",
+   "pos": [
+    2570,
+    690
+   ],
+   "params": {},
+   "inputs": {
+    "b": 25.0
+   }
+  },
+  {
+   "id": 32,
+   "type": "Clamp",
+   "pos": [
+    2800,
+    690
+   ],
+   "params": {
+    "lo": 0.0,
+    "hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 33,
+   "type": "Threshold",
+   "pos": [
+    3030,
+    690
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.08
+   }
+  },
+  {
+   "id": 34,
+   "type": "Select",
+   "pos": [
+    3030,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.5
+   }
+  },
+  {
+   "id": 35,
+   "type": "Select",
+   "pos": [
+    3030,
+    1128
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.5
+   }
+  },
+  {
+   "id": 36,
+   "type": "Slew",
+   "pos": [
+    3260,
+    950
+   ],
+   "params": {},
+   "inputs": {
+    "up": 1.6,
+    "down": 1.6
+   }
+  },
+  {
+   "id": 37,
+   "type": "Slew",
+   "pos": [
+    3260,
+    1153
+   ],
+   "params": {},
+   "inputs": {
+    "up": 1.6,
+    "down": 1.6
+   }
+  },
+  {
+   "id": 38,
+   "type": "Graph output",
+   "pos": [
+    3490,
+    40
+   ],
+   "params": {
+    "name": "motion",
+    "type": "float"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 39,
+   "type": "Graph output",
+   "pos": [
+    3490,
+    191
+   ],
+   "params": {
+    "name": "trail",
+    "type": "float"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 40,
+   "type": "Graph output",
+   "pos": [
+    3490,
+    342
+   ],
+   "params": {
+    "name": "luma",
+    "type": "float"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 41,
+   "type": "Graph output",
+   "pos": [
+    3490,
+    950
+   ],
+   "params": {
+    "name": "centre u",
+    "type": "float"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 42,
+   "type": "Graph output",
+   "pos": [
+    3490,
+    1101
+   ],
+   "params": {
+    "name": "centre v",
+    "type": "float"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 43,
+   "type": "Graph output",
+   "pos": [
+    3490,
+    690
+   ],
+   "params": {
+    "name": "presence",
+    "type": "float"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 44,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "What moves: this frame's brightness against a running average of the last few. motion is 1 where something moved just now; trail follows it and fades (hold: how slowly); centre u / v is the middle of what moves, gliding, and presence how much moves at all. It keeps its memory in fields 0 to 3 - use one per graph."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   5,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   5,
+   "v"
+  ],
+  [
+   6,
+   "value",
+   7,
+   "a"
+  ],
+  [
+   5,
+   "luma",
+   7,
+   "b"
+  ],
+  [
+   7,
+   "result",
+   8,
+   "value"
+  ],
+  [
+   5,
+   "luma",
+   9,
+   "a"
+  ],
+  [
+   6,
+   "value",
+   9,
+   "b"
+  ],
+  [
+   9,
+   "result",
+   10,
+   "x"
+  ],
+  [
+   3,
+   "value",
+   11,
+   "x"
+  ],
+  [
+   10,
+   "result",
+   12,
+   "a"
+  ],
+  [
+   11,
+   "result",
+   12,
+   "b"
+  ],
+  [
+   12,
+   "result",
+   13,
+   "a"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "x"
+  ],
+  [
+   4,
+   "value",
+   16,
+   "x"
+  ],
+  [
+   15,
+   "value",
+   17,
+   "a"
+  ],
+  [
+   16,
+   "result",
+   17,
+   "b"
+  ],
+  [
+   14,
+   "result",
+   18,
+   "a"
+  ],
+  [
+   17,
+   "result",
+   18,
+   "b"
+  ],
+  [
+   18,
+   "result",
+   19,
+   "value"
+  ],
+  [
+   18,
+   "result",
+   21,
+   "a"
+  ],
+  [
+   20,
+   "u",
+   21,
+   "b"
+  ],
+  [
+   18,
+   "result",
+   22,
+   "a"
+  ],
+  [
+   20,
+   "v",
+   22,
+   "b"
+  ],
+  [
+   21,
+   "result",
+   23,
+   "value"
+  ],
+  [
+   22,
+   "result",
+   24,
+   "value"
+  ],
+  [
+   25,
+   "mean",
+   28,
+   "a"
+  ],
+  [
+   26,
+   "mean",
+   29,
+   "a"
+  ],
+  [
+   28,
+   "result",
+   29,
+   "b"
+  ],
+  [
+   27,
+   "mean",
+   30,
+   "a"
+  ],
+  [
+   28,
+   "result",
+   30,
+   "b"
+  ],
+  [
+   25,
+   "mean",
+   31,
+   "a"
+  ],
+  [
+   31,
+   "result",
+   32,
+   "x"
+  ],
+  [
+   32,
+   "result",
+   33,
+   "x"
+  ],
+  [
+   33,
+   "on",
+   34,
+   "on"
+  ],
+  [
+   29,
+   "result",
+   34,
+   "b"
+  ],
+  [
+   33,
+   "on",
+   35,
+   "on"
+  ],
+  [
+   30,
+   "result",
+   35,
+   "b"
+  ],
+  [
+   34,
+   "result",
+   36,
+   "x"
+  ],
+  [
+   35,
+   "result",
+   37,
+   "x"
+  ],
+  [
+   14,
+   "result",
+   38,
+   "value"
+  ],
+  [
+   18,
+   "result",
+   39,
+   "value"
+  ],
+  [
+   5,
+   "luma",
+   40,
+   "value"
+  ],
+  [
+   36,
+   "value",
+   41,
+   "value"
+  ],
+  [
+   37,
+   "value",
+   42,
+   "value"
+  ],
+  [
+   32,
+   "result",
+   43,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

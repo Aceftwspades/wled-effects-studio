@@ -981,6 +981,27 @@ Video node shows black there when it is flashed instead of streamed.
    it. The Video node's tutorial (F1 on it, then Try it) has a stripe
    layer screened over the video, ready to change.
 
+**The Video Switchboard** (an example graph: open it from the graph pane's
+list) is a VJ desk made of sub-graphs. Ten looks - Clean, Neon Edges,
+Mosaic, Thermal, Halftone, Chroma Split, Melt, Motion Trails, Imprint and
+Follow Spot - each a sub-graph (`fx_...`) with the same pins: u and v,
+amount (the **Detail** slider) and t (turned by **Motion**), a colour out.
+**Deck A** and **Deck B** pick one each, a tenth of the slider apart (the
+Note on the graph lists them), and **A - B** crossfades between the decks.
+**Auto mix on the bar** swings the mix to the other deck every four beats;
+**Shuffle looks** deals a deck a random look as the mix leaves it, so it
+comes back as something new - with both on, it runs a show by itself.
+**Kaleidoscope** turns and mirror-folds where every look reads the frame.
+Three looks follow what moves: **VS Motion** compares each frame's
+brightness with the last (kept in the graph's fields 0 and 1), so
+**Motion Trails** draws glowing tracers behind anything moving, **Imprint**
+leaves fading afterimages of it, and **Follow Spot** lights a circle that
+glides after the middle of the motion, with a lock-on ring. To change a
+look, select its node and press Tab to enter it (Tab again, or Node >
+Sub-graph > Back to the parent graph, to come back); to swap one for a
+look of your own, make a sub-graph with the same pins and wire it in its
+place on both decks' **VS Pick**.
+
 ## A show: the Sequence frame
 
 Window > Sequence (Ctrl+Shift+Q). A **step** is what the sim

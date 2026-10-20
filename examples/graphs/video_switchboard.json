@@ -9,7 +9,7 @@
     40
    ],
    "params": {
-    "label": "Spin speed",
+    "label": "Motion",
     "default": 96
    },
    "inputs": {}
@@ -35,8 +35,8 @@
     300
    ],
    "params": {
-    "label": "Look",
-    "default": 0
+    "label": "Deck A",
+    "default": 191
    },
    "inputs": {}
   },
@@ -48,17 +48,43 @@
     430
    ],
    "params": {
-    "label": "Stripes",
-    "default": 0
+    "label": "Deck B",
+    "default": 89
    },
    "inputs": {}
   },
   {
    "id": 5,
-   "type": "Check 1",
+   "type": "Custom 3",
    "pos": [
     40,
     560
+   ],
+   "params": {
+    "label": "A - B",
+    "default": 0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Check 1",
+   "pos": [
+    40,
+    690
+   ],
+   "params": {
+    "label": "Auto mix on the bar",
+    "default": false
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Check 2",
+   "pos": [
+    40,
+    820
    ],
    "params": {
     "label": "Kaleidoscope",
@@ -67,37 +93,24 @@
    "inputs": {}
   },
   {
-   "id": 6,
-   "type": "Check 2",
-   "pos": [
-    40,
-    690
-   ],
-   "params": {
-    "label": "Beat pulse",
-    "default": false
-   },
-   "inputs": {}
-  },
-  {
-   "id": 7,
+   "id": 8,
    "type": "Check 3",
    "pos": [
     40,
-    820
+    950
    ],
    "params": {
-    "label": "Negative",
+    "label": "Shuffle looks",
     "default": false
    },
    "inputs": {}
   },
   {
-   "id": 8,
+   "id": 9,
    "type": "Effect settings",
    "pos": [
     40,
-    950
+    1080
    ],
    "params": {
     "palette": 11,
@@ -108,36 +121,38 @@
    "inputs": {}
   },
   {
-   "id": 9,
-   "type": "Coords",
-   "pos": [
-    270,
-    40
-   ],
-   "params": {},
-   "inputs": {}
-  },
-  {
    "id": 10,
-   "type": "Remap",
+   "type": "Note",
    "pos": [
-    270,
-    272
+    40,
+    1210
    ],
    "params": {
-    "in_lo": 0.0,
-    "in_hi": 1.0,
-    "out_lo": 0.0,
-    "out_hi": 0.6
+    "text": "Deck A and Deck B: ten looks each, a tenth of the slider apart -\n  1 Clean  2 Neon Edges  3 Mosaic  4 Thermal  5 Halftone\n  6 Chroma Split  7 Melt  8 Motion Trails  9 Imprint  10 Follow Spot\n(slider 0, 26, 51, 77, 102, 128, 153, 179, 204, 230). A - B crossfades; Auto mix on the bar swings it to the other deck every four beats; Shuffle looks gives each deck a random look as the mix leaves it, so it comes back as something new - both on, it runs a show by itself. Every look is a sub-graph: Tab enters one."
    },
    "inputs": {}
   },
   {
    "id": 11,
-   "type": "Integrate",
+   "type": "Remap",
    "pos": [
     270,
-    481
+    40
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.0,
+    "out_hi": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Integrate",
+   "pos": [
+    500,
+    40
    ],
    "params": {
     "wrap": 1.0
@@ -145,353 +160,255 @@
    "inputs": {}
   },
   {
-   "id": 12,
-   "type": "Subtract",
-   "pos": [
-    500,
-    40
-   ],
-   "params": {},
-   "inputs": {
-    "b": 0.5
-   }
-  },
-  {
    "id": 13,
-   "type": "Subtract",
+   "type": "sub:vs_source",
    "pos": [
-    500,
-    191
+    270,
+    300
    ],
    "params": {},
-   "inputs": {
-    "b": 0.5
-   }
+   "inputs": {}
   },
   {
    "id": 14,
-   "type": "Rotate",
+   "type": "sub:vs_motion",
    "pos": [
-    730,
-    40
+    500,
+    430
    ],
    "params": {},
    "inputs": {}
   },
   {
    "id": 15,
-   "type": "Abs",
+   "type": "sub:fx_clean",
    "pos": [
-    960,
-    40
+    730,
+    40.0
    ],
    "params": {},
    "inputs": {}
   },
   {
    "id": 16,
-   "type": "Abs",
+   "type": "sub:fx_edges",
    "pos": [
-    960,
-    195
+    730,
+    248.0
    ],
    "params": {},
    "inputs": {}
   },
   {
    "id": 17,
-   "type": "Add",
+   "type": "sub:fx_mosaic",
    "pos": [
-    1190,
-    40
+    730,
+    456.0
    ],
    "params": {},
-   "inputs": {
-    "b": 0.2
-   }
+   "inputs": {}
   },
   {
    "id": 18,
-   "type": "Add",
+   "type": "sub:fx_thermal",
    "pos": [
-    1190,
-    191
+    730,
+    664.0000000000001
    ],
    "params": {},
-   "inputs": {
-    "b": 0.2
-   }
+   "inputs": {}
   },
   {
    "id": 19,
-   "type": "Select",
+   "type": "sub:fx_halftone",
    "pos": [
-    1420,
-    40
+    730,
+    872.0
    ],
    "params": {},
    "inputs": {}
   },
   {
    "id": 20,
-   "type": "Select",
+   "type": "sub:fx_chroma",
    "pos": [
-    1420,
-    218
+    960,
+    40.0
    ],
    "params": {},
    "inputs": {}
   },
   {
    "id": 21,
-   "type": "Remap",
+   "type": "sub:fx_melt",
    "pos": [
-    1420,
-    430
+    960,
+    248.0
    ],
-   "params": {
-    "in_lo": 0.0,
-    "in_hi": 1.0,
-    "out_lo": 1.0,
-    "out_hi": 8.0
-   },
+   "params": {},
    "inputs": {}
   },
   {
    "id": 22,
-   "type": "Remap",
+   "type": "sub:fx_trails",
    "pos": [
-    1420,
-    639
+    960,
+    456.0
    ],
-   "params": {
-    "in_lo": 0.0,
-    "in_hi": 1.0,
-    "out_lo": 4.0,
-    "out_hi": 32.0
-   },
+   "params": {},
    "inputs": {}
   },
   {
    "id": 23,
-   "type": "Video",
+   "type": "sub:fx_imprint",
    "pos": [
-    1650,
-    300.0
+    960,
+    688.0
    ],
-   "params": {
-    "projection": "picture",
-    "style": "none"
-   },
+   "params": {},
    "inputs": {}
   },
   {
    "id": 24,
-   "type": "Video",
+   "type": "sub:fx_follow",
    "pos": [
-    1650,
-    613.0
+    960,
+    920.0
    ],
-   "params": {
-    "projection": "picture",
-    "style": "edges"
-   },
+   "params": {},
    "inputs": {}
   },
   {
    "id": 25,
-   "type": "Video",
+   "type": "Audio",
    "pos": [
-    1650,
-    926.0
+    1190,
+    950
    ],
-   "params": {
-    "projection": "picture",
-    "style": "pixelate"
-   },
+   "params": {},
    "inputs": {}
   },
   {
    "id": 26,
-   "type": "Video",
+   "type": "Counter",
    "pos": [
-    1650,
-    1239.0
+    1420,
+    1101
+   ],
+   "params": {},
+   "inputs": {
+    "steps": 4.0
+   }
+  },
+  {
+   "id": 27,
+   "type": "Toggle",
+   "pos": [
+    1420,
+    950
    ],
    "params": {
-    "projection": "picture",
-    "style": "palette"
+    "on": false
    },
    "inputs": {}
   },
   {
-   "id": 27,
-   "type": "Threshold",
-   "pos": [
-    1880,
-    300.0
-   ],
-   "params": {},
-   "inputs": {
-    "at": 0.25
-   }
-  },
-  {
    "id": 28,
-   "type": "Select",
+   "type": "Rising edge",
    "pos": [
-    2110,
-    300.0
+    1650,
+    1340
    ],
    "params": {},
-   "inputs": {
-    "a": 0.0,
-    "b": 1.0
-   }
+   "inputs": {}
   },
   {
    "id": 29,
-   "type": "Blend",
+   "type": "Not",
    "pos": [
-    2340,
-    300.0
+    1650,
+    1470
    ],
-   "params": {
-    "mode": "over"
-   },
+   "params": {},
    "inputs": {}
   },
   {
    "id": 30,
-   "type": "Threshold",
+   "type": "Rising edge",
    "pos": [
     1880,
-    509.0
+    1516
    ],
    "params": {},
-   "inputs": {
-    "at": 0.5
-   }
+   "inputs": {}
   },
   {
    "id": 31,
-   "type": "Select",
+   "type": "Random hold",
    "pos": [
-    2110,
-    495.0
+    1880,
+    1340
    ],
    "params": {},
-   "inputs": {
-    "a": 0.0,
-    "b": 1.0
-   }
+   "inputs": {}
   },
   {
    "id": 32,
-   "type": "Blend",
+   "type": "Random hold",
    "pos": [
-    2340,
-    505.0
+    2110,
+    1470
    ],
-   "params": {
-    "mode": "over"
-   },
+   "params": {},
    "inputs": {}
   },
   {
    "id": 33,
-   "type": "Threshold",
-   "pos": [
-    1880,
-    718.0
-   ],
-   "params": {},
-   "inputs": {
-    "at": 0.75
-   }
-  },
-  {
-   "id": 34,
    "type": "Select",
    "pos": [
     2110,
-    690.0
+    170
    ],
    "params": {},
-   "inputs": {
-    "a": 0.0,
-    "b": 1.0
-   }
+   "inputs": {}
+  },
+  {
+   "id": 34,
+   "type": "sub:vs_pick",
+   "pos": [
+    2340,
+    170
+   ],
+   "params": {},
+   "inputs": {}
   },
   {
    "id": 35,
-   "type": "Blend",
+   "type": "Select",
    "pos": [
-    2340,
-    710.0
+    2110,
+    560
    ],
-   "params": {
-    "mode": "over"
-   },
+   "params": {},
    "inputs": {}
   },
   {
    "id": 36,
-   "type": "Stripes",
+   "type": "sub:vs_pick",
    "pos": [
-    2110,
-    950
+    2340,
+    564
    ],
    "params": {},
-   "inputs": {
-    "count": 6.0,
-    "duty": 0.2
-   }
+   "inputs": {}
   },
   {
    "id": 37,
-   "type": "Palette",
-   "pos": [
-    2340,
-    950
-   ],
-   "params": {},
-   "inputs": {}
-  },
-  {
-   "id": 38,
-   "type": "Blend",
-   "pos": [
-    2570,
-    690
-   ],
-   "params": {
-    "mode": "screen"
-   },
-   "inputs": {}
-  },
-  {
-   "id": 39,
-   "type": "Colour",
-   "pos": [
-    2570,
-    950
-   ],
-   "params": {
-    "rgb": [
-     255,
-     255,
-     255
-    ]
-   },
-   "inputs": {}
-  },
-  {
-   "id": 40,
    "type": "Select",
    "pos": [
-    2570,
-    1080
+    1650,
+    950
    ],
    "params": {},
    "inputs": {
@@ -500,83 +417,44 @@
    }
   },
   {
-   "id": 41,
-   "type": "Blend",
+   "id": 38,
+   "type": "Slew",
    "pos": [
-    2800,
-    690
-   ],
-   "params": {
-    "mode": "difference"
-   },
-   "inputs": {}
-  },
-  {
-   "id": 42,
-   "type": "Audio",
-   "pos": [
-    2800,
+    1880,
     950
-   ],
-   "params": {},
-   "inputs": {}
-  },
-  {
-   "id": 43,
-   "type": "Envelope",
-   "pos": [
-    3030,
-    950
-   ],
-   "params": {
-    "attack": 10.0,
-    "release": 300.0
-   },
-   "inputs": {}
-  },
-  {
-   "id": 44,
-   "type": "Remap",
-   "pos": [
-    3260,
-    998
-   ],
-   "params": {
-    "in_lo": 0.0,
-    "in_hi": 1.0,
-    "out_lo": 0.25,
-    "out_hi": 1.0
-   },
-   "inputs": {}
-  },
-  {
-   "id": 45,
-   "type": "Select",
-   "pos": [
-    3260,
-    820
    ],
    "params": {},
    "inputs": {
-    "a": 1.0
+    "up": 2.5,
+    "down": 2.5
    }
   },
   {
-   "id": 46,
-   "type": "Mask",
+   "id": 39,
+   "type": "Select",
    "pos": [
-    3030,
-    690
+    2110,
+    820
    ],
    "params": {},
    "inputs": {}
   },
   {
-   "id": 47,
+   "id": 40,
+   "type": "sub:vs_mixer",
+   "pos": [
+    2570,
+    430
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 41,
    "type": "Output",
    "pos": [
-    3260,
-    690
+    2800,
+    430
    ],
    "params": {},
    "inputs": {}
@@ -586,373 +464,583 @@
   [
    1,
    "value",
-   10,
+   11,
    "x"
   ],
   [
-   10,
-   "result",
    11,
+   "result",
+   12,
    "rate"
   ],
   [
-   9,
-   "u",
-   12,
-   "a"
-  ],
-  [
-   9,
-   "v",
+   1,
+   "value",
    13,
-   "a"
-  ],
-  [
-   12,
-   "result",
-   14,
-   "x"
-  ],
-  [
-   13,
-   "result",
-   14,
-   "y"
-  ],
-  [
-   11,
-   "value",
-   14,
-   "turns"
-  ],
-  [
-   14,
-   "x",
-   15,
-   "x"
-  ],
-  [
-   14,
-   "y",
-   16,
-   "x"
-  ],
-  [
-   15,
-   "result",
-   17,
-   "a"
-  ],
-  [
-   16,
-   "result",
-   18,
-   "a"
-  ],
-  [
-   5,
-   "on",
-   19,
-   "on"
-  ],
-  [
-   9,
-   "u",
-   19,
-   "a"
-  ],
-  [
-   17,
-   "result",
-   19,
-   "b"
-  ],
-  [
-   5,
-   "on",
-   20,
-   "on"
-  ],
-  [
-   9,
-   "v",
-   20,
-   "a"
-  ],
-  [
-   18,
-   "result",
-   20,
-   "b"
-  ],
-  [
-   2,
-   "value",
-   21,
-   "x"
-  ],
-  [
-   2,
-   "value",
-   22,
-   "x"
-  ],
-  [
-   19,
-   "result",
-   23,
-   "u"
-  ],
-  [
-   20,
-   "result",
-   23,
-   "v"
-  ],
-  [
-   19,
-   "result",
-   24,
-   "u"
-  ],
-  [
-   20,
-   "result",
-   24,
-   "v"
-  ],
-  [
-   21,
-   "result",
-   24,
-   "gain"
-  ],
-  [
-   19,
-   "result",
-   25,
-   "u"
-  ],
-  [
-   20,
-   "result",
-   25,
-   "v"
-  ],
-  [
-   22,
-   "result",
-   25,
-   "blocks"
-  ],
-  [
-   19,
-   "result",
-   26,
-   "u"
-  ],
-  [
-   20,
-   "result",
-   26,
-   "v"
-  ],
-  [
-   3,
-   "value",
-   27,
-   "x"
-  ],
-  [
-   27,
-   "on",
-   28,
-   "on"
-  ],
-  [
-   23,
-   "color",
-   29,
-   "under"
-  ],
-  [
-   24,
-   "color",
-   29,
-   "over"
-  ],
-  [
-   28,
-   "result",
-   29,
-   "amount"
-  ],
-  [
-   3,
-   "value",
-   30,
-   "x"
-  ],
-  [
-   30,
-   "on",
-   31,
-   "on"
-  ],
-  [
-   29,
-   "color",
-   32,
-   "under"
-  ],
-  [
-   25,
-   "color",
-   32,
-   "over"
-  ],
-  [
-   31,
-   "result",
-   32,
-   "amount"
-  ],
-  [
-   3,
-   "value",
-   33,
-   "x"
-  ],
-  [
-   33,
-   "on",
-   34,
-   "on"
-  ],
-  [
-   32,
-   "color",
-   35,
-   "under"
-  ],
-  [
-   26,
-   "color",
-   35,
-   "over"
-  ],
-  [
-   34,
-   "result",
-   35,
-   "amount"
-  ],
-  [
-   9,
-   "u",
-   36,
-   "x"
-  ],
-  [
-   11,
-   "value",
-   36,
-   "phase"
-  ],
-  [
-   9,
-   "v",
-   37,
-   "index"
-  ],
-  [
-   36,
-   "value",
-   37,
-   "brightness"
-  ],
-  [
-   35,
-   "color",
-   38,
-   "under"
-  ],
-  [
-   37,
-   "color",
-   38,
-   "over"
-  ],
-  [
-   4,
-   "value",
-   38,
-   "amount"
+   "spin"
   ],
   [
    7,
    "on",
-   40,
-   "on"
+   13,
+   "kaleidoscope"
   ],
   [
-   38,
-   "color",
-   41,
-   "under"
+   13,
+   "u",
+   14,
+   "u"
   ],
   [
-   39,
-   "color",
-   41,
-   "over"
+   13,
+   "v",
+   14,
+   "v"
   ],
   [
-   40,
-   "result",
-   41,
+   2,
+   "value",
+   14,
+   "sensitivity"
+  ],
+  [
+   2,
+   "value",
+   14,
+   "hold"
+  ],
+  [
+   13,
+   "u",
+   15,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   15,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   15,
    "amount"
   ],
   [
-   42,
-   "bass",
-   43,
+   12,
+   "value",
+   15,
+   "t"
+  ],
+  [
+   13,
+   "u",
+   16,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   16,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   16,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   16,
+   "t"
+  ],
+  [
+   13,
+   "u",
+   17,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   17,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   17,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   17,
+   "t"
+  ],
+  [
+   13,
+   "u",
+   18,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   18,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   18,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   18,
+   "t"
+  ],
+  [
+   13,
+   "u",
+   19,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   19,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   19,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   19,
+   "t"
+  ],
+  [
+   13,
+   "u",
+   20,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   20,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   20,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   20,
+   "t"
+  ],
+  [
+   13,
+   "u",
+   21,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   21,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   21,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   21,
+   "t"
+  ],
+  [
+   13,
+   "u",
+   22,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   22,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   22,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   22,
+   "t"
+  ],
+  [
+   14,
+   "trail",
+   22,
+   "trail"
+  ],
+  [
+   13,
+   "u",
+   23,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   23,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   23,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   23,
+   "t"
+  ],
+  [
+   14,
+   "motion",
+   23,
+   "motion"
+  ],
+  [
+   13,
+   "u",
+   24,
+   "u"
+  ],
+  [
+   13,
+   "v",
+   24,
+   "v"
+  ],
+  [
+   2,
+   "value",
+   24,
+   "amount"
+  ],
+  [
+   12,
+   "value",
+   24,
+   "t"
+  ],
+  [
+   14,
+   "centre u",
+   24,
+   "centre u"
+  ],
+  [
+   14,
+   "centre v",
+   24,
+   "centre v"
+  ],
+  [
+   14,
+   "presence",
+   24,
+   "presence"
+  ],
+  [
+   25,
+   "beat",
+   26,
+   "trigger"
+  ],
+  [
+   26,
+   "wrap",
+   27,
+   "flip"
+  ],
+  [
+   27,
+   "on",
+   28,
    "x"
   ],
   [
-   43,
+   27,
+   "on",
+   29,
+   "on"
+  ],
+  [
+   29,
+   "result",
+   30,
+   "x"
+  ],
+  [
+   28,
+   "pulse",
+   31,
+   "trigger"
+  ],
+  [
+   30,
+   "pulse",
+   32,
+   "trigger"
+  ],
+  [
+   8,
+   "on",
+   33,
+   "on"
+  ],
+  [
+   3,
    "value",
-   44,
+   33,
+   "a"
+  ],
+  [
+   31,
+   "value",
+   33,
+   "b"
+  ],
+  [
+   33,
+   "result",
+   34,
+   "which"
+  ],
+  [
+   15,
+   "color",
+   34,
+   "1"
+  ],
+  [
+   16,
+   "color",
+   34,
+   "2"
+  ],
+  [
+   17,
+   "color",
+   34,
+   "3"
+  ],
+  [
+   18,
+   "color",
+   34,
+   "4"
+  ],
+  [
+   19,
+   "color",
+   34,
+   "5"
+  ],
+  [
+   20,
+   "color",
+   34,
+   "6"
+  ],
+  [
+   21,
+   "color",
+   34,
+   "7"
+  ],
+  [
+   22,
+   "color",
+   34,
+   "8"
+  ],
+  [
+   23,
+   "color",
+   34,
+   "9"
+  ],
+  [
+   24,
+   "color",
+   34,
+   "10"
+  ],
+  [
+   8,
+   "on",
+   35,
+   "on"
+  ],
+  [
+   4,
+   "value",
+   35,
+   "a"
+  ],
+  [
+   32,
+   "value",
+   35,
+   "b"
+  ],
+  [
+   35,
+   "result",
+   36,
+   "which"
+  ],
+  [
+   15,
+   "color",
+   36,
+   "1"
+  ],
+  [
+   16,
+   "color",
+   36,
+   "2"
+  ],
+  [
+   17,
+   "color",
+   36,
+   "3"
+  ],
+  [
+   18,
+   "color",
+   36,
+   "4"
+  ],
+  [
+   19,
+   "color",
+   36,
+   "5"
+  ],
+  [
+   20,
+   "color",
+   36,
+   "6"
+  ],
+  [
+   21,
+   "color",
+   36,
+   "7"
+  ],
+  [
+   22,
+   "color",
+   36,
+   "8"
+  ],
+  [
+   23,
+   "color",
+   36,
+   "9"
+  ],
+  [
+   24,
+   "color",
+   36,
+   "10"
+  ],
+  [
+   27,
+   "on",
+   37,
+   "on"
+  ],
+  [
+   37,
+   "result",
+   38,
    "x"
   ],
   [
    6,
    "on",
-   45,
+   39,
    "on"
   ],
   [
-   44,
-   "result",
-   45,
+   5,
+   "value",
+   39,
+   "a"
+  ],
+  [
+   38,
+   "value",
+   39,
    "b"
   ],
   [
-   41,
+   34,
    "color",
-   46,
-   "color"
+   40,
+   "a"
   ],
   [
-   45,
+   36,
+   "color",
+   40,
+   "b"
+  ],
+  [
+   39,
    "result",
-   46,
-   "mask"
+   40,
+   "crossfade"
   ],
   [
-   46,
+   40,
    "color",
-   47,
+   41,
    "color"
   ]
  ],

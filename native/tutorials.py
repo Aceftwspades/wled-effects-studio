@@ -112,10 +112,13 @@ def copy_assets(lesson, project_dir):
 
 
 def used_in(node):
-    """The example graphs that use a node: [(file, title)]."""
-    d = os.path.join(paths.RES, "examples", "graphs")
+    """The example graphs that use a node, and the examples' sub-graphs (the Video Switchboard's looks): [(file,
+    title)] - a sub-graph's title says it is one, and its file is under subgraphs/."""
     out = []
-    if os.path.isdir(d):
+    for folder, sub in (("graphs", False), ("subgraphs", True)):
+        d = os.path.join(paths.RES, "examples", folder)
+        if not os.path.isdir(d):
+            continue
         for f in sorted(os.listdir(d)):
             if not f.endswith(".json"):
                 continue
@@ -124,7 +127,8 @@ def used_in(node):
             except Exception:
                 continue
             if any(n.get("type") == node for n in g.get("nodes", [])):
-                out.append((f, g.get("name") or f[:-5]))
+                title = g.get("name") or f[:-5]
+                out.append((f"subgraphs/{f}" if sub else f, f"{title} (sub-graph)" if sub else title))
     return out
 
 

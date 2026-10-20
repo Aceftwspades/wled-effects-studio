@@ -1,0 +1,147 @@
+{
+ "name": "FX Mosaic",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "amount",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "t",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 32.0,
+    "out_hi": 4.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Video",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "pixelate"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "Big blocks of the picture - the more amount, the bigger."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   3,
+   "value",
+   5,
+   "x"
+  ],
+  [
+   1,
+   "value",
+   6,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   6,
+   "v"
+  ],
+  [
+   5,
+   "result",
+   6,
+   "blocks"
+  ],
+  [
+   6,
+   "color",
+   7,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

@@ -1,0 +1,319 @@
+{
+ "name": "FX Motion Trails",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "amount",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "t",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Graph input",
+   "pos": [
+    40,
+    752
+   ],
+   "params": {
+    "name": "trail",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Remap",
+   "pos": [
+    270,
+    353
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.6,
+    "out_hi": 0.1
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Video",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Fade",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Subtract",
+   "pos": [
+    500,
+    560
+   ],
+   "params": {},
+   "inputs": {
+    "a": 1.0
+   }
+  },
+  {
+   "id": 10,
+   "type": "Add",
+   "pos": [
+    730,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Fract",
+   "pos": [
+    960,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Multiply",
+   "pos": [
+    960,
+    715
+   ],
+   "params": {},
+   "inputs": {
+    "b": 1.8
+   }
+  },
+  {
+   "id": 13,
+   "type": "Clamp",
+   "pos": [
+    1190,
+    724
+   ],
+   "params": {
+    "lo": 0.0,
+    "hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Palette",
+   "pos": [
+    1190,
+    560
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Layers",
+   "pos": [
+    1420,
+    170
+   ],
+   "params": {
+    "mode 1": "add",
+    "mode 2": "add",
+    "mode 3": "add",
+    "mode 4": "add"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "Tracers: whatever moves leaves a glowing trail behind it, newest end bright, running through the palette as it fades - the video under it dims with amount so the trails stand out. trail comes from VS Motion."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   3,
+   "value",
+   6,
+   "x"
+  ],
+  [
+   1,
+   "value",
+   7,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   7,
+   "v"
+  ],
+  [
+   7,
+   "color",
+   8,
+   "color"
+  ],
+  [
+   6,
+   "result",
+   8,
+   "keep"
+  ],
+  [
+   5,
+   "value",
+   9,
+   "b"
+  ],
+  [
+   9,
+   "result",
+   10,
+   "a"
+  ],
+  [
+   4,
+   "value",
+   10,
+   "b"
+  ],
+  [
+   10,
+   "result",
+   11,
+   "x"
+  ],
+  [
+   5,
+   "value",
+   12,
+   "a"
+  ],
+  [
+   12,
+   "result",
+   13,
+   "x"
+  ],
+  [
+   11,
+   "result",
+   14,
+   "index"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "brightness"
+  ],
+  [
+   8,
+   "color",
+   15,
+   "base"
+  ],
+  [
+   14,
+   "color",
+   15,
+   "layer 1"
+  ],
+  [
+   15,
+   "color",
+   16,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

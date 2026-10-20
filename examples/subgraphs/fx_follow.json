@@ -1,0 +1,693 @@
+{
+ "name": "FX Follow Spot",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "amount",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "t",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Graph input",
+   "pos": [
+    40,
+    752
+   ],
+   "params": {
+    "name": "centre u",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Graph input",
+   "pos": [
+    40,
+    930
+   ],
+   "params": {
+    "name": "centre v",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Graph input",
+   "pos": [
+    40,
+    1108
+   ],
+   "params": {
+    "name": "presence",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Coords",
+   "pos": [
+    270,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Subtract",
+   "pos": [
+    500,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Subtract",
+   "pos": [
+    500,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Multiply",
+   "pos": [
+    730,
+    690
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Multiply",
+   "pos": [
+    730,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Add",
+   "pos": [
+    960,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 0.15,
+    "out_hi": 0.4
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Multiply",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 16,
+   "type": "Multiply",
+   "pos": [
+    730,
+    300
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.45
+   }
+  },
+  {
+   "id": 17,
+   "type": "Map range",
+   "pos": [
+    1190,
+    560
+   ],
+   "params": {
+    "ease": "linear",
+    "clamp": true
+   },
+   "inputs": {
+    "out_lo": 1.0,
+    "out_hi": 0.0
+   }
+  },
+  {
+   "id": 18,
+   "type": "Subtract",
+   "pos": [
+    1190,
+    904
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 19,
+   "type": "Abs",
+   "pos": [
+    1420,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Map range",
+   "pos": [
+    1650,
+    820
+   ],
+   "params": {
+    "ease": "linear",
+    "clamp": true
+   },
+   "inputs": {
+    "in_hi": 0.006,
+    "out_lo": 1.0,
+    "out_hi": 0.0
+   }
+  },
+  {
+   "id": 21,
+   "type": "Abs",
+   "pos": [
+    1190,
+    1080
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 22,
+   "type": "Abs",
+   "pos": [
+    1190,
+    1235
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 23,
+   "type": "Map range",
+   "pos": [
+    1420,
+    1080
+   ],
+   "params": {
+    "ease": "linear",
+    "clamp": true
+   },
+   "inputs": {
+    "in_hi": 0.025,
+    "out_lo": 0.6,
+    "out_hi": 0.0
+   }
+  },
+  {
+   "id": 24,
+   "type": "Map range",
+   "pos": [
+    1420,
+    1424
+   ],
+   "params": {
+    "ease": "linear",
+    "clamp": true
+   },
+   "inputs": {
+    "in_hi": 0.025,
+    "out_lo": 0.6,
+    "out_hi": 0.0
+   }
+  },
+  {
+   "id": 25,
+   "type": "Max",
+   "pos": [
+    1650,
+    1164
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 26,
+   "type": "Max",
+   "pos": [
+    1880,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 27,
+   "type": "Multiply",
+   "pos": [
+    2110,
+    950
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 28,
+   "type": "Video",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 29,
+   "type": "Fade",
+   "pos": [
+    1190,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "keep": 0.12
+   }
+  },
+  {
+   "id": 30,
+   "type": "Mask",
+   "pos": [
+    1420,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 31,
+   "type": "Colour",
+   "pos": [
+    1880,
+    690
+   ],
+   "params": {
+    "rgb": [
+     0,
+     230,
+     255
+    ]
+   },
+   "inputs": {}
+  },
+  {
+   "id": 32,
+   "type": "Mask",
+   "pos": [
+    2340,
+    820
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 33,
+   "type": "Layers",
+   "pos": [
+    2570,
+    300
+   ],
+   "params": {
+    "mode 1": "max",
+    "mode 2": "add",
+    "mode 3": "add",
+    "mode 4": "add"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 34,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 35,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "A spotlight that follows whatever moves: the picture lit in a circle round the middle of the motion, the rest in shadow, with a lock-on ring and cross-hairs while it has something to follow. amount is the spot's size. centre u / v and presence come from VS Motion."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   8,
+   "u",
+   9,
+   "a"
+  ],
+  [
+   5,
+   "value",
+   9,
+   "b"
+  ],
+  [
+   8,
+   "v",
+   10,
+   "a"
+  ],
+  [
+   6,
+   "value",
+   10,
+   "b"
+  ],
+  [
+   9,
+   "result",
+   11,
+   "a"
+  ],
+  [
+   9,
+   "result",
+   11,
+   "b"
+  ],
+  [
+   10,
+   "result",
+   12,
+   "a"
+  ],
+  [
+   10,
+   "result",
+   12,
+   "b"
+  ],
+  [
+   11,
+   "result",
+   13,
+   "a"
+  ],
+  [
+   12,
+   "result",
+   13,
+   "b"
+  ],
+  [
+   3,
+   "value",
+   14,
+   "x"
+  ],
+  [
+   14,
+   "result",
+   15,
+   "a"
+  ],
+  [
+   14,
+   "result",
+   15,
+   "b"
+  ],
+  [
+   15,
+   "result",
+   16,
+   "a"
+  ],
+  [
+   13,
+   "result",
+   17,
+   "x"
+  ],
+  [
+   16,
+   "result",
+   17,
+   "in_lo"
+  ],
+  [
+   15,
+   "result",
+   17,
+   "in_hi"
+  ],
+  [
+   13,
+   "result",
+   18,
+   "a"
+  ],
+  [
+   15,
+   "result",
+   18,
+   "b"
+  ],
+  [
+   18,
+   "result",
+   19,
+   "x"
+  ],
+  [
+   19,
+   "result",
+   20,
+   "x"
+  ],
+  [
+   9,
+   "result",
+   21,
+   "x"
+  ],
+  [
+   10,
+   "result",
+   22,
+   "x"
+  ],
+  [
+   21,
+   "result",
+   23,
+   "x"
+  ],
+  [
+   22,
+   "result",
+   24,
+   "x"
+  ],
+  [
+   23,
+   "result",
+   25,
+   "a"
+  ],
+  [
+   24,
+   "result",
+   25,
+   "b"
+  ],
+  [
+   20,
+   "result",
+   26,
+   "a"
+  ],
+  [
+   25,
+   "result",
+   26,
+   "b"
+  ],
+  [
+   26,
+   "result",
+   27,
+   "a"
+  ],
+  [
+   7,
+   "value",
+   27,
+   "b"
+  ],
+  [
+   1,
+   "value",
+   28,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   28,
+   "v"
+  ],
+  [
+   28,
+   "color",
+   29,
+   "color"
+  ],
+  [
+   28,
+   "color",
+   30,
+   "color"
+  ],
+  [
+   17,
+   "result",
+   30,
+   "mask"
+  ],
+  [
+   31,
+   "color",
+   32,
+   "color"
+  ],
+  [
+   27,
+   "result",
+   32,
+   "mask"
+  ],
+  [
+   29,
+   "color",
+   33,
+   "base"
+  ],
+  [
+   30,
+   "color",
+   33,
+   "layer 1"
+  ],
+  [
+   32,
+   "color",
+   33,
+   "layer 2"
+  ],
+  [
+   33,
+   "color",
+   34,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

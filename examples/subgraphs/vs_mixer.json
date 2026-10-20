@@ -1,0 +1,130 @@
+{
+ "name": "VS Mixer",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "a",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "b",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "crossfade",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Smoothstep",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "e0": 0.0,
+    "e1": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Blend",
+   "pos": [
+    500,
+    170
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Graph output",
+   "pos": [
+    730,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Note",
+   "pos": [
+    270,
+    430
+   ],
+   "params": {
+    "text": "A into B as crossfade goes 0 to 1, eased at the ends."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   3,
+   "value",
+   4,
+   "x"
+  ],
+  [
+   1,
+   "value",
+   5,
+   "under"
+  ],
+  [
+   2,
+   "value",
+   5,
+   "over"
+  ],
+  [
+   4,
+   "result",
+   5,
+   "amount"
+  ],
+  [
+   5,
+   "color",
+   6,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

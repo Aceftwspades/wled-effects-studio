@@ -1,0 +1,796 @@
+{
+ "name": "VS Pick",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "which",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "1",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "2",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "3",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Graph input",
+   "pos": [
+    40,
+    752
+   ],
+   "params": {
+    "name": "4",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Graph input",
+   "pos": [
+    40,
+    930
+   ],
+   "params": {
+    "name": "5",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Graph input",
+   "pos": [
+    40,
+    1108
+   ],
+   "params": {
+    "name": "6",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Graph input",
+   "pos": [
+    40,
+    1286
+   ],
+   "params": {
+    "name": "7",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Graph input",
+   "pos": [
+    40,
+    1464
+   ],
+   "params": {
+    "name": "8",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Graph input",
+   "pos": [
+    40,
+    1642
+   ],
+   "params": {
+    "name": "9",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Graph input",
+   "pos": [
+    40,
+    1820
+   ],
+   "params": {
+    "name": "10",
+    "type": "color",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 12,
+   "type": "Threshold",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.1
+   }
+  },
+  {
+   "id": 13,
+   "type": "Select",
+   "pos": [
+    500,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 14,
+   "type": "Blend",
+   "pos": [
+    500,
+    430
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Threshold",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.2
+   }
+  },
+  {
+   "id": 16,
+   "type": "Select",
+   "pos": [
+    730,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 17,
+   "type": "Blend",
+   "pos": [
+    730,
+    427
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Threshold",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.3
+   }
+  },
+  {
+   "id": 19,
+   "type": "Select",
+   "pos": [
+    960,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 20,
+   "type": "Blend",
+   "pos": [
+    960,
+    430
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 21,
+   "type": "Threshold",
+   "pos": [
+    1190,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.4
+   }
+  },
+  {
+   "id": 22,
+   "type": "Select",
+   "pos": [
+    1190,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 23,
+   "type": "Blend",
+   "pos": [
+    1190,
+    427
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 24,
+   "type": "Threshold",
+   "pos": [
+    1420,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.5
+   }
+  },
+  {
+   "id": 25,
+   "type": "Select",
+   "pos": [
+    1420,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 26,
+   "type": "Blend",
+   "pos": [
+    1420,
+    430
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 27,
+   "type": "Threshold",
+   "pos": [
+    1650,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.6
+   }
+  },
+  {
+   "id": 28,
+   "type": "Select",
+   "pos": [
+    1650,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 29,
+   "type": "Blend",
+   "pos": [
+    1650,
+    427
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 30,
+   "type": "Threshold",
+   "pos": [
+    1880,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.7
+   }
+  },
+  {
+   "id": 31,
+   "type": "Select",
+   "pos": [
+    1880,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 32,
+   "type": "Blend",
+   "pos": [
+    1880,
+    430
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 33,
+   "type": "Threshold",
+   "pos": [
+    2110,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.8
+   }
+  },
+  {
+   "id": 34,
+   "type": "Select",
+   "pos": [
+    2110,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 35,
+   "type": "Blend",
+   "pos": [
+    2110,
+    427
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 36,
+   "type": "Threshold",
+   "pos": [
+    2340,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "at": 0.9
+   }
+  },
+  {
+   "id": 37,
+   "type": "Select",
+   "pos": [
+    2340,
+    249
+   ],
+   "params": {},
+   "inputs": {
+    "a": 0.0,
+    "b": 1.0
+   }
+  },
+  {
+   "id": 38,
+   "type": "Blend",
+   "pos": [
+    2340,
+    430
+   ],
+   "params": {
+    "mode": "over"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 39,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    300
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 40,
+   "type": "Note",
+   "pos": [
+    500,
+    690
+   ],
+   "params": {
+    "text": "One of ten looks by which, 0..1: each a tenth of the range (0 the first, 1 the last). A deck: wire a slider to which, a look to each number."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   12,
+   "x"
+  ],
+  [
+   12,
+   "on",
+   13,
+   "on"
+  ],
+  [
+   2,
+   "value",
+   14,
+   "under"
+  ],
+  [
+   3,
+   "value",
+   14,
+   "over"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "amount"
+  ],
+  [
+   1,
+   "value",
+   15,
+   "x"
+  ],
+  [
+   15,
+   "on",
+   16,
+   "on"
+  ],
+  [
+   14,
+   "color",
+   17,
+   "under"
+  ],
+  [
+   4,
+   "value",
+   17,
+   "over"
+  ],
+  [
+   16,
+   "result",
+   17,
+   "amount"
+  ],
+  [
+   1,
+   "value",
+   18,
+   "x"
+  ],
+  [
+   18,
+   "on",
+   19,
+   "on"
+  ],
+  [
+   17,
+   "color",
+   20,
+   "under"
+  ],
+  [
+   5,
+   "value",
+   20,
+   "over"
+  ],
+  [
+   19,
+   "result",
+   20,
+   "amount"
+  ],
+  [
+   1,
+   "value",
+   21,
+   "x"
+  ],
+  [
+   21,
+   "on",
+   22,
+   "on"
+  ],
+  [
+   20,
+   "color",
+   23,
+   "under"
+  ],
+  [
+   6,
+   "value",
+   23,
+   "over"
+  ],
+  [
+   22,
+   "result",
+   23,
+   "amount"
+  ],
+  [
+   1,
+   "value",
+   24,
+   "x"
+  ],
+  [
+   24,
+   "on",
+   25,
+   "on"
+  ],
+  [
+   23,
+   "color",
+   26,
+   "under"
+  ],
+  [
+   7,
+   "value",
+   26,
+   "over"
+  ],
+  [
+   25,
+   "result",
+   26,
+   "amount"
+  ],
+  [
+   1,
+   "value",
+   27,
+   "x"
+  ],
+  [
+   27,
+   "on",
+   28,
+   "on"
+  ],
+  [
+   26,
+   "color",
+   29,
+   "under"
+  ],
+  [
+   8,
+   "value",
+   29,
+   "over"
+  ],
+  [
+   28,
+   "result",
+   29,
+   "amount"
+  ],
+  [
+   1,
+   "value",
+   30,
+   "x"
+  ],
+  [
+   30,
+   "on",
+   31,
+   "on"
+  ],
+  [
+   29,
+   "color",
+   32,
+   "under"
+  ],
+  [
+   9,
+   "value",
+   32,
+   "over"
+  ],
+  [
+   31,
+   "result",
+   32,
+   "amount"
+  ],
+  [
+   1,
+   "value",
+   33,
+   "x"
+  ],
+  [
+   33,
+   "on",
+   34,
+   "on"
+  ],
+  [
+   32,
+   "color",
+   35,
+   "under"
+  ],
+  [
+   10,
+   "value",
+   35,
+   "over"
+  ],
+  [
+   34,
+   "result",
+   35,
+   "amount"
+  ],
+  [
+   1,
+   "value",
+   36,
+   "x"
+  ],
+  [
+   36,
+   "on",
+   37,
+   "on"
+  ],
+  [
+   35,
+   "color",
+   38,
+   "under"
+  ],
+  [
+   11,
+   "value",
+   38,
+   "over"
+  ],
+  [
+   37,
+   "result",
+   38,
+   "amount"
+  ],
+  [
+   38,
+   "color",
+   39,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

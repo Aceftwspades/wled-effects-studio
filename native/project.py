@@ -149,6 +149,14 @@ class Project:
                 for f in os.listdir(ex):
                     if f.endswith(".json"):
                         shutil.copyfile(os.path.join(ex, f), os.path.join(gdir, f))
+            # and the sub-graphs they use (the Video Switchboard's looks, decks and mixer): an example whose
+            # sub-graphs were left behind would not build
+            exs = os.path.join(HERE, "examples", "subgraphs")
+            if os.path.isdir(exs):
+                sdir = os.path.join(self.path, "subgraphs"); os.makedirs(sdir, exist_ok=True)
+                for f in os.listdir(exs):
+                    if f.endswith(".json") and not os.path.exists(os.path.join(sdir, f)):
+                        shutil.copyfile(os.path.join(exs, f), os.path.join(sdir, f))
             assets = os.path.join(HERE, "examples", "assets")
             if os.path.isdir(assets):
                 adir = os.path.join(self.path, "assets"); os.makedirs(adir, exist_ok=True)

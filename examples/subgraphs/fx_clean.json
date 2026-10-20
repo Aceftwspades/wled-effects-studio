@@ -1,0 +1,190 @@
+{
+ "name": "FX Clean",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "amount",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "t",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Video",
+   "pos": [
+    270,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Remap",
+   "pos": [
+    270,
+    353
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 1.0,
+    "out_hi": 2.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Remap",
+   "pos": [
+    270,
+    562
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 1.0,
+    "out_hi": 1.4
+   },
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Adjust",
+   "pos": [
+    500,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 9,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "The video as it is - amount adds colour and punch."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   1,
+   "value",
+   5,
+   "u"
+  ],
+  [
+   2,
+   "value",
+   5,
+   "v"
+  ],
+  [
+   3,
+   "value",
+   6,
+   "x"
+  ],
+  [
+   3,
+   "value",
+   7,
+   "x"
+  ],
+  [
+   5,
+   "color",
+   8,
+   "color"
+  ],
+  [
+   6,
+   "result",
+   8,
+   "saturation"
+  ],
+  [
+   7,
+   "result",
+   8,
+   "contrast"
+  ],
+  [
+   8,
+   "color",
+   9,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

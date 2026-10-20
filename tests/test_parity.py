@@ -25,8 +25,13 @@ def _graphs():
     gs = dict(T.graphs())
     gs["control kit"] = T.kit_graph(summed=True)[0]         # the kit moving: a census graph has no trigger
     ex = os.path.join(ROOT, "examples", "graphs")
+    subs = os.path.join(ROOT, "examples", "subgraphs")
+
+    def resolve(ident):                                    # the examples' sub-graphs (the Video Switchboard's)
+        p = os.path.join(subs, ident + ".json")
+        return G.load(p, resolver=resolve) if os.path.exists(p) else None
     for fn in sorted(os.listdir(ex)):
-        g = G.load(os.path.join(ex, fn)); g.project_dir = os.path.join(ROOT, "examples")
+        g = G.load(os.path.join(ex, fn), resolver=resolve); g.project_dir = os.path.join(ROOT, "examples")
         gs["example " + fn] = g
     return gs
 

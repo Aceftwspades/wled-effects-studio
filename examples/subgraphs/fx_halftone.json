@@ -1,0 +1,570 @@
+{
+ "name": "FX Halftone",
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Graph input",
+   "pos": [
+    40,
+    40
+   ],
+   "params": {
+    "name": "u",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 2,
+   "type": "Graph input",
+   "pos": [
+    40,
+    218
+   ],
+   "params": {
+    "name": "v",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 3,
+   "type": "Graph input",
+   "pos": [
+    40,
+    396
+   ],
+   "params": {
+    "name": "amount",
+    "type": "float",
+    "default": 0.5
+   },
+   "inputs": {}
+  },
+  {
+   "id": 4,
+   "type": "Graph input",
+   "pos": [
+    40,
+    574
+   ],
+   "params": {
+    "name": "t",
+    "type": "float",
+    "default": 0.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 5,
+   "type": "Remap",
+   "pos": [
+    270,
+    300
+   ],
+   "params": {
+    "in_lo": 0.0,
+    "in_hi": 1.0,
+    "out_lo": 14.0,
+    "out_hi": 4.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 6,
+   "type": "Multiply",
+   "pos": [
+    500,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 7,
+   "type": "Floor",
+   "pos": [
+    730,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 8,
+   "type": "Add",
+   "pos": [
+    960,
+    40
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 9,
+   "type": "Divide",
+   "pos": [
+    1190,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 10,
+   "type": "Fract",
+   "pos": [
+    730,
+    195
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 11,
+   "type": "Subtract",
+   "pos": [
+    960,
+    191
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 12,
+   "type": "Multiply",
+   "pos": [
+    1190,
+    191
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 13,
+   "type": "Multiply",
+   "pos": [
+    500,
+    300
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 14,
+   "type": "Floor",
+   "pos": [
+    730,
+    350
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 15,
+   "type": "Add",
+   "pos": [
+    960,
+    342
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 16,
+   "type": "Divide",
+   "pos": [
+    1190,
+    342
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 17,
+   "type": "Fract",
+   "pos": [
+    730,
+    505
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 18,
+   "type": "Subtract",
+   "pos": [
+    960,
+    493
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.5
+   }
+  },
+  {
+   "id": 19,
+   "type": "Multiply",
+   "pos": [
+    1190,
+    493
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 20,
+   "type": "Video",
+   "pos": [
+    1420,
+    40
+   ],
+   "params": {
+    "projection": "picture",
+    "style": "none"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 21,
+   "type": "Add",
+   "pos": [
+    1420,
+    353
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 22,
+   "type": "Multiply",
+   "pos": [
+    1650,
+    170
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.62
+   }
+  },
+  {
+   "id": 23,
+   "type": "Add",
+   "pos": [
+    1650,
+    321
+   ],
+   "params": {},
+   "inputs": {
+    "b": 0.12
+   }
+  },
+  {
+   "id": 24,
+   "type": "Multiply",
+   "pos": [
+    1880,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 25,
+   "type": "Subtract",
+   "pos": [
+    2110,
+    170
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 26,
+   "type": "Multiply",
+   "pos": [
+    2340,
+    170
+   ],
+   "params": {},
+   "inputs": {
+    "b": 30.0
+   }
+  },
+  {
+   "id": 27,
+   "type": "Clamp",
+   "pos": [
+    2340,
+    321
+   ],
+   "params": {
+    "lo": 0.0,
+    "hi": 1.0
+   },
+   "inputs": {}
+  },
+  {
+   "id": 28,
+   "type": "Mask",
+   "pos": [
+    2570,
+    40
+   ],
+   "params": {},
+   "inputs": {}
+  },
+  {
+   "id": 29,
+   "type": "Graph output",
+   "pos": [
+    2800,
+    170
+   ],
+   "params": {
+    "name": "color",
+    "type": "color"
+   },
+   "inputs": {}
+  },
+  {
+   "id": 30,
+   "type": "Note",
+   "pos": [
+    730,
+    820
+   ],
+   "params": {
+    "text": "A newspaper photo: a dot per cell, as big as the picture is bright there, in its colour - amount makes the cells bigger and fewer."
+   },
+   "inputs": {}
+  }
+ ],
+ "links": [
+  [
+   3,
+   "value",
+   5,
+   "x"
+  ],
+  [
+   1,
+   "value",
+   6,
+   "a"
+  ],
+  [
+   5,
+   "result",
+   6,
+   "b"
+  ],
+  [
+   6,
+   "result",
+   7,
+   "x"
+  ],
+  [
+   7,
+   "result",
+   8,
+   "a"
+  ],
+  [
+   8,
+   "result",
+   9,
+   "a"
+  ],
+  [
+   5,
+   "result",
+   9,
+   "b"
+  ],
+  [
+   6,
+   "result",
+   10,
+   "x"
+  ],
+  [
+   10,
+   "result",
+   11,
+   "a"
+  ],
+  [
+   11,
+   "result",
+   12,
+   "a"
+  ],
+  [
+   11,
+   "result",
+   12,
+   "b"
+  ],
+  [
+   2,
+   "value",
+   13,
+   "a"
+  ],
+  [
+   5,
+   "result",
+   13,
+   "b"
+  ],
+  [
+   13,
+   "result",
+   14,
+   "x"
+  ],
+  [
+   14,
+   "result",
+   15,
+   "a"
+  ],
+  [
+   15,
+   "result",
+   16,
+   "a"
+  ],
+  [
+   5,
+   "result",
+   16,
+   "b"
+  ],
+  [
+   13,
+   "result",
+   17,
+   "x"
+  ],
+  [
+   17,
+   "result",
+   18,
+   "a"
+  ],
+  [
+   18,
+   "result",
+   19,
+   "a"
+  ],
+  [
+   18,
+   "result",
+   19,
+   "b"
+  ],
+  [
+   9,
+   "result",
+   20,
+   "u"
+  ],
+  [
+   16,
+   "result",
+   20,
+   "v"
+  ],
+  [
+   12,
+   "result",
+   21,
+   "a"
+  ],
+  [
+   19,
+   "result",
+   21,
+   "b"
+  ],
+  [
+   20,
+   "luma",
+   22,
+   "a"
+  ],
+  [
+   22,
+   "result",
+   23,
+   "a"
+  ],
+  [
+   23,
+   "result",
+   24,
+   "a"
+  ],
+  [
+   23,
+   "result",
+   24,
+   "b"
+  ],
+  [
+   24,
+   "result",
+   25,
+   "a"
+  ],
+  [
+   21,
+   "result",
+   25,
+   "b"
+  ],
+  [
+   25,
+   "result",
+   26,
+   "a"
+  ],
+  [
+   26,
+   "result",
+   27,
+   "x"
+  ],
+  [
+   20,
+   "color",
+   28,
+   "color"
+  ],
+  [
+   27,
+   "result",
+   28,
+   "mask"
+  ],
+  [
+   28,
+   "color",
+   29,
+   "value"
+  ]
+ ],
+ "implicit": 1
+}

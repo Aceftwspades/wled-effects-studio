@@ -303,7 +303,7 @@ Its neighbours: Custom 1 and 2 have the full 256 steps; Check 1, 2 and 3 are on-
 
 **Used in**
 
-Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`)
+Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Intensity
 
@@ -531,7 +531,7 @@ Use it wherever a single steady colour is wanted, then shape it with a mask, a b
 
 **Used in**
 
-Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Meteors (`meteors.json`), Ring Rain (`ring_rain.json`), Snowstorm (`snowstorm.json`), Video Switchboard (`video_switchboard.json`)
+Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Meteors (`meteors.json`), Ring Rain (`ring_rain.json`), Snowstorm (`snowstorm.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`)
 
 ### Counter
 
@@ -569,6 +569,10 @@ Its wrap output fires on the trigger that brings it back to 0 - once a bar with 
 - [Two steps](studio:try/counter/1): steps 2: the count only goes 0, 1 - the light swaps between the first two columns on every beat.
 - [Eight steps](studio:try/counter/2): steps 8: the count runs to 7, so after the fourth column it goes dark for four beats, then starts again - a two-bar cycle.
 - [Hold at the start](studio:try/counter/3): reset on: the counter is held at 0, so only the first column lights.
+
+**Used in**
+
+Video Switchboard (`video_switchboard.json`)
 
 ### Delay
 
@@ -721,7 +725,7 @@ Put one between Audio and anything that would flicker. Its neighbours: Slew limi
 
 **Used in**
 
-Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Feigenbaum (`feigenbaum.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
+Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Feigenbaum (`feigenbaum.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Watershed (`watershed.json`)
 
 ### FFT bin
 
@@ -938,7 +942,7 @@ Plug a Speed slider into rate and you have a scroll the slider controls, which k
 
 **Used in**
 
-Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Garlands (`garlands.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Garlands (`garlands.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Loudest bin
 
@@ -1206,7 +1210,7 @@ Its neighbours: Hash is a random per thing, steady for ever; Sparkle is random p
 
 **Used in**
 
-Liquid (`liquid.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`)
+Liquid (`liquid.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Rising edge
 
@@ -1239,6 +1243,10 @@ Its neighbours: Gate's own rise output does the same for its gate; Counter and T
 
 - [More sensitive gate](studio:try/rising_edge/1): the Gate's high at 0.3 and low at 0.15: quieter kicks open it too, so the colours step more often.
 - [Smaller steps](studio:try/rising_edge/2): the Counter's steps at 12: each kick moves the colours a twelfth of the way round.
+
+**Used in**
+
+Video Switchboard (`video_switchboard.json`)
 
 ### Scenes
 
@@ -1392,6 +1400,10 @@ Its speeds are separate for rising and falling, which is how a VU meter behaves:
 - [Slow fall](studio:try/slew/2): down 0.3: after a kick the meter takes three seconds to sink, so it barely drops between beats and holds near the top.
 - [Lazy both ways](studio:try/slew/3): up 0.5 and down 0.5: Slew can no longer keep up with the beat at all, so it settles at a level that rises and falls with how busy the music is.
 
+**Used in**
+
+Video Switchboard (`video_switchboard.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
+
 ### Spectrum
 
 The whole spectrum as a curve you can read anywhere: index 0 is the lowest band, 1 the highest. Feed a coordinate into index and the bands spread across the cube - a graphic equaliser along u, or round the ring. smooth stops it flickering.
@@ -1539,6 +1551,10 @@ The average says how much of the picture is lit, for an effect that should keep 
 **Try this**
 
 - [Another field](studio:try/statistics/1): field 1: Statistics reads a field nothing writes - its min and max are 0, so the division has nothing to stretch by and the picture goes dark.
+
+**Used in**
+
+VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Steps
 
@@ -1709,6 +1725,10 @@ Its neighbours: Counter counts through more than two; Gate is on and off by a le
 - [Smaller jump](studio:try/toggle/1): the Select's b at 0.15: each flip moves the colours only a little - a shimmer on the beat.
 - [Start off](studio:try/toggle/2): on unticked: the switch starts off - the same flipping, the other way round.
 
+**Used in**
+
+Video Switchboard (`video_switchboard.json`)
+
 ### Waveform
 
 The sound's own shape, as a scope draws it: the last 23 ms of it, read at index 0..1 - unwired, the pixel's u, so the wave lies across the picture. sample swings -1..1 about 0; level is its size. It reads the studio's audioreactive patch (the PCM waveform); with WLED's stock audioreactive it is flat.
@@ -1783,7 +1803,7 @@ It gives the place several ways, for different jobs: `u` and `v` run 0..1 across
 
 **Used in**
 
-Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json`), Fan (`fan.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Shockwave (`shockwave.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json`), Fan (`fan.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Shockwave (`shockwave.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Watershed (`watershed.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Cube face
 
@@ -2860,7 +2880,7 @@ Its duty setting is what Wave cannot do cleanly: a thin bright line with wide ga
 
 **Used in**
 
-Fan (`fan.json`), Marquee (`marquee.json`), Pinwheel (`pinwheel.json`), Video Switchboard (`video_switchboard.json`)
+Fan (`fan.json`), Marquee (`marquee.json`), Pinwheel (`pinwheel.json`)
 
 ### Text
 
@@ -3003,7 +3023,7 @@ The projection puts it on any shape: the picture as it is on a matrix or a cube'
 
 **Used in**
 
-Video Switchboard (`video_switchboard.json`)
+FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Clean (sub-graph) (`subgraphs/fx_clean.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), FX Mosaic (sub-graph) (`subgraphs/fx_mosaic.json`), FX Thermal (sub-graph) (`subgraphs/fx_thermal.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Voronoi
 
@@ -3086,7 +3106,7 @@ Reach for it whenever something should repeat evenly. Noise is the neighbour to 
 
 **Used in**
 
-Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json`), Fan (`fan.json`), Garlands (`garlands.json`), Liquid Tunnel (`liquid_tunnel.json`), Morph (`morph.json`), Spirals (`spirals.json`), Tendril (`tendril.json`)
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json`), Fan (`fan.json`), Garlands (`garlands.json`), Liquid Tunnel (`liquid_tunnel.json`), Morph (`morph.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`)
 
 ## maths
 
@@ -3124,7 +3144,7 @@ Its neighbours: Mirror fold mirrors in 3-D with many copies; Flip mirrors coordi
 
 **Used in**
 
-Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Morph (`morph.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`)
+Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Morph (`morph.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Add
 
@@ -3161,7 +3181,7 @@ Its neighbours: Multiply masks (both must be bright); Max keeps the brighter; Mi
 
 **Used in**
 
-Box Fire (`box_fire.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`), FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Band
 
@@ -3238,7 +3258,7 @@ It is also a shaping tool: clamp a smooth wave and its peaks go flat. Its neighb
 
 **Used in**
 
-Candy Knot (`candy_knot.json`), Cube Chladni (`cube_chladni.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Question Block (`question_block.json`), Watershed (`watershed.json`)
+Candy Knot (`candy_knot.json`), Cube Chladni (`cube_chladni.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Question Block (`question_block.json`), Watershed (`watershed.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Cosine
 
@@ -3351,7 +3371,7 @@ Its neighbours: Multiply scales up; Modulo gives the remainder; Divide makes rat
 
 **Used in**
 
-Butterfly (`butterfly.json`), Feigenbaum (`feigenbaum.json`), Gyro Sand (`gyro_sand.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Mandelbrot (`mandelbrot.json`), Morph (`morph.json`), Question Block (`question_block.json`), Shockwave (`shockwave.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`)
+Butterfly (`butterfly.json`), Feigenbaum (`feigenbaum.json`), Gyro Sand (`gyro_sand.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Mandelbrot (`mandelbrot.json`), Morph (`morph.json`), Question Block (`question_block.json`), Shockwave (`shockwave.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Dot 3
 
@@ -3494,7 +3514,7 @@ Its neighbours: Fract keeps the part after the point (Floor keeps the part befor
 
 **Used in**
 
-Candy Knot (`candy_knot.json`), Fan (`fan.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Slab Cut (`slab_cut.json`), Spirals (`spirals.json`), Truchet Cube (`truchet_cube.json`)
+Candy Knot (`candy_knot.json`), Fan (`fan.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Slab Cut (`slab_cut.json`), Spirals (`spirals.json`), Truchet Cube (`truchet_cube.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`)
 
 ### Fract
 
@@ -3530,7 +3550,7 @@ Its neighbours: Floor keeps the whole part; Modulo wraps at any period; Wave's s
 
 **Used in**
 
-Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid Tunnel (`liquid_tunnel.json`), Meteors (`meteors.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Truchet Cube (`truchet_cube.json`)
+Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid Tunnel (`liquid_tunnel.json`), Meteors (`meteors.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Truchet Cube (`truchet_cube.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`)
 
 ### Length
 
@@ -3646,6 +3666,10 @@ Wire a slider into out high and the person controls the range. Its neighbours: R
 - [Whole palette](studio:try/map_range/2): out low 0 and out high 1: the full palette across, in five steps.
 - [Linear](studio:try/map_range/3): ease linear: the five steps are evenly spaced.
 
+**Used in**
+
+FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Thermal (sub-graph) (`subgraphs/fx_thermal.json`)
+
 ### Math
 
 One node for every sum: pick the operation from the dropdown. Covers what Add, Multiply and the rest do, plus sqrt, sign, round, ceil, snap (round to a step of b), ping-pong (bounce between 0 and b), wrap, less / greater / equal (1 or 0), sin / cos / tan in turns, log and exp.
@@ -3718,7 +3742,7 @@ Its neighbours: Add sums (overlaps get brighter); Min keeps the smaller; Blend i
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Moire (`moire.json`), Snowstorm (`snowstorm.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Moire (`moire.json`), Snowstorm (`snowstorm.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Min
 
@@ -3832,7 +3856,7 @@ Its neighbours: Select jumps between two values by a switch; Blend crossfades co
 
 **Used in**
 
-Cube Chladni (`cube_chladni.json`)
+Cube Chladni (`cube_chladni.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Modulo
 
@@ -3906,7 +3930,7 @@ Its neighbours: Add sums; Min keeps the dimmer (a harder mask); Scale and Mask d
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`), FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Not
 
@@ -3941,7 +3965,7 @@ Its neighbours: Threshold makes a switch from a value; Select picks a value by a
 
 **Used in**
 
-Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_sand.json`)
+Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_sand.json`), Video Switchboard (`video_switchboard.json`)
 
 ### Power
 
@@ -4020,7 +4044,7 @@ It is the everyday node between controls and the things they control. Its neighb
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`), FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Clean (sub-graph) (`subgraphs/fx_clean.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), FX Mosaic (sub-graph) (`subgraphs/fx_mosaic.json`), FX Thermal (sub-graph) (`subgraphs/fx_thermal.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Rotate
 
@@ -4058,7 +4082,7 @@ Three of them on the three pairs of x, y and z tumble a 3-D pattern. Its neighbo
 
 **Used in**
 
-Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Kaleidoscope (`kaleidoscope.json`), Liquid Tunnel (`liquid_tunnel.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), Video Switchboard (`video_switchboard.json`)
+Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Kaleidoscope (`kaleidoscope.json`), Liquid Tunnel (`liquid_tunnel.json`), Mandelbrot (`mandelbrot.json`), Moire (`moire.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Select
 
@@ -4091,7 +4115,7 @@ Its neighbours: Mix fades smoothly between two values; Not flips the switch; Col
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Pick (sub-graph) (`subgraphs/vs_pick.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Sine
 
@@ -4167,7 +4191,7 @@ Its neighbours: Threshold is the hard switch; Clamp cuts without curving; Band i
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Morph (`morph.json`), Question Block (`question_block.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Morph (`morph.json`), Question Block (`question_block.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`), VS Mixer (sub-graph) (`subgraphs/vs_mixer.json`)
 
 ### Subtract
 
@@ -4204,7 +4228,7 @@ Its neighbours: Add sums; Abs makes the difference a distance; Vector math's dis
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_chladni.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Snowstorm (`snowstorm.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`), FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Threshold
 
@@ -4242,7 +4266,7 @@ Its neighbours: Smoothstep is the soft version; Gate has two levels so a noisy v
 
 **Used in**
 
-Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Mandelbrot (`mandelbrot.json`), Meteors (`meteors.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`)
+Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Mandelbrot (`mandelbrot.json`), Meteors (`meteors.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Truchet Cube (`truchet_cube.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Pick (sub-graph) (`subgraphs/vs_pick.json`)
 
 ### Vector
 
@@ -4431,6 +4455,10 @@ Because it works on whatever colour comes in, it is the easy way to vary a whole
 - [Greyscale](studio:try/adjust/2): saturation 0: all colour drained, only brightness left.
 - [Punchy](studio:try/adjust/3): contrast 2 and gamma 0.6: darks pushed down, brights up, mids lifted - a harder, more saturated look.
 
+**Used in**
+
+FX Clean (sub-graph) (`subgraphs/fx_clean.json`)
+
 ### Blackbody
 
 The colour of something hot: a candle, a bulb, daylight, a blue-white star. Feed a heat value remapped to 1000..10000 for a fire that goes red, orange, yellow, white.
@@ -4504,7 +4532,7 @@ Chain Blends to stack as many layers as you like; amount sets how much of the to
 
 **Used in**
 
-Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Meteors (`meteors.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Snowstorm (`snowstorm.json`), Video Switchboard (`video_switchboard.json`)
+Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`), Lightning (`lightning.json`), Liquid (`liquid.json`), Meteors (`meteors.json`), Question Block (`question_block.json`), Ring Rain (`ring_rain.json`), Snowstorm (`snowstorm.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), VS Mixer (sub-graph) (`subgraphs/vs_mixer.json`), VS Pick (sub-graph) (`subgraphs/vs_pick.json`)
 
 ### Blur
 
@@ -4623,6 +4651,10 @@ Because it is part of the effect, the colours are the same whatever palette the 
 - [Soft](studio:try/colour_ramp/2): mode ease: each blend eases in and out, so the stops' own colours spread wider and the changes are gentler.
 - [Ocean](studio:try/colour_ramp/3): stops from deep blue through teal to white foam: the same noise, an ocean instead of a fire.
 
+**Used in**
+
+FX Thermal (sub-graph) (`subgraphs/fx_thermal.json`)
+
 ### Combine
 
 Makes a colour from red, green and blue amounts, each 0..1.
@@ -4660,7 +4692,7 @@ It is the plainest way to turn numbers into colour, and good for colour you comp
 
 **Used in**
 
-Cube Axes (`cube_axes.json`)
+Cube Axes (`cube_axes.json`), FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`)
 
 ### Drain
 
@@ -4738,7 +4770,7 @@ keep sets how long the trails last: 0.9 fades to almost nothing in about a secon
 
 **Used in**
 
-Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`)
+Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`)
 
 ### Field
 
@@ -4779,7 +4811,7 @@ Reading a neighbour's value, not just your own, is what makes things move and sp
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.json`), Watershed (`watershed.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Field write
 
@@ -4816,7 +4848,7 @@ Without it there is no memory and no simulation: each frame would start from not
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.json`), Watershed (`watershed.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 
 ### Glow
 
@@ -4937,6 +4969,10 @@ A layer with nothing wired is skipped, so it grows as you need. Its neighbours: 
 - [Tint with stripes](studio:try/layers/2): mode 1 multiply: the orange multiplies what is under it - inside the stripes the background is tinted orange and darkened.
 - [Sparks added](studio:try/layers/3): mode 2 add: the white sparks add to what is under them instead of replacing it - hotter, tinted sparks.
 
+**Used in**
+
+FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`)
+
 ### Levels
 
 The last touch on a colour: brightness scales it, contrast stretches it about mid grey (above 1 punchier, below 1 flatter), gamma bends it (below 1 brightens the darks). 1, 1, 1 changes nothing.
@@ -4972,6 +5008,10 @@ At 1, 1, 1 it changes nothing, so it is safe to leave in place and adjust by eye
 - [Dimmer](studio:try/levels/1): brightness 0.4: everything at less than half - for a night-time version of the effect.
 - [Lift the darks](studio:try/levels/2): gamma 0.4: the dark parts are brightened much more than the bright ones, so the picture looks lighter and flatter.
 - [Flat](studio:try/levels/3): contrast 0.5: colours drawn toward mid grey - a muted, misty look.
+
+**Used in**
+
+FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`)
 
 ### Mask
 
@@ -5009,7 +5049,7 @@ Any pattern can be the mask: noise for clouds, a gradient for a fade, stripes fo
 
 **Used in**
 
-Liquid (`liquid.json`), Question Block (`question_block.json`), Video Switchboard (`video_switchboard.json`)
+Liquid (`liquid.json`), Question Block (`question_block.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`)
 
 ### Palette
 
@@ -5048,7 +5088,7 @@ Use it for the colour of almost everything. Its neighbours: Colour ramp is a gra
 
 **Used in**
 
-Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Video Switchboard (`video_switchboard.json`), Watershed (`watershed.json`)
+Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Curtain (`curtain.json`), Fan (`fan.json`), Feigenbaum (`feigenbaum.json`), Fireworks (`fireworks.json`), Garlands (`garlands.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liquid.json`), Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`), Mandelbrot (`mandelbrot.json`), Marquee (`marquee.json`), Meteors (`meteors.json`), Moire (`moire.json`), Morph (`morph.json`), Pinwheel (`pinwheel.json`), Ring Rain (`ring_rain.json`), Shockwave (`shockwave.json`), Slab Cut (`slab_cut.json`), Spirals (`spirals.json`), Tendril (`tendril.json`), Truchet Cube (`truchet_cube.json`), Watershed (`watershed.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`)
 
 ### Palette source
 
@@ -5116,7 +5156,7 @@ Trails, smears, afterglow, motion blur all start here. Its neighbours: Previous 
 
 **Used in**
 
-Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`)
+Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`)
 
 ### Previous at
 
@@ -5151,6 +5191,10 @@ Read the pixel below and things rise; beside and they smear sideways; a little t
 - [Taller](studio:try/previous_at/1): the Fade's keep at 0.96: the light dims less per row, so the fire climbs higher.
 - [Falling](studio:try/previous_at/2): the Add at -0.07: each pixel reads the one above it, so the light falls - put the sparks at the top to see it rain.
 - [In place](studio:try/previous_at/3): the Add at 0: each pixel reads itself - which is just Previous - so nothing climbs; the bottom row's sparks leave embers that fade where they are.
+
+**Used in**
+
+FX Melt (sub-graph) (`subgraphs/fx_melt.json`)
 
 ### Scale
 
@@ -5225,6 +5269,10 @@ From there the numbers drive anything: brightness by luma, a colour's red into a
 - [More colours across](studio:try/split/1): the spread Multiply at 3: the palette three times across, so more of its colours - each swapped - are on the matrix at once.
 - [Slower](studio:try/split/2): the clock's Multiply at 0.05: the colours creep, easier to follow which became which.
 - [Halve the brightness](studio:try/split/3): the Palette's brightness at 0.5: Split's luma halves too, so the result dims twice as much - by its own brightness.
+
+**Used in**
+
+FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`)
 
 ## custom
 
@@ -5435,6 +5483,10 @@ Select nodes and Node > Fold into a sub-graph makes one, with these pins already
 
 - [Faster default](studio:try/graph_input/1): default 1: the pin's default triples the scroll - in the preview, and wherever the node is used with speed unwired.
 
+**Used in**
+
+FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Clean (sub-graph) (`subgraphs/fx_clean.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), FX Mosaic (sub-graph) (`subgraphs/fx_mosaic.json`), FX Thermal (sub-graph) (`subgraphs/fx_thermal.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Mixer (sub-graph) (`subgraphs/vs_mixer.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Pick (sub-graph) (`subgraphs/vs_pick.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
+
 ### Graph output
 
 When this graph is used as a node inside another graph, this is one of that node's output pins.
@@ -5466,6 +5518,10 @@ Select nodes and Node > Fold into a sub-graph makes one, with these pins already
 **Try this**
 
 - [Rename the pin](studio:try/graph_output/1): name paint: the node made from this graph will have an output called paint.
+
+**Used in**
+
+FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Clean (sub-graph) (`subgraphs/fx_clean.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), FX Mosaic (sub-graph) (`subgraphs/fx_mosaic.json`), FX Thermal (sub-graph) (`subgraphs/fx_thermal.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Mixer (sub-graph) (`subgraphs/vs_mixer.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Pick (sub-graph) (`subgraphs/vs_pick.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Knot
 
@@ -5544,6 +5600,10 @@ Its neighbours: Frame titles a group of nodes; a node's own title can be renamed
 **Try this**
 
 - [Say something else](studio:try/note/1): text set to a reminder: the note changes, the effect does not.
+
+**Used in**
+
+Video Switchboard (`video_switchboard.json`), FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Clean (sub-graph) (`subgraphs/fx_clean.json`), FX Neon Edges (sub-graph) (`subgraphs/fx_edges.json`), FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Halftone (sub-graph) (`subgraphs/fx_halftone.json`), FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`), FX Melt (sub-graph) (`subgraphs/fx_melt.json`), FX Mosaic (sub-graph) (`subgraphs/fx_mosaic.json`), FX Thermal (sub-graph) (`subgraphs/fx_thermal.json`), FX Motion Trails (sub-graph) (`subgraphs/fx_trails.json`), VS Mixer (sub-graph) (`subgraphs/vs_mixer.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.json`), VS Pick (sub-graph) (`subgraphs/vs_pick.json`), VS Source (sub-graph) (`subgraphs/vs_source.json`)
 
 ### Receive
 

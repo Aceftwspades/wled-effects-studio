@@ -21,10 +21,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-import numpy as np                                        # noqa: E402
 
 EXAMPLES = ("candy_knot", "kaleidoscope", "liquid_tunnel", "maelstrom", "mandelbrot", "moire", "ring_rain",
-            "spirals", "truchet_cube", "watershed", "fireworks", "snowstorm")
+            "spirals", "truchet_cube", "watershed", "fireworks", "snowstorm", "video_switchboard")
 DESCRIPTIONS = {
     "candy_knot": "A striped knot wound round the cube, turning on the beat.",
     "kaleidoscope": "Mirrored wedges of colour folding into each other.",
@@ -38,16 +37,44 @@ DESCRIPTIONS = {
     "watershed": "Water finding its way down the cube's sides.",
     "fireworks": "Bursts launched on the beat, falling as sparks.",
     "snowstorm": "Snow blown round the cube, thicker with the music.",
+    "video_switchboard": "A VJ desk for live video: two decks of ten looks (motion trails, a follow spot, "
+                         "halftone, thermal...) and a crossfader, each look a sub-graph - auto mix and shuffle run "
+                         "a show by themselves.",
 }
+TAGS = {"video_switchboard": ["video", "2-D", "sub-graphs", "audio"]}
 SECONDS, FPS, SIZE = 4.0, 15, 200
 
 
+def _resolver(lib):
+    folder = os.path.join(ROOT, "examples", "subgraphs")
+
+    def resolve(ident):
+        from native import graph as G
+        p = os.path.join(folder, ident + ".json")
+        return G.load(p, lib=lib, resolver=resolve) if os.path.exists(p) else None
+    return resolve
+
+
 def bundle_of(path, lib):
-    """The bundle for a graph file of the examples (no sub-graphs or user nodes there), and its needs."""
+    """The bundle for a graph file of the examples - with every sub-graph it reaches (examples/subgraphs), as the
+    graph pane's Export graph bundle makes one - and its needs."""
     from native import graph as G, flash
-    g = G.load(path, lib=lib)
-    req = flash.requirements_of_graph(g, lib)
-    return {"studio_graph": 1, "graph": g.to_json(), "subgraphs": {}, "nodes": {}, "requires": sorted(req)}, g
+    resolve = _resolver(lib)
+    g = G.load(path, lib=lib, resolver=resolve)
+    subs = {}
+
+    def collect(gr):
+        for n in gr.nodes.values():
+            if n["type"].startswith(G.SUB):
+                ident = n["type"][len(G.SUB):]
+                if ident not in subs:
+                    sub = resolve(ident)
+                    if sub is not None:
+                        subs[ident] = sub.to_json()
+                        collect(sub)
+    collect(g)
+    req = flash.requirements_of_graph(g, lib, resolve)
+    return {"studio_graph": 1, "graph": g.to_json(), "subgraphs": subs, "nodes": {}, "requires": sorted(req)}, g
 
 
 def main(argv):
@@ -72,7 +99,7 @@ def main(argv):
     for path in files:
         bundle, g = bundle_of(path, lib)
         nonstd = [k for k in bundle["requires"] if not flash.DEPENDENCIES.get(k, {}).get("standard", True)]
-        if nonstd or any(n["type"] in ("Image", "Video") for n in g.nodes.values()):
+        if nonstd or any(n["type"] == "Image" for n in g.nodes.values()):
             print(f"left out {os.path.basename(path)}: needs {', '.join(nonstd) or 'a file of its own'}")
             continue
         stem = os.path.splitext(os.path.basename(path))[0]
@@ -93,20 +120,34 @@ def main(argv):
     print(f"built {len(srcs)} in {time.time() - t0:.0f} s")
     eng = Engine(rep.library)
     eng.resize(16)
+    from native.video import TestPattern
+    tp = TestPattern()                                    # what a Video node sees while the previews are made
     entries = []
+    import numpy as np
+    from native.geometry import Geometry
     for eid, stem, g, bundle, title in items:
+        # a video graph on a flat matrix, the picture as it is: on the cube the picture lies across the unfolded
+        # net, and what moves in it mostly falls where there are no faces
+        flat = any(n["type"] == "Video" for n in g.flatten().nodes.values()) if g.nodes else False
+        if flat:
+            eng.set_geometry(Geometry("matrix", w=48, h=27))
+        else:
+            eng.resize(16)
         k = eng.find(title)
         eng.select(k)
         syn = Synth()
         syn.gate_bass = syn.gate_mid = syn.gate_treb = True
-        for _ in range(40):
-            syn.push(eng); eng.frame()
+        for f in range(40):
+            syn.push(eng); eng.video(tp.frame_at(f * 0.04)); eng.frame()
         frames, n = [], int(SECONDS * FPS)
         for i in range(n):
             tgt = eng.sim_ms + 1000.0 / FPS
             while eng.sim_ms < tgt:
-                syn.push(eng); eng.frame()
+                syn.push(eng); eng.video(tp.frame_at(eng.sim_ms / 1000.0)); eng.frame()
             net = eng.rgb().copy()
+            if flat:
+                frames.append(np.repeat(np.repeat(net, 5, 0), 5, 1).astype(np.uint8))
+                continue
             net[~eng.lit_mask()] = 0
             frames.append(render.render(net, eng.B, SIZE, -0.6 + 2 * math.pi * 0.25 * i / n, 0.75, 4.6))
         gif.write(os.path.join(out, "previews", eid + ".gif"), frames, fps=FPS)
@@ -117,7 +158,7 @@ def main(argv):
         entries.append({"id": eid, "name": g.name or stem,
                         "author": prev.get("author", "WLED Effects Studio examples"),
                         "description": prev.get("description", DESCRIPTIONS.get(stem, "")),
-                        "tags": prev.get("tags", ["3-D", "cube"]),
+                        "tags": prev.get("tags", TAGS.get(stem, ["3-D", "cube"])),
                         "sha256": hashlib.sha256(data).hexdigest(), "requires": bundle["requires"]})
         print(f"{eid}: {len(data) // 1024} KB, preview {os.path.getsize(os.path.join(out, 'previews', eid + '.gif')) // 1024} KB")
     keep = [e for i, e in old.items() if i not in {x["id"] for x in entries}]

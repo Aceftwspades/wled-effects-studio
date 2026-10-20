@@ -3688,6 +3688,17 @@ fork's 16_x merge.
       mirror-folded copy), Stripes, Negative, Beat pulse; Speed and Intensity
       the spin and the detail. The example check plays the test pattern into
       the Video node now (a video graph is dark without a picture).
+      Rebuilt from sub-graphs (2026-10-20): two decks of ten looks and a
+      crossfader - each look a sub-graph with the same pins (u, v, amount, t
+      in; a colour out: examples/subgraphs/fx_*.json), the source, the motion
+      tracking, the deck (VS Pick) and the mixer sub-graphs too. Three looks
+      follow what moves: VS Motion compares each frame's brightness with a
+      running average (fields 0 to 3), for Motion Trails (tracers), Imprint
+      (afterimages) and Follow Spot (a spot gliding after the motion's
+      middle, from Statistics' means of trail-weighted positions). Auto mix
+      swings the decks on the bar; Shuffle deals a deck a random look as the
+      mix leaves it. New projects get examples/subgraphs; the gallery has it
+      too, sub-graphs and all.
 - [x] **Readouts trailing the canvas** (user, 2026-10-04: "pin values floating
       through other nodes and dragging behind when dragging graph movement with
       middle mouse button"). The readouts, range bars, hover plot, wire labels
