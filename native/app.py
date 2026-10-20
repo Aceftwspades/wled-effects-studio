@@ -1139,10 +1139,16 @@ class App(Features, Recorder, EditBuild):
         msg = f"project zipped: {path} ({os.path.getsize(path) // 1024} KB)"
         dpg.set_value("edit_status", msg); self.gp.status(msg)
 
-    def import_project_zip(self, path):
-        """A project zip into projects/, opened."""
+    def import_project_zip(self, path, sure=False):
+        """A project zip into projects/, opened. Asked first: its effects are C++ that opening it builds and runs
+        on this computer (`sure`: asked already)."""
         from native.project import unzip_project
         if not path:
+            return
+        if not sure:
+            from native.graph_files import trust_words
+            chrome.confirm(self, "Open this project?", trust_words("project", os.path.basename(path)),
+                           [("Open it", lambda: self.import_project_zip(path, True)), ("Cancel", None)])
             return
         try:
             dest = unzip_project(path)

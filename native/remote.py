@@ -568,7 +568,7 @@ def service_command(app):
             if "graph_export" in c:                     # test hook: True / False answers the dependencies question
                 app.gp.export_bundle(c["graph_export"] if isinstance(c["graph_export"], bool) else None)
             if "graph_import" in c:
-                app.gp.import_bundle(c["graph_import"])
+                app.gp.import_bundle(c["graph_import"], sure=True)    # the test's own file: not asked
             if "meta" in c:
                 for k, v in c["meta"].items():
                     dpg.set_value(k, v)
