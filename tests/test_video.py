@@ -140,6 +140,42 @@ def test_a_file_through_ffmpeg():
         src.close()
 
 
+def test_the_monitors_xrandr_lists():
+    """X11's monitors, from `xrandr --listmonitors`: the name, the size and where each one sits."""
+    text = ("Monitors: 2\n 0: +*HDMI-0 1920/598x1080/336+0+0  HDMI-0\n"
+            " 1: +DP-1 2560/597x1440/336+1920+-360  DP-1\n")
+    assert video._xrandr_monitors(text) == [("HDMI-0", 1920, 1080, 0, 0), ("DP-1", 2560, 1440, 1920, -360)]
+    assert video._xrandr_monitors("") == []
+
+
+def test_the_screen_through_ffmpeg():
+    """The screen as a video source: the whole desktop (or X11's whole screen) first in the list, and frames
+    from it at the source's size. Left out without ffmpeg, without a display, and on macOS (it asks for the
+    Screen Recording permission, which a test cannot give)."""
+    if not shutil.which("ffmpeg") or sys.platform == "darwin":
+        print("     (no ffmpeg, or macOS: the screen test is left out)")
+        return
+    found = video.screens()
+    if not found:
+        print(f"     (no screen here: {video.screen_note()})")
+        return
+    assert found[0][0] in ("the whole desktop", "the whole screen"), found[0][0]
+    src = video.open_source("screen", name=found[0][0], width=64, height=36)
+    try:
+        end = time.time() + 10
+        while src.latest()[1] < 3 and time.time() < end and not src.error:
+            time.sleep(0.05)
+        frame, n = src.latest()
+        assert n >= 3 and frame.shape == (36, 64, 3), (n, src.error)
+    finally:
+        src.close()
+    try:
+        video.open_source("screen", name="no such display")
+        raise AssertionError("a screen that is not there was opened")
+    except ValueError as e:
+        assert "no screen called" in str(e)
+
+
 def test_a_device_build_reads_black():
     src = _graph("Video device", {"projection": "front", "style": "palette"}).compile(title="Video device")
     assert "GC_VIDEO(" in src

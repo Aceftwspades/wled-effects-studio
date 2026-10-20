@@ -1,15 +1,16 @@
-"""Live video for the Video node: a webcam, a video file, or a built-in test
-pattern, decoded to small RGB frames the engine's video slot takes
+"""Live video for the Video node: a webcam, a video file, the screen (the
+desktop, a monitor, or a window by its title), or a built-in test pattern, decoded to small RGB frames the engine's video slot takes
 (Engine.video). Video plays only in the studio; it reaches the LEDs by the
 stream (Device > Stream), which sends the sim's picture as it is.
 
     src = video.open_source("file", path="clip.mp4", width=96, loop=True)
     src = video.open_source("webcam", name="Integrated Camera")
+    src = video.open_source("screen", name="the whole desktop")   # a name from screens()
     src = video.open_source("test")              # no ffmpeg needed
     frame, n = src.latest()                      # (h, w, 3) uint8 and its number, or (None, 0)
     src.close()
 
-Files and webcams are read by ffmpeg (it must be on the PATH, as for the
+Files, webcams and the screen are read by ffmpeg (it must be on the PATH, as for the
 camera map): every frame scaled and cropped to `width` x `height` (16:9 by
 default, filling the frame - no black bars on the LEDs), in a thread that
 keeps only the newest, so a slow frame in the studio never makes the video
@@ -194,8 +195,134 @@ def webcams():
     return out
 
 
+# --- the screen ------------------------------------------------------------------------------------
+SCREEN_FPS = 30
+WINDOW = "window: "                 # a window's entry: its title after this
+
+
+def _win_monitors():
+    """Windows: each monitor's (left, top, width, height, main) in the desktop's pixels, the main one first."""
+    import ctypes
+    import ctypes.wintypes as W
+
+    class MI(ctypes.Structure):
+        _fields_ = [("cbSize", W.DWORD), ("rcMonitor", W.RECT), ("rcWork", W.RECT), ("dwFlags", W.DWORD)]
+    out = []
+    user = ctypes.windll.user32
+
+    def each(h, dc, rect, data):
+        mi = MI()
+        mi.cbSize = ctypes.sizeof(MI)
+        if user.GetMonitorInfoW(h, ctypes.byref(mi)):
+            r = mi.rcMonitor
+            out.append((r.left, r.top, r.right - r.left, r.bottom - r.top, bool(mi.dwFlags & 1)))
+        return True
+    proc = ctypes.WINFUNCTYPE(W.BOOL, W.HMONITOR, W.HDC, ctypes.POINTER(W.RECT), W.LPARAM)(each)
+    user.EnumDisplayMonitors(None, None, proc, 0)
+    out.sort(key=lambda m: (not m[4], m[1], m[0]))
+    return out
+
+
+def _win_windows():
+    """Windows: the titles of the windows on screen - shown, not minimised, with a title and some size."""
+    import ctypes
+    import ctypes.wintypes as W
+    user = ctypes.windll.user32
+    titles = []
+
+    def each(h, data):
+        if not user.IsWindowVisible(h) or user.IsIconic(h):
+            return True
+        n = user.GetWindowTextLengthW(h)
+        if n <= 0:
+            return True
+        buf = ctypes.create_unicode_buffer(n + 1)
+        user.GetWindowTextW(h, buf, n + 1)
+        r = W.RECT()
+        user.GetWindowRect(h, ctypes.byref(r))
+        t = buf.value.strip()
+        if r.right - r.left >= 64 and r.bottom - r.top >= 64 and t and t not in titles:
+            titles.append(t)
+        return True
+    proc = ctypes.WINFUNCTYPE(W.BOOL, W.HWND, W.LPARAM)(each)
+    user.EnumWindows(proc, 0)
+    return titles
+
+
+def _xrandr_monitors(text=None):
+    """X11: each monitor's (name, width, height, x, y), from `xrandr --listmonitors` (or its `text`)."""
+    if text is None:
+        try:
+            from native import procs
+            text = procs.run(["xrandr", "--listmonitors"], capture_output=True, text=True, timeout=5).stdout
+        except Exception:
+            return []
+    out = []
+    for m in re.finditer(r"^\s*\d+:\s+\S+\s+(\d+)/\d+x(\d+)/\d+\+(-?\d+)\+(-?\d+)\s+(\S+)", text or "", re.M):
+        out.append((m.group(5), int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))))
+    return out
+
+
+def _win_window_args(title):
+    return ["-f", "gdigrab", "-framerate", str(SCREEN_FPS), "-draw_mouse", "0", "-i", "title=" + title]
+
+
+def screens(windows=True):
+    """What of the screen ffmpeg can read here: [(name shown, input args)] - the whole desktop, each monitor
+    when there are several, and on Windows each window on screen by its title (`windows`). macOS lists its
+    "Capture screen" devices; Linux reads X11 (x11grab) - a Wayland session has none."""
+    exe = ffmpeg()
+    if not exe:
+        return []
+    out = []
+    try:
+        if sys.platform == "win32":
+            grab = ["-f", "gdigrab", "-framerate", str(SCREEN_FPS), "-draw_mouse", "0"]
+            out.append(("the whole desktop", grab + ["-i", "desktop"]))
+            mons = _win_monitors()
+            if len(mons) > 1:
+                for k, (x, y, w, h, main) in enumerate(mons, 1):
+                    out.append((f"display {k}{' (main)' if main else ''}, {w} x {h}",
+                                grab + ["-offset_x", str(x), "-offset_y", str(y), "-video_size", f"{w}x{h}", "-i", "desktop"]))
+            if windows:
+                out += [(WINDOW + t, _win_window_args(t)) for t in _win_windows()]
+        elif sys.platform == "darwin":
+            from native import procs
+            txt = procs.run([exe, "-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""],
+                            capture_output=True, text=True, timeout=15).stderr
+            for m in re.finditer(r"\[(\d+)\]\s+(Capture screen.*)", txt.split("audio devices")[0]):
+                out.append((m.group(2).strip(), ["-f", "avfoundation", "-capture_cursor", "0",
+                                                 "-framerate", str(SCREEN_FPS), "-i", m.group(1)]))
+        else:
+            import os
+            disp = os.environ.get("DISPLAY")
+            if disp:
+                grab = ["-f", "x11grab", "-framerate", str(SCREEN_FPS), "-draw_mouse", "0"]
+                out.append(("the whole screen", grab + ["-i", disp]))
+                mons = _xrandr_monitors()
+                if len(mons) > 1:
+                    for name, w, h, x, y in mons:
+                        out.append((f"{name}, {w} x {h}", grab + ["-video_size", f"{w}x{h}", "-i", f"{disp}+{x},{y}"]))
+    except Exception:
+        pass
+    return out
+
+
+def screen_note():
+    """Why there may be no screen to choose here, or None."""
+    import os
+    if not ffmpeg():
+        return "the screen is read by ffmpeg, which is not on the PATH (ffmpeg.org)"
+    if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
+        return "the screen can be read on X11 only - this session has no DISPLAY (Wayland)"
+    if sys.platform == "darwin":
+        return "macOS asks for Screen Recording permission the first time (System Settings > Privacy & Security)"
+    return None
+
+
 def open_source(kind, path=None, name=None, width=WIDTH, height=HEIGHT, loop=True, fit=False):
-    """A video source: kind "test", "file" (path) or "webcam" (name, from webcams())."""
+    """A video source: kind "test", "file" (path), "webcam" (name, from webcams()) or "screen" (name, from
+    screens())."""
     if kind == "test":
         return TestPattern(width, height)
     if kind == "file":
@@ -208,5 +335,16 @@ def open_source(kind, path=None, name=None, width=WIDTH, height=HEIGHT, loop=Tru
         if name not in cams:
             raise ValueError(f"no camera called {name!r}" + (f" - there is {', '.join(cams)}" if cams else " - none found"))
         return FfmpegSource(cams[name], name, "webcam", width, height, realtime=False, fit=fit)
+    if kind == "screen":
+        name = name or ""
+        if name.startswith(WINDOW) and sys.platform == "win32" and ffmpeg():
+            # a window by its title, whether or not it was on screen when the list was made
+            return FfmpegSource(_win_window_args(name[len(WINDOW):]), name, "screen", width, height, realtime=False, fit=fit)
+        found = dict(screens(windows=False))
+        if name not in found:
+            note = screen_note()
+            raise ValueError(f"no screen called {name!r}" + (f" - {note}" if note else
+                             (f" - there is {', '.join(list(found)[:4])}" if found else " - none found")))
+        return FfmpegSource(found[name], name, "screen", width, height, realtime=False, fit=fit)
     raise ValueError(f"unknown video source {kind!r}")
 # AI: end
