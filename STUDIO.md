@@ -3916,6 +3916,39 @@ recompiles the engine once: about 45 s).
 Released as 1.7.0 (2026-10-03), with the node tutorials and live video: the
 per-node lessons, the Video node and the Lightwork mapping.
 
+### From the feature review against similar software (October 2026)
+
+The studio set beside Pixelblaze, xLights and Vixen, LedFx, Madrix and
+Resolume, Lightjams, the FastLED browser compiler and WLED 16's own UI
+(2026-10-20). Its own ground - a graph or C++ that ends as native WLED
+firmware, on a simulated 3-D shape, with camera mapping and power planning -
+none of them covers. What they have that it lacks, all six wanted, in the
+order they are being built (small and live-performance first, the compiler
+job last):
+
+- [ ] **Screen capture as a video source** (Resolume, Madrix, Lightjams; the
+      "screen to LEDs" request): beside the test pattern, a file and a webcam,
+      the screen or a window, read by the ffmpeg the video already uses
+      (gdigrab on Windows, avfoundation on macOS, x11grab on Linux).
+- [ ] **Ableton Link** (Lightjams): the synth's tempo and the show's bars
+      locked to DJ and DAW software over the network, as MIDI clock is now.
+- [ ] **A phone remote** (LedFx's and Pixelblaze's web UIs, Lightjams on an
+      iPad): a page served on the local network - the effect's sliders, the
+      steps, brightness, play - for a show run away from the desk.
+- [ ] **Automation lanes on the timeline** (xLights' value curves): a slider's
+      curve drawn across a step's length, played with the show and sent as
+      the device's presets can carry it.
+- [ ] **A shared library online** (Pixelblaze's pattern site, xLights'
+      sequence vendors): graphs and bundles browsed and fetched from a
+      GitHub-hosted gallery in the Library frame, through the import
+      question (cd074b2).
+- [ ] **Shaders in** (xLights, TouchDesigner, Resolume, Madrix: GLSL and
+      ISF): a Shadertoy-style fragment shader translated into a graph or a C++
+      effect.
+
+Out of scope: DMX fixtures (moving heads, pars), singing faces and lyric
+tracks.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every
