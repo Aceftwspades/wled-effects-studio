@@ -3610,7 +3610,7 @@ LedFx have added that matters here, in the order it helps most.
       (a3c1f81); studio.json, platformio_override.ini and graphs rewritten by a
       sub-graph's rename were written in place (bab82f3, a68df02, fffeae0). A
       project zip, graph or bundle from elsewhere built and ran its C++ with no word
-      that it would; each import now asks first (cd074b2).
+      that it would; each import now asks first (cd074b2). Released as 1.16.0.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
