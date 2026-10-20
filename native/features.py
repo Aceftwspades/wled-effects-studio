@@ -662,11 +662,14 @@ class Features:
 
     def _seq_dim(self, rgb):
         """The frame at a playing sequence's step brightness (WLED's presets set it: the sim shows what the device
-        will); as it is otherwise."""
+        will), and at the master brightness the phone remote sets (0 in a blackout); as it is otherwise."""
         bri = getattr(self, "_seq_bri", None)
-        if bri is None or bri >= 255:
+        bri = 255 if bri is None else int(max(0, min(255, bri)))
+        master = 0 if getattr(self, "blackout", False) else int(max(0, min(255, getattr(self, "master_bri", 255))))
+        bri = bri * master // 255
+        if bri >= 255:
             return rgb
-        return (np.asarray(rgb, np.uint16) * int(max(0, bri)) // 255).astype(np.uint8)
+        return (np.asarray(rgb, np.uint16) * bri // 255).astype(np.uint8)
 
     def _frame_rgb_inner(self, eng):
         tr = getattr(self, "_transition", None)

@@ -39,8 +39,8 @@ def build(app):
     app._osc_error = ""
     app.devfx = bank.Switcher()                           # the device's effect, switched with the sim's
     app._sl_send = None                                   # the setlist going to the device: (thread result) when done
-    with dpg.window(tag=TAG, label="MIDI and OSC", no_title_bar=True, show=False, width=px(600), height=px(670), no_collapse=True):
-        c.dialog_header(TAG, "MIDI and OSC")                    # one window style (C8): the frames' header
+    with dpg.window(tag=TAG, label="MIDI, OSC and phone", no_title_bar=True, show=False, width=px(600), height=px(670), no_collapse=True):
+        c.dialog_header(TAG, "MIDI, OSC and phone")                    # one window style (C8): the frames' header
         dpg.add_text("", tag="midi_note", color=c.DIM, wrap=px(580))
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("PORT", color=c.ACCENT))
@@ -60,6 +60,8 @@ def build(app):
                                             callback=lambda s, v: set_osc(app, port=int(v))))
             c.tip("the port the sender sends to (TouchOSC's outgoing port); Enter to listen there")
             dpg.add_text("", tag="osc_state", color=c.DIM)
+        from native import phone_ui
+        phone_ui.build_row(app)                           # the phone remote's row (native/phone_ui.py)
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("LEARN", color=c.ACCENT))
             dpg.add_combo([], tag="midi_target", width=px(300))
@@ -503,7 +505,7 @@ def learn(app, target):
     if target is None:
         app.gp.status("MIDI learn cancelled")
     elif not app.midi.port and not app.osc.port:
-        app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)} - no port is open yet (Window > MIDI and OSC)")
+        app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)} - no port is open yet (Window > MIDI, OSC and phone)")
     else:
         app.gp.status(f"MIDI learn: move the knob for {target_label(app, target)}")
 

@@ -93,7 +93,7 @@ class GraphMenu:
                     for label, src in self.MODULATORS:
                         row(f"  {label}", lambda src=src: self.modulate(nid, name, src))
             if i["type"] in ("float", "bool") and not linked and self.file:
-                # a controller's knob onto this typed value (Window > MIDI and OSC lists the rest)
+                # a controller's knob onto this typed value (Window > MIDI, OSC and phone lists the rest)
                 from native import midi_ui, midi
                 t = midi_ui.pin_target(self.app, nid, name)
                 row("MIDI learn: move a knob", lambda: midi_ui.learn(self.app, t))

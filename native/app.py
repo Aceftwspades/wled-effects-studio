@@ -43,7 +43,7 @@ from native.geometry import Geometry, KINDS
 from native.project import (default_project, Project, list_projects, project_path, remember_project, PROJECTS, pref_num,
                             load_prefs, save_prefs)
 from native.graph_ui import GraphPanel, build_panel
-from native import chrome, glow, device_ui, shape_ui, midi_ui, bank_ui, procs, reader_ui, room, weight, view3d, shape_tools, tasks
+from native import chrome, glow, device_ui, shape_ui, midi_ui, phone_ui, bank_ui, procs, reader_ui, room, weight, view3d, shape_tools, tasks
 from native.gpucube import CubeQuads
 from native import look
 from native import video_ui
@@ -4088,6 +4088,7 @@ def main():
                 messages.poll(app)                   # a note's time on the footer's line; the open log follows
                 app.poll_present_hint()              # how to leave presentation, for a few seconds after entering it
                 midi_ui.poll(app)
+                phone_ui.poll(app)                   # the phone remote's commands, and the state its page shows
                 bank_ui.poll(app)
                 reader_ui.poll(app)
                 room.poll(app)

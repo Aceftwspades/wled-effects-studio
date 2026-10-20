@@ -341,7 +341,7 @@ def build_menus(app):
                     callback=lambda s, a, u: toggle_window(app, u))
             dpg.add_separator()
             _mi(app, "Snapshots...", "snapshots", callback=lambda: show_snapshots(app))
-            _mi(app, "MIDI and OSC...", "midi", callback=lambda: app.run_action("midi"))
+            _mi(app, "MIDI, OSC and phone...", "midi", callback=lambda: app.run_action("midi"))
             _mi(app, "Effect slots...", "bank", callback=lambda: app.run_action("bank"))
             dpg.add_menu_item(label="Message log...", callback=lambda: __import__("native.messages", fromlist=["x"]).show_log(app))
             dpg.add_separator()

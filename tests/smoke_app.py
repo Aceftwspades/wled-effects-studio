@@ -352,6 +352,22 @@ STEPS = [
       {"py": "__import__('socket').socket(2, 2).sendto(__import__('native.osc', fromlist=['osc']).message('/1/fader1', 0.2), "
              "('127.0.0.1', app.osc.port))"}], 0.8),
     ([{"check": "app.eng.fx['ix'] == 51"}, {"py": "midi_ui.set_osc(app, on=False)"}], 0.3),
+    # the phone remote, on the loopback: its page's state is the studio's, a slider and the master brightness
+    # moved from it, a blackout darkens the picture every view and the stream read, then off again
+    ([{"py": "phone_ui._st(app).update(host='127.0.0.1', port=0)"}, {"py": "phone_ui.set_on(app, True)"}], 0.6),
+    ([{"check": "app.phone.is_open and app.phone.key in dpg.get_value('phone_url')"},
+      {"check": "__import__('json').loads(__import__('urllib.request', fromlist=['x']).urlopen("
+                "f'http://127.0.0.1:{app.phone.port}/state?k={app.phone.key}', timeout=5).read())['effect'] "
+                "== app.eng.names[app.eng.idx]"},
+      {"py": "__import__('urllib.request', fromlist=['x']).urlopen(__import__('urllib.request', fromlist=['x']).Request("
+             "f'http://127.0.0.1:{app.phone.port}/act?k={app.phone.key}', data=b'[{\"a\":\"fx\",\"k\":\"sx\",\"v\":0.5},"
+             "{\"a\":\"bri\",\"v\":128}]', headers={'Content-Type': 'application/json'}), timeout=5).read()"}], 0.5),
+    ([{"check": "app.eng.fx['sx'] == 128 and app.master_bri == 128"},
+      {"py": "phone_ui.apply(app, {'a': 'blackout', 'v': 1})"}], 0.3),
+    ([{"check": "int(app.frame_rgb().max()) == 0"},
+      {"py": "(phone_ui.apply(app, {'a': 'blackout', 'v': 0}), phone_ui.apply(app, {'a': 'bri', 'v': 255}))"},
+      {"py": "phone_ui._st(app).update(host='', port=8765)"}, {"py": "phone_ui.set_on(app, False)"}], 0.3),
+    ([{"check": "not app.phone.is_open and not app.blackout and app.master_bri == 255"}], 0.1),
     # live effect switching: a Program Change picks from the setlist with nothing learnt; next learnt on a pad
     # (learning it steps once, wrapping); a release alone switches nothing, a press and release in one frame steps
     # once; with a crossfade set, a switch blends from the effect going out; the effect put back
@@ -1001,6 +1017,14 @@ STEPS = [
       {"check": "'playing - test pattern' in dpg.get_value('video_msg')"}, {"py": "video_ui.toggle(app)"}], 0.3),
     ([{"check": "app.video_src.paused and dpg.get_item_label('video_play') == 'Play'"}, {"py": "video_ui.stop(app)"}], 0.3),
     ([{"check": "app.video_src is None and dpg.get_value('video_msg').startswith('stopped')"}], 0.1),
+    # the screen as the source: its row in place of the camera's, the list found, and where ffmpeg can read it
+    # (not on macOS: its permission prompt), frames from the whole desktop into the Video node
+    ([{"py": "video_ui._set_kind(app, 'the screen')"}, {"py": "setattr(app, '_scr', video_ui.find_screens(app))"}], 0.3),
+    ([{"check": "dpg.is_item_shown('video_screen_row') and not dpg.is_item_shown('video_cam_row')"},
+      {"py": "video_ui.start(app) if app._scr and __import__('sys').platform != 'darwin' else None"}], 1.5),
+    ([{"check": "not app._scr or __import__('sys').platform == 'darwin' or "
+                "(app.video_src is not None and app._video_n > 2 and 'playing - the whole' in dpg.get_value('video_msg'))"},
+      {"py": "video_ui.stop(app)"}, {"py": "video_ui._set_kind(app, 'test pattern')"}], 0.3),
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": f"projects/{SMOKE}/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     # a graph or a project from elsewhere is code: asked first, nothing written on Cancel, imported on the answer

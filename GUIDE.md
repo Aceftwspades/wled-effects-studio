@@ -426,7 +426,7 @@ compiled again; the status line says the frame's and the top three, and how
 much is the rest (each pixel's coordinates, the drawing). The device's own
 proportions can differ (a division or a sine costs more there next to a
 multiply): read the shares as where the time goes. A **MIDI
-controller** (Window > MIDI and OSC...) puts its knobs on the
+controller** (Window > MIDI, OSC and phone...) puts its knobs on the
 sliders: pick the port ("Rescan" after plugging one in), pick what a knob
 should drive - a parameter slider, a check, the palette or the effect by
 index, the effect from the setlist, the next or the previous effect, a
@@ -474,7 +474,20 @@ mapping moves things the same way. A fader sends 0..1 (finer than MIDI's
 128 steps), an int 0..127 is taken as MIDI's, an XY pad's two numbers are
 two controls. OSC has no password - anyone on the network who reaches the
 port can move what is mapped - so it stays off until turned on, and it
-only ever moves the sim's sliders and pins. Segments (+ in
+only ever moves the sim's sliders and pins. A **phone remote** needs no app
+at all: tick the PHONE row's "serve a remote page on port" (8765 unless
+changed) and open the link under it in the phone's browser, on the same
+network - it is the address to type, or select it to copy and send it to
+the phone. The page has the effect (a list, and Previous and Next, which
+step through the setlist as MIDI's do), the effect's own sliders and checks
+by their names, the palette, a **master brightness** and **Blackout**, and
+the Sequence's show: Play, Stop, and each step - a step tapped plays the
+show from it. The master brightness dims the picture every view and the
+stream read; it is the phone's alone (the studio's panels do not change).
+The link carries a key, so a phone or a computer without the link cannot
+use the page; **New key** makes another, and the old link stops working. It
+stays off until turned on, and it is on again at the next start when it was
+left on. Segments (+ in
 the panel) layer several effects with WLED's blend modes and opacity, and
 carry WLED's segment options - reverse, mirror (and Y, and swap XY on a
 matrix), group, space, offset - which the sim lays out the way the device
@@ -1424,7 +1437,7 @@ on and install what it carries.
 - **Window** › LED outputs and power `Ctrl+Shift+O`
 - **Window** › Audio input (mic / line-in) `Ctrl+Shift+M`
 - **Window** › Snapshots... `Ctrl+Shift+K`
-- **Window** › MIDI and OSC...
+- **Window** › MIDI, OSC and phone...
 - **Window** › Effect slots...
 - **Window** › Message log...
 - **Window** › Close every frame
@@ -1580,7 +1593,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Shift+R` | Repeat the last action | anywhere |
 | `Ctrl+P` | Command palette: every action and menu command by name | anywhere |
 | `Ctrl+Shift+K` | Snapshots: the graph's settings as named states | anywhere |
-| `—` | MIDI and OSC: knobs and faders onto the sliders | anywhere |
+| `—` | MIDI, OSC and phone: knobs, faders and a phone onto the sliders | anywhere |
 | `—` | Effect slots: which cube_fx effects the device lists | anywhere |
 | `Ctrl+Alt+Z` | Undo history | anywhere |
 | `Ctrl+Shift+Y` | History of the current graph or code | anywhere |
@@ -1599,7 +1612,7 @@ Every button, with what its tooltip says.
 
 **Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `play from the top`; `play from the selected step` — play from the selected step (Space while the frame has the keyboard); playing, it pauses and goes on; `stop` — stop: the sim goes back to running on its own; `+ Add from the sim` — a new step after the selected one: what the sim shows now - effect, sliders, palette, colours, segments; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `a copy of this step, after it`; `this step away` — this step away (undo brings it back); `Update from the sim` — the selected step becomes what the sim shows now (its name, length, blend and ramps kept); `Load into the sim` — the sim shows the selected step (double-click it on the timeline does the same); `Duplicate` — a copy of the selected step, after it (Ctrl+D); `Delete` — the selected step away (Delete); undo brings it back; `+` — a layer more (the right half, as the side panel adds one); `-` — the last layer away; `x` — this ramp off (the others stay); `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap lengths to bars` — every step's length rounded to whole bars, so the sequence changes on the music; `Render GIF` — plays the sequence once from the top and records it as a GIF, into captures/; `Render video` — plays the sequence once from the top and records it as an mp4, into captures/ - needs ffmpeg on the path; `Send and run it`; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 
-**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `making...`
+**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`
 
 **Palettes frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ New`; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy`; `Remove`; `Use in the sim`; `New palette`; `spread evenly`; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all`; `Remove this one there`
 
