@@ -463,7 +463,7 @@ def stage(project, base_env, log, only=None):
     path = os.path.join(ROOT, "platformio_override.ini")
     text = open(path, encoding="utf-8").read() if os.path.exists(path) else "[platformio]\n"
     text = put_block(text, lines)
-    open(path, "w", encoding="utf-8", newline="\n").write(text)
+    _write_override(path, text)
     log(f"environment [env:{env}] written to platformio_override.ini")
     # A new env fetches its libraries afresh from the registry. The base
     # env has them already: start from its copy, so the first build needs
@@ -476,6 +476,13 @@ def stage(project, base_env, log, only=None):
     return env
 
 
+def _write_override(path, text):
+    """platformio_override.ini whole or not at all: it holds the user's own environments beside the studio's
+    block, and written in place, a write cut short (a full disk, a file held open) lost them."""
+    from native.project import write_atomic
+    write_atomic(path, text)
+
+
 def stage_stock(base_env, log):
     """WLED as the checkout has it on this environment, without the studio: its env's usermods less cube_fx
     and the studio's own (audioreactive and the rest kept), no feature flags. Returns the env to build."""
@@ -486,7 +493,7 @@ def stage_stock(base_env, log):
     path = os.path.join(ROOT, "platformio_override.ini")
     text = open(path, encoding="utf-8").read() if os.path.exists(path) else "[platformio]\n"
     text = put_block(text, lines)
-    open(path, "w", encoding="utf-8", newline="\n").write(text)
+    _write_override(path, text)
     log(f"environment [env:{env}]: {base_env} without the studio - usermods " + (", ".join(mods) or "none"))
     src_deps = os.path.join(ROOT, ".pio", "libdeps", base_env)
     dst_deps = os.path.join(ROOT, ".pio", "libdeps", env)
