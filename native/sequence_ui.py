@@ -689,55 +689,73 @@ def timers_json(T):
 
 def send_timers(app):
     import urllib.request
-    from native import device_ui
+    from native import device_ui, tasks
     host = app.active_host()
-    T = _timers(app)
+    T = json.loads(json.dumps(_timers(app)))              # the worker's own copy
     if not host:
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
     h = host if host.startswith("http") else "http://" + host
-    # an "off" preset for the off timers, saved as a state that is off. A fixed
-    # high id: the playlist's id + 1 used to be it, which is the first step's
-    # preset by default (playlist 9, steps from 10) - the off timer then played
-    # the first step.
-    if any(t.get("what") == "off" for t in T):
-        # saving a preset applies its state first, so the device goes dark for
-        # the save; it is switched back on after if it was on before
+    off = any(t.get("what") == "off" for t in T)
+
+    def work():
+        # an "off" preset for the off timers, saved as a state that is off. A fixed
+        # high id: the playlist's id + 1 used to be it, which is the first step's
+        # preset by default (playlist 9, steps from 10) - the off timer then played
+        # the first step.
+        if off:
+            # saving a preset applies its state first, so the device goes dark for
+            # the save; it is switched back on after if it was on before
+            try:
+                was_on = bool(json.loads(urllib.request.urlopen(h + "/json/state", timeout=6).read()).get("on"))
+                sequence.psave(h, OFF_PRESET, {"on": False, "n": "Off", "ib": True})   # ib: keep "on" (off) and the brightness in it
+                if was_on:
+                    urllib.request.urlopen(urllib.request.Request(h + "/json/state", data=b'{"on":true}', headers={"Content-Type": "application/json"}), timeout=6).read()
+            except Exception as e:
+                return False, f"the off preset was refused: {e}"
+        req = urllib.request.Request(h + "/json/cfg", data=json.dumps(timers_json(T)).encode(), headers={"Content-Type": "application/json"})
         try:
-            was_on = bool(json.loads(urllib.request.urlopen(h + "/json/state", timeout=6).read()).get("on"))
-            sequence.psave(h, OFF_PRESET, {"on": False, "n": "Off", "ib": True})   # ib: keep "on" (off) and the brightness in it
-            if was_on:
-                urllib.request.urlopen(urllib.request.Request(h + "/json/state", data=b'{"on":true}', headers={"Content-Type": "application/json"}), timeout=6).read()
+            with urllib.request.urlopen(req, timeout=6) as r:
+                r.read()
+            return True, f"{len(T)} timer(s) sent to {host}" + ("; the off preset saved" if off else "")
         except Exception as e:
-            dpg.set_value("seq_tlog", f"the off preset was refused: {e}"); return
-    req = urllib.request.Request(h + "/json/cfg", data=json.dumps(timers_json(T)).encode(), headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=6) as r:
-            r.read()
-        msg = f"{len(T)} timer(s) sent to {host}" + ("; the off preset saved" if any(t.get("what") == "off" for t in T) else "")
-    except Exception as e:
-        msg = f"the device refused the timers: {e}"
-    dpg.set_value("seq_tlog", msg); app.gp.status(msg); device_ui.send_log(app, msg)
+            return False, f"the device refused the timers: {e}"
+
+    def done(r):
+        ok, msg = r
+        dpg.set_value("seq_tlog", msg)
+        if ok:
+            app.gp.status(msg); device_ui.send_log(app, msg)
+    # on a worker (native/tasks.py): up to four requests of 6 s each held the whole studio with a device that did not answer
+    tasks.run(app, "seq:timers", f"sending the schedule to {host}", work, done)
 
 
 def read_timers(app):
-    from native import devices, device_ui
+    from native import devices, device_ui, tasks
     host = app.active_host()
     if not host:
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
-    try:
-        cfg = devices._get(host, "/json/cfg", 6)
-    except Exception as e:
-        dpg.set_value("seq_tlog", f"could not read the device's config: {e}"); return
-    T = []
-    pid = int(_steps(app).get("pid", 9))
-    for e in ((cfg.get("timers") or {}).get("ins") or []):
-        h = int(e.get("hour", 0)); m = int(e.get("macro", 0))
-        T.append({"en": bool(e.get("en", 0)), "when": "sunrise" if h == 255 else ("sunset" if h == 254 else "time"),
-                  "hour": 0 if h >= 254 else h, "min": int(e.get("min", 0)), "dow": int(e.get("dow", 127)), "preset": m,
-                  "what": "playlist" if m == pid else ("off" if m == OFF_PRESET else "")})     # our own rows recognised
-    app.project.options["schedule"] = T
-    app.project.save(); refresh_timers(app)
-    dpg.set_value("seq_tlog", f"{len(T)} timer(s) read from the device")
+
+    def work():
+        try:
+            return devices._get(host, "/json/cfg", 6)
+        except Exception as e:
+            return e
+
+    def done(cfg):
+        if isinstance(cfg, Exception):
+            dpg.set_value("seq_tlog", f"could not read the device's config: {cfg}"); return
+        T = []
+        pid = int(_steps(app).get("pid", 9))
+        for e in (((cfg if isinstance(cfg, dict) else {}).get("timers") or {}).get("ins") or []):
+            h = int(e.get("hour", 0)); m = int(e.get("macro", 0))
+            T.append({"en": bool(e.get("en", 0)), "when": "sunrise" if h == 255 else ("sunset" if h == 254 else "time"),
+                      "hour": 0 if h >= 254 else h, "min": int(e.get("min", 0)), "dow": int(e.get("dow", 127)), "preset": m,
+                      "what": "playlist" if m == pid else ("off" if m == OFF_PRESET else "")})     # our own rows recognised
+        app.project.options["schedule"] = T
+        app.project.save(); refresh_timers(app)
+        dpg.set_value("seq_tlog", f"{len(T)} timer(s) read from the device")
+    # on a worker (native/tasks.py): a device that did not answer held the whole studio for 6 s
+    tasks.run(app, "seq:timers", f"reading the schedule from {host}", work, done)
 
 
 # --- the steps ---------------------------------------------------------------------------------

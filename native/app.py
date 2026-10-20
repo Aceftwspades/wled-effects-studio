@@ -1082,8 +1082,13 @@ class App(Features, Recorder, EditBuild):
                            "the ledmap is removed. Send it?",
                            [("Send", lambda: self.send_ledmap(True), "danger"), ("Cancel", None)])
             return
-        msg = self.project.send_ledmap(host)
-        dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
+        from native import tasks
+
+        def done(msg):
+            dpg.set_value("edit_status", msg); self.gp.status(msg); device_ui.send_log(self, msg)
+        # on a worker, as send_shape's: a device that does not answer held the whole studio for the upload's 5 s
+        lm = self.project.geometry.ledmap()           # made here: the worker must not read a geometry being changed
+        tasks.run(self, "send:ledmap", f"sending the ledmap to {host}", lambda: self.project.send_ledmap(host, lm), done)
 
     def send_shape(self, sure=False):
         """The geometry to the device: its ledmap (the wiring), and its
@@ -1099,8 +1104,10 @@ class App(Features, Recorder, EditBuild):
                            "positions table the effects read. Its wiring changes with the ledmap. Send both?",
                            [("Send", lambda: self.send_shape(True), "danger"), ("Cancel", None)])
             return
+        lm = g.ledmap()                               # made here, as the worker must not read a geometry being changed
+
         def work():                                   # on a worker: a device that does not answer froze the studio
-            msg = self.project.send_ledmap(host)
+            msg = self.project.send_ledmap(host, lm)
             ok, msg2 = flash.send_geometry(host, g)
             return msg + "; " + msg2
 

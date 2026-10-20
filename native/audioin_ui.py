@@ -166,58 +166,82 @@ def _post(host, path, body, timeout=8):
 
 
 def read_device(app):
-    from native import devices
+    from native import devices, tasks
     host = _host(app)
     if not host:
         return
-    try:
-        cfg = devices._get(host, "/json/cfg", 6)
-    except Exception as e:
-        dpg.set_value("ain_log", f"could not read the device's config: {e}"); return
-    st = _st(app)
-    if "AudioReactive" not in ((cfg.get("um") or {})):
-        dpg.set_value("ain_log", "the device has no audioreactive usermod in its config - flash it with audio on first"); return
-    st.update(audioin.from_wled_cfg(cfg, st))
-    app.project.save(); refresh(app)
-    msg = f"the device's audio input read: {audioin.describe(st)}"
-    dpg.set_value("ain_log", msg); app.gp.status(msg)
+
+    def work():
+        try:
+            return devices._get(host, "/json/cfg", 6)
+        except Exception as e:
+            return e
+
+    def done(cfg):
+        if isinstance(cfg, Exception):
+            dpg.set_value("ain_log", f"could not read the device's config: {cfg}"); return
+        if not isinstance(cfg, dict):
+            dpg.set_value("ain_log", "the device's config did not read as one"); return
+        st = _st(app)
+        if "AudioReactive" not in ((cfg.get("um") or {})):
+            dpg.set_value("ain_log", "the device has no audioreactive usermod in its config - flash it with audio on first"); return
+        st.update(audioin.from_wled_cfg(cfg, st))
+        app.project.save(); refresh(app)
+        msg = f"the device's audio input read: {audioin.describe(st)}"
+        dpg.set_value("ain_log", msg); app.gp.status(msg)
+    # the waiting on a worker (native/tasks.py): a device that does not answer held the whole studio for 6 s
+    tasks.run(app, "ain:read", f"reading the audio input from {host}", work, done)
 
 
 def send(app):
-    from native import device_ui, devices
+    from native import device_ui, devices, tasks
     host = _host(app)
     if not host:
         return
-    st = _st(app)
-    before = None
-    try:
-        before = audioin.from_wled_cfg(devices._get(host, "/json/cfg", 6))
-    except Exception:
-        pass
+    st = dict(_st(app))                                   # the worker's own copy
     body = audioin.wled_cfg(st)
-    try:
-        _post(host, "/json/cfg", body)
-    except Exception as e:
-        msg = f"the device refused the config: {e}"
-        dpg.set_value("ain_log", msg); app.gp.status(msg); return
-    msg = f"audio input sent to {host}: {audioin.describe(st)}"
-    if before is None or audioin.needs_reboot(before, st):
-        msg += " - a new type or new pins take effect after a reboot"
-        _c().confirm(app, "Audio input", "The device's audioreactive takes a new type or new pins on its next boot. Reboot it now? "
-                     "(the LEDs go dark for a few seconds)", [("Reboot", lambda: reboot(app), "danger"), ("Later", None)])
-    dpg.set_value("ain_log", msg); app.gp.status(msg); device_ui.send_log(app, msg)
+
+    def work():
+        before = None
+        try:
+            before = audioin.from_wled_cfg(devices._get(host, "/json/cfg", 6))
+        except Exception:
+            pass
+        try:
+            _post(host, "/json/cfg", body)
+        except Exception as e:
+            return False, f"the device refused the config: {e}", before
+        return True, f"audio input sent to {host}: {audioin.describe(st)}", before
+
+    def done(r):
+        ok, msg, before = r
+        if ok and (before is None or audioin.needs_reboot(before, st)):
+            msg += " - a new type or new pins take effect after a reboot"
+            _c().confirm(app, "Audio input", "The device's audioreactive takes a new type or new pins on its next boot. Reboot it now? "
+                         "(the LEDs go dark for a few seconds)", [("Reboot", lambda: reboot(app), "danger"), ("Later", None)])
+        dpg.set_value("ain_log", msg); app.gp.status(msg)
+        if ok:
+            device_ui.send_log(app, msg)
+    # on a worker: the read and the post held the whole studio for up to 14 s with a device that did not answer
+    tasks.run(app, "ain:send", f"sending the audio input to {host}", work, done)
 
 
 def reboot(app):
+    from native import tasks
     host = _host(app)
     if not host:
         return
-    try:
-        _post(host, "/json/state", {"rb": True}, timeout=5)
-        msg = f"{host} is rebooting - back in a few seconds"
-    except Exception as e:
-        msg = f"the reboot request failed: {e}"
-    dpg.set_value("ain_log", msg); app.gp.status(msg)
+
+    def work():
+        try:
+            _post(host, "/json/state", {"rb": True}, timeout=5)
+            return f"{host} is rebooting - back in a few seconds"
+        except Exception as e:
+            return f"the reboot request failed: {e}"
+
+    def done(msg):
+        dpg.set_value("ain_log", msg); app.gp.status(msg)
+    tasks.run(app, "ain:reboot", f"asking {host} to reboot", work, done)
 
 
 # --- the meter: the level the device hears, on a thread while ticked ---------------------

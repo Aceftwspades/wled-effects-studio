@@ -530,16 +530,18 @@ class Project:
                 z.write(os.path.join(um, fn), f"usermod_studio/{fn}")
         return out
 
-    def send_ledmap(self, host):
+    def send_ledmap(self, host, ledmap=None):
         """Upload ledmap.json to a device over WLED's /upload form, as the
-        web UI does. Returns a message for the status line."""
+        web UI does. Returns a message for the status line. `ledmap`: the
+        one to send, made on the main thread when this runs on a worker
+        (the geometry can change under it); else this project's."""
         host = (host or "").strip().rstrip("/")
         if not host:
             return "type the device's address first"
         if not host.startswith("http"):
             host = "http://" + host
         import urllib.request
-        body = json.dumps(self.geometry.ledmap()).encode()
+        body = json.dumps(self.geometry.ledmap() if ledmap is None else ledmap).encode()
         boundary = "----studio" + str(int(time.time()))
         data = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"data\"; filename=\"/ledmap.json\"\r\n"
                 "Content-Type: application/json\r\n\r\n").encode() + body + f"\r\n--{boundary}--\r\n".encode()
