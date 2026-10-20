@@ -3934,10 +3934,11 @@ job last):
       by its title.
 - [ ] **Ableton Link** (Lightjams): the synth's tempo and the show's bars
       locked to DJ and DAW software over the network, as MIDI clock is now.
-      Waiting on a licence decision: Link is GPL, its Python binding (aalink,
-      which has a cp314 wheel) GPLv3+, the studio EUPL 1.2 - bundled in the
-      packaged app, or optional (pip, as python-rtmidi is), or through the
-      Carabiner bridge (a separate GPL program the studio talks to over TCP).
+      Set aside (2026-10-20, the author's call): Link is GPL, its Python
+      binding (aalink, which has a cp314 wheel) GPLv3+, the studio EUPL 1.2.
+      The ways left open: optional (pip, as python-rtmidi is), the Carabiner
+      bridge (a separate GPL program the studio talks to over TCP), or
+      bundled. MIDI clock stays the way to follow a DJ or a DAW.
 - [x] **A phone remote** (LedFx's and Pixelblaze's web UIs, Lightjams on an
       iPad): a page served on the local network - the effect's sliders, the
       steps, brightness, play - for a show run away from the desk. Done
@@ -3947,11 +3948,13 @@ job last):
       curve drawn across a step's length, played with the show and sent as
       the device's presets can carry it. Done (e773b9a): a ramp's "curve"
       shape, its points dragged on the selected step; sub-steps land on them.
-- [ ] **A shared library online** (Pixelblaze's pattern site, xLights'
+- [x] **A shared library online** (Pixelblaze's pattern site, xLights'
       sequence vendors): graphs and bundles browsed and fetched from a
       GitHub-hosted gallery in the Library frame, through the import
-      question (cd074b2). Waiting on where the gallery lives (a public repo
-      to be made).
+      question (cd074b2). Done (125c43c): the Library's Gallery bank reads
+      Aceftwspades/wled-effects-gallery (twelve of the examples to start,
+      a check on its pull requests); Share this graph... makes the folder
+      to send.
 - [x] **Shaders in** (xLights, TouchDesigner, Resolume, Madrix: GLSL and
       ISF): a Shadertoy-style fragment shader translated into a graph or a C++
       effect. Done (cd0a5b6): File > New effect from a shader... makes a code
