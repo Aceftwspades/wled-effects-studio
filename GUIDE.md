@@ -1018,9 +1018,15 @@ the sim is free again, to set up something new for Add from the sim.
 **RAMPS**: any slider of any segment - or the brightness - moving over
 the step from its value to an end value, in a shape (straight, eased,
 up and back, a jump half way); add one from "+ a ramp...", a row each.
-In the sim they move as it plays; on the device they become sub-steps
-in the playlist (about a second apiece, up to twelve), since a preset
-cannot move a slider.
+The shape **curve** is an automation lane you draw: the ramp becomes
+points on the selected step's block on the timeline (its lower half,
+where the ramps' lines run), starting as the shape it had. Drag a point
+to move it (the last stays at the step's end), Shift+click the lower half
+for one more (on the curve whose line passes nearest), right-click a
+point to take it away; the row's end value is the last point's. In the
+sim they move as it plays; on the device they become sub-steps in the
+playlist (about a second apiece, up to twelve - a curve's land on its
+points), since a preset cannot move a slider.
 
 **BEATS**: the tempo the show is laid on - typed, tapped (Tap, on the
 beat), the synth's, or found in the audio file playing as live audio

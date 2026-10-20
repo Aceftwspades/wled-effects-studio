@@ -904,6 +904,16 @@ STEPS = [
       {"check": "__import__('native.sequence', fromlist=['x']).ramp_of(app.project.options['sequence']['steps'][0], 'ix') == (40, 'up and back')"},
       {"seq": ["ramp_del", "ix"]}, {"check": "'ix' not in (app.project.options['sequence']['steps'][0].get('ramps') or {})"},
       {"seq": ["ramp", "ix", 40, "ease out"]},
+      # the ramp as a curve drawn on the timeline: sampled from its shape, a point added, one moved, one taken away
+      {"seq": ["ramp", "ix", 40, "curve"]},
+      {"check": "__import__('native.sequence', fromlist=['x']).ramp_of(app.project.options['sequence']['steps'][0], 'ix') == (40, 'curve') "
+                "and len(__import__('native.sequence', fromlist=['x']).curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 4"},
+      {"check": "__import__('native.sequence_ui', fromlist=['x']).curve_add(app, 0.6, 250, 'ix') and "
+                "len(__import__('native.sequence', fromlist=['x']).curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 5"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).curve_move(app, 'ix', 0, 0.3, 10)"},
+      {"check": "__import__('native.sequence', fromlist=['x']).curve_points(app.project.options['sequence']['steps'][0], 'ix')[0] == [0.3, 10]"},
+      {"check": "__import__('native.sequence_ui', fromlist=['x']).curve_remove(app, 'ix', 1) and "
+                "len(__import__('native.sequence', fromlist=['x']).curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 4"},
       {"py": "__import__('native.sequence_ui', fromlist=['x']).send(app, run=True)"}], 22.0),
     ([{"expect": ["seq_log", "saved on the device"]}, {"expect": ["seq_sent", "as it is here"]},
       {"seq": ["select", 0]}, {"seq": ["field", "trans", 1.5]}, {"expect": ["seq_sent", "changed since"]},

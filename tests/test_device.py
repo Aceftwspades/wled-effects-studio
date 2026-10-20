@@ -181,6 +181,24 @@ def test_up_and_back_peaks_and_the_file_switches_on():
     assert json.loads(sequence.presets_file(presets, playlist, 39))["39"]["on"] is True
 
 
+def test_a_curve_drawn_on_the_timeline():
+    """A curve ramp (an automation lane): its value runs from the step's own through its points, straight between
+    them; a ramp turned into one keeps its look; bad points are left out; and on the device it is as many sub-steps
+    as its points need, landing on them."""
+    st = {"name": "c", "dur": 10.0, "rows": 1, "colors": [0, 0, 0], "ramps": {"ix": {"end": 200, "shape": "ease in"}},
+          "segments": [{"effect": "Rainbow", "params": {"ix": 0}, "bounds": [0, 0, 30, 1]}]}
+    pts = sequence.to_curve(st, "ix")
+    assert [p[1] for p in pts] == [sequence.ramp_value(st, "ix", t) for t in (0.25, 0.5, 0.75, 1.0)]
+    st["ramps"]["ix"] = {"shape": "curve", "points": [[0.5, 255], [1.0, 0], ["x", 9], [float("nan"), 3], [2.0, 999]]}
+    assert sequence.curve_points(st, "ix") == [[0.5, 255], [1.0, 0], [1.0, 255]]
+    st["ramps"]["ix"] = {"shape": "curve", "points": [[0.5, 255], [1.0, 0]]}
+    assert [sequence.ramp_value(st, "ix", t) for t in (0, 0.25, 0.5, 0.75, 1.0)] == [0, 128, 255, 128, 0]
+    assert sequence.ramp_of(st, "ix") == (0, "curve")
+    subs = sequence.sub_steps(st)
+    vals = [q["segments"][0]["params"]["ix"] for q in subs]
+    assert len(subs) >= 5 and max(vals) == 255 and vals[0] == 0 and vals[-1] == 0, vals
+
+
 def test_ramps_become_sub_presets():
     st = {"name": "fade", "dur": 4.0, "rows": 48, "colors": [0, 0, 0], "ramps": {"ix": 250},
           "segments": [{"effect": "Rainbow", "params": {"ix": 10}, "bounds": [0, 0, 48, 48]}]}
