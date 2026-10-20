@@ -41,29 +41,51 @@ import numpy as np
 
 from native import svg_import
 
+LED_MAX = 256 * 256         # LEDs along the strokes at most: shapes.MAX_COUNT, the engine's own limit
+
+
 STYLES = (("center", "one stroke a letter (neon)"), ("outline", "the letters' outlines"))
 
 
 # --- LEDs along strokes ------------------------------------------------------------------------
-def _resample(pts, closed, pitch):
+def _length(pts, closed):
+    pts = np.asarray(pts, np.float64)
+    if closed and len(pts):
+        pts = np.vstack([pts, pts[:1]])
+    return float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum()) if len(pts) > 1 else 0.0
+
+
+def _count(total, closed, pitch):
+    """How many LEDs _resample puts along a stroke `total` long, worked out rather than made: a
+    float, so a stroke kilometres long (a units slip, a scale of 1e8) is a number and not an array
+    - counted by making them, 1e8 LEDs took 7 GB and 14 s before any limit was looked at."""
+    if not math.isfinite(total):
+        return math.inf
+    if total < pitch * 0.5:
+        return 1.0                                          # a dot
+    return max(1.0, total // pitch) if closed else total // pitch + 1
+
+
+def _resample(pts, closed, pitch, cap=LED_MAX):
     """LEDs a pitch apart along a polyline, the leftover split between its ends (open) or left at
-    the join (closed); a stroke shorter than half a pitch, one LED at its middle (a dot)."""
+    the join (closed); a stroke shorter than half a pitch, one LED at its middle (a dot). No more
+    than `cap` of them: the first `cap` from the start."""
     pts = np.asarray(pts, np.float64)
     if closed:
         pts = np.vstack([pts, pts[:1]])
     seg = np.diff(pts, axis=0)
     L = np.linalg.norm(seg, axis=1)
     total = float(L.sum())
-    if len(pts) == 0:
+    if len(pts) == 0 or cap <= 0 or not math.isfinite(total):
         return np.zeros((0, 2))
     if total < pitch * 0.5 or len(pts) < 2:
         return pts.mean(0, keepdims=True)                   # a dot: one LED
+    n = _count(total, closed, pitch)
+    k = int(min(n, cap))
     if closed:
-        n = max(1, int(total // pitch))
-        d = np.arange(n) * pitch                                    # from the start; the gap where the ends meet
+        d = np.arange(k) * pitch                                    # from the start; the gap where the ends meet
     else:
-        n = int(total // pitch) + 1
-        d = np.arange(n) * pitch + (total - (n - 1) * pitch) / 2.0  # centred: the leftover split
+        d = np.arange(k) * pitch + (total - (n - 1) * pitch) / 2.0  # centred: the leftover split
     cum = np.concatenate([[0.0], np.cumsum(L)])
     i = np.clip(np.searchsorted(cum, d, side="right") - 1, 0, len(seg) - 1)
     t = np.where(L[i] > 0, (d - cum[i]) / np.where(L[i] > 0, L[i], 1.0), 0.0)
@@ -113,7 +135,7 @@ def leds(paths, closed, pitch=1.0, order=None):
             P = np.vstack([P[rot:], P[:rot]])
         if rev:
             P = P[::-1]
-        L = _resample(P, closed[k], pitch)
+        L = _resample(P, closed[k], pitch, LED_MAX - len(owner))
         if len(L):
             pos.append(np.stack([L[:, 0], np.zeros(len(L)), L[:, 1]], 1))
             owner += [k] * len(L)
@@ -126,11 +148,12 @@ def counts(paths, closed, pitch=1.0):
     """(LEDs, dots - strokes too short for a run, one LED each): what an import comes to."""
     n = dots = 0
     for P, c in zip(paths, closed):
-        P = np.asarray(P, np.float64)
-        n += len(_resample(P, c, pitch))
-        seg = np.diff(np.vstack([P, P[:1]]) if c else P, axis=0)
-        dots += float(np.linalg.norm(seg, axis=1).sum()) < pitch * 0.5
-    return n, dots
+        if not len(P):
+            continue
+        total = _length(P, c)
+        n += _count(total, c, pitch) if len(P) > 1 else 1
+        dots += total < pitch * 0.5
+    return (int(n) if math.isfinite(n) else n), dots
 
 
 def fit(strokes, unit_mm, size=None):

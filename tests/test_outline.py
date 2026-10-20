@@ -165,6 +165,26 @@ def test_an_svg_as_a_part():
     assert abs(np.ptp(np.asarray(sized[0])[:, 0]) - 12.0) < 1e-6                 # fitted to a width instead
 
 
+def test_a_drawing_too_big_to_hold_is_counted_not_made():
+    """A stroke kilometres long - a scale of 1e8, a drawing in the wrong units - was counted by making its LEDs,
+    one array entry each: 7 GB and 14 s for 1e8 of them before the studio's limit was looked at, and a scale of
+    1e12 ran out of memory. The count is worked out, the import refuses it by its number, and a part already
+    saved too big lays its first LED_MAX (a polyline part and a 0, negative or nan pitch the same)."""
+    import time
+    st, _ = svg_import.parse('<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">'
+                             '<g transform="scale(1e8)"><path d="M0 0 L10 0"/></g></svg>')
+    paths, closed = outline.fit(st, unit_mm=10.0)
+    t = time.time()
+    n, dots = outline.counts(paths, closed, 1.0)
+    assert n == 10 ** 8 + 1 and dots == 0, n
+    pos, owner = outline.leds(paths, closed, 1.0)
+    assert len(pos) == len(owner) == outline.LED_MAX
+    assert time.time() - t < 2.0
+    for pitch in (0, -1.0, float("nan"), 1e-12):
+        line = shapes.new_part("polyline", points=[[0, 0, 0], [1000, 0, 0]], pitch=pitch)
+        assert 1 <= len(shapes.resolve([line])[0]) <= shapes.MAX_COUNT, pitch
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

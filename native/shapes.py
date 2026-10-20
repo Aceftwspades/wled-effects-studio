@@ -208,7 +208,12 @@ def formula_error(part):
 
 def _part_points(part):
     k, p = part["kind"], part.get("params", {})
-    pitch = float(p.get("pitch", 1.0)) or 1.0
+    try:
+        pitch = float(p.get("pitch", 1.0))
+    except (TypeError, ValueError):
+        pitch = 1.0
+    if not (math.isfinite(pitch) and pitch > 0):
+        pitch = 1.0                                 # 0, a negative or a nan from a file: lengths over it were no count
     if k == "strip":
         n = _count(p, "n", 30, 1)
         t = np.arange(n, dtype=np.float32) - (n - 1) / 2.0
@@ -316,7 +321,8 @@ def _part_points(part):
         seg = np.diff(pts, axis=0)
         L = np.linalg.norm(seg, axis=1)
         total = float(L.sum())
-        n = max(1, int(total / pitch) + 1)
+        # at most a part's LEDs: a line 1e9 long, or one at a pitch of 1e-9, asked for that many
+        n = max(1, min(MAX_COUNT, int(total / pitch) + 1)) if math.isfinite(total) else 1
         d = np.arange(n) * pitch
         d = d[d <= total + 1e-6]
         cum = np.concatenate([[0.0], np.cumsum(L)])

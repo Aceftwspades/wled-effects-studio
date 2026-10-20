@@ -1460,6 +1460,9 @@ def _svg_part(app, path):
                            order=order, source=name)
     part["name"] = os.path.splitext(name)[0]
     n, dots = outline.counts(paths, closed, 1.0)
+    if n > outline.LED_MAX:
+        raise ValueError(f"{n:,.0f} LEDs at its size - more than the {outline.LED_MAX:,} the studio holds: check the "
+                         "drawing's units, or fit it to a width")
     allp = np.concatenate([np.asarray(P) for P in paths])
     w, h = np.ptp(allp[:, 0]), np.ptp(allp[:, 1])
     note = (f"{name}: {len(paths)} strokes, {n} LEDs, {units.show(w, sp)} x {units.show(h, sp)}"
