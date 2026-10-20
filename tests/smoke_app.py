@@ -1031,7 +1031,7 @@ STEPS = [
     # (not on macOS: its permission prompt), frames from the whole desktop into the Video node
     ([{"py": "video_ui._set_kind(app, 'the screen')"}, {"py": "setattr(app, '_scr', video_ui.find_screens(app))"}], 0.3),
     ([{"check": "dpg.is_item_shown('video_screen_row') and not dpg.is_item_shown('video_cam_row')"},
-      {"py": "video_ui.start(app) if app._scr and __import__('sys').platform != 'darwin' else None"}], 1.5),
+      {"py": "video_ui.start(app) if app._scr and __import__('sys').platform != 'darwin' else None"}], 4.0),   # ffmpeg's first frames of the desktop: about a second, more under load
     ([{"check": "not app._scr or __import__('sys').platform == 'darwin' or "
                 "(app.video_src is not None and app._video_n > 2 and 'playing - the whole' in dpg.get_value('video_msg'))"},
       {"py": "video_ui.stop(app)"}, {"py": "video_ui._set_kind(app, 'test pattern')"}], 0.3),
