@@ -449,7 +449,9 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu, GraphProps):
                     p = os.path.join(gd, f)
                     txt = open(p, encoding="utf-8").read()
                     if f'"{G.SUB}{old_stem}"' in txt:
-                        open(p, "w", encoding="utf-8").write(txt.replace(f'"{G.SUB}{old_stem}"', f'"{G.SUB}{new_stem}"'))
+                        # whole or not at all: written in place, a write cut short left a graph that did not load
+                        from native.project import write_atomic
+                        write_atomic(p, txt.replace(f'"{G.SUB}{old_stem}"', f'"{G.SUB}{new_stem}"'))
         self.refresh_lib()
         self.open(self.file, sub=(d == self.sub_dir))
         self.status(f"renamed to {name}")

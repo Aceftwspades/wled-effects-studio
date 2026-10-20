@@ -171,7 +171,7 @@ class GraphFiles:
         n = 2
         while os.path.exists(os.path.join(self.dir, fname)):
             fname = f"{G._ident(name)}_{n}.json"; n += 1
-        json.dump(g, open(os.path.join(self.dir, fname), "w", encoding="utf-8"), indent=1)
+        write_atomic(os.path.join(self.dir, fname), json.dumps(g, indent=1))
         self.refresh_lib()
         self.open(fname)
         self.status(f"imported {name} as {fname}")
