@@ -3608,9 +3608,9 @@ LedFx have added that matters here, in the order it helps most.
       loop, freezing the studio up to 24 s on a device that did not answer
       (5583c0d); a dropped picture replaced another of its name in assets/
       (a3c1f81); studio.json, platformio_override.ini and graphs rewritten by a
-      sub-graph's rename were written in place (bab82f3, a68df02, fffeae0). Left
-      for a decision: a project zip or bundle opened builds and runs its C++ with
-      no word that it does.
+      sub-graph's rename were written in place (bab82f3, a68df02, fffeae0). A
+      project zip, graph or bundle from elsewhere built and ran its C++ with no word
+      that it would; each import now asks first (cd074b2).
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
