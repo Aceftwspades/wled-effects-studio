@@ -759,8 +759,7 @@ def fetch_wled(app):
     def work():
         try:
             got = wledtree.fetch(dest, log=lambda l: q.put(("line", l)))
-            wledtree.remember(got)
-            q.put(("done", got))
+            q.put(("done", got))                          # remembered on the main thread (poll_wled), as the prefs are written
         except Exception as e:
             q.put(("fail", str(e)))
     threading.Thread(target=work, daemon=True).start()

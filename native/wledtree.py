@@ -10,7 +10,6 @@
 The fork is version.WLED_REPO on its branch (the firmware side: the
 cube_fx usermod, the PlatformIO environments the studio flashes).
 """
-import json
 import os
 import shutil
 import subprocess
@@ -81,14 +80,12 @@ def fetch(dest, log=print):
 
 def remember(dest):
     """The path into the prefs (projects/studio.json, ui.wled_root)."""
-    p = os.path.join(paths.PROJECTS, "studio.json")
-    try:
-        d = json.load(open(p, encoding="utf-8"))
-    except Exception:
-        d = {}
+    # through project's own reading and writing: whole or not at all, and one that does not read is put aside
+    # rather than written over with this one key (it was written in place, from the fetch's thread too)
+    from native.project import _studio, _studio_save
+    d = _studio()
     d.setdefault("ui", {})["wled_root"] = dest
-    os.makedirs(paths.PROJECTS, exist_ok=True)
-    json.dump(d, open(p, "w", encoding="utf-8"), indent=1)
+    _studio_save(d)
     os.environ["WLED_ROOT"] = dest
 
 
