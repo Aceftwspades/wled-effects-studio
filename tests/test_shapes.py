@@ -549,6 +549,42 @@ def test_a_ledmap_larger_than_the_studio_holds_is_refused():
             assert "at most" in str(e)
 
 
+def test_meshes_and_models_that_lie_are_refused_quickly():
+    """Files whose numbers cannot be laid, refused with a reason, quickly: a binary PLY whose face list says
+    2^31 entries (a 200-byte file took 10 GB and 43 s to fail), vertices that are not numbers (they went on as
+    LEDs' positions, nan in the shape), faces naming vertices the file does not have, an xLights model
+    20000 x 20000 (its grid was a 3 GB list for one LED)."""
+    import time
+    d = tempfile.mkdtemp()
+    head = (b"ply\nformat binary_little_endian 1.0\nelement vertex 1\nproperty float x\nproperty float y\n"
+            b"property float z\nelement face 1\nproperty list int int vertex_indices\nend_header\n")
+    cases = {"big.ply": head + struct.pack("<3f", 0, 0, 0) + struct.pack("<i", 2 ** 31 - 1) + b"\0" * 12,
+             "nan.obj": b"v 0 0 0\nv 1e309 0 0\nv nan 0 0\nf 1 2 3\n",
+             "nan.stl": b"solid x\nfacet normal 0 0 1\nouter loop\nvertex nan 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid\n",
+             "index.obj": b"v 0 0 0\nv 1 0 0\nf 1 2 999\n"}
+    for name, data in cases.items():
+        path = os.path.join(d, name)
+        open(path, "wb").write(data)
+        t = time.time()
+        try:
+            shape_io.read_mesh(path)
+            raise AssertionError(f"{name} was read")
+        except ValueError:
+            pass
+        assert time.time() - t < 2.0, name
+    good = os.path.join(d, "good.obj")
+    open(good, "w").write("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
+    assert len(shape_io.read_mesh(good).v) == 3
+    big = os.path.join(d, "big.xmodel")
+    open(big, "w").write('<?xml version="1.0"?><custommodel name="x" parm1="20000" parm2="20000" CustomModel="1"/>')
+    t = time.time()
+    m = shape_io.read_xmodel(big)
+    assert len(m["points"]) == 1 and m["grid"] is None and time.time() - t < 1.0
+    odd = os.path.join(d, "odd.xmodel")
+    open(odd, "w").write('<?xml version="1.0"?><custommodel name="x" parm1="nan" parm2="-3" CustomModel="1,2"/>')
+    assert len(shape_io.read_xmodel(odd)["points"]) == 2
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0
