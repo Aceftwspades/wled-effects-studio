@@ -3594,6 +3594,23 @@ LedFx have added that matters here, in the order it helps most.
       or at the end (27d474d). The Library's refresh no longer fails on a graph whose
       sub-graph is missing (58a3a96), and its tiles are not remade under a held button,
       which lost drags while thumbnails came in (c9f84d4). Released as 1.15.0.
+- [x] **The second review pass** (2026-10-19): the code new since the first review
+      (frames as panes, the Library to the Sequence, the precompiled header, the
+      speed pass's caches, the focus) read again, then what the first did not
+      cover - what comes in from outside (downloads, archives, SVG, meshes, xLights
+      files, OSC and MIDI, dropped files) fuzzed with files that lie about
+      themselves. Fixed, each with a test: the Windows update never went in from a
+      folder with an accent or an apostrophe in its name (6d02407); an SVG kilometres
+      long counted its LEDs one array entry each, 7 GB for a scale of 1e8 (94d9512);
+      a 200-byte PLY took 10 GB and 43 s to fail, nan vertices went on as LED
+      positions, a 20000 x 20000 xLights model made a 3 GB grid (b871f65); the
+      schedule, the audio input and the ledmap-only send still waited on the main
+      loop, freezing the studio up to 24 s on a device that did not answer
+      (5583c0d); a dropped picture replaced another of its name in assets/
+      (a3c1f81); studio.json, platformio_override.ini and graphs rewritten by a
+      sub-graph's rename were written in place (bab82f3, a68df02, fffeae0). Left
+      for a decision: a project zip or bundle opened builds and runs its C++ with
+      no word that it does.
 - [x] **`test_library` fails on the last engine built**: after the smoke or the
       walk, the engine is the default project's, without Freqmatrix,
       Freqpixels and Freqwave, and `test_the_major_peak_from_the_bands` fails
