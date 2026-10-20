@@ -3926,25 +3926,36 @@ none of them covers. What they have that it lacks, all six wanted, in the
 order they are being built (small and live-performance first, the compiler
 job last):
 
-- [ ] **Screen capture as a video source** (Resolume, Madrix, Lightjams; the
+- [x] **Screen capture as a video source** (Resolume, Madrix, Lightjams; the
       "screen to LEDs" request): beside the test pattern, a file and a webcam,
       the screen or a window, read by the ffmpeg the video already uses
-      (gdigrab on Windows, avfoundation on macOS, x11grab on Linux).
+      (gdigrab on Windows, avfoundation on macOS, x11grab on Linux). Done
+      (2408069): the whole desktop, each monitor, and on Windows each window
+      by its title.
 - [ ] **Ableton Link** (Lightjams): the synth's tempo and the show's bars
       locked to DJ and DAW software over the network, as MIDI clock is now.
-- [ ] **A phone remote** (LedFx's and Pixelblaze's web UIs, Lightjams on an
+      Waiting on a licence decision: Link is GPL, its Python binding (aalink,
+      which has a cp314 wheel) GPLv3+, the studio EUPL 1.2 - bundled in the
+      packaged app, or optional (pip, as python-rtmidi is), or through the
+      Carabiner bridge (a separate GPL program the studio talks to over TCP).
+- [x] **A phone remote** (LedFx's and Pixelblaze's web UIs, Lightjams on an
       iPad): a page served on the local network - the effect's sliders, the
-      steps, brightness, play - for a show run away from the desk.
-- [ ] **Automation lanes on the timeline** (xLights' value curves): a slider's
+      steps, brightness, play - for a show run away from the desk. Done
+      (6aaaf81): Window > MIDI, OSC and phone, a keyed link, a master
+      brightness and blackout. Not yet opened on a real phone.
+- [x] **Automation lanes on the timeline** (xLights' value curves): a slider's
       curve drawn across a step's length, played with the show and sent as
-      the device's presets can carry it.
+      the device's presets can carry it. Done (e773b9a): a ramp's "curve"
+      shape, its points dragged on the selected step; sub-steps land on them.
 - [ ] **A shared library online** (Pixelblaze's pattern site, xLights'
       sequence vendors): graphs and bundles browsed and fetched from a
       GitHub-hosted gallery in the Library frame, through the import
-      question (cd074b2).
-- [ ] **Shaders in** (xLights, TouchDesigner, Resolume, Madrix: GLSL and
+      question (cd074b2). Waiting on where the gallery lives (a public repo
+      to be made).
+- [x] **Shaders in** (xLights, TouchDesigner, Resolume, Madrix: GLSL and
       ISF): a Shadertoy-style fragment shader translated into a graph or a C++
-      effect.
+      effect. Done (cd0a5b6): File > New effect from a shader... makes a code
+      effect carrying its own vector library; it builds for the ESP32-S3.
 
 Out of scope: DMX fixtures (moving heads, pars), singing faces and lyric
 tracks.
