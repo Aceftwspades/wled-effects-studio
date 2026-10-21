@@ -3954,7 +3954,11 @@ job last):
       iPad): a page served on the local network - the effect's sliders, the
       steps, brightness, play - for a show run away from the desk. Done
       (6aaaf81): Window > MIDI, OSC and phone, a keyed link, a master
-      brightness and blackout. Not yet opened on a real phone.
+      brightness and blackout. Since 95c4dcc served over HTTPS (a certificate
+      the studio makes) with a Camera page: the phone's camera as a video
+      source and for camera mapping, beside network streams (rtsp, rtmp, srt,
+      http). Opened on a real phone (2026-10-20): the camera reached the
+      Video node.
 - [x] **Automation lanes on the timeline** (xLights' value curves): a slider's
       curve drawn across a step's length, played with the show and sent as
       the device's presets can carry it. Done (e773b9a): a ramp's "curve"
@@ -3973,6 +3977,10 @@ job last):
 
 Out of scope: DMX fixtures (moving heads, pars), singing faces and lyric
 tracks.
+
+Released as 1.17.0 (2026-10-20), with the Video Switchboard rebuilt from
+sub-graphs (5bdf10b), the phone's camera and network streams (95c4dcc), and
+a long menu's hole in the frames following it where ImGui moves it (fab4b45).
 
 ### Deferred from earlier lists
 
