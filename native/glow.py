@@ -43,6 +43,15 @@ TURNS_PER_S = 0.1
 STYLES = (("turning", "The gradient, turning"), ("gradient", "The gradient, still"),
           ("outline", "An outline in the accent, still"))
 POOL = {"sel": PER_RECT * 7, "focus": PER_RECT * 2}      # pieces, split round any dialog
+POPUP_PAD = 3                                # ImGui's DisplaySafeAreaPadding: a popup keeps this far inside the window
+
+
+def clamp_popup(x0, y0, w, h, vw, vh):
+    """Where ImGui puts a popup (a menu) of w x h asked for at x0, y0 in a vw x vh window: moved back inside,
+    up and left first (ImGui's FindBestWindowPosForPopupEx) - a long menu rises over the item it hangs from."""
+    x0 = max(min(x0 + w, vw - POPUP_PAD) - w, POPUP_PAD)
+    y0 = max(min(y0 + h, vh - POPUP_PAD) - h, POPUP_PAD)
+    return x0, y0
 
 
 def sample(stops, t, mirror=False):

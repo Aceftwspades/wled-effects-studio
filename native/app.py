@@ -3279,6 +3279,7 @@ class App(Features, Recorder, EditBuild):
         # the item's height. Menus come parents first, so a parent's box is
         # known by the time its child is looked at.
         bar_bottom = (dpg.get_item_rect_min("toolbar")[1] - 8) if dpg.does_item_exist("toolbar") else 24
+        vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
         boxes = {}
         for m in self._menus:
             st = dpg.get_item_state(m)
@@ -3291,6 +3292,11 @@ class App(Features, Recorder, EditBuild):
                 x0, y0 = px - 2, bar_bottom
             else:
                 x0, y0 = parent[2] - 8, parent[1] + py - 6
+                if x0 + w > vw - glow.POPUP_PAD:         # no room to the right: ImGui opens it to the left
+                    x0 = parent[0] - w + 8
+            # ImGui keeps a popup inside the window, so one taller than the room under it is moved up (a long list,
+            # File > Open graph's, rose over the item it hangs from and the frames ran through its top)
+            x0, y0 = glow.clamp_popup(x0, y0, w, h, vw, vh)
             boxes[m] = (x0, y0, x0 + w, y0 + h)
             holes.append((x0 - 2, y0 - 2, x0 + w + 2, y0 + h + 2))
         for tag in tags:
