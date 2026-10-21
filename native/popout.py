@@ -1,5 +1,7 @@
 """A view in its own window: the 3-D cube or the logical net on a second
-monitor while the graph has the main window.
+monitor while the graph has the main window. Both draw on the GPU as the main
+view does (gpucube.py): the cube as textured faces, any other shape as a cloud
+of squares.
 
 Dear PyGui has one viewport a process, so a pop-out is a second process
 (python -m native.popout cube <block>) showing what the app publishes into
@@ -290,7 +292,7 @@ def _parent_alive(pid):
 def run(view, name, parent=0):
     import dearpygui.dearpygui as dpg
     from native import look, render
-    from native.gpucube import CubeQuads
+    from native.gpucube import CubeQuads, PointQuads
 
     lut = np.arange(256, dtype=np.float32) / 255.0
     blk = Block(name, create=False)
@@ -372,7 +374,7 @@ def run(view, name, parent=0):
         for t in ("img", "tex"):
             if dpg.does_item_exist(t):
                 dpg.delete_item(t)
-        state["quads"] = None
+        state["quads"] = state["points"] = None
         state["bufs"].clear()
 
     def the_look():
@@ -397,7 +399,12 @@ def run(view, name, parent=0):
             px = np.ndarray((rows * cols, 3), np.uint8, blk.px, 0)
         kind = "net" if view == "net" else ("cube" if cube else "points")
         shape = (rows, cols, B)
-        if kind != state["kind"] or shape != state["shape"] or (kind == "points" and state["gseq"] != int(blk.i[7])):
+        if kind == "points" and state["kind"] == "points" and state["gseq"] != int(blk.i[7]) and state.get("points") is not None:
+            state["gseq"] = int(blk.i[7])                 # the shape moved or changed: the same cloud, its points anew
+            n = min(npts, px.shape[0])
+            if n > 0:
+                state["points"].set_points(np.ndarray((n, 3), np.float32, blk.pts, 0).copy())
+        if kind != state["kind"] or (kind != "points" and shape != state["shape"]):
             clear()
             state["kind"], state["shape"], state["gseq"] = kind, shape, int(blk.i[7])
             if kind == "net":
@@ -411,11 +418,11 @@ def run(view, name, parent=0):
                                     tag="tex", parent="texreg")
                 state["quads"] = CubeQuads("root", "img", "tex")
             else:
-                p = min(CUBE_MAX, size)
-                dpg.add_raw_texture(p, p, np.zeros(p * p * 4, np.float32), format=dpg.mvFormat_Float_rgba,
-                                    tag="tex", parent="texreg")
-                dpg.add_image("tex", tag="img", parent="root", width=10, height=10)
-                state["px"] = p
+                n = min(npts, px.shape[0])
+                if n <= 0:
+                    state["kind"] = None
+                    return
+                state["points"] = PointQuads("root", "img", np.ndarray((n, 3), np.float32, blk.pts, 0).copy())
         if kind == "net":
             k = SRC_SCALE
             dpg.set_value("tex", rgba("net", px.repeat(k, 0).repeat(k, 1)))
@@ -443,21 +450,21 @@ def run(view, name, parent=0):
             q.camera(cam[0], cam[1], cam[2], six=bool(blk.i[8]))
             state["size"] = size
         else:
-            p = state["px"]
-            if p != min(CUBE_MAX, size):
-                state["kind"] = None           # the texture follows the window; next frame remakes it
-                return
-            pos = np.ndarray((max(1, npts), 3), np.float32, blk.pts, 0)
-            n = min(npts, px.shape[0])
+            # any other shape: the main view's cloud of squares on the GPU (it was drawn on the CPU here, 40 ms a
+            # frame for 2,048 LEDs - and with a glow 700)
+            pq = state["points"]
+            n = min(pq.n, px.shape[0])
             if n <= 0:
                 return
-            cols_ = look.tone(look.diffuse_points(pos[:n], px[:n], lk), lk)
-            img = render.render_points(pos[:n], cols_, p, cam[0], cam[1], cam[2],
-                                       unlit=render.UNLIT if int(blk.i[9]) & 1 else None, floor=bool(int(blk.i[9]) & 2),
-                                       lk=lk)
-            dpg.set_value("tex", rgba("pts", img))
-            dpg.configure_item("img", width=size, height=size)
-            dpg.set_item_pos("img", [(vw - size) // 2, (vh - size) // 2])
+            unlit = render.UNLIT if int(blk.i[9]) & 1 else None
+            pq.resize(int(size * 0.86), vw, vh)
+            pq.floor, pq.dots = bool(int(blk.i[9]) & 2), unlit is not None
+            pq.reflect = lk["reflect"]
+            cols_ = look.diffuse_points(pq.pos[:n], px[:n], lk)
+            pq.colours(look.tone(cols_, lk), unlit=unlit, lk=lk)
+            pq.camera(cam[0], cam[1], cam[2])
+            pq.layers.update(lk, look.mean_light(cols_) if lk["spill"] > 0 else None, pq.size, pq.w, pq.h)
+            state["size"] = size
 
     def on_bar():
         return dpg.is_item_shown("bar") and (dpg.is_item_hovered("bar") or dpg.is_item_hovered("bar_full")

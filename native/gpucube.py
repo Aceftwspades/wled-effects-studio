@@ -398,6 +398,10 @@ class PointQuads:
                 self.floor_items = _floor_items(self.tag)
             self.mirror_layer = dpg.add_draw_layer(parent=self.tag)       # the reflection, under the LEDs
             self.items, self.dot_items = [], []
+            self._ranks = [None] * n                      # which LED each square shows now (its texture place set)
+            self._mranks = []
+            self._dots_on = False
+            self._rgb_was = None
             for _ in range(n):                            # in pairs: each LED's dot, then its square over it
                 self.dot_items.append(dpg.draw_image_quad(self.dot_tex, z, z, z, z, show=False, parent=self.tag))
                 self.items.append(dpg.draw_image_quad(self.tex, z, z, z, z, show=False, parent=self.tag))
@@ -425,6 +429,16 @@ class PointQuads:
             self._last = None
 
     background = CubeQuads.background
+
+    def _uvs(self):
+        """Every LED's texture place, made once for the texture in use (a list: read in the camera's loop)."""
+        key = (self.sprite, self.n, getattr(self, "cols", 0), getattr(self, "scols", 0))
+        if getattr(self, "_uv_key", None) != key:
+            self._uv_key = key
+            self._uv_list = [self._uv(i) for i in range(self.n)]
+            self._ranks = [None] * len(self.items)        # a texture changed: every square's place set again
+            self._mranks = [None] * len(self.mirror_items)
+        return self._uv_list
 
     def _uv(self, i):
         """LED i's part of the texture it is drawn from: its texel's centre (one colour), or its sprite's cell."""
@@ -461,19 +475,38 @@ class PointQuads:
         sy = oy + sy
         half = np.maximum(1.0, cam.scale(depth) * (self.LED / self.ext))
         order = np.argsort(np.where(ok, -depth, np.inf))          # far first; the NaN and behind-the-eye last
-        for k, i in enumerate(order):
-            q, dq = self.items[k], self.dot_items[k]
-            hs = half[i] * grow
-            if not ok[i] or sx[i] + hs < 0 or sy[i] + hs < 0 or sx[i] - hs > self.w or sy[i] - hs > self.h:
-                dpg.configure_item(q, show=False); dpg.configure_item(dq, show=False); continue
-            x0, x1, y0, y1 = sx[i] - hs, sx[i] + hs, sy[i] - hs, sy[i] + hs
-            dpg.configure_item(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), show=True, **self._uv(int(i)))
-            if self.dots:
-                h = max(1.0, half[i] * self.DOT)
-                dpg.configure_item(dq, p1=(sx[i] - h, sy[i] - h), p2=(sx[i] + h, sy[i] - h), p3=(sx[i] + h, sy[i] + h),
-                                   p4=(sx[i] - h, sy[i] + h), show=True)
+        # Every square placed by one call, its corners from plain lists (numpy's scalars, read one by one, were a
+        # third of it), its texture place only when the LED it shows has changed (the depth order mostly holds as
+        # the camera turns), the dots left alone while they are off and hidden: about a third of the time it took.
+        hs = half * grow
+        vis = ok & (sx + hs >= 0) & (sy + hs >= 0) & (sx - hs <= self.w) & (sy - hs <= self.h)
+        X0, X1, Y0, Y1 = (sx - hs).tolist(), (sx + hs).tolist(), (sy - hs).tolist(), (sy + hs).tolist()
+        VIS, ORD = vis.tolist(), order.tolist()
+        uvs, ranks = self._uvs(), self._ranks
+        cfg = dpg.configure_item
+        for k, i in enumerate(ORD):
+            q = self.items[k]
+            if not VIS[i]:
+                cfg(q, show=False); continue
+            x0, x1, y0, y1 = X0[i], X1[i], Y0[i], Y1[i]
+            if ranks[k] != i:
+                ranks[k] = i
+                cfg(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), show=True, **uvs[i])
             else:
-                dpg.configure_item(dq, show=False)
+                cfg(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), show=True)
+        if self.dots:
+            hd = np.maximum(1.0, half * self.DOT)
+            D0, D1, E0, E1 = (sx - hd).tolist(), (sx + hd).tolist(), (sy - hd).tolist(), (sy + hd).tolist()
+            for k, i in enumerate(ORD):
+                if VIS[i]:
+                    cfg(self.dot_items[k], p1=(D0[i], E0[i]), p2=(D1[i], E0[i]), p3=(D1[i], E1[i]), p4=(D0[i], E1[i]), show=True)
+                else:
+                    cfg(self.dot_items[k], show=False)
+            self._dots_on = True
+        elif self._dots_on:
+            for dq in self.dot_items:
+                cfg(dq, show=False)
+            self._dots_on = False
 
     def _place_mirror(self, cam, ox, oy, fz, zs, grow):
         """The reflection: each LED mirrored in the floor (z = fz), drawn far
@@ -498,15 +531,25 @@ class PointQuads:
         tall = max(1e-3, float(zs.max()) - fz)
         alpha = reflection_weight((self.P[:, 2] - fz) / tall * 2.0) * min(1.0, 0.55 * self.reflect)
         order = np.argsort(np.where(ok, -depth, np.inf))
-        for k, i in enumerate(order):
+        vis = (ok & np.isfinite(alpha) & (alpha > 0.01) & (sx + half >= 0) & (sy + half >= 0)
+               & (sx - half <= self.w) & (sy - half <= self.h))
+        X0, X1, Y0, Y1 = (sx - half).tolist(), (sx + half).tolist(), (sy - half).tolist(), (sy + half).tolist()
+        A = np.clip(np.nan_to_num(alpha) * 255, 0, 255).astype(int).tolist()
+        VIS, ORD = vis.tolist(), order.tolist()
+        uvs = self._uvs()
+        if len(self._mranks) != len(self.mirror_items):
+            self._mranks = [None] * len(self.mirror_items)
+        ranks, cfg = self._mranks, dpg.configure_item
+        for k, i in enumerate(ORD):
             q = self.mirror_items[k]
-            a = alpha[i]
-            if (not ok[i] or not np.isfinite(a) or a <= 0.01 or sx[i] + half[i] < 0 or sy[i] + half[i] < 0
-                    or sx[i] - half[i] > self.w or sy[i] - half[i] > self.h):
-                dpg.configure_item(q, show=False); continue
-            x0, x1, y0, y1 = sx[i] - half[i], sx[i] + half[i], sy[i] - half[i], sy[i] + half[i]
-            dpg.configure_item(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), show=True,
-                               color=(255, 255, 255, int(255 * a)), **self._uv(int(i)))
+            if not VIS[i]:
+                cfg(q, show=False); continue
+            x0, x1, y0, y1 = X0[i], X1[i], Y0[i], Y1[i]
+            if ranks[k] != i:
+                ranks[k] = i
+                cfg(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), show=True, color=(255, 255, 255, A[i]), **uvs[i])
+            else:
+                cfg(q, p1=(x0, y0), p2=(x1, y0), p3=(x1, y1), p4=(x0, y1), show=True, color=(255, 255, 255, A[i]))
 
     def colours(self, rgb, unlit=None, lk=None):
         """The LEDs' colours this frame: (n, 3) uint8, in the positions' order;
@@ -522,6 +565,14 @@ class PointQuads:
             self.sprite = sprite
             self.grow = look.sprite_grow(lk) if sprite else 1.0
             self._last = None                             # the squares drawn again, from the other texture
+            self._rgb_was = None
+        # the same colours as last frame (an effect standing still, a paused show): nothing to send
+        key = (sprite, unlit is not None, round(self.grow, 3) if sprite else 0, round(float(lk.get("glow", 0)), 3) if lk else 0,
+               round(float(lk.get("diffuse", 0)), 3) if lk else 0)
+        was = getattr(self, "_rgb_was", None)
+        if was is not None and was[0] == key and was[1].shape == rgb[:m].shape and np.array_equal(was[1], rgb[:m]):
+            return
+        self._rgb_was = (key, rgb[:m].copy())
         if sprite:
             K = look.SPRITE_K
             mask = look.sprite_mask(lk, K)
@@ -530,10 +581,12 @@ class PointQuads:
             col[:m] = rgb[:m].astype(np.float32) / 255.0
             lit = np.zeros(n, np.float32)
             lit[:m] = (rgb[:m].max(axis=1) >= UNLIT_BELOW) if unlit is not None else 1.0
-            cells = np.empty((self.srows, self.scols, K, K, 4), np.float32)
-            cells[..., :3] = col.reshape(self.srows, self.scols, 1, 1, 3)
-            cells[..., 3] = mask[None, None] * lit.reshape(self.srows, self.scols, 1, 1)
-            dpg.set_value(self.spr_tex, cells.transpose(0, 2, 1, 3, 4).ravel())
+            # made in the texture's own row order (a cell row's K texel rows, each across every cell): no
+            # transposed copy of the whole texture each frame
+            cells = np.empty((self.srows, K, self.scols, K, 4), np.float32)
+            cells[..., :3] = col.reshape(self.srows, 1, self.scols, 1, 3)
+            cells[..., 3] = mask[None, :, None, :] * lit.reshape(self.srows, 1, self.scols, 1)
+            dpg.set_value(self.spr_tex, cells.reshape(-1))
             return
         n = self.cols * self.rows
         buf = np.zeros((n, 4), np.float32); buf[:, 3] = 1.0

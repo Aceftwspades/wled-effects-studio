@@ -449,23 +449,39 @@ def _points(out, sx, sy, ok, depth, half, rgb, unlit, lk):
     off = (np.asarray(rgb).max(axis=1) < UNLIT_BELOW) if unlit is not None else None
     order = np.argsort(-depth)                  # far first
     if lk is not None:
+        # every sprite blended into one float picture in place, written back once at the end: a blend of values in
+        # 0..255 by an alpha in 0..1 stays in range, so the per-LED clip and conversion it did are not needed
         grow = _look.sprite_grow(lk)
-        for i in order:
-            if not ok[i]:
+        buf = out.astype(np.float32)
+        SX, SY = sx.tolist(), sy.tolist()
+        H = np.maximum(2, np.round(half * grow)).astype(int).tolist()
+        HD = np.maximum(1, np.round(half * DOT_POINT)).astype(int).tolist()
+        OK = ok.tolist()
+        OFF = off.tolist() if off is not None else None
+        cols = np.asarray(rgb, np.float32)
+        unl = np.asarray(unlit, np.float32) if unlit is not None else None
+        cache = {}
+        for i in order.tolist():
+            if not OK[i]:
                 continue
-            h = max(2, int(round(half[i] * grow)))
-            x0, y0 = int(sx[i]) - h, int(sy[i]) - h
+            h = H[i]
+            x0, y0 = int(SX[i]) - h, int(SY[i]) - h
             x1, y1 = x0 + 2 * h, y0 + 2 * h
             if x1 <= 0 or y1 <= 0 or x0 >= size or y0 >= size:
                 continue
-            a = _sprite(lk, 2 * h)[max(0, -y0):2 * h - max(0, y1 - size), max(0, -x0):2 * h - max(0, x1 - size)]
-            dst = out[max(0, y0):min(size, y1), max(0, x0):min(size, x1)]
-            if off is not None and off[i]:
-                hh = max(1, int(round(half[i] * DOT_POINT)))     # off: its dim dot, no light
-                out[max(0, int(sy[i]) - hh):max(0, int(sy[i]) + hh), max(0, int(sx[i]) - hh):max(0, int(sx[i]) + hh)] = unlit
+            if OFF is not None and OFF[i]:
+                hh = HD[i]                                       # off: its dim dot, no light
+                buf[max(0, int(SY[i]) - hh):max(0, int(SY[i]) + hh), max(0, int(SX[i]) - hh):max(0, int(SX[i]) + hh)] = unl
                 continue
-            col = np.asarray(rgb[i], np.float32)
-            dst[:] = np.clip(dst * (1.0 - a[..., None]) + col * a[..., None], 0, 255).astype(out.dtype)   # as the GPU blends it
+            spr = cache.get(h)
+            if spr is None:
+                s2 = _sprite(lk, 2 * h)[..., None]
+                spr = cache[h] = (s2, 1.0 - s2)
+            ya, yb, xa, xb = max(0, -y0), 2 * h - max(0, y1 - size), max(0, -x0), 2 * h - max(0, x1 - size)
+            dst = buf[max(0, y0):min(size, y1), max(0, x0):min(size, x1)]
+            dst *= spr[1][ya:yb, xa:xb]                          # as the GPU blends it
+            dst += spr[0][ya:yb, xa:xb] * cols[i]
+        out[:] = buf.astype(out.dtype)
         return
     for i in order:
         if not ok[i]:
