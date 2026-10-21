@@ -2483,9 +2483,15 @@ class App(Features, Recorder, EditBuild):
         return bool(self.gpu_cube and g is not None and g.kind == "cube" and not self.ab)
 
     def gpu_points_active(self):
-        """The GPU view draws every other geometry as a cloud of squares."""
+        """The GPU view draws every other geometry as a cloud of squares - or, one whose LEDs lie on a surface
+        (a matrix, a cylinder, a sphere, a torus: surface_geom), as that surface."""
         g = self.eng.geom
         return bool(self.gpu_cube and g is not None and g.kind != "cube" and not self.ab)
+
+    def surface_geom(self):
+        """The engine's geometry when the 3-D view draws it as a surface (gpucube.SurfaceQuads), else None."""
+        g = self.eng.geom
+        return g if g is not None and g.is_surface() and len(self.view_positions()) == len(g.pos) else None
 
     def view_positions(self):
         """The LEDs' positions the 3-D view draws: the project's geometry
@@ -2508,8 +2514,10 @@ class App(Features, Recorder, EditBuild):
         if dpg.does_item_exist("cube_tex"):
             dpg.delete_item("cube_tex")
         if self.gpu_points_active():
-            from native.gpucube import PointQuads
-            self.point_quads = PointQuads("cube_win", "cube_img", self.view_positions())
+            from native.gpucube import PointQuads, SurfaceQuads
+            sg = self.surface_geom()
+            self.point_quads = (SurfaceQuads("cube_win", "cube_img", sg, self.view_positions()) if sg is not None
+                                else PointQuads("cube_win", "cube_img", self.view_positions()))
             self.point_quads.set_frame(view3d.frame(self))
             r = getattr(self, "_cube_rect", None)
             if r and self.ui:
@@ -3255,9 +3263,10 @@ class App(Features, Recorder, EditBuild):
 
 
     def poll_view_mode(self):
-        """The 3-D view is remade when what it should draw changes: flat
-        mode toggled, A/B started or stopped, the GPU view switched."""
-        want = (self.gpu_cube_active(), self.gpu_points_active())
+        """The 3-D view is remade when what it should draw changes: A/B
+        started or stopped, the GPU view switched, a surface's kind or grid."""
+        sg = self.surface_geom() if self.gpu_points_active() else None
+        want = (self.gpu_cube_active(), self.gpu_points_active(), (sg.kind, sg.w, sg.h) if sg is not None else None)
         if want != getattr(self, "_gpu_was", None):
             self._gpu_was = want
             self.request_layout()

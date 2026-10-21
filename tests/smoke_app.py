@@ -635,11 +635,16 @@ STEPS = [
     ([{"check": "not __import__('native.look', fromlist=['x']).active(app.view_look())"},
       {"check": "app.cube_quads is None or not dpg.get_item_configuration(app.cube_quads.layers.over_items[0])['show']"},
       {"check": "app.cube_quads is None or not any(dpg.get_item_configuration(q)['show'] for qs in app.cube_quads.mirror.values() for q in qs)"},
-      # every shape in parity: a sphere's LEDs as glowing sprites with their reflection
+      # every shape in parity: a sphere drawn as its surface (gpucube.SurfaceQuads), glowing, with its reflection
       {"geometry": {"kind": "sphere", "params": {"w": 24, "h": 12}}}, {"py": "chrome.set_look(app, preset='night')"}], 1.5),
-    ([{"check": "app.point_quads is not None and app.point_quads.sprite and app.point_quads.reflect > 0"},
+    ([{"check": "type(app.point_quads).__name__ == 'SurfaceQuads' and app.point_quads.reflect > 0"},
       {"check": "any(dpg.get_item_configuration(q)['show'] for q in app.point_quads.mirror_items)"},
       {"check": "app.view_image(app.net_image(), 160).shape == (160, 160, 3)"},
+      # a helix of LEDs, not a surface: the point cloud, its LEDs glowing sprites with their reflection
+      {"geometry": {"kind": "xyz", "params": {"points": [[__import__('math').cos(k * 0.4), __import__('math').sin(k * 0.4), k * 0.05]
+                                                          for k in range(60)]}}}], 1.5),
+    ([{"check": "type(app.point_quads).__name__ == 'PointQuads' and app.point_quads.sprite and app.point_quads.reflect > 0"},
+      {"check": "any(dpg.get_item_configuration(q)['show'] for q in app.point_quads.mirror_items)"},
       {"py": "chrome.set_look(app, preset='studio')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.5),
     ([{"check": "app.cube_quads is not None"},
       {"py": "chrome.close_dialog('appearance_win')"}], 0.4),

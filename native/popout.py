@@ -37,13 +37,15 @@ HDR = 256
 SRC_SCALE = 4                    # the net a few times its size, so bilinear sampling keeps the LEDs square
 CUBE_MAX = 620                   # the point-cloud render is quadratic in this
 TITLES = {"cube": "3-D view", "net": "Logical net"}
+SURF_KINDS = (None, "matrix", "cylinder", "sphere", "torus")      # a shape drawn as its surface (Geometry.is_surface)
 BAR_S = 2.5                      # the corner bar stays this long after the mouse last moved
 
 
 class Block:
     """The shared block. Ints: 0 alive, 1 frame seq, 2 rows, 3 cols, 4 cube
     (1: the net of a cube of B a face; 0: LEDs with positions), 5 B, 6 point
-    count, 7 geometry seq, 8 six faces, 9 the view's flags, 10 a look given.
+    count, 7 geometry seq, 8 six faces, 9 the view's flags, 10 a look given,
+    11 a surface's kind (SURF_KINDS, 0 for none), 12 its grid's width, 13 height.
     Floats: yaw, pitch, dist. The look's strengths (look.KEYS, in order).
     Then the pixels, then the positions."""
 
@@ -160,6 +162,9 @@ class Popouts:
         blk.i[4] = 1 if cube else 0
         blk.i[5] = int(eng.B)
         blk.i[8] = 1 if getattr(eng, "six", False) else 0
+        surf = g is not None and view == "cube" and not cube and g.is_surface() and g.kind in SURF_KINDS
+        blk.i[11] = SURF_KINDS.index(g.kind) if surf else 0
+        blk.i[12], blk.i[13] = (int(g.w), int(g.h)) if surf else (0, 0)
         if not cube and g is not None and view == "cube":
             pos = g.pos
             if id(pos) != self._pos_id:
@@ -292,7 +297,8 @@ def _parent_alive(pid):
 def run(view, name, parent=0):
     import dearpygui.dearpygui as dpg
     from native import look, render
-    from native.gpucube import CubeQuads, PointQuads
+    from native.gpucube import CubeQuads, PointQuads, SurfaceQuads
+    from native.geometry import Geometry
 
     lut = np.arange(256, dtype=np.float32) / 255.0
     blk = Block(name, create=False)
@@ -399,6 +405,10 @@ def run(view, name, parent=0):
             px = np.ndarray((rows * cols, 3), np.uint8, blk.px, 0)
         kind = "net" if view == "net" else ("cube" if cube else "points")
         shape = (rows, cols, B)
+        surf = (int(blk.i[11]), int(blk.i[12]), int(blk.i[13])) if kind == "points" else (0, 0, 0)
+        if kind == "points" and surf != state.get("surf"):
+            state["kind"] = None                          # a surface's kind or grid changed, or one came or went: made again
+        state["surf"] = surf
         if kind == "points" and state["kind"] == "points" and state["gseq"] != int(blk.i[7]) and state.get("points") is not None:
             state["gseq"] = int(blk.i[7])                 # the shape moved or changed: the same cloud, its points anew
             n = min(npts, px.shape[0])
@@ -422,7 +432,12 @@ def run(view, name, parent=0):
                 if n <= 0:
                     state["kind"] = None
                     return
-                state["points"] = PointQuads("root", "img", np.ndarray((n, 3), np.float32, blk.pts, 0).copy())
+                pos = np.ndarray((n, 3), np.float32, blk.pts, 0).copy()
+                code, gw, gh = surf
+                if 0 < code < len(SURF_KINDS) and gw * gh == n:   # a matrix, a cylinder...: drawn as its surface
+                    state["points"] = SurfaceQuads("root", "img", Geometry(SURF_KINDS[code], w=gw, h=gh), pos)
+                else:
+                    state["points"] = PointQuads("root", "img", pos)
         if kind == "net":
             k = SRC_SCALE
             dpg.set_value("tex", rgba("net", px.repeat(k, 0).repeat(k, 1)))
