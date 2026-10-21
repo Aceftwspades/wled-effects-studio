@@ -12,9 +12,9 @@ cloud for anything else - so it is as sharp as its window is big, and it
 orbits and zooms on its own, with the 3-D view's look (look.py: Appearance >
 3-D view), which the app publishes with each frame. F11, F or a double-click
 puts it full screen and back; a bar in its corner while the mouse moves says
-so, and has Back into the studio. Esc leaves full screen, then hands the pane
-back, as Back into the studio and closing the window do. Closing the window (or Esc) hands the pane
-back to the app; the app closing takes the pop-out with it. The window
+so, and has Back into the studio. Esc leaves full screen; pressed again (or
+Back into the studio, or closing the window) it hands the pane back to the
+app. The app closing takes the pop-out with it. The window
 remembers where it was, which on two monitors is the point.
 
     app side:  Popouts.open(view, eng, cam) / close(view) / is_out(view)

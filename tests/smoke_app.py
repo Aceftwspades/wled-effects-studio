@@ -932,6 +932,24 @@ STEPS = [
       {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
       {"py": "__import__('native.sequence_ui', fromlist=['x']).send_timers(app)"}], 6.0),
     ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).read_timers(app)"}], 3.0),
+    # the timeline zoomed to the first step and moved along, its overview drawn with the box
+    ([{"py": "__import__('native.sequence_ui', fromlist=['x']).fit_step(app, 0)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).zoom(app, 2.0)"}], 0.4),
+    ([{"check": "app._tl_view is not None and app._tl_view['span'] < __import__('native.sequence_ui', fromlist=['x'])._starts(app)[1]"},
+      {"check": "'of' in dpg.get_value('seq_zoom_words')"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).set_view(app, 0.5, 2.0)"}], 0.3),
+    ([{"check": "abs(app._tl_view['t0'] - 0.5) < 1e-6 and dpg.does_item_exist('seq_tl_ov')"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).fit_all(app)"}], 0.3),
+    # Edit live while the show plays: the effect changed goes into the step on the playhead; a step chosen is played from
+    ([{"py": "__import__('native.sequence_ui', fromlist=['x']).toggle_edit(app, True)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).play(app, 0)"}], 1.5),
+    ([{"check": "__import__('native.sequence_ui', fromlist=['x'])._play_i(app) == 0 and app._seq_sel == 0"}, {"py": "__import__('native.sequence_ui', fromlist=['x'])._set_effect(app, 'Ace 3-D Maelstrom')"}], 0.8),
+    ([{"check": "app.project.options['sequence']['steps'][0]['segments'][0]['effect'] == 'Ace 3-D Maelstrom'"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 1)"}], 0.4),
+    ([{"check": "__import__('native.sequence_ui', fromlist=['x'])._play_i(app) == 1 and app._seq_sel == 1"}, {"seq": ["stop"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).toggle_edit(app, False)"}], 0.4),
+    # automation recorded: Custom 1 moved by hand while the first step plays becomes a curve on it
+    ([{"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 0)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).toggle_rec(app, True)"}], 1.4),
+    ([{"py": "(app.eng.fx.__setitem__('c1', 40), app.eng.push())"}], 0.15),
+    ([{"py": "(app.eng.fx.__setitem__('c1', 120), app.eng.push())"}], 0.15),
+    ([{"py": "(app.eng.fx.__setitem__('c1', 220), app.eng.push())"}], 0.15),
+    ([{"check": "__import__('native.sequence_ui', fromlist=['x'])._REC.armed and any(k == 'c1' for _, k in __import__('native.sequence_ui', fromlist=['x'])._REC.takes)"}, {"seq": ["stop"]}], 0.4),
+    ([{"check": "not __import__('native.sequence_ui', fromlist=['x'])._REC.armed and (app.project.options['sequence']['steps'][0].get('ramps') or {}).get('c1', {}).get('shape') == 'curve'"},
+      {"expect": ["messages", "automation recorded"]}], 0.2),
     ([{"expect": ["seq_tlog", "read from the device"]}, {"seq": ["del", 1]}, {"seq": ["del", 0]}, {"seq": ["timer_del", 1]}, {"seq": ["timer_del", 0]},
       {"seq": ["tap"]}, {"seq": ["snap", 120.0, 4]}, {"camera": "front"}, {"camera": ["save", 1]}, {"camera": "isometric"}], 1.5),
     # undo in the frames: a deleted step comes back, and goes again on redo

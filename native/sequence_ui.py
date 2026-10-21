@@ -576,6 +576,12 @@ def refresh(app):
 
 def select(app, i):
     app._seq_sel = int(i)
+    if getattr(app, "_seq_edit", False) and getattr(app, "_seq_play", None) is not None and _play_i(app) != app._seq_sel:
+        # editing while the show plays edits the step on the playhead (_edit_poll keeps the selection there): a step
+        # chosen - on the timeline, in the list - is played from, or it was taken back a frame later
+        starts = _starts(app)[0]
+        if 0 <= app._seq_sel < len(starts):
+            seek(app, starts[app._seq_sel])
     _into_view(app, int(i))
     refresh(app)
 
@@ -1541,7 +1547,7 @@ def poll(app):
             draw_timeline(app); draw_overview(app); app._tl_dirty = False; app._tl_hover_was = getattr(app, "_tl_hover", None)
             app._tl_state_was = state
         elif getattr(app, "_seq_play", None) is not None:
-            _move_head(app); draw_overview(app)             # playing: the playhead moves, the rest stays (redrawn every
+            _move_head(app); _move_ov_head(app)             # playing: the playheads move, the rest stays (redrawn every
                                                             # frame it was 2 ms of each)
         _show_position(app)
     p = getattr(app, "_seq_play", None)
@@ -1633,20 +1639,42 @@ def _ruler_step(total, w):
     return 600
 
 
-def _wave(app, cols):
-    """The WAV's loudness in `cols` columns (0..1 each), cached per file."""
+WAVE_RES = 20000             # the WAV's loudness kept at this many points (fewer for a short file)
+
+
+def _wave(app):
+    """The WAV's loudness, 0..1, at WAVE_RES points across the file, as a running sum (a column's mean is then two
+    reads, whatever the zoom): made once a file - made for each zoom, a long file stalled every wheel notch."""
     from native import audio
     live = getattr(app, "live", None)
     if not isinstance(live, audio.FileAudio):
         return None
-    key = (id(live), cols)
-    if getattr(app, "_wave_key", None) != key:
-        n = len(live.samples) // cols
+    if getattr(app, "_wave_key", None) != id(live):
+        res = max(1, min(WAVE_RES, len(live.samples) // 16))
+        n = len(live.samples) // res
         if n < 1:
             return None
-        a = np.abs(live.samples[:n * cols].reshape(cols, n)).mean(1)
-        app._wave_key, app._wave = key, a / (a.max() or 1.0)
+        a = np.abs(live.samples[:n * res].reshape(res, n)).mean(1)
+        a = a / (a.max() or 1.0)
+        app._wave_key, app._wave = id(live), np.concatenate([[0.0], np.cumsum(a)])
     return app._wave
+
+
+def wave_columns(cs, seconds, t0, sx, w, end, every=2):
+    """The wave's columns on the timeline: (x, loudness 0..1) every `every` pixels from its left edge to `end`
+    seconds, each the mean of the loudness over the time the column covers. `cs` is _wave's running sum over
+    the file's `seconds`."""
+    res = len(cs) - 1
+    if res < 1 or seconds <= 0 or sx <= 0:
+        return np.zeros(0), np.zeros(0)
+    xs = np.arange(0, int(w), every, dtype=np.float64)
+    ta = t0 + xs / sx
+    keep = ta <= end
+    xs, ta = xs[keep], ta[keep]
+    tb = np.minimum(ta + every / sx, end)
+    i0 = np.clip((ta / seconds * res).astype(int), 0, res - 1)
+    i1 = np.clip(np.ceil(tb / seconds * res).astype(int), i0 + 1, res)
+    return xs, (cs[i1] - cs[i0]) / (i1 - i0)
 
 
 def _fill_look(st, a, b, top, bot, parent, alpha=255):
@@ -1781,9 +1809,12 @@ def _over(tag):
 
 
 def _hold_scroll(app):
-    """The frame does not scroll with the wheel while the pointer is over the timeline or its strip: the wheel is
-    theirs there (it moved the frame under them as well)."""
-    over = any(_over(t) for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip"))
+    """The frame does not scroll with the wheel while the pointer is over the timeline or its strip and the wheel is
+    theirs - zoomed in (it moves along the time), or with Ctrl (it zooms): it moved the frame under them as well.
+    The whole show shown, the plain wheel scrolls the frame as it does anywhere in it."""
+    ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
+    zoomed = getattr(app, "_tl_view", None) is not None
+    over = (zoomed or ctrl) and any(_over(t) for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip"))
     if over != getattr(app, "_tl_held", False):
         app._tl_held = over
         dpg.configure_item(TAG, no_scroll_with_mouse=over)
@@ -1809,6 +1840,8 @@ def wheel(app, delta):
         zoom(app, ZOOM_STEP ** (1 if delta > 0 else -1), at)
     elif getattr(app, "_tl_view", None) is not None:
         set_view(app, t0 - (1 if delta > 0 else -1) * span * 0.12, span)
+    else:
+        return False                                      # the whole show shown: the frame's to scroll
     return True
 
 
@@ -1867,16 +1900,11 @@ def draw_timeline(app):
     from native import audio
     live = getattr(app, "live", None)
     if isinstance(live, audio.FileAudio) and live.seconds > 0:
-        res = int(max(50, min(20000, live.seconds * sx / 2)))       # a column every two pixels at this zoom
-        wave = _wave(app, res)
-        if wave is not None:
+        cs = _wave(app)
+        if cs is not None:
             mid = (top + bot) / 2
-            end = min(live.seconds, total)                          # only as far as the sequence goes
-            for x in range(0, int(w), 2):
-                t = t0 + x / sx
-                if t > end:
-                    break
-                a = float(wave[min(res - 1, int(t / live.seconds * res))]) * (bot - top) * 0.5
+            xs, amp = wave_columns(cs, live.seconds, t0, sx, w, min(live.seconds, total))   # as far as the sequence goes
+            for x, a in zip(xs.tolist(), (amp * (bot - top) * 0.5).tolist()):
                 dpg.draw_line((x, mid - a), (x, mid + a), color=(255, 255, 255, 34), thickness=1, parent=dl)
     # the steps (those on screen; the one before the first keeps its colour for the blend into it)
     sel = min(getattr(app, "_seq_sel", 0), len(spans) - 1)
@@ -2040,13 +2068,25 @@ def draw_overview(app):
         if i == sel:
             dpg.draw_rectangle((t * k, h - 3), ((t + d) * k, h), color=(0, 0, 0, 0), fill=c.ACCENT, parent=dl)
     at = position(app)
+    app._ov_scale = (k, h)                                  # for _move_ov_head, between redraws
     if at is not None:
-        dpg.draw_line((at * k, 0), (at * k, h), color=(255, 255, 255, 230), thickness=1.5, parent=dl)
+        dpg.draw_line((at * k, 0), (at * k, h), color=(255, 255, 255, 230), thickness=1.5, parent=dl, tag="seq_ov_head")
     t0, span, _ = _span_now(app)
     a, b = t0 * k, (t0 + span) * k
     dpg.draw_rectangle((0, 0), (a, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 120), parent=dl)       # what is off the timeline,
     dpg.draw_rectangle((b, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 120), parent=dl)       # darker
     dpg.draw_rectangle((a, 0.5), (max(a + 3, b), h - 0.5), color=(255, 255, 255, 200), thickness=1.5, rounding=2, parent=dl)
+
+
+def _move_ov_head(app):
+    """The overview's playhead to where the show is now, the strip as it was drawn (drawn again when it has none)."""
+    at, sc = position(app), getattr(app, "_ov_scale", None)
+    if at is None or sc is None or not dpg.does_item_exist("seq_ov_head"):
+        if at is not None:
+            draw_overview(app)
+        return
+    k, h = sc
+    dpg.configure_item("seq_ov_head", p1=(at * k, 0), p2=(at * k, h))
 
 
 def overview_mouse(app):
@@ -2081,7 +2121,7 @@ def overview_mouse(app):
     if not (x0 <= mx <= x0 + w and y0 <= my <= y0 + h) or not dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
         return False
     a, b = t0 * k + x0, (t0 + span) * k + x0
-    if abs(mx - a) <= px(5) and span < total:
+    if abs(mx - a) <= px(5):
         app._tl_ov = ("left", t_at, t0, span)
     elif abs(mx - b) <= px(5):
         app._tl_ov = ("right", t_at, t0, span)
@@ -2518,7 +2558,7 @@ def _rec_flush(app):
         app._tl_dirty = True
         sel = getattr(app, "_seq_sel", 0)
         steps = _steps(app)["steps"]
-        if 0 <= sel < len(steps):
+        if 0 <= sel < len(steps) and dpg.does_item_exist("seq_ramps"):
             refresh_ramps(app, steps[sel])
         app.gp.status(f"automation recorded: {done} curve{'s' if done != 1 else ''}")
 # AI: end
