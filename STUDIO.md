@@ -3982,6 +3982,12 @@ Released as 1.17.0 (2026-10-20), with the Video Switchboard rebuilt from
 sub-graphs (5bdf10b), the phone's camera and network streams (95c4dcc), and
 a long menu's hole in the frames following it where ImGui moves it (fab4b45).
 
+Released as 1.17.1 (2026-10-21): the pop-out with the view's look and full
+screen on its own monitor, flat mode drawn as the cube, a cheaper Cinematic
+(e6ec89b); the Sequence's timeline zoomed and moved along, Edit live while
+the show plays and record automation (d648618); the pop-out's shapes on the
+GPU and a cheaper point cloud (e7c6f55); the review's fixes (48cd126).
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every
