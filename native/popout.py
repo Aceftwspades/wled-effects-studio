@@ -7,7 +7,11 @@ a shared-memory block: the net at LED resolution, the geometry (a cube's
 face size, or every LED's position) and the camera it started from. The
 pop-out draws the picture itself - the GPU quads for a cube, the point
 cloud for anything else - so it is as sharp as its window is big, and it
-orbits and zooms on its own. Closing the window (or Esc) hands the pane
+orbits and zooms on its own, with the 3-D view's look (look.py: Appearance >
+3-D view), which the app publishes with each frame. F11, F or a double-click
+puts it full screen and back; a bar in its corner while the mouse moves says
+so, and has Back into the studio. Esc leaves full screen, then hands the pane
+back, as Back into the studio and closing the window do. Closing the window (or Esc) hands the pane
 back to the app; the app closing takes the pop-out with it. The window
 remembers where it was, which on two monitors is the point.
 
@@ -31,13 +35,15 @@ HDR = 256
 SRC_SCALE = 4                    # the net a few times its size, so bilinear sampling keeps the LEDs square
 CUBE_MAX = 620                   # the point-cloud render is quadratic in this
 TITLES = {"cube": "3-D view", "net": "Logical net"}
+BAR_S = 2.5                      # the corner bar stays this long after the mouse last moved
 
 
 class Block:
     """The shared block. Ints: 0 alive, 1 frame seq, 2 rows, 3 cols, 4 cube
     (1: the net of a cube of B a face; 0: LEDs with positions), 5 B, 6 point
-    count, 7 geometry seq, 8 six faces. Floats: yaw, pitch, dist. Then the
-    pixels, then the positions."""
+    count, 7 geometry seq, 8 six faces, 9 the view's flags, 10 a look given.
+    Floats: yaw, pitch, dist. The look's strengths (look.KEYS, in order).
+    Then the pixels, then the positions."""
 
     def __init__(self, name, create):
         size = HDR + MAX_NET + MAX_PTS * 4
@@ -45,12 +51,13 @@ class Block:
         buf = self.shm.buf
         self.i = np.ndarray(16, np.int32, buf, 0)
         self.f = np.ndarray(8, np.float32, buf, 64)
+        self.look = np.ndarray(16, np.float32, buf, 128)
         self.px = np.ndarray(MAX_NET, np.uint8, buf, HDR)
         self.pts = np.ndarray(MAX_PTS, np.float32, buf, HDR + MAX_NET)
 
     def close(self):
         # the views export the buffer; the block cannot close while they live
-        self.i = self.f = self.px = self.pts = None
+        self.i = self.f = self.look = self.px = self.pts = None
         try:
             self.shm.close()
         except Exception:
@@ -120,19 +127,24 @@ class Popouts:
             blk.close()
         return gone
 
-    def publish(self, net, eng, cam, flags=0):
+    def publish(self, net, eng, cam, flags=0, lk=None):
         """This frame to every popped-out view; `flags` what the 3-D view
-        adds - 1 unlit LEDs as dim dots, 2 a floor under the shape."""
+        adds - 1 unlit LEDs as dim dots, 2 a floor under the shape; `lk`
+        its look (look.current)."""
+        from native import look
         for view, (proc, blk) in self.jobs.items():
             try:
-                self._write(view, blk, net, eng, cam)
+                if lk is not None:
+                    blk.look[:len(look.KEYS)] = [float(lk.get(k, look.DEFAULTS[k])) for k in look.KEYS]
+                blk.i[10] = 1 if lk is not None else 0
                 blk.i[9] = int(flags)
+                self._write(view, blk, net, eng, cam)       # last: its frame number tells the window to draw
             except Exception:
                 pass
 
     def _write(self, view, blk, net, eng, cam):
         g = eng.geom
-        cube = g is not None and g.kind == "cube" and not eng.fx.get("o3")
+        cube = g is not None and g.kind == "cube"                 # in flat mode too: the faces are where they were
         if view == "net" or cube:
             px = net
         else:
@@ -181,6 +193,66 @@ def _on_screen(x, y, w, h):
         pass
     return x, y
 
+def _own_window():
+    """This process's visible top-level window (the pop-out's viewport), or None."""
+    import ctypes
+    from ctypes import wintypes as w
+    u32, found = ctypes.windll.user32, []
+
+    @ctypes.WINFUNCTYPE(w.BOOL, w.HWND, w.LPARAM)
+    def each(h, _):
+        pid = w.DWORD()
+        u32.GetWindowThreadProcessId(h, ctypes.byref(pid))
+        if pid.value == os.getpid() and u32.IsWindowVisible(h):
+            found.append(h)
+        return True
+    u32.EnumWindows(each, 0)
+    return found[0] if found else None
+
+
+def _win_full(on, ui):
+    """Full screen on the monitor the window is on (`on`), or back to the window it was: its style and place kept
+    in ui. False when it cannot be done here (the caller falls back to Dear PyGui's own)."""
+    try:
+        import ctypes
+        from ctypes import wintypes as w
+        u32 = ctypes.windll.user32
+        u32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+        u32.GetWindowLongPtrW.argtypes = [w.HWND, ctypes.c_int]
+        u32.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+        u32.SetWindowLongPtrW.argtypes = [w.HWND, ctypes.c_int, ctypes.c_ssize_t]
+        GWL_STYLE, WS_POPUP, WS_VISIBLE = -16, 0x80000000, 0x10000000
+        SWP_FRAMECHANGED, SWP_NOOWNERZORDER = 0x0020, 0x0200
+        h = ui.get("hwnd") or _own_window()
+        if not h:
+            return False
+        ui["hwnd"] = h
+        if on:
+            r = w.RECT()
+            u32.GetWindowRect(h, ctypes.byref(r))
+            ui["restore"] = (u32.GetWindowLongPtrW(h, GWL_STYLE), (r.left, r.top, r.right - r.left, r.bottom - r.top))
+
+            class MONITORINFO(ctypes.Structure):
+                _fields_ = [("cbSize", w.DWORD), ("rcMonitor", w.RECT), ("rcWork", w.RECT), ("dwFlags", w.DWORD)]
+            mi = MONITORINFO(); mi.cbSize = ctypes.sizeof(MONITORINFO)
+            u32.MonitorFromWindow.restype = w.HMONITOR
+            mon = u32.MonitorFromWindow(h, 2)                     # MONITOR_DEFAULTTONEAREST
+            if not mon or not u32.GetMonitorInfoW(mon, ctypes.byref(mi)):
+                return False
+            m = mi.rcMonitor
+            u32.SetWindowLongPtrW(h, GWL_STYLE, WS_POPUP | WS_VISIBLE)
+            u32.SetWindowPos(h, 0, m.left, m.top, m.right - m.left, m.bottom - m.top, SWP_FRAMECHANGED | SWP_NOOWNERZORDER)
+        else:
+            style, (x, y, cw, ch) = ui.get("restore") or (None, (0, 0, 0, 0))
+            if style is None:
+                return False
+            u32.SetWindowLongPtrW(h, GWL_STYLE, style)
+            u32.SetWindowPos(h, 0, x, y, cw, ch, SWP_FRAMECHANGED | SWP_NOOWNERZORDER)
+        return True
+    except Exception:
+        return False
+
+
 def _pos_file(view):
     return scratch.path(f"popout_{view}.json")
 
@@ -217,7 +289,7 @@ def _parent_alive(pid):
 
 def run(view, name, parent=0):
     import dearpygui.dearpygui as dpg
-    from native import render
+    from native import look, render
     from native.gpucube import CubeQuads
 
     lut = np.arange(256, dtype=np.float32) / 255.0
@@ -237,6 +309,51 @@ def run(view, name, parent=0):
         pass
     dpg.set_primary_window("root", True)
     dpg.configure_item("root", no_scrollbar=True, no_scroll_with_mouse=True)   # set_primary_window put its own flags in their place
+
+    # the corner bar: full screen, and back into the studio - shown while the mouse moves, so a full-screen
+    # picture has a way back that is not hidden behind a key
+    ui = {"full": False, "moved": time.time(), "mouse": None}
+
+    def toggle_full():
+        # on Windows the monitor the window is on, borderless (Dear PyGui's own full screen takes the primary
+        # monitor: a pop-out on the second one jumped back to the main window's); elsewhere Dear PyGui's
+        if not (sys.platform == "win32" and _win_full(not ui["full"], ui)):
+            dpg.toggle_viewport_fullscreen()
+        ui["full"] = not ui["full"]
+        dpg.configure_item("bar_full", label="Window  (F11)" if ui["full"] else "Full screen  (F11)")
+        ui["moved"] = time.time()
+
+    def dock():
+        dpg.stop_dearpygui()                  # the window gone: the app takes the pane back (Popouts.poll)
+
+    with dpg.theme(tag="bar_th"):
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 6, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 10, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 6, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_WindowRounding, 8)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (0, 0, 0, 0))     # the buttons alone over the picture
+            dpg.add_theme_style(dpg.mvStyleVar_WindowBorderSize, 0)
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (30, 33, 40, 235))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (60, 66, 78, 255))
+    with dpg.window(tag="bar", no_title_bar=True, no_resize=True, no_move=True, autosize=True, show=False,
+                    no_scrollbar=True, no_collapse=True, no_focus_on_appearing=True, no_saved_settings=True):
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Full screen  (F11)", tag="bar_full", callback=toggle_full)
+            dpg.add_button(label="Back into the studio", tag="bar_dock", callback=dock)
+    dpg.bind_item_theme("bar", "bar_th")
+
+    def poll_bar():
+        m = tuple(dpg.get_mouse_pos(local=False))
+        if m != ui["mouse"]:
+            ui["mouse"], ui["moved"] = m, time.time()
+        over = dpg.is_item_hovered("bar") or dpg.is_item_hovered("bar_full") or dpg.is_item_hovered("bar_dock")
+        show = over or time.time() - ui["moved"] < BAR_S
+        if show:
+            bw = dpg.get_item_rect_size("bar")[0] or 330
+            dpg.set_item_pos("bar", [max(0, dpg.get_viewport_client_width() - int(bw) - 12), 12])
+        dpg.configure_item("bar", show=show)
 
     cam = [float(blk.f[0]), float(blk.f[1]), float(blk.f[2])]
     drag = {"on": False, "y0": 0.0, "p0": 0.0}
@@ -258,8 +375,14 @@ def run(view, name, parent=0):
         state["quads"] = None
         state["bufs"].clear()
 
+    def the_look():
+        if not int(blk.i[10]):
+            return dict(look.DEFAULTS)
+        return {k: float(blk.look[j]) for j, k in enumerate(look.KEYS)}
+
     def frame():
         rows, cols, cube, B, npts = (int(blk.i[k]) for k in (2, 3, 4, 5, 6))
+        lk = the_look()
         if rows <= 0 or cols <= 0:
             return
         # the primary window is the client area; the viewport's own client
@@ -306,11 +429,17 @@ def run(view, name, parent=0):
             dpg.set_item_pos("img", [(vw - iw) // 2, (vh - ih) // 2])
         elif kind == "cube":
             k = SRC_SCALE
-            dots = bool(int(blk.i[9]) & 1)
-            dpg.set_value("tex", rgba("src", render.dotted(px, k) if dots else px.repeat(k, 0).repeat(k, 1)))
+            unlit = render.UNLIT if int(blk.i[9]) & 1 else None
+            toned = look.tone(px, lk)
+            if unlit is None and lk["glow"] <= 0 and lk["diffuse"] <= 0:
+                dpg.set_value("tex", rgba("src", toned.repeat(k, 0).repeat(k, 1)))
+            else:                                     # glowing, diffused or dotted: the main view's texture
+                dpg.set_value("tex", rgba("src", look.led_texture(toned, k, lk, unlit, B=B)))
             q = state["quads"]
             q.resize(int(size * 0.86), vw, vh)        # the drawlist is the window; the cube sits centred, a margin round it
             q.floor = bool(int(blk.i[9]) & 2)
+            q.reflect = lk["reflect"]
+            q.layers.update(lk, look.mean_light(px) if lk["spill"] > 0 else None, q.size, q.w, q.h)
             q.camera(cam[0], cam[1], cam[2], six=bool(blk.i[8]))
             state["size"] = size
         else:
@@ -322,14 +451,20 @@ def run(view, name, parent=0):
             n = min(npts, px.shape[0])
             if n <= 0:
                 return
-            img = render.render_points(pos[:n], px[:n], p, cam[0], cam[1], cam[2],
-                                       unlit=render.UNLIT if int(blk.i[9]) & 1 else None, floor=bool(int(blk.i[9]) & 2))
+            cols_ = look.tone(look.diffuse_points(pos[:n], px[:n], lk), lk)
+            img = render.render_points(pos[:n], cols_, p, cam[0], cam[1], cam[2],
+                                       unlit=render.UNLIT if int(blk.i[9]) & 1 else None, floor=bool(int(blk.i[9]) & 2),
+                                       lk=lk)
             dpg.set_value("tex", rgba("pts", img))
             dpg.configure_item("img", width=size, height=size)
             dpg.set_item_pos("img", [(vw - size) // 2, (vh - size) // 2])
 
+    def on_bar():
+        return dpg.is_item_shown("bar") and (dpg.is_item_hovered("bar") or dpg.is_item_hovered("bar_full")
+                                             or dpg.is_item_hovered("bar_dock"))
+
     def on_click(s, a):
-        if view == "cube":
+        if view == "cube" and not on_bar():
             drag["on"] = True
             drag["y0"], drag["p0"] = cam[0], cam[1]
 
@@ -350,9 +485,18 @@ def run(view, name, parent=0):
 
     def on_key(s, a):
         if a == dpg.mvKey_Escape:
-            dpg.stop_dearpygui()
+            if ui["full"]:
+                toggle_full()                 # Esc leaves full screen first; again: back into the studio
+            else:
+                dock()
+        elif a in (dpg.mvKey_F11, dpg.mvKey_F):
+            toggle_full()
         elif a in (dpg.mvKey_R, dpg.mvKey_Home):
             cam[:] = [-0.6, 0.75, 4.6]
+
+    def on_double(s, a):
+        if not on_bar():
+            toggle_full()
 
     with dpg.handler_registry():
         dpg.add_mouse_click_handler(button=dpg.mvMouseButton_Left, callback=on_click)
@@ -360,6 +504,7 @@ def run(view, name, parent=0):
         dpg.add_mouse_drag_handler(button=dpg.mvMouseButton_Left, callback=on_drag)
         dpg.add_mouse_wheel_handler(callback=on_wheel)
         dpg.add_key_press_handler(callback=on_key)
+        dpg.add_mouse_double_click_handler(button=dpg.mvMouseButton_Left, callback=on_double)
 
     kw = dict(title=f"WLED Effects Studio - {TITLES.get(view, view)}", width=w0, height=h0, clear_color=(0, 0, 0, 255),
               min_width=160, min_height=160)
@@ -386,6 +531,7 @@ def run(view, name, parent=0):
                 stale += 1
                 if view == "cube" and drag["on"] or (stale % 30 == 0):
                     frame()                    # the camera moves while the app is paused
+            poll_bar()
             dpg.render_dearpygui_frame()
             # a capture on request, the way the app does it (checked, not the app's window) - the tests' alone
             req = scratch.path(f"popout_{view}.request") if scratch.remote_control() else None
@@ -397,6 +543,8 @@ def run(view, name, parent=0):
                     pass
     finally:
         try:
+            if ui["full"]:
+                raise RuntimeError("full screen: the window's own place is not this")   # the last one kept
             x, y = dpg.get_viewport_pos()
             w, h = int(dpg.get_viewport_width()), int(dpg.get_viewport_height())
             # minimized, Windows places a window at about -32000 with no size: not kept - the next pop-out

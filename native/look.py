@@ -162,13 +162,16 @@ def led_texture(net, k, lk, unlit=None, B=None):
             return np.asarray(Image.fromarray(net).resize((w * k, h * k), Image.BILINEAR))
         return dotted(net, k, unlit) if unlit is not None else net.repeat(k, 0).repeat(k, 1)
     f = net.astype(np.float32)
-    cell = _cell(k, g) * (1.0 - d) + d                    # a diffuser washes the dots out
+    cell = (_cell(k, g) * (1.0 - d) + d).astype(np.float32)      # a diffuser washes the dots out
     h, w = net.shape[:2]
-    disc = f.repeat(k, 0).repeat(k, 1) * np.tile(cell, (h, w))[..., None]
-    halo = _blur(f).repeat(k, 0).repeat(k, 1) * (1.1 * g)
+    # each LED's k x k block by broadcasting, (h, k, w, k, 3), then laid flat: no repeated copies of the net
+    # (it ran every frame of the live view)
+    out = f[:, None, :, None, :] * cell[None, :, None, :, None]
+    out += (_blur(f) * np.float32(1.1 * g))[:, None, :, None, :]
     board = np.array(unlit if unlit is not None else (9, 10, 12), np.float32) * (0.5 if unlit is not None else 1.0)
-    out = np.maximum(disc + halo, board)
-    return np.clip(out, 0, 255).astype(np.uint8)
+    np.maximum(out, board, out=out)
+    np.minimum(out, 255.0, out=out)
+    return out.reshape(h * k, w * k, 3).astype(np.uint8)
 
 
 # --- any shape: an LED a sprite, a diffuser by distance ------------------------------------------

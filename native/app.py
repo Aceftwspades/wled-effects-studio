@@ -469,7 +469,9 @@ class App(Features, Recorder, EditBuild):
         exact for flat faces), the point cloud for everything else."""
         g = eng.geom
         unlit, floor = self.view_extras()
-        if g is not None and g.kind == "cube" and not eng.fx.get("o3"):
+        if g is not None and g.kind == "cube":
+            # flat mode too: it changes how an effect draws, not where the LEDs are - the net's faces are the
+            # cube's whichever way the picture was made (drawn as dots, its LEDs stood apart and cost a CPU render)
             src = net if net.shape[0] == eng.rows else self.frame_rgb(eng)
             lk = self.view_look()
             if lk["glow"] > 0 or lk["diffuse"] > 0:        # the glowing or diffused LEDs, as the live view's texture has them
@@ -2475,10 +2477,10 @@ class App(Features, Recorder, EditBuild):
 
     def gpu_cube_active(self):
         """The GPU view draws a cube as its faces: five flat faces, one
-        segment. Flat mode and two effects side by side keep the software
-        renderer."""
+        segment, in flat mode too (the LEDs are where they were). Two
+        effects side by side keep the software renderer."""
         g = self.eng.geom
-        return bool(self.gpu_cube and g is not None and g.kind == "cube" and not self.eng.fx.get("o3") and not self.ab)
+        return bool(self.gpu_cube and g is not None and g.kind == "cube" and not self.ab)
 
     def gpu_points_active(self):
         """The GPU view draws every other geometry as a cloud of squares."""
@@ -3569,7 +3571,8 @@ class App(Features, Recorder, EditBuild):
                 rgb = self.history_rgb[k]                  # the scrubbed frame on a strip, a sphere, a shape of parts too
         big = img = None
         _u, _f = self.view_extras()
-        self.popouts.publish(net, self.eng, (self.yaw, self.pitch, self.dist), (1 if _u is not None else 0) | (2 if _f else 0))
+        self.popouts.publish(net, self.eng, (self.yaw, self.pitch, self.dist), (1 if _u is not None else 0) | (2 if _f else 0),
+                             self.view_look())
         if self.net_on():
             if self.gpu_net:
                 k = self.NET_SRC_SCALE

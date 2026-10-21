@@ -79,6 +79,7 @@ class Layers:
         self.over_items = []
         self._vig_key = None
         self._grain_n = 0
+        self._grain_uv = None
         self._rng = np.random.default_rng(3)
         self._tick = 0
 
@@ -137,17 +138,26 @@ class Layers:
             dpg.configure_item(vig, show=False)
         if lk.get("grain", 0) > 0:
             self._tick += 1
+            # The grain is made once, twice the size it is shown at, and a window of half of it is shown at a
+            # new random place every other frame: new grain without a new texture (made and uploaded each time,
+            # it was 4 ms of the frame at a full screen's size)
             n = int(max(32, min(360, max(w, h) // 2)))
-            if n != self._grain_n:                        # a new size: its texture made again
+            key = (2 * n, round(float(lk["grain"]), 3))
+            if key != getattr(self, "_grain_key", None):
                 tex = f"{self.tag}_grain"
-                dpg.configure_item(grain, texture_tag=f"{self.tag}_vig")   # off the old texture, so it can go
-                if dpg.does_item_exist(tex):
-                    dpg.delete_item(tex)
-                self._grain_n = n
-                dpg.configure_item(grain, texture_tag=self._tex("grain", look.grain_rgba(lk, n, self._rng)))
-            elif self._tick % 2 == 0:                     # new grain every other frame
-                self._tex("grain", look.grain_rgba(lk, n, self._rng))
-            dpg.configure_item(grain, pmin=(0, 0), pmax=(w, h), show=True)
+                if self._grain_n != 2 * n:                # a new size: its texture made again
+                    dpg.configure_item(grain, texture_tag=f"{self.tag}_vig")   # off the old texture, so it can go
+                    if dpg.does_item_exist(tex):
+                        dpg.delete_item(tex)
+                    self._grain_n = 2 * n
+                    dpg.configure_item(grain, texture_tag=self._tex("grain", look.grain_rgba(lk, 2 * n, self._rng)))
+                else:
+                    self._tex("grain", look.grain_rgba(lk, 2 * n, self._rng))
+                self._grain_key = key
+            if self._tick % 2 == 0 or self._grain_uv is None:
+                u, v = (float(x) for x in self._rng.random(2) * 0.5)
+                self._grain_uv = ((u, v), (u + 0.5, v + 0.5))
+            dpg.configure_item(grain, pmin=(0, 0), pmax=(w, h), uv_min=self._grain_uv[0], uv_max=self._grain_uv[1], show=True)
         else:
             dpg.configure_item(grain, show=False)
 
