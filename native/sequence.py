@@ -217,6 +217,57 @@ def curve_value(start, pts, t):
 def to_curve(step, key, n=4):
     """The ramp on `key` as a curve that looks as it did: its value sampled at n points across the step."""
     return [[round(j / n, 4), ramp_value(step, key, j / n)] for j in range(1, n + 1)]
+
+
+def thin(pts, n):
+    """At most n of the points [(t, v)] (in t order, the first and last kept), the ones that matter most: from the
+    two ends, each time the point farthest (in value) from the line through the ones kept is added - the
+    Ramer-Douglas-Peucker idea, by count - until n are kept or every one left is within a step of the line."""
+    if len(pts) <= n:
+        return list(pts)
+    keep = [0, len(pts) - 1]
+    while len(keep) < n:
+        keep.sort()
+        best, at = 1.0, None
+        for a, b in zip(keep, keep[1:]):
+            (ta, va), (tb, vb) = pts[a], pts[b]
+            for k in range(a + 1, b):
+                t, v = pts[k]
+                f = (t - ta) / (tb - ta) if tb > ta else 0.0
+                err = abs(v - (va + (vb - va) * f))
+                if err > best:
+                    best, at = err, k
+        if at is None:
+            break
+        keep.append(at)
+    return [pts[k] for k in sorted(keep)]
+
+
+def record_into(step, key, samples):
+    """A slider's moves recorded while the step played - samples [(t 0..1, value 0..255)] in time order - into the
+    step: its ramp on `key` becomes a curve that runs as it did outside the recorded stretch and as recorded within
+    it, thinned to CURVE_MAX points. (start value, points): the start is the step's own value, which the recording
+    sets when it began at the step's start."""
+    samples = [(max(0.0, min(1.0, float(t))), max(0, min(255, int(round(v))))) for t, v in samples]
+    if not samples:
+        return ramp_value(step, key, 0.0), curve_points(step, key)
+    ta, tb = samples[0][0], samples[-1][0]
+    eps = 1e-3
+    dense = [(j / 64.0, float(ramp_value(step, key, j / 64.0))) for j in range(65)]
+    before = [(t, v) for t, v in dense if t < ta - eps]
+    after = [(t, v) for t, v in dense if t > tb + eps]
+    if before:
+        before.append((ta - eps, float(ramp_value(step, key, ta - eps))))       # the curve as it was, up to the take
+    if after:
+        after.insert(0, (tb + eps, float(ramp_value(step, key, tb + eps))))     # and from where it ended
+    pts = before + [(t, float(v)) for t, v in samples] + after
+    if pts[0][0] > 0.0:
+        pts.insert(0, (0.0, pts[0][1]))
+    if pts[-1][0] < 1.0:
+        pts.append((1.0, pts[-1][1]))
+    kept = thin(pts, CURVE_MAX + 1)                       # the start at t = 0, then the curve's points
+    start = int(round(kept[0][1]))
+    return start, [[round(t, 4), int(round(v))] for t, v in kept[1:] if t > 0.0]
 # AI: end
 
 

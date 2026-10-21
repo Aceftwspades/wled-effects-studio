@@ -1052,6 +1052,21 @@ handle at the bottom of its blend to set the blend. Right-click a step
 for Play from here, Show it in the sim, Update from the sim, Add from
 the sim after it, Duplicate, Delete. The step playing is underlined.
 
+**Zooming and moving along the timeline**, as in an arrangement view: the
+**wheel** over it moves it along the time, **Ctrl+wheel** zooms in or
+out at the pointer, and a **middle-button drag** moves it as if by hand.
+The **-** and **+** over it zoom about its middle, **All** puts the
+whole show across it again, and **Step** the selected step with a
+little either side (**Z** and **Shift+Z** with the frame's keyboard); the
+time it shows is written beside them. The strip over the timeline is the
+**overview**: the whole show in its colours, with a box round the part the
+timeline shows - drag the box to move along, drag its sides to zoom, or
+click beside it to go there. With **follow** ticked, a playing show turns
+the page when the playhead reaches the timeline's edge. A step selected in
+the list while it is off the timeline is brought onto it. Drag the **grip**
+under the timeline down to make it taller - the ramps and the curves'
+points get the room - and up to make it smaller; the height is kept.
+
 The **list** has a row a step: its swatch, name, effect, length (and
 bars, with a tempo), and buttons to duplicate or delete it. Drag a row
 by its name onto another to move it. With the frame's keyboard, Delete
@@ -1082,9 +1097,14 @@ blend mode. A change here or in the side panel goes into the step as you
 make it - a drag one undo step - and the two show the same values, each
 following the other. Select another step and the sim shows it, edits
 going to it; a name that was the effect's follows a new effect, a name
-of its own is kept. Playing, scrubbing or a blend shows other steps
-without writing into any, and the selected one comes back after. Off,
-the sim is free again, to set up something new for Add from the sim.
+of its own is kept. **While the show plays** (or is held at a time),
+the step on the playhead is the one edited: the selection follows the
+playhead, and a change - another effect, a palette, a slider - goes into
+the step playing. A slider a ramp moves is the ramp's while it plays (its
+in-between values are not kept as the step's); during a blend from one
+step into the next nothing is written, and the next is taken up once
+the blend is done. Off, the sim is free again, to set up something new
+for Add from the sim.
 
 **RAMPS**: any slider of any segment - or the brightness - moving over
 the step from its value to an end value, in a shape (straight, eased,
@@ -1098,6 +1118,18 @@ point to take it away; the row's end value is the last point's. In the
 sim they move as it plays; on the device they become sub-steps in the
 playlist (about a second apiece, up to twelve - a curve's land on its
 points), since a preset cannot move a slider.
+
+**Recording automation**: the red-dot button beside Stop arms recording
+(the show plays from the selected step if it was stopped). While the show
+plays, move a slider - in the card, the side panel, from MIDI or the
+phone - and the slider's moves are recorded into the step playing: when
+the step ends (or the show is paused or stopped, or the button pressed
+again) they become a **curve** ramp on it, running as you moved it over
+the stretch you moved it, and as it was before and after. A slider held
+still for a moment is let go; a ramp on a slider being moved gives way to
+the hand while it is recorded. A take is simplified to a curve's sixteen
+points, the ones that keep its shape. Stop ends the recording; undo takes
+a recorded step back as it was.
 
 **BEATS**: the tempo the show is laid on - typed, tapped (Tap, on the
 beat), the synth's, or found in the audio file playing as live audio
@@ -1688,7 +1720,7 @@ Every button, with what its tooltip says.
 
 **Shape frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Add part...` — a strip, a ring, a tree, a star... picked from pictures, its sizes asked first; it joins the end of the selected part (or goes beside it); `Draw a run` — click corners in the 3-D view and a strip is laid along them, an LED every spacing; double-click or Enter ends it, Backspace takes the last corner back, Esc leaves it; `File...` — open or save a shape; import a model, an xLights model or layout, a point list; a reference mesh; export an xLights model or the positions; a preview; `Undo`; `Redo`; `show me`; `the way its LEDs run along it` — the way its LEDs run along it: click to turn its wiring round; `shown` — shown: click to hide it while you build (it stays LEDs on the device); `click to lock it` — click to lock it: the view's clicks, handles and keys pass it by; `x` — delete the part (Undo brings it back); `delete the last`; `renumber: nearest chain from the first`; `turn into a path`; `X`; `Y`; `Z`; `+X`; `-X`; `+Y`; `-Y`; `+Z`; `-Z`; `aim outward`; `turn only`; `aim at the origin`; `from its place` — the direction and distance the part is at now, into the fields; `first`; `earlier`; `later`; `last`; `light it` — the wiring test lighting this part: in the sim, and on the device while the sim is streamed to it; `Generate a preview` — a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here; `Open the folder`
 
-**Sequence frame**: `float` — float: out over the panes (or drag the grip to another place); `close` — close (Esc while the frame has the focus); the menu opens it again; `play from the top`; `play from the selected step` — play from the selected step (Space while the frame has the keyboard); playing, it pauses and goes on; `stop` — stop: the sim goes back to running on its own; `+ Add from the sim` — a new step after the selected one: what the sim shows now - effect, sliders, palette, colours, segments; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `a copy of this step, after it`; `this step away` — this step away (undo brings it back); `Update from the sim` — the selected step becomes what the sim shows now (its name, length, blend and ramps kept); `Load into the sim` — the sim shows the selected step (double-click it on the timeline does the same); `Duplicate` — a copy of the selected step, after it (Ctrl+D); `Delete` — the selected step away (Delete); undo brings it back; `+` — a layer more (the right half, as the side panel adds one); `-` — the last layer away; `x` — this ramp off (the others stay); `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap lengths to bars` — every step's length rounded to whole bars, so the sequence changes on the music; `Render GIF` — plays the sequence once from the top and records it as a GIF, into captures/; `Render video` — plays the sequence once from the top and records it as an mp4, into captures/ - needs ffmpeg on the path; `Send and run it`; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
+**Sequence frame**: `float` — float: out over the panes (or drag the grip to another place); `close` — close (Esc while the frame has the focus); the menu opens it again; `play from the top`; `play from the selected step` — play from the selected step (Space while the frame has the keyboard); playing, it pauses and goes on; `stop` — stop: the sim goes back to running on its own; `record automation` — record automation: while the show plays, a slider moved (here or in the side panel) is written into the step playing as a curve ramp - over the stretch it was moved, the rest of the step as it was. Again: stop recording; `+ Add from the sim` — a new step after the selected one: what the sim shows now - effect, sliders, palette, colours, segments; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `-` — zoom out (Ctrl+wheel over the timeline zooms at the pointer); `+` — zoom in (Ctrl+wheel over the timeline zooms at the pointer); `All` — the whole show across the timeline (Shift+Z); `Step` — the selected step across the timeline, a little either side (Z); `a copy of this step, after it`; `this step away` — this step away (undo brings it back); `Update from the sim` — the selected step becomes what the sim shows now (its name, length, blend and ramps kept); `Load into the sim` — the sim shows the selected step (double-click it on the timeline does the same); `Duplicate` — a copy of the selected step, after it (Ctrl+D); `Delete` — the selected step away (Delete); undo brings it back; `x` — this ramp off (the others stay); `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap lengths to bars` — every step's length rounded to whole bars, so the sequence changes on the music; `Render GIF` — plays the sequence once from the top and records it as a GIF, into captures/; `Render video` — plays the sequence once from the top and records it as an mp4, into captures/ - needs ffmpeg on the path; `Send and run it`; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 
 **Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `making...`
 

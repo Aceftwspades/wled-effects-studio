@@ -2849,6 +2849,9 @@ class App(Features, Recorder, EditBuild):
     def on_wheel(self, sender, app_data):
         if room.wheel(self, app_data):
             return                                       # Ctrl+wheel over the 3-D view in its corner: its size
+        from native import sequence_ui
+        if sequence_ui.wheel(self, app_data):
+            return                                       # over the Sequence's timeline: along the time, Ctrl: a zoom
         if dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl):
             h = num.hovered()
             if h is not None:

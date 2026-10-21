@@ -23,7 +23,12 @@ from native import sequence, transition
 
 TAG = "sequence_win"
 ROW_H = 30               # a step's row in the list, at the interface size
-TL_H = 104               # the timeline's height
+TL_H = 104               # the timeline's height, until it is sized by its grip (prefs "seq_tl_h")
+TL_H_MIN, TL_H_MAX = 80, 640
+OV_H = 16                # the overview strip over the timeline: the whole show, and the part the timeline shows
+GRIP_H = 9               # the grip under the timeline that sizes it
+MIN_SPAN = 0.5           # seconds across the timeline at the closest zoom
+ZOOM_STEP = 1.35         # a notch of the wheel, or a click of + or -
 RULER_H = 18             # its time ruler, along the top
 BEAT_LANE = 9            # the beats' ticks, along the bottom
 LOOK_SPAN = 1.5          # seconds of a step's frames its look is read from (an effect's colours over a moment, not one frame)
@@ -268,6 +273,10 @@ def build(app):
                          "playing, it pauses and goes on", lambda: play_pause(app))
             weight.need("seq_play", _has_steps)
             _icon_button("seq_stop", "stop", "stop: the sim goes back to running on its own", lambda: stop(app))
+            _icon_button("seq_rec", "record", "record automation: while the show plays, a slider moved (here or in "
+                         "the side panel) is written into the step playing as a curve ramp - over the stretch it was "
+                         "moved, the rest of the step as it was. Again: stop recording", lambda: toggle_rec(app))
+            weight.need("seq_rec", _has_steps)
             dpg.add_checkbox(label="loop", tag="seq_repeat", default_value=True,
                              callback=lambda s, v: (_steps(app).__setitem__("repeat", 0 if v else 1), app.project.save()))
             c.tip("round again from the first step after the last - on the device too (its playlist repeats)")
@@ -289,11 +298,30 @@ def build(app):
                    "list, the timeline, the bars, the show's length. On the timeline: click the ruler to go to a time, click "
                    "a step to select it, drag a step to move it, drag the line after a step to make it longer or shorter (on "
                    "the beats when a tempo is set; Alt: free), drag the little handle where a step's blend ends to set it. Double-click a step to show it in "
-                   "the sim, right-click for more. In the list, drag a row by its name to move it, or drop an effect's "
+                   "the sim, right-click for more. The wheel moves the timeline along the time, Ctrl+wheel zooms at the "
+                   "pointer, a middle-button drag moves it; the strip over it is the whole show, the box in it what the "
+                   "timeline shows - drag the box, or its sides to zoom; drag the grip under the timeline to make it "
+                   "taller. Z: the selected step across it, Shift+Z: the whole show. In the list, drag a row by its name to move it, or drop an effect's "
                    "tile from the Library on it for a step of that effect there. With the frame's "
                    "keyboard: Space plays and pauses, Delete removes the selected step, Ctrl+D duplicates it.")
-        # the timeline: the steps as blocks of their own colours along the time, the ruler, bars, beats, the WAV
-        dpg.add_drawlist(tag="seq_tl", width=px(600), height=px(TL_H))       # its drawing reads its size back
+        # the timeline: the steps as blocks of their own colours along the time, the ruler, bars, beats, the WAV -
+        # zoomed and moved along like an arrangement view, the whole show in the overview over it
+        with dpg.group(horizontal=True):                    # short, to fit the frame docked narrow
+            dpg.add_button(label="-", tag="seq_zoom_out", small=True, callback=lambda: zoom(app, 1 / ZOOM_STEP))
+            c.tip("zoom out (Ctrl+wheel over the timeline zooms at the pointer)")
+            dpg.add_button(label="+", tag="seq_zoom_in", small=True, callback=lambda: zoom(app, ZOOM_STEP))
+            c.tip("zoom in (Ctrl+wheel over the timeline zooms at the pointer)")
+            dpg.add_button(label="All", tag="seq_zoom_all", small=True, callback=lambda: fit_all(app))
+            c.tip("the whole show across the timeline (Shift+Z)")
+            dpg.add_button(label="Step", tag="seq_zoom_step", small=True, callback=lambda: fit_step(app))
+            c.tip("the selected step across the timeline, a little either side (Z)")
+            dpg.add_checkbox(label="follow", tag="seq_follow", default_value=bool(app.prefs.get("seq_follow", True)),
+                             callback=lambda s, v: _set_pref(app, "seq_follow", bool(v)))
+            c.tip("while the show plays, the timeline turns the page when the playhead reaches its edge")
+            typeface.mono(dpg.add_text("", tag="seq_zoom_words", color=c.DIM))
+        dpg.add_drawlist(tag="seq_tl_ov", width=px(600), height=px(OV_H))
+        dpg.add_drawlist(tag="seq_tl", width=px(600), height=_tl_height(app))   # its drawing reads its size back
+        dpg.add_drawlist(tag="seq_tl_grip", width=px(600), height=px(GRIP_H))
         # a drop on the list below its rows: a step moved to the end, or an effect from the Library added there
         with dpg.child_window(tag="seq_rows", height=px(ROW_H * 4 + 12), border=True, payload_type="seq_step",
                               drop_callback=lambda s, a, u: dropped(app, a, None)):
@@ -318,8 +346,8 @@ def build(app):
             c.tip("the selected step away (Delete); undo brings it back")
             dpg.add_checkbox(label="edit live", tag="seq_edit", callback=lambda s, v: toggle_edit(app, v))
             c.tip("the sim shows the selected step, and every change - here or in the side panel: its effect, "
-                  "sliders, palette, layers, mirroring - goes into the step as you make it. Off, the sim is free to "
-                  "set up something new for Add from the sim")
+                  "sliders, palette, layers, mirroring - goes into the step as you make it; while the show plays, into "
+                  "the step on the playhead. Off, the sim is free to set up something new for Add from the sim")
         with dpg.group(horizontal=True) as _row:
             form.inline("name")
             dpg.add_input_text(tag="seq_name", width=px(170), on_enter=True, callback=lambda s, v: set_field(app, "name", v))
@@ -548,6 +576,7 @@ def refresh(app):
 
 def select(app, i):
     app._seq_sel = int(i)
+    _into_view(app, int(i))
     refresh(app)
 
 
@@ -897,9 +926,9 @@ def load_step(app, i=None, quiet=False):
 # With "edit live" on, the sim IS the selected step: it is loaded, and whatever then changes in the engine - from the
 # card's EFFECT here or from the side panel, they call the same handlers - is written back into the step once it
 # settles (one undo step a drag, as the numbers are). Both views show the engine; each takes the values it is not
-# itself being dragged in. Off, the sim is free again (Add from the sim needs it so). Playback, a seek and a blend
-# between steps load other states into the engine: nothing is written while they run, and the step is loaded again
-# after.
+# itself being dragged in. Off, the sim is free again (Add from the sim needs it so). While the show plays (or is
+# held at a time) the step edited is the one on the playhead, the selection following it; what its ramps move is
+# left out of what is written (_unramped), and nothing is written during a blend between two steps.
 SYNC_EVERY = 0.25                                         # s between looks at the engine for changes to keep
 
 
@@ -1020,10 +1049,37 @@ def _sync_fx(app):
             dpg.set_value(tag, bool(o[key]))
 
 
+def _edit_index(app):
+    """The step Edit live edits now: the selected one, or while the show plays (or is held at a time) the one on
+    the playhead - the one the sim shows. None while not editing, and during a blend between two steps (the sim
+    shows neither then)."""
+    if not getattr(app, "_seq_edit", False) or getattr(app, "_transition", None) is not None:
+        return None
+    if getattr(app, "_seq_play", None) is not None:
+        return _play_i(app)
+    return getattr(app, "_seq_sel", 0)
+
+
 def _editable(app):
-    """Editing, with the selected step the sim's to show: not while playing, paused on a seek or blending."""
-    return (getattr(app, "_seq_edit", False) and _play_i(app) is None and getattr(app, "_seq_play", None) is None
-            and getattr(app, "_transition", None) is None)
+    return _edit_index(app) is not None
+
+
+def _unramped(segs, st):
+    """The engine's segments with every slider the step's ramps move put back to the step's own value: while the
+    show plays a ramp moves it each frame, and that is the playback, not an edit to keep - nor is a slider being
+    recorded (it goes in as a curve once the take is done)."""
+    ramps = list(st.get("ramps") or {}) + [k for (s_, k) in _REC.takes if s_ == id(st)]
+    if not ramps:
+        return segs
+    out = json.loads(json.dumps(segs))
+    own = st.get("segments") or []
+    for k in ramps:
+        seg, slider = sequence.ramp_target(k)
+        if 0 <= seg < min(len(out), len(own)):
+            mine = (own[seg].get("params") or {}).get(slider)
+            if mine is not None:
+                out[seg].setdefault("params", {})[slider] = mine
+    return out
 
 
 def toggle_edit(app, on):
@@ -1054,25 +1110,29 @@ def _edit_poll(app):
     if dpg.does_item_exist("seq_edit") and not dpg.get_value("seq_edit"):
         dpg.set_value("seq_edit", True)
     steps = _steps(app)["steps"]
-    sel = getattr(app, "_seq_sel", 0)
-    if not (0 <= sel < len(steps)) or not _editable(app):
-        app._seq_look_due = None                          # playing or seeking: no look of an edit gathered meanwhile
-        app._seq_edit_step = None                         # (play and seek kept the last change): loaded after Stop
-        _fx_body(app, False, sel)
+    sel = _edit_index(app)
+    if sel is None or not (0 <= sel < len(steps)):
+        app._seq_look_due = None                          # blending between steps: no look of an edit gathered meanwhile
+        app._seq_edit_step = None                         # (the last change was kept): the next step taken up after it
+        _fx_body(app, False, getattr(app, "_seq_sel", 0))
         return
+    playing = getattr(app, "_seq_play", None) is not None
+    if playing and getattr(app, "_seq_sel", -1) != sel:
+        select(app, sel)                                  # playing: the selection follows the playhead, card and all
     _fx_body(app, True, sel)
     st = steps[sel]
     now = time.perf_counter()
     if getattr(app, "_seq_edit_step", None) is not st:
-        edit_commit(app)                                  # another step selected: the last change kept in the one left
+        edit_commit(app)                                  # another step: the last change kept in the one left
         _flush_save(app, now=True)
-        load_step(app, sel, quiet=True)
+        if not playing:
+            load_step(app, sel, quiet=True)               # playing, the show has loaded it already (and its blend)
         app._seq_edit_step = st
-        app._seq_edit_base = (app.eng.segments(), [int(c) for c in app.seg_cols])
+        app._seq_edit_base = (_unramped(app.eng.segments(), st), [int(c) for c in app.seg_cols])
         app._seq_edit_at = now
         refresh_fx(app)
         if dpg.does_item_exist("seq_fx_note"):
-            dpg.set_value("seq_fx_note", f"step {sel + 1}, live - here or in the side panel")
+            dpg.set_value("seq_fx_note", f"step {sel + 1}, live{' on the playhead' if playing else ''} - here or in the side panel")
         return
     _sync_fx(app)
     if now - getattr(app, "_seq_edit_at", 0.0) < SYNC_EVERY:
@@ -1093,7 +1153,7 @@ def edit_commit(app):
     st = getattr(app, "_seq_edit_step", None)
     if st is None or not getattr(app, "_seq_edit", False) or not any(s is st for s in _steps(app)["steps"]):
         return
-    cur = (app.eng.segments(), [int(c) for c in app.seg_cols])
+    cur = (_unramped(app.eng.segments(), st), [int(c) for c in app.seg_cols])
     if cur == getattr(app, "_seq_edit_base", None):
         return
     app._seq_edit_base = cur
@@ -1110,13 +1170,13 @@ def edit_commit(app):
 
 
 def _fx_body(app, editable, sel):
-    """The EFFECT controls shown while they edit the step; while the sequence plays or is held at a time they
-    edit nothing (what is changed then is lost at Stop), so they are put away and the note says so."""
+    """The EFFECT controls shown while they edit the step; during a blend between two steps they edit nothing (the
+    sim shows neither), so they are put away for it and the note says so."""
     if not dpg.does_item_exist("seq_fx_body") or dpg.is_item_shown("seq_fx_body") == editable:
         return
     dpg.configure_item("seq_fx_body", show=editable)
     dpg.set_value("seq_fx_note", f"step {sel + 1}, live - here or in the side panel" if editable else
-                  "the sequence is playing or held at a time - Stop, and the selected step is edited again")
+                  "blending into the next step - it is edited once the blend is done")
 
 
 def _gather_look(app, st):
@@ -1129,7 +1189,9 @@ def _take_look(app):
     g = getattr(app, "_seq_look", None)
     if g is None:
         return
-    if g.get("edit") and not _editable(app):
+    i = _edit_index(app)
+    steps_ = _steps(app)["steps"]
+    if g.get("edit") and (i is None or not (0 <= i < len(steps_)) or steps_[i] is not g.get("st")):
         app._seq_look = None                              # an edit's look, and the sim taken over meanwhile: dropped
         return
     now = time.perf_counter()
@@ -1324,6 +1386,7 @@ def position(app):
 def play(app, i=0, offset=0.0):
     """The show from step i (offset seconds into it), the sim following it."""
     edit_commit(app)                                      # the step being edited keeps its last change first
+    _rec_flush(app)
     S = _steps(app)
     if not S["steps"]:
         app.gp.status("no steps to play"); return
@@ -1347,6 +1410,7 @@ def play_pause(app):
     if p is None:
         play(app, getattr(app, "_seq_sel", 0))
     elif p.get("paused") is None:
+        _rec_flush(app)                                   # a take ends with the pause
         p["paused"] = max(0.0, p["next"] - time.perf_counter())
         app.playing = False
         app.gp.status("sequence paused")
@@ -1362,6 +1426,7 @@ def play_pause(app):
 def seek(app, t):
     """The show at t seconds: its step in the sim, playing on from there (or held there while paused or stopped)."""
     edit_commit(app)
+    _rec_flush(app)
     S = _steps(app)
     starts, total = _starts(app)
     if not S["steps"] or total <= 0:
@@ -1403,6 +1468,10 @@ def render(app, fmt="gif"):
 
 
 def stop(app):
+    _rec_flush(app)                                       # a take ends with the show, and recording with it
+    if _REC.armed:
+        _REC.armed = False
+        _rec_button(app)
     app._transition = None
     app._seq_bri = None
     app._seq_edit_step = None                             # editing: the selected step shown again (not the last played)
@@ -1427,7 +1496,7 @@ def _sync_transport(app):
 
 def _apply_ramps(app, i, t):
     """The step's ramps at t (0..1) into the sim - each slider on its segment, the panel's field with it when that
-    segment is the one shown - and the step's brightness (or its ramp)."""
+    segment is the one shown - and the step's brightness (or its ramp). A slider being recorded is the hand's."""
     steps = _steps(app)["steps"]
     if not (0 <= i < len(steps)):
         return
@@ -1436,7 +1505,7 @@ def _apply_ramps(app, i, t):
     app._seq_bri = sequence.ramp_value(st, sequence.BRI, t) if sequence.BRI in ramps else int(st.get("bri", 255))
     changed = False
     for k in ramps:
-        if k == sequence.BRI:
+        if k == sequence.BRI or k in _REC.held:
             continue
         v = sequence.ramp_value(st, k, t)
         seg, slider = sequence.ramp_target(k)
@@ -1456,7 +1525,10 @@ def poll(app):
     _poll_send(app)
     _take_look(app)
     if dpg.is_item_shown(TAG):
-        timeline_mouse(app)
+        _hold_scroll(app)
+        if not overview_mouse(app) and not grip_mouse(app):
+            timeline_mouse(app)
+        _follow_head(app)
         fw = (dpg.get_item_rect_size(TAG)[0], _c().scrollbar_w(TAG))
         if fw[0] and fw != getattr(app, "_tl_frame_w", None):
             app._tl_frame_w = fw; app._tl_dirty = True          # laid out, resized, a scrollbar come or gone: it follows
@@ -1466,10 +1538,10 @@ def poll(app):
         pl = getattr(app, "_seq_play", None)
         state = (pl is not None, pl is not None and pl.get("paused") is not None, pl["i"] if pl is not None else None)
         if getattr(app, "_tl_dirty", True) or getattr(app, "_tl_hover_was", None) != getattr(app, "_tl_hover", None)                 or state != getattr(app, "_tl_state_was", None) or (pl is not None and not dpg.does_item_exist("seq_tl_head")):
-            draw_timeline(app); app._tl_dirty = False; app._tl_hover_was = getattr(app, "_tl_hover", None)
+            draw_timeline(app); draw_overview(app); app._tl_dirty = False; app._tl_hover_was = getattr(app, "_tl_hover", None)
             app._tl_state_was = state
         elif getattr(app, "_seq_play", None) is not None:
-            _move_head(app)                                 # playing: the playhead moves, the rest stays (redrawn every
+            _move_head(app); draw_overview(app)             # playing: the playhead moves, the rest stays (redrawn every
                                                             # frame it was 2 ms of each)
         _show_position(app)
     p = getattr(app, "_seq_play", None)
@@ -1491,6 +1563,8 @@ def poll(app):
             live = getattr(app, "live", None)
             if live is not None and hasattr(live, "t0"):
                 live.t0 = now                                # round again: the WAV from its start with it
+        edit_commit(app)                                  # editing live: the step leaving keeps its last change
+        _rec_flush(app)                                   # recording: the take on the step leaving goes into it
         prev = steps[p["i"]] if 0 <= p["i"] < len(steps) else None
         p["i"] = i
         p["st"], p["n"] = steps[i], len(steps)
@@ -1500,11 +1574,15 @@ def poll(app):
         if prev is not None and trans > 0:
             app.transition_start(prev, trans, S.get("style", "fade"))
         load_step(app, i, quiet=True)
+        _REC.applied = None                               # the next step's values are playback's, not the hand's
         app._seq_rows_dirty = True
     i = p["i"]
     if 0 <= i < len(steps):
         dur = float(steps[i].get("dur", 10)) or 1.0
-        _apply_ramps(app, i, 1.0 - max(0.0, p["next"] - now) / dur)
+        t = 1.0 - max(0.0, p["next"] - now) / dur
+        _rec_poll(app, i, t)
+        _apply_ramps(app, i, t)
+        _REC.applied = (i, app.eng.idx, app.eng.seg, dict(app.eng.fx))   # what playback left: a difference next frame is the hand's
 
 
 def _show_position(app):
@@ -1585,10 +1663,175 @@ def _fill_look(st, a, b, top, bot, parent, alpha=255):
     return cols[-1]
 
 
+# AI: below section was generated by an AI
+# --- the timeline's view: where it starts and how much of the show it shows -----------------------
+def _tl_height(app):
+    """The timeline's height on screen: as its grip left it (prefs "seq_tl_h", at the interface size 1), else TL_H."""
+    try:
+        h = float(app.prefs.get("seq_tl_h", TL_H))
+    except (TypeError, ValueError):
+        h = TL_H
+    return px(max(TL_H_MIN, min(TL_H_MAX, h)))
+
+
+def _set_pref(app, key, value):
+    from native.project import save_prefs
+    app.prefs[key] = value
+    save_prefs(app.prefs)
+
+
+def _view(app, total, w):
+    """(t0, sx): the time at the timeline's left edge and its pixels a second. The whole show until it is zoomed;
+    zoomed, app._tl_view {"t0", "span"} is kept inside the show (and the show's length, should it shrink)."""
+    v = getattr(app, "_tl_view", None)
+    if not v or total <= 0 or v["span"] >= total:
+        if v is not None and total > 0 and v["span"] >= total:
+            app._tl_view = None
+        return 0.0, w / max(total, 1e-6)
+    span = max(MIN_SPAN, float(v["span"]))
+    t0 = max(0.0, min(total - span, float(v["t0"])))
+    v["span"], v["t0"] = span, t0
+    return t0, w / span
+
+
+def _span_now(app):
+    """(t0, span, total) the timeline shows now."""
+    total = _starts(app)[1]
+    v = getattr(app, "_tl_view", None)
+    if not v or total <= 0:
+        return 0.0, total, total
+    span = max(MIN_SPAN, min(total, float(v["span"])))
+    return max(0.0, min(total - span, float(v["t0"]))), span, total
+
+
+def set_view(app, t0, span):
+    """The timeline to show `span` seconds from `t0`: the whole show again when that is all of it."""
+    total = _starts(app)[1]
+    if total <= 0:
+        return
+    span = max(MIN_SPAN, float(span))
+    if span >= total - 1e-6:
+        app._tl_view = None
+    else:
+        app._tl_view = {"t0": max(0.0, min(total - span, float(t0))), "span": span}
+    app._tl_dirty = True
+
+
+def zoom(app, factor, at=None):
+    """Zoomed in by `factor` (below 1: out), the time `at` (the middle when not given) staying where it is."""
+    t0, span, total = _span_now(app)
+    if total <= 0:
+        return
+    at = t0 + span / 2 if at is None else at
+    new = max(MIN_SPAN, min(total, span / factor))
+    set_view(app, at - (at - t0) * new / max(span, 1e-6), new)
+
+
+def fit_all(app):
+    app._tl_view = None
+    app._tl_dirty = True
+
+
+def fit_step(app, i=None):
+    """The step (the selected one) across the timeline, a twentieth of it either side."""
+    starts, total = _starts(app)
+    i = getattr(app, "_seq_sel", 0) if i is None else i
+    if not (0 <= i < len(starts)):
+        return
+    d = float(_steps(app)["steps"][i].get("dur", 10))
+    set_view(app, starts[i] - d * 0.05, d * 1.1)
+
+
+def _into_view(app, i):
+    """A step selected off the zoomed timeline (in the list, say) brought onto it, its start a tenth in."""
+    if getattr(app, "_tl_view", None) is None:
+        return
+    starts, total = _starts(app)
+    if not (0 <= i < len(starts)):
+        return
+    t0, span, _ = _span_now(app)
+    d = float(_steps(app)["steps"][i].get("dur", 10))
+    if starts[i] + d < t0 or starts[i] > t0 + span:
+        set_view(app, starts[i] - span * 0.1, span)
+
+
+def _follow_head(app):
+    """Playing and zoomed, with follow on: the page turned when the playhead reaches the timeline's right edge (or
+    is behind its left), as an arrangement view does - not every frame, so the blocks stand still to be read."""
+    if getattr(app, "_tl_view", None) is None or not app.prefs.get("seq_follow", True):
+        return
+    p = getattr(app, "_seq_play", None)
+    if p is None or p.get("paused") is not None or getattr(app, "_tl_drag", None) is not None:
+        return
+    at = position(app)
+    if at is None:
+        return
+    t0, span, _ = _span_now(app)
+    if at > t0 + span * 0.98 or at < t0:
+        set_view(app, at - span * 0.02, span)
+
+
+def _over(tag):
+    """The pointer over a drawlist of the frame (its rectangle, while it is shown)."""
+    if not dpg.does_item_exist(tag) or not dpg.is_item_visible(tag):
+        return False
+    (x0, y0), (w, h) = dpg.get_item_rect_min(tag), dpg.get_item_rect_size(tag)
+    mx, my = dpg.get_mouse_pos(local=False)
+    return x0 <= mx <= x0 + w and y0 <= my <= y0 + h
+
+
+def _hold_scroll(app):
+    """The frame does not scroll with the wheel while the pointer is over the timeline or its strip: the wheel is
+    theirs there (it moved the frame under them as well)."""
+    over = any(_over(t) for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip"))
+    if over != getattr(app, "_tl_held", False):
+        app._tl_held = over
+        dpg.configure_item(TAG, no_scroll_with_mouse=over)
+
+
+def wheel(app, delta):
+    """The wheel over the timeline or its strip: along the time; with Ctrl, a zoom at the pointer. True when it was
+    the timeline's."""
+    if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG) or not _has_steps(app):
+        return False
+    if not (_over("seq_tl") or _over("seq_tl_ov")):
+        return False
+    t0, span, total = _span_now(app)
+    if total <= 0:
+        return True
+    ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
+    if ctrl:
+        g = _tl_geometry(app)
+        at = None
+        if g is not None and _over("seq_tl"):
+            mx = dpg.get_mouse_pos(local=False)[0]
+            at = t0 + (mx - g[0]) / max(1.0, g[2]) * span
+        zoom(app, ZOOM_STEP ** (1 if delta > 0 else -1), at)
+    elif getattr(app, "_tl_view", None) is not None:
+        set_view(app, t0 - (1 if delta > 0 else -1) * span * 0.12, span)
+    return True
+
+
+def _zoom_words(app):
+    if not dpg.does_item_exist("seq_zoom_words"):
+        return
+    t0, span, total = _span_now(app)
+    if total <= 0 or getattr(app, "_tl_view", None) is None:
+        dpg.set_value("seq_zoom_words", "the whole show" if total > 0 else "")
+    else:
+        dpg.set_value("seq_zoom_words", f"{_fmt_t(t0)} - {_fmt_t(t0 + span)} of {_fmt_t(total)}")
+
+
+def _last_colour(st):
+    cols = sequence.look_colours(st)
+    return cols[-1] if cols else (70, 76, 90)
+
+
 def draw_timeline(app):
     """The steps as blocks of their own colours along the time, names and lengths on them, the blend into each as a
     wedge from the colour before, the ramps' curves in their lower half; the ruler with the time; the bars at the
-    tempo; the beats found in the WAV as ticks; the WAV's wave; the playhead; where a dragged step would land."""
+    tempo; the beats found in the WAV as ticks; the WAV's wave; the playhead; where a dragged step would land. All of
+    it through the view (_view): the part of the show the timeline shows, at its zoom."""
     g = _tl_geometry(app)
     if g is None:
         return
@@ -1601,7 +1844,11 @@ def draw_timeline(app):
         fw = dpg.get_item_rect_size(TAG)[0] or dpg.get_item_configuration(TAG)["width"]
         want = max(200, int(fw) - 24 - c.scrollbar_w(TAG))      # clear of the scrollbar too: past it, the frame scrolled sideways
         if abs(want - w) > 4:
-            dpg.configure_item("seq_tl", width=want); w = want
+            for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip"):
+                if dpg.does_item_exist(t):
+                    dpg.configure_item(t, width=want)
+            w = want
+    _zoom_words(app)
     rb, top, bot = _lanes(h)
     dl = "seq_tl"
     dpg.draw_rectangle((0, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 70), parent=dl)
@@ -1610,29 +1857,37 @@ def draw_timeline(app):
         typeface.draw_text((px(8), top + (bot - top) / 2 - px(8)), "the timeline: the steps along the time - add one from the sim",
                            px(14), color=c.DIM, parent=dl)
         return
-    sx = w / total
+    t0, sx = _view(app, total, w)
+    t1 = t0 + w / sx
+
+    def X(t):
+        return (t - t0) * sx
     steps = _steps(app)["steps"]
     # the WAV's wave, faint behind the blocks (the WAV plays from 0 when the sequence starts)
     from native import audio
     live = getattr(app, "live", None)
     if isinstance(live, audio.FileAudio) and live.seconds > 0:
-        cols = max(50, min(int(w), 600))
-        wave = _wave(app, cols)
+        res = int(max(50, min(20000, live.seconds * sx / 2)))       # a column every two pixels at this zoom
+        wave = _wave(app, res)
         if wave is not None:
-            span = min(live.seconds, total)                 # only as far as the sequence goes
-            n = int(cols * span / live.seconds)
             mid = (top + bot) / 2
-            for k in range(n):
-                x = k * (span * sx) / max(1, n)
-                a = float(wave[k]) * (bot - top) * 0.5
+            end = min(live.seconds, total)                          # only as far as the sequence goes
+            for x in range(0, int(w), 2):
+                t = t0 + x / sx
+                if t > end:
+                    break
+                a = float(wave[min(res - 1, int(t / live.seconds * res))]) * (bot - top) * 0.5
                 dpg.draw_line((x, mid - a), (x, mid + a), color=(255, 255, 255, 34), thickness=1, parent=dl)
-    # the steps
+    # the steps (those on screen; the one before the first keeps its colour for the blend into it)
     sel = min(getattr(app, "_seq_sel", 0), len(spans) - 1)
     hover = getattr(app, "_tl_hover", None)
     prev_end = None
     for i, (t, d, tr) in enumerate(spans):
-        a, b = t * sx + 1, (t + d) * sx - 1
         st = steps[i]
+        if t + d < t0 or t > t1:
+            prev_end = _last_colour(st)
+            continue
+        a, b = X(t) + 1, X(t + d) - 1
         last = _fill_look(st, a, b, top, bot, dl, 235)
         # a dark band along the top for the name, the look still showing through
         dpg.draw_rectangle((a, top), (b, top + px(18)), color=(0, 0, 0, 0), fill=(0, 0, 0, 110), parent=dl)
@@ -1648,23 +1903,26 @@ def draw_timeline(app):
             dpg.draw_circle((hx, bot - px(5)), px(4), color=(255, 255, 255, 200), fill=(30, 34, 42, 255),
                             thickness=1.5, parent=dl)
         prev_end = last
-        # its name, shortened to fit; its length on the right where there is room
-        room = b - a - px(10)
+        # its name, shortened to fit, kept at the timeline's left edge when the block starts before it; its length
+        # on the right where there is room
+        la, lb = max(a, 0.0), min(b, float(w))
+        room = lb - la - px(10)
         name = str(st.get("name", ""))
         length = f"{d:.1f}s" if d < 10 else f"{d:.0f}s"
         lw = typeface.measure(length, "mono", px(11))
         if room > lw + px(30):
-            typeface.draw_text((b - lw - px(5), top + px(3)), length, px(11), face="mono", color=(230, 233, 240, 170), parent=dl)
+            typeface.draw_text((lb - lw - px(5), top + px(3)), length, px(11), face="mono", color=(230, 233, 240, 170), parent=dl)
             room -= lw + px(8)
         if room > px(14):
             shown = _fit_measured(name, room, px(13))
-            typeface.draw_text((a + px(5), top + px(2)), shown, px(13), color=(245, 247, 250, 240), parent=dl)
-        # the ramps: each a curve over the block's lower half, the brightness dashed
-        rtop, rbot = top + (bot - top) * 0.5, bot - px(3)
+            typeface.draw_text((la + px(5), top + px(2)), shown, px(13), color=(245, 247, 250, 240), parent=dl)
+        # the ramps: each a curve over the block's lower half, the brightness dashed - finer the wider it is drawn
+        rtop, rbot = _ramp_band(top, bot)
+        n = int(max(24, min(400, (b - a) / 4)))
         for j, k in enumerate(st.get("ramps") or {}):
             if b - a < 12:
                 break
-            pts = [(a + 2 + (b - a - 4) * q / 24, rbot - (rbot - rtop) * sequence.ramp_value(st, k, q / 24) / 255.0) for q in range(25)]
+            pts = [(a + 2 + (b - a - 4) * q / n, rbot - (rbot - rtop) * sequence.ramp_value(st, k, q / n) / 255.0) for q in range(n + 1)]
             dpg.draw_polyline(pts, color=(255, 255, 255, 230 - 45 * j) if k != sequence.BRI else (255, 220, 120, 220),
                               thickness=2, parent=dl)
         # the selected one outlined; the one playing underlined; a curve's points on it, as handles
@@ -1679,51 +1937,62 @@ def draw_timeline(app):
     bl = _barlen(app)
     end_w = typeface.measure(_fmt_t(total), "mono", px(10)) + px(10)     # the end's time keeps the ruler's right end
     if bl and bl * sx >= 4:
-        t, nbar = 0.0, 1
+        nbar = int(t0 // bl)
         every = max(1, int(np.ceil(px(28) / (bl * sx))))
-        while t <= total + 1e-6:
-            dpg.draw_line((t * sx, rb), (t * sx, bot), color=(255, 255, 255, 26), thickness=1, parent=dl)
-            if (nbar - 1) % every == 0 and t * sx + px(16) < w - end_w:
-                typeface.draw_text((t * sx + 2, 1), str(nbar), px(10), face="mono", color=(255, 210, 120, 150), parent=dl)
+        t = nbar * bl
+        nbar += 1
+        while t <= min(total, t1) + 1e-6:
+            x = X(t)
+            dpg.draw_line((x, rb), (x, bot), color=(255, 255, 255, 26), thickness=1, parent=dl)
+            if (nbar - 1) % every == 0 and x >= 0 and x + px(16) < w - end_w:
+                typeface.draw_text((x + 2, 1), str(nbar), px(10), face="mono", color=(255, 210, 120, 150), parent=dl)
             t += bl; nbar += 1
     # the ruler: ticks and the time
-    rs = _ruler_step(total, w)
-    t = 0.0
-    while t <= total + 1e-6:
-        x = t * sx
-        dpg.draw_line((x, rb - px(6)), (x, rb), color=(255, 255, 255, 90), thickness=1, parent=dl)
-        lab = _fmt_t(t) if rs >= 1 else f"{t:.1f}"
-        lw = typeface.measure(lab, "mono", px(10))
-        if x + lw + 2 < w and not (bl and bl * sx >= 4):          # with a tempo the ruler numbers the bars instead
-            typeface.draw_text((x + 2, 2), lab, px(10), face="mono", color=c.DIM, parent=dl)
+    rs = _ruler_step(w / sx, w)
+    t = np.floor(t0 / rs) * rs
+    while t <= min(total, t1) + 1e-6:
+        x = X(t)
+        if x >= -1:
+            dpg.draw_line((x, rb - px(6)), (x, rb), color=(255, 255, 255, 90), thickness=1, parent=dl)
+            lab = _fmt_t(t) if rs >= 1 else f"{t:.1f}"
+            lw = typeface.measure(lab, "mono", px(10))
+            if x + lw + 2 < w and not (bl and bl * sx >= 4):          # with a tempo the ruler numbers the bars instead
+                typeface.draw_text((x + 2, 2), lab, px(10), face="mono", color=c.DIM, parent=dl)
         t += rs
     if bl and bl * sx >= 4:                                   # with bars numbered, the end's time alone, on the right
         end = _fmt_t(total)
         typeface.draw_text((w - typeface.measure(end, "mono", px(10)) - 3, 2), end, px(10), face="mono", color=c.DIM, parent=dl)
     # the beats found in the WAV
     for bt in getattr(app, "_seq_beats", None) or []:
-        if bt <= total:
-            dpg.draw_line((bt * sx, h - px(BEAT_LANE)), (bt * sx, h - 1), color=(255, 200, 80, 150), thickness=1, parent=dl)
+        if t0 <= bt <= min(total, t1):
+            dpg.draw_line((X(bt), h - px(BEAT_LANE)), (X(bt), h - 1), color=(255, 200, 80, 150), thickness=1, parent=dl)
     # where a dragged step would go
     drag = getattr(app, "_tl_drag", None)
     if drag and drag[0] == "move" and drag[3] is not None:
         j = drag[3]
-        xs = [s * sx for s, _, _ in spans] + [total * sx]
+        xs = [X(st_) for st_, _, _ in spans] + [X(total)]
         x = xs[j] if j <= drag[1] else xs[min(len(xs) - 1, j + 1)]
         dpg.draw_line((x, top - 2), (x, bot + 2), color=c.ACCENT, thickness=px(3), parent=dl)
     # the playhead, with its time
     at = position(app)
-    app._tl_scale = (sx, h)                                 # for _move_head, between redraws
+    app._tl_scale = (sx, h, t0)                             # for _move_head, between redraws
     if at is not None:
-        x = at * sx
+        x = X(at)
         dpg.draw_line((x, 0), (x, h), color=(255, 255, 255, 240), thickness=2, parent=dl, tag="seq_tl_head")
         dpg.draw_triangle((x - px(5), 0), (x + px(5), 0), (x, px(7)), color=(0, 0, 0, 0), fill=(255, 255, 255, 240), parent=dl,
                           tag="seq_tl_head_tri")
     elif hover and hover[0] == "ruler":
-        x = hover[1] * sx
+        x = X(hover[1])
         dpg.draw_line((x, 0), (x, h), color=(255, 255, 255, 90), thickness=1, parent=dl)
         lab = _fmt_t(hover[1])
         typeface.draw_text((min(x + 3, w - px(30)), rb + 2), lab, px(10), face="mono", color=(255, 255, 255, 200), parent=dl)
+    # the grip under it: a short bar in the middle, to drag
+    if dpg.does_item_exist("seq_tl_grip"):
+        dpg.delete_item("seq_tl_grip", children_only=True)
+        gh = px(GRIP_H)
+        hot = getattr(app, "_tl_grip", None) is not None or _over("seq_tl_grip")
+        dpg.draw_rectangle((w / 2 - px(24), gh / 2 - 1.5), (w / 2 + px(24), gh / 2 + 1.5), color=(0, 0, 0, 0),
+                           fill=(255, 255, 255, 150 if hot else 60), rounding=2, parent="seq_tl_grip")
 
 
 def _move_head(app):
@@ -1732,11 +2001,125 @@ def _move_head(app):
     if at is None or sh is None or not dpg.does_item_exist("seq_tl_head"):
         app._tl_dirty = True
         return
-    sx, h = sh
-    x = at * sx
+    sx, h, t0 = sh
+    x = (at - t0) * sx
     dpg.configure_item("seq_tl_head", p1=(x, 0), p2=(x, h))
     if dpg.does_item_exist("seq_tl_head_tri"):
         dpg.configure_item("seq_tl_head_tri", p1=(x - px(5), 0), p2=(x + px(5), 0), p3=(x, px(7)))
+
+
+# --- the overview: the whole show, and the box of what the timeline shows -------------------------
+def _ov_geometry(app):
+    """(x0, y0, w, h, total, spans) of the overview strip, or None."""
+    g = _tl_geometry(app)
+    if g is None or not dpg.does_item_exist("seq_tl_ov"):
+        return None
+    (x0, y0) = dpg.get_item_state("seq_tl_ov").get("rect_min") or (0, 0)
+    cfg = dpg.get_item_configuration("seq_tl_ov")
+    return x0, y0, cfg["width"], cfg["height"], g[4], g[5]
+
+
+def draw_overview(app):
+    """The whole show in a strip: each step its colours, the selected one marked, the playhead, and a box round the
+    part the timeline shows (all of it until zoomed)."""
+    g = _ov_geometry(app)
+    if g is None:
+        return
+    x0, y0, w, h, total, spans = g
+    c = _c()
+    dl = "seq_tl_ov"
+    dpg.delete_item(dl, children_only=True)
+    dpg.draw_rectangle((0, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 90), parent=dl)
+    if total <= 0:
+        return
+    k = w / total
+    steps = _steps(app)["steps"]
+    sel = getattr(app, "_seq_sel", -1)
+    for i, (t, d, tr) in enumerate(spans):
+        _fill_look(steps[i], t * k, (t + d) * k - (1 if d * k > 3 else 0), 3, h - 3, dl, 200)
+        if i == sel:
+            dpg.draw_rectangle((t * k, h - 3), ((t + d) * k, h), color=(0, 0, 0, 0), fill=c.ACCENT, parent=dl)
+    at = position(app)
+    if at is not None:
+        dpg.draw_line((at * k, 0), (at * k, h), color=(255, 255, 255, 230), thickness=1.5, parent=dl)
+    t0, span, _ = _span_now(app)
+    a, b = t0 * k, (t0 + span) * k
+    dpg.draw_rectangle((0, 0), (a, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 120), parent=dl)       # what is off the timeline,
+    dpg.draw_rectangle((b, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 120), parent=dl)       # darker
+    dpg.draw_rectangle((a, 0.5), (max(a + 3, b), h - 0.5), color=(255, 255, 255, 200), thickness=1.5, rounding=2, parent=dl)
+
+
+def overview_mouse(app):
+    """The overview's pointer: the box dragged moves the timeline along the show, its sides zoom it; a press
+    beside the box brings that part of the show onto the timeline. True while the overview has the mouse."""
+    drag = getattr(app, "_tl_ov", None)
+    g = _ov_geometry(app)
+    if g is None:
+        app._tl_ov = None
+        return False
+    x0, y0, w, h, total, spans = g
+    if total <= 0:
+        return False
+    k = w / total
+    mx, my = dpg.get_mouse_pos(local=False)
+    t_at = (mx - x0) / k
+    t0, span, _ = _span_now(app)
+    if drag is not None:
+        if not dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
+            app._tl_ov = None
+            return True
+        kind, grab, a0, s0 = drag
+        if kind == "box":
+            set_view(app, a0 + (t_at - grab), s0)
+        elif kind == "left":
+            end = a0 + s0
+            start = max(0.0, min(end - MIN_SPAN, t_at))
+            set_view(app, start, end - start)
+        elif kind == "right":
+            set_view(app, a0, max(MIN_SPAN, min(total, t_at) - a0))
+        return True
+    if not (x0 <= mx <= x0 + w and y0 <= my <= y0 + h) or not dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
+        return False
+    a, b = t0 * k + x0, (t0 + span) * k + x0
+    if abs(mx - a) <= px(5) and span < total:
+        app._tl_ov = ("left", t_at, t0, span)
+    elif abs(mx - b) <= px(5):
+        app._tl_ov = ("right", t_at, t0, span)
+    elif a <= mx <= b:
+        app._tl_ov = ("box", t_at, t0, span)
+    else:                                                    # beside it: that part brought on, and dragged from there
+        set_view(app, t_at - span / 2, span)
+        t0, span, _ = _span_now(app)
+        app._tl_ov = ("box", t_at, t0, span)
+    return True
+
+
+def grip_mouse(app):
+    """The grip under the timeline dragged up or down: the timeline's height, kept for next time. True while it
+    has the mouse."""
+    drag = getattr(app, "_tl_grip", None)
+    my = dpg.get_mouse_pos(local=False)[1]
+    if drag is not None:
+        y0, h0 = drag
+        h = int(max(px(TL_H_MIN), min(px(TL_H_MAX), h0 + (my - y0))))
+        if h != dpg.get_item_configuration("seq_tl")["height"]:
+            dpg.configure_item("seq_tl", height=h)
+            app._tl_dirty = True
+        if not dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
+            app._tl_grip = None
+            _set_pref(app, "seq_tl_h", round(h / max(px(100), 1) * 100))      # at the interface size 1
+            app._tl_dirty = True
+        return True
+    if _over("seq_tl_grip") and dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
+        app._tl_grip = (my, dpg.get_item_configuration("seq_tl")["height"])
+        app._tl_dirty = True
+        return True
+    hot = _over("seq_tl_grip")
+    if hot != getattr(app, "_tl_grip_hot", False):
+        app._tl_grip_hot = hot
+        app._tl_dirty = True
+    return False
+# AI: end
 
 
 def _fit_measured(text, width, size):
@@ -1781,10 +2164,10 @@ def _sel_block(app, g):
     steps = _steps(app)["steps"]
     if total <= 0 or not (0 <= sel < len(spans)):
         return None
-    sx = w / total
+    t0, sx = _view(app, total, w)
     t, d, _ = spans[sel]
     _, top, bot = _lanes(h)
-    return sel, steps[sel], t * sx + 1, (t + d) * sx - 1, top, bot
+    return sel, steps[sel], (t - t0) * sx + 1, (t + d - t0) * sx - 1, top, bot
 
 
 def _curve_at(app, g, mx, my):
@@ -1890,8 +2273,8 @@ def _hit(app, g, mx, my):
     x0, y0, w, h, total, spans = g
     if not (x0 <= mx <= x0 + w and y0 <= my <= y0 + h) or total <= 0:
         return None
-    sx = w / total
-    x, y = mx - x0, my - y0
+    t0, sx = _view(app, total, w)
+    x, y = mx - x0 + t0 * sx, my - y0                      # x along the whole show, at this zoom
     rb, top, bot = _lanes(h)
     if y < rb:
         return ("ruler", max(0.0, min(total, x / sx)))
@@ -1911,7 +2294,8 @@ def timeline_mouse(app):
     """The pointer on the timeline: the ruler goes to a time (and scrubs while held); a step's end is dragged to
     retime it (on the beats when a tempo is set; Alt: free), its blend handle to set the blend; a step is selected
     by a click and moved by a drag; a double-click shows it in the sim; a right-click opens its menu. On the
-    selected step a curve ramp's points are dragged, Shift+click adds one, a right-click on one takes it away."""
+    selected step a curve ramp's points are dragged, Shift+click adds one, a right-click on one takes it away.
+    Zoomed in, a middle-button drag moves the timeline along the show (the wheel too: wheel())."""
     g = _tl_geometry(app)
     if g is None:
         return
@@ -1919,8 +2303,21 @@ def timeline_mouse(app):
     mx, my = dpg.get_mouse_pos(local=False)
     down = dpg.is_mouse_button_down(dpg.mvMouseButton_Left)
     drag = getattr(app, "_tl_drag", None)
-    sx = w / total if total > 0 else 1.0
-    t_at = max(0.0, (mx - x0) / sx) if total > 0 else 0.0
+    t0, sx = _view(app, total, w) if total > 0 else (0.0, 1.0)
+    t_at = max(0.0, t0 + (mx - x0) / sx) if total > 0 else 0.0
+    # the middle button: the timeline moved along the show, as a hand drags it
+    pan = getattr(app, "_tl_pan", None)
+    if pan is not None:
+        if dpg.is_mouse_button_down(dpg.mvMouseButton_Middle):
+            set_view(app, pan[1] - (mx - pan[0]) / sx, pan[2])
+        else:
+            app._tl_pan = None
+        return
+    if (dpg.is_mouse_button_clicked(dpg.mvMouseButton_Middle) and total > 0 and x0 <= mx <= x0 + w and y0 <= my <= y0 + h
+            and getattr(app, "_tl_view", None) is not None):
+        v0, span, _ = _span_now(app)
+        app._tl_pan = (mx, v0, span)
+        return
     if drag is not None:
         steps = _steps(app)["steps"]
         kind = drag[0]
@@ -2018,10 +2415,120 @@ def _context(app, i):
     dpg.show_item("seq_ctx")
 
 
+# AI: below section was generated by an AI
+# --- recording automation ----------------------------------------------------------------------
+# Armed, while the show plays: each frame the sliders of the layer shown are held against what playback left in
+# them the frame before (the step's values, its ramps' at that moment). A difference is the hand's - the card's
+# field, the side panel's, MIDI, the phone - and from then until it has been still for HOLD_S the slider is
+# recorded: its value at the step's moment each frame, and the ramp (if any) leaves it alone. When the step ends,
+# or the show stops or pauses, or recording is turned off, each take goes into its step as a curve ramp
+# (sequence.record_into): as recorded over the stretch it was moved, as it was elsewhere.
+HOLD_S = 0.4                                              # a slider still this long is let go (its take goes on)
+
+
+class _Rec:
+    armed = False
+    takes = {}                                            # (id of the step, key) -> [(t, value)]
+    steps = {}                                            # id of the step -> the step
+    held = {}                                             # key -> when it last moved
+    applied = None                                        # (step, effect, layer, fx) as playback left them
+
+
+_REC = _Rec()
+
+
+def toggle_rec(app, on=None):
+    """Recording armed or not; armed while stopped, the show plays from the selected step."""
+    on = (not _REC.armed) if on is None else bool(on)
+    if not on:
+        _rec_flush(app)
+    _REC.armed = on
+    _REC.held, _REC.applied = {}, None
+    _rec_button(app)
+    if on:
+        if getattr(app, "_seq_play", None) is None:
+            play(app, getattr(app, "_seq_sel", 0))
+        elif app._seq_play.get("paused") is not None:
+            play_pause(app)
+        app.gp.status("recording automation: move a slider while the show plays - it goes into the step playing")
+    else:
+        app.gp.status("recording off")
+
+
+def _rec_button(app):
+    if dpg.does_item_exist("seq_rec"):
+        dpg.configure_item("seq_rec", tint_color=(255, 90, 80, 255) if _REC.armed else (255, 255, 255, 255))
+
+
+def _rec_key(seg, slider):
+    return slider if seg == 0 else f"{seg}:{slider}"
+
+
+def _rec_poll(app, i, t):
+    """This frame's part of a take: the sliders the hand moved, and those it holds, at the step's moment t."""
+    if not _REC.armed or getattr(app, "_transition", None) is not None:
+        return
+    steps = _steps(app)["steps"]
+    if not (0 <= i < len(steps)):
+        return
+    st = steps[i]
+    now = time.perf_counter()
+    seg = app.eng.seg
+    was = _REC.applied
+    if was is not None and was[:3] == (i, app.eng.idx, seg):   # the same step, effect and layer as last frame
+        for slider in sequence.RAMP_KEYS:
+            if app.eng.fx.get(slider) != was[3].get(slider):
+                _REC.held[_rec_key(seg, slider)] = now      # moved since playback left it: the hand's
+    for key, at in list(_REC.held.items()):
+        if now - at > HOLD_S:
+            del _REC.held[key]
+            continue
+        s_, slider = sequence.ramp_target(key)
+        if s_ != seg:
+            continue
+        take = _REC.takes.setdefault((id(st), key), [])
+        v = int(app.eng.fx.get(slider, 0))
+        if not take or t > take[-1][0] + 1e-4:
+            take.append((t, v))
+    if any(sid == id(st) for sid, _ in _REC.takes):
+        _REC.steps[id(st)] = st
+    app._tl_dirty = True
+
+
+def _rec_flush(app):
+    """Every take into its step, as a curve ramp; saved as one undo step."""
+    takes, _REC.takes, _REC.held = _REC.takes, {}, {}
+    steps_by, _REC.steps = _REC.steps, {}
+    _REC.applied = None
+    done = 0
+    for (sid, key), samples in takes.items():
+        st = steps_by.get(sid)
+        if st is None or len(samples) < 2 or not any(s is st for s in _steps(app)["steps"]):
+            continue
+        seg, slider = sequence.ramp_target(key)
+        segs = st.get("segments") or []
+        if not 0 <= seg < len(segs):
+            continue
+        start, pts = sequence.record_into(st, key, samples)
+        segs[seg].setdefault("params", {})[slider] = start
+        st.setdefault("ramps", {})[key] = {"shape": "curve", "points": pts}
+        done += 1
+    if done:
+        _save(app)
+        app._tl_dirty = True
+        sel = getattr(app, "_seq_sel", 0)
+        steps = _steps(app)["steps"]
+        if 0 <= sel < len(steps):
+            refresh_ramps(app, steps[sel])
+        app.gp.status(f"automation recorded: {done} curve{'s' if done != 1 else ''}")
+# AI: end
+
+
 # --- the keys ------------------------------------------------------------------------------------
 def key(app, code):
     """The frame's own keys while it has the keyboard (not while a box is typed in): Space plays and pauses,
-    Delete removes the selected step, Ctrl+D duplicates it. True when the key was the frame's."""
+    Delete removes the selected step, Ctrl+D duplicates it, Z zooms the timeline to the selected step and Shift+Z
+    to the whole show. True when the key was the frame's."""
     if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG) or app.typing() or app.undo_target() != "sequence":
         return False
     ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
@@ -2031,6 +2538,10 @@ def key(app, code):
         del_step(app, getattr(app, "_seq_sel", 0)); return True
     if code == dpg.mvKey_D and ctrl and _has_sel(app):
         duplicate_step(app); return True
+    if code == dpg.mvKey_Z and not ctrl and _has_steps(app):
+        shift = dpg.is_key_down(dpg.mvKey_LShift) or dpg.is_key_down(dpg.mvKey_RShift)
+        fit_all(app) if shift else fit_step(app)
+        return True
     return False
 
 
