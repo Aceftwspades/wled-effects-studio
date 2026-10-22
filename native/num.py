@@ -117,6 +117,13 @@ def _on_activated(sender, item):
         and not dpg.is_mouse_button_double_clicked(dpg.mvMouseButton_Left)
     x, y = dpg.get_mouse_pos(local=False)
     _press[item] = (by_mouse, x, y, time.time())
+    s = _specs.get(item)
+    if s and not s["open"] and dpg.does_item_exist(item):
+        # the pace from the field's width as drawn now: a field made wide (a frame stretched, popped out, docked
+        # beside another) kept the pace of an ordinary one, and its value lagged behind the pointer across the fill
+        w = dpg.get_item_rect_size(item)[0]
+        if w > 0:
+            dpg.configure_item(item, speed=_speed(s, dpg.get_value(item), w))
 
 
 def _on_deactivated(sender, item):
@@ -149,8 +156,9 @@ def _on_edited(sender, item):
     _draw_fill(s, v)
 
 
-def _speed(s, v):
-    """Value a pixel: a range crossed in about one and a half field widths;
+def _speed(s, v, width=None):
+    """Value a pixel: a range crossed in about one and a half field widths (`width`, as drawn; an ordinary
+    field's, 200 px, before it has been);
     a log field or an open one a hundredth of its size - or of its pace,
     the size it is usually about, while it is near 0 (never under 0.005,
     or a twentieth of a step for an integer)."""
@@ -160,7 +168,7 @@ def _speed(s, v):
             size = max(size, float(s["lo"]))
         return max(0.05 if s["int"] else 0.005, size * 0.01)
     span = float(s["hi"]) - float(s["lo"])
-    return max(span / 300.0, 0.02 if s["int"] else 1e-6)
+    return max(span / (1.5 * max(60.0, float(width or 200.0))), 0.02 if s["int"] else 1e-6)
 
 
 def fraction(s, v):

@@ -170,6 +170,14 @@ def test_a_change_of_effect_is_not_a_hand():
         S._REC.armed, S._REC.takes, S._REC.held, S._REC.steps, S._REC.applied = False, {}, {}, {}, None
 
 
+def test_a_number_field_s_pace_follows_its_width():
+    from native import num
+    spec = {"open": False, "log": False, "lo": 0, "hi": 255, "int": True}
+    narrow, wide = num._speed(spec, 0, 200), num._speed(spec, 0, 600)
+    assert abs(narrow - 255 / 300) < 1e-9 and abs(wide - narrow / 3) < 1e-9     # three times as wide: a third the pace
+    assert num._speed(spec, 0) == narrow                                         # not drawn yet: an ordinary field's
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0
