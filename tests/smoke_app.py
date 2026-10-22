@@ -942,6 +942,32 @@ STEPS = [
       {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
       {"py": "__import__('native.sequence_ui', fromlist=['x']).send_timers(app)"}], 6.0),
     ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).read_timers(app)"}], 3.0),
+    # the show's audio: a short WAV onto a track at the first step, heard where the show is while it plays (the
+    # speakers at volume 0), the effects hearing it; the clip moved, its fades set by hand and made automatic again,
+    # deleted, the track removed
+    ([{"py": "(lambda w, np, p: (lambda f: (f.setnchannels(1), f.setsampwidth(2), f.setframerate(22050), "
+             "f.writeframes((np.sin(np.arange(44100) * 0.06) * 3000).astype(np.int16).tobytes()), f.close()))(w.open(p, 'wb')))"
+             "(__import__('wave'), __import__('numpy'), __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 0)"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).add_audio(app, __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"}], 3.0),
+    ([{"check": "len(app.project.options['sequence']['tracks']) == 1 and app.project.options['sequence']['tracks'][0]['clips'][0]['file'] == 'assets/audio/smoke_tone.wav'"},
+      {"check": "abs(app.project.options['sequence']['tracks'][0]['clips'][0]['len'] - 2.0) < 0.05"},
+      {"py": "setattr(app._show_player, 'volume', 0.0) if getattr(app, '_show_player', None) else None"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).play(app, 0)"}], 1.2),
+    ([{"check": "type(__import__('native.sequence_ui', fromlist=['x']).show_source(app)).__name__ == 'ShowAudio'"},
+      {"check": "abs(app._show_player.position - __import__('native.sequence_ui', fromlist=['x']).position(app)) < 0.15"},
+      {"seq": ["stop"]},
+      {"py": "app.project.options['sequence']['tracks'][0]['clips'][0].update(at=1.0, fade_in=0.5)"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x'])._audio_changed(app)"}], 0.4),
+    ([{"check": "__import__('native.showaudio', fromlist=['x']).fades(app.project.options['sequence']['tracks'][0])[0] == (0.5, 0.0)"},
+      {"check": "__import__('native.sequence_ui', fromlist=['x']).show_source(app) is None"},
+      {"py": "setattr(app, '_clip_sel', (0, 0))"}, {"check": "__import__('native.sequence_ui', fromlist=['x']).delete_clip(app)"},
+      {"check": "app.project.options['sequence']['tracks'][0]['clips'] == []"},
+      {"py": "app.project.options['sequence']['tracks'].clear()"}, {"py": "__import__('native.sequence_ui', fromlist=['x'])._audio_changed(app)"}], 0.4),
+    # a number field dragged: its pace from its width as drawn, so a wide one keeps up with the pointer
+    ([{"py": "num._on_activated(None, dpg.get_alias_id('inp_sx'))"},
+      {"check": "dpg.get_item_rect_size('inp_sx')[0] <= 0 or "
+                "abs(dpg.get_item_configuration('inp_sx')['speed'] - 255 / (1.5 * max(60.0, dpg.get_item_rect_size('inp_sx')[0]))) < 1e-3"}], 0.2),
     # the timeline zoomed to the first step and moved along, its overview drawn with the box
     ([{"py": "__import__('native.sequence_ui', fromlist=['x']).fit_step(app, 0)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).zoom(app, 2.0)"}], 0.4),
     ([{"check": "app._tl_view is not None and app._tl_view['span'] < __import__('native.sequence_ui', fromlist=['x'])._starts(app)[1]"},

@@ -322,6 +322,22 @@ def build(app):
         dpg.add_drawlist(tag="seq_tl_ov", width=px(600), height=px(OV_H))
         dpg.add_drawlist(tag="seq_tl", width=px(600), height=_tl_height(app))   # its drawing reads its size back
         dpg.add_drawlist(tag="seq_tl_grip", width=px(600), height=px(GRIP_H))
+        # the show's audio: tracks of clips under the steps, through the same view (showaudio.py)
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("AUDIO", color=c.ACCENT))
+            dpg.add_button(label="+ Audio...", tag="seq_audio_add", small=True,
+                           callback=lambda: (setattr(app, "_audio_to_track", None), dpg.show_item("seq_audio_dialog")))
+            c.tip("an audio file onto the show, at the playhead (or the selected step's start), on a track with room "
+                  "there: heard while the show plays, and by its effects; copied into the project")
+            dpg.add_button(label="+ Track", tag="seq_track_add", small=True, callback=lambda: add_track(app))
+            c.tip("one more track: a lane of its own under the others, for a layer of sound over another")
+            dpg.add_text("", tag="seq_audio_words", color=c.DIM)
+        dpg.add_drawlist(tag="seq_tl_audio", width=px(600), height=_audio_height(app))
+        from native.audio import AUDIO_EXTS
+        with dpg.file_dialog(directory_selector=False, show=False, tag="seq_audio_dialog", width=px(620), height=px(420),
+                             callback=lambda s, a: add_audio(app, a.get("file_path_name", ""), getattr(app, "_audio_to_track", None))):
+            dpg.add_file_extension("{" + ",".join(AUDIO_EXTS) + "}", color=(120, 170, 255))
+            dpg.add_file_extension(".*")
         # a drop on the list below its rows: a step moved to the end, or an effect from the Library added there
         with dpg.child_window(tag="seq_rows", height=px(ROW_H * 4 + 12), border=True, payload_type="seq_step",
                               drop_callback=lambda s, a, u: dropped(app, a, None)):
@@ -576,6 +592,7 @@ def refresh(app):
 
 def select(app, i):
     app._seq_sel = int(i)
+    app._clip_sel = None
     if getattr(app, "_seq_edit", False) and getattr(app, "_seq_play", None) is not None and _play_i(app) != app._seq_sel:
         # editing while the show plays edits the step on the playhead (_edit_poll keeps the selection there): a step
         # chosen - on the timeline, in the list - is played from, or it was taken back a frame later
@@ -1527,12 +1544,13 @@ def _apply_ramps(app, i, t):
 
 def poll(app):
     _flush_save(app)
+    _poll_audio(app)
     _edit_poll(app)
     _poll_send(app)
     _take_look(app)
     if dpg.is_item_shown(TAG):
         _hold_scroll(app)
-        if not overview_mouse(app) and not grip_mouse(app):
+        if not overview_mouse(app) and not grip_mouse(app) and not audio_mouse(app):
             timeline_mouse(app)
         _follow_head(app)
         fw = (dpg.get_item_rect_size(TAG)[0], _c().scrollbar_w(TAG))
@@ -1547,7 +1565,7 @@ def poll(app):
             draw_timeline(app); draw_overview(app); app._tl_dirty = False; app._tl_hover_was = getattr(app, "_tl_hover", None)
             app._tl_state_was = state
         elif getattr(app, "_seq_play", None) is not None:
-            _move_head(app); _move_ov_head(app)             # playing: the playheads move, the rest stays (redrawn every
+            _move_head(app); _move_ov_head(app); _move_au_head(app)   # playing: the playheads move, the rest stays (redrawn every
                                                             # frame it was 2 ms of each)
         _show_position(app)
     p = getattr(app, "_seq_play", None)
@@ -1623,7 +1641,7 @@ def _tl_geometry(app):
     spans, t = [], 0.0
     for s in steps:
         d = float(s.get("dur", 10)); spans.append((t, d, float(s.get("trans", sequence.TRANS_DEFAULT)))); t += d
-    return x0, y0, w, h, t, spans
+    return x0, y0, w, h, max(t, _extent(app)) if t > 0 else t, spans
 
 
 def _lanes(h):
@@ -1724,7 +1742,7 @@ def _view(app, total, w):
 
 def _span_now(app):
     """(t0, span, total) the timeline shows now."""
-    total = _starts(app)[1]
+    total = _extent(app) if _starts(app)[1] > 0 else 0.0
     v = getattr(app, "_tl_view", None)
     if not v or total <= 0:
         return 0.0, total, total
@@ -1734,7 +1752,7 @@ def _span_now(app):
 
 def set_view(app, t0, span):
     """The timeline to show `span` seconds from `t0`: the whole show again when that is all of it."""
-    total = _starts(app)[1]
+    total = _extent(app) if _starts(app)[1] > 0 else 0.0
     if total <= 0:
         return
     span = max(MIN_SPAN, float(span))
@@ -1814,7 +1832,7 @@ def _hold_scroll(app):
     The whole show shown, the plain wheel scrolls the frame as it does anywhere in it."""
     ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
     zoomed = getattr(app, "_tl_view", None) is not None
-    over = (zoomed or ctrl) and any(_over(t) for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip"))
+    over = (zoomed or ctrl) and any(_over(t) for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip", "seq_tl_audio"))
     if over != getattr(app, "_tl_held", False):
         app._tl_held = over
         dpg.configure_item(TAG, no_scroll_with_mouse=over)
@@ -1825,7 +1843,7 @@ def wheel(app, delta):
     the timeline's."""
     if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG) or not _has_steps(app):
         return False
-    if not (_over("seq_tl") or _over("seq_tl_ov")):
+    if not (_over("seq_tl") or _over("seq_tl_ov") or _over("seq_tl_audio")):
         return False
     t0, span, total = _span_now(app)
     if total <= 0:
@@ -1877,7 +1895,7 @@ def draw_timeline(app):
         fw = dpg.get_item_rect_size(TAG)[0] or dpg.get_item_configuration(TAG)["width"]
         want = max(200, int(fw) - 24 - c.scrollbar_w(TAG))      # clear of the scrollbar too: past it, the frame scrolled sideways
         if abs(want - w) > 4:
-            for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip"):
+            for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip", "seq_tl_audio"):
                 if dpg.does_item_exist(t):
                     dpg.configure_item(t, width=want)
             w = want
@@ -1889,6 +1907,7 @@ def draw_timeline(app):
     if total <= 0:
         typeface.draw_text((px(8), top + (bot - top) / 2 - px(8)), "the timeline: the steps along the time - add one from the sim",
                            px(14), color=c.DIM, parent=dl)
+        draw_audio(app, 0.0, w / max(_extent(app), 1.0), 0.0)
         return
     t0, sx = _view(app, total, w)
     t1 = t0 + w / sx
@@ -2014,6 +2033,7 @@ def draw_timeline(app):
         dpg.draw_line((x, 0), (x, h), color=(255, 255, 255, 90), thickness=1, parent=dl)
         lab = _fmt_t(hover[1])
         typeface.draw_text((min(x + 3, w - px(30)), rb + 2), lab, px(10), face="mono", color=(255, 255, 255, 200), parent=dl)
+    draw_audio(app, t0, sx, total)
     # the grip under it: a short bar in the middle, to drag
     if dpg.does_item_exist("seq_tl_grip"):
         dpg.delete_item("seq_tl_grip", children_only=True)
@@ -2353,8 +2373,8 @@ def timeline_mouse(app):
         else:
             app._tl_pan = None
         return
-    if (dpg.is_mouse_button_clicked(dpg.mvMouseButton_Middle) and total > 0 and x0 <= mx <= x0 + w and y0 <= my <= y0 + h
-            and getattr(app, "_tl_view", None) is not None):
+    if (dpg.is_mouse_button_clicked(dpg.mvMouseButton_Middle) and total > 0 and getattr(app, "_tl_view", None) is not None
+            and ((x0 <= mx <= x0 + w and y0 <= my <= y0 + h) or _over("seq_tl_audio"))):
         v0, span, _ = _span_now(app)
         app._tl_pan = (mx, v0, span)
         return
@@ -2564,6 +2584,502 @@ def _rec_flush(app):
 # AI: end
 
 
+# AI: below section was generated by an AI
+# --- the show's audio: tracks of clips under the steps (native/showaudio.py) ---------------------------------------
+# Drawn in their own strip under the timeline, through the same view - zoomed, moved, followed with it - and used
+# the way the steps are: a clip dragged to move it (on the beats, or onto a step's start; Alt: free; up or down to
+# another track), its ends to trim it, the handles at its top corners for its fades; a right-click for its menu. Each
+# track a lane: its name and its mute (M) at its left. Heard while the show plays, and heard by the effects.
+LANE_H = 46              # a track's lane
+LANE_HEAD = 15           # its top band: the name and M
+AUDIO_EMPTY_H = 24       # the strip with no track yet
+
+
+def _tracks(app):
+    from native import showaudio
+    return showaudio.tracks(_steps(app))
+
+
+def _extent(app):
+    """How far the timeline reaches: the steps, or the last clip when it ends after them."""
+    from native import showaudio
+    return max(_starts(app)[1], showaudio.length(_steps(app)))
+
+
+def _audio_height(app):
+    n = len(_tracks(app))
+    return px(LANE_H) * n if n else px(AUDIO_EMPTY_H)
+
+
+def add_track(app):
+    T = _tracks(app)
+    T.append({"name": f"Track {len(T) + 1}", "mute": False, "gain": 1.0, "clips": []})
+    _save(app)
+    _audio_changed(app)
+    return len(T) - 1
+
+
+def _project_copy(app, path):
+    """The file in the project's assets/audio (a copy; one of the same name and other sound gets a number): its
+    path from the project's folder."""
+    import shutil
+    from native.features import _same_file
+    adir = os.path.join(app.project.path, "assets", "audio")
+    os.makedirs(adir, exist_ok=True)
+    name = os.path.basename(path)
+    dst = os.path.join(adir, name)
+    if os.path.abspath(dst) != os.path.abspath(path):
+        stem, ext = os.path.splitext(name)
+        n = 2
+        while os.path.exists(dst) and not _same_file(dst, path):
+            name = f"{stem}_{n}{ext}"; dst = os.path.join(adir, name); n += 1
+        if not os.path.exists(dst):
+            shutil.copyfile(path, dst)
+    return "assets/audio/" + name
+
+
+def add_audio(app, path, ti=None, at=None):
+    """An audio file onto the show: copied into the project, decoded on a worker, then a clip of all of it - at the
+    playhead (or the selected step's start), on the selected clip's track or the first with room there (a new
+    track when none has)."""
+    from native import showaudio, tasks
+    if not path or not os.path.isfile(path):
+        return False
+    try:
+        rel = _project_copy(app, path)
+    except OSError as e:
+        app.gp.status(f"could not copy {os.path.basename(path)}: {e}", "warn"); return False
+    full = os.path.join(app.project.path, rel)
+    if at is None:
+        pos = position(app)
+        starts = _starts(app)[0]
+        sel = getattr(app, "_seq_sel", 0)
+        at = pos if pos is not None else (starts[sel] if 0 <= sel < len(starts) else 0.0)
+
+    def work():
+        snd = showaudio.sound(full, wait=True)
+        if snd is None:
+            raise RuntimeError(showaudio.error(full) or "it could not be read")
+        return snd
+
+    def done(snd):
+        T = _tracks(app)
+        k = ti
+        if k is None and getattr(app, "_clip_sel", None) is not None and app._clip_sel[0] < len(T):
+            k = app._clip_sel[0]
+        if k is None:
+            end = at + snd.seconds
+            k = next((j for j, tr in enumerate(T)
+                      if all(showaudio.clip_end(c) <= at or float(c.get("at", 0)) >= end for c in tr.get("clips") or [])), None)
+        if k is None:
+            k = add_track(app)
+        T[k].setdefault("clips", []).append({"file": rel, "at": round(float(at), 3), "in": 0.0,
+                                             "len": round(snd.seconds, 3), "gain": 1.0})
+        app._clip_sel = (k, len(T[k]["clips"]) - 1)
+        _save(app)
+        _audio_changed(app)
+        app.gp.status(f"{os.path.basename(rel)}: {snd.seconds:.1f} s on {T[k].get('name', 'a track')} at {_fmt_t(at)}")
+    return tasks.run(app, "seq_audio", f"reading {os.path.basename(path)}", work, done)
+
+
+def _audio_changed(app):
+    """The lanes drawn again, and the speakers given the clips anew (_poll_audio)."""
+    app._tl_dirty = True
+    app._audio_key = None
+    if dpg.does_item_exist("seq_tl_audio"):
+        h = _audio_height(app)
+        if dpg.get_item_configuration("seq_tl_audio")["height"] != h:
+            dpg.configure_item("seq_tl_audio", height=h)
+
+
+def _lane_geometry(app):
+    """(x0, y0, w, h) of the audio strip on screen, or None."""
+    if not dpg.does_item_exist("seq_tl_audio") or not dpg.is_item_shown(TAG):
+        return None
+    (x0, y0) = dpg.get_item_state("seq_tl_audio").get("rect_min") or (0, 0)
+    cfg = dpg.get_item_configuration("seq_tl_audio")
+    return x0, y0, cfg["width"], cfg["height"]
+
+
+def _clip_rect(app, ti, ci, t0, sx):
+    """(a, b, top, bot) of a clip in the strip's own coordinates."""
+    c = _tracks(app)[ti]["clips"][ci]
+    top = ti * px(LANE_H) + px(LANE_HEAD)
+    return (float(c.get("at", 0)) - t0) * sx, (float(c.get("at", 0)) + float(c.get("len", 0)) - t0) * sx, top, \
+        (ti + 1) * px(LANE_H) - 2
+
+
+def _wave_peaks(snd, cin, at, t0, sx, a, b, every=2):
+    """(xs, loudness 0..1) of a clip's wave across [a, b) of the strip: the loudest in each column's stretch."""
+    from native import showaudio
+    xs = np.arange(max(0, int(a)), int(b), every, dtype=np.float64)
+    if not len(xs):
+        return xs, xs
+    per = showaudio.RATE / float(showaudio.PEAK)                 # points a second
+    ta = cin + (t0 + xs / sx - at)
+    i0 = np.clip((ta * per).astype(int), 0, len(snd.peaks) - 1)
+    i1 = np.clip(((ta + every / sx) * per).astype(int) + 1, i0 + 1, len(snd.peaks))
+    ok = (ta >= 0) & (ta <= snd.seconds)
+    vals = np.array([snd.peaks[s:e].max() for s, e in zip(i0.tolist(), i1.tolist())], np.float32)
+    vals[~ok] = 0.0
+    vals /= max(snd.loudest, 1e-4)                               # drawn to the file's own loudest, as a DAW draws it
+    return xs, vals
+
+
+def draw_audio(app, t0, sx, total):
+    """The tracks' lanes: each clip a block on its time, its wave in it, its fades as lines down to its ends (the
+    handles at its top corners), its name; the track's name and M at its left; the bars, the playhead."""
+    from native import showaudio
+    if not dpg.does_item_exist("seq_tl_audio"):
+        return
+    c = _c()
+    dl = "seq_tl_audio"
+    dpg.delete_item(dl, children_only=True)
+    w = dpg.get_item_configuration(dl)["width"]
+    h = _audio_height(app)
+    T = _tracks(app)
+    dpg.draw_rectangle((0, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 55), parent=dl)
+    if not T:
+        typeface.draw_text((px(8), px(4)), "the show's audio: + Audio... puts a file at the playhead, on a track of its own",
+                           px(12), color=c.DIM, parent=dl)
+        return
+    X = lambda t: (t - t0) * sx                                        # noqa: E731
+    bl = _barlen(app)
+    if bl and bl * sx >= 4:                                            # the bars, as over the steps
+        t = np.floor(t0 / bl) * bl
+        while X(t) <= w:
+            dpg.draw_line((X(t), 0), (X(t), h), color=(255, 255, 255, 18), thickness=1, parent=dl)
+            t += bl
+    sel = getattr(app, "_clip_sel", None)
+    root = app.project.path
+    for ti, tr in enumerate(T):
+        y0, y1 = ti * px(LANE_H), (ti + 1) * px(LANE_H)
+        dpg.draw_rectangle((0, y0), (w, y1), color=(0, 0, 0, 0), fill=(255, 255, 255, 8 if ti % 2 else 3), parent=dl)
+        dpg.draw_line((0, y1 - 0.5), (w, y1 - 0.5), color=(255, 255, 255, 22), thickness=1, parent=dl)
+        muted = bool(tr.get("mute"))
+        col = (120, 170, 255) if not muted else (110, 110, 118)
+        for ci, (cl, (fi, fo)) in enumerate(zip(tr.get("clips") or [], showaudio.fades(tr))):
+            a, b, top, bot = _clip_rect(app, ti, ci, t0, sx)
+            if b < 0 or a > w:
+                continue
+            at, ln, cin = float(cl.get("at", 0)), float(cl.get("len", 0)), float(cl.get("in", 0))
+            dpg.draw_rectangle((a, top), (b, bot), color=(0, 0, 0, 0), fill=col + (55,), rounding=3, parent=dl)
+            snd = showaudio.sound(os.path.join(root, cl.get("file", "")))
+            mid, half = (top + bot) / 2, (bot - top) / 2 - 1
+            if snd is not None:
+                xs, v = _wave_peaks(snd, cin, at, t0, sx, max(a, 0), min(b, w))
+                g = showaudio.envelope((t0 + xs / sx - at).astype(np.float32), ln, fi, fo) if len(xs) else xs
+                for x, k in zip(xs.tolist(), (v * g * half).tolist()):
+                    if k > 0.4:
+                        dpg.draw_line((x, mid - k), (x, mid + k), color=col + (200,), thickness=1, parent=dl)
+            else:
+                err = showaudio.error(os.path.join(root, cl.get("file", "")))
+                typeface.draw_text((max(a, 0) + px(4), mid - px(6)), ("cannot be read: " + err) if err else "reading...",
+                                   px(11), color=c.AMBER if err else c.DIM, parent=dl)
+            # the fades: a line from the clip's top corner to its foot, the handle at the corner
+            if fi > 0:
+                dpg.draw_line((a, bot), (X(at + fi), top), color=(255, 255, 255, 150), thickness=1, parent=dl)
+            if fo > 0:
+                dpg.draw_line((b, bot), (X(at + ln - fo), top), color=(255, 255, 255, 150), thickness=1, parent=dl)
+            if b - a > px(16):
+                for hx, auto in ((X(at + fi), "fade_in" not in cl), (X(at + ln - fo), "fade_out" not in cl)):
+                    dpg.draw_rectangle((hx - px(3), top), (hx + px(3), top + px(6)), color=(255, 255, 255, 220),
+                                       fill=(30, 34, 42, 255) if auto else (255, 255, 255, 220), parent=dl)
+            name = os.path.basename(cl.get("file", ""))
+            room = min(b, w) - max(a, 0) - px(10)
+            if room > px(20):
+                typeface.draw_text((max(a, 0) + px(4), top + px(1)), _fit_measured(name, room, px(11)), px(11),
+                                   color=(235, 238, 245, 210), parent=dl)
+            if sel == (ti, ci):
+                dpg.draw_rectangle((a, top), (b, bot), color=c.ACCENT, thickness=2, rounding=3, parent=dl)
+        # the track's head, over its lane's left end: its name and M
+        tw = typeface.measure(str(tr.get("name", "")), "body", px(11))
+        dpg.draw_rectangle((0, y0), (tw + px(30), y0 + px(LANE_HEAD)), color=(0, 0, 0, 0), fill=(20, 22, 28, 220), parent=dl)
+        dpg.draw_rectangle((px(3), y0 + px(2)), (px(15), y0 + px(13)), color=(255, 255, 255, 140),
+                           fill=(230, 160, 60, 255) if muted else (0, 0, 0, 0), rounding=2, parent=dl)
+        typeface.draw_text((px(5), y0 + px(1)), "M", px(10), face="mono", color=(20, 20, 20, 255) if muted else (230, 233, 240, 220), parent=dl)
+        typeface.draw_text((px(20), y0 + px(1)), str(tr.get("name", "")), px(11), color=(230, 233, 240, 220), parent=dl)
+    drag = getattr(app, "_au_drag", None)
+    if drag and drag[0] == "move" and drag[5] is not None:            # the track a clip would go to
+        ty = drag[5] * px(LANE_H)
+        dpg.draw_rectangle((0, ty), (w, ty + px(LANE_H)), color=c.ACCENT, thickness=1, parent=dl)
+    at = position(app)
+    app._au_scale = (sx, h, t0)
+    if at is not None:
+        dpg.draw_line((X(at), 0), (X(at), h), color=(255, 255, 255, 240), thickness=2, parent=dl, tag="seq_au_head")
+
+
+def _move_au_head(app):
+    at, sc = position(app), getattr(app, "_au_scale", None)
+    if at is None or sc is None or not dpg.does_item_exist("seq_au_head"):
+        return
+    sx, h, t0 = sc
+    x = (at - t0) * sx
+    dpg.configure_item("seq_au_head", p1=(x, 0), p2=(x, h))
+
+
+def _audio_hit(app, mx, my):
+    """What the pointer is on in the strip: ("mute", ti) | ("fade_in" | "fade_out" | "trim_l" | "trim_r" |
+    "clip", ti, ci) | ("lane", ti, t) | None."""
+    g = _lane_geometry(app)
+    if g is None:
+        return None
+    x0, y0, w, h = g
+    if not (x0 <= mx <= x0 + w and y0 <= my <= y0 + h):
+        return None
+    T = _tracks(app)
+    x, y = mx - x0, my - y0
+    ti = int(y // px(LANE_H))
+    if not (0 <= ti < len(T)):
+        return None
+    if x <= px(16) and y - ti * px(LANE_H) <= px(LANE_HEAD):
+        return ("mute", ti)
+    gt = _tl_geometry(app)
+    t0, sx = _view(app, gt[4] if gt else _extent(app), w)
+    from native import showaudio
+    tr = T[ti]
+    for ci in reversed(range(len(tr.get("clips") or []))):         # the last drawn, on top, first
+        a, b, top, bot = _clip_rect(app, ti, ci, t0, sx)
+        cl = tr["clips"][ci]
+        fi, fo = showaudio.fades(tr)[ci]
+        at, ln = float(cl.get("at", 0)), float(cl.get("len", 0))
+        if top - px(2) <= y <= top + px(8):
+            if abs(x - (at + fi - t0) * sx) <= px(5):
+                return ("fade_in", ti, ci)
+            if abs(x - (at + ln - fo - t0) * sx) <= px(5):
+                return ("fade_out", ti, ci)
+        if top <= y <= bot:
+            if abs(x - a) <= px(4):
+                return ("trim_l", ti, ci)
+            if abs(x - b) <= px(4):
+                return ("trim_r", ti, ci)
+            if a <= x <= b:
+                return ("clip", ti, ci)
+    return ("lane", ti, t0 + x / sx)
+
+
+def _snap(app, t, exclude=None):
+    """A time put on the beat when a tempo is set and snapping is on (Alt: free), or onto a step's start or a
+    clip's end within a few pixels."""
+    if dpg.is_key_down(dpg.mvKey_LAlt) or dpg.is_key_down(dpg.mvKey_RAlt):
+        return t
+    g = _tl_geometry(app)
+    sx = _view(app, g[4], g[2])[1] if g else 10.0
+    from native import showaudio
+    marks = list(_starts(app)[0]) + [_starts(app)[1]]
+    for ti, tr in enumerate(_tracks(app)):
+        for ci, c in enumerate(tr.get("clips") or []):
+            if (ti, ci) != exclude:
+                marks += [float(c.get("at", 0)), showaudio.clip_end(c)]
+    near = min(marks, key=lambda m: abs(m - t), default=None)
+    if near is not None and abs(near - t) * sx <= px(8):
+        return near
+    beat = _beat(app)
+    if beat and _steps(app).get("snap", True):
+        return round(t / beat) * beat
+    return t
+
+
+def audio_mouse(app):
+    """The strip's pointer: a clip pressed is selected and dragged - its body moves it (and to another track, up or
+    down), an end trims it, a top corner's handle sets that fade; M mutes the track; a right-click a clip's or a
+    track's menu; a double-click on a clip plays from its start. True while the strip has the mouse."""
+    from native import showaudio
+    g = _lane_geometry(app)
+    drag = getattr(app, "_au_drag", None)
+    mx, my = dpg.get_mouse_pos(local=False)
+    if drag is not None:
+        if g is None:
+            app._au_drag = None
+            return False
+        x0, y0, w, h = g
+        gt = _tl_geometry(app)
+        t0, sx = _view(app, gt[4] if gt else _extent(app), w)
+        t = t0 + (mx - x0) / sx
+        kind, ti, ci, grab, orig = drag[:5]
+        T = _tracks(app)
+        if not (0 <= ti < len(T) and 0 <= ci < len(T[ti].get("clips") or [])):
+            app._au_drag = None
+            return True
+        cl = T[ti]["clips"][ci]
+        snd = showaudio.sound(os.path.join(app.project.path, cl.get("file", "")))
+        full = snd.seconds if snd is not None else orig["in"] + orig["len"]
+        if dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
+            if kind == "move":
+                at = _snap(app, max(0.0, orig["at"] + (t - grab)), (ti, ci))
+                cl["at"] = round(max(0.0, at), 3)
+                to = int((my - y0) // px(LANE_H))
+                app._au_drag = drag[:5] + ((to if 0 <= to < len(T) and to != ti else None),)
+            elif kind == "trim_l":
+                at = _snap(app, t, (ti, ci))
+                at = max(orig["at"] - orig["in"], min(orig["at"] + orig["len"] - 0.05, at))
+                d = at - orig["at"]
+                cl["at"], cl["in"], cl["len"] = round(at, 3), round(orig["in"] + d, 3), round(orig["len"] - d, 3)
+            elif kind == "trim_r":
+                end = _snap(app, t, (ti, ci))
+                cl["len"] = round(max(0.05, min(full - orig["in"], end - orig["at"])), 3)
+            elif kind == "fade_in":
+                cl["fade_in"] = round(max(0.0, min(orig["len"], t - orig["at"])), 3)
+            elif kind == "fade_out":
+                cl["fade_out"] = round(max(0.0, min(orig["len"], orig["at"] + orig["len"] - t)), 3)
+            app._tl_dirty = True
+            app._audio_key = None
+        else:
+            app._au_drag = None
+            to = drag[5] if len(drag) > 5 else None
+            if kind == "move" and to is not None:                    # onto another track
+                T[to].setdefault("clips", []).append(T[ti]["clips"].pop(ci))
+                app._clip_sel = (to, len(T[to]["clips"]) - 1)
+            _save(app)
+            _audio_changed(app)
+        return True
+    hit = _audio_hit(app, mx, my)
+    if hit is None:
+        return False
+    if dpg.is_mouse_button_clicked(dpg.mvMouseButton_Right):
+        if hit[0] in ("clip", "trim_l", "trim_r", "fade_in", "fade_out"):
+            _clip_menu(app, hit[1], hit[2])
+        elif hit[0] in ("lane", "mute"):
+            _track_menu(app, hit[1])
+        return True
+    if not dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
+        return False
+    if hit[0] == "mute":
+        tr = _tracks(app)[hit[1]]
+        tr["mute"] = not tr.get("mute")
+        _save(app); _audio_changed(app)
+        return True
+    if hit[0] == "lane":
+        app._clip_sel = None
+        app._tl_dirty = True
+        return False                                             # an empty lane: the timeline's own (a middle drag)
+    ti, ci = hit[1], hit[2]
+    cl = _tracks(app)[ti]["clips"][ci]
+    app._clip_sel = (ti, ci)
+    if dpg.is_mouse_button_double_clicked(dpg.mvMouseButton_Left):
+        seek(app, float(cl.get("at", 0)))
+        return True
+    g = _lane_geometry(app)
+    gt = _tl_geometry(app)
+    t0, sx = _view(app, gt[4] if gt else _extent(app), g[2])
+    kind = {"clip": "move"}.get(hit[0], hit[0])
+    app._au_drag = (kind, ti, ci, t0 + (mx - g[0]) / sx,
+                    {"at": float(cl.get("at", 0)), "in": float(cl.get("in", 0)), "len": float(cl.get("len", 0))}, None)
+    app._tl_dirty = True
+    return True
+
+
+def _menu(app, title, items):
+    c = _c()
+    dpg.delete_item("seq_ctx", children_only=True)
+    dpg.add_text(c._fit_text(title, px(220)), parent="seq_ctx", color=c.DIM)
+    for label, fn in items:
+        dpg.add_selectable(label=label, parent="seq_ctx", callback=lambda s, a, u: (dpg.hide_item("seq_ctx"), u()), user_data=fn)
+    x, y = dpg.get_mouse_pos(local=False)
+    dpg.set_item_pos("seq_ctx", [x, y])
+    dpg.show_item("seq_ctx")
+
+
+def _clip_menu(app, ti, ci):
+    app._clip_sel = (ti, ci)
+    T = _tracks(app)
+    cl = T[ti]["clips"][ci]
+
+    def auto():
+        cl.pop("fade_in", None); cl.pop("fade_out", None); _save(app); _audio_changed(app)
+
+    def dup():
+        import copy
+        d = copy.deepcopy(cl)
+        d["at"] = round(float(cl.get("at", 0)) + float(cl.get("len", 0)), 3)
+        T[ti]["clips"].append(d); app._clip_sel = (ti, len(T[ti]["clips"]) - 1); _save(app); _audio_changed(app)
+
+    def delete():
+        T[ti]["clips"].pop(ci); app._clip_sel = None; _save(app); _audio_changed(app)
+
+    def new_track():
+        k = add_track(app)
+        T[k]["clips"].append(T[ti]["clips"].pop(ci)); app._clip_sel = (k, 0); _save(app); _audio_changed(app)
+
+    def play_here():
+        seek(app, float(cl.get("at", 0)))
+        p = getattr(app, "_seq_play", None)
+        if p is not None and p.get("paused") is not None:
+            play_pause(app)                                       # held there: on from it
+
+    _menu(app, os.path.basename(cl.get("file", "")), [
+        ("Play from its start", play_here),
+        ("Automatic fades", auto), ("Duplicate after it", dup), ("To a new track", new_track), ("Delete", delete)])
+
+
+def _track_menu(app, ti):
+    T = _tracks(app)
+    tr = T[ti]
+
+    def mute():
+        tr["mute"] = not tr.get("mute"); _save(app); _audio_changed(app)
+
+    def remove():
+        T.pop(ti); app._clip_sel = None; _save(app); _audio_changed(app)
+
+    def add():
+        app._audio_to_track = ti
+        dpg.show_item("seq_audio_dialog")
+
+    _menu(app, str(tr.get("name", "")), [("Unmute" if tr.get("mute") else "Mute", mute), ("Add audio here...", add),
+                                         ("Remove the track and its clips", remove)])
+
+
+def delete_clip(app):
+    sel = getattr(app, "_clip_sel", None)
+    T = _tracks(app)
+    if sel is None or not (0 <= sel[0] < len(T) and 0 <= sel[1] < len(T[sel[0]].get("clips") or [])):
+        return False
+    T[sel[0]]["clips"].pop(sel[1])
+    app._clip_sel = None
+    _save(app); _audio_changed(app)
+    return True
+
+
+def _poll_audio(app):
+    """The speakers kept to the show: the clips given anew when they change, the show's place and whether it plays
+    every frame. A player is made once there is a clip; it stays silent with its reason when it cannot sound."""
+    import json
+    from native import showaudio
+    T = _tracks(app)
+    has = any(tr.get("clips") for tr in T)
+    pl = getattr(app, "_show_player", None)
+    if not has:
+        if pl is not None:
+            pl.sync(None, False)
+        return
+    if pl is None:
+        pl = app._show_player = showaudio.Player()
+        if pl.error:
+            app.gp.status(pl.error, "warn")
+    key = (json.dumps(T, sort_keys=True, default=str), showaudio.decoding(), len(showaudio._CACHE))
+    if key != getattr(app, "_audio_key", None):
+        app._audio_key = key
+        app._audio_resolved = showaudio.resolve(_steps(app), app.project.path)
+        pl.set(app._audio_resolved)
+        app._tl_dirty = True                                     # a file decoded since: its wave drawn
+    p = getattr(app, "_seq_play", None)
+    pl.sync(position(app), p is not None and p.get("paused") is None)
+
+
+def show_source(app):
+    """What the effects hear while the show plays or is held at a time and has audio: its mix where it is
+    (showaudio.ShowAudio), in place of the synth or the live audio; None otherwise."""
+    if getattr(app, "_seq_play", None) is None or not getattr(app, "_audio_resolved", None):
+        return None
+    src = getattr(app, "_show_src", None)
+    if src is None:
+        from native import showaudio
+        src = app._show_src = showaudio.ShowAudio(lambda: getattr(app, "_audio_resolved", []), lambda: position(app))
+    return src
+# AI: end
+
+
 # --- the keys ------------------------------------------------------------------------------------
 def key(app, code):
     """The frame's own keys while it has the keyboard (not while a box is typed in): Space plays and pauses,
@@ -2574,6 +3090,8 @@ def key(app, code):
     ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
     if code == dpg.mvKey_Spacebar and not ctrl and _has_steps(app):
         play_pause(app); return True
+    if code == dpg.mvKey_Delete and getattr(app, "_clip_sel", None) is not None and delete_clip(app):
+        return True                                       # a clip selected: the clip
     if code == dpg.mvKey_Delete and _has_sel(app):
         del_step(app, getattr(app, "_seq_sel", 0)); return True
     if code == dpg.mvKey_D and ctrl and _has_sel(app):
