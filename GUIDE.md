@@ -1024,7 +1024,8 @@ glides after the middle of the motion, with a lock-on ring. To change a
 look, select its node and press Tab to enter it (Tab again, or Node >
 Sub-graph > Back to the parent graph, to come back); to swap one for a
 look of your own, make a sub-graph with the same pins and wire it in its
-place on both decks' **VS Pick**.
+place on both decks' **VS Pick**. The **VJ frame** (below) is the same
+desk made a frame of its own, with more looks and a source per deck.
 
 ## Playing it live: modulators and the mixer
 
@@ -1056,6 +1057,84 @@ fader turned round so the picture stays. The fader is a MIDI target too
 it while the mixer is on. What the mixer shows is what every view, the
 stream, a recording, a video, an FSEQ export and a device GIF take; the
 device itself has no second deck (it blends between a show's presets).
+
+## The VJ frame
+
+**Window > VJ** (Ctrl+Shift+J, or **VJ** on the toolbar) is a VJ's desk:
+two decks, each a **video** source and a **look**, a crossfader between
+them, and the mix on the shape. Tick **on air** and the mix shows in
+place of the effect - in every view, and so in the stream, a recording,
+a video, an FSEQ export and a device GIF; untick it and the effect is
+back. It runs in the studio only: the LEDs get it by the stream.
+
+Each deck has its own **video** - no video, the test pattern, a video
+file, a webcam, the screen (or a window), the phone's camera or a network
+stream; **...** picks the file, the camera, the screen or the address -
+and its own **look**, drawn on a small canvas (96 x 72) that is then laid
+on the shape by **MAP**: as the logical view lays it out, through the
+shape from the front or the top, round it, the same on every face, or all
+round it as a sphere's map (the Video node's projections). The looks:
+
+- **Video**: the Video Switchboard's ten - Clean, Neon Edges, Mosaic,
+  Thermal, Halftone, Chroma Split, Melt, Motion Trails, Imprint and Follow
+  Spot (the last three follow what moves in the picture).
+- **Shaders**, in the Shadertoy manner - a picture worked out for every
+  pixel from where it is, the time and the sound: Plasma, Tunnel, Warp,
+  Voronoi, Kaleido Tunnel, Starfield, Metaballs and Beat Rings.
+- **MilkDrop**, its way of making pictures: the last frame fed back,
+  zoomed, turned and warped a little and faded, the sound drawn over it -
+  Nebula, Vortex, Fireflies, Bloom, Liquid Mirror and Pulse Grid. A deck's
+  video, when it has one, seeds the feedback.
+- **Flames**: fractal flames (Scott Draves' algorithm, Electric Sheep's) -
+  points thrown at random through a few bent maps, where they land counted
+  and shown on a log scale, turning slowly. **Mutate** breeds a new flame
+  from the one on the deck, kept with the project.
+- **Effect**: any effect of the studio's, run on the shape itself beside
+  the main one (its **speed** and **amount** are the effect's Speed and
+  Intensity).
+- **Yours** (below).
+
+Under the preview, each deck's **amount** (what the look makes more of:
+the edges' gain, the mosaic's blocks, a shader's detail), **speed**, the
+**colours** it is drawn in, a **kaleidoscope** of so many mirrors, a
+**hue** turn, **mirror** and **strobe on the beat**. **Shuffle** deals the
+deck another look. A deck's look and knobs can be kept: **Save as...**
+names them, and the **preset** list puts one on a deck. The deck off the
+mix is shown dimmer: it is the one to set up before fading to it.
+
+**MIX**: the crossfader (deck A at 0, B at 1), **A** and **B** throw it to
+an end, **Cut** goes straight to the other deck, **Fade** sweeps there
+over two beats, and the blend (crossfade, add, screen, multiply, lighten,
+difference) is how the two meet between the ends. **AUTO** moves the
+fader by itself: **every few bars** (1 to 16), or **at the show's
+sections** while the Sequence plays - a cut into a drop, a slow fade into
+an intro, a breakdown or the outro, two beats into the rest; **shuffle
+looks** deals the deck the mix just left a new look, so with both it
+plays by itself. The beat is the effects' (the synth's, the live audio's
+or the show's audio), the tempo the show's.
+
+**Playing it**: the MIDI frame's learn lists the VJ's crossfader, Cut,
+Fade, Shuffle A and B, and on air; the phone remote shows a VJ card (the
+fader, Cut, Fade, On air, Shuffle A and B) while the frame is open.
+
+**In a show**: a step added (or updated) from the sim while the VJ is on
+air is the VJ's - its decks, fader, blend and map kept with it and named
+after its looks. Played, it puts them on air; a step that is not the VJ's
+takes the VJ off air again. Its ramps have one more, the **VJ crossfader**
+(a curve on the timeline like any other), to fade between the step's
+decks as it plays. The device plays a VJ step as the effect it was
+captured over; the VJ itself is the stream's.
+
+**Looks of your own**: **New look...** makes a small Python file in the
+project's `looks/` folder from an example and opens it in your editor;
+saved, it reloads in the frame at once, listed under Yours (**Edit** opens
+it again). It is a function `draw(c, st)` that returns the picture for
+every pixel at once - numpy arrays, in the Shadertoy manner - from where
+each pixel is (`c.u`, `c.v`, `c.x`, `c.y`, `c.r`, `c.a`), the time, the
+beat and the sound, the deck's video and knobs, and `st`, kept from frame
+to frame; the example's comments list it all, and the helpers the built-in
+looks use are there too (a MilkDrop preset or a flame of your own is a few
+lines). A look that fails says so under the decks and draws dark.
 
 ## A show: the Sequence frame
 
@@ -1696,6 +1775,7 @@ on and install what it carries.
 - **Window** › Palettes (gradients) `Ctrl+Shift+G`
 - **Window** › LED outputs and power `Ctrl+Shift+O`
 - **Window** › Audio input (mic / line-in) `Ctrl+Shift+M`
+- **Window** › VJ: two decks of video and looks `Ctrl+Shift+J`
 - **Window** › Snapshots... `Ctrl+Shift+K`
 - **Window** › MIDI, OSC and phone...
 - **Window** › Effect slots...
@@ -1786,6 +1866,7 @@ Every action, its key (Settings › Keyboard shortcuts rebinds them) and where i
 | `Ctrl+Shift+G` | Palettes: gradients of the project's own | anywhere |
 | `Ctrl+Shift+O` | LED outputs and power | anywhere |
 | `Ctrl+Shift+M` | Audio input: the device's microphone or line-in | anywhere |
+| `Ctrl+Shift+J` | VJ: two decks of video and looks | anywhere |
 | `Ctrl+Shift+X` | Randomise the settings | anywhere |
 | `Ctrl+Z` | Undo (the graph, or the code) | anywhere |
 | `Ctrl+Y` | Redo (the graph, or the code) | anywhere |
@@ -1880,6 +1961,8 @@ Every button, with what its tooltip says.
 
 **Audio input frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Read the device's` — what the device's audioreactive is set to now (its type, pins and levels), into these fields; `Send the audio input` — over /json/cfg; the levels take at once, a new type or new pins after a reboot (offered when needed); `Reboot the device` — restarts the device so a new type or new pins take effect; the LEDs go dark for a few seconds
 
+**VJ frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `New look...` — a look of your own: a small Python file in the project's looks/ folder, made from an example and opened in your editor - it reloads here each time it is saved; it goes on the deck off the mix; `Shuffle` — a look this deck does not have, at random; `Mutate` — a new flame bred from this one (its maps nudged, a variation swapped) - kept with the project; `Edit` — this look's file in your editor: saved, it reloads here; `...` — the file, the camera, the screen or the address; `Save as...`; `A` — all deck A; `B` — all deck B; `Cut` — straight to the other deck; `Fade` — to the other deck over two beats
+
 **Keyboard shortcuts**: `close` — close (Esc while it has the focus); `Reset all to defaults`
 
 **Appearance**: `close` — close (Esc while it has the focus); `dark`; `light`; `soft light`; `slate`; `Back to the preset` — the preset's colours again, your changes dropped; `Save`; `Save + use for nodes`; `Save + use for pane`; `Delete`; `Studio`; `Glow`; `Cinematic`; `Diffused`; `Night`; `The monitor's` — the size the monitor is set to in the system's display settings; `Restart now` — the studio closes and starts again at the new size; the graph is saved, and unsaved code is asked about first
@@ -1904,6 +1987,6 @@ Every button, with what its tooltip says.
 
 **Message log**: `close` — close (Esc while it has the focus); `copy all` — the log as text, to paste into an issue or a note; `clear` — empties the recent messages; the problems stay until they are fixed
 
-**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `pip_max`; `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `Lay the shape out as a grid` — the shape's LEDs projected onto a grid (the best fit), so a matrix effect draws on it - the Shape frame's Shape tab says how, and can change it; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `Shape settings...` — the Shape frame on the whole shape's settings: its sizes, what the effects see and how a grid is projected, power; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play an audio file...`; `sec_video_arrow`; `Choose...` — a video file: mp4, mov, mkv, webm, avi, gif - read by ffmpeg; `Find` — the webcams ffmpeg can open on this computer, into the list; `Stop` — the source closed (a webcam switched off); the Video node goes black; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or an audio file - goes to it; `VIDEO` — VIDEO: a webcam, a file, the screen, a phone or a stream, for the Video node - goes to it; `Panel` — Panel - brings it to the front; `Devices - brings it to the front`; `x` — close Devices (the menus open it again); `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
+**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `VJ` — VJ: two decks of video and looks, crossfaded onto the shape  Ctrl+Shift+J; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `pip_max`; `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `Lay the shape out as a grid` — the shape's LEDs projected onto a grid (the best fit), so a matrix effect draws on it - the Shape frame's Shape tab says how, and can change it; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `Shape settings...` — the Shape frame on the whole shape's settings: its sizes, what the effects see and how a grid is projected, power; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play an audio file...`; `sec_video_arrow`; `Choose...` — a video file: mp4, mov, mkv, webm, avi, gif - read by ffmpeg; `Find` — the webcams ffmpeg can open on this computer, into the list; `Stop` — the source closed (a webcam switched off); the Video node goes black; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or an audio file - goes to it; `VIDEO` — VIDEO: a webcam, a file, the screen, a phone or a stream, for the Video node - goes to it; `Panel` — Panel - brings it to the front; `Devices - brings it to the front`; `x` — close Devices (the menus open it again); `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
 
 <!-- uiref end -->

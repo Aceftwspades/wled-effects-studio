@@ -77,6 +77,7 @@ ACTIONS = [
     ("palettes",      "Palettes: gradients of the project's own",            "Ctrl+Shift+G", "global"),
     ("outputs",       "LED outputs and power",                               "Ctrl+Shift+O", "global"),
     ("audioin",       "Audio input: the device's microphone or line-in",    "Ctrl+Shift+M", "global"),
+    ("vj",            "VJ: two decks of video and looks",                    "Ctrl+Shift+J", "global"),
     ("randomise",     "Randomise the settings",                              "Ctrl+Shift+X", "global"),
     # the graph
     ("undo",          "Undo (the graph, or the code)",                       "Ctrl+Z", "global"),

@@ -4081,6 +4081,19 @@ What they have that the studio lacks, in the order they would pay back:
       *On hold* (2026-10-22): the user is to describe how it should work,
       if at all.
 
+- [x] **The VJ frame** (asked for 2026-10-22: the Video Switchboard graph made
+      a feature of its own): native/vj.py, vj_looks.py, vj_ui.py - two decks,
+      each a video source and a look on a 96 x 72 canvas mapped onto the
+      shape by the Video node's projections; the switchboard's ten looks as
+      image work, eight Shadertoy-style shaders, a MilkDrop-style feedback
+      engine (six presets), fractal flames with Mutate, any effect as a deck;
+      kaleidoscope, mirror, hue, strobe; the crossfader with six blends;
+      auto-mix on bars or the show's sections, shuffle; presets; looks of
+      the project's own as Python files (looks/, reloaded on save); MIDI and
+      phone controls; VJ steps on the Sequence with a crossfader ramp. Sim
+      and stream only. Not done: real GLSL (pasting a Shadertoy shader as it
+      is) - it needs an OpenGL context (moderngl) in all four builds.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every

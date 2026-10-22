@@ -661,8 +661,9 @@ class Features:
         eng = eng or self.eng
         if eng is not self.eng:
             return eng.rgb()
-        from native import mixer
-        return self._seq_dim(mixer.picture(self, self._frame_rgb_inner(eng)))   # deck B mixed in (mixer.py)
+        from native import mixer, vj
+        # the VJ's mix on air in place of the effect (vj.py), then the mixer's deck B over it (mixer.py)
+        return self._seq_dim(mixer.picture(self, vj.picture(self, self._frame_rgb_inner(eng))))
 
     def _seq_dim(self, rgb):
         """The frame at a playing sequence's step brightness (WLED's presets set it: the sim shows what the device

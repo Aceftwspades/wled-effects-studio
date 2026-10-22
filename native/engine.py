@@ -519,6 +519,7 @@ class Engine:
         """The waveform slot (u_data[8]) for effects that draw the wave
         itself: 256 int8 samples, as audioreactive's cube_fx block gives
         the device. Ignored by an engine built without it."""
+        self.last_pcm = samples                        # the VJ frame's looks draw the wave too (vj.py)
         try:
             f = self.lib.simPcmSet
         except AttributeError:

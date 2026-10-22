@@ -1034,6 +1034,21 @@ STEPS = [
     ([{"check": "__import__('native.mixer', fromlist=['m']).deck_b(app) is not None and bool((app.frame_rgb() == __import__('native.mixer', fromlist=['m']).deck_b(app).rgb()).all())"},
       {"py": "__import__('native.mixer', fromlist=['m']).set_fader(app, 0.0)"}, {"py": "__import__('native.mixer', fromlist=['m']).options(app).update(on=False)"},
       {"py": "chrome.close_dialog('mixer_win')"}], 0.3),
+    # the VJ frame: Plasma on deck A, Thermal on the test pattern on deck B, on air - the views show its mix; the
+    # fader at B; a step added while on air is the VJ's, and played puts its decks back on air; off air, the step
+    # taken away again
+    ([{"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0].update(look='Plasma', source={'kind': 'none', 'path': '', 'name': '', 'url': ''})"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1].update(look='Thermal', source={'kind': 'test', 'path': '', 'name': '', 'url': ''})"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(fader=1.0)"}, {"py": "device_ui.show(app, 'vj')"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, True)"}], 1.5),
+    ([{"check": "app._vj_out is not None and bool((app.frame_rgb() == app._vj_out).all()) and app._vj_out.any()"},
+      {"check": "bool((app._vj_out == __import__('native.vj', fromlist=['v']).deck_led(app, 1)).all())"},
+      {"py": "setattr(app, '_vj_n', len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']))"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).add_step(app)"}], 0.5),
+    ([{"check": "__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps'][app._seq_sel].get('vj', {}).get('decks', [{}])[1].get('look') == 'Thermal' "
+                "and __import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps'][app._seq_sel]['name'].startswith('VJ:')"},
+      {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).load_step(app, app._seq_sel)"}], 0.4),
+    ([{"check": "__import__('native.vj', fromlist=['v']).on(app)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).del_step(app, app._seq_sel)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
+      {"py": "setattr(app, '_vj_by_show', False)"}, {"py": "device_ui.close(app, 'vj')"}], 0.5),
+    ([{"check": "len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) == app._vj_n and not __import__('native.vj', fromlist=['v']).on(app)"}], 0.1),
     # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed
     # left where it was set
     ([{"py": "setattr(app, '_mo_sx', app.eng.fx['sx'])"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='sx', kind='lfo', shape='square', period=0.5, depth=40)"},

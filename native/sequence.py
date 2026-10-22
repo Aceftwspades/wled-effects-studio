@@ -141,6 +141,7 @@ def segment_json(k, sg, names, pals, is2d, colours):
 
 RAMP_KEYS = ("sx", "ix", "c1", "c2", "c3")
 BRI = "bri"                      # a ramp of the step's brightness (the whole show's, as WLED's presets set it)
+VJF = "vjf"                      # a ramp of a VJ step's crossfader, 0..255 (vj.py; the sim's only - not the device's)
 RAMP_SHAPES = ("linear", "ease in", "ease out", "ease in-out", "up and back", "step", "curve")
 CURVE_MAX = 16                   # a curve's points at most (a lane drawn on the timeline: a handful is plenty)
 
@@ -294,6 +295,8 @@ def ramp_value(step, key, t):
     seg, slider = ramp_target(key)
     if slider == BRI:
         start = int(step.get("bri", 255))
+    elif slider == VJF:
+        start = int(round(float((step.get("vj") or {}).get("fader", 0.0)) * 255))
     else:
         start = int((segs[seg].get("params") or {}).get(slider, 128)) if 0 <= seg < len(segs) else 128
     r = ramp_of(step, key)

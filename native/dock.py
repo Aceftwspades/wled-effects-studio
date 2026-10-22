@@ -27,9 +27,9 @@ TAB_H = 34                  # the tab strip at 100%
 MIN_W = 240                 # a tab's narrowest column, at 100%
 NAMES = {"side": "Panel", "devices": "Devices", "flash": "Flash", "send": "Send", "shape": "Shape",
          "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs",
-         "audioin": "Audio input"}
+         "audioin": "Audio input", "vj": "VJ"}
 ICONS = {"devices": "devices", "flash": "flash", "send": "send", "shape": "shape", "sequence": "sequence",
-         "library": "library", "palettes": "palette", "outputs": "outputs", "audioin": "mic"}
+         "library": "library", "palettes": "palette", "outputs": "outputs", "audioin": "mic", "vj": "video"}
 
 _sig = None                 # what the tab strip was built for
 

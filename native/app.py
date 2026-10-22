@@ -1886,7 +1886,7 @@ class App(Features, Recorder, EditBuild):
                ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
                ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
     CORE = ("main", "cube", "side", "props")
-    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes", "outputs", "audioin")
+    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes", "outputs", "audioin", "vj")
     SLOTS = CORE + OPTIONAL
 
     @classmethod
@@ -2622,7 +2622,7 @@ class App(Features, Recorder, EditBuild):
     def _slot_label(self, slot):
         return {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
                 "side": "Panel", "props": "Properties", "devices": "Devices", "flash": "Flash firmware",
-                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs", "audioin": "Audio input"}.get(slot, slot)
+                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs", "audioin": "Audio input", "vj": "VJ"}.get(slot, slot)
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
@@ -3106,6 +3106,7 @@ class App(Features, Recorder, EditBuild):
             "sequence":     lambda: device_ui.show(self, "sequence"),
             "library":      lambda: device_ui.show(self, "library"),
             "palettes":     lambda: device_ui.show(self, "palettes"),
+            "vj":           lambda: device_ui.show(self, "vj"),
             "outputs":      lambda: device_ui.show(self, "outputs"),
             "audioin":      lambda: device_ui.show(self, "audioin"),
             "randomise":    self.randomise,

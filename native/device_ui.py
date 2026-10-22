@@ -36,7 +36,8 @@ FRAMES = {"devices": ("devices_win", "Devices", 640, 420),
           "library": ("library_win", "Library", 640, 520),     # the graphs as looping thumbnails (library_ui.py)
           "palettes": ("palettes_win", "Palettes", 560, 460),  # gradients of the project's own (palette_ui.py)
           "outputs": ("outputs_win", "LED outputs", 680, 420),  # the wiring as the device's busses, and the power (outputs_ui.py)
-          "audioin": ("audioin_win", "Audio input", 640, 340)}  # the device's microphone or line-in module (audioin_ui.py)
+          "audioin": ("audioin_win", "Audio input", 640, 340),
+          "vj": ("vj_win", "VJ", 680, 720)}                    # two decks of video and looks (vj_ui.py)  # the device's microphone or line-in module (audioin_ui.py)
 HEADER_H = 30
 
 
@@ -252,6 +253,8 @@ def build(app):
     palette_ui.build(app)
     outputs_ui.build(app)
     audioin_ui.build(app)
+    from native import vj_ui
+    vj_ui.build(app)
 
 
 # the firmware's sources, as the frame words them
@@ -835,6 +838,9 @@ def show(app, which):
     elif which == "audioin":
         from native import audioin_ui
         audioin_ui.refresh(app)
+    elif which == "vj":
+        from native import vj_ui
+        vj_ui.refresh(app)
     # in the dock, its tab in front - over the panes only if it was floated (C8)
     from native import dock
     dock.open_frame(app, which)
@@ -1444,6 +1450,7 @@ def poll(app):
     sequence_ui.poll(app)
     __import__("native.devicegif", fromlist=["d"]).poll(app)    # a GIF for the device being caught from the sim
     __import__("native.mixer", fromlist=["m"]).poll(app)        # the fader saved once it rests
+    __import__("native.vj_ui", fromlist=["v"]).poll(app)        # the VJ's decks drawn while on air or open
     library_ui.poll(app)
     palette_ui.poll(app)
     outputs_ui.poll(app)

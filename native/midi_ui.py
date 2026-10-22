@@ -167,6 +167,9 @@ def targets(app):
     out.append(("next effect", {"kind": "next"}))
     out.append(("previous effect", {"kind": "prev"}))
     out.append(("the mixer's fader", {"kind": "mixer"}))
+    out += [("VJ: the crossfader", {"kind": "vj_fader"}), ("VJ: cut to the other deck", {"kind": "vj_cut"}),
+            ("VJ: fade to the other deck", {"kind": "vj_fade"}), ("VJ: shuffle deck A", {"kind": "vj_shuffle_a"}),
+            ("VJ: shuffle deck B", {"kind": "vj_shuffle_b"}), ("VJ: on air, on or off", {"kind": "vj_air"})]
     g = app.gp.graph
     if g and app.gp.file:
         wired = {(b, i) for _, _, b, i in g.links}
@@ -647,6 +650,19 @@ def apply_target(app, t, v, full=127.0, ctl=None):
     kind = t.get("kind")
     if kind == "setlist":
         switch_effect(app, midi.setlist_pick(app.eng.names, _st(app)["setlist"], ctl or ("cc", 0, 0), v, full))
+        return
+    if kind == "vj_fader" or kind in midi.VJ_BUTTONS:     # the VJ frame's (vj.py)
+        from native import vj, vj_ui
+        if kind == "vj_fader":
+            vj.set_fader(app, float(v) / float(full or 127.0))
+        elif kind == "vj_cut":
+            vj.cut(app)
+        elif kind == "vj_fade":
+            vj.go(app, vj.FADE_BEATS * 60.0 / vj._tempo(app))
+        elif kind in ("vj_shuffle_a", "vj_shuffle_b"):
+            vj.shuffle(app, 0 if kind.endswith("a") else 1)
+        elif kind == "vj_air":
+            vj_ui.set_on(app, not vj.on(app))
         return
     if kind in midi.STEPS:
         switch_effect(app, midi.step_effect(app.eng.names, _st(app)["setlist"], app.eng.names[app.eng.idx],

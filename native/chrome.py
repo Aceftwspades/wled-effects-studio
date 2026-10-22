@@ -57,7 +57,8 @@ def _mi(app, label, action=None, **kw):
 WINDOW_FRAMES = (("devices", "Devices", "devices"), ("send", "Send to device", "send_frame"),
                  ("shape", "Shape editor", "shape"), ("sequence", "Sequence: presets and a playlist", "sequence"),
                  ("library", "Library", "library"), ("palettes", "Palettes (gradients)", "palettes"),
-                 ("outputs", "LED outputs and power", "outputs"), ("audioin", "Audio input (mic / line-in)", "audioin"))
+                 ("outputs", "LED outputs and power", "outputs"), ("audioin", "Audio input (mic / line-in)", "audioin"),
+                 ("vj", "VJ: two decks of video and looks", "vj"))
 
 
 def window_open(app, slot):
@@ -508,7 +509,8 @@ TOOLBAR_FRAMES = (("devices", "devices", "Devices", "Devices on the network", "d
                   ("library", "library", "Library", "Library: every effect as a looping thumbnail", "library"),
                   ("palettes", "palette", "Palettes", "Palettes: gradients of the project's own", "palettes"),
                   ("outputs", "outputs", "Outputs", "LED outputs and power", "outputs"),
-                  ("audioin", "mic", "Audio in", "Audio input: the device's microphone or line-in", "audioin"))
+                  ("audioin", "mic", "Audio in", "Audio input: the device's microphone or line-in", "audioin"),
+                  ("vj", "video", "VJ", "VJ: two decks of video and looks, crossfaded onto the shape", "vj"))
 _WORD_THEMES = {}
 
 

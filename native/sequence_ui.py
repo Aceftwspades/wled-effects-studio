@@ -864,6 +864,7 @@ def add_step(app):
     """What the sim shows now, as a new step after the selected one (at the end with none)."""
     S = _steps(app)
     st = sequence.capture(app.eng, app.seg_cols, 255, "", 10.0, 0.7, rgb=_undimmed(app))
+    _take_vj(app, st)
     at = getattr(app, "_seq_sel", -1) + 1 if S["steps"] else 0
     at = max(0, min(len(S["steps"]), at))
     S["steps"].insert(at, st)
@@ -882,9 +883,20 @@ def update_step(app):
                               old.get("trans", 0.7), rgb=_undimmed(app))
         if old.get("ramps"):
             st["ramps"] = old["ramps"]                   # the step's own settings stay; what it shows is the sim's
+        _take_vj(app, st)
+        if not st.get("vj"):
+            (st.get("ramps") or {}).pop(sequence.VJF, None)
         S["steps"][i] = st
         _gather_look(app, st)
         _save(app)
+
+
+def _take_vj(app, st):
+    """A step made while the VJ is on air is the VJ's: its decks and fader kept with it, named after its looks."""
+    from native import vj
+    if vj.on(app):
+        st["vj"] = vj.snapshot(app)
+        st["name"] = vj.step_name(app)
 
 
 def duplicate_step(app, i=None):
@@ -925,6 +937,8 @@ def _ramp_names(app, step):
     segment's, each led by the segment's number, when the step has more than one (sequence.ramp_key)."""
     segs = step.get("segments") or [{}]
     out = {sequence.BRI: "Brightness"}
+    if step.get("vj"):
+        out[sequence.VJF] = "VJ crossfader"
     for s, sg in enumerate(segs):
         for k, lab in _slider_words(app, sg.get("effect")).items():
             out[sequence.ramp_key(s, k)] = f"{s}: {lab}" if len(segs) > 1 else lab
@@ -974,6 +988,7 @@ def load_step(app, i=None, quiet=False):
     i = getattr(app, "_seq_sel", 0) if i is None else i
     if 0 <= i < len(S["steps"]):
         sequence.apply(app.eng, S["steps"][i])
+        __import__("native.vj", fromlist=["v"]).apply_step(app, S["steps"][i])   # a VJ step's decks on air (vj.py)
         app.seg_cols = [int(c) for c in app.eng._colors]         # the current segment's, as the step left them
         app.refresh_colours()
         dpg.set_value("fx_combo", app.eng.names[app.eng.idx])
@@ -1572,6 +1587,10 @@ def _apply_ramps(app, i, t):
     changed = False
     for k in ramps:
         if k == sequence.BRI or k in _REC.held:
+            continue
+        if k == sequence.VJF:                                     # a VJ step's crossfader (vj.py)
+            if st.get("vj"):
+                __import__("native.vj", fromlist=["v"]).options(app)["fader"] = sequence.ramp_value(st, k, t) / 255.0
             continue
         v = sequence.ramp_value(st, k, t)
         seg, slider = sequence.ramp_target(k)
