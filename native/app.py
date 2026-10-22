@@ -291,6 +291,7 @@ class App(Features, Recorder, EditBuild):
         self.building = False
         # --- pane sizes: dragged on the splitters, remembered across runs ----
         self.prefs = load_prefs()
+        render.PICTURE_GLOW = self.prefs.get("picture_glow") if self.prefs.get("picture_glow") in render.PICTURE_GLOWS else "auto"
         self.side_w = px(self.prefs["side_w"]) if self.prefs.get("side_w") else SIDE_W    # kept at 100%
         # where the panes sit: columns of rows of slots (see PRESETS), the
         # columns' shares of the width per layout mode, the rows' of a column

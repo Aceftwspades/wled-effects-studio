@@ -1145,6 +1145,26 @@ def _appearance_view(app):
         tip("the preset's values again, your changes dropped")
     dpg.add_text("Every shape takes all of it: a cube's diffuser spreads light within each face, any other shape's "
                  "to the LEDs nearest it.", color=DIM, wrap=px(540))
+    dpg.add_separator()
+    with form.row("glow in pictures", width=96):
+        dpg.add_combo(list(GLOW_WORDS.values()), tag="look_picture_glow", width=px(220),
+                      default_value=GLOW_WORDS.get(app.prefs.get("picture_glow", "auto"), GLOW_WORDS["auto"]),
+                      callback=lambda s, v: set_picture_glow(app, v))
+        tip("how screenshots, GIFs and videos of a shape that is not a cube make the glow: exact - each LED its own "
+            "round glowing dot, as the live view draws them; fast - one blur of the whole picture, softer, quicker for a "
+            "big sphere, torus or matrix; automatic - whichever is quicker for the picture")
+
+
+GLOW_WORDS = {"auto": "automatic (the quicker)", "exact": "exact (each LED's dot)", "fast": "fast (a blur)"}
+
+
+def set_picture_glow(app, words):
+    """Appearance > 3-D view's glow in pictures: kept in the prefs, in force at once (render.PICTURE_GLOW)."""
+    from native import render
+    mode = next((k for k, w in GLOW_WORDS.items() if w == words), "auto")
+    app.prefs["picture_glow"] = mode
+    save_prefs(app.prefs)
+    render.PICTURE_GLOW = mode
 
 
 def set_look(app, preset=None, key=None, value=None):

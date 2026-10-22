@@ -131,6 +131,21 @@ def test_the_cheaper_way_is_taken():
     assert called == ["sprites", "blur"], called
 
 
+def test_the_setting_chooses_the_way():
+    called = []
+    keep = (render._glow_points, render._sprite_points, render.PICTURE_GLOW)
+    render._glow_points = lambda *a, **k: called.append("blur")
+    render._sprite_points = lambda *a, **k: called.append("sprites")
+    try:
+        for mode in ("exact", "fast"):
+            render.PICTURE_GLOW = mode
+            _picture(Geometry("strip", n=60), look.PRESETS["glow"], 400)          # automatic would take the sprites
+            _picture(Geometry("sphere", w=64, h=32), look.PRESETS["glow"], 400)   # and the blur here
+    finally:
+        render._glow_points, render._sprite_points, render.PICTURE_GLOW = keep
+    assert called == ["sprites", "sprites", "blur", "blur"], called
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

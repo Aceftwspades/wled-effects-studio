@@ -645,6 +645,11 @@ STEPS = [
                                                           for k in range(60)]}}}], 1.5),
     ([{"check": "type(app.point_quads).__name__ == 'PointQuads' and app.point_quads.sprite and app.point_quads.reflect > 0"},
       {"check": "any(dpg.get_item_configuration(q)['show'] for q in app.point_quads.mirror_items)"},
+      # the glow in pictures, a setting: exact and back to automatic, kept in the prefs and in force at once
+      {"py": "chrome.set_picture_glow(app, chrome.GLOW_WORDS['exact'])"},
+      {"check": "__import__('native.render', fromlist=['r']).PICTURE_GLOW == 'exact' and app.prefs['picture_glow'] == 'exact'"},
+      {"py": "chrome.set_picture_glow(app, chrome.GLOW_WORDS['auto'])"},
+      {"check": "__import__('native.render', fromlist=['r']).PICTURE_GLOW == 'auto' and dpg.does_item_exist('look_picture_glow')"},
       {"py": "chrome.set_look(app, preset='studio')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.5),
     ([{"check": "app.cube_quads is not None"},
       {"py": "chrome.close_dialog('appearance_win')"}], 0.4),
