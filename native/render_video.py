@@ -192,7 +192,7 @@ class Job:
 def start(app):
     """The render begun: the show from the length's start on the held clock, the speakers silent."""
     from native import sequence_ui
-    if getattr(app, "_video_job", None) is not None:
+    if getattr(app, "_video_job", None) is not None or getattr(app, "_fseq_job", None) is not None:
         return False
     if not app.has_ffmpeg():
         app.gp.status("a video needs ffmpeg on the path - not found", "warn"); return False

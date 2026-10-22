@@ -166,6 +166,7 @@ def targets(app):
     out.append(("the effect, from the setlist", {"kind": "setlist"}))
     out.append(("next effect", {"kind": "next"}))
     out.append(("previous effect", {"kind": "prev"}))
+    out.append(("the mixer's fader", {"kind": "mixer"}))
     g = app.gp.graph
     if g and app.gp.file:
         wired = {(b, i) for _, _, b, i in g.links}
@@ -650,6 +651,10 @@ def apply_target(app, t, v, full=127.0, ctl=None):
     if kind in midi.STEPS:
         switch_effect(app, midi.step_effect(app.eng.names, _st(app)["setlist"], app.eng.names[app.eng.idx],
                                             1 if kind == "next" else -1))
+        return
+    if kind == "mixer":                                   # the fader, A at 0 to B at the top (mixer.py)
+        from native import mixer
+        mixer.set_fader(app, float(v) / float(full or 127.0))
         return
     val = midi.value_for(t, v, full)
     if kind == "fx":

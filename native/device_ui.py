@@ -175,6 +175,12 @@ def build(app):
             dpg.add_button(label="Send the ledmap only", width=px(200), callback=lambda: app.send_ledmap())
             weight.need(dpg.last_item(), "device")
         with dpg.group(horizontal=True):
+            dpg.add_button(label="Play a GIF on the device...", tag="send_gif", width=px(200),
+                           callback=lambda: __import__("native.devicegif", fromlist=["d"]).show(app))
+            weight.need(dpg.last_item(), "device")
+            c.tip("what the sim shows for a few seconds - or a GIF file - played by the device itself (WLED's Image "
+                  "effect): no stream needed")
+        with dpg.group(horizontal=True):
             dpg.add_text("ledmap", color=c.DIM)
             dpg.add_button(label="Import the device's", small=True, callback=lambda: app.import_ledmap(host=app.active_host()))
             weight.danger(dpg.last_item())
@@ -1436,6 +1442,8 @@ def poll(app):
     from native import shape_ui, sequence_ui, library_ui, palette_ui, outputs_ui, audioin_ui
     shape_ui.poll(app)
     sequence_ui.poll(app)
+    __import__("native.devicegif", fromlist=["d"]).poll(app)    # a GIF for the device being caught from the sim
+    __import__("native.mixer", fromlist=["m"]).poll(app)        # the fader saved once it rests
     library_ui.poll(app)
     palette_ui.poll(app)
     outputs_ui.poll(app)

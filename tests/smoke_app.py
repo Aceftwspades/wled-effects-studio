@@ -118,6 +118,18 @@ MULTI_STEPS = [
     ([{"check": "len(app.streams) == 1 and app.streams[0].mode == 'all'"}, {"stream": False},
       {"py": "app.remove_device('127.0.0.2:8771')"}], 0.5),
 ]
+# the show to two devices at once - the stream's two - and started on both together
+MULTI_SEND_STEPS = [
+    ([{"py": "app.add_device('127.0.0.2:8771')"}, {"py": f"app.stream_config().update(multi=True, targets={_HALVES})"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).__setitem__('to_all', True)"},
+      {"check": "__import__('native.sequence_ui', fromlist=['x']).send_hosts(app) == ['127.0.0.1:8770', '127.0.0.2:8771']"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).send(app, run=True)"}], 22.0),
+    ([{"expect": ["seq_log", "sent to 2 of 2 devices"]}, {"expect": ["seq_log", "started together on 2"]},
+      {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).__setitem__('to_all', False)"}, {"py": "device_ui._set_multi(app, False)"},
+      {"py": "app.remove_device('127.0.0.2:8771')"}], 0.5),
+]
+
+
 def _holds(other):
     """A sub-graph whose output is fed by a node of `other` - wired, so loading it resolves `other`."""
     return json.dumps({"name": "x", "nodes": [{"id": 1, "type": "sub:" + other, "pos": [0, 0], "params": {}, "inputs": {}},
@@ -942,6 +954,7 @@ STEPS = [
       {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
       {"py": "__import__('native.sequence_ui', fromlist=['x']).send_timers(app)"}], 6.0),
     ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).read_timers(app)"}], 3.0),
+    *MULTI_SEND_STEPS,
     # the show's audio: a short WAV onto a track at the first step, heard where the show is while it plays (the
     # speakers at volume 0), the effects hearing it; the clip moved, its fades set by hand and made automatic again,
     # deleted, the track removed
@@ -964,6 +977,31 @@ STEPS = [
       {"py": "setattr(app, '_clip_sel', (0, 0))"}, {"check": "__import__('native.sequence_ui', fromlist=['x']).delete_clip(app)"},
       {"check": "app.project.options['sequence']['tracks'][0]['clips'] == []"},
       {"py": "app.project.options['sequence']['tracks'].clear()"}, {"py": "__import__('native.sequence_ui', fromlist=['x'])._audio_changed(app)"}], 0.4),
+    # song sections and a show made from them: two sections laid by hand at 120 bpm, a show made from three
+    # effects of a setlist (measured on the spare engine) - a step a 4 bars over the 16 s verse and the 8 s drop -
+    # then undone to the steps before; the sections, the tempo and the setlist put back
+    ([{"py": "setattr(app, '_as_before', (len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']), __import__('native.midi_ui', fromlist=['m'])._st(app).get('setlist'), __import__('native.sequence_ui', fromlist=['x'])._steps(app).get('bpm')))"},
+      {"py": "__import__('native.midi_ui', fromlist=['m'])._st(app).__setitem__('setlist', [n for n in app.eng.names if n in ('Rainbow', 'Fire 2012', 'Colorwaves')])"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).update(bpm=120, sections=[{'name': 'Verse', 'kind': 'verse', 'at': 0.0, 'len': 16.0}, "
+             "{'name': 'Drop', 'kind': 'drop', 'at': 16.0, 'len': 8.0}])"},
+      {"py": "__import__('native.autoshow', fromlist=['a']).show(app)"}, {"check": "dpg.is_item_shown('autoshow_win')"},
+      {"py": "__import__('native.autoshow', fromlist=['a']).options(app).update(pool='setlist', bars=4)"}, {"py": "__import__('native.autoshow', fromlist=['a']).make(app)"}], 8.0),
+    ([{"check": "len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) == 3 and abs(sum(s['dur'] for s in __import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) - 24.0) < 0.1"},
+      {"check": "__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps'][2]['trans'] == 0.0"},
+      {"py": "dpg.hide_item('autoshow_win')"}, {"seq": ["undo"]}], 1.0),
+    ([{"check": "len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) == app._as_before[0]"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).pop('sections', None)"}, {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).update(bpm=app._as_before[2])"},
+      {"py": "__import__('native.midi_ui', fromlist=['m'])._st(app).__setitem__('setlist', app._as_before[1]) if app._as_before[1] is not None else __import__('native.midi_ui', fromlist=['m'])._st(app).pop('setlist', None)"},
+      {"py": "app.project.save()"}], 0.6),
+    # timecode in: MTC on the MIDI port (a stand-in port), a full frame locating 00:00:00:15 at 30 - the show held
+    # half a second in; the timecode off again
+    ([{"py": "setattr(app, '_tc_port', app.midi.port) or setattr(app.midi, 'port', app.midi.port or 'smoke')"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).tc_set(app, source='mtc', start='00:00:00:00')"},
+      {"py": "app.midi.inject([0xF0, 0x7F, 0x7F, 0x01, 0x01, 0x60, 0, 0, 15, 0xF7])"}], 0.5),
+    ([{"check": "abs(__import__('native.sequence_ui', fromlist=['x']).position(app) - 0.5) < 0.05 and app._seq_play.get('paused') is not None"},
+      {"check": "dpg.get_value('seq_tc_words').startswith('00:00:00:15')"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).tc_set(app, source='off')"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).stop(app)"},
+      {"py": "setattr(app.midi, 'port', app._tc_port)"}], 0.4),
     # the show rendered to a video, frame by frame on the held clock: the second step (1 s) at 720p and 24 frames a
     # second, 24 frames in an mp4 in captures/ (taken away again), the clock the real one after
     ([{"py": "__import__('native.render_video', fromlist=['r']).options(app).update(size='1280x720', fps=24, view='both', "
@@ -976,6 +1014,34 @@ STEPS = [
       {"check": "'24 frames' in app.rec_msg and app.rec_msg.split(':')[0].endswith('.mp4')"},
       {"py": "__import__('os').remove(__import__('os').path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, app.rec_msg.split(':')[0]))"},
       {"py": "chrome.close_dialog('render_video_win')"}], 0.4),
+    # the same step exported for Falcon Player: 20 frames of every LED in an FSEQ v2 file (read back, taken away)
+    ([{"py": "__import__('native.render_fseq', fromlist=['r']).options(app).update(fps=20, length='step', audio=False)"}, {"py": "__import__('native.render_fseq', fromlist=['r']).show(app)"},
+      {"check": "'20 frames' in dpg.get_value('fs_words')"}, {"py": "__import__('native.render_fseq', fromlist=['r']).start(app)"}], 6.0),
+    ([{"check": "not __import__('native.render_fseq', fromlist=['r']).exporting(app) and not __import__('native.clock', fromlist=['c']).held()"},
+      {"py": "setattr(app, '_fs_path', __import__('os').path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, app.rec_msg.split(':')[0]))"},
+      {"check": "app._fs_path.endswith('.fseq') and __import__('native.render_fseq', fromlist=['r']).read(app._fs_path)[0]['frames'] == 20 and "
+                "__import__('native.render_fseq', fromlist=['r']).read(app._fs_path)[0]['channels'] == 3 * app.project.geometry.count"},
+      {"py": "__import__('os').remove(app._fs_path)"}, {"py": "chrome.close_dialog('render_fseq_win')"}], 0.4),
+    # a GIF for the device: half a second of the sim caught at the matrix's size and sent to the fake - which, a WLED
+    # without the Image effect, refuses it (the sending against a WLED that has one: tests/test_devicegif.py)
+    ([{"py": "__import__('native.devicegif', fromlist=['d']).options(app).update(seconds=2, fps=10, name='smoke.gif')"}, {"py": "__import__('native.devicegif', fromlist=['d']).show(app)"},
+      {"check": "'20 frames of' in dpg.get_value('dg_words')"},
+      {"py": "__import__('native.devicegif', fromlist=['d']).start(app)"}, {"py": "app._dg_cap.update(end=app._dg_cap['end'] - 1.5)"}], 2.5),
+    ([{"check": "getattr(app, '_dg_cap', None) is None"}, {"expect": ["dg_words", "no Image effect"]},
+      {"py": "chrome.close_dialog('devgif_win')"}], 0.3),
+    # the mixer: deck B (Rainbow) beside the effect, the fader at B showing B alone, then off
+    ([{"py": "__import__('native.mixer', fromlist=['m']).options(app).update(on=True, b='Rainbow', fader=1.0, mode='screen')"}, {"py": "__import__('native.mixer', fromlist=['m']).show(app)"}], 0.8),
+    ([{"check": "__import__('native.mixer', fromlist=['m']).deck_b(app) is not None and bool((app.frame_rgb() == __import__('native.mixer', fromlist=['m']).deck_b(app).rgb()).all())"},
+      {"py": "__import__('native.mixer', fromlist=['m']).set_fader(app, 0.0)"}, {"py": "__import__('native.mixer', fromlist=['m']).options(app).update(on=False)"},
+      {"py": "chrome.close_dialog('mixer_win')"}], 0.3),
+    # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed
+    # left where it was set
+    ([{"py": "setattr(app, '_mo_sx', app.eng.fx['sx'])"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='sx', kind='lfo', shape='square', period=0.5, depth=40)"},
+      {"py": "__import__('native.modulate', fromlist=['m']).show(app)"}], 0.15),
+    ([{"check": "__import__('native.modulate', fromlist=['m']).place(app, 'sx') == app._mo_sx and abs(app.eng.fx['sx'] - app._mo_sx) in (20, 0) and "
+                "app.eng.fx['sx'] in (max(0, app._mo_sx - 20), min(255, app._mo_sx + 20))"},
+      {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
+    ([{"check": "app.eng.fx['sx'] == app._mo_sx"}], 0.1),
     # a number field dragged: its pace from its width as drawn, so a wide one keeps up with the pointer
     ([{"py": "num._on_activated(None, dpg.get_alias_id('inp_sx'))"},
       {"check": "dpg.get_item_rect_size('inp_sx')[0] <= 0 or "
@@ -1276,7 +1342,7 @@ def main():
     except OSError:
         ddp2 = None
         print("no 127.0.0.2 on this machine: the steps streaming to two devices are left out")
-        STEPS[:] = [s for s in STEPS if s not in MULTI_STEPS]
+        STEPS[:] = [s for s in STEPS if s not in MULTI_STEPS and s not in MULTI_SEND_STEPS]
     with open(LOG, "w") as log:
         # the console variant of the packaged app keeps its stdout, which is the log the test reads
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
@@ -1324,6 +1390,8 @@ def main():
                    "a buffered stdout, the wrong exe, or STUDIO_REMOTE_CONTROL not reaching it")
     if ddp.ddp_frames < 10:
         bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
+    if ddp2 is not None and not any(isinstance(v, dict) and "playlist" in v for v in ddp2.presets.values()):
+        bad.append("the second device got no playlist from the show sent to both")
     if ddp2 is not None and (ddp2.ddp_frames < 10 or not getattr(ddp2, "ddp_last", b"") or len(ddp2.ddp_last) % 3):
         bad.append(f"the second device got {ddp2.ddp_frames} frames ({len(getattr(ddp2, 'ddp_last', b''))} bytes the last); 10 or more expected")
     # the cube's net in logical order, 6912 bytes, is 14 universes of 510 (the last 282): from 3 in E1.31, from 0 in Art-Net

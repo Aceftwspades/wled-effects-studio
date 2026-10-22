@@ -320,8 +320,34 @@ def build(app):
             c.tip("while the show plays, the timeline turns the page when the playhead reaches its edge")
             typeface.mono(dpg.add_text("", tag="seq_zoom_words", color=c.DIM))
         dpg.add_drawlist(tag="seq_tl_ov", width=px(600), height=px(OV_H))
+        dpg.add_drawlist(tag="seq_tl_sec", width=px(600), height=px(SEC_H))   # the show's sections
         dpg.add_drawlist(tag="seq_tl", width=px(600), height=_tl_height(app))   # its drawing reads its size back
         dpg.add_drawlist(tag="seq_tl_grip", width=px(600), height=px(GRIP_H))
+        # the show as a whole: its sections found in its audio, and a show made from them (showanalysis, autoshow)
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("SHOW", color=c.ACCENT))
+            dpg.add_button(label="Find sections", tag="seq_find_sections", small=True, callback=lambda: find_sections(app))
+            c.tip("the show's audio listened to: its intro, verses, builds, drops, breakdowns and outro, as named "
+                  "sections over the steps - and its tempo, when none is set")
+            dpg.add_button(label="Make a show...", tag="seq_make_show", small=True,
+                           callback=lambda: __import__("native.autoshow", fromlist=["a"]).show(app))
+            c.tip("steps laid on the sections and the bars: calm effects for the quiet parts, the brightest for the "
+                  "drops, the intensity rising over a build - from the effects you choose, then yours to edit")
+        # timecode in: the playhead chasing a DAW's or a desk's clock (timecode.py)
+        with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("TIMECODE", color=c.ACCENT))
+            tco = _tc_opts(app)
+            dpg.add_combo([w for _, w in TC_SOURCES], tag="seq_tc_src", width=px(120),
+                          default_value=dict(TC_SOURCES)[tco["source"]], callback=lambda s, v: tc_set(app, source=v))
+            c.tip("the show follows a timecode: MIDI Time Code on the MIDI frame's input port, or LTC (SMPTE) on an "
+                  "audio input - playing, stopping and moving with it")
+            dpg.add_input_text(tag="seq_tc_start", width=px(96), hint="starts at", default_value=tco["start"],
+                               on_enter=True, callback=lambda s, v: tc_set(app, start=v))
+            c.tip("the timecode the show's start is at (hh:mm:ss:ff) - 01:00:00:00 is a common one")
+            dpg.add_combo([], tag="seq_tc_dev", width=px(150), show=tco["source"] == "ltc",
+                          callback=lambda s, v: tc_set(app, device=v))
+            c.tip("the audio input the LTC comes in on")
+            typeface.mono(dpg.add_text("", tag="seq_tc_words", color=c.DIM))
         # the show's audio: tracks of clips under the steps, through the same view (showaudio.py)
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("AUDIO", color=c.ACCENT))
@@ -430,6 +456,11 @@ def build(app):
             weight.need(dpg.last_item(), _has_steps)
             c.tip("the show made into an mp4, frame by frame at the size, rate and quality chosen, with its audio - "
                   "into captures/; needs ffmpeg on the path")
+            dpg.add_button(label="Export FSEQ...", tag="seq_fseq", small=True,
+                           callback=lambda: __import__("native.render_fseq", fromlist=["r"]).show(app))
+            weight.need(dpg.last_item(), _has_steps)
+            c.tip("the show frame by frame into an FSEQ file for Falcon Player, with its audio beside it - FPP plays it "
+                  "to the controllers, WLED among them")
         dpg.add_separator()
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
@@ -452,6 +483,10 @@ def build(app):
             dpg.add_button(label="Save presets.json...", small=True, callback=lambda: dpg.show_item("seq_save_dialog"))
             weight.need(dpg.last_item(), _has_steps)
             c.tip("the same presets and playlist as a file, for a device that is not on the network")
+            dpg.add_checkbox(label="every device of the stream", tag="seq_to_all", default_value=bool(_steps(app).get("to_all")),
+                             callback=lambda s, v: (_steps(app).__setitem__("to_all", bool(v)), app.project.save()))
+            c.tip("the show to each device the LIVE row streams to (its several devices ticked), each sent at once, "
+                  "and started together - a stage of several controllers; each plays the effects on its own LEDs")
         dpg.add_text("", tag="seq_sent", color=c.DIM, wrap=0)
         dpg.add_text("", tag="seq_log", color=c.DIM, wrap=0)
         # SCHEDULE: WLED's timers - a preset at a time of day, sunrise or sunset, on chosen days
@@ -503,6 +538,9 @@ def refresh(app):
     c = _c()
     from native.icons import texture
     S = _steps(app)
+    tco = _tc_opts(app)                                   # the timecode row as the project has it (another opened)
+    if dpg.get_value("seq_tc_src") != dict(TC_SOURCES)[tco["source"]] or dpg.get_value("seq_tc_start") != tco["start"]:
+        tc_set(app)
     steps = S["steps"]
     sel = min(getattr(app, "_seq_sel", 0), len(steps) - 1)
     app._seq_sel = max(0, sel)
@@ -1334,18 +1372,22 @@ def set_tempo(app, bpm=None, bar=None):
 
 def beats_from_wav(app):
     """The bpm and the beat marks from the audio file the sim plays as live audio."""
-    from native import audio
+    from native import audio, showanalysis
     live = getattr(app, "live", None)
-    if not isinstance(live, audio.FileAudio):
-        app.gp.status("play an audio file first: AUDIO > play an audio file..."); return
-    got = audio.beats_of(live.samples, live.rate)
+    x, rate = showanalysis.mix(_steps(app), app.project.path)
+    name = "the show's audio"
+    if not len(x):
+        if not isinstance(live, audio.FileAudio):
+            app.gp.status("no audio: put a file on a track (+ Audio...), or play one (AUDIO > play an audio file...)"); return
+        x, rate, name = live.samples, live.rate, live.name
+    got = audio.beats_of(x, rate)
     if not got:
         app.gp.status("no beat found in the file"); return
     bpm, first, beats = got
     app._seq_beats = beats
     set_tempo(app, bpm=bpm)
-    dpg.set_value("seq_tap", f"{_c()._fit_text(live.name, px(150))}: {bpm:.1f} bpm, {len(beats)} beats")
-    app.gp.status(f"{bpm:.1f} bpm from {live.name}")
+    dpg.set_value("seq_tap", f"{_c()._fit_text(name, px(150))}: {bpm:.1f} bpm, {len(beats)} beats")
+    app.gp.status(f"{bpm:.1f} bpm from {name}")
 
 
 def tap(app):
@@ -1546,12 +1588,15 @@ def _apply_ramps(app, i, t):
 def poll(app):
     _flush_save(app)
     _poll_audio(app)
+    from native import autoshow
+    autoshow.poll(app)                                          # a show asked for while its sections were being found
+    poll_timecode(app)
     _edit_poll(app)
     _poll_send(app)
     _take_look(app)
     if dpg.is_item_shown(TAG):
         _hold_scroll(app)
-        if not overview_mouse(app) and not grip_mouse(app) and not audio_mouse(app):
+        if not overview_mouse(app) and not grip_mouse(app) and not sections_mouse(app) and not audio_mouse(app):
             timeline_mouse(app)
         _follow_head(app)
         fw = (dpg.get_item_rect_size(TAG)[0], _c().scrollbar_w(TAG))
@@ -1833,7 +1878,7 @@ def _hold_scroll(app):
     The whole show shown, the plain wheel scrolls the frame as it does anywhere in it."""
     ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
     zoomed = getattr(app, "_tl_view", None) is not None
-    over = (zoomed or ctrl) and any(_over(t) for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip", "seq_tl_audio"))
+    over = (zoomed or ctrl) and any(_over(t) for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip", "seq_tl_audio", "seq_tl_sec"))
     if over != getattr(app, "_tl_held", False):
         app._tl_held = over
         dpg.configure_item(TAG, no_scroll_with_mouse=over)
@@ -1844,7 +1889,7 @@ def wheel(app, delta):
     the timeline's."""
     if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG) or not _has_steps(app):
         return False
-    if not (_over("seq_tl") or _over("seq_tl_ov") or _over("seq_tl_audio")):
+    if not (_over("seq_tl") or _over("seq_tl_ov") or _over("seq_tl_audio") or _over("seq_tl_sec")):
         return False
     t0, span, total = _span_now(app)
     if total <= 0:
@@ -1896,7 +1941,7 @@ def draw_timeline(app):
         fw = dpg.get_item_rect_size(TAG)[0] or dpg.get_item_configuration(TAG)["width"]
         want = max(200, int(fw) - 24 - c.scrollbar_w(TAG))      # clear of the scrollbar too: past it, the frame scrolled sideways
         if abs(want - w) > 4:
-            for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip", "seq_tl_audio"):
+            for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip", "seq_tl_audio", "seq_tl_sec"):
                 if dpg.does_item_exist(t):
                     dpg.configure_item(t, width=want)
             w = want
@@ -2035,6 +2080,7 @@ def draw_timeline(app):
         lab = _fmt_t(hover[1])
         typeface.draw_text((min(x + 3, w - px(30)), rb + 2), lab, px(10), face="mono", color=(255, 255, 255, 200), parent=dl)
     draw_audio(app, t0, sx, total)
+    draw_sections(app, t0, sx, w)
     # the grip under it: a short bar in the middle, to drag
     if dpg.does_item_exist("seq_tl_grip"):
         dpg.delete_item("seq_tl_grip", children_only=True)
@@ -2390,7 +2436,10 @@ def timeline_mouse(app):
                 end = t_at
                 beat = _beat(app)
                 alt = dpg.is_key_down(dpg.mvKey_LAlt) or dpg.is_key_down(dpg.mvKey_RAlt)
-                if beat and _steps(app).get("snap", True) and not alt:
+                near = min(_sec_edges(app), key=lambda e_: abs(e_ - end), default=None)
+                if near is not None and abs(near - end) * sx <= px(8) and not alt:
+                    end = near                                       # onto a section's edge
+                elif beat and _steps(app).get("snap", True) and not alt:
                     end = round(end / beat) * beat                   # on the beat
                 if 0 <= i < len(steps):
                     was = float(steps[i].get("dur", 10))
@@ -2867,7 +2916,7 @@ def _snap(app, t, exclude=None):
     g = _tl_geometry(app)
     sx = _view(app, g[4], g[2])[1] if g else 10.0
     from native import showaudio
-    marks = list(_starts(app)[0]) + [_starts(app)[1]]
+    marks = list(_starts(app)[0]) + [_starts(app)[1]] + _sec_edges(app)
     for ti, tr in enumerate(_tracks(app)):
         for ci, c in enumerate(tr.get("clips") or []):
             if (ti, ci) != exclude:
@@ -3065,8 +3114,8 @@ def _poll_audio(app):
         pl.set(app._audio_resolved)
         app._tl_dirty = True                                     # a file decoded since: its wave drawn
     p = getattr(app, "_seq_play", None)
-    from native import render_video
-    if render_video.rendering(app):
+    from native import render_video, render_fseq
+    if render_video.rendering(app) or render_fseq.exporting(app):
         pl.sync(None, False)                                     # a video rendering: its sound goes into the file
         return
     pl.sync(position(app), p is not None and p.get("paused") is None)
@@ -3082,6 +3131,382 @@ def show_source(app):
         from native import showaudio
         src = app._show_src = showaudio.ShowAudio(lambda: getattr(app, "_audio_resolved", []), lambda: position(app))
     return src
+# AI: end
+
+
+# AI: below section was generated by an AI
+# --- the show's sections: named stretches over the steps (showanalysis.py) ------------------------------------------
+# S["sections"] = [{"name", "kind", "at", "len"}], in time order, not overlapping. Found in the show's audio (Find
+# sections) or added by hand; a strip of their colours between the overview and the timeline, through the same view.
+# Their edges are dragged (the two sides of an edge move together), a step's end and a clip snap to them; a right-click
+# names a section's kind, fits its steps to it, splits it at the playhead or deletes it.
+SEC_H = 16               # the strip's height
+
+
+def _sections(app):
+    return _steps(app).setdefault("sections", [])
+
+
+def find_sections(app):
+    """The show's sections from its audio - its tracks' mix, or the audio file the sim plays - on a worker; the
+    tempo and the beats from it too when none is set."""
+    from native import audio, showanalysis, tasks
+    S = _steps(app)
+    root = app.project.path
+    live = getattr(app, "live", None)
+    snap = json.loads(json.dumps(S))
+    bar = _barlen(app)
+
+    def work():
+        x, rate = showanalysis.mix(snap, root)
+        if not len(x) and isinstance(live, audio.FileAudio):
+            x, rate = live.samples, live.rate
+        if len(x) < rate * 4:
+            raise RuntimeError("no audio to listen to: put a file on a track (+ Audio...) first")
+        got = None if bar else audio.beats_of(x, rate)
+        b = bar or (60.0 / got[0] * int(S.get("bar", 4)) if got else None)
+        return showanalysis.sections(x, rate, bar=b), got
+
+    def done(r):
+        secs, got = r
+        if got:
+            set_tempo(app, bpm=got[0])
+            app._seq_beats = got[2]
+        S["sections"] = [{k: s[k] for k in ("name", "kind", "at", "len")} for s in secs]
+        _save(app)
+        app._tl_dirty = True
+        app.gp.status(f"{len(secs)} sections: " + ", ".join(s["name"] for s in secs))
+    return tasks.run(app, "seq_sections", "listening for the sections", work, done)
+
+
+def _sec_edges(app):
+    return sorted({round(float(s["at"]), 3) for s in _sections(app)} |
+                  {round(float(s["at"]) + float(s["len"]), 3) for s in _sections(app)})
+
+
+def draw_sections(app, t0, sx, w):
+    """The strip: each section a block of its kind's colour with its name, the selected one outlined."""
+    from native import showanalysis
+    if not dpg.does_item_exist("seq_tl_sec"):
+        return
+    c = _c()
+    dl = "seq_tl_sec"
+    dpg.delete_item(dl, children_only=True)
+    h = px(SEC_H)
+    dpg.draw_rectangle((0, 0), (w, h), color=(0, 0, 0, 0), fill=(0, 0, 0, 60), parent=dl)
+    secs = _sections(app)
+    if not secs:
+        typeface.draw_text((px(6), 1), "sections: Find sections (SHOW), or right-click here for one", px(10),
+                           color=c.DIM, parent=dl)
+        return
+    sel = getattr(app, "_sec_sel", None)
+    for k, s in enumerate(secs):
+        a, b = (float(s["at"]) - t0) * sx, (float(s["at"]) + float(s["len"]) - t0) * sx
+        if b < 0 or a > w:
+            continue
+        col = showanalysis.COLOURS.get(s.get("kind"), (120, 130, 150))
+        dpg.draw_rectangle((a + 1, 1), (b - 1, h - 1), color=(0, 0, 0, 0), fill=col + (170,), rounding=2, parent=dl)
+        room = min(b, w) - max(a, 0) - px(8)
+        if room > px(16):
+            typeface.draw_text((max(a, 0) + px(4), 1), _fit_measured(str(s.get("name", "")), room, px(10)), px(10),
+                               color=(15, 15, 18, 255), parent=dl)
+        if sel == k:
+            dpg.draw_rectangle((a + 1, 1), (b - 1, h - 1), color=(255, 255, 255, 230), thickness=1.5, rounding=2, parent=dl)
+
+
+def _sec_hit(app, mx, my):
+    """("edge", k) - the edge at section k's start - | ("sec", k) | ("empty", t) | None, under the pointer."""
+    if not dpg.does_item_exist("seq_tl_sec") or not _over("seq_tl_sec"):
+        return None
+    (x0, _), w = dpg.get_item_rect_min("seq_tl_sec"), dpg.get_item_configuration("seq_tl_sec")["width"]
+    g = _tl_geometry(app)
+    if g is None:
+        return None
+    t0, sx = _view(app, g[4], w)
+    t = t0 + (mx - x0) / sx
+    secs = _sections(app)
+    for k, s in enumerate(secs):
+        if k > 0 and abs((float(s["at"]) - t0) * sx - (mx - x0)) <= px(4):
+            return ("edge", k)
+    for k, s in enumerate(secs):
+        if float(s["at"]) <= t < float(s["at"]) + float(s["len"]):
+            return ("sec", k)
+    return ("empty", t)
+
+
+def sections_mouse(app):
+    """The strip's pointer: an edge dragged moves it (the section before ends, the one after starts there), a
+    section clicked is selected (a double-click plays from it), a right-click its menu. True while it has the
+    mouse."""
+    drag = getattr(app, "_sec_drag", None)
+    mx, my = dpg.get_mouse_pos(local=False)
+    secs = _sections(app)
+    if drag is not None:
+        k = drag
+        if dpg.is_mouse_button_down(dpg.mvMouseButton_Left) and 0 < k < len(secs):
+            (x0, _), w = dpg.get_item_rect_min("seq_tl_sec"), dpg.get_item_configuration("seq_tl_sec")["width"]
+            g = _tl_geometry(app)
+            t0, sx = _view(app, g[4], w)
+            t = t0 + (mx - x0) / sx
+            beat = _beat(app)
+            alt = dpg.is_key_down(dpg.mvKey_LAlt) or dpg.is_key_down(dpg.mvKey_RAlt)
+            if beat and not alt:
+                t = round(t / beat) * beat
+            prev, cur = secs[k - 1], secs[k]
+            end = float(cur["at"]) + float(cur["len"])
+            t = max(float(prev["at"]) + 0.5, min(end - 0.5, t))
+            prev["len"] = round(t - float(prev["at"]), 3)
+            cur["at"], cur["len"] = round(t, 3), round(end - t, 3)
+            app._tl_dirty = True
+        else:
+            app._sec_drag = None
+            _save(app)
+        return True
+    hit = _sec_hit(app, mx, my)
+    if hit is None:
+        return False
+    if dpg.is_mouse_button_clicked(dpg.mvMouseButton_Right):
+        _sec_menu(app, hit)
+        return True
+    if not dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
+        return False
+    if hit[0] == "edge":
+        app._sec_drag = hit[1]
+    elif hit[0] == "sec":
+        app._sec_sel = hit[1]
+        app._tl_dirty = True
+        if dpg.is_mouse_button_double_clicked(dpg.mvMouseButton_Left):
+            seek(app, float(secs[hit[1]]["at"]))
+    return True
+
+
+def add_section(app, t, kind="verse"):
+    """A section at time t: the one there split at t, or - none there - one from t to the next section's start
+    (or a phrase of eight bars, or 8 s)."""
+    from native import showanalysis
+    secs = _sections(app)
+    for k, s in enumerate(secs):
+        a, b = float(s["at"]), float(s["at"]) + float(s["len"])
+        if a < t < b:
+            return split_section(app, k, t)
+    nxt = min((float(s["at"]) for s in secs if float(s["at"]) > t), default=None)
+    ln = (nxt - t) if nxt is not None else ((_barlen(app) or 1.0) * 8 if _barlen(app) else 8.0)
+    secs.append({"name": showanalysis.WORDS.get(kind, "Section"), "kind": kind, "at": round(t, 3), "len": round(ln, 3)})
+    secs.sort(key=lambda s: float(s["at"]))
+    _save(app); app._tl_dirty = True
+    return True
+
+
+def split_section(app, k, t):
+    secs = _sections(app)
+    s = secs[k]
+    a, b = float(s["at"]), float(s["at"]) + float(s["len"])
+    if not a + 0.25 < t < b - 0.25:
+        return False
+    secs.insert(k + 1, dict(s, at=round(t, 3), len=round(b - t, 3)))
+    s["len"] = round(t - a, 3)
+    _save(app); app._tl_dirty = True
+    return True
+
+
+def set_section_kind(app, k, kind):
+    from native import showanalysis
+    s = _sections(app)[k]
+    s["kind"], s["name"] = kind, showanalysis.WORDS.get(kind, kind)
+    _save(app); app._tl_dirty = True
+
+
+def delete_section(app, k):
+    _sections(app).pop(k)
+    app._sec_sel = None
+    _save(app); app._tl_dirty = True
+
+
+def fit_steps(app, k):
+    """The steps that start in section k made to fill it exactly: the step before ends at its start, these
+    stretched or shrunk together, in proportion, to end at its end."""
+    secs = _sections(app)
+    if not (0 <= k < len(secs)):
+        return False
+    a, b = float(secs[k]["at"]), float(secs[k]["at"]) + float(secs[k]["len"])
+    steps = _steps(app)["steps"]
+    starts = _starts(app)[0]
+    inside = [i for i, t in enumerate(starts) if a - 1e-6 <= t < b - 1e-6]
+    if not inside:
+        return False
+    i0 = inside[0]
+    if i0 > 0 and a - starts[i0 - 1] > 0.25:
+        steps[i0 - 1]["dur"] = round(a - starts[i0 - 1], 3)
+    have = sum(float(steps[i].get("dur", 10)) for i in inside)
+    f = (b - a) / max(1e-6, have)
+    for i in inside:
+        steps[i]["dur"] = round(max(0.25, float(steps[i].get("dur", 10)) * f), 3)
+    _save(app); app._tl_dirty = True
+    app.gp.status(f"{len(inside)} step(s) fitted to {secs[k].get('name', 'the section')}")
+    return True
+
+
+def _sec_menu(app, hit):
+    from native import showanalysis
+    pos = position(app)
+    if hit[0] == "empty":
+        t = hit[1]
+        _menu(app, "sections", [("Add a section here", lambda: add_section(app, t)),
+                                ("Find sections in the audio", lambda: find_sections(app))])
+        return
+    k = hit[1]
+    app._sec_sel = k
+    s = _sections(app)[k]
+    items = [(f"{showanalysis.WORDS[kd]}{'  (it is)' if s.get('kind') == kd else ''}", (lambda kd=kd: set_section_kind(app, k, kd)))
+             for kd in showanalysis.KINDS]
+    items += [("Fit its steps to it", lambda: fit_steps(app, k)), ("Play from it", lambda: seek(app, float(s["at"])))]
+    if pos is not None:
+        items.append(("Split it at the playhead", lambda: split_section(app, k, pos)))
+    items.append(("Delete", lambda: delete_section(app, k)))
+    _menu(app, s.get("name", "section"), items)
+# AI: end
+
+
+# --- timecode in -----------------------------------------------------------------------------------
+# AI: below section was generated by an AI
+TC_SOURCES = (("off", "off"), ("mtc", "MIDI (MTC)"), ("ltc", "audio (LTC)"))
+
+
+def _tc_opts(app):
+    o = _steps(app).setdefault("timecode", {})
+    o.setdefault("source", "off")
+    o.setdefault("start", "00:00:00:00")
+    o.setdefault("device", "")
+    return o
+
+
+def tc_set(app, source=None, start=None, device=None):
+    """The timecode's settings changed from the row: the source (its words or key), where the show starts, the
+    LTC's input."""
+    from native import timecode
+    o = _tc_opts(app)
+    if source is not None:
+        o["source"] = next((k for k, w in TC_SOURCES if source in (k, w)), "off")
+    if start is not None:
+        if timecode.parse_words(start) is None:
+            app.gp.status("a timecode is hh:mm:ss:ff"); dpg.set_value("seq_tc_start", o["start"]); return
+        o["start"] = start.strip()
+    if device is not None:
+        o["device"] = device
+    _tc_close(app)
+    app._tc_was = None
+    if dpg.does_item_exist("seq_tc_src"):                  # set from elsewhere (a script, a test): the row shows it
+        dpg.set_value("seq_tc_src", dict(TC_SOURCES)[o["source"]])
+        dpg.set_value("seq_tc_start", o["start"])
+    if dpg.does_item_exist("seq_tc_dev"):
+        dpg.configure_item("seq_tc_dev", show=o["source"] == "ltc")
+        if o["source"] == "ltc":
+            from native import audio
+            names = [n for _, n in audio.list_inputs()]
+            dpg.configure_item("seq_tc_dev", items=names)
+            if names and o["device"] not in names:
+                o["device"] = names[0]
+            dpg.set_value("seq_tc_dev", o["device"])
+    app.project.save()
+
+
+def _tc_close(app):
+    ltc = getattr(app, "_ltc_in", None)
+    if ltc is not None:
+        ltc.close()
+    app._ltc_in = None
+    app._ltc_error = ""
+
+
+def _tc_source(app):
+    """What the timecode is read from, or None (off, or nothing to read it from yet - the words say why)."""
+    o = _tc_opts(app)
+    if o["source"] == "mtc":
+        m = getattr(app, "midi", None)
+        return m.mtc if m is not None and m.port else None
+    if o["source"] == "ltc":
+        if getattr(app, "_ltc_in", None) is None and not getattr(app, "_ltc_error", ""):
+            from native import audio, timecode
+            names = audio.list_inputs()
+            dev = next((i for i, n in names if n == o["device"]), None)
+            if dpg.does_item_exist("seq_tc_dev") and not dpg.get_item_configuration("seq_tc_dev")["items"]:
+                dpg.configure_item("seq_tc_dev", items=[n for _, n in names])
+                dpg.set_value("seq_tc_dev", o["device"] if dev is not None else (names[0][1] if names else ""))
+            try:
+                app._ltc_in = timecode.LtcIn(dev)
+            except Exception as e:
+                app._ltc_error = str(e) or "no input"
+        return getattr(app, "_ltc_in", None)
+    return None
+
+
+def _tc_words(app, t, running, fps):
+    o = _tc_opts(app)
+    if o["source"] == "off":
+        w = ""
+    elif o["source"] == "mtc" and not (getattr(app, "midi", None) and app.midi.port):
+        w = "no MIDI input open (the MIDI frame)"
+    elif o["source"] == "ltc" and getattr(app, "_ltc_error", ""):
+        w = "LTC: " + app._ltc_error
+    elif t is None:
+        w = "waiting for timecode"
+    else:
+        from native import timecode
+        w = f"{timecode.words(t, fps)} {fps:g}  {'running' if running else 'stopped'}"
+    if dpg.does_item_exist("seq_tc_words") and dpg.get_value("seq_tc_words") != w:
+        dpg.set_value("seq_tc_words", w)
+
+
+def poll_timecode(app):
+    """The show chasing its timecode: started with it, put back on it when it has drifted, held where it stops or
+    is located, stopped before the show's start - a stop or a hold only as the timecode changes, so the show can be
+    played by hand while the timecode is still. Not while a video renders (the clock is the render's)."""
+    from native import timecode
+    if _tc_opts(app)["source"] == "off" or clock.held():
+        return
+    src = _tc_source(app)
+    t, running, fps = src.position() if src is not None else (None, False, 30.0)
+    now = clock.now()
+    if now - getattr(app, "_tc_words_at", 0.0) > 0.1:
+        app._tc_words_at = now
+        _tc_words(app, t, running, fps)
+    if t is None or not _steps(app)["steps"]:
+        return
+    offset = timecode.parse_words(_tc_opts(app)["start"], fps) or 0.0
+    p = getattr(app, "_seq_play", None)
+    pos = position(app)
+    act = timecode.chase((pos, p is not None and p.get("paused") is None), t, running, offset)
+    was = getattr(app, "_tc_was", None)
+    app._tc_was = (running, t)
+    if act is None:
+        return
+    kind, at = act
+    if kind in ("pause", "stop") and was is not None and not was[0] and abs(was[1] - t) < 1.0 / fps:
+        return                                            # still, as it was: the show left to the hand
+    _, total = _starts(app)
+    if at is not None and at >= total:
+        if pos is not None:
+            stop(app)
+        return
+    if kind == "stop":
+        stop(app)
+    elif kind == "play" and p is None:
+        starts, _ = _starts(app)
+        i = max(k for k, s in enumerate(starts) if s <= at)
+        play(app, i, at - starts[i])
+    elif kind == "play":                                  # paused: on from the timecode's time
+        seek(app, at); play_pause(app)
+    elif kind == "seek":
+        seek(app, at)
+    elif kind == "pause":
+        if p is None:
+            starts, _ = _starts(app)
+            i = max(k for k, s in enumerate(starts) if s <= at)
+            play(app, i, at - starts[i])
+            p = getattr(app, "_seq_play", None)
+        if p is not None and p.get("paused") is None:
+            play_pause(app)
+        seek(app, at)
 # AI: end
 
 
@@ -3127,13 +3552,32 @@ def _resolve(app, host=None, S=None):
     return presets, playlist, None
 
 
+def send_hosts(app):
+    """The devices a show goes to: every one the stream goes to when the show says so (and the stream has
+    several), else the active one."""
+    if _steps(app).get("to_all"):
+        hosts = []
+        for h, _, _, _ in app.stream_plan():
+            if h and h not in hosts:
+                hosts.append(h)
+        if hosts:
+            return hosts
+    host = app.active_host()
+    return [host] if host else []
+
+
 def send(app, run=False):
     """The steps as presets and a playlist onto the device - on a thread,
-    since each preset is waited for (about a second apiece)."""
+    since each preset is waited for (about a second apiece). Several
+    devices: each on a thread of its own, and run, started together once
+    every one has them."""
     import threading
     from native import device_ui
     S = _steps(app)
-    host = app.active_host()
+    hosts = send_hosts(app)
+    if len(hosts) > 1:
+        return _send_all(app, hosts, run)
+    host = hosts[0] if hosts else None
     if not host:
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
     if not S["steps"]:
@@ -3168,6 +3612,61 @@ def send(app, run=False):
         app._seq_sent_now = sent
         app._seq_send_result = msg
     app._seq_send = threading.Thread(target=work, daemon=True); app._seq_send.start()
+
+
+# AI: below section was generated by an AI
+def _send_all(app, hosts, run):
+    """The show to several devices at once (one thread each), then - run, and every one has it - each started
+    by a request made at the same moment (the threads held at a gate, then let go together): a stage of
+    controllers playing one show."""
+    import threading
+    if not _steps(app)["steps"]:
+        app.gp.status("no steps to send"); return
+    if getattr(app, "_seq_send", None) is not None and app._seq_send.is_alive():
+        app.gp.status("a send is still going"); return
+    S = _steps(app)
+    snap = json.loads(json.dumps(S))
+    pid = int(S.get("pid", 9))
+    fp = sequence.fingerprint(S)
+    dpg.set_value("seq_log", f"sending the presets and the playlist to {len(hosts)} devices...")
+    for t in ("seq_send", "seq_send_run"):
+        if dpg.does_item_exist(t):
+            dpg.configure_item(t, enabled=False)
+
+    def work():
+        results = {}
+
+        def one(h):
+            try:
+                presets, playlist, err = _resolve(app, h, snap)
+                results[h] = (False, err) if err else sequence.send(h, presets, playlist, pid)
+            except Exception as e:
+                results[h] = (False, f"send failed: {e}")
+        ts = [threading.Thread(target=one, args=(h,), daemon=True) for h in hosts]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+        good = [h for h in hosts if results.get(h, (False,))[0]]
+        lines = [f"{h}: {results[h][1]}" for h in hosts if not results[h][0]]
+        msg = f"sent to {len(good)} of {len(hosts)} devices" + ("; " + "; ".join(lines) if lines else "")
+        if run and good:
+            gate, started = threading.Event(), {}
+
+            def go(h):
+                gate.wait(5.0)
+                started[h] = sequence.start(h, pid)[0]
+            ts = [threading.Thread(target=go, args=(h,), daemon=True) for h in good]
+            for t in ts:
+                t.start()
+            gate.set()                                    # every request made at once
+            for t in ts:
+                t.join()
+            msg += f"; started together on {sum(started.values())}"
+        app._seq_sent_now = (", ".join(good), fp) if good else None
+        app._seq_send_result = msg
+    app._seq_send = threading.Thread(target=work, daemon=True); app._seq_send.start()
+# AI: end
 
 
 def _poll_send(app):

@@ -193,6 +193,9 @@ def apply(app, cmd):
             app.on_palette(None, cmd["v"])
             if dpg.does_item_exist("pal_combo"):
                 dpg.set_value("pal_combo", cmd["v"])
+    elif a == "fader":                                   # the mixer's, 0 (deck A) to 1 (deck B)
+        from native import mixer
+        mixer.set_fader(app, cmd["v"])
     elif a == "bri":
         app.master_bri = int(max(0, min(255, round(cmd["v"]))))
     elif a == "blackout":
@@ -237,6 +240,8 @@ def state(app):
             "effects": list(eng.names), "effect": eng.names[eng.idx] if eng.names else "",
             "sliders": sliders, "palettes": [n for n, _ in pals], "palette": pal,
             "bri": int(getattr(app, "master_bri", 255)), "blackout": bool(getattr(app, "blackout", False)),
+            "mixer": {"on": __import__("native.mixer", fromlist=["m"]).on(app),
+                      "fader": float(__import__("native.mixer", fromlist=["m"]).options(app)["fader"])},
             "steps": [str(s.get("name") or f"step {i + 1}") for i, s in enumerate(S["steps"])],
             "step": play["i"] if play else getattr(app, "_seq_sel", -1),
             "playing": bool(play) and play.get("paused") is None}

@@ -321,6 +321,10 @@ def build_menus(app):
             dpg.add_separator()
             _mi(app, "Compare with another effect...", "compare", callback=lambda: app.run_action("compare"))
             _mi(app, "Sweep a slider...", "sweep", callback=lambda: app.run_action("sweep"))
+            dpg.add_menu_item(label="Modulators...", tag="menu_modulators",
+                              callback=lambda: __import__("native.modulate", fromlist=["m"]).show(app))
+            dpg.add_menu_item(label="Mixer...", tag="menu_mixer",
+                              callback=lambda: __import__("native.mixer", fromlist=["m"]).show(app))
         with dpg.menu(label="Build"):
             # the effect built and run - in the sim, as a script, onto a device's firmware
             _mi(app, "Compile + reload", "build", callback=lambda: app.build_current())

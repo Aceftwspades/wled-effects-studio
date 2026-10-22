@@ -248,6 +248,8 @@ class MidiIn:
         self._lock = threading.Lock()
         self.last = None            # (ctl, value, time): the newest seen, for the window
         self.clock = Clock()        # the port's MIDI clock, if it sends one
+        from native.timecode import Mtc
+        self.mtc = Mtc()            # its MIDI Time Code, if it sends that (the Sequence chases it)
 
     def open(self, name):
         self.close()
@@ -258,16 +260,22 @@ class MidiIn:
         if name not in names:
             raise RuntimeError(f"no MIDI input named {name!r}")
         mi.open_port(names.index(name))
-        mi.ignore_types(sysex=True, timing=False, active_sense=True)     # the clock's ticks let through
+        mi.ignore_types(sysex=False, timing=False, active_sense=True)    # the clock's ticks and timecode let through
         mi.set_callback(self._on)
         self._in, self.port = mi, name
         self.clock = Clock()
+        from native.timecode import Mtc
+        self.mtc = Mtc()
 
     def _on(self, event, data=None, now=None):
         msg, _dt = event
         if msg and msg[0] in (0xF8, 0xFA, 0xFB, 0xFC):                    # the clock: kept apart from the controls
             with self._lock:
                 self.clock.feed(msg[0], time.perf_counter() if now is None else now)
+            return
+        if msg and msg[0] in (0xF0, 0xF1):                                # timecode (quarter frames, a full frame)
+            with self._lock:
+                self.mtc.feed(list(msg), time.perf_counter() if now is None else now)
             return
         p = parse(list(msg))
         if p:

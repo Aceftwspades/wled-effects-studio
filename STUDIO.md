@@ -4003,53 +4003,83 @@ Ableton Link (set aside in the first review).
 
 What they have that the studio lacks, in the order they would pay back:
 
-- [ ] **Song sections on the timeline** (xLights 2026.11's Song Structure
+- [x] **Song sections on the timeline** (xLights 2026.11's Song Structure
       Regions; SoundSwitch's phrases; MadMapper 6's markers): named,
       coloured regions over the steps - intro, verse, build, drop, breakdown,
       outro - found in the show's audio (its energy and where its sound
       changes) and edited by hand; steps and clips snap to their edges, a
       region's steps selected, moved or re-timed together. Small to medium;
       the ground for the next.
-- [ ] **A show made from a track** (SoundSwitch's autoscript, which scripts
+      *Done:* native/showanalysis.py (Foote novelty on band energies, edges
+      on the bars, kinds by loudness); the strip over the steps, Find
+      sections, drag an edge, a kind, Fit its steps to it, split, delete.
+      A section moved does not carry its steps with it (Fit does it after).
+- [x] **A show made from a track** (SoundSwitch's autoscript, which scripts
       "a unique lighting show for every track" from its phrases): from the
       sections, the beats and the energy, steps laid on the bars - calmer
       effects for verses, the brightest for drops, a rising intensity ramp
       over a build, a cut on the drop - from the setlist or chosen looks,
       then edited like any other show. Medium to large; nothing in the
       WLED world does it.
-- [ ] **Several devices as one stage** (xLights, Chromatik, Madrix and
+      *Done:* native/autoshow.py - effects scored for energy on a spare
+      engine, steps of 2/4/8 bars, ramps on builds, a cut into a drop, the
+      outro faded; tilt-driven (IMU) effects left out of the pool.
+- [x] **Several devices as one stage** (xLights, Chromatik, Madrix and
       Resolume all drive many controllers): a shape's parts given to
       different WLEDs, the stream split to each, a show's presets sent to
       each and started together. Medium to large; the studio streams to
       one device today.
-- [ ] **FSEQ export for Falcon Player** (the xLights and FPP world of
+      *Done, narrower than listed:* the stream to several devices, each a
+      range of the wiring, was already there (the review missed it); added
+      a show's presets sent to every device of the stream at once and
+      started together (sequence_ui._send_all). Each device then runs its
+      own clock; a continuous picture across them is the stream's or FSEQ's.
+- [x] **FSEQ export for Falcon Player** (the xLights and FPP world of
       holiday and event shows): the show rendered frame by frame on the
       held clock (render_video's way) to an FSEQ v2 file with its audio,
       for FPP to play on any controllers - WLED among them, over DDP or
       E1.31. Medium; it opens the studio's effects to that whole community.
-- [ ] **Timecode in** (Resolume, MadMapper 6, Chromatik): MIDI Time Code
+      *Done:* native/render_fseq.py - FSEQ v2.0 uncompressed, wiring order,
+      the audio beside it (MP3, or WAV without ffmpeg) named as its media.
+      Checked against the format as FPP reads it, not yet played on an FPP.
+- [x] **Timecode in** (Resolume, MadMapper 6, Chromatik): MIDI Time Code
       through the MIDI input already there (python-rtmidi), and LTC from an
       audio input, chased by the show's playhead - a DAW's or a DJ's
       timeline running the show. Small to medium.
-- [ ] **A GIF or a clip played by the device itself** (WLED 16's GIF
+      *Done:* native/timecode.py - MTC (quarter frames and full-frame
+      locates) on the MIDI frame's port, LTC decoded from an audio input,
+      24/25/29.97 DF/30; the Sequence's TIMECODE row. Tested with synthetic
+      MTC and LTC, not yet with a DAW's or a real LTC source.
+- [x] **A GIF or a clip played by the device itself** (WLED 16's GIF
       playback and PixelForge; the studio's Video node plays in the sim
       only): a GIF - or a video look rendered down to the matrix's size -
       sent to the device's files and played there by WLED's image effect
       (a WLED_ENABLE_GIF build), no stream needed. Small to medium.
-- [ ] **Modulators on any slider** (Chromatik's LFOs, envelopes and step
+      *Done:* native/devicegif.py - Send to device > Play a GIF on the
+      device...: the sim caught at the matrix size, or a GIF file fitted;
+      uploaded, the main segment set to Image named after it. Tested against
+      a stand-in WLED, not yet a real one.
+- [x] **Modulators on any slider** (Chromatik's LFOs, envelopes and step
       sequencers; Lightjams' sources): a live LFO, an envelope on the beat
       or a step pattern bound to any effect slider, in the sim and the
       stream - beside the graph's own, for the stock effects. Medium.
-- [ ] **A mixer of two effects** (Chromatik's and Resolume's decks and
+      *Done:* native/modulate.py - a wave, the beat, a step pattern, round
+      the slider's place (which follows whatever sets it); Playback >
+      Modulators.... Not saved into presets: the device does not run them.
+- [x] **A mixer of two effects** (Chromatik's and Resolume's decks and
       crossfader): two effects running at once, crossfaded with a blend
       mode, the fader on MIDI or the phone - for the sim and the stream
       (the device blends between presets itself). Medium; the Video
       Switchboard does it inside a graph already.
+      *Done:* native/mixer.py - deck B on a second engine, six blends, the
+      fader in the dialog, on MIDI and on the phone; Playback > Mixer....
 - [ ] **Stems** (DJ software separates drums, bass, vocals and the rest;
       no lighting tool found uses them): a show's audio track split once,
       offline, each stem a source the effects can hear - the kick for one
       effect, the vocal for another. Large, and an optional heavy
       dependency (Demucs); last.
+      *On hold* (2026-10-22): the user is to describe how it should work,
+      if at all.
 
 ### Deferred from earlier lists
 

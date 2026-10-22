@@ -29,7 +29,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import num
-from native import render_video
+from native import render_video, render_fseq, modulate, mixer
 from native import typeface
 from native import form
 from native import dock
@@ -580,6 +580,7 @@ class App(Features, Recorder, EditBuild):
             hit = 0
         if hit:
             self.beat_flash = 6
+            self.last_hit_at = __import__("native.clock", fromlist=["c"]).now()   # the modulators' beat (modulate.py)
         if self.audio_sync is not None:                  # the same sound out to the WLEDs listening (audio_sync.py)
             self.audio_sync.send(self.eng)
         return hit
@@ -3542,12 +3543,14 @@ class App(Features, Recorder, EditBuild):
             return
         self.scrub = None
         self._poll_sweep()
+        modulate.apply(self)                 # the sliders' modulators: each moved round where it is set
         self.acc += dt * 1000.0 * self.speed
         n = 0
         while self.acc >= STEP and n < 8:
             self.audio_push()
             t0 = time.perf_counter()
             self.eng.frame(STEP)
+            mixer.step(self, STEP)                   # the mixer's deck B a frame on beside it (native/mixer.py)
             ms = (time.perf_counter() - t0) * 1000.0
             self.frame_ms = ms if self.frame_ms == 0.0 else self.frame_ms * 0.95 + ms * 0.05
             if self.ab:
@@ -4124,6 +4127,7 @@ def main():
                     app.code_ed.poll()
                 app.poll_glow()
                 render_video.advance(app)            # rendering a video: the show a frame's time on (native/clock.py)
+                render_fseq.advance(app)             # exporting for FPP: the same
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 tasks.poll(app)                      # what a device answered, from the workers (native/tasks.py)
                 dock.poll(app)                       # a frame's tab closed by its x
@@ -4148,6 +4152,7 @@ def main():
                 _t.append(time.perf_counter())
                 app.draw()
                 render_video.capture(app)            # rendering a video: this frame of the show into it
+                render_fseq.capture(app)             # exporting for FPP: this frame's LEDs into the file
                 _t.append(time.perf_counter())
                 app._prof = [(b - a) * 1000.0 for a, b in zip(_t, _t[1:])]
             except Exception:
