@@ -37,6 +37,7 @@ from native.textures import registry
 from native.render import FACES6 as FACES, Cam, floor_segments, FLOOR, FLOOR_POOL, FLOOR_STEP, UNLIT, UNLIT_BELOW, DOT_POINT, FLOOR_Z, mirrored, reflection_weight
 
 N = 8            # sub-quads across a face
+SPILL_REACH = 2.0    # the look's spill drawn over this many times the view's square and margin (look.spill_rgba)
 FOV = 38.0
 
 
@@ -120,9 +121,12 @@ class Layers:
         ox, oy = (w - size) * 0.5, (h - size) * 0.5
         if self.under_item is not None and dpg.does_item_exist(self.under_item):
             if lk.get("spill", 0) > 0 and light is not None:
-                self._tex("spill", look.spill_rgba(light[0], light[1], lk))
-                pad = size * 0.25
-                dpg.configure_item(self.under_item, pmin=(ox - pad, oy - pad), pmax=(ox + size + pad, oy + size + pad), show=True)
+                # the pool twice as far as the view's square and a margin, faded to nothing well inside that: drawn
+                # as far as the square alone, it stopped at a hard edge (two black bars beside it on a wide screen)
+                self._tex("spill", look.spill_rgba(light[0], light[1], lk, reach=SPILL_REACH))
+                half = size * 0.75 * SPILL_REACH
+                cx, cy = ox + size * 0.5, oy + size * 0.5
+                dpg.configure_item(self.under_item, pmin=(cx - half, cy - half), pmax=(cx + half, cy + half), show=True)
             else:
                 dpg.configure_item(self.under_item, show=False)
         if len(self.over_items) != 2 or not all(dpg.does_item_exist(q) for q in self.over_items):
@@ -231,6 +235,7 @@ class CubeQuads:
             return
         self.bg_key = key
         h, w = picture.shape[:2]
+        whole = (w, h) == (self.w, self.h) and (w, h) != (self.size, self.size)   # cropped to the pane: all of it
         rgba = np.ones((h, w, 4), np.float32); rgba[:, :, :3] = picture.astype(np.float32) / 255.0
         tex = f"{self.tag}_bg"
         if dpg.does_item_exist(tex):
@@ -241,6 +246,9 @@ class CubeQuads:
                 dpg.delete_item(tex)
         if not dpg.does_item_exist(tex):
             dpg.add_dynamic_texture(w, h, rgba.ravel(), tag=tex, parent=registry())
+        if whole:
+            dpg.configure_item(self.bg_item, texture_tag=tex, pmin=(0, 0), pmax=(self.w, self.h), show=True)
+            return
         ox, oy = (self.w - self.size) * 0.5, (self.h - self.size) * 0.5
         dpg.configure_item(self.bg_item, texture_tag=tex, pmin=(ox, oy), pmax=(ox + self.size, oy + self.size), show=True)
 

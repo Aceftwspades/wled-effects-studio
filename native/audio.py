@@ -413,11 +413,13 @@ class FileAudio:
         self._primed = False
         self._agc = 1.0
         self.level = 0.0
-        self.t0 = time.perf_counter()
+        from native import clock
+        self.t0 = clock.now()
 
     @property
     def position(self):
-        return (time.perf_counter() - self.t0) % max(0.01, self.seconds)
+        from native import clock
+        return (clock.now() - self.t0) % max(0.01, self.seconds)
 
     def push(self, eng):
         n = len(self.samples)

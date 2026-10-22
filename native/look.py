@@ -261,12 +261,14 @@ def mean_light(rgb):
     return a[lit].astype(np.float32).mean(axis=0) / 255.0, float(lit.mean())
 
 
-def spill_rgba(mean, frac, lk, n=48):
+def spill_rgba(mean, frac, lk, n=48, reach=1.0):
     """The pool of light behind the shape: the LEDs' mean colour, strongest
     behind the middle and fading out, its alpha by how much is lit and the
-    spill's strength - stretched to the view, where its smallness is a blur."""
+    spill's strength - stretched to the view, where its smallness is a blur.
+    `reach`: how many times the view's half-width the texture spans (the same
+    pool, drawn over more: at 2 it has faded to nothing before its edge)."""
     s = float(lk.get("spill", 0.0))
-    u = (np.arange(n) + 0.5) / n * 2 - 1
+    u = ((np.arange(n) + 0.5) / n * 2 - 1) * reach
     r2 = u[:, None] ** 2 + (u[None, :] * 1.15 + 0.12) ** 2           # a little low: the floor catches more
     fall = np.exp(-r2 / 0.6)
     col = np.clip(mean / max(1e-3, mean.max()) if mean.max() > 0 else mean, 0, 1)
@@ -331,10 +333,35 @@ def _spread(a, w, h):
     return big[y0:y0 + h, x0:x0 + w]
 
 
-def finish(img, lk, seed=None, light=None):
+def _spill_box(lk, w, h, box):
+    """The spill's fall-off for a picture whose view is the square `box` (x0, y0, side) inside it - a video's
+    frame: round the view as the live view draws it (gpucube.SPILL_REACH: twice the square and its margin), faded
+    to nothing before the frame's edges, not stretched over the frame."""
+    from PIL import Image
+    x0, y0, side = box
+    half = int(side * 0.75 * 2.0)
+    tex = spill_rgba(np.ones(3, np.float32), 1.0, dict(lk, spill=1.0), n=64, reach=2.0)[..., 3]
+    big = np.asarray(Image.fromarray(np.clip(tex * 255, 0, 255).astype(np.uint8)).resize((2 * half, 2 * half), Image.BILINEAR),
+                     np.float32) / 255.0
+    out = np.zeros((h, w), np.float32)
+    cx, cy = x0 + side // 2, y0 + side // 2
+    ax, ay = cx - half, cy - half
+    sx0, sy0 = max(0, -ax), max(0, -ay)
+    dx0, dy0 = max(0, ax), max(0, ay)
+    dx1, dy1 = min(w, ax + 2 * half), min(h, ay + 2 * half)
+    if dx1 > dx0 and dy1 > dy0:
+        out[dy0:dy1, dx0:dx1] = big[sy0:sy0 + dy1 - dy0, sx0:sx0 + dx1 - dx0]
+    return out
+
+
+def finish(img, lk, seed=None, light=None, spill_box=None, room=None):
     """A picture of the view (uint8 h x w x 3) with the look: the spill
     under the shape (`light`: mean_light of its LEDs), bloom, the curve,
-    the vignette and the grain. The studio look returns it as it was."""
+    the vignette and the grain. The studio look returns it as it was.
+    `spill_box`: (x0, y0, side) of the view's square in a bigger picture (a
+    video's frame) - the spill round it, not stretched over the picture.
+    `room`: (h, w) bool, where the room shows (App.view_image_room) - the spill
+    there only, behind the shape as the live view draws it; else where dark."""
     if not active(lk):
         return img
     from PIL import Image, ImageFilter
@@ -347,10 +374,15 @@ def finish(img, lk, seed=None, light=None):
         f = img.astype(np.float32)
         if spill > 0:
             mean, frac = light
-            fall = _layer("fall", w, h, lambda: _spread(spill_rgba(np.ones(3, np.float32), 1.0, dict(lk, spill=1.0))[..., 3], w, h))
+            fall = (_layer(("fallbox",) + tuple(int(v) for v in spill_box), w, h, lambda: _spill_box(lk, w, h, spill_box))
+                    if spill_box is not None else
+                    _layer("fall", w, h, lambda: _spread(spill_rgba(np.ones(3, np.float32), 1.0, dict(lk, spill=1.0))[..., 3], w, h)))
             col = (np.clip(mean / max(1e-3, float(mean.max())), 0, 1) if mean.max() > 0 else mean).astype(np.float32)
             a = fall * (255.0 * min(1.0, spill * (0.35 + 0.9 * frac)))
-            a = a * (1.0 - img.max(axis=2) * (1.0 / 255.0))            # under the shape: only where it is dark
+            if room is not None:
+                a = a * room                                            # behind the shape: the room only
+            else:
+                a = a * (1.0 - img.max(axis=2) * (1.0 / 255.0))        # under the shape: only where it is dark
             f += a[..., None] * col
         if b > 0:
             small_img = Image.fromarray(img[::2, ::2])

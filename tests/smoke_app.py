@@ -964,6 +964,18 @@ STEPS = [
       {"py": "setattr(app, '_clip_sel', (0, 0))"}, {"check": "__import__('native.sequence_ui', fromlist=['x']).delete_clip(app)"},
       {"check": "app.project.options['sequence']['tracks'][0]['clips'] == []"},
       {"py": "app.project.options['sequence']['tracks'].clear()"}, {"py": "__import__('native.sequence_ui', fromlist=['x'])._audio_changed(app)"}], 0.4),
+    # the show rendered to a video, frame by frame on the held clock: the second step (1 s) at 720p and 24 frames a
+    # second, 24 frames in an mp4 in captures/ (taken away again), the clock the real one after
+    ([{"py": "__import__('native.render_video', fromlist=['r']).options(app).update(size='1280x720', fps=24, view='both', "
+             "length='step', camera='slow', audio=True)"},
+      {"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 1)"},
+      {"py": "__import__('native.render_video', fromlist=['r']).show(app)"},
+      {"check": "'24 frames' in dpg.get_value('rv_words')"},
+      {"py": "__import__('native.render_video', fromlist=['r']).start(app)"}], 20.0),
+    ([{"check": "not __import__('native.render_video', fromlist=['r']).rendering(app) and not __import__('native.clock', fromlist=['c']).held()"},
+      {"check": "'24 frames' in app.rec_msg and app.rec_msg.split(':')[0].endswith('.mp4')"},
+      {"py": "__import__('os').remove(__import__('os').path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, app.rec_msg.split(':')[0]))"},
+      {"py": "chrome.close_dialog('render_video_win')"}], 0.4),
     # a number field dragged: its pace from its width as drawn, so a wide one keeps up with the pointer
     ([{"py": "num._on_activated(None, dpg.get_alias_id('inp_sx'))"},
       {"check": "dpg.get_item_rect_size('inp_sx')[0] <= 0 or "

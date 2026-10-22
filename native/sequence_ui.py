@@ -19,7 +19,7 @@ from native import form
 from native import weight
 import numpy as np
 
-from native import sequence, transition
+from native import clock, sequence, transition
 
 TAG = "sequence_win"
 ROW_H = 30               # a step's row in the list, at the interface size
@@ -170,7 +170,7 @@ def _follow_playing(app, i, delta):
     if p.get("paused") is not None:
         p["paused"] = max(0.05, p["paused"] + delta)
     else:
-        p["next"] = max(time.perf_counter() + 0.05, p["next"] + delta)
+        p["next"] = max(clock.now() + 0.05, p["next"] + delta)
 
 
 def _total_changed(app, v):
@@ -426,9 +426,10 @@ def build(app):
             dpg.add_button(label="Render GIF", small=True, callback=lambda: render(app, "gif"))
             weight.need(dpg.last_item(), _has_steps)
             c.tip("plays the sequence once from the top and records it as a GIF, into captures/")
-            dpg.add_button(label="Render video", small=True, callback=lambda: render(app, "mp4"))
+            dpg.add_button(label="Render video...", small=True, callback=lambda: __import__("native.render_video", fromlist=["r"]).show(app))
             weight.need(dpg.last_item(), _has_steps)
-            c.tip("plays the sequence once from the top and records it as an mp4, into captures/ - needs ffmpeg on the path")
+            c.tip("the show made into an mp4, frame by frame at the size, rate and quality chosen, with its audio - "
+                  "into captures/; needs ffmpeg on the path")
         dpg.add_separator()
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
@@ -1402,7 +1403,7 @@ def position(app):
     steps = _steps(app)["steps"]
     if p["i"] >= len(steps):
         return None
-    left = p["paused"] if p.get("paused") is not None else max(0.0, p["next"] - time.perf_counter())
+    left = p["paused"] if p.get("paused") is not None else max(0.0, p["next"] - clock.now())
     return starts[p["i"]] + float(steps[p["i"]].get("dur", 10)) - left
 
 
@@ -1416,12 +1417,12 @@ def play(app, i=0, offset=0.0):
     i = max(0, min(len(S["steps"]) - 1, int(i)))
     dur = float(S["steps"][i].get("dur", 10))
     app._transition = None
-    app._seq_play = {"i": i, "next": time.perf_counter() + max(0.05, dur - offset), "paused": None,
+    app._seq_play = {"i": i, "next": clock.now() + max(0.05, dur - offset), "paused": None,
                      "st": S["steps"][i], "n": len(S["steps"])}
     app.playing = True
     live = getattr(app, "live", None)
     if live is not None and hasattr(live, "t0"):
-        live.t0 = time.perf_counter() - (_starts(app)[0][i] + offset)   # the WAV from the same moment, with the sequence
+        live.t0 = clock.now() - (_starts(app)[0][i] + offset)   # the WAV from the same moment, with the sequence
     load_step(app, i, quiet=True)
     _sync_transport(app)
     refresh(app)
@@ -1434,15 +1435,15 @@ def play_pause(app):
         play(app, getattr(app, "_seq_sel", 0))
     elif p.get("paused") is None:
         _rec_flush(app)                                   # a take ends with the pause
-        p["paused"] = max(0.0, p["next"] - time.perf_counter())
+        p["paused"] = max(0.0, p["next"] - clock.now())
         app.playing = False
         app.gp.status("sequence paused")
     else:
-        p["next"] = time.perf_counter() + p["paused"]; p["paused"] = None
+        p["next"] = clock.now() + p["paused"]; p["paused"] = None
         app.playing = True
         live = getattr(app, "live", None)
         if live is not None and hasattr(live, "t0"):
-            live.t0 = time.perf_counter() - (position(app) or 0.0)
+            live.t0 = clock.now() - (position(app) or 0.0)
     _sync_transport(app)
 
 
@@ -1463,12 +1464,12 @@ def seek(app, t):
     if p is None or p["i"] != i:
         load_step(app, i, quiet=True)
         app._transition = None
-    app._seq_play = {"i": i, "next": time.perf_counter() + left, "paused": left if held else None,
+    app._seq_play = {"i": i, "next": clock.now() + left, "paused": left if held else None,
                      "st": S["steps"][i], "n": len(S["steps"])}
     app.playing = not held
     live = getattr(app, "live", None)
     if live is not None and hasattr(live, "t0"):
-        live.t0 = time.perf_counter() - t
+        live.t0 = clock.now() - t
     _apply_ramps(app, i, off / max(0.05, float(S["steps"][i].get("dur", 10))))
     _sync_transport(app)
     app._tl_dirty = True; app._seq_rows_dirty = True
@@ -1577,7 +1578,7 @@ def poll(app):
         stop(app); return
     if p.get("paused") is not None:
         return
-    now = time.perf_counter()
+    now = clock.now()
     if now >= p["next"]:
         i = p["i"] + 1
         if i >= len(steps):
@@ -2532,7 +2533,7 @@ def _rec_poll(app, i, t):
     if not (0 <= i < len(steps)):
         return
     st = steps[i]
-    now = time.perf_counter()
+    now = clock.now()
     seg = app.eng.seg
     was = _REC.applied
     if was is not None and was[:3] == (i, app.eng.idx, seg):   # the same step, effect and layer as last frame
@@ -3064,6 +3065,10 @@ def _poll_audio(app):
         pl.set(app._audio_resolved)
         app._tl_dirty = True                                     # a file decoded since: its wave drawn
     p = getattr(app, "_seq_play", None)
+    from native import render_video
+    if render_video.rendering(app):
+        pl.sync(None, False)                                     # a video rendering: its sound goes into the file
+        return
     pl.sync(position(app), p is not None and p.get("paused") is None)
 
 

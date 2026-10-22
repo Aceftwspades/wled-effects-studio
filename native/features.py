@@ -13,6 +13,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
+from native import clock
 from native import num
 from native import typeface
 from native import form
@@ -608,22 +609,24 @@ class Features:
         self._bg_cache = {}
         self.gp.status(f"background: {os.path.basename(path)}" if path else "background cleared")
 
-    def view_background(self, size):
-        """The background at the view's size: a (size, size, 3) picture, or black."""
+    def view_background(self, size, w=None, h=None):
+        """The background at the view's size: a (size, size, 3) picture - or, given the pane's w and h, (h, w, 3),
+        cropped to its shape, so a wide pane is filled - or black."""
         path = self.prefs.get("view_bg") or ""
         if not path:
             return (0, 0, 0)
         cache = getattr(self, "_bg_cache", None)
         if cache is None:
             cache = self._bg_cache = {}
-        key = (path, int(size))
+        ow, oh = (int(w), int(h)) if w and h else (int(size), int(size))
+        key = (path, ow, oh)
         if key not in cache:
             try:
                 from PIL import Image
                 im = Image.open(path).convert("RGB")
-                w, h = im.size
-                side = min(w, h)
-                im = im.crop(((w - side) // 2, (h - side) // 2, (w - side) // 2 + side, (h - side) // 2 + side)).resize((int(size), int(size)), Image.BILINEAR)
+                iw, ih = im.size
+                cw, ch = (iw, int(iw * oh / ow)) if iw * oh / ow <= ih else (int(ih * ow / oh), ih)   # the pane's shape
+                im = im.crop(((iw - cw) // 2, (ih - ch) // 2, (iw - cw) // 2 + cw, (ih - ch) // 2 + ch)).resize((ow, oh), Image.BILINEAR)
                 cache[key] = (np.asarray(im, np.float32) * __import__("native.project", fromlist=["x"]).pref_num(self.prefs, "view_bg_dim", 0.45)).astype(np.uint8)
             except Exception as e:
                 self.gp.status(f"background not read: {e}")
@@ -675,7 +678,7 @@ class Features:
         tr = getattr(self, "_transition", None)
         if tr is None:
             return self._limited(eng.rgb())
-        prog = (time.perf_counter() - tr["t0"]) / max(0.05, tr["dur"])
+        prog = (clock.now() - tr["t0"]) / max(0.05, tr["dur"])
         if prog >= 1.0:
             self._transition = None
             return eng.rgb()
@@ -722,7 +725,7 @@ class Features:
             sequence.apply(eng2, old_state)
         except Exception as e:
             self.gp.status(f"transition skipped: {e}"); return
-        self._transition = {"t0": time.perf_counter(), "dur": float(dur), "style": style, "old": eng2}
+        self._transition = {"t0": clock.now(), "dur": float(dur), "style": style, "old": eng2}
 
     def poll_transition(self):
         """The old step keeps running in its engine while the blend lasts."""
@@ -1345,7 +1348,7 @@ class Features:
     def start_sweep(self, key, secs, loop=True, record=False):
         if key not in self.eng.fx:
             return
-        self.sweep = {"key": key, "secs": max(1.0, float(secs)), "t0": time.perf_counter(), "loop": loop,
+        self.sweep = {"key": key, "secs": max(1.0, float(secs)), "t0": clock.now(), "loop": loop,
                       "was": self.eng.fx[key]}
         self.playing = True
         if record:
@@ -1360,7 +1363,7 @@ class Features:
         sw = self.sweep
         if not sw:
             return
-        t = (time.perf_counter() - sw["t0"]) / sw["secs"]
+        t = (clock.now() - sw["t0"]) / sw["secs"]
         if t >= 1.0 and not sw["loop"]:
             self.stop_sweep(); return
         phase = t % 1.0

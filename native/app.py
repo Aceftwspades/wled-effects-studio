@@ -29,6 +29,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import num
+from native import render_video
 from native import typeface
 from native import form
 from native import dock
@@ -449,12 +450,29 @@ class App(Features, Recorder, EditBuild):
         screenshot, a GIF's or a video's frame, or the view itself where
         the GPU does not draw it."""
         eng = eng or self.eng
-        img = self._view_image(net, px, eng)
         lk = self.view_look()
         if not look.active(lk):
-            return img
+            return self._view_image(net, px, eng)
+        img, room = self.view_image_room(net, px, eng)
         self._look_frame = getattr(self, "_look_frame", 0) + 1
-        return look.finish(img, lk, self._look_frame, look.mean_light(self.frame_rgb(eng)) if lk["spill"] > 0 else None)
+        return look.finish(img, lk, self._look_frame, look.mean_light(self.frame_rgb(eng)) if lk["spill"] > 0 else None,
+                           room=room)
+
+    ROOM_MARK = (1, 0, 1)        # a background no LED is drawn in: where the picture still has it, the room shows
+
+    def view_image_room(self, net, px, eng=None, bg=None):
+        """The 3-D view as a picture (no look yet) and where in it the room shows - the background, round the shape
+        and through its gaps: drawn on ROOM_MARK, the pixels still that colour are the room's, then given the real
+        background. The look's spill goes there only: on the shape's own dark LEDs it tinted the shape."""
+        eng = eng or self.eng
+        img = self._view_image(net, px, eng, bg=self.ROOM_MARK)
+        room = np.all(img == np.asarray(self.ROOM_MARK, np.uint8), axis=-1)
+        real = bg if bg is not None else self.view_background(px)
+        if isinstance(real, np.ndarray):
+            img[room] = real[room]
+        else:
+            img[room] = np.asarray(real, np.uint8)
+        return img, room
 
     def eye_above_floor(self):
         """The 3-D view's camera is above the floor (a reflection in it can be seen)."""
@@ -465,9 +483,11 @@ class App(Features, Recorder, EditBuild):
         """The look of the 3-D view in force (Settings > Appearance, its 3-D view tab)."""
         return look.current(self.prefs)
 
-    def _view_image(self, net, px, eng):
+    def _view_image(self, net, px, eng, bg=None):
         """The 3-D view: the face-warp renderer for the cube (faster, and
-        exact for flat faces), the point cloud for everything else."""
+        exact for flat faces), the point cloud for everything else. `bg`: the picture behind it (a video's
+        frame's part), else the view's background."""
+        bgv = bg if bg is not None else self.view_background(px)
         g = eng.geom
         unlit, floor = self.view_extras()
         if g is not None and g.kind == "cube":
@@ -478,9 +498,9 @@ class App(Features, Recorder, EditBuild):
             if lk["glow"] > 0 or lk["diffuse"] > 0:        # the glowing or diffused LEDs, as the live view's texture has them
                 k = 8                                      # finer than the live texture: no GPU smooths a picture's dots
                 return render.render(look.led_texture(src, k, lk, unlit, B=eng.B), eng.B * k, px, self.yaw, self.pitch,
-                                     self.dist, six=eng.six, bg=self.view_background(px), unlit=None, floor=floor,
+                                     self.dist, six=eng.six, bg=bgv, unlit=None, floor=floor,
                                      reflect=lk["reflect"], **view3d.kw(self))
-            return render.render(src, eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=self.view_background(px),
+            return render.render(src, eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=bgv,
                                  unlit=unlit, floor=floor, reflect=lk["reflect"], **view3d.kw(self))
         rgb = self.frame_rgb(eng).reshape(-1, 3)
         if g is None:
@@ -489,11 +509,11 @@ class App(Features, Recorder, EditBuild):
         if eng is self.eng:
             pos = self.view_positions()
             rgb = look.diffuse_points(pos, shape_ui.view_colours(self, rgb), lk)     # a shape being built: each part its colour
-            return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=self.view_background(px),
+            return render.render_points(pos, rgb, px, self.yaw, self.pitch, self.dist, bg=bgv,
                                         unlit=unlit, floor=floor, frame=view3d.frame(self), floor_step=view3d.floor_step(self),
                                         lk=lk, **view3d.kw(self))
         return render.render_points(g.pos, look.diffuse_points(g.pos, rgb, lk), px, self.yaw, self.pitch, self.dist,
-                                    bg=self.view_background(px), unlit=unlit, floor=floor, lk=lk, **view3d.kw(self))
+                                    bg=bgv, unlit=unlit, floor=floor, lk=lk, **view3d.kw(self))
 
     def fill_stats(self, pw, factor, dev_fps):
         """The stats popover's figures, this frame (while it is open): the
@@ -3513,7 +3533,8 @@ class App(Features, Recorder, EditBuild):
 
 
     def step_sim(self):
-        now = time.perf_counter()
+        from native import clock
+        now = clock.now()                    # the studio's clock: held and stepped by hand while a video renders
         dt = min(0.25, now - self.last)      # a stalled window must not sprint
         self.last = now
         if not self.playing:
@@ -3612,7 +3633,7 @@ class App(Features, Recorder, EditBuild):
             cq.layers.update(lk, look.mean_light(src) if lk["spill"] > 0 else None, cq.size, cq.w, cq.h)
             self.cube_quads.floor = floor
             self.cube_quads.camera(self.yaw, self.pitch, self.dist, six=self.eng.six, **view3d.kw(self))
-            self.cube_quads.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
+            self.cube_quads.background(self.view_background(self.view_side, cq.w, cq.h) if self.prefs.get("view_bg") else None)
             if self.shot_req or self.rec is not None:
                 img = self.view_image(net, self.cube_px)      # a picture is wanted: the software path makes one
         elif self.cube_on() and self.point_quads is not None:
@@ -3626,7 +3647,7 @@ class App(Features, Recorder, EditBuild):
             unlit, floor = self.view_extras()
             pq.floor, pq.dots = floor, unlit is not None
             pq.camera(self.yaw, self.pitch, self.dist, floor_step=view3d.floor_step(self), **view3d.kw(self))
-            pq.background(self.view_background(self.view_side) if self.prefs.get("view_bg") else None)
+            pq.background(self.view_background(self.view_side, pq.w, pq.h) if self.prefs.get("view_bg") else None)
             lk = self.view_look()
             cols = shape_ui.view_colours(self, (rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3))
             cols = look.diffuse_points(pos, cols, lk)          # through the diffuser: light shared by distance
@@ -4102,6 +4123,7 @@ def main():
                 if app.code_ed is not None and app.layout == "edit":
                     app.code_ed.poll()
                 app.poll_glow()
+                render_video.advance(app)            # rendering a video: the show a frame's time on (native/clock.py)
                 device_ui.poll(app)                  # after poll_glow: its overlays keep off this frame's holes
                 tasks.poll(app)                      # what a device answered, from the workers (native/tasks.py)
                 dock.poll(app)                       # a frame's tab closed by its x
@@ -4125,6 +4147,7 @@ def main():
                 app.step_sim()
                 _t.append(time.perf_counter())
                 app.draw()
+                render_video.capture(app)            # rendering a video: this frame of the show into it
                 _t.append(time.perf_counter())
                 app._prof = [(b - a) * 1000.0 for a, b in zip(_t, _t[1:])]
             except Exception:
