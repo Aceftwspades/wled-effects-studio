@@ -3988,6 +3988,69 @@ screen on its own monitor, flat mode drawn as the cube, a cheaper Cinematic
 the show plays and record automation (d648618); the pop-out's shapes on the
 GPU and a cheaper point cloud (e7c6f55); the review's fixes (48cd126).
 
+### From the second feature review (October 2026)
+
+The studio set again beside the software it shares ground with (2026-10-22),
+after the first review's six, the Sequence's timeline, automation, audio
+tracks and video render: xLights 2026.02-2026.11, Chromatik (LX Studio's
+successor), MadMapper 6, Resolume Arena 7, SoundSwitch, Lightjams, LedFx,
+Pixelblaze, WLED 16 and FastLED's browser compiler. Already here, so not
+listed: a command palette (xLights 2026.11's newest), looping previews of
+every effect (xLights 2026.04's), a timeline with curves on any slider
+(MadMapper 6's headline), audio tracks under the show and a video export
+with its sound. Still out of scope: DMX fixtures, projection mapping, and
+Ableton Link (set aside in the first review).
+
+What they have that the studio lacks, in the order they would pay back:
+
+- [ ] **Song sections on the timeline** (xLights 2026.11's Song Structure
+      Regions; SoundSwitch's phrases; MadMapper 6's markers): named,
+      coloured regions over the steps - intro, verse, build, drop, breakdown,
+      outro - found in the show's audio (its energy and where its sound
+      changes) and edited by hand; steps and clips snap to their edges, a
+      region's steps selected, moved or re-timed together. Small to medium;
+      the ground for the next.
+- [ ] **A show made from a track** (SoundSwitch's autoscript, which scripts
+      "a unique lighting show for every track" from its phrases): from the
+      sections, the beats and the energy, steps laid on the bars - calmer
+      effects for verses, the brightest for drops, a rising intensity ramp
+      over a build, a cut on the drop - from the setlist or chosen looks,
+      then edited like any other show. Medium to large; nothing in the
+      WLED world does it.
+- [ ] **Several devices as one stage** (xLights, Chromatik, Madrix and
+      Resolume all drive many controllers): a shape's parts given to
+      different WLEDs, the stream split to each, a show's presets sent to
+      each and started together. Medium to large; the studio streams to
+      one device today.
+- [ ] **FSEQ export for Falcon Player** (the xLights and FPP world of
+      holiday and event shows): the show rendered frame by frame on the
+      held clock (render_video's way) to an FSEQ v2 file with its audio,
+      for FPP to play on any controllers - WLED among them, over DDP or
+      E1.31. Medium; it opens the studio's effects to that whole community.
+- [ ] **Timecode in** (Resolume, MadMapper 6, Chromatik): MIDI Time Code
+      through the MIDI input already there (python-rtmidi), and LTC from an
+      audio input, chased by the show's playhead - a DAW's or a DJ's
+      timeline running the show. Small to medium.
+- [ ] **A GIF or a clip played by the device itself** (WLED 16's GIF
+      playback and PixelForge; the studio's Video node plays in the sim
+      only): a GIF - or a video look rendered down to the matrix's size -
+      sent to the device's files and played there by WLED's image effect
+      (a WLED_ENABLE_GIF build), no stream needed. Small to medium.
+- [ ] **Modulators on any slider** (Chromatik's LFOs, envelopes and step
+      sequencers; Lightjams' sources): a live LFO, an envelope on the beat
+      or a step pattern bound to any effect slider, in the sim and the
+      stream - beside the graph's own, for the stock effects. Medium.
+- [ ] **A mixer of two effects** (Chromatik's and Resolume's decks and
+      crossfader): two effects running at once, crossfaded with a blend
+      mode, the fader on MIDI or the phone - for the sim and the stream
+      (the device blends between presets itself). Medium; the Video
+      Switchboard does it inside a graph already.
+- [ ] **Stems** (DJ software separates drums, bass, vocals and the rest;
+      no lighting tool found uses them): a show's audio track split once,
+      offline, each stem a source the effects can hear - the kick for one
+      effect, the vocal for another. Large, and an optional heavy
+      dependency (Demucs); last.
+
 ### Deferred from earlier lists
 
 - [x] **Live values on pins**: the compiler puts a `GC_PROBE` after every
