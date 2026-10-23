@@ -3990,6 +3990,9 @@ GPU and a cheaper point cloud (e7c6f55); the review's fixes (48cd126).
 
 ### To do: found in use and in the review of everything since 1.17.1 (2026-10-22)
 
+Released as 1.18.0 (2026-10-23), with the VJ frame, song sections, timecode, FSEQ and the rest of the
+second feature review's first eight.
+
 Bugs, the worst first (each traced in the code; all fixed 2026-10-23 - a VJ step shown in the sim
 without playing now makes its decks the desk's, as Load into the sim makes an effect the sim's; the show
 keeps its first beat when Find sections hears it, and sections and the VJ's bars count from it):
