@@ -10,4 +10,4 @@ python-rtmidi>=1.5
 # optional: the phone remote over HTTPS, which a phone's browser asks before it offers the camera
 cryptography>=41
 # optional: Shadertoy shaders in the VJ frame, run on the graphics card (OpenGL 3.3)
-moderngl>=5.8
+moderngl>=5.8; sys_platform != "linux" or platform_machine == "x86_64"   # no ARM Linux wheel (needs X11 headers to build)

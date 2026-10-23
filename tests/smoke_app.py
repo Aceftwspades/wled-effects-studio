@@ -1003,7 +1003,8 @@ STEPS = [
       {"py": "__import__('native.sequence_ui', fromlist=['x']).tc_set(app, source='off')"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).stop(app)"},
       {"py": "setattr(app.midi, 'port', app._tc_port)"}], 0.4),
     # the show rendered to a video, frame by frame on the held clock: the second step (1 s) at 720p and 24 frames a
-    # second, 24 frames in an mp4 in captures/ (taken away again), the clock the real one after
+    # second, 24 frames in an mp4 in captures/ (taken away again), the clock the real one after - without ffmpeg on the
+    # path (the Windows runner), the render says so and the mp4's checks are left out
     ([{"py": "__import__('native.render_video', fromlist=['r']).options(app).update(size='1280x720', fps=24, view='both', "
              "length='step', camera='slow', audio=True)"},
       {"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 1)"},
@@ -1011,8 +1012,9 @@ STEPS = [
       {"check": "'24 frames' in dpg.get_value('rv_words')"},
       {"py": "__import__('native.render_video', fromlist=['r']).start(app)"}], 20.0),
     ([{"check": "not __import__('native.render_video', fromlist=['r']).rendering(app) and not __import__('native.clock', fromlist=['c']).held()"},
-      {"check": "'24 frames' in app.rec_msg and app.rec_msg.split(':')[0].endswith('.mp4')"},
-      {"py": "__import__('os').remove(__import__('os').path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, app.rec_msg.split(':')[0]))"},
+      {"check": "not app.has_ffmpeg() or ('24 frames' in app.rec_msg and app.rec_msg.split(':')[0].endswith('.mp4'))"},
+      {"py": "__import__('os').remove(__import__('os').path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, "
+             "app.rec_msg.split(':')[0])) if app.has_ffmpeg() else None"},
       {"py": "chrome.close_dialog('render_video_win')"}], 0.4),
     # the same step exported for Falcon Player: 20 frames of every LED in an FSEQ v2 file (read back, taken away)
     ([{"py": "__import__('native.render_fseq', fromlist=['r']).options(app).update(fps=20, length='step', audio=False)"}, {"py": "__import__('native.render_fseq', fromlist=['r']).show(app)"},

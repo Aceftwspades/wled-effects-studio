@@ -8,7 +8,7 @@ dependencies = ["numpy>=1.26", "dearpygui>=1.11", "pillow>=10"]
 [project.optional-dependencies]
 audio = ["sounddevice>=0.4", "pyaudiowpatch>=0.2.12; sys_platform == 'win32'"]
 package = ["pyinstaller>=6"]
-shaders = ["moderngl>=5.8"]
+shaders = ["moderngl>=5.8; sys_platform != 'linux' or platform_machine == 'x86_64'"]
 
 [project.scripts]
 wled-studio = "native.app:main"

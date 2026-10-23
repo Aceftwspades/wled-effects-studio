@@ -29,8 +29,8 @@ except ImportError:                                    # pragma: no cover
     pyaudio = None
 try:
     import sounddevice as sd
-except ImportError:                                    # pragma: no cover
-    sd = None
+except Exception:                                      # pragma: no cover - not installed, or no sound system to start
+    sd = None                                          # (PortAudio fails its start where no audio server runs)
 
 
 class LiveAudio:
