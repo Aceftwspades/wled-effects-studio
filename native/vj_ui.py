@@ -38,7 +38,7 @@ def build(app):
     for i in (0, 1):
         if not dpg.does_item_exist(f"vj_tex{i}"):
             dpg.add_dynamic_texture(PV_W, PV_H, [0.0] * (PV_W * PV_H * 4), tag=f"vj_tex{i}", parent=registry())
-    with dpg.window(tag=TAG, show=False, width=px(680), height=px(720), no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=px(680), height=px(680), no_collapse=True, no_title_bar=True):
         device_ui.header(app, "vj")
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="on air", tag="vj_on", default_value=bool(o["on"]), callback=lambda s, v: set_on(app, v))
@@ -52,7 +52,7 @@ def build(app):
                   "opened in your editor - it reloads here each time it is saved; it goes on the deck off the mix")
         with dpg.group(horizontal=True):
             for i in (0, 1):
-                with dpg.child_window(tag=f"vj_deck{i}", width=px(326), autosize_y=True, border=True):
+                with dpg.child_window(tag=f"vj_deck{i}", width=px(326), height=px(530), border=True):
                     _deck(app, i)
         # the fader
         with dpg.group(horizontal=True):
