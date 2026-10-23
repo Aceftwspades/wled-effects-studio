@@ -1550,6 +1550,7 @@ def render(app, fmt="gif"):
 
 def stop(app):
     _rec_flush(app)                                       # a take ends with the show, and recording with it
+    __import__("native.vj", fromlist=["v"]).restore_desk(app)   # the VJ's desk as it was before the show's VJ steps
     if _REC.armed:
         _REC.armed = False
         _rec_button(app)
@@ -1589,7 +1590,7 @@ def _apply_ramps(app, i, t):
         if k == sequence.BRI or k in _REC.held:
             continue
         if k == sequence.VJF:                                     # a VJ step's crossfader (vj.py)
-            if st.get("vj"):
+            if st.get("vj") and k not in _REC.held:
                 __import__("native.vj", fromlist=["v"]).options(app)["fader"] = sequence.ramp_value(st, k, t) / 255.0
             continue
         v = sequence.ramp_value(st, k, t)
@@ -2608,9 +2609,18 @@ def _rec_poll(app, i, t):
         for slider in sequence.RAMP_KEYS:
             if app.eng.fx.get(slider) != was[3].get(slider):
                 _REC.held[_rec_key(seg, slider)] = now      # moved since playback left it: the hand's
+    hand = getattr(app, "_vj_hand_at", None)                 # the VJ's crossfader, moved by hand in a VJ step
+    if st.get("vj") and hand is not None and now - hand < HOLD_S:
+        _REC.held[sequence.VJF] = hand
     for key, at in list(_REC.held.items()):
         if now - at > HOLD_S:
             del _REC.held[key]
+            continue
+        if key == sequence.VJF:
+            take = _REC.takes.setdefault((id(st), key), [])
+            v = int(round(float(__import__("native.vj", fromlist=["v"]).options(app)["fader"]) * 255))
+            if not take or t > take[-1][0] + 1e-4:
+                take.append((t, v))
             continue
         s_, slider = sequence.ramp_target(key)
         if s_ != seg:
@@ -2633,6 +2643,14 @@ def _rec_flush(app):
     for (sid, key), samples in takes.items():
         st = steps_by.get(sid)
         if st is None or len(samples) < 2 or not any(s is st for s in _steps(app)["steps"]):
+            continue
+        if key == sequence.VJF:                                  # the VJ's crossfader: its start is the step's fader
+            if not st.get("vj"):
+                continue
+            start, pts = sequence.record_into(st, key, samples)
+            st["vj"]["fader"] = start / 255.0
+            st.setdefault("ramps", {})[key] = {"shape": "curve", "points": pts}
+            done += 1
             continue
         seg, slider = sequence.ramp_target(key)
         segs = st.get("segments") or []

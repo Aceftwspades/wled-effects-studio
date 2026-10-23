@@ -170,6 +170,12 @@ def targets(app):
     out += [("VJ: the crossfader", {"kind": "vj_fader"}), ("VJ: cut to the other deck", {"kind": "vj_cut"}),
             ("VJ: fade to the other deck", {"kind": "vj_fade"}), ("VJ: shuffle deck A", {"kind": "vj_shuffle_a"}),
             ("VJ: shuffle deck B", {"kind": "vj_shuffle_b"}), ("VJ: on air, on or off", {"kind": "vj_air"})]
+    from native import vj
+    for i, d in enumerate("AB"):
+        out.append((f"VJ {d}: the look, along the list", {"kind": "vj_look", "deck": i}))
+        out += [(f"VJ {d}: {vj.KNOB_WORDS[k]}", {"kind": "vj_knob", "deck": i, "key": k}) for k, _, _ in vj.KNOBS]
+        out += [(f"VJ {d}: next video file", {"kind": f"vj_clip_{d.lower()}"}),
+                (f"VJ {d}: video paused or playing", {"kind": f"vj_pause_{d.lower()}"})]
     g = app.gp.graph
     if g and app.gp.file:
         wired = {(b, i) for _, _, b, i in g.links}
@@ -651,10 +657,22 @@ def apply_target(app, t, v, full=127.0, ctl=None):
     if kind == "setlist":
         switch_effect(app, midi.setlist_pick(app.eng.names, _st(app)["setlist"], ctl or ("cc", 0, 0), v, full))
         return
-    if kind == "vj_fader" or kind in midi.VJ_BUTTONS:     # the VJ frame's (vj.py)
+    if kind in ("vj_fader", "vj_knob", "vj_look") or kind in midi.VJ_BUTTONS:     # the VJ frame's (vj.py)
         from native import vj, vj_ui
+        f = max(0.0, min(1.0, float(v) / float(full or 127.0)))
         if kind == "vj_fader":
-            vj.set_fader(app, float(v) / float(full or 127.0))
+            vj.set_fader(app, f)
+        elif kind == "vj_knob":
+            vj.knob_set(app, int(t.get("deck", 0)), t.get("key", "amount"), f)
+            app._vj_dirty = True
+        elif kind == "vj_look":
+            names = vj_ui.look_names()
+            vj.options(app)["decks"][int(t.get("deck", 0))]["look"] = names[int(round(f * (len(names) - 1)))]
+            app._vj_dirty = True
+        elif kind in ("vj_clip_a", "vj_clip_b"):
+            vj.next_clip(app, 0 if kind.endswith("a") else 1)
+        elif kind in ("vj_pause_a", "vj_pause_b"):
+            vj.pause(app, 0 if kind.endswith("a") else 1)
         elif kind == "vj_cut":
             vj.cut(app)
         elif kind == "vj_fade":

@@ -61,7 +61,7 @@ for name in vj_looks.LOOKS:
         vj.update(app, 1 / 40)
     ms = (time.perf_counter() - t0) / 4 * 1000
     cv = vj._runs(app)[0].canvas
-    if cv is None or cv.shape != (vj.CANVAS_H, vj.CANVAS_W, 3) or cv.min() < 0 or cv.max() > 1:
+    if cv is None or cv.shape != (vj.canvas_size(app)[1], vj.canvas_size(app)[0], 3) or cv.min() < 0 or cv.max() > 1:
         check(False, f"{name}: canvas {None if cv is None else cv.shape}")
     if ms > 40:
         slow.append(f"{name} {ms:.0f} ms")
@@ -69,9 +69,10 @@ check(not slow, "every look under 40 ms a frame" + (": " + ", ".join(slow) if sl
 vj.close(app)
 
 # the map onto the cube
-canvas = np.zeros((vj.CANVAS_H, vj.CANVAS_W, 3), np.float32)
-canvas[:, : vj.CANVAS_W // 2, 0] = 1.0                                     # left half red, right half green
-canvas[:, vj.CANVAS_W // 2:, 1] = 1.0
+CW, CH = vj.canvas_size(app)
+canvas = np.zeros((CH, CW, 3), np.float32)
+canvas[:, : CW // 2, 0] = 1.0                                              # left half red, right half green
+canvas[:, CW // 2:, 1] = 1.0
 for mode, _ in vj.MAPS:
     out = vj.to_shape(app, canvas, mode)
     lit = np.asarray(g.lit).reshape(g.h, g.w)
@@ -168,6 +169,145 @@ check(errs and "draw" in errs[0][1] and "Pull Rings" not in vj_looks.LOOKS, "no 
 os.remove(path)
 vj_looks.load_user(app.project)
 check("Pull Rings" not in vj_looks.LOOKS, "deleted: gone")
+vj.close(app)
+
+# --- the review's fixes ----------------------------------------------------------------------------
+# an Effect deck's speed held at the slider's top, not wrapped round
+class FakeEng:
+    names = ["Rainbow"]
+    cols, rows = g.w, g.h
+
+    def __init__(self):
+        self.fx = {}
+        self.fft = np.zeros(16, np.uint8)
+
+    def select(self, k):
+        pass
+
+    def push(self):
+        pass
+
+    def audio(self, *a):
+        pass
+
+    def frame(self, ms):
+        pass
+
+    def rgb(self):
+        return np.zeros((g.h, g.w, 3), np.uint8)
+
+
+fe = FakeEng()
+app.second_engine = lambda purpose: fe
+o["decks"][0].update(look=vj.EFFECT, effect="Rainbow", speed=2.5, amount=1.0)
+o["fader"] = 0.0
+vj.update(app, 1 / 40)
+check(fe.fx["sx"] == 255 and fe.fx["ix"] == 255, f"an Effect deck at speed 2.5: Speed 255, not wrapped ({fe.fx})")
+o["decks"][0].update(look="Plasma", speed=1.0, amount=0.5)
+
+# the desk put back when the show lets the VJ go
+o["decks"][0]["look"] = "Warp"
+o["on"] = False
+app._vj_by_show = False
+vj.apply_step(app, {"vj": {"decks": vj.json_copy(o["decks"]), "fader": 1.0}, "trans": 0.0})
+o["decks"][0]["look"] = "Tunnel"                                   # the show's VJ steps change it
+vj.restore_desk(app)
+check(o["decks"][0]["look"] == "Warp" and not o["on"] and o["fader"] == 0.0, "the show stopped: the desk as it was")
+
+# a step's blend into the VJ: the picture before blended into the VJ's
+clock.hold()
+try:
+    app._vj_last_pic = np.full((g.h, g.w, 3), 200, np.uint8)
+    vj.update(app, 1 / 40)
+    vj.apply_step(app, {"vj": vj.snapshot(app), "trans": 1.0})
+    vj.update(app, 1 / 40)
+    clock.step(0.5)
+    half = vj.picture(app, np.zeros((g.h, g.w, 3), np.uint8)).astype(int)
+    want = (200 + app._vj_out.astype(int)) / 2
+    check(np.abs(half - want).max() <= 2, "half way through a step's blend: half the picture before")
+    clock.step(0.6)
+    check(np.array_equal(vj.picture(app, np.zeros((g.h, g.w, 3), np.uint8)), app._vj_out), "the blend done: the VJ's")
+    vj.restore_desk(app)
+finally:
+    clock.release()
+
+# two decks on one video share its source
+o["decks"][0].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
+o["decks"][1].update(look="Thermal", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
+o["fader"] = 0.5
+vj.update(app, 1 / 40)
+check(len(vj._pool(app)) == 1, f"one source for two decks ({len(vj._pool(app))})")
+o["decks"][1]["source"]["kind"] = "none"
+vj.update(app, 1 / 40)
+check(len(vj._pool(app)) == 1, "one deck let go: still open for the other")
+o["decks"][0]["source"]["kind"] = "none"
+vj.update(app, 1 / 40)
+check(len(vj._pool(app)) == 0, "neither: closed")
+
+# bars counted on the beats heard
+clock.hold()
+try:
+    app._vj_hits = 0
+    for k in range(9):
+        app.last_hit_at = clock.now()
+        vj.update(app, 0.5)
+        clock.step(0.5)
+    bars, where = vj.bar_count(app)
+    check(where == "the beats heard" and abs(bars - 9 / 4) < 1e-6, f"bars from the beats heard: {bars} ({where})")
+finally:
+    clock.release()
+
+# a wipe, the sound routing, trails, the text look
+o["wipe"] = "swipe right"
+o["fader"] = 0.5
+vj.update(app, 1 / 40)
+a, b = vj.deck_led(app, 0), vj.deck_led(app, 1)
+from native import transition
+check(np.array_equal(app._vj_out, transition.blend(a, b, 0.5, "swipe right")), "a wipe in place of the blend")
+o["wipe"] = "blend"
+d = o["decks"][0]
+d.update(look="Plasma", react={"to": "bass", "what": "amount", "depth": 1.0})
+app.eng.fft[:] = 255
+what, rv = vj._react(d, vj.sound(app), 0.0)
+check(what == "amount" and abs(rv - 1.0) < 1e-6, "the bass moving the amount")
+app.eng.fft[:] = 0
+d.update(react={"to": "off", "what": "amount", "depth": 0.5}, trails=0.9)
+vj.update(app, 1 / 40)
+check(vj._runs(app)[0].trail is not None, "trails kept")
+d.update(trails=0.0, look="Text", text="HI")
+for _ in range(30):
+    vj.update(app, 0.1)
+check(vj._runs(app)[0].canvas.max() > 0.3 and not vj._runs(app)[0].error, "the text look draws its words")
+
+# presets renamed and deleted; a flame renamed and forgotten
+vj.save_preset(app, 0, "p1")
+check(vj.rename_preset(app, "p1", "p2") and "p2" in o["presets"] and "p1" not in o["presets"], "a preset renamed")
+check(vj.delete_preset(app, "p2") and "p2" not in o["presets"], "a preset deleted")
+o["decks"][0]["look"] = "Flame: Sheep"
+fl = vj.mutate_flame(app, 0)
+check(vj.rename_flame(app, fl, "Woolly") and o["decks"][0]["look"] == "Woolly" and "Woolly" in vj_looks.LOOKS,
+      "a bred flame renamed")
+check(vj.forget_flame(app, "Woolly") and "Woolly" not in vj_looks.LOOKS and o["decks"][0]["look"] == "Plasma",
+      "forgotten: the deck back on a look there is")
+
+# a deck's knobs by name: MIDI's and the modulators'
+vj.knob_set(app, 1, "kaleido", 0.5)
+vj.knob_set(app, 1, "speed", 1.0)
+check(o["decks"][1]["kaleido"] == 6 and abs(o["decks"][1]["speed"] - vj.SPEED_MAX) < 1e-6, "knobs from 0..1")
+from native import modulate
+check(modulate._get(app, "vj1.kaleido") == int(round(6 / 12 * 255)), "a modulator reads a deck's knob")
+modulate._set(app, "vj1.amount", 51)
+check(abs(o["decks"][1]["amount"] - 0.2) < 1e-3, "and sets it")
+
+# a list of video files: the next one, its key with speed and in and out
+s = o["decks"][0]["source"]
+s.update(kind="file", files=["a.mp4", "b.mp4", "c.mp4"], clip=0, speed=2.0, **{"in": 1.0, "out": 3.0})
+vj.next_clip(app, 0)
+check(vj.clip_path(s) == "b.mp4", "the next file")
+key = vj.source_key(app, s)
+check(key[0] == "file" and key[1] == "b.mp4" and key[2] == 2.0 and key[3] == 1.0 and key[4] == 3.0,
+      "a file's source: its speed, from and to in its key")
+s.update(kind="none", files=[])
 vj.close(app)
 
 print("FAILED:", fails if fails else "none")

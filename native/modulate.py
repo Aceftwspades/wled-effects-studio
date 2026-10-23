@@ -24,7 +24,10 @@ The kinds:
 import math
 import random
 
-KEYS = ("sx", "ix", "c1", "c2", "c3")
+FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
+# the VJ frame's deck knobs too (vj.py): "vj0.amount" is deck A's amount - 0..255 of the knob's range
+VJ_KEYS = tuple(f"vj{i}.{k}" for i in (0, 1) for k in ("amount", "speed", "hue", "kaleido", "trails", "blur"))
+KEYS = FX_KEYS + VJ_KEYS
 KINDS = (("lfo", "a wave (LFO)"), ("beat", "on the beat"), ("steps", "a step pattern"))
 SHAPES = ("sine", "triangle", "saw up", "saw down", "square", "random")
 PERIODS = (0.25, 0.5, 1, 2, 4, 8, 16, 32)          # beats
@@ -123,15 +126,15 @@ def apply(app):
     push = {}
     for m in mods:
         k = m.get("key")
-        if not m.get("on", True) or k not in KEYS or k not in eng.fx:
+        if not m.get("on", True) or _get(app, k) is None:
             continue
         push[k] = push.get(k, 0.0) + offset(m, st["beats"], since, 60.0 / bpm)
     changed = False
     places = st.setdefault("places", {})
     for k in KEYS:
-        if k not in eng.fx:
+        cur = _get(app, k)
+        if cur is None:
             continue
-        cur = eng.fx[k]
         written = places.get(k)
         if k in push:
             if written is None or cur != written[1]:
@@ -139,19 +142,44 @@ def apply(app):
             else:
                 base = written[0]
             v = int(round(min(hi(k), max(0, base + push[k]))))
-            places[k] = (base, v)
             if v != cur:
-                eng.fx[k] = v
-                changed = True
+                changed |= _set(app, k, v)
+            places[k] = (base, _get(app, k))                # as it reads back (a knob of whole steps rounds it)
         elif written is not None:                           # no longer modulated: left at its place
             if cur == written[1] and cur != written[0]:
-                eng.fx[k] = written[0]
-                changed = True
+                changed |= _set(app, k, written[0])
             del places[k]
     if not mods:
         app._mod_state = {}
     if changed:
         eng.push()
+
+
+def _vj_key(k):
+    i, knob = k[2:].split(".", 1)
+    return int(i), knob
+
+
+def _get(app, k):
+    """A target's value now, 0..hi(k), or None when there is none to move."""
+    if k in FX_KEYS:
+        return app.eng.fx.get(k) if k in app.eng.fx else None
+    if k in VJ_KEYS:
+        from native import vj
+        i, knob = _vj_key(k)
+        return int(round(vj.knob_get(app, i, knob) * 255))
+    return None
+
+
+def _set(app, k, v):
+    """A target set; True when the engine has to be told."""
+    if k in FX_KEYS:
+        app.eng.fx[k] = int(v)
+        return True
+    from native import vj
+    i, knob = _vj_key(k)
+    vj.knob_set(app, i, knob, v / 255.0)
+    return False
 
 
 def place(app, key):
@@ -169,9 +197,13 @@ def _labels(app):
     m = app.eng.meta[app.eng.idx]
     generic = {"sx": "Speed", "ix": "Intensity", "c1": "Custom 1", "c2": "Custom 2", "c3": "Custom 3"}
     out = {}
-    for i, k in enumerate(KEYS):
+    for i, k in enumerate(FX_KEYS):
         lab = (m["labels"][i] if i < len(m["labels"]) else "").strip()
         out[k] = lab if lab and lab != "!" else generic[k]
+    from native import vj
+    for k in VJ_KEYS:
+        i, knob = _vj_key(k)
+        out[k] = f"VJ {'AB'[i]} {vj.KNOB_WORDS[knob]}"
     return out
 
 
@@ -204,7 +236,7 @@ def refresh(app):
         with dpg.group(horizontal=True, parent="mod_rows"):
             dpg.add_checkbox(default_value=bool(m.get("on", True)), callback=lambda s, v, i=i: edit(app, i, on=bool(v)))
             chrome.tip("on or off: off, the slider stays where it is set")
-            dpg.add_combo([labs[k] for k in KEYS], width=px(100), default_value=labs.get(m.get("key"), "Speed"),
+            dpg.add_combo([labs[k] for k in KEYS], width=px(140), default_value=labs.get(m.get("key"), "Speed"),
                           callback=lambda s, v, i=i: edit(app, i, key=by_lab.get(v, "sx")))
             dpg.add_combo([w for _, w in KINDS], width=px(110), default_value=dict(KINDS).get(m.get("kind"), "a wave (LFO)"),
                           callback=lambda s, v, i=i: edit(app, i, kind=next(k for k, w in KINDS if w == v)))

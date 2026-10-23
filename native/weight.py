@@ -217,6 +217,8 @@ def _undo_state(app):
         return (p.can_undo("sequence") or p.can_undo("schedule")), (p.can_redo("sequence") or p.can_redo("schedule"))
     if t == "palettes":
         return p.can_undo("palettes"), p.can_redo("palettes")
+    if t == "vj":
+        return p.can_undo("vj"), p.can_redo("vj")
     return True, True
 
 

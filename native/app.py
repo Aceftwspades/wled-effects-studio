@@ -3209,7 +3209,7 @@ class App(Features, Recorder, EditBuild):
             for slot, (tag, _, _, _) in device_ui.FRAMES.items():
                 if self.focus == tag and self.docked(slot):
                     f = slot; break
-        if f in ("shape", "sequence", "palettes"):
+        if f in ("shape", "sequence", "palettes", "vj"):
             return f
         return "code" if self.layout == "edit" else "graph"
 
@@ -3224,6 +3224,9 @@ class App(Features, Recorder, EditBuild):
         elif t == "palettes":
             from native import palette_ui
             palette_ui.undo(self, redo)
+        elif t == "vj":
+            from native import vj_ui
+            vj_ui.undo(self, redo)
         elif t == "code":
             self.code_redo() if redo else self.code_undo()
         else:

@@ -41,7 +41,8 @@ class Look:
 
 
 LOOKS = {}
-FAMILIES = (("video", "Video"), ("shader", "Shaders"), ("milkdrop", "MilkDrop"), ("flame", "Flames"), ("yours", "Yours"))
+FAMILIES = (("video", "Video"), ("shader", "Shaders"), ("milkdrop", "MilkDrop"), ("flame", "Flames"), ("layer", "Text and image"),
+            ("yours", "Yours"))
 
 
 def look(name, family, desc, video=False):
@@ -586,6 +587,72 @@ def register_flame(name, flame):
     """A flame of the project's own (bred by Mutate) as a look."""
     LOOKS[name] = Look(name, "flame", lambda ctx, st, fl=flame: flame_frame(ctx, st, fl),
                        "a fractal flame bred by Mutate: points thrown through bent maps, counted, shown on a log scale")
+
+
+# --- text and image: a deck's words or a picture of the user's ----------------------------------------
+_FONTS = {}
+
+
+def _font(px):
+    from PIL import ImageFont
+    f = _FONTS.get(px)
+    if f is None:
+        try:
+            f = ImageFont.load_default(size=px)
+        except TypeError:                                          # a Pillow before 10.1: one size only
+            f = ImageFont.load_default()
+        _FONTS[px] = f
+    return f
+
+
+@look("Text", "layer", "the deck's words scrolling across, in its colours - amount their size, a jump on the beat")
+def _text(ctx, st):
+    from PIL import Image, ImageDraw
+    words = str((getattr(ctx, "deck", None) or {}).get("text") or "WLED")
+    px = max(8, int(ctx.h * (0.35 + ctx.amount * 0.6)))
+    key = (words, px)
+    if st.get("key") != key:
+        f = _font(px)
+        l, t, r, b = ImageDraw.Draw(Image.new("L", (1, 1))).textbbox((0, 0), words, font=f)
+        im = Image.new("L", (max(1, r - l) + px, max(1, b - t) + 2))
+        ImageDraw.Draw(im).text((-l + px // 2, -t + 1), words, fill=255, font=f)
+        st["key"], st["mask"] = key, np.asarray(im, np.float32) / 255.0
+    m = st["mask"]
+    mh, mw = m.shape
+    st["x"] = (st.get("x", 0.0) + ctx.dt * ctx.w * 0.25 * ctx.speed) % (mw + ctx.w)
+    out = np.zeros((ctx.h, ctx.w), np.float32)
+    x0 = int(ctx.w - st["x"])
+    y0 = int((ctx.h - mh) / 2 - ctx.beat * ctx.h * 0.08)
+    xs, xe = max(0, x0), min(ctx.w, x0 + mw)
+    ys, ye = max(0, y0), min(ctx.h, y0 + mh)
+    if xe > xs and ye > ys:
+        out[ys:ye, xs:xe] = m[ys - y0:ye - y0, xs - x0:xe - x0]
+    col = ctx.grad((ctx.u + ctx.t * 0.1) % 1.0)
+    col = col / np.maximum(col.max(axis=2, keepdims=True), 0.2)       # the words at the colours' full brightness
+    return np.clip(col, 0, 1) * out[..., None]
+
+
+@look("Image", "layer", "a picture file of the deck's, filling the canvas, drifting slowly - amount its zoom")
+def _image(ctx, st):
+    path = str((getattr(ctx, "deck", None) or {}).get("image") or "")
+    key = (path, ctx.w, ctx.h)
+    if st.get("key") != key:
+        st["key"], st["img"] = key, None
+        if path:
+            try:
+                from PIL import Image, ImageOps
+                im = ImageOps.fit(Image.open(path).convert("RGB"), (ctx.w * 2, ctx.h * 2), Image.BILINEAR)
+                st["img"] = np.asarray(im, np.float32) / 255.0
+            except Exception as e:
+                raise ValueError(f"could not read {path}: {e}")
+    img = st["img"]
+    if img is None:
+        raise ValueError("no picture chosen (the deck's image ...)")
+    z = 1.0 + ctx.amount * 0.6 + ctx.beat * 0.05
+    a = ctx.t * 0.05
+    u = (ctx.u - 0.5) / z + 0.5 + math.sin(a) * 0.05
+    v = (ctx.v - 0.5) / z + 0.5 + math.cos(a * 0.7) * 0.05
+    return sample(img, u, v)
 
 
 # --- your own: a look in a file of the project's ---------------------------------------------------

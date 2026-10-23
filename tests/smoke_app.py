@@ -1049,6 +1049,17 @@ STEPS = [
     ([{"check": "__import__('native.vj', fromlist=['v']).on(app)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).del_step(app, app._seq_sel)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
       {"py": "setattr(app, '_vj_by_show', False)"}, {"py": "device_ui.close(app, 'vj')"}], 0.5),
     ([{"check": "len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) == app._vj_n and not __import__('native.vj', fromlist=['v']).on(app)"}], 0.1),
+    # the VJ's look browser (a click puts Tunnel on deck B), a wipe in place of the blend, and undo taking back a knob
+    ([{"py": "device_ui.show(app, 'vj')"}, {"py": "__import__('native.vj_ui', fromlist=['v']).browse(app, 1)"}], 1.5),
+    ([{"check": "dpg.is_item_shown('vj_browse_win') and len(app._vj_thumbs) >= 30"},
+      {"py": "__import__('native.vj_ui', fromlist=['v'])._browse_pick(app, 'Tunnel')"}, {"py": "chrome.close_dialog('vj_browse_win')"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(wipe='swipe right', fader=0.5)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, True)"}], 0.6),
+    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['look'] == 'Tunnel' and app._vj_out is not None"},
+      {"py": "__import__('native.vj_ui', fromlist=['v'])._flush_save(app, now=True)"}, {"py": "setattr(app, '_vj_amt0', __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['amount'])"},
+      {"py": "__import__('native.vj_ui', fromlist=['v'])._set_deck(app, 0, 'amount', 0.93)"}, {"py": "__import__('native.vj_ui', fromlist=['v'])._flush_save(app, now=True)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).undo(app)"}], 0.4),
+    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['amount'] == app._vj_amt0"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(wipe='blend', fader=0.0)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
+      {"py": "device_ui.close(app, 'vj')"}], 0.4),
     # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed
     # left where it was set
     ([{"py": "setattr(app, '_mo_sx', app.eng.fx['sx'])"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='sx', kind='lfo', shape='square', period=0.5, depth=40)"},

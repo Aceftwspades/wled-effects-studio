@@ -4093,6 +4093,21 @@ What they have that the studio lacks, in the order they would pay back:
       phone controls; VJ steps on the Sequence with a crossfader ramp. Sim
       and stream only. Not done: real GLSL (pasting a Shadertoy shader as it
       is) - it needs an OpenGL context (moderngl) in all four builds.
+      *Reviewed 2026-10-22, and done from the review:* an Effect deck's speed
+      over 2 wrapped to 0 (clamped); a show's VJ steps overwrote the desk
+      (kept, put back when the show stops); a step's blend into or out of a
+      VJ step was a cut (blended from the picture before); one webcam on two
+      decks opened twice (sources shared); the auto-mix's bars were the
+      tempo's from whenever (the show's bars, else the beats heard);
+      presets and bred flames could not be deleted or renamed, and nothing
+      could be undone (both now). Added: a look browser of moving
+      thumbnails, MIDI on every deck knob and the look, the modulators on
+      the deck knobs, sound routing per deck, the output preview, a beat
+      light and Tap, video files as a list with clip speed, from/to, pause
+      and next (by hand, on the beat, on the bars), wipes in place of the
+      blend, trails and blur, a canvas size, the crossfader recorded into a
+      VJ step, Text and Image looks. Still not done: real GLSL, importing
+      MilkDrop's .milk presets, a third deck.
 
 ### Deferred from earlier lists
 

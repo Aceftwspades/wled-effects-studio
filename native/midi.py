@@ -49,7 +49,8 @@ except Exception:                       # not installed, or no MIDI API on this 
 FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
 CHECK_KEYS = ("o1", "o2", "o3")
 # the VJ frame's buttons (vj.py): fired once as the control rises, as next and previous are
-VJ_BUTTONS = ("vj_cut", "vj_fade", "vj_shuffle_a", "vj_shuffle_b", "vj_air")
+VJ_BUTTONS = ("vj_cut", "vj_fade", "vj_shuffle_a", "vj_shuffle_b", "vj_air", "vj_clip_a", "vj_clip_b", "vj_pause_a",
+              "vj_pause_b")
 SWITCHES = ("effect", "palette", "setlist", "next", "prev") + VJ_BUTTONS   # targets that pick, not set: a note-off never fires them
 STEPS = ("next", "prev") + VJ_BUTTONS                         # fired once as the control rises
 
