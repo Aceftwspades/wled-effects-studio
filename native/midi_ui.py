@@ -666,7 +666,7 @@ def apply_target(app, t, v, full=127.0, ctl=None):
             vj.knob_set(app, int(t.get("deck", 0)), t.get("key", "amount"), f)
             app._vj_dirty = True
         elif kind == "vj_look":
-            names = vj_ui.look_names()
+            names = vj.midi_looks()
             vj.options(app)["decks"][int(t.get("deck", 0))]["look"] = names[int(round(f * (len(names) - 1)))]
             app._vj_dirty = True
         elif kind in ("vj_clip_a", "vj_clip_b"):

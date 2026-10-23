@@ -655,6 +655,9 @@ def _image(ctx, st):
     return sample(img, u, v)
 
 
+BUILTIN = tuple(LOOKS)            # the looks that ship, in their order (MIDI's look target counts along these first)
+
+
 # --- your own: a look in a file of the project's ---------------------------------------------------
 TEMPLATE = '''"""A look of my own for the VJ frame - saved, it reloads in the studio at once.
 

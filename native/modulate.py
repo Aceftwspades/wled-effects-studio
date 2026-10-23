@@ -124,7 +124,9 @@ def apply(app):
     last_hit = getattr(app, "last_hit_at", None)
     since = None if last_hit is None else now - last_hit
     push = {}
-    for m in mods:
+    for n, m in enumerate(mods):
+        if "seed" not in m:                                 # one made before seeds: its own, kept
+            m["seed"] = 7 + n * 7919
         k = m.get("key")
         if not m.get("on", True) or _get(app, k) is None:
             continue
@@ -146,11 +148,14 @@ def apply(app):
                 changed |= _set(app, k, v)
             places[k] = (base, _get(app, k))                # as it reads back (a knob of whole steps rounds it)
         elif written is not None:                           # no longer modulated: left at its place
-            if cur == written[1] and cur != written[0]:
+            if k in VJ_KEYS:
+                getattr(app, "_vj_mod", {}).pop(_vj_key(k), None)
+            elif cur == written[1] and cur != written[0]:
                 changed |= _set(app, k, written[0])
             del places[k]
     if not mods:
         app._mod_state = {}
+        app._vj_mod = {}
     if changed:
         eng.push()
 
@@ -161,7 +166,8 @@ def _vj_key(k):
 
 
 def _get(app, k):
-    """A target's value now, 0..hi(k), or None when there is none to move."""
+    """A target's value now, 0..hi(k), or None when there is none to move. A VJ knob's is the knob's own - its
+    place: what the modulator moves it to is kept apart (vj.knob_value), never in the project's options."""
     if k in FX_KEYS:
         return app.eng.fx.get(k) if k in app.eng.fx else None
     if k in VJ_KEYS:
@@ -178,7 +184,8 @@ def _set(app, k, v):
         return True
     from native import vj
     i, knob = _vj_key(k)
-    vj.knob_set(app, i, knob, v / 255.0)
+    lo, hi_ = next((a, b) for kk, a, b in vj.KNOBS if kk == knob)
+    app.__dict__.setdefault("_vj_mod", {})[(i, knob)] = lo + (hi_ - lo) * max(0.0, min(1.0, v / 255.0))
     return False
 
 
@@ -293,7 +300,7 @@ def add(app, **kw):
     """One more modulator: the first slider without one (or `key`), a wave unless said otherwise."""
     mods = modulators(app)
     used = {m.get("key") for m in mods}
-    m = dict(DEFAULT, steps=list(DEFAULT["steps"]))
+    m = dict(DEFAULT, steps=list(DEFAULT["steps"]), seed=random.randrange(1 << 20))   # a random wave of its own
     m["key"] = next((k for k in KEYS if k not in used), "sx")
     m.update(kw)
     mods.append(m)

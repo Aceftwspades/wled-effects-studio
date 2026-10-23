@@ -131,10 +131,12 @@ class Popouts:
             blk.close()
         return gone
 
-    def publish(self, net, eng, cam, flags=0, lk=None):
+    def publish(self, net, eng, cam, flags=0, lk=None, rgb=None):
         """This frame to every popped-out view; `flags` what the 3-D view
         adds - 1 unlit LEDs as dim dots, 2 a floor under the shape; `lk`
-        its look (look.current)."""
+        its look (look.current); `rgb` the picture the views show
+        (frame_rgb: the VJ on air, the Mixer, a step's blend, the
+        brightness), else the engine's own."""
         from native import look
         for view, (proc, blk) in self.jobs.items():
             try:
@@ -142,17 +144,17 @@ class Popouts:
                     blk.look[:len(look.KEYS)] = [float(lk.get(k, look.DEFAULTS[k])) for k in look.KEYS]
                 blk.i[10] = 1 if lk is not None else 0
                 blk.i[9] = int(flags)
-                self._write(view, blk, net, eng, cam)       # last: its frame number tells the window to draw
+                self._write(view, blk, net, eng, cam, rgb)  # last: its frame number tells the window to draw
             except Exception:
                 pass
 
-    def _write(self, view, blk, net, eng, cam):
+    def _write(self, view, blk, net, eng, cam, rgb=None):
         g = eng.geom
         cube = g is not None and g.kind == "cube"                 # in flat mode too: the faces are where they were
         if view == "net" or cube:
             px = net
         else:
-            px = eng.rgb()                    # the LEDs in order, for the positions
+            px = eng.rgb() if rgb is None else rgb    # the LEDs in order, for the positions: as the views show them
         px = np.ascontiguousarray(px).reshape(-1)
         if px.size > MAX_NET:
             return

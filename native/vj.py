@@ -117,6 +117,7 @@ class DeckRun:
         self.canvas = None              # (h, w, 3) float 0..1, the look's last picture
         self.led = None                 # (rows, cols, 3) uint8: an Effect deck's picture
         self.trail = None
+        self.size = None                # the canvas the look's state was made for
         self.error = ""
         self.open_error = ""            # the source's, when it could not be opened (kept until it is changed)
 
@@ -409,10 +410,14 @@ def draw_deck(app, i, dt, snd, beat, hit):
     deck = o["decks"][i]
     run = _runs(app)[i]
     what, rv = _react(deck, snd, beat)
-    speed = float(deck.get("speed", 1.0)) * (1.0 + 2.0 * rv if what == "speed" else 1.0)
-    amount = min(1.0, float(deck.get("amount", 0.5)) + (rv if what == "amount" else 0.0))
+    speed = knob_value(app, i, "speed") * (1.0 + 2.0 * rv if what == "speed" else 1.0)
+    amount = min(1.0, knob_value(app, i, "amount") + (rv if what == "amount" else 0.0))
     run.t += dt * speed
     if deck["look"] == EFFECT:
+        if run.src_key is not None:                           # an Effect deck has no video: its source let go
+            run.src_key = None
+            run.video = run.video_prev = None
+            _release(app)
         run.led = _effect_frame(app, i, run, deck, speed, amount)
         return
     src = _source(app, i, run, deck)
@@ -427,10 +432,12 @@ def draw_deck(app, i, dt, snd, beat, hit):
         if err:
             run.error = str(err)
     lk = vj_looks.LOOKS.get(deck["look"]) or vj_looks.LOOKS["Plasma"]
-    if run.look != lk.name:
-        run.look = lk.name
-        run.state = {}
     w, h = canvas_size(app)
+    if run.look != lk.name or run.size != (w, h):           # another look, or the canvas resized: it starts again
+        run.look = lk.name
+        run.size = (w, h)
+        run.state = {}
+        run.trail = None
     c = Ctx()
     c.w, c.h = w, h
     c.u, c.v, c.x, c.y, c.r, c.a = _grid(w, h)
@@ -466,18 +473,18 @@ def post(app, i, c, img, beat, what=None, rv=0.0):
     run = _runs(app)[i]
     if what == "zoom":
         img = _zoom(img, rv)
-    k = int(deck.get("kaleido", 0) or 0)
+    k = int(round(knob_value(app, i, "kaleido")))
     if k > 0:
         img = vj_looks.kaleido(c, img, k)
     if deck.get("mirror"):
         img = vj_looks.mirror(img)
-    hue = float(deck.get("hue", 0.0)) + (rv * 0.5 if what == "hue" else 0.0)
+    hue = knob_value(app, i, "hue") + (rv * 0.5 if what == "hue" else 0.0)
     if hue:
         img = vj_looks.hue_turn(img, hue)
-    b = int(deck.get("blur", 0) or 0)
+    b = int(round(knob_value(app, i, "blur")))
     if b > 0:
         img = vj_looks.blur(img, b)
-    tr = float(deck.get("trails", 0.0) or 0.0)
+    tr = knob_value(app, i, "trails")
     if tr > 0:
         keep = 0.6 + 0.38 * tr                                         # how much of the last frame stays
         prev = run.trail
@@ -759,13 +766,27 @@ def _fade_from_here(app, step):
     app._vj_fade = {"t0": clock.now(), "dur": dur, "from": np.array(last, copy=True), "style": style}
 
 
-def apply_step(app, step):
+def apply_step(app, step, playing=True):
     """A step loaded: one of the VJ's puts its decks on air (the desk as it was kept, to come back when the show
     lets it go); one that is not takes the VJ off air again - if a VJ step had put it there. Either way, blended
-    over the step's blend from what showed before."""
+    over the step's blend from what showed before. Not playing (a step shown in the sim, as Load into the sim
+    does), a VJ step's decks become the desk's - nothing is kept to come back to - and a step that is not the
+    VJ's leaves the desk alone."""
     v = step.get("vj") if isinstance(step, dict) else None
     o = options(app)
     by_show = getattr(app, "_vj_by_show", False)
+    if not playing:
+        if v:
+            if by_show:                                    # a show's desk let go: what is loaded now is the desk
+                app._vj_by_show, app._vj_desk = False, None
+            for k in SNAP_KEYS:
+                if k in v:
+                    o[k] = json_copy(v[k])
+            options(app)
+            o["on"] = True
+            app._vj_sweep = None
+            app._vj_dirty = True
+        return
     if v:
         if not by_show:
             app._vj_desk = json_copy({k: o[k] for k in SNAP_KEYS + ("on",)})
@@ -889,11 +910,39 @@ def rename_flame(app, old, new):
     return True
 
 
+def project_changed(app):
+    """Another project opened: the last one's show desk, sources, decks' state and bred flames let go."""
+    app._vj_by_show, app._vj_desk, app._vj_fade, app._vj_sweep = False, None, None, None
+    app._vj_mod = {}
+    close(app)
+    app._vj_runs = None
+    for n in [n for n, lk in vj_looks.LOOKS.items() if lk.family == "flame" and n not in vj_looks.FLAMES]:
+        vj_looks.LOOKS.pop(n, None)
+    options(app)                                            # this project's flames registered
+
+
+def midi_looks():
+    """The looks in an order that does not shift as looks are added: the built-in ones as they ship, Effect, then
+    the project's own and the bred flames by name (MIDI picks a look by its place along this)."""
+    extra = sorted(n for n in vj_looks.LOOKS if n not in vj_looks.BUILTIN)
+    return list(vj_looks.BUILTIN) + [EFFECT] + extra
+
+
 # --- a deck's controls by name: MIDI's and the modulators' -----------------------------------------
 KNOBS = (("amount", 0.0, 1.0), ("speed", 0.0, SPEED_MAX), ("hue", 0.0, 1.0), ("kaleido", 0, 12), ("trails", 0.0, 1.0),
          ("blur", 0, 3))
 KNOB_WORDS = {"amount": "amount", "speed": "speed", "hue": "hue", "kaleido": "kaleidoscope", "trails": "trails",
               "blur": "blur"}
+
+
+def knob_value(app, i, key):
+    """A deck's knob as it draws: a modulator's value over it while one moves it (vj_mod, never saved), else the
+    knob's own (what the dialog, MIDI and the project have)."""
+    m = getattr(app, "_vj_mod", None)
+    if m and (i, key) in m:
+        return m[(i, key)]
+    lo = next(a for k, a, _ in KNOBS if k == key)
+    return float(options(app)["decks"][i].get(key, lo) or 0)
 
 
 def knob_get(app, i, key):

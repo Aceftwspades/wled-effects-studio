@@ -88,9 +88,9 @@ def novelty(feat):
     return out
 
 
-def boundaries(nov, bar=None, beats=None):
+def boundaries(nov, bar=None, beats=None, first=0.0):
     """The section edges, in seconds: the novelty's peaks - the strongest first, none within MIN_S of another or
-    of either end - put on the nearest bar (or beat)."""
+    of either end - put on the nearest bar (counted from the first beat, `first`) or beat."""
     n = len(nov)
     if n < 4 or nov.max() <= 0:
         return []
@@ -107,7 +107,7 @@ def boundaries(nov, bar=None, beats=None):
     out = []
     for t in sorted(kept):
         if bar:
-            t = round(t / bar) * bar
+            t = round((t - first) / bar) * bar + first
         elif beats:
             t = min(beats, key=lambda b: abs(b - t))
         if out and t - out[-1] < MIN_S * 0.5:
@@ -145,13 +145,13 @@ def label(secs):
     return secs
 
 
-def sections(x, rate, bar=None, beats=None):
+def sections(x, rate, bar=None, beats=None, first=0.0):
     """The audio's sections: [{"name", "kind", "at", "len", "energy" (its mean loudness, 0..1 of the loudest)}]."""
     feat, rms = features(np.asarray(x, np.float32), rate)
     if len(feat) < 4:
         return []
     total = len(x) / float(rate)
-    edges = [0.0] + boundaries(novelty(feat), bar, beats) + [total]
+    edges = [0.0] + boundaries(novelty(feat), bar, beats, first) + [total]
     top = float(rms.max()) or 1.0
     out = []
     for a, b in zip(edges[:-1], edges[1:]):

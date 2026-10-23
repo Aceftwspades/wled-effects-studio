@@ -1089,6 +1089,8 @@ class App(Features, Recorder, EditBuild):
         device_ui.refresh_devices(self)
         from native import palette_ui
         palette_ui.sync(self); palette_ui.refresh(self)
+        from native import vj, vj_ui
+        vj.project_changed(self); vj_ui.refresh(self)
         name = os.path.basename(path)
         dpg.set_value("edit_status", f"project {name}"); self.gp.status(f"project {name}")
         # the engine holds the previous project's drafts: build this one's list
@@ -3613,8 +3615,10 @@ class App(Features, Recorder, EditBuild):
                 rgb = self.history_rgb[k]                  # the scrubbed frame on a strip, a sphere, a shape of parts too
         big = img = None
         _u, _f = self.view_extras()
-        self.popouts.publish(net, self.eng, (self.yaw, self.pitch, self.dist), (1 if _u is not None else 0) | (2 if _f else 0),
-                             self.view_look())
+        if self.popouts.jobs:
+            shown = rgb if rgb is not None else self.frame_rgb(self.eng)   # what the views show, not the engine's own
+            self.popouts.publish(net, self.eng, (self.yaw, self.pitch, self.dist),
+                                 (1 if _u is not None else 0) | (2 if _f else 0), self.view_look(), shown)
         if self.net_on():
             if self.gpu_net:
                 k = self.NET_SRC_SCALE

@@ -3990,40 +3990,42 @@ GPU and a cheaper point cloud (e7c6f55); the review's fixes (48cd126).
 
 ### To do: found in use and in the review of everything since 1.17.1 (2026-10-22)
 
-Bugs, the worst first (each traced in the code, not yet fixed):
+Bugs, the worst first (each traced in the code; all fixed 2026-10-23 - a VJ step shown in the sim
+without playing now makes its decks the desk's, as Load into the sim makes an effect the sim's; the show
+keeps its first beat when Find sections hears it, and sections and the VJ's bars count from it):
 
-- [ ] **The pop-out misses the VJ's mix** (found in use): for any shape but
+- [x] **The pop-out misses the VJ's mix** (found in use): for any shape but
       the cube the pop-out takes the engine's own LEDs (popout.py `_write`,
       `eng.rgb()`), not the picture every other view takes
       (`frame_rgb`) - so it shows the effect, not the VJ on air, and
       misses the Mixer's deck B, a step's blend, the show's brightness and
       the blackout too. The cube's pop-out is right (it is sent the net).
-- [ ] **A flame errors after the canvas size changes**: its counts keep the
+- [x] **A flame errors after the canvas size changes**: its counts keep the
       old size (vj_looks `flame_frame` resets only for another flame), so
       the deck says an error and draws dark until its look is changed.
       Every look's state should start again with a new canvas.
-- [ ] **A modulated VJ knob is saved mid-swing**: the modulators write the
+- [x] **A modulated VJ knob is saved mid-swing**: the modulators write the
       deck's knob into the project's options, so the next save keeps
       wherever the wave was, not the knob's place.
-- [ ] **Showing a VJ step in the sim takes over the desk** (selecting it,
+- [x] **Showing a VJ step in the sim takes over the desk** (selecting it,
       "Show it in the sim", not playing): it is put back only when a show
       stops or a step that is not the VJ's loads.
-- [ ] **The power estimate and the limiter's preview ignore the VJ and the
+- [x] **The power estimate and the limiter's preview ignore the VJ and the
       Mixer** (features.py `poll_power`, `eng.rgb()`): with either on air
       the current shown is the effect's, not what the stream sends.
-- [ ] **The auto-mix's bars assume the show's first beat is at 0 s**: the
+- [x] **The auto-mix's bars assume the show's first beat is at 0 s**: the
       show keeps no first beat (Find sections finds the beats but keeps
       only the tempo), so a song with a lead-in has its fades between bars.
-- [ ] **An Effect deck keeps its video source open** (a webcam stays on
+- [x] **An Effect deck keeps its video source open** (a webcam stays on
       after the deck's look is changed to Effect).
-- [ ] **A show's VJ desk outlives a project switch**: the desk kept for the
+- [x] **A show's VJ desk outlives a project switch**: the desk kept for the
       end of a show (and the flames bred) carry over into the next project.
-- [ ] **MIDI on a deck's look shifts** when a look of your own or a bred
+- [x] **MIDI on a deck's look shifts** when a look of your own or a bred
       flame is added: the target picks by place in the list.
-- [ ] **Every random modulator is the same wave** (modulate.py: one seed).
-- [ ] **Adding video files takes one at a time**: the file dialog is not
+- [x] **Every random modulator is the same wave** (modulate.py: one seed).
+- [x] **Adding video files takes one at a time**: the file dialog is not
       set to take several.
-- [ ] **Listing the webcams freezes the studio** for a second or two (ffmpeg
+- [x] **Listing the webcams freezes the studio** for a second or two (ffmpeg
       on the main loop, the deck's "..." button).
 
 What the VJ still lacks, from its review:

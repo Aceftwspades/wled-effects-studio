@@ -296,8 +296,11 @@ vj.knob_set(app, 1, "speed", 1.0)
 check(o["decks"][1]["kaleido"] == 6 and abs(o["decks"][1]["speed"] - vj.SPEED_MAX) < 1e-6, "knobs from 0..1")
 from native import modulate
 check(modulate._get(app, "vj1.kaleido") == int(round(6 / 12 * 255)), "a modulator reads a deck's knob")
+was = o["decks"][1]["amount"]
 modulate._set(app, "vj1.amount", 51)
-check(abs(o["decks"][1]["amount"] - 0.2) < 1e-3, "and sets it")
+check(abs(vj.knob_value(app, 1, "amount") - 0.2) < 1e-3 and o["decks"][1]["amount"] == was,
+      "and moves it - over the knob, the knob (what is saved) left where it was set")
+app._vj_mod = {}
 
 # a list of video files: the next one, its key with speed and in and out
 s = o["decks"][0]["source"]
@@ -309,6 +312,88 @@ check(key[0] == "file" and key[1] == "b.mp4" and key[2] == 2.0 and key[3] == 1.0
       "a file's source: its speed, from and to in its key")
 s.update(kind="none", files=[])
 vj.close(app)
+
+# --- the to-do list's fixes (2026-10-23) ------------------------------------------------------------
+# the pop-out sends what the views show, on a shape that is not a cube (a matrix)
+from native import popout
+gm = geometry.Geometry("matrix")
+
+
+class PopEng:
+    geom, B, six, rows, cols = gm, 0, False, gm.h, gm.w
+
+    def rgb(self):
+        return np.zeros((gm.h, gm.w, 3), np.uint8)
+
+
+shown = np.full((gm.h, gm.w, 3), 77, np.uint8)
+blk = popout.Block(f"vjtest_{os.getpid()}", create=True)
+try:
+    popout.Popouts()._write("cube", blk, shown, PopEng(), (0.0, 0.0, 3.0), shown)
+    check(int(blk.i[2]) == 1 and bool((np.asarray(blk.px[:shown.size]) == 77).all()),
+          "the pop-out of a matrix: the picture the views show, not the engine's own")
+finally:
+    blk.close()
+
+# a new canvas size: a flame starts again rather than erring
+o["decks"][0].update(look="Flame: Sheep", source=vj.json_copy(vj.SOURCE))
+o["fader"] = 0.0
+vj.update(app, 1 / 40)
+o["canvas"] = "64x48"
+vj.update(app, 1 / 40)
+check(not vj._runs(app)[0].error and vj._runs(app)[0].canvas.shape == (48, 64, 3), "a flame on a new canvas size")
+o["canvas"] = "96x72"
+
+# a VJ step shown in the sim (not played): its decks are the desk's, nothing kept to go back to
+app._vj_by_show, app._vj_desk = False, None
+o["decks"][0]["look"] = "Warp"
+snap = vj.snapshot(app)
+snap["decks"][0]["look"] = "Voronoi"
+o["on"] = False
+vj.apply_step(app, {"vj": snap}, playing=False)
+check(o["on"] and o["decks"][0]["look"] == "Voronoi" and not app._vj_by_show, "a VJ step loaded: the desk's now")
+vj.apply_step(app, {"segments": []}, playing=False)
+check(o["on"] and o["decks"][0]["look"] == "Voronoi", "a plain step loaded after it: the desk left alone")
+
+# another project: the show's desk and the bred flames let go
+o["decks"][0]["look"] = "Flame: Coral"
+bred = vj.mutate_flame(app, 0)
+app._vj_by_show, app._vj_desk = True, {"on": False}
+vj.project_changed(app)
+check(not app._vj_by_show and app._vj_desk is None, "another project: the show's desk let go")
+app.project.options["vj"]["flames"] = {}
+vj.project_changed(app)
+check(bred not in vj_looks.LOOKS, "another project: the last one's bred flames unlisted")
+
+# MIDI's look list: the built-in looks keep their places when looks are added
+before = vj.midi_looks()
+vj_looks.register_flame("Flame: Zzz test", vj_looks.new_flame(5))
+after = vj.midi_looks()
+check(after[:len(vj_looks.BUILTIN) + 1] == before[:len(vj_looks.BUILTIN) + 1] and "Flame: Zzz test" in after,
+      "a look added: the built-in ones keep their places for MIDI")
+vj_looks.LOOKS.pop("Flame: Zzz test", None)
+
+# an Effect deck lets its video source go
+o["decks"][0].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
+o["decks"][1]["source"] = vj.json_copy(vj.SOURCE)
+vj.update(app, 1 / 40)
+check(len(vj._pool(app)) == 1, "a video deck: its source open")
+o["decks"][0].update(look=vj.EFFECT, effect="Rainbow")
+vj.update(app, 1 / 40)
+check(len(vj._pool(app)) == 0, "made an Effect deck: the source closed")
+o["decks"][0].update(look="Plasma", source=vj.json_copy(vj.SOURCE))
+
+# the sections' edges on bars counted from the first beat
+from native import showanalysis
+nov = np.zeros(120, np.float32)
+nov[40] = 1.0                                                        # a change at 20.25 s
+check(showanalysis.boundaries(nov, bar=2.0, first=0.5) == [20.5], "an edge on the bars counted from the first beat")
+
+# each modulator its own random wave
+from native import modulate as mo
+m1 = dict(mo.DEFAULT, shape="random", seed=1)
+m2 = dict(mo.DEFAULT, shape="random", seed=2)
+check(mo.offset(m1, 2.5, None) != mo.offset(m2, 2.5, None), "two random modulators: two waves")
 
 print("FAILED:", fails if fails else "none")
 sys.exit(1 if fails else 0)

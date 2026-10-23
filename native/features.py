@@ -708,7 +708,9 @@ class Features:
         if n % 4:
             return
         try:
-            ma, scale = outputs.power(self.eng.rgb(), self.project.geometry.phys, int(S.get("ma_per_led", outputs.LED_MA_DEFAULT)),
+            from native import mixer, vj
+            shown = mixer.picture(self, vj.picture(self, self.eng.rgb()))   # the VJ and the Mixer, as streamed
+            ma, scale = outputs.power(shown, self.project.geometry.phys, int(S.get("ma_per_led", outputs.LED_MA_DEFAULT)),
                                       int(S.get("max_ma", outputs.MAX_MA_DEFAULT)), int(getattr(self, "bri", 255)))
             self._power = (ma, scale, int(S.get("max_ma", outputs.MAX_MA_DEFAULT)))
         except Exception:

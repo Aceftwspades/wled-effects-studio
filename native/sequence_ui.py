@@ -988,7 +988,7 @@ def load_step(app, i=None, quiet=False):
     i = getattr(app, "_seq_sel", 0) if i is None else i
     if 0 <= i < len(S["steps"]):
         sequence.apply(app.eng, S["steps"][i])
-        __import__("native.vj", fromlist=["v"]).apply_step(app, S["steps"][i])   # a VJ step's decks on air (vj.py)
+        __import__("native.vj", fromlist=["v"]).apply_step(app, S["steps"][i], playing=_play_i(app) is not None)
         app.seg_cols = [int(c) for c in app.eng._colors]         # the current segment's, as the step left them
         app.refresh_colours()
         dpg.set_value("fx_combo", app.eng.names[app.eng.idx])
@@ -3200,15 +3200,22 @@ def find_sections(app):
             x, rate = live.samples, live.rate
         if len(x) < rate * 4:
             raise RuntimeError("no audio to listen to: put a file on a track (+ Audio...) first")
-        got = None if bar else audio.beats_of(x, rate)
+        got = audio.beats_of(x, rate)                    # the beats - for where the first is, with a tempo set too
+        if got and not got[0]:
+            got = None
         b = bar or (60.0 / got[0] * int(S.get("bar", 4)) if got else None)
-        return showanalysis.sections(x, rate, bar=b), got
+        first = 0.0
+        if got and got[1] is not None and b:                # the first beat, within the first bar: where bars count from
+            first = float(got[1]) % b
+        return showanalysis.sections(x, rate, bar=b, first=first), (got, first)
 
     def done(r):
-        secs, got = r
-        if got:
+        secs, (got, first) = r
+        if got and not bar:
             set_tempo(app, bpm=got[0])
+        if got:
             app._seq_beats = got[2]
+        S["first"] = round(first, 3)                        # the show's first beat: the VJ's bars count from it
         S["sections"] = [{k: s[k] for k in ("name", "kind", "at", "len")} for s in secs]
         _save(app)
         app._tl_dirty = True

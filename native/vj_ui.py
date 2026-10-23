@@ -128,7 +128,7 @@ def build(app):
         dpg.add_text("", tag="vj_words", color=c.DIM, wrap=0)
     for i in (0, 1):
         with dpg.file_dialog(directory_selector=False, show=False, tag=f"vj_file{i}", width=px(620), height=px(420),
-                             callback=lambda s, a, i=i: _add_files(app, i, a)):
+                             file_count=50, callback=lambda s, a, i=i: _add_files(app, i, a)):   # several at once
             dpg.add_file_extension("{.mp4,.mov,.mkv,.webm,.avi,.gif,.m4v}", color=(120, 170, 255))
             dpg.add_file_extension(".*")
         with dpg.file_dialog(directory_selector=False, show=False, tag=f"vj_imgfile{i}", width=px(620), height=px(420),
@@ -584,14 +584,17 @@ def _pick_source(app, i):
     if kind == "file":
         dpg.show_item(f"vj_file{i}")
     elif kind in ("webcam", "screen"):
-        try:
-            names = [n for n, _ in (video.webcams() if kind == "webcam" else video.screens())]
-        except Exception as e:
-            names = []
-            app.gp.status(f"video: {e}", "warn")
-        dpg.configure_item(f"vj_srcname{i}", items=names, show=True)
-        if names:
+        from native import tasks
+
+        def work():                                         # ffmpeg asked on a worker: the studio does not stop
+            return [n for n, _ in (video.webcams() if kind == "webcam" else video.screens())]
+
+        def done(names):
+            if not names:
+                app.gp.status(f"no {'cameras' if kind == 'webcam' else 'screens'} found"); return
+            dpg.configure_item(f"vj_srcname{i}", items=names, show=True)
             dpg.set_value(f"vj_srcname{i}", vj.options(app)["decks"][i]["source"].get("name") or names[0])
+        tasks.run(app, f"vj_list{i}", "looking for " + ("cameras" if kind == "webcam" else "screens"), work, done)
     elif kind == "stream":
         dpg.configure_item(f"vj_url{i}", show=True)
 
