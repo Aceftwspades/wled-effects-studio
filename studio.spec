@@ -26,6 +26,11 @@ datas = [(s, d) for s, d in datas if os.path.exists(s)]
 # every module of native/: the app imports many of them by name at run time
 hidden = ["native." + f[:-3] for f in os.listdir(os.path.join(HERE, "native")) if f.endswith(".py") and f != "__init__.py"]
 hidden += ["sounddevice", "pyaudiowpatch", "PIL.Image", "PIL.ImageDraw", "numpy"]
+try:                                       # the VJ's shaders: moderngl finds its OpenGL backend by name at run time
+    from PyInstaller.utils.hooks import collect_submodules
+    hidden += ["moderngl"] + collect_submodules("glcontext")
+except Exception:
+    pass
 
 a = Analysis([os.path.join(HERE, "studio.py")],
              pathex=[HERE],

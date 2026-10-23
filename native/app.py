@@ -29,7 +29,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import num
-from native import render_video, render_fseq, modulate, mixer
+from native import render_video, render_fseq, modulate, mixer, vj
 from native import typeface
 from native import form
 from native import dock
@@ -3617,7 +3617,13 @@ class App(Features, Recorder, EditBuild):
         _u, _f = self.view_extras()
         if self.popouts.jobs:
             shown = rgb if rgb is not None else self.frame_rgb(self.eng)   # what the views show, not the engine's own
-            self.popouts.publish(net, self.eng, (self.yaw, self.pitch, self.dist),
+            pop_net = net
+            cue = vj.cue_picture(self) if vj.on(self) else None           # the VJ's cue: the deck off the mix there
+            if cue is not None and cue.shape == shown.shape:
+                shown = cue
+                if pop_net.shape == cue.shape:
+                    pop_net = cue
+            self.popouts.publish(pop_net, self.eng, (self.yaw, self.pitch, self.dist),
                                  (1 if _u is not None else 0) | (2 if _f else 0), self.view_look(), shown)
         if self.net_on():
             if self.gpu_net:

@@ -26,7 +26,7 @@ import random
 
 FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
 # the VJ frame's deck knobs too (vj.py): "vj0.amount" is deck A's amount - 0..255 of the knob's range
-VJ_KEYS = tuple(f"vj{i}.{k}" for i in (0, 1) for k in ("amount", "speed", "hue", "kaleido", "trails", "blur"))
+VJ_KEYS = tuple(f"vj{i}.{k}" for i in (0, 1, 2) for k in ("level", "amount", "speed", "hue", "kaleido", "trails", "blur"))
 KEYS = FX_KEYS + VJ_KEYS
 KINDS = (("lfo", "a wave (LFO)"), ("beat", "on the beat"), ("steps", "a step pattern"))
 SHAPES = ("sine", "triangle", "saw up", "saw down", "square", "random")
@@ -210,7 +210,7 @@ def _labels(app):
     from native import vj
     for k in VJ_KEYS:
         i, knob = _vj_key(k)
-        out[k] = f"VJ {'AB'[i]} {vj.KNOB_WORDS[knob]}"
+        out[k] = f"VJ {vj.LETTERS[i]} {vj.KNOB_WORDS[knob]}"
     return out
 
 

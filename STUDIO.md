@@ -4030,21 +4030,41 @@ keeps its first beat when Find sections hears it, and sections and the VJ's bars
 
 What the VJ still lacks, from its review:
 
-- [ ] **Its media kept with the project**: video files and pictures are
+- [x] **Its media kept with the project**: video files and pictures are
       kept by their full path, so a project moved or shared loses them
       (the show's audio is copied into assets/; these should be too, or
       offered).
-- [ ] **MIDI learn from the frame itself**: right-click a deck's control
+- [x] **MIDI learn from the frame itself**: right-click a deck's control
       to learn it, as the MIDI frame's list does now in two steps.
-- [ ] **A level for each deck**, apart from the fader (Resolume's layer
+- [x] **A level for each deck**, apart from the fader (Resolume's layer
       opacity): a deck faded down while the fader stays.
-- [ ] **The deck off air on the shape**: a cue - the pop-out (or the 3-D
+- [x] **The deck off air on the shape**: a cue - the pop-out (or the 3-D
       view) showing the deck about to go on, not the mix.
-- [ ] **An Effect deck's palette and colours**: it runs the effect's
+- [x] **An Effect deck's palette and colours**: it runs the effect's
       defaults; the deck's colours do nothing on it.
-- [ ] Still not done from before: real GLSL (pasting a Shadertoy shader as
-      it is, needs moderngl in all four builds), MilkDrop's .milk presets
-      imported, a third deck.
+- [x] Real GLSL (Shadertoy shaders run as they are - native/vj_glsl.py,
+      moderngl on a thread of its own), MilkDrop's .milk presets imported
+      (native/milk.py: ns-eel to numpy; motion, decay, wave and equations -
+      shapes and MilkDrop 2 shaders left out), a third deck (C, over the
+      mix). Done 2026-10-23 with the rest of this list: media copied into
+      assets/vj, right-click Learn MIDI, a level a deck, the cue in the
+      pop-out, an Effect deck's palette and colours.
+
+From the review before 1.18.0 (2026-10-23), still to do:
+
+- [ ] **The phone's VJ card** has the fader and the buttons only: deck C, the
+      decks' levels and a look picker would make it a remote for a set.
+- [ ] **Shader channels**: many Shadertoy shaders read a noise texture or an
+      image on iChannel0..3; the studio gives the deck's video and the
+      sound. A choice per channel (video, sound, noise, a picture) would
+      run most of the rest; several passes (Buffer A-D) are further off.
+- [ ] **MilkDrop's custom shapes and waves**, and its MilkDrop 2 warp and
+      composite shaders, are left out of an imported preset.
+- [ ] **An Effect deck's colours** have no "the effect's own": the deck's
+      gradient always sets them (its palette has the choice).
+- [ ] **A shared project's Python looks run as code** when its VJ frame
+      opens (as its graphs compile and run): worth a word when a project
+      from elsewhere is opened, as .milk and .glsl files cannot do that.
 
 ### From the second feature review (October 2026)
 

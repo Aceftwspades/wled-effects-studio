@@ -22,7 +22,7 @@ BROWSE = "vj_browse_win"
 PV_W, PV_H = 96, 72                       # a deck's preview texture (any canvas is fitted to it)
 OUT_N = 64                                # the output's preview texture, square
 TH_W, TH_H = 48, 36                       # a look's thumbnail in the browser
-LETTER = ("A", "B")
+LETTER = ("A", "B", "C")
 AUTO = (("off", "off"), ("bars", "every few bars"), ("sections", "at the show's sections"))
 SAVE_AFTER = 0.4                          # s a change settles before it is saved (one undo step a drag)
 
@@ -50,7 +50,7 @@ def build(app):
     c = _c()
     from native import device_ui
     o = vj.options(app)
-    for i in (0, 1):
+    for i in range(vj.DECKS):
         _tex(f"vj_tex{i}", PV_W, PV_H)
     _tex("vj_out_tex", OUT_N, OUT_N)
     with dpg.window(tag=TAG, show=False, width=px(680), height=px(700), no_collapse=True, no_title_bar=True):
@@ -67,6 +67,12 @@ def build(app):
                     c.tip("a look of your own: a small Python file in the project's looks/ folder, made from an example "
                           "and opened in your editor - it reloads here each time it is saved; it goes on the deck off "
                           "the mix")
+                    dpg.add_button(label="New shader...", tag="vj_newglsl", small=True, callback=lambda: _new_shader(app))
+                    c.tip("a Shadertoy shader of your own: a .glsl file to paste one from shadertoy.com into (its Image "
+                          "tab's code) - it runs as it is, on the graphics card")
+                    dpg.add_button(label="Import...", tag="vj_import", small=True, callback=lambda: dpg.show_item("vj_impfile"))
+                    c.tip("a MilkDrop preset (.milk) or a Shadertoy shader (.glsl) copied into the project's looks/ and "
+                          "listed - a preset runs its motion, decay, wave and equations; its shapes and shaders are left out")
                 with dpg.group(horizontal=True):
                     typeface.label(dpg.add_text("MAP", color=c.ACCENT))
                     dpg.add_combo([w for _, w in vj.MAPS], tag="vj_map", width=px(190),
@@ -84,12 +90,16 @@ def build(app):
                         dpg.draw_circle((px(8), px(8)), px(6), fill=(60, 60, 60, 255), color=(0, 0, 0, 0), tag="vj_beat")
                     dpg.add_button(label="Tap", tag="vj_tap", small=True, callback=lambda: _tap(app))
                     c.tip("tap on the beat: the show's tempo from the gaps (the Sequence's Tap)")
+                    dpg.add_checkbox(label="cue", tag="vj_cue", default_value=bool(o.get("cue")),
+                                     callback=lambda s, v: _set(app, "cue", bool(v)))
+                    c.tip("the pop-out shows the deck off the mix - the one to set up before fading to it - while the "
+                          "views and the stream go on with the mix")
                     dpg.add_text("", tag="vj_tempo", color=c.DIM)
             dpg.add_image("vj_out_tex", width=px(84), height=px(84), tag="vj_out")
             c.tip("what is on air: the mix, on the shape's logical view")
         with dpg.group(horizontal=True):
             for i in (0, 1):
-                with dpg.child_window(tag=f"vj_deck{i}", width=px(326), height=px(470), border=True):
+                with dpg.child_window(tag=f"vj_deck{i}", width=px(326), height=px(500), border=True):
                     _deck(app, i)
         # the fader
         with dpg.group(horizontal=True):
@@ -98,7 +108,8 @@ def build(app):
             c.tip("all deck A")
             num.add("vj_fader", float(o["fader"]), 0.0, 1.0, digits=2, width=px(200),
                     callback=lambda s, v: vj.set_fader(app, float(v)))
-            c.tip("the crossfader: deck A at 0, deck B at 1 - MIDI and the phone move it too")
+            c.tip("the crossfader: deck A at 0, deck B at 1 - MIDI and the phone move it too (right-click: learn MIDI)")
+            _learnable(app, "vj_fader", {"kind": "vj_fader"})
             dpg.add_button(label="B", tag="vj_to_b", small=True, callback=lambda: _fade_to(app, 1.0))
             c.tip("all deck B")
             dpg.add_button(label="Cut", tag="vj_cut", small=True, callback=lambda: vj.cut(app))
@@ -125,14 +136,27 @@ def build(app):
             dpg.add_checkbox(label="shuffle looks", tag="vj_shuffle", default_value=bool(o["auto"]["shuffle"]),
                              callback=lambda s, v: _set_auto(app, "shuffle", bool(v)))
             c.tip("a deck dealt a new look as the mix leaves it, so it comes back as something else")
+        with dpg.collapsing_header(label="DECK C - over the mix", tag="vj_chead", default_open=False):
+            with dpg.group(horizontal=True):
+                dpg.add_text("over the mix by", color=c.DIM)
+                dpg.add_combo(list(vj.C_MODES), tag="vj_cmode", width=px(110), default_value=o["c_mode"],
+                              callback=lambda s, v: _set(app, "c_mode", v))
+                c.tip("how deck C goes over A and B's mix: lightened into it, added, the lighter of each, multiplied, "
+                      "their difference, or over it (its black lets the mix through) - at its level")
+            with dpg.child_window(tag="vj_deck2", width=px(326), height=px(500), border=True):
+                _deck(app, 2)
         dpg.add_text("", tag="vj_words", color=c.DIM, wrap=0)
-    for i in (0, 1):
+    with dpg.file_dialog(directory_selector=False, show=False, tag="vj_impfile", width=px(620), height=px(420),
+                         file_count=50, callback=lambda s, a: _import(app, a)):
+        dpg.add_file_extension("{.milk,.glsl}", color=(120, 170, 255))
+        dpg.add_file_extension(".*")
+    for i in range(vj.DECKS):
         with dpg.file_dialog(directory_selector=False, show=False, tag=f"vj_file{i}", width=px(620), height=px(420),
                              file_count=50, callback=lambda s, a, i=i: _add_files(app, i, a)):   # several at once
             dpg.add_file_extension("{.mp4,.mov,.mkv,.webm,.avi,.gif,.m4v}", color=(120, 170, 255))
             dpg.add_file_extension(".*")
         with dpg.file_dialog(directory_selector=False, show=False, tag=f"vj_imgfile{i}", width=px(620), height=px(420),
-                             callback=lambda s, a, i=i: _set_deck(app, i, "image", a.get("file_path_name", ""))):
+                             callback=lambda s, a, i=i: _set_image(app, i, a.get("file_path_name", ""))):
             dpg.add_file_extension("{.png,.jpg,.jpeg,.gif,.bmp,.webp}", color=(120, 170, 255))
             dpg.add_file_extension(".*")
     _build_browser(app)
@@ -155,6 +179,7 @@ def _deck(app, i):
     dpg.add_image(f"vj_tex{i}", width=px(PV_W * 2.2), height=px(PV_H * 2.2), tag=f"vj_pv{i}")
     _row("look", lambda: dpg.add_combo(look_names(), tag=f"vj_look{i}", width=-1, default_value=d["look"],
                                        callback=lambda s, v: _set_deck(app, i, "look", v)))
+    _learnable(app, f"vj_look{i}", {"kind": "vj_look", "deck": i})
     _row("effect", lambda: dpg.add_combo(list(app.eng.names), tag=f"vj_fx{i}", width=-1, default_value=d.get("effect", ""),
                                          callback=lambda s, v: _set_deck(app, i, "effect", v)), tag=f"vj_fxrow{i}")
     _row("words", lambda: dpg.add_input_text(tag=f"vj_text{i}", width=-1, default_value=d.get("text", ""),
@@ -164,12 +189,22 @@ def _deck(app, i):
         dpg.add_text("", tag=f"vj_imgname{i}")
         dpg.add_button(label="...", small=True, callback=lambda: dpg.show_item(f"vj_imgfile{i}"))
         c.tip("the picture file the Image look shows")
+    _row("level", lambda: num.add(f"vj_lvl{i}", float(d["level"]), 0.0, 1.0, digits=2,
+                                  callback=lambda s, v: _set_deck(app, i, "level", float(v))))
+    c.tip("the deck's own level, apart from the fader: faded down here while the fader stays" if i < 2 else
+          "how much of deck C goes over the mix: 0, none of it")
+    _learnable(app, f"vj_lvl{i}", {"kind": "vj_knob", "deck": i, "key": "level"})
     _row("amount", lambda: num.add(f"vj_amt{i}", float(d["amount"]), 0.0, 1.0, digits=2,
                                    callback=lambda s, v: _set_deck(app, i, "amount", float(v))))
+    _learnable(app, f"vj_amt{i}", {"kind": "vj_knob", "deck": i, "key": "amount"})
     _row("speed", lambda: num.add(f"vj_spd{i}", float(d["speed"]), 0.0, vj.SPEED_MAX, digits=2,
                                   callback=lambda s, v: _set_deck(app, i, "speed", float(v))))
+    _learnable(app, f"vj_spd{i}", {"kind": "vj_knob", "deck": i, "key": "speed"})
     _row("colours", lambda: dpg.add_combo(list(vj_looks.GRADIENTS), tag=f"vj_col{i}", width=-1, default_value=d["colours"],
                                           callback=lambda s, v: _set_deck(app, i, "colours", v)))
+    _row("palette", lambda: dpg.add_combo([], tag=f"vj_pal{i}", width=-1,
+                                          callback=lambda s, v: _set_deck(app, i, "palette", "" if v == OWN_PAL else v)),
+         tag=f"vj_palrow{i}")
     with dpg.collapsing_header(label="VIDEO", tag=f"vj_vidhead{i}", default_open=False):
         with dpg.group(horizontal=True, tag=f"vj_srcrow{i}"):
             dpg.add_combo([w for _, w in vj.SOURCES], tag=f"vj_src{i}", width=px(140),
@@ -222,6 +257,8 @@ def _deck(app, i):
                                        callback=lambda s, v: _set_deck(app, i, "trails", float(v))))
         _row("blur", lambda: num.add(f"vj_blr{i}", int(d["blur"]), 0, 3, integer=True,
                                      callback=lambda s, v: _set_deck(app, i, "blur", int(v))))
+        for key, tag in (("kaleido", "vj_kal"), ("hue", "vj_hue"), ("trails", "vj_trl"), ("blur", "vj_blr")):
+            _learnable(app, f"{tag}{i}", {"kind": "vj_knob", "deck": i, "key": key})
         with dpg.group(horizontal=True):
             dpg.add_checkbox(label="mirror", tag=f"vj_mir{i}", default_value=bool(d["mirror"]),
                              callback=lambda s, v: _set_deck(app, i, "mirror", bool(v)))
@@ -244,6 +281,28 @@ def _deck(app, i):
             weight.danger(dpg.last_item())
             c.tip("this bred flame no longer kept; the deck goes back to the flame it came from")
     dpg.add_text("", tag=f"vj_desc{i}", color=c.DIM, wrap=px(300))
+
+
+OWN_PAL = "the effect's own"
+
+
+def _learnable(app, item, target):
+    """A right-click on the control: MIDI learn for it - the next knob, fader or pad moved is bound to it."""
+    if not dpg.does_item_exist(item):
+        return
+    from native import midi_ui
+    with dpg.popup(item, mousebutton=dpg.mvMouseButton_Right):
+        dpg.add_selectable(label="Learn MIDI", callback=lambda: midi_ui.learn(app, dict(target)))
+        dpg.add_selectable(label="Forget its MIDI", callback=lambda: _forget_midi(app, target))
+
+
+def _forget_midi(app, target):
+    from native import midi_ui
+    st = midi_ui._st(app)
+    n = len(st["maps"])
+    st["maps"] = [m for m in st["maps"] if not midi_ui._same(m["target"], target)]
+    app.project.save()
+    app.gp.status(f"{n - len(st['maps'])} MIDI control(s) let go")
 
 
 def _row(label, make, tag=None):
@@ -416,19 +475,74 @@ def _set_src(app, i, **kw):
 
 
 def _add_files(app, i, a):
-    """Files from the dialog onto the deck's list (several at once where the dialog gives them)."""
-    sel = list((a.get("selections") or {}).values()) or [a.get("file_path_name", "")]
-    s = vj.options(app)["decks"][i]["source"]
-    files = [f for f in (s.get("files") or []) if f]
-    if not files and s.get("path"):
-        files = [s["path"]]
-    added = [f for f in sel if f and os.path.isfile(f) and f not in files]
-    s["files"] = files + added
-    if added:
-        s["clip"] = len(files)                                      # the first one added plays
-    s["kind"] = "file"
-    _save(app)
+    """Files from the dialog onto the deck's list (several at once), copied into the project's assets/vj first -
+    on a worker, a video can be large - so the project keeps them."""
+    from native import tasks
+    sel = [f for f in (list((a.get("selections") or {}).values()) or [a.get("file_path_name", "")]) if f and os.path.isfile(f)]
+    if not sel:
+        return
+
+    def work():
+        return [vj.keep_media(app, f) for f in sel]
+
+    def done(kept):
+        s = vj.options(app)["decks"][i]["source"]
+        files = [f for f in (s.get("files") or []) if f]
+        if not files and s.get("path"):
+            files = [s["path"]]
+        added = [f for f in kept if f not in files]
+        s["files"] = files + added
+        if added:
+            s["clip"] = len(files)                                  # the first one added plays
+        s["kind"] = "file"
+        _save(app)
+        refresh(app)
+        app.gp.status(f"{len(kept)} video file(s) kept in the project's {vj.MEDIA_DIR}")
+    tasks.run(app, f"vj_files{i}", f"copying {len(sel)} video file(s) into the project", work, done)
+
+
+def _set_image(app, i, path):
+    if not path or not os.path.isfile(path):
+        return
+    try:
+        kept = vj.keep_media(app, path)
+    except OSError as e:
+        app.gp.status(f"could not copy {os.path.basename(path)}: {e}", "warn"); return
+    _set_deck(app, i, "image", kept)
+
+
+def _import(app, a):
+    """.milk presets and .glsl shaders copied into the project's looks/ and listed."""
+    sel = [f for f in (list((a.get("selections") or {}).values()) or [a.get("file_path_name", "")]) if f and os.path.isfile(f)]
+    for f in sel:
+        vj_looks.import_file(app.project, f)
+    errs = vj_looks.load_user(app.project)
+    app._vj_file_errs = errs
+    app._vj_thumbs = None
     refresh(app)
+    bad = [e for e in errs if any(os.path.basename(f).lower() in e[0].lower() for f in sel)]
+    app.gp.status(f"{len(sel)} imported into the project's looks/" + (f" - {len(bad)} could not be read" if bad else ""))
+
+
+def _new_shader(app):
+    def made(name):
+        name = (name or "").strip()
+        if not name:
+            return
+        ok, why = __import__("native.vj_glsl", fromlist=["g"]).available()
+        path = vj_looks.new_shader(app.project, name)
+        vj_looks.load_user(app.project)
+        o = vj.options(app)
+        cue = vj.cue_deck(app)
+        lk = next((n for n, l in vj_looks.LOOKS.items() if l.family == "yours" and _user_path(n) == path), None)
+        if lk:
+            o["decks"][cue]["look"] = lk
+        _save(app)
+        refresh(app)
+        _open(app, path)
+        app.gp.status(f"{os.path.basename(path)} made in the project's looks/ - on deck {LETTER[cue]}"
+                      + ("" if ok else f" (it will not run here: {why})"))
+    _c().ask(app, "A shader of your own", "its name", "My shader", made)
 
 
 def _pick_clip(app, i, label):
@@ -563,7 +677,7 @@ def _new_look(app):
 
 
 def _user_path(name):
-    return next((p for p, (_, n) in vj_looks._USER.items() if n == name), None)
+    return next((p for p, e in vj_looks._USER.items() if e[1] == name), None)
 
 
 def _edit_look(app, i):
@@ -611,7 +725,10 @@ def refresh(app):
     dpg.set_value("vj_auto", dict(AUTO)[o["auto"]["mix"]])
     dpg.set_value("vj_bars", f"{o['auto']['bars']} bars")
     dpg.set_value("vj_shuffle", bool(o["auto"]["shuffle"]))
-    for i in (0, 1):
+    dpg.set_value("vj_cue", bool(o.get("cue")))
+    dpg.set_value("vj_cmode", o.get("c_mode", "screen"))
+    pals = [OWN_PAL] + [n for n, _ in app.eng.palette_list()]
+    for i in range(vj.DECKS):
         d = o["decks"][i]
         s = d["source"]
         eff = d["look"] == vj.EFFECT
@@ -621,6 +738,9 @@ def refresh(app):
         dpg.configure_item(f"vj_fx{i}", items=list(app.eng.names))
         dpg.set_value(f"vj_fx{i}", d.get("effect", ""))
         dpg.configure_item(f"vj_fxrow{i}", show=eff)
+        dpg.configure_item(f"vj_palrow{i}", show=eff)
+        dpg.configure_item(f"vj_pal{i}", items=pals)
+        dpg.set_value(f"vj_pal{i}", d.get("palette") or OWN_PAL)
         dpg.configure_item(f"vj_textrow{i}", show=d["look"] == "Text")
         dpg.set_value(f"vj_text{i}", d.get("text", ""))
         dpg.configure_item(f"vj_imgrow{i}", show=d["look"] == "Image")
@@ -642,8 +762,8 @@ def refresh(app):
         for tag, key in (("vj_csp", "speed"), ("vj_cin", "in"), ("vj_cout", "out")):
             num.set(f"{tag}{i}", float(s.get(key, 0.0)))
         dpg.set_value(f"vj_adv{i}", dict(vj.ADVANCE).get(s.get("advance", "off"), "by hand"))
-        for tag, key in (("vj_amt", "amount"), ("vj_spd", "speed"), ("vj_kal", "kaleido"), ("vj_hue", "hue"),
-                         ("vj_trl", "trails"), ("vj_blr", "blur")):
+        for tag, key in (("vj_lvl", "level"), ("vj_amt", "amount"), ("vj_spd", "speed"), ("vj_kal", "kaleido"),
+                         ("vj_hue", "hue"), ("vj_trl", "trails"), ("vj_blr", "blur")):
             num.set(f"{tag}{i}", d[key])
         dpg.set_value(f"vj_col{i}", d["colours"])
         dpg.set_value(f"vj_mir{i}", bool(d["mirror"]))
@@ -678,7 +798,8 @@ def _preview(app, i):
         return
     img = _fit(img, PV_W, PV_H)
     fader = float(vj.options(app)["fader"])
-    live = (1.0 - fader) if i == 0 else fader                       # the deck off the mix shown dimmer: the cue
+    live = ((1.0 - fader) if i == 0 else fader) if i < 2 else 1.0  # the deck off the mix shown dimmer: the cue
+    live *= vj.knob_value(app, i, "level")
     k = 0.45 + 0.55 * min(1.0, live * 2.0)
     rgba = np.concatenate([img.astype(np.float32) * (k / 255.0), np.ones((PV_H, PV_W, 1), np.float32)], -1)
     dpg.set_value(f"vj_tex{i}", rgba.ravel())
@@ -707,7 +828,7 @@ def poll(app):
             app._vj_open = False
         return
     app._vj_open = True
-    app._vj_preview = shown
+    app._vj_preview = {i for i in range(vj.DECKS) if dpg.is_item_visible(f"vj_pv{i}")} if shown else set()
     if time.monotonic() - getattr(app, "_vj_files_at", 0.0) > 1.0:     # the project's own looks, as they are saved
         app._vj_files_at = time.monotonic()
         before = set(vj_looks.LOOKS)
@@ -718,7 +839,7 @@ def poll(app):
     vj.update(app)
     _thumbs(app)
     if shown:
-        for i in (0, 1):
+        for i in range(vj.DECKS):
             _preview(app, i)
         _out_preview(app)
         p = float(getattr(app, "_vj_pulse", 0.0))
@@ -729,10 +850,10 @@ def poll(app):
             num.set("vj_fader", float(o["fader"]))
         if getattr(app, "_vj_knobs_moved", False) and not num.busy():       # MIDI or a modulator moved a knob
             app._vj_knobs_moved = False
-            for i in (0, 1):
+            for i in range(vj.DECKS):
                 d = o["decks"][i]
-                for tag, key in (("vj_amt", "amount"), ("vj_spd", "speed"), ("vj_kal", "kaleido"), ("vj_hue", "hue"),
-                                 ("vj_trl", "trails"), ("vj_blr", "blur")):
+                for tag, key in (("vj_lvl", "level"), ("vj_amt", "amount"), ("vj_spd", "speed"), ("vj_kal", "kaleido"),
+                                 ("vj_hue", "hue"), ("vj_trl", "trails"), ("vj_blr", "blur")):
                     num.set(f"{tag}{i}", d[key])
         if getattr(app, "_vj_dirty", False):
             app._vj_dirty = False

@@ -171,7 +171,7 @@ def targets(app):
             ("VJ: fade to the other deck", {"kind": "vj_fade"}), ("VJ: shuffle deck A", {"kind": "vj_shuffle_a"}),
             ("VJ: shuffle deck B", {"kind": "vj_shuffle_b"}), ("VJ: on air, on or off", {"kind": "vj_air"})]
     from native import vj
-    for i, d in enumerate("AB"):
+    for i, d in enumerate(vj.LETTERS):
         out.append((f"VJ {d}: the look, along the list", {"kind": "vj_look", "deck": i}))
         out += [(f"VJ {d}: {vj.KNOB_WORDS[k]}", {"kind": "vj_knob", "deck": i, "key": k}) for k, _, _ in vj.KNOBS]
         out += [(f"VJ {d}: next video file", {"kind": f"vj_clip_{d.lower()}"}),
@@ -669,10 +669,10 @@ def apply_target(app, t, v, full=127.0, ctl=None):
             names = vj.midi_looks()
             vj.options(app)["decks"][int(t.get("deck", 0))]["look"] = names[int(round(f * (len(names) - 1)))]
             app._vj_dirty = True
-        elif kind in ("vj_clip_a", "vj_clip_b"):
-            vj.next_clip(app, 0 if kind.endswith("a") else 1)
-        elif kind in ("vj_pause_a", "vj_pause_b"):
-            vj.pause(app, 0 if kind.endswith("a") else 1)
+        elif kind.startswith("vj_clip_"):
+            vj.next_clip(app, "abc".index(kind[-1]))
+        elif kind.startswith("vj_pause_"):
+            vj.pause(app, "abc".index(kind[-1]))
         elif kind == "vj_cut":
             vj.cut(app)
         elif kind == "vj_fade":

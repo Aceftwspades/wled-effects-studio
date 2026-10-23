@@ -634,7 +634,7 @@ def _text(ctx, st):
 
 @look("Image", "layer", "a picture file of the deck's, filling the canvas, drifting slowly - amount its zoom")
 def _image(ctx, st):
-    path = str((getattr(ctx, "deck", None) or {}).get("image") or "")
+    path = str(getattr(ctx, "image_path", "") or (getattr(ctx, "deck", None) or {}).get("image") or "")
     key = (path, ctx.w, ctx.h)
     if st.get("key") != key:
         st["key"], st["img"] = key, None
@@ -696,13 +696,13 @@ def user_dir(project):
 
 
 def load_user(project):
-    """The project's own looks (looks/*.py) registered - again when a file has changed, gone when it has gone.
-    [(file, error)] for the ones that could not be loaded."""
+    """The project's own looks registered - Python looks (looks/*.py), Shadertoy shaders (*.glsl) and MilkDrop
+    presets (*.milk) - again when a file has changed, gone when it has gone. [(file, error)] for every one that
+    could not be loaded (as long as it cannot)."""
     import os
     d = user_dir(project)
-    errs = []
     seen = set()
-    files = sorted(f for f in os.listdir(d) if f.endswith(".py")) if os.path.isdir(d) else []
+    files = sorted(f for f in os.listdir(d) if f.lower().endswith((".py", ".glsl", ".milk"))) if os.path.isdir(d) else []
     for f in files:
         path = os.path.join(d, f)
         seen.add(path)
@@ -712,28 +712,81 @@ def load_user(project):
             continue
         if _USER.get(path, (None,))[0] == mt:
             continue
-        old = _USER.get(path, (None, None))[1]
+        old = _USER.get(path, (None, None, ""))[1]
         if old:
             LOOKS.pop(old, None)
-        ns = {"np": np, "math": math, "sample": sample, "hsv": hsv, "blur": blur, "noise": noise, "fbm": fbm,
-              "luma": luma, "milkdrop_frame": milkdrop_frame, "flame_frame": flame_frame, "new_flame": new_flame,
-              "__file__": path, "__name__": "vj_look_" + os.path.splitext(f)[0]}
         try:
-            exec(compile(open(path, encoding="utf-8").read(), path, "exec"), ns)
-            name = str(ns.get("NAME") or os.path.splitext(f)[0])
-            if not callable(ns.get("draw")):
-                raise ValueError("it has no draw(c, st)")
-            LOOKS[name] = Look(name, "yours", ns["draw"], str(ns.get("DESC") or "a look of the project's own"),
-                               bool(ns.get("VIDEO", False)))
-            _USER[path] = (mt, name)
+            lk = _load_file(path)
+            LOOKS[lk.name] = lk
+            _USER[path] = (mt, lk.name, "")
         except Exception as e:
-            _USER[path] = (mt, None)
-            errs.append((f, f"{type(e).__name__}: {e}"))
+            _USER[path] = (mt, None, f"{type(e).__name__}: {e}")
     for path in [p for p in _USER if p not in seen]:
         name = _USER.pop(path)[1]
         if name:
             LOOKS.pop(name, None)
-    return errs
+    return [(os.path.basename(p), e[2]) for p, e in _USER.items() if e[2]]
+
+
+def _load_file(path):
+    """A look from a file of the project's: its kind by its extension."""
+    import os
+    base = os.path.splitext(os.path.basename(path))[0]
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".glsl":
+        from native import vj_glsl
+        src = open(path, encoding="utf-8", errors="replace").read()
+        if "mainImage" not in src:
+            raise ValueError("it has no mainImage(out vec4 fragColor, in vec2 fragCoord)")
+        name = vj_glsl.name_of(src, base)
+        return Look(name, "yours", vj_glsl.look_draw(src, name), "a Shadertoy shader of the project's, on the graphics card",
+                    "iChannel0" in src)
+    if ext == ".milk":
+        from native import milk
+        pre = milk.load(path)
+        name = "Milk: " + base
+        return Look(name, "milkdrop", milk.look_draw(pre), milk.TEMPLATE_NOTE)
+    ns = {"np": np, "math": math, "sample": sample, "hsv": hsv, "blur": blur, "noise": noise, "fbm": fbm,
+          "luma": luma, "milkdrop_frame": milkdrop_frame, "flame_frame": flame_frame, "new_flame": new_flame,
+          "__file__": path, "__name__": "vj_look_" + base}
+    exec(compile(open(path, encoding="utf-8").read(), path, "exec"), ns)
+    name = str(ns.get("NAME") or base)
+    if not callable(ns.get("draw")):
+        raise ValueError("it has no draw(c, st)")
+    return Look(name, "yours", ns["draw"], str(ns.get("DESC") or "a look of the project's own"), bool(ns.get("VIDEO", False)))
+
+
+def import_file(project, path):
+    """A .milk preset or a .glsl shader copied into the project's looks/ (a new name if one is taken): its path."""
+    import os
+    import shutil
+    d = user_dir(project)
+    os.makedirs(d, exist_ok=True)
+    base, ext = os.path.splitext(os.path.basename(path))
+    dest = os.path.join(d, base + ext.lower())
+    k = 2
+    while os.path.exists(dest):
+        dest = os.path.join(d, f"{base}_{k}{ext.lower()}")
+        k += 1
+    shutil.copy2(path, dest)
+    return dest
+
+
+def new_shader(project, name):
+    """A new Shadertoy shader file from the template, named; its path."""
+    import os
+    from native import vj_glsl
+    d = user_dir(project)
+    os.makedirs(d, exist_ok=True)
+    base = "".join(ch if ch.isalnum() else "_" for ch in name.strip().lower()).strip("_") or "my_shader"
+    path = os.path.join(d, base + ".glsl")
+    k = 2
+    while os.path.exists(path):
+        path = os.path.join(d, f"{base}_{k}.glsl")
+        k += 1
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(vj_glsl.TEMPLATE.replace("{name}", name.strip() or "My shader"))
+    return path
 
 
 def new_user_look(project, name):

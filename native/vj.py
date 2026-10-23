@@ -45,8 +45,11 @@ ADVANCE = (("off", "by hand"), ("bars", "with the auto-mix's bars"), ("beat", "e
 SOURCE = {"kind": "none", "path": "", "name": "", "url": "", "files": [], "clip": 0, "speed": 1.0, "in": 0.0,
           "out": 0.0, "advance": "off"}
 DECK = {"look": "Plasma", "source": SOURCE, "amount": 0.5, "speed": 1.0, "colours": "neon", "kaleido": 0,
-        "mirror": False, "hue": 0.0, "strobe": False, "trails": 0.0, "blur": 0,
-        "react": {"to": "off", "what": "amount", "depth": 0.5}, "text": "WLED", "image": "", "effect": ""}
+        "mirror": False, "hue": 0.0, "strobe": False, "trails": 0.0, "blur": 0, "level": 1.0,
+        "react": {"to": "off", "what": "amount", "depth": 0.5}, "text": "WLED", "image": "", "effect": "", "palette": ""}
+DECKS = 3                         # A and B on the fader, C over the mix (a logo, words, a layer of its own)
+LETTERS = "ABC"
+C_MODES = ("screen", "add", "lighten", "multiply", "difference", "over")   # how deck C goes over the mix
 SPEED_MAX = 3.0
 
 
@@ -58,10 +61,14 @@ def options(app):
     o.setdefault("wipe", "blend")
     o.setdefault("map", "picture")
     o.setdefault("canvas", "96x72")
+    o.setdefault("c_mode", "screen")
+    o.setdefault("cue", False)
     decks = o.setdefault("decks", [])
-    while len(decks) < 2:
+    while len(decks) < DECKS:
         d = json_copy(DECK)
-        d["look"] = "Plasma" if not decks else "Drop: Nebula"
+        d["look"] = ("Plasma", "Drop: Nebula", "Text")[len(decks)]
+        if len(decks) == 2:
+            d["level"] = 0.0                                 # deck C: off until it is turned up
         decks.append(d)
     for d in decks:
         for k, v in DECK.items():
@@ -125,7 +132,7 @@ class DeckRun:
 def _runs(app):
     r = app.__dict__.get("_vj_runs")
     if r is None:
-        r = app._vj_runs = [DeckRun(), DeckRun()]
+        r = app._vj_runs = [DeckRun() for _ in range(DECKS)]
     return r
 
 
@@ -135,11 +142,62 @@ def _pool(app):
 
 
 def clip_path(s):
-    """The file a deck plays: its clip in its list, else its one path."""
+    """The file a deck plays, as kept: its clip in its list, else its one path (relative to the project when it
+    was copied into it - media() finds it)."""
     files = [f for f in (s.get("files") or []) if f]
     if files:
         return files[int(s.get("clip", 0)) % len(files)]
     return s.get("path") or ""
+
+
+MEDIA_DIR = "assets/vj"           # where the VJ's video files and pictures are kept with the project
+
+
+def media(app, p):
+    """A media path as kept, made a file's: relative ones under the project, absolute ones as they are."""
+    import os
+    if not p:
+        return ""
+    if os.path.isabs(p):
+        return p
+    return os.path.join(app.project.path, p)
+
+
+def keep_media(app, path):
+    """A video file or picture copied into the project (assets/vj), so it goes where the project goes: the path
+    to keep (relative to the project). One already inside the project is kept where it is."""
+    import os
+    import shutil
+    path = os.path.abspath(path)
+    root = os.path.abspath(app.project.path)
+    try:
+        inside = os.path.commonpath([path, root]) == root
+    except ValueError:                                       # another drive
+        inside = False
+    if inside:
+        return os.path.relpath(path, root).replace(os.sep, "/")
+    d = os.path.join(root, *MEDIA_DIR.split("/"))
+    os.makedirs(d, exist_ok=True)
+    base, ext = os.path.splitext(os.path.basename(path))
+    dest = os.path.join(d, base + ext)
+    k = 2
+    while os.path.exists(dest) and not _same_file(dest, path):
+        dest = os.path.join(d, f"{base}_{k}{ext}")
+        k += 1
+    if not os.path.exists(dest):
+        shutil.copy2(path, dest)
+    return os.path.relpath(dest, root).replace(os.sep, "/")
+
+
+def _same_file(a, b):
+    import os
+    try:
+        if os.path.getsize(a) != os.path.getsize(b):
+            return False
+        with open(a, "rb") as fa, open(b, "rb") as fb:
+            return fa.read(65536) == fb.read(65536)
+    except OSError:
+        return False
 
 
 def source_key(app, s):
@@ -148,7 +206,7 @@ def source_key(app, s):
         return None
     w, h = canvas_size(app)
     if kind == "file":
-        return ("file", clip_path(s), round(float(s.get("speed", 1.0)), 3), float(s.get("in", 0.0)),
+        return ("file", media(app, clip_path(s)), round(float(s.get("speed", 1.0)), 3), float(s.get("in", 0.0)),
                 float(s.get("out", 0.0)), w, h)
     return (kind, s.get("path"), s.get("name"), s.get("url"), w, h)
 
@@ -159,7 +217,7 @@ def _open(app, s, key):
     kind = s["kind"]
     if kind == "file":
         import os
-        path = clip_path(s)
+        path = media(app, clip_path(s))
         if not path or not os.path.exists(path):
             raise ValueError(f"no video file at {path}" if path else "no video file chosen")
         args = []
@@ -446,6 +504,11 @@ def draw_deck(app, i, dt, snd, beat, hit):
     c.beat, c.beat_hit = beat, hit
     c.beats = getattr(app, "_vj_beats", 0.0)
     c.deck = deck
+    c.image_path = media(app, deck.get("image") or "")
+    try:
+        c.bands = np.asarray(app.eng.fft, np.float32) / 255.0             # the sixteen bands, for a shader's spectrum
+    except Exception:
+        c.bands = None
     v = run.video
     if v is not None and v.shape[:2] != (h, w):                         # a frame of another size (a canvas change)
         from PIL import Image
@@ -516,6 +579,19 @@ def _effect_frame(app, i, run, deck, speed, amount):
     if run.state.get("sel") != name:
         eng.select(eng.names.index(name))
         run.state = {"sel": name}
+    look = (deck.get("palette") or "", deck.get("colours") or "")
+    if run.state.get("look") != look:                         # its palette (else the effect's own) and colours
+        was = run.state.get("look")
+        run.state["look"] = look
+        pals = dict(eng.palette_list())
+        if look[0] in pals:
+            eng.pal = pals[look[0]]
+        elif was and was[0]:                                  # back to the effect's own: the effect chosen again
+            eng.select(eng.names.index(name))
+        g = vj_looks.gradient(look[1] or "neon")
+        rgb = [(np.clip(np.asarray(g(np.array([q], np.float32))).reshape(-1)[:3], 0, 1) * 255).astype(int)
+               for q in (0.3, 0.65, 0.95)]
+        eng.colors(*[(int(c[0]) << 16) | (int(c[1]) << 8) | int(c[2]) for c in rgb])
     # its Speed from the deck's (1.0 is the slider's middle, 2.0 and more its top) and its Intensity the amount
     eng.fx["sx"] = int(max(0, min(255, round(speed * 128))))
     eng.fx["ix"] = int(max(0, min(255, round(amount * 255))))
@@ -551,14 +627,47 @@ def deck_canvas(app, i):
     return None if run.canvas is None else (run.canvas * 255).astype(np.uint8)
 
 
-def mix(app, a, b):
-    """The two decks' pictures through the fader: a wipe, or the blend mode."""
+def _level(img, lv):
+    if lv >= 0.999:
+        return img
+    return (img.astype(np.float32) * max(0.0, lv)).astype(np.uint8)
+
+
+def mix(app, a, b, c=None):
+    """The decks' pictures: A and B through the fader (a wipe, or the blend mode), each at its level, then deck C
+    over the mix at its level, through its own blend."""
     from native import mixer, transition
     o = options(app)
     f = float(o["fader"])
+    a, b = _level(a, knob_value(app, 0, "level")), _level(b, knob_value(app, 1, "level"))
     if o.get("wipe", "blend") != "blend" and 0.0 < f < 1.0:
-        return transition.blend(a, b, f, o["wipe"])
-    return mixer.mix(a, b, f, o["mode"])
+        out = transition.blend(a, b, f, o["wipe"])
+    else:
+        out = mixer.mix(a, b, f, o["mode"])
+    lc = knob_value(app, 2, "level") if len(o["decks"]) > 2 else 0.0
+    if c is not None and lc > 0.0 and c.shape == out.shape:
+        mode = o.get("c_mode", "screen")
+        base, top = out.astype(np.float32), c.astype(np.float32)
+        if mode == "over":                                    # what deck C draws covers the mix; its black lets it through
+            k = (top.max(axis=2, keepdims=True) / 255.0) * lc
+            out = base * (1.0 - k) + top * k
+        else:
+            out = base + (mixer._blend(base, top, mode) - base) * lc
+        out = np.clip(out + 0.5, 0, 255).astype(np.uint8)
+    return out
+
+
+def cue_deck(app):
+    """The deck the fader is furthest from: the one to set up before fading to it."""
+    return 1 if float(options(app)["fader"]) < 0.5 else 0
+
+
+def cue_picture(app):
+    """The off-air deck's picture on the shape - for the pop-out while Cue is on - or None."""
+    o = options(app)
+    if not o.get("cue"):
+        return None
+    return deck_led(app, cue_deck(app))
 
 
 def update(app, dt=None):
@@ -578,22 +687,28 @@ def update(app, dt=None):
     app._vj_pulse = beat
     f = float(o["fader"])
     app._vj_tick = getattr(app, "_vj_tick", 0) + 1
-    for i in (0, 1):
+    cue = cue_deck(app) if o.get("cue") else -1
+    for i in range(len(o["decks"])):
         _advance_clips(app, i, hit)
-        live = (i == 0 and f < 1.0) or (i == 1 and f > 0.0)
+        if i < 2:
+            live = ((i == 0 and f < 1.0) or (i == 1 and f > 0.0)) and knob_value(app, i, "level") > 0.0
+            live = live or i == cue
+        else:
+            live = knob_value(app, i, "level") > 0.0
         # a deck fully off the mix is drawn only for its preview, every other frame (its time kept whole)
         if live:
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
-        elif getattr(app, "_vj_preview", False) and (app._vj_tick + i) % 2 == 0:
+        elif i in _previewed(app) and (app._vj_tick + i) % 2 == 0:
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
         else:
-            app.__dict__.setdefault("_vj_skip", [0.0, 0.0])[i] += dt
+            _skips(app)[i] += dt
     _auto(app, hit)
-    a, b = deck_led(app, 0), deck_led(app, 1)
     shape = (app.eng.rows, app.eng.cols, 3)
-    a = a if a is not None and a.shape == shape else np.zeros(shape, np.uint8)
-    b = b if b is not None and b.shape == shape else np.zeros(shape, np.uint8)
-    app._vj_out = mix(app, a, b)
+    pics = []
+    for i in range(len(o["decks"])):
+        p = deck_led(app, i)
+        pics.append(p if p is not None and p.shape == shape else np.zeros(shape, np.uint8))
+    app._vj_out = mix(app, pics[0], pics[1], pics[2] if len(pics) > 2 else None)
 
 
 def _advance_clips(app, i, hit):
@@ -613,9 +728,24 @@ def _advance_clips(app, i, hit):
         setattr(app, key, k)
 
 
+def _previewed(app):
+    """The decks whose previews are on screen (vj_ui says): only those are drawn while off the mix."""
+    p = getattr(app, "_vj_preview", False)
+    if p is True:
+        return range(DECKS)
+    return p or ()
+
+
+def _skips(app):
+    sk = app.__dict__.get("_vj_skip")
+    if sk is None or len(sk) < DECKS:
+        sk = app._vj_skip = [0.0] * DECKS
+    return sk
+
+
 def _skipped(app, i):
     """The time a deck was not drawn for, given back to it once (and forgotten)."""
-    sk = app.__dict__.setdefault("_vj_skip", [0.0, 0.0])
+    sk = _skips(app)
     t, sk[i] = sk[i], 0.0
     return min(t, 0.25)
 
@@ -742,7 +872,7 @@ def set_fader(app, v, hand=True):
 
 
 # --- the show: a step that is the VJ's --------------------------------------------------------------
-SNAP_KEYS = ("decks", "fader", "mode", "wipe", "map", "canvas")
+SNAP_KEYS = ("decks", "fader", "mode", "wipe", "map", "canvas", "c_mode")
 
 
 def snapshot(app):
@@ -823,13 +953,13 @@ def restore_desk(app):
 
 def step_name(app):
     o = options(app)
-    a, b = (d["look"] if d["look"] != EFFECT else d.get("effect") or EFFECT for d in o["decks"])
+    a, b = (d["look"] if d["look"] != EFFECT else d.get("effect") or EFFECT for d in o["decks"][:2])
     return f"VJ: {a} / {b}"
 
 
 # --- your own: presets, mutated flames, look files -------------------------------------------------
 PRESET_KEYS = ("look", "effect", "amount", "speed", "colours", "kaleido", "mirror", "hue", "strobe", "trails",
-               "blur", "react", "text", "image")
+               "blur", "react", "text", "image", "palette")
 
 
 def save_preset(app, i, name):
@@ -929,10 +1059,10 @@ def midi_looks():
 
 
 # --- a deck's controls by name: MIDI's and the modulators' -----------------------------------------
-KNOBS = (("amount", 0.0, 1.0), ("speed", 0.0, SPEED_MAX), ("hue", 0.0, 1.0), ("kaleido", 0, 12), ("trails", 0.0, 1.0),
-         ("blur", 0, 3))
-KNOB_WORDS = {"amount": "amount", "speed": "speed", "hue": "hue", "kaleido": "kaleidoscope", "trails": "trails",
-              "blur": "blur"}
+KNOBS = (("level", 0.0, 1.0), ("amount", 0.0, 1.0), ("speed", 0.0, SPEED_MAX), ("hue", 0.0, 1.0), ("kaleido", 0, 12),
+         ("trails", 0.0, 1.0), ("blur", 0, 3))
+KNOB_WORDS = {"level": "level", "amount": "amount", "speed": "speed", "hue": "hue", "kaleido": "kaleidoscope",
+              "trails": "trails", "blur": "blur"}
 
 
 def knob_value(app, i, key):

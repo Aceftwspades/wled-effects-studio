@@ -48,7 +48,8 @@ class App:
 g = geometry.Geometry("cube", B=16)
 app = App(g)
 o = vj.options(app)
-check(len(o["decks"]) == 2 and o["decks"][0]["look"] in vj_looks.LOOKS, "two decks, each a look")
+check(len(o["decks"]) == 3 and o["decks"][0]["look"] in vj_looks.LOOKS and o["decks"][2]["level"] == 0.0,
+      "three decks, each a look - C over the mix, off until turned up")
 
 # every look: the canvas's size, values 0..1, quickly
 slow = []
@@ -180,6 +181,16 @@ class FakeEng:
     def __init__(self):
         self.fx = {}
         self.fft = np.zeros(16, np.uint8)
+        self.pal, self.cols = 0, None
+
+    def palette_list(self):
+        return [("Default", 0), ("Lava", 8)]
+
+    def set_geometry(self, geom):
+        self.cols, self.rows = geom.w, geom.h
+
+    def colors(self, *c):
+        self.cols = c
 
     def select(self, k):
         pass
@@ -308,7 +319,7 @@ s.update(kind="file", files=["a.mp4", "b.mp4", "c.mp4"], clip=0, speed=2.0, **{"
 vj.next_clip(app, 0)
 check(vj.clip_path(s) == "b.mp4", "the next file")
 key = vj.source_key(app, s)
-check(key[0] == "file" and key[1] == "b.mp4" and key[2] == 2.0 and key[3] == 1.0 and key[4] == 3.0,
+check(key[0] == "file" and key[1].endswith("b.mp4") and key[2] == 2.0 and key[3] == 1.0 and key[4] == 3.0,
       "a file's source: its speed, from and to in its key")
 s.update(kind="none", files=[])
 vj.close(app)
@@ -394,6 +405,90 @@ from native import modulate as mo
 m1 = dict(mo.DEFAULT, shape="random", seed=1)
 m2 = dict(mo.DEFAULT, shape="random", seed=2)
 check(mo.offset(m1, 2.5, None) != mo.offset(m2, 2.5, None), "two random modulators: two waves")
+
+# --- the remaining list (2026-10-23) ----------------------------------------------------------------
+# deck C over the mix, at its level; A and B at theirs
+o["decks"][0].update(look="Plasma", level=1.0, source=vj.json_copy(vj.SOURCE))
+o["decks"][1].update(look="Thermal", level=1.0, source=vj.json_copy(vj.SOURCE))
+o["decks"][2].update(look="Metaballs", level=0.0, source=vj.json_copy(vj.SOURCE))
+o.update(fader=0.0, wipe="blend", c_mode="screen")
+vj.update(app, 1 / 40)
+a_only = app._vj_out.copy()
+check(np.array_equal(a_only, vj.deck_led(app, 0)), "deck C at 0: the mix as it was")
+o["decks"][2]["level"] = 1.0
+vj.update(app, 1 / 40)
+c_led = vj.deck_led(app, 2)
+want = np.clip(255 - (255 - vj.deck_led(app, 0).astype(np.float32)) * (255 - c_led.astype(np.float32)) / 255 + 0.5, 0, 255)
+check(np.abs(app._vj_out.astype(int) - want.astype(int)).max() <= 2, "deck C screened over the mix at its level")
+o["decks"][2]["level"] = 0.0
+o["decks"][0]["level"] = 0.5
+vj.update(app, 1 / 40)
+check(np.abs(app._vj_out.astype(int) - vj.deck_led(app, 0).astype(int) // 2).max() <= 1, "deck A at half its level")
+o["decks"][0]["level"] = 1.0
+
+# the cue: the deck off the mix
+o["cue"] = True
+o["fader"] = 0.0
+vj.update(app, 1 / 40)
+check(vj.cue_deck(app) == 1 and np.array_equal(vj.cue_picture(app), vj.deck_led(app, 1)), "the cue: deck B, off the mix")
+o["cue"] = False
+check(vj.cue_picture(app) is None, "no cue: nothing")
+
+# media kept with the project
+src = os.path.join(tempfile.mkdtemp(), "clip.mp4")
+open(src, "wb").write(b"0123456789" * 10)
+kept = vj.keep_media(app, src)
+check(kept == "assets/vj/clip.mp4" and os.path.isfile(vj.media(app, kept)), f"a file copied into the project ({kept})")
+check(vj.keep_media(app, src) == kept, "the same file again: the copy there")
+other = os.path.join(tempfile.mkdtemp(), "clip.mp4")
+open(other, "wb").write(b"another" * 10)
+check(vj.keep_media(app, other) == "assets/vj/clip_2.mp4", "another file of the same name: one beside it")
+inside = vj.media(app, kept)
+check(vj.keep_media(app, inside) == kept, "a file already in the project: kept where it is")
+
+# an Effect deck's palette and colours
+fe.pal, fe.cols = 0, None
+o["decks"][0].update(look=vj.EFFECT, effect="Rainbow", palette="Lava", colours="fire")
+vj._runs(app)[0].state = {}
+vj.update(app, 1 / 40)
+check(fe.pal == 8 and fe.cols is not None and len(fe.cols) == 3, f"an Effect deck: its palette and colours ({fe.pal})")
+o["decks"][0].update(look="Plasma", palette="")
+
+# a shader and a MilkDrop preset of the project's
+from native import vj_glsl
+d = vj_looks.user_dir(app.project)
+os.makedirs(d, exist_ok=True)
+open(os.path.join(d, "glow.glsl"), "w").write("// NAME: Glow\nvoid mainImage(out vec4 c, in vec2 p) { c = vec4(p.x / iResolution.x, iBass, 0.5, 1.0); }\n")
+open(os.path.join(d, "bad.glsl"), "w").write("void mainImage(out vec4 c, in vec2 p) { c = vec4(nope, 1.0); }\n")
+open(os.path.join(d, "wavy.milk"), "w").write("[preset00]\nzoom=1.02\nper_frame_1=rot = 0.02;\n")
+errs = vj_looks.load_user(app.project)
+check("Glow" in vj_looks.LOOKS and "Milk: wavy" in vj_looks.LOOKS and vj_looks.LOOKS["Milk: wavy"].family == "milkdrop",
+      "a .glsl shader and a .milk preset listed")
+again = vj_looks.load_user(app.project)
+check(again == errs, "a file's load error kept while it stands, not only said once")
+ok, why = vj_glsl.available()
+if ok:
+    st = {}
+    cx = vj.Ctx()
+    cx.w, cx.h = 32, 24
+    cx.u, cx.v, cx.x, cx.y, cx.r, cx.a = vj._grid(32, 24)
+    cx.t, cx.dt, cx.beat, cx.bass, cx.mid, cx.treb, cx.level, cx.amount = 1.0, 0.03, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5
+    cx.wave, cx.video, cx.wait = np.zeros(64, np.float32), None, True
+    img = vj_looks.LOOKS["Glow"].draw(cx, st)
+    check(img.shape == (24, 32, 3) and abs(float(img[0, 31, 0]) - 1.0) < 0.05 and abs(float(img[0, 0, 1]) - 0.5) < 0.02,
+          "a shader runs on the graphics card: its gradient, iBass")
+    try:
+        vj_looks.LOOKS["Bad"].draw(cx, {}) if "Bad" in vj_looks.LOOKS else vj_looks.LOOKS["bad"].draw(cx, {})
+        check(False, "a shader that does not compile says so")
+    except RuntimeError as e:
+        check("nope" in str(e) and "line 1" in str(e), f"a shader that does not compile says so: {e}")
+else:
+    print("skip shaders: " + why)
+for f in ("glow.glsl", "bad.glsl", "wavy.milk"):
+    os.remove(os.path.join(d, f))
+vj_looks.load_user(app.project)
+check("Glow" not in vj_looks.LOOKS and "Milk: wavy" not in vj_looks.LOOKS, "their files gone: unlisted")
+vj.close(app)
 
 print("FAILED:", fails if fails else "none")
 sys.exit(1 if fails else 0)

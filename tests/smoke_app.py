@@ -1057,6 +1057,12 @@ STEPS = [
     ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['look'] == 'Tunnel' and app._vj_out is not None"},
       {"py": "__import__('native.vj_ui', fromlist=['v'])._flush_save(app, now=True)"}, {"py": "setattr(app, '_vj_amt0', __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['amount'])"},
       {"py": "__import__('native.vj_ui', fromlist=['v'])._set_deck(app, 0, 'amount', 0.93)"}, {"py": "__import__('native.vj_ui', fromlist=['v'])._flush_save(app, now=True)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).undo(app)"}], 0.4),
+    # deck C over the mix at its level; the cue the deck off the mix
+    ([{"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][2].update(look='Metaballs', level=1.0)"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(wipe='blend', fader=0.0, cue=True, c_mode='screen')"}], 0.5),
+    ([{"check": "not bool((app._vj_out == __import__('native.vj', fromlist=['v']).deck_led(app, 0)).all()) and __import__('native.vj', fromlist=['v']).deck_led(app, 2) is not None"},
+      {"check": "bool((__import__('native.vj', fromlist=['v']).cue_picture(app) == __import__('native.vj', fromlist=['v']).deck_led(app, 1)).all())"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][2].update(level=0.0)"}, {"py": "__import__('native.vj', fromlist=['v']).options(app).update(cue=False)"}], 0.3),
     ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['amount'] == app._vj_amt0"},
       {"py": "__import__('native.vj', fromlist=['v']).options(app).update(wipe='blend', fader=0.0)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
       {"py": "device_ui.close(app, 'vj')"}], 0.4),
