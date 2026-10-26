@@ -674,9 +674,9 @@ def apply_target(app, t, v, full=127.0, ctl=None):
         elif kind.startswith("vj_pause_"):
             vj.pause(app, "abc".index(kind[-1]))
         elif kind == "vj_cut":
-            vj.cut(app)
+            vj.launch(app, 0.0)
         elif kind == "vj_fade":
-            vj.go(app, vj.FADE_BEATS * 60.0 / vj._tempo(app))
+            vj.launch(app, vj.FADE_BEATS * 60.0 / vj._tempo(app))
         elif kind in ("vj_shuffle_a", "vj_shuffle_b"):
             vj.shuffle(app, 0 if kind.endswith("a") else 1)
         elif kind == "vj_air":

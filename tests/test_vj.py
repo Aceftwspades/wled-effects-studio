@@ -255,16 +255,18 @@ o["decks"][0]["source"]["kind"] = "none"
 vj.update(app, 1 / 40)
 check(len(vj._pool(app)) == 0, "neither: closed")
 
-# bars counted on the beats heard
+# bars counted on the tempo, kept on the beats heard
 clock.hold()
 try:
     app._vj_hits = 0
+    b0 = vj.bar_count(app)[0]
     for k in range(9):
         app.last_hit_at = clock.now()
         vj.update(app, 0.5)
         clock.step(0.5)
     bars, where = vj.bar_count(app)
-    check(where == "the beats heard" and abs(bars - 9 / 4) < 1e-6, f"bars from the beats heard: {bars} ({where})")
+    check(where == "the tempo, kept on the beats heard" and abs(bars - b0 - 9 / 4) < 0.05,
+          f"bars on the tempo while beats are heard: {bars - b0} ({where})")
 finally:
     clock.release()
 
@@ -497,6 +499,192 @@ for f in ("glow.glsl", "bad.glsl", "wavy.milk"):
     os.remove(os.path.join(d, f))
 vj_looks.load_user(app.project)
 check("Glow" not in vj_looks.LOOKS and "Milk: wavy" not in vj_looks.LOOKS, "their files gone: unlisted")
+vj.close(app)
+
+# --- what a VJ set on a 16:9 panel needed (the VJ showcase) ----------------------------------------------
+check(any(k == "192x108" for k, _ in vj.CANVASES) and any(k == "128x72" for k, _ in vj.CANVASES), "16:9 canvases")
+
+
+def ctx_of(w=64, h=36, **kw):
+    cx = vj.Ctx()
+    cx.w, cx.h = w, h
+    cx.u, cx.v, cx.x, cx.y, cx.r, cx.a = vj._grid(w, h)
+    cx.t, cx.dt, cx.beat, cx.beat_hit, cx.beats = 1.0, 1 / 30, 0.0, False, 0.0
+    cx.bass, cx.mid, cx.treb, cx.level, cx.amount, cx.speed = 0.5, 0.3, 0.3, 0.6, 0.5, 1.0
+    cx.wave, cx.video, cx.video_prev, cx.deck = np.zeros(64, np.float32), None, None, {}
+    cx.grad = vj_looks.gradient("neon")
+    for k, v in kw.items():
+        setattr(cx, k, v)
+    return cx
+
+
+# the built-in MilkDrop looks in the deck's colours: on "mono", grey
+st = {}
+for _ in range(20):
+    img = vj_looks.LOOKS["Drop: Nebula"].draw(ctx_of(grad=vj_looks.gradient("mono")), st)
+lit = img.max(axis=2) > 0.1
+check(lit.any() and float(np.abs(img[lit] - img[lit].mean(axis=1, keepdims=True)).max()) < 0.02,
+      "a MilkDrop look draws in the deck's colours (mono: grey)")
+# Text at speed 0: held in the middle, fitted
+img = vj_looks.LOOKS["Text"].draw(ctx_of(speed=0.0, deck={"text": "WLED"}), {})
+cols = np.where(img.max(axis=(0, 2)) > 0.2)[0]
+check(len(cols) and cols[0] > 0 and cols[-1] < 63 and abs((cols[0] + cols[-1]) / 2 - 31.5) < 4,
+      f"Text at speed 0: the words held whole in the middle ({cols[:1]}..{cols[-1:]})")
+# Gradient Map: dark footage (LEDs on black) keeps its detail, in the deck's colours
+rng = np.random.default_rng(3)
+dark = (rng.random((36, 64, 3)) ** 6 * 0.25).astype(np.float32)
+st = {}
+img = vj_looks.LOOKS["Gradient Map"].draw(ctx_of(video=dark), st)
+check(float(img.max()) > 0.6 and float((img.max(axis=2) > 0.2).mean()) > 0.02, "Gradient Map: dark footage brought up")
+
+# shuffle: never a look a deck has, and from the deck's own family when asked
+o = vj.options(app)
+o["decks"][0]["look"], o["decks"][1]["look"] = "Flame: Coral", "Flame: Orchid"
+o["decks"][0]["source"]["kind"] = "none"
+o["auto"]["shuffle_from"] = "family"
+seen = set()
+for _ in range(30):
+    vj.shuffle(app, 0)
+    seen.add(o["decks"][0]["look"])
+check(all(vj_looks.LOOKS[n].family == "flame" for n in seen) and "Flame: Orchid" not in seen and len(seen) > 2,
+      f"shuffle from its family: flames only, never deck B's ({sorted(seen)})")
+o["auto"]["shuffle_from"] = "any"
+
+# the auto-mix's bars outside a show: the tempo's count, kept on the beats heard, an off-beat not counted
+app.project.options["sequence"]["bpm"] = 120.0                     # a beat every 0.5 s
+clock.hold()
+app._vj_beats, app.last_hit_at = 0.1, None                          # a tenth of a beat out to start with
+app.__dict__.pop("_vj_downbeat", None)
+e = 1.0
+for f in range(1200):                                              # 20 s at 60 frames a second
+    now = clock.now()
+    app._vj_beats += (1 / 60) * 2.0
+    hit = (f % 30 == 0) or (f % 30 == 15 and f % 60 == 15)          # every beat, and every other off-beat
+    if hit:
+        app.last_hit_at = now
+    vj._keep_count(app, now, hit)
+    if f % 30 == 0:
+        e = app._vj_beats - round(app._vj_beats)                   # where the count is on a beat of the music
+    clock.step(1 / 60)
+check(abs(e) < 0.03, f"the count pulled onto the beats heard, the off-beats left out (a beat out by {e:+.3f})")
+app._vj_downbeat = clock.now()                                     # a tap: a bar's first beat here
+vj._keep_count(app, clock.now(), False)
+check(abs(app._vj_beats / 4 - round(app._vj_beats / 4)) < 1e-6, "a tap's first tap: a bar's first beat")
+clock.release()
+
+# a video file while the clock is held (a render): a frame of the file for each frame of the clock
+from native import video as videomod
+if videomod.ffmpeg():
+    clip = os.path.join(tempfile.mkdtemp(), "count.mp4")
+    import subprocess
+    subprocess.run([videomod.ffmpeg(), "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=64x36:rate=30",
+                    "-t", "4", "-pix_fmt", "yuv420p", clip], check=True)
+    src = videomod.open_source("file", path=clip, width=32, height=18)
+    time.sleep(0.3)
+    clock.hold()
+    reads = []
+    for _ in range(20):
+        clock.step(1 / 30)
+        src.latest()
+        reads.append(src._reads)
+        time.sleep(0.04)                                           # slower than the video: a render's pace
+    clock.release()
+    src.close()
+    steps = np.diff(reads)
+    check(set(steps.tolist()) <= {1}, f"a held clock: one frame of the file a frame ({steps.tolist()})")
+else:
+    print("skip the held clock's video: no ffmpeg")
+
+# the pulse on the bar grid: centred on the beat the count keeps, none in silence; the old way still there
+o = vj.options(app)
+o["pulse"] = "grid"
+clock.hold()
+now = clock.now()
+app.last_hit_at = now                                              # music heard
+app._vj_beats = 9.0
+mid, _ = vj._beat(app, now, False)
+app._vj_beats = 9.0 + 0.07 / 0.5                                   # 70 ms after it (at 120 bpm)
+top, _ = vj._beat(app, now, False)
+app._vj_beats = 9.6
+_, hit_off = vj._beat(app, now, True)                              # a heard off-beat: no beat lands
+app._vj_beats = 10.01
+_, hit_on = vj._beat(app, now, False)
+check(abs(mid - 0.5) < 0.02 and top > 0.99 and not hit_off and hit_on,
+      f"the pulse on the grid: half-way up on the beat ({mid:.2f}), at the top just after ({top:.2f}), a beat on "
+      f"the line not the off-beat")
+app.last_hit_at = now - 10.0                                       # silence
+check(vj._beat(app, now, False)[0] == 0.0, "no pulse while nothing is heard")
+o["pulse"] = "heard"
+app.last_hit_at = now
+check(vj._beat(app, now, True) == (0.0, True), "every beat heard: the old way, eased in after the beat")
+o["pulse"] = "grid"
+
+# Cut and Fade on the next bar
+o["quant"], o["fader"] = "bar", 0.0
+app.last_hit_at = clock.now()
+app._vj_beats = 10.5
+waits = vj.launch(app, 0.0)
+app._vj_beats = 11.9
+vj._launch_due(app)
+early = o["fader"]
+app._vj_beats = 12.0
+vj._launch_due(app)
+check(waits == "the next bar" and early == 0.0 and o["fader"] == 1.0, "a Cut on the next bar: waits, then goes on it")
+o["quant"] = "now"
+clock.release()
+
+# a look changed on a deck that shows: blended over a beat, not a jump
+o["fader"], o["decks"][0]["level"] = 0.0, 1.0
+o["decks"][0].update(look="Plasma", source=vj.json_copy(vj.SOURCE), kaleido=0, strobe=False, trails=0.0, hue=0.0)
+for _ in range(3):
+    vj.update(app, 1 / 30)
+before = vj._runs(app)[0].canvas.copy()
+o["decks"][0]["look"] = "Metaballs"
+vj.update(app, 1 / 30)
+run = vj._runs(app)[0]
+mixed = run.canvas.copy()
+for _ in range(30):
+    vj.update(app, 1 / 30)
+check(getattr(run, "xfade", 1) is None and np.abs(mixed - before).mean() < np.abs(run.canvas - before).mean(),
+      "a live deck's new look blended in from its last picture, then itself")
+
+# an Effect deck's own settings, as the effect names them
+class Meta:
+    names = ["Fx"]
+    meta = [{"labels": ["Speed", "Size", "Density", "", "Shape", "", "", "Flat mode"], "defs": {"c1": 100, "c3": 4}}]
+got = vj.fx_settings(Meta, "Fx", {"fx_set": {"c1": 200, "o3": 1}})
+check(got == [("c1", "Density", 200, 255), ("c3", "Shape", 4, 31), ("o3", "Flat mode", 1, 1)],
+      f"an Effect deck's settings: the effect's names, the deck's values over its own ({got})")
+check("fx_set" in vj.PRESET_KEYS, "kept with a preset")
+
+# a deck off the mix with video: its source rolls on, so it has a picture the moment it is cut to
+o["fader"] = 0.0
+o["decks"][1].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
+app._vj_preview = ()
+vj._runs(app)[1].video = None
+for _ in range(3):
+    vj.update(app, 1 / 30)
+check(vj._runs(app)[1].video is not None, "a deck off the mix: its video rolling on, a frame ready")
+o["decks"][1]["source"]["kind"] = "none"
+vj.update(app, 1 / 30)
+
+# the next deck up keeps running off the mix: a cut to a feedback look lands on its picture, not on black
+o["fader"] = 0.0
+o["decks"][1].update(look="Drop: Nebula", level=1.0, source=vj.json_copy(vj.SOURCE))
+app._vj_preview = ()
+vj._runs(app)[1].state = {}
+for _ in range(40):
+    vj.update(app, 1 / 30)
+vj.cut(app)
+vj.update(app, 1 / 30)
+warm = float(app._vj_out.mean())
+o["fader"] = 0.0
+vj._runs(app)[1].state = {}                                        # the same cut to a look started from nothing
+vj._runs(app)[1].look = None
+vj.cut(app)
+vj.update(app, 1 / 30)
+cold = float(app._vj_out.mean())
+check(warm > 2.0 * cold, f"a cut to a MilkDrop look kept running: its picture at once ({warm:.1f} against {cold:.1f} cold)")
 vj.close(app)
 
 print("FAILED:", fails if fails else "none")

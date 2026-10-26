@@ -1411,6 +1411,8 @@ def tap(app):
     taps = getattr(app, "_taps", [])
     if taps and now - taps[-1] > 2.0:
         taps = []
+    if not taps:
+        app._vj_downbeat = __import__("native.clock", fromlist=["c"]).now()   # the VJ's bars start on the first tap
     taps.append(now); taps = taps[-8:]; app._taps = taps
     if len(taps) >= 2:
         bpm = 60.0 * (len(taps) - 1) / (taps[-1] - taps[0])

@@ -30,7 +30,8 @@ import numpy as np
 from native import clock, vj_looks
 
 CANVASES = (("64x48", "64 x 48 (light)"), ("96x72", "96 x 72"), ("128x96", "128 x 96 (fine)"),
-            ("64x64", "64 x 64 (square)"), ("128x32", "128 x 32 (a long strip)"), ("48x96", "48 x 96 (tall)"))
+            ("64x64", "64 x 64 (square)"), ("128x72", "128 x 72 (16:9, a wide panel)"),
+            ("192x108", "192 x 108 (16:9, fine)"), ("128x32", "128 x 32 (a long strip)"), ("48x96", "48 x 96 (tall)"))
 MAPS = (("picture", "as the logical view lays it out"), ("front", "through the shape from the front"),
         ("top", "from the top"), ("around", "round it (a cylinder, a tree)"), ("faces", "on every face alike"),
         ("sphere", "all round it (a sphere's map)"))
@@ -48,7 +49,9 @@ DECK = {"look": "Plasma", "source": SOURCE, "amount": 0.5, "speed": 1.0, "colour
         "mirror": False, "hue": 0.0, "strobe": False, "trails": 0.0, "blur": 0, "level": 1.0,
         "react": {"to": "off", "what": "amount", "depth": 0.5}, "text": "WLED", "image": "", "effect": "", "palette": "",
         "fx_colours": "",           # an Effect deck's colours: "" the effect's own, else a gradient's
-        "channels": ["", "", "", ""]}   # a shader's iChannel0..3: "" what its file says (vj_glsl.CHANNELS)
+        "fx_set": {},               # an Effect deck's own sliders and checks set ({"c1": 200, "o3": 1}): the rest its own
+        "channels": ["", "", "", ""],   # a shader's iChannel0..3: "" what its file says (vj_glsl.CHANNELS)
+        "channels_look": ""}            # the look they were chosen for: another look on the deck reads its file's
 DECKS = 3                         # A and B on the fader, C over the mix (a logo, words, a layer of its own)
 LETTERS = "ABC"
 C_MODES = ("screen", "add", "lighten", "multiply", "difference", "over")   # how deck C goes over the mix
@@ -65,6 +68,8 @@ def options(app):
     o.setdefault("canvas", "96x72")
     o.setdefault("c_mode", "screen")
     o.setdefault("cue", False)
+    o.setdefault("pulse", "grid")       # the decks' beat: "grid" (on the bar grid) or "heard" (every beat heard)
+    o.setdefault("quant", "now")        # Cut and Fade by hand: "now", or waiting for the next "beat" or "bar"
     decks = o.setdefault("decks", [])
     while len(decks) < DECKS:
         d = json_copy(DECK)
@@ -83,14 +88,19 @@ def options(app):
             d["react"].setdefault(k, v)
     o.setdefault("presets", {})          # {name: a deck's look and knobs, saved}
     flames = o.setdefault("flames", {})  # {name: a flame bred by Mutate}
-    for name, fl in flames.items():
-        if name not in vj_looks.LOOKS:
-            vj_looks.register_flame(name, fl)
+    vj_looks.sync_flames(flames)
     a = o.setdefault("auto", {})
     a.setdefault("mix", "off")          # "off", "bars" (every n bars) or "sections" (the show's song sections)
     a.setdefault("bars", 4)
     a.setdefault("shuffle", False)
+    a.setdefault("shuffle_from", "any")  # "any" look, or the deck's own "family" (flames to flames): a set kept of a piece
     return o
+
+
+def deck_channels(d):
+    """The deck's choice of its shader's channels, when made for the look it has now (else None: the file's)."""
+    ch = d.get("channels")
+    return ch if ch and any(ch) and d.get("channels_look") == d.get("look") else None
 
 
 def json_copy(v):
@@ -139,8 +149,24 @@ def _runs(app):
 
 
 def _pool(app):
-    """{source key: [source, error]}: the video sources open, shared by the decks that look at the same one."""
-    return app.__dict__.setdefault("_vj_pool", {})
+    """{source key: [source, error]}: the video sources open, shared by the decks that look at the same one (those
+    still open when the studio quits, closed then)."""
+    pool = app.__dict__.get("_vj_pool")
+    if pool is None:
+        import atexit
+        pool = app._vj_pool = {}
+        atexit.register(_close_all, pool)
+    return pool
+
+
+def _close_all(pool):
+    for src, _ in list(pool.values()):
+        if src is not None:
+            try:
+                src.close()
+            except Exception:
+                pass
+    pool.clear()
 
 
 def clip_path(s):
@@ -231,7 +257,8 @@ def _open(app, s, key):
             args += ["-ss", f"{a:.3f}"]
         if b > a:
             args += ["-t", f"{(b - a):.3f}"]
-        return video.FfmpegSource(args + ["-i", path], os.path.basename(path), "file", w, h, realtime=True, loop=True)
+        return video.FfmpegSource(args + ["-i", path], os.path.basename(path), "file", w, h, realtime=True, loop=True,
+                                  fps=video.FILE_FPS)
     return video.open_source(kind, path=s.get("url") if kind == "stream" else s.get("path"), name=s.get("name"),
                              width=w, height=h, loop=True)
 
@@ -243,17 +270,16 @@ def _source(app, i, run, deck):
     pool = _pool(app)
     if key != run.src_key:
         run.src_key = key
-        run.video = run.video_prev = None
+        run.video_prev = None                                 # its last frame held until the next source's first
         run.n = -1
         _release(app)
     if key is None:
+        run.video = None
         run.open_error = ""
         return None
     if key not in pool:
         try:
             src = _open(app, s, key)
-            import atexit
-            atexit.register(src.close)
             pool[key] = [src, ""]
         except Exception as e:
             pool[key] = [None, str(e)]
@@ -348,9 +374,9 @@ def mapping(geom, rows, cols, mode):
     """(u, v) on the canvas for every pixel of the logical grid, (rows*cols,) each, and the lit mask: the
     Video node's projections (nodedefs.py), made once for a geometry and a mode."""
     key = (id(geom), rows, cols, mode)
-    m = _MAP.get(key)
-    if m is not None:
-        return m
+    got = _MAP.get(key)
+    if got is not None and got[0] is geom:                    # the same geometry (not another given its id since)
+        return got[1]
     n = rows * cols
     lit = np.ones(n, bool) if geom is None or geom.lit is None or len(geom.lit) != n else np.asarray(geom.lit, bool)
     cu, cv = np.meshgrid(np.linspace(0, 1, cols), np.linspace(0, 1, rows))
@@ -387,7 +413,7 @@ def mapping(geom, rows, cols, mode):
     m = (np.clip(u, 0, 1).astype(np.float32), np.clip(v, 0, 1).astype(np.float32), lit)
     if len(_MAP) > 32:
         _MAP.clear()
-    _MAP[key] = m
+    _MAP[key] = (geom, m)
     return m
 
 
@@ -402,16 +428,44 @@ def to_shape(app, canvas, mode=None):
 
 
 # --- the beat ------------------------------------------------------------------------------------
-def _beat(app, now):
+PULSES = (("grid", "on the bar grid"), ("heard", "every beat heard"))
+ATTACK = 0.14                    # s a beat's pulse eases in over (a beat moves a picture, it does not jump it)
+HEARD_FOR = 2.0                  # s since a beat was heard that the music still counts as playing
+
+
+def _pulse(since):
+    """The pulse `since` seconds after its ease began: up over ATTACK, then let go."""
+    if since < 0:
+        return 0.0
+    return 0.5 - 0.5 * math.cos(math.pi * since / ATTACK) if since < ATTACK else math.exp(-(since - ATTACK) * 5.0)
+
+
+def _beat(app, now, heard):
+    """(pulse 0..1, True on the frame a beat lands). On the bar grid (the default): the beats of the count the
+    auto-mix keeps - the show's while it plays, else the tempo's held on the beats heard - each pulse's ease
+    centred on its beat (the grid knows it is coming), none between, and none while nothing is heard. Every beat
+    heard (the old way): a pulse on each beat the detector hears, off-beats and all, eased in after it."""
+    if options(app).get("pulse", "grid") == "grid":
+        beats, src = beat_count(app)
+        last = getattr(app, "last_hit_at", None)
+        playing = src == "the show's bars" or (last is not None and now - last < HEARD_FOR)
+        prev = getattr(app, "_vj_pulse_beats", None)
+        app._vj_pulse_beats = beats
+        if not playing:
+            app._vj_grid_beat_at = None
+            return 0.0, False
+        spb = 60.0 / _tempo(app)
+        lead = ATTACK * 0.5 / spb                                    # in beats: the ease's first half before the beat
+        k = math.floor(beats + lead)
+        since = (beats + lead - k) * spb
+        app._vj_grid_beat_at = now - since                           # the modulators' beat (modulate.py) the same
+        hit = prev is not None and math.floor(prev) != math.floor(beats) and beats > prev
+        return _pulse(since), hit
+    app._vj_grid_beat_at = None
     last = getattr(app, "last_hit_at", None)
     if last is None:
         return 0.0, False
-    since = now - last
-    if since < 0:
-        return 0.0, False
-    pulse = 0.5 - 0.5 * math.cos(math.pi * since / 0.14) if since < 0.14 else math.exp(-(since - 0.14) * 5.0)
-    hit = last != getattr(app, "_vj_last_hit", None)
-    return pulse, hit
+    return _pulse(now - last), heard
 
 
 def _tempo(app):
@@ -422,9 +476,31 @@ def _tempo(app):
         return 120.0
 
 
+LOCK_WINDOW = 0.2                # a beat heard this near (in beats) to where the tempo puts one moves the count
+LOCK_PULL = 0.3                  # ... this much of the way to it (the rest: the tempo's own count holds)
+
+
 def bar_count(app):
     """(bars gone by, where it came from): on the show's grid while it plays (from its first beat, at its tempo),
-    else the beats the effects hear (four to a bar) while they come, else the tempo's own count."""
+    else the tempo's own count (four beats a bar) - kept on the beats heard while they come, a heard beat near
+    where the tempo puts one nudging it, one between (an off-beat, a hat the detector took) not counted. A tap
+    tempo's first tap is a bar's first beat."""
+    beats, src = beat_count(app)
+    return beats / _per_bar(app, src), src
+
+
+def _per_bar(app, src):
+    if src == "the show's bars":
+        try:
+            from native import sequence_ui
+            return int(sequence_ui._steps(app).get("bar") or 4)
+        except Exception:
+            pass
+    return 4
+
+
+def beat_count(app):
+    """(beats gone by, where they came from): bar_count's, in beats."""
     try:
         from native import sequence_ui
         pos = sequence_ui.position(app)
@@ -432,14 +508,31 @@ def bar_count(app):
         bpm = float(S.get("bpm") or 0)
         if pos is not None and bpm > 0 and getattr(app, "_seq_play", None) is not None:
             first = float(S.get("first") or 0.0)
-            per = int(S.get("bar") or 4)
-            return max(0.0, (pos - first) * bpm / 60.0) / per, "the show's bars"
+            return max(0.0, (pos - first) * bpm / 60.0), "the show's bars"
     except Exception:
         pass
     last = getattr(app, "last_hit_at", None)
-    if last is not None and clock.now() - last < 2.0:
-        return getattr(app, "_vj_hits", 0) / 4.0, "the beats heard"
-    return getattr(app, "_vj_beats", 0.0) / 4.0, "the tempo"
+    if last is not None and clock.now() - last < HEARD_FOR:
+        return getattr(app, "_vj_beats", 0.0), "the tempo, kept on the beats heard"
+    return getattr(app, "_vj_beats", 0.0), "the tempo"
+
+
+def _keep_count(app, now, hit):
+    """The tempo's beat count a frame on, a beat heard near one of its beats pulling it onto the music, and a tap
+    tempo's first tap made a bar's first beat (sequence_ui.tap sets _vj_downbeat)."""
+    bpm = _tempo(app)
+    db = getattr(app, "_vj_downbeat", None)
+    if db is not None:
+        app._vj_downbeat = None
+        n = getattr(app, "_vj_beats", 0.0)
+        app._vj_beats = 4.0 * math.floor(n / 4.0 + 0.5) + max(0.0, now - db) * bpm / 60.0
+        return
+    if hit:
+        at = getattr(app, "last_hit_at", now)
+        b = app._vj_beats - max(0.0, now - at) * bpm / 60.0       # the count when the beat was heard
+        e = b - round(b)
+        if abs(e) < LOCK_WINDOW:
+            app._vj_beats -= e * LOCK_PULL
 
 
 # --- drawing -------------------------------------------------------------------------------------
@@ -464,6 +557,22 @@ def _zoom(img, k):
     return vj_looks.sample(img, (u - 0.5) * s + 0.5, (v - 0.5) * s + 0.5)
 
 
+def _take_video(app, i, run, deck):
+    """The deck's video source kept open and its newest frame taken (the deck drawn or not: one off the mix rolls
+    on, so its clip is where it should be and has a picture the moment it is cut to)."""
+    src = _source(app, i, run, deck)
+    run.error = run.open_error
+    if src is not None:
+        frame, n = src.latest()
+        if frame is not None and n != run.n:
+            run.n = n
+            run.video_prev = run.video
+            run.video = np.asarray(frame, np.float32) / 255.0
+        err = getattr(src, "error", None)
+        if err:
+            run.error = str(err)
+
+
 def draw_deck(app, i, dt, snd, beat, hit):
     """Deck i a frame on: its video's newest frame taken, its look drawn on the canvas (or its effect run)."""
     o = options(app)
@@ -478,22 +587,17 @@ def draw_deck(app, i, dt, snd, beat, hit):
             run.src_key = None
             run.video = run.video_prev = None
             _release(app)
-        run.led = _effect_frame(app, i, run, deck, speed, amount)
+        run.led = _effect_frame(app, i, run, deck, speed, amount, dt)
         return
-    src = _source(app, i, run, deck)
-    run.error = run.open_error
-    if src is not None:
-        frame, n = src.latest()
-        if frame is not None and n != run.n:
-            run.n = n
-            run.video_prev = run.video
-            run.video = np.asarray(frame, np.float32) / 255.0
-        err = getattr(src, "error", None)
-        if err:
-            run.error = str(err)
+    _take_video(app, i, run, deck)
     lk = vj_looks.LOOKS.get(deck["look"]) or vj_looks.LOOKS["Plasma"]
     w, h = canvas_size(app)
     if run.look != lk.name or run.size != (w, h):           # another look, or the canvas resized: it starts again
+        last = getattr(run, "canvas", None)
+        recent = clock.now() - getattr(run, "drawn_at", -1e9) < 0.2           # it was being drawn, not long put away
+        if run.look is not None and run.size == (w, h) and recent and last is not None and last.shape[:2] == (h, w):
+            # another look on a deck that was showing: the last picture blended into the new over a beat
+            run.xfade = [last.copy(), 0.0, max(0.25, min(0.6, 60.0 / _tempo(app)))]
         run.look = lk.name
         run.size = (w, h)
         run.state = {}
@@ -530,7 +634,17 @@ def draw_deck(app, i, dt, snd, beat, hit):
     if run.state.get("warn") and not run.error:              # what of a look could not run, though it draws
         run.error = f"{lk.name}: {run.state['warn']}"
     img = post(app, i, c, img, beat, what, rv)
+    xf = getattr(run, "xfade", None)
+    if xf is not None:
+        xf[1] += dt                                           # on the deck's own frames: a render's as the live run's
+        k = xf[1] / xf[2]
+        if k >= 1.0 or xf[0].shape != img.shape:
+            run.xfade = None
+        else:
+            e = 0.5 - 0.5 * math.cos(math.pi * max(0.0, k))
+            img = xf[0] * (1.0 - e) + img * e
     run.canvas = np.clip(img, 0, 1).astype(np.float32)
+    run.drawn_at = clock.now()
 
 
 def post(app, i, c, img, beat, what=None, rv=0.0):
@@ -566,7 +680,28 @@ def post(app, i, c, img, beat, what=None, rv=0.0):
     return img
 
 
-def _effect_frame(app, i, run, deck, speed, amount):
+FX_STEP = 23                       # ms an engine frame, as the main engine's (app.STEP)
+FX_SET = ("c1", "c2", "c3", "o1", "o2", "o3")   # an Effect deck's own settings: the effect's three sliders and checks
+
+
+def fx_settings(eng, name, d):
+    """An Effect deck's effect's own settings: [(key, its label, the value it has now, the most it takes)] - the
+    sliders and checks the effect names (the others it does not use), each the deck's or else the effect's own."""
+    try:
+        meta = eng.meta[eng.names.index(name)]
+    except (ValueError, IndexError, AttributeError):
+        return []
+    labels = list(meta.get("labels") or []) + [""] * 8
+    defs = meta.get("defs") or {}
+    own = d.get("fx_set") or {}
+    out = []
+    for n, k in enumerate(("sx", "ix") + FX_SET):
+        if k in FX_SET and labels[n]:
+            out.append((k, labels[n], int(own.get(k, defs.get(k, 0))), 1 if k[0] == "o" else (31 if k == "c3" else 255)))
+    return out
+
+
+def _effect_frame(app, i, run, deck, speed, amount, dt):
     """An Effect deck: the studio's effect named, on an engine of the deck's, hearing the same sound."""
     name = deck.get("effect") or ""
     try:
@@ -597,6 +732,10 @@ def _effect_frame(app, i, run, deck, speed, amount):
             rgb = [(np.clip(np.asarray(g(np.array([q], np.float32))).reshape(-1)[:3], 0, 1) * 255).astype(int)
                    for q in (0.3, 0.65, 0.95)]
             eng.colors(*[(int(c[0]) << 16) | (int(c[1]) << 8) | int(c[2]) for c in rgb])
+    # its own sliders and checks as the deck sets them (the rest as the effect chose them when it was picked)
+    for k, v in (deck.get("fx_set") or {}).items():
+        if k in FX_SET:
+            eng.fx[k] = int(v)
     # its Speed from the deck's (1.0 is the slider's middle, 2.0 and more its top) and its Intensity the amount
     eng.fx["sx"] = int(max(0, min(255, round(speed * 128))))
     eng.fx["ix"] = int(max(0, min(255, round(amount * 255))))
@@ -604,7 +743,12 @@ def _effect_frame(app, i, run, deck, speed, amount):
     try:
         eng.fft[:] = app.eng.fft[:]
         eng.audio(*getattr(app.eng, "last_audio", (0.0, 0)))
-        eng.frame(23)
+        # its clock run on in the main engine's steps for the time since it was last drawn (a deck only in a
+        # preview is drawn every other frame: two steps then, so it runs at the effect's own pace)
+        run.fx_acc = min(getattr(run, "fx_acc", FX_STEP) + dt * 1000.0, 8 * FX_STEP)
+        while run.fx_acc >= FX_STEP:
+            run.fx_acc -= FX_STEP
+            eng.frame(FX_STEP)
     except Exception as e:
         run.error = str(e)
         return None
@@ -685,10 +829,13 @@ def update(app, dt=None):
     app._vj_at = now
     app._vj_beats = getattr(app, "_vj_beats", 0.0) + dt * _tempo(app) / 60.0
     snd = sound(app)
-    beat, hit = _beat(app, now)
-    if hit:
+    last = getattr(app, "last_hit_at", None)
+    heard = last is not None and last != getattr(app, "_vj_last_hit", None)
+    if heard:
         app._vj_hits = getattr(app, "_vj_hits", 0) + 1
-    app._vj_last_hit = getattr(app, "last_hit_at", None)
+    _keep_count(app, now, heard)
+    app._vj_last_hit = last
+    beat, hit = _beat(app, now, heard)
     app._vj_pulse = beat
     f = float(o["fader"])
     app._vj_tick = getattr(app, "_vj_tick", 0) + 1
@@ -700,13 +847,19 @@ def update(app, dt=None):
             live = live or i == cue
         else:
             live = knob_value(app, i, "level") > 0.0
-        # a deck fully off the mix is drawn only for its preview, every other frame (its time kept whole)
+        # a deck fully off the mix is drawn every other frame (its time kept whole) for its preview - and always
+        # when it is A or B, the next one up: its look already running when it is cut to (a feedback look, built up
+        # from black only then, would land the drop on black)
         if live:
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
-        elif i in _previewed(app) and (app._vj_tick + i) % 2 == 0:
+        elif (i in _previewed(app) or i < 2) and (app._vj_tick + i) % 2 == 0:
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
         else:
             _skips(app)[i] += dt
+            d = o["decks"][i]
+            if d["look"] != EFFECT and d["source"].get("kind", "none") != "none":
+                _take_video(app, i, _runs(app)[i], d)         # its video rolling on off the mix
+    _launch_due(app)
     _auto(app, hit)
     shape = (app.eng.rows, app.eng.cols, 3)
     pics = []
@@ -850,15 +1003,21 @@ def go(app, seconds):
 
 
 def shuffle(app, i):
-    """Deck i dealt a look it does not have, of the same family when its source is video, else any canvas look."""
+    """Deck i dealt a look it does not have: one that suits its source (a video look only with video), from any
+    look's family or - the auto-mix's "shuffle from its own family" - from the family of the one it has."""
     import random
     o = options(app)
     d = o["decks"][i]
     if d["look"] == EFFECT:
         return
     has_video = d["source"].get("kind", "none") != "none"
+    shown = {dd["look"] for dd in o["decks"]}                # none a deck has now: a swap always changes the picture
     pool = [n for n, lk in vj_looks.LOOKS.items()
-            if n != d["look"] and lk.family != "layer" and (lk.video == has_video or not lk.video)]
+            if n not in shown and lk.family != "layer" and (lk.video == has_video or not lk.video)]
+    cur = vj_looks.LOOKS.get(d["look"])
+    if o["auto"].get("shuffle_from") == "family" and cur is not None:
+        kin = [n for n in pool if vj_looks.LOOKS[n].family == cur.family]
+        pool = kin or pool                                  # a family of one: any look rather than none
     if pool:
         d["look"] = random.choice(pool)
         app._vj_dirty = True
@@ -866,6 +1025,35 @@ def shuffle(app, i):
 
 def cut(app):
     go(app, 0.0)
+
+
+QUANTS = (("now", "now"), ("beat", "on the next beat"), ("bar", "on the next bar"))
+
+
+def launch(app, seconds):
+    """Cut (0) or Fade (seconds) by hand - the frame's buttons, MIDI, the phone: at once, or waiting for the next
+    beat or bar of the count the auto-mix keeps (quant). Asked again while one waits: the newer in its place.
+    What it waits for, in words, or "" when it went at once."""
+    q = options(app).get("quant", "now")
+    if q not in ("beat", "bar"):
+        app._vj_pending = None
+        go(app, seconds)
+        return ""
+    beats, src = beat_count(app)
+    unit = 1 if q == "beat" else _per_bar(app, src)
+    target = (math.floor(beats / unit + 1e-6) + 1) * unit
+    app._vj_pending = (float(target), float(seconds))
+    return "the next beat" if q == "beat" else "the next bar"
+
+
+def _launch_due(app):
+    """A Cut or Fade waiting for its beat or bar, gone once the count reaches it."""
+    p = getattr(app, "_vj_pending", None)
+    if p is None:
+        return
+    if beat_count(app)[0] >= p[0] - 1e-6:
+        app._vj_pending = None
+        go(app, p[1])
 
 
 def set_fader(app, v, hand=True):
@@ -877,6 +1065,7 @@ def set_fader(app, v, hand=True):
 
 
 # --- the show: a step that is the VJ's --------------------------------------------------------------
+SHUFFLE_FROM = (("any", "from any look"), ("family", "from its own family"))
 SNAP_KEYS = ("decks", "fader", "mode", "wipe", "map", "canvas", "c_mode")
 
 
@@ -964,7 +1153,7 @@ def step_name(app):
 
 # --- your own: presets, mutated flames, look files -------------------------------------------------
 PRESET_KEYS = ("look", "effect", "amount", "speed", "colours", "kaleido", "mirror", "hue", "strobe", "trails",
-               "blur", "react", "text", "image", "palette", "fx_colours", "channels")
+               "blur", "react", "text", "image", "palette", "fx_colours", "fx_set", "channels", "channels_look")
 
 
 def save_preset(app, i, name):
@@ -1033,7 +1222,7 @@ def forget_flame(app, name):
 def rename_flame(app, old, new):
     o = options(app)
     new = (new or "").strip()
-    if old not in o["flames"] or not new or new in vj_looks.LOOKS:
+    if old not in o["flames"] or not new or new == EFFECT or new in vj_looks.LOOKS:
         return False
     fl = o["flames"].pop(old)
     o["flames"][new] = fl

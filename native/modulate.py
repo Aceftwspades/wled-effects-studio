@@ -123,6 +123,9 @@ def apply(app):
     st["at"] = now
     last_hit = getattr(app, "last_hit_at", None)
     since = None if last_hit is None else now - last_hit
+    grid = getattr(app, "_vj_grid_beat_at", None)                # the VJ running on its bar grid: its beat
+    if grid is not None and now - getattr(app, "_vj_at", -1e9) < 0.25:
+        since = now - grid
     push = {}
     for n, m in enumerate(mods):
         if "seed" not in m:                                 # one made before seeds: its own, kept

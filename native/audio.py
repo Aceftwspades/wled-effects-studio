@@ -452,47 +452,66 @@ class FileAudio:
         pass
 
 
+def _onsets(x, hop):
+    """The onset envelope: the rise of the loudness (log RMS) frame to frame, falls left out."""
+    n = len(x) // hop
+    frames = x[:n * hop].reshape(n, hop)
+    rms = np.sqrt((frames * frames).mean(1) + 1e-9)
+    env = np.diff(np.log(rms + 1e-6))
+    env[env < 0] = 0
+    return env
+
+
+HARMONICS = (1, 2, 3, 4)          # a beat's onsets repeat at its tempo and at two, three and four times it
+LEAN_OCTAVES = 0.6                # the lean to 120 bpm: so wide (a 3:2 relative of 128, 192, does not win; very
+                                  # fast music, drum and bass's 174, may read at half: its bars land the same)
+
+
 def beats_of(samples, rate, lo_bpm=60.0, hi_bpm=200.0):
     """The tempo of a recording and where its beats fall: (bpm, first beat
     in seconds, [beat times]). An onset envelope (the rise of the loudness
-    frame to frame), its autocorrelation over the lags of 60..200 bpm for
-    the period, then the phase that lines a comb of beats up with the
-    onsets best. Rough, the way tapping along is rough - but from the
-    music, not a guess. None when there is too little to go on."""
+    frame to frame); its spectrum, finely (zero-padded to a hundredth of a
+    beat a minute); each tempo of the range scored by its own line and its
+    harmonics' (two, three and four times it: the eighths, triplets and
+    sixteenths a beat brings), with a lean to 120 - so a song's
+    phrasing, which puts lines a few beats a minute either side of its
+    tempo (a pattern every four bars: 8 bpm at 128), is not taken for it,
+    nor its half or double; then the beat's phase from the onsets folded
+    at that tempo (a circular mean). Rough, the way tapping along is rough
+    - but from the music, not a guess. None when there is too little to
+    go on."""
     x = np.asarray(samples, np.float32)
     hop = 256
     n = len(x) // hop
     if n < 64:
         return None
-    frames = x[:n * hop].reshape(n, hop)
-    rms = np.sqrt((frames * frames).mean(1) + 1e-9)
-    env = np.diff(np.log(rms + 1e-6)); env[env < 0] = 0
-    env -= env.mean()
+    env = _onsets(x, hop)
+    env = env - env.mean()
     if not env.any():
         return None
     fps = rate / hop
-    lags = np.arange(int(fps * 60.0 / hi_bpm), int(fps * 60.0 / lo_bpm) + 1)
-    ac = np.array([float(np.dot(env[:-L], env[L:])) for L in lags])
-    if ac.max() <= 0:
+    size = 1 << max(16, int(np.ceil(np.log2(fps * 60.0 / 0.01))))      # a bin a hundredth of a bpm or finer
+    size = max(size, 1 << int(np.ceil(np.log2(len(env)))))
+    E = np.abs(np.fft.rfft(env, size))
+    per_bpm = size / (fps * 60.0)                                       # bins a beat a minute
+    bpms = np.arange(lo_bpm, hi_bpm, 0.01)
+    score = np.zeros(len(bpms))
+    for h in HARMONICS:
+        k = bpms * h * per_bpm
+        ok = k < len(E) - 1
+        score[ok] += np.interp(k[ok], np.arange(len(E)), E)
+    score *= np.exp(-0.5 * (np.log2(bpms / 120.0) / LEAN_OCTAVES) ** 2)  # a lean to the middle of the range
+    if score.max() <= 0:
         return None
-    # a mild lean to the middle of the range: 120 over its half and double
-    bpms = 60.0 * fps / lags
-    ac *= np.exp(-0.5 * ((np.log2(bpms / 120.0)) / 1.0) ** 2)
-    j = int(np.argmax(ac))
-    L = int(lags[j])
-    Lf = float(L)                                          # the peak between two lags: a parabola through three
-    if 0 < j < len(ac) - 1:
-        den = ac[j - 1] - 2 * ac[j] + ac[j + 1]
-        if den < 0:
-            Lf += 0.5 * float(ac[j - 1] - ac[j + 1]) / float(den)
-    bpm = 60.0 * fps / Lf
-    # the phase: the comb offset the onsets like best
-    scores = [float(env[ph::L].sum()) for ph in range(L)]
-    ph = int(np.argmax(scores))
-    first = ph / fps
-    period = Lf / fps
+    bpm = float(bpms[int(np.argmax(score))])
+    # the phase: each onset a unit vector at its place in the beat, weighted by its size, summed
+    t = (np.arange(len(env)) + 1.0) / fps
+    w = np.maximum(env, 0)
+    z = (w * np.exp(2j * np.pi * t * bpm / 60.0)).sum()
+    period = 60.0 / bpm
+    first = float((np.angle(z) / (2 * np.pi)) % 1.0 * period)        # onsets at first + k periods: z's angle 2 pi first/period
     beats = [first + k * period for k in range(int((len(x) / rate - first) / period) + 1)]
-    return round(bpm, 1), first, beats
+    return round(bpm, 2), first, beats
 
 
 def list_inputs():

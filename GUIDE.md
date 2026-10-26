@@ -1067,9 +1067,13 @@ place of the effect - in every view, and so in the stream, a recording,
 a video, an FSEQ export and a device GIF; untick it and the effect is
 back. It runs in the studio only: the LEDs get it by the stream. The
 small picture at the top right is what is on air (dim while off air);
-**BEAT** lights on each beat the effects hear, **Tap** sets the show's
-tempo by tapping (the Sequence's Tap), and beside it the tempo and the bar
-the auto-mix counts. **cue** turns a pop-out of the 3-D view (View > Pop
+**BEAT** lights on each beat, **Tap** sets the show's tempo by tapping (the
+Sequence's Tap; the first tap is a bar's first beat), and beside it what the
+looks pulse on - **on the bar grid** (the tempo, kept on the beats the
+effects hear: each pulse eased in across its beat, none on an off-beat the
+detector took, none in silence) or **every beat heard** (each beat the
+detector hears, off-beats and all) - and the tempo and the bar the
+auto-mix counts. **cue** turns a pop-out of the 3-D view (View > Pop
 out) into the cue monitor: it shows the deck off the mix - the one to set
 up before fading to it - while every other view and the stream go on with
 the mix. **undo** (or Ctrl+Z with the frame focused, Ctrl+Y to
@@ -1080,34 +1084,46 @@ Each deck's look is drawn on a small canvas, then laid on the shape by
 or the top, round it, the same on every face, or all round it as a
 sphere's map (the Video node's projections). The canvas's size is beside
 it: 96 x 72 by default, coarser to cost less, finer to be sharper, or a
-long strip's or a tall shape's own proportions.
+wide panel's (16:9), a long strip's or a tall shape's own proportions.
 
 **Looks**: **Browse...** on a deck shows every look as a moving thumbnail,
 and a click puts it on that deck; **look** lists them too:
 
 - **Video**: the Video Switchboard's ten - Clean, Neon Edges, Mosaic,
   Thermal, Halftone, Chroma Split, Melt, Motion Trails, Imprint and Follow
-  Spot (the last three follow what moves in the picture).
+  Spot (the last three follow what moves in the picture) - and **Gradient
+  Map**, the video's brightness through the deck's colours: any clip in
+  the set's palette.
 - **Shaders**, in the Shadertoy manner - a picture worked out for every
   pixel from where it is, the time and the sound: Plasma, Tunnel, Warp,
   Voronoi, Kaleido Tunnel, Starfield, Metaballs and Beat Rings.
 - **MilkDrop**, its way of making pictures: the last frame fed back,
   zoomed, turned and warped a little and faded, the sound drawn over it -
-  Nebula, Vortex, Fireflies, Bloom, Liquid Mirror and Pulse Grid. A deck's
-  video, when it has one, seeds the feedback.
+  Nebula, Vortex, Fireflies, Bloom, Liquid Mirror and Pulse Grid, in the
+  deck's colours (rainbow for MilkDrop's own hues). A deck's video, when
+  it has one, seeds the feedback.
 - **Flames**: fractal flames (Scott Draves' algorithm, Electric Sheep's) -
   points thrown at random through a few bent maps, where they land counted
   and shown on a log scale, turning slowly. **Mutate** breeds a new flame
   from the one on the deck, kept with the project.
 - **Text and image**: **Text** scrolls the deck's **words** across in its
-  colours; **Image** shows a picture file (**picture ...**), filling the
+  colours (speed 0 holds them still in the middle, fitted to the canvas -
+  a logo); **Image** shows a picture file (**picture ...**), filling the
   canvas and drifting slowly - a logo, a poster.
 - **Effect**: any effect of the studio's, run on the shape itself beside
   the main one (its **speed** and **amount** are the effect's Speed and
   Intensity; **its colours** and **palette** are the effect's own, or a
-  gradient's three colours and a palette of your choosing).
+  gradient's three colours and a palette of your choosing - a gradient
+  chosen while the palette is the effect's own makes it Color Gradient,
+  the palette drawn from those colours, so the effect paints in them);
+  under them, **the effect's own sliders and checks** as it names them -
+  Flat mode, a size, a shape - kept with the deck and its presets).
 - **Yours** (below): looks in Python, Shadertoy shaders, and MilkDrop
   presets imported.
+
+A look changed on a deck that is showing - by hand, MIDI, the phone,
+Shuffle or Mutate - blends in from its last picture over a beat rather
+than jumping.
 
 Under the preview: **level** (the deck's own, apart from the fader - turn
 a deck down without moving it), **amount** (what the look makes more of:
@@ -1116,7 +1132,9 @@ the edges' gain, the mosaic's blocks, a shader's detail), **speed** and
 AFTER (or the crossfader) for **Learn MIDI** - the next knob, fader or pad
 moved on the controller is bound to it - or **Forget its MIDI**.
 **Shuffle** deals the deck another look. The deck off the mix is shown
-dimmer: it is the one to set up before fading to it. The rest is folded
+dimmer: it is the one to set up before fading to it - and it keeps
+running (at half the frame rate), so a feedback look on it has built up
+its picture by the time it is cut to. The rest is folded
 away in four sections:
 
 - **VIDEO**: the deck's source - no video, the test pattern, video files,
@@ -1128,7 +1146,9 @@ away in four sections:
   list picks the one playing, **>** goes to the next, **x** takes one off
   the list; **clip speed** plays it faster or slower, **from** and **to**
   play only that stretch (to 0: its end), looped; **next file** steps
-  through the list by hand, every beat, or with the auto-mix's bars.
+  through the list by hand, every beat, or with the auto-mix's bars. A
+  deck's video rolls on while the deck is off the mix, so a cut to it
+  has a picture at once and the clip is where it would be.
 - **SOUND**: what the deck listens to - the bass, the mid, the treble, the
   level or the beat - and what that **moves**: the amount, the speed, the
   hue, a zoom or the brightness, **by** so much. A look then answers the
@@ -1150,16 +1170,22 @@ fader does, a strobe or a flame on top of both.
 
 **MIX**: the crossfader (deck A at 0, B at 1), **A** and **B** throw it to
 an end, **Cut** goes straight to the other deck, **Fade** sweeps there
-over two beats, and the blend (crossfade, add, screen, multiply, lighten,
+over two beats - **now**, or **on the next beat** or **on the next bar**
+of the count the auto-mix keeps (from here, MIDI or the phone alike: a
+press a little early lands on the music) - and the blend (crossfade, add, screen, multiply, lighten,
 difference) is how the two meet between the ends - or, in place of
 **blend**, a wipe: the other deck swept, pushed or opened in as the fader
 moves (the Sequence's transitions). **AUTO** moves the fader by itself:
 **every few bars** (1 to 16) - on the show's bars while it plays, else on
-the beats the effects hear, else on the tempo - or **at the show's
+the tempo's, kept on the beats the effects hear (a beat heard near where
+the tempo puts one pulls the count onto it; one between, an off-beat,
+does not count) - **Tap** the tempo in and its first tap is a bar's first
+beat - or **at the show's
 sections** while the Sequence plays: a cut into a drop, a slow fade into
 an intro, a breakdown or the outro, two beats into the rest; **shuffle
-looks** deals the deck the mix just left a new look, so with both it
-plays by itself.
+looks** deals the deck the mix just left a new look - one no deck has,
+**from any look** or **from its own family** (a flame for a flame: a set
+that keeps of a piece) - so with both it plays by itself.
 
 **Playing it**: the MIDI frame's learn lists the VJ's crossfader, Cut,
 Fade, Shuffle A and B and on air, and for each deck its look (along the
@@ -2048,7 +2074,7 @@ Every button, with what its tooltip says.
 
 **Audio input frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Read the device's` — what the device's audioreactive is set to now (its type, pins and levels), into these fields; `Send the audio input` — over /json/cfg; the levels take at once, a new type or new pins after a reboot (offered when needed); `Reboot the device` — restarts the device so a new type or new pins take effect; the LEDs go dark for a few seconds
 
-**VJ frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the VJ's last change undone (Ctrl+Z with the frame focused, Ctrl+Y redoes); `New look...` — a look of your own: a small Python file in the project's looks/ folder, made from an example and opened in your editor - it reloads here each time it is saved; it goes on the deck off the mix; `New shader...` — a Shadertoy shader of your own: a .glsl file to paste one from shadertoy.com into (its Image tab's code) - it runs as it is, on the graphics card; `Import...` — a MilkDrop preset (.milk) or a Shadertoy shader (.glsl) copied into the project's looks/ and listed - a preset runs its motion, decay, wave and equations; its shapes and shaders are left out; `Tap` — tap on the beat: the show's tempo from the gaps (the Sequence's Tap); `Browse...` — every look as a moving thumbnail: click one to put it on this deck; `Shuffle` — a look this deck does not have, at random; `Mutate` — a new flame bred from this one (its maps nudged, a variation swapped) - kept with the project; `Edit` — this look's file in your editor: saved, it reloads here; `...` — the picture file the Image look shows; `||` — the video paused (the picture holds) or played on; `>` — the next file; `x` — this file off the list; `Save as...`; `Rename...`; `Delete`; `Forget` — this bred flame no longer kept; the deck goes back to the flame it came from; `A` — all deck A; `B` — all deck B; `Cut` — straight to the other deck; `Fade` — to the other deck over two beats
+**VJ frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the VJ's last change undone (Ctrl+Z with the frame focused, Ctrl+Y redoes); `New look...` — a look of your own: a small Python file in the project's looks/ folder, made from an example and opened in your editor - it reloads here each time it is saved; it goes on the deck off the mix; `New shader...` — a Shadertoy shader of your own: a .glsl file to paste one from shadertoy.com into (its Image tab's code) - it runs as it is, on the graphics card; `Import...` — a MilkDrop preset (.milk) or a Shadertoy shader (.glsl) copied into the project's looks/ and listed - a preset runs its motion, decay, wave, shapes, custom waves and equations, and its MilkDrop 2 shaders translated (one that does not translate is left out, and said); `Tap` — tap on the beat: the show's tempo from the gaps (the Sequence's Tap) - the first tap is the first beat of a bar; `Browse...` — every look as a moving thumbnail: click one to put it on this deck; `Shuffle` — a look this deck does not have, at random; `Mutate` — a new flame bred from this one (its maps nudged, a variation swapped) - kept with the project; `Edit` — this look's file in your editor: saved, it reloads here; `...` — the picture file the Image look shows; `||` — the video paused (the picture holds) or played on; `>` — the next file; `x` — this file off the list; `Save as...`; `Rename...`; `Delete`; `Forget` — this bred flame no longer kept; the deck goes back to the flame it came from; `A` — all deck A; `B` — all deck B; `Cut` — straight to the other deck (now, or on the next beat or bar - the choice beside Fade); `Fade` — to the other deck over two beats (now, or from the next beat or bar)
 
 **Keyboard shortcuts**: `close` — close (Esc while it has the focus); `Reset all to defaults`
 

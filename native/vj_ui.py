@@ -72,7 +72,8 @@ def build(app):
                           "tab's code) - it runs as it is, on the graphics card")
                     dpg.add_button(label="Import...", tag="vj_import", small=True, callback=lambda: dpg.show_item("vj_impfile"))
                     c.tip("a MilkDrop preset (.milk) or a Shadertoy shader (.glsl) copied into the project's looks/ and "
-                          "listed - a preset runs its motion, decay, wave and equations; its shapes and shaders are left out")
+                          "listed - a preset runs its motion, decay, wave, shapes, custom waves and equations, and its "
+                          "MilkDrop 2 shaders translated (one that does not translate is left out, and said)")
                 with dpg.group(horizontal=True):
                     typeface.label(dpg.add_text("MAP", color=c.ACCENT))
                     dpg.add_combo([w for _, w in vj.MAPS], tag="vj_map", width=px(190),
@@ -89,7 +90,13 @@ def build(app):
                     with dpg.drawlist(width=px(16), height=px(16), tag="vj_beat_dl"):
                         dpg.draw_circle((px(8), px(8)), px(6), fill=(60, 60, 60, 255), color=(0, 0, 0, 0), tag="vj_beat")
                     dpg.add_button(label="Tap", tag="vj_tap", small=True, callback=lambda: _tap(app))
-                    c.tip("tap on the beat: the show's tempo from the gaps (the Sequence's Tap)")
+                    c.tip("tap on the beat: the show's tempo from the gaps (the Sequence's Tap) - the first tap is "
+                          "the first beat of a bar")
+                    dpg.add_combo([w for _, w in vj.PULSES], tag="vj_pulse", width=px(130),
+                                  default_value=dict(vj.PULSES)[o["pulse"]],
+                                  callback=lambda s, v: _set(app, "pulse", next(k for k, w in vj.PULSES if w == v)))
+                    c.tip("what the looks pulse on: the bar grid (the tempo, kept on the beats heard - each pulse on "
+                          "its beat, none on the off-beats) or every beat the detector hears")
                     dpg.add_checkbox(label="cue", tag="vj_cue", default_value=bool(o.get("cue")),
                                      callback=lambda s, v: _set(app, "cue", bool(v)))
                     c.tip("the pop-out shows the deck off the mix - the one to set up before fading to it - while the "
@@ -112,11 +119,16 @@ def build(app):
             _learnable(app, "vj_fader", {"kind": "vj_fader"})
             dpg.add_button(label="B", tag="vj_to_b", small=True, callback=lambda: _fade_to(app, 1.0))
             c.tip("all deck B")
-            dpg.add_button(label="Cut", tag="vj_cut", small=True, callback=lambda: vj.cut(app))
-            c.tip("straight to the other deck")
+            dpg.add_button(label="Cut", tag="vj_cut", small=True, callback=lambda: _launch(app, 0.0))
+            c.tip("straight to the other deck (now, or on the next beat or bar - the choice beside Fade)")
             dpg.add_button(label="Fade", tag="vj_go", small=True,
-                           callback=lambda: vj.go(app, vj.FADE_BEATS * 60.0 / vj._tempo(app)))
-            c.tip("to the other deck over two beats")
+                           callback=lambda: _launch(app, vj.FADE_BEATS * 60.0 / vj._tempo(app)))
+            c.tip("to the other deck over two beats (now, or from the next beat or bar)")
+            dpg.add_combo([w for _, w in vj.QUANTS], tag="vj_quant", width=px(130),
+                          default_value=dict(vj.QUANTS)[o["quant"]],
+                          callback=lambda s, v: _set(app, "quant", next(k for k, w in vj.QUANTS if w == v)))
+            c.tip("when Cut and Fade go - from here, MIDI or the phone: at once, or on the next beat or bar of the "
+                  "count the auto-mix keeps, so a press a little early lands on the music")
             dpg.add_combo(list(vj.MODES), tag="vj_mode", width=px(90), default_value=o["mode"],
                           callback=lambda s, v: _set(app, "mode", v))
             c.tip("how the two meet between the fader's ends")
@@ -128,7 +140,8 @@ def build(app):
             dpg.add_combo([w for _, w in AUTO], tag="vj_auto", width=px(170), default_value=dict(AUTO)[o["auto"]["mix"]],
                           callback=lambda s, v: _set_auto(app, "mix", next(k for k, w in AUTO if w == v)))
             c.tip("the fader moved by itself: to the other deck every few bars (on the show's bars while it plays, "
-                  "else on the beats heard), or at the show's song sections - a cut into a drop, a slow fade into "
+                  "else on the tempo, kept on the beats heard - tap the tempo in to set where a bar starts), or at "
+                  "the show's song sections - a cut into a drop, a slow fade into "
                   "the quiet parts")
             dpg.add_combo([f"{b} bars" for b in (1, 2, 4, 8, 16)], tag="vj_bars", width=px(80),
                           default_value=f"{o['auto']['bars']} bars",
@@ -136,6 +149,11 @@ def build(app):
             dpg.add_checkbox(label="shuffle looks", tag="vj_shuffle", default_value=bool(o["auto"]["shuffle"]),
                              callback=lambda s, v: _set_auto(app, "shuffle", bool(v)))
             c.tip("a deck dealt a new look as the mix leaves it, so it comes back as something else")
+            dpg.add_combo([w for _, w in vj.SHUFFLE_FROM], tag="vj_shuffle_from", width=px(150),
+                          default_value=dict(vj.SHUFFLE_FROM)[o["auto"]["shuffle_from"]],
+                          callback=lambda s, v: _set_auto(app, "shuffle_from", next(k for k, w in vj.SHUFFLE_FROM if w == v)))
+            c.tip("what shuffle deals from: any look, or only the deck's own family (a flame for a flame, a shader "
+                  "for a shader) - a set that keeps of a piece")
         with dpg.collapsing_header(label="DECK C - over the mix", tag="vj_chead", default_open=False):
             with dpg.group(horizontal=True):
                 dpg.add_text("over the mix by", color=c.DIM)
@@ -212,11 +230,23 @@ def _deck(app, i):
     _row("colours", lambda: dpg.add_combo(list(vj_looks.GRADIENTS), tag=f"vj_col{i}", width=-1, default_value=d["colours"],
                                           callback=lambda s, v: _set_deck(app, i, "colours", v)), tag=f"vj_colrow{i}")
     _row("its colours", lambda: dpg.add_combo([OWN_COLS] + list(vj_looks.GRADIENTS), tag=f"vj_fxcol{i}", width=-1,
-                                              callback=lambda s, v: _set_deck(app, i, "fx_colours", "" if v == OWN_COLS else v)),
+                                              callback=lambda s, v: _set_fx_colours(app, i, "" if v == OWN_COLS else v)),
          tag=f"vj_fxcolrow{i}")
     _row("palette", lambda: dpg.add_combo([], tag=f"vj_pal{i}", width=-1,
                                           callback=lambda s, v: _set_deck(app, i, "palette", "" if v == OWN_PAL else v)),
          tag=f"vj_palrow{i}")
+    with dpg.group(tag=f"vj_fxset{i}"):                       # an Effect deck's effect's own sliders and checks
+        for k in vj.FX_SET:
+            if k[0] == "c":
+                with dpg.group(horizontal=True, tag=f"vj_fxsr{i}_{k}"):
+                    dpg.add_text("", tag=f"vj_fxsl{i}_{k}", color=c.DIM)
+                    num.add(f"vj_fxs{i}_{k}", 0, 0, 31 if k == "c3" else 255, integer=True, width=-1,
+                            callback=lambda s, v, k=k: _set_fx(app, i, k, int(v)))
+            else:
+                dpg.add_checkbox(label="", tag=f"vj_fxs{i}_{k}",
+                                 callback=lambda s, v, k=k: _set_fx(app, i, k, 1 if v else 0))
+        c.tip("the effect's own sliders and checks, as the effect names them (Flat mode, a size, a shape...) - "
+              "kept with the deck and its presets; another effect starts from its own")
     with dpg.collapsing_header(label="VIDEO", tag=f"vj_vidhead{i}", default_open=False):
         with dpg.group(horizontal=True, tag=f"vj_srcrow{i}"):
             dpg.add_combo([w for _, w in vj.SOURCES], tag=f"vj_src{i}", width=px(140),
@@ -454,6 +484,12 @@ def _set(app, key, v):
     _save(app)
 
 
+def _launch(app, seconds):
+    waits = vj.launch(app, seconds)
+    if waits:
+        app.gp.status(("Cut" if seconds <= 0 else "Fade") + f" on {waits}")
+
+
 def _set_auto(app, key, v):
     vj.options(app)["auto"][key] = v
     _save(app)
@@ -467,18 +503,45 @@ def set_on(app, v):
     app.gp.status("the VJ is on air" if v else "the VJ is off air: the effect shows again")
 
 
+def _set_fx(app, i, k, v):
+    d = vj.options(app)["decks"][i]
+    d.setdefault("fx_set", {})[k] = int(v)
+    _save(app)
+
+
 def _set_deck(app, i, key, v):
+    if key == "effect" and vj.options(app)["decks"][i].get("effect") != v:
+        vj.options(app)["decks"][i]["fx_set"] = {}                   # another effect: its own settings, not the last's
     vj.options(app)["decks"][i][key] = v
     _save(app)
     if key in ("look", "effect", "image"):
         refresh(app)
 
 
+GRADIENT_PAL = "* Color Gradient"          # WLED's palette drawn from the effect's three colours
+
+
+def _set_fx_colours(app, i, v):
+    """An Effect deck's colours: a gradient's three - and, while its palette is the effect's own, the palette made
+    the one drawn from those colours, so an effect that paints from its palette takes them too (most do)."""
+    d = vj.options(app)["decks"][i]
+    d["fx_colours"] = v
+    note = ""
+    if v and not d.get("palette") and GRADIENT_PAL in dict(app.eng.palette_list()):
+        d["palette"] = GRADIENT_PAL
+        note = f" - its palette {GRADIENT_PAL}, so the effect paints in them"
+    _save(app)
+    refresh(app)
+    if v:
+        app.gp.status(f"deck {LETTER[i]}'s effect in {v}{note}")
+
+
 def _set_channel(app, i, k, v):
     d = vj.options(app)["decks"][i]
-    ch = list(d.get("channels") or ["", "", "", ""])
+    ch = list(vj.deck_channels(d) or ["", "", "", ""])
     ch[k] = "" if v.startswith("file:") else v
     d["channels"] = ch
+    d["channels_look"] = d["look"]                                   # this shader's: another look reads its own file's
     _save(app)
     refresh(app)                                                     # a picture chosen: its row shown
 
@@ -536,6 +599,8 @@ def _set_image(app, i, path):
 def _import(app, a):
     """.milk presets and .glsl shaders copied into the project's looks/ and listed."""
     sel = [f for f in (list((a.get("selections") or {}).values()) or [a.get("file_path_name", "")]) if f and os.path.isfile(f)]
+    skipped = [f for f in sel if os.path.splitext(f)[1].lower() not in vj_looks.IMPORTS]
+    sel = [f for f in sel if f not in skipped]
     for f in sel:
         vj_looks.import_file(app.project, f)
     errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
@@ -543,7 +608,8 @@ def _import(app, a):
     app._vj_thumbs = None
     refresh(app)
     bad = [e for e in errs if any(os.path.basename(f).lower() in e[0].lower() for f in sel)]
-    app.gp.status(f"{len(sel)} imported into the project's looks/" + (f" - {len(bad)} could not be read" if bad else ""))
+    app.gp.status(f"{len(sel)} imported into the project's looks/" + (f" - {len(bad)} could not be read" if bad else "")
+                  + (f" - {len(skipped)} left out: only .milk and .glsl files are imported" if skipped else ""))
 
 
 def _new_shader(app):
@@ -689,7 +755,7 @@ def _new_look(app):
             allow_py(app, True)                                      # the look is the user's own: this project is allowed
         vj_looks.load_user(app.project)
         o = vj.options(app)
-        cue = 1 if float(o["fader"]) < 0.5 else 0                  # the deck off the mix: seen in its preview first
+        cue = vj.cue_deck(app)                                     # the deck off the mix: seen in its preview first
         lk = next((n for n, l in vj_looks.LOOKS.items() if l.family == "yours" and _user_path(n) == path), None)
         if lk:
             o["decks"][cue]["look"] = lk
@@ -781,6 +847,9 @@ def refresh(app):
     dpg.set_value("vj_auto", dict(AUTO)[o["auto"]["mix"]])
     dpg.set_value("vj_bars", f"{o['auto']['bars']} bars")
     dpg.set_value("vj_shuffle", bool(o["auto"]["shuffle"]))
+    dpg.set_value("vj_quant", dict(vj.QUANTS)[o["quant"]])
+    dpg.set_value("vj_pulse", dict(vj.PULSES)[o["pulse"]])
+    dpg.set_value("vj_shuffle_from", dict(vj.SHUFFLE_FROM)[o["auto"]["shuffle_from"]])
     dpg.set_value("vj_cue", bool(o.get("cue")))
     dpg.set_value("vj_cmode", o.get("c_mode", "screen"))
     pals = [OWN_PAL] + [n for n, _ in app.eng.palette_list()]
@@ -796,6 +865,17 @@ def refresh(app):
         dpg.configure_item(f"vj_fxrow{i}", show=eff)
         dpg.configure_item(f"vj_palrow{i}", show=eff)
         dpg.configure_item(f"vj_fxcolrow{i}", show=eff)
+        sets = {k: (lab, v, hi) for k, lab, v, hi in (vj.fx_settings(app.eng, d.get("effect", ""), d) if eff else [])}
+        dpg.configure_item(f"vj_fxset{i}", show=bool(sets))
+        for k in vj.FX_SET:
+            lab, v, hi = sets.get(k, ("", 0, 1))
+            if k[0] == "c":
+                dpg.configure_item(f"vj_fxsr{i}_{k}", show=k in sets)
+                dpg.set_value(f"vj_fxsl{i}_{k}", lab)
+                num.set(f"vj_fxs{i}_{k}", v)
+            else:
+                dpg.configure_item(f"vj_fxs{i}_{k}", show=k in sets, label=lab)
+                dpg.set_value(f"vj_fxs{i}_{k}", bool(v))
         dpg.configure_item(f"vj_colrow{i}", show=not eff)
         dpg.set_value(f"vj_fxcol{i}", d.get("fx_colours") or OWN_COLS)
         dpg.configure_item(f"vj_pal{i}", items=pals)
@@ -804,12 +884,12 @@ def refresh(app):
         dpg.set_value(f"vj_text{i}", d.get("text", ""))
         glsl = getattr(lk, "glsl", None) if lk else None
         dpg.configure_item(f"vj_imgrow{i}", show=d["look"] == "Image" or bool(glsl and (
-            "picture" in glsl or "picture" in (d.get("channels") or []))))
+            "picture" in glsl or "picture" in (vj.deck_channels(d) or []))))
         dpg.configure_item(f"vj_chrow{i}", show=bool(glsl))
         if glsl:
             from native import vj_glsl
             own = vj_glsl.channels_of(glsl)
-            ch = list(d.get("channels") or ["", "", "", ""])
+            ch = list(vj.deck_channels(d) or ["", "", "", ""])
             for k in range(4):
                 first = f"file: {own[k]}"
                 dpg.configure_item(f"vj_ch{i}_{k}", items=[first] + list(vj_glsl.CHANNELS))

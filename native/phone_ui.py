@@ -199,14 +199,16 @@ def apply(app, cmd):
             vj.set_fader(app, cmd["v"])
         elif a == "vjlevel":
             vj.knob_set(app, cmd["d"], "level", cmd["v"])
+            vj_ui._save(app)                             # saved once it settles: a drag on the phone one undo step
         elif a == "vjlook":
             if cmd["v"] in vj_ui.look_names():
                 vj.options(app)["decks"][cmd["d"]]["look"] = cmd["v"]
                 app._vj_dirty = True
+                vj_ui._save(app)
         elif cmd["k"] == "cut":
-            vj.cut(app)
+            vj.launch(app, 0.0)
         elif cmd["k"] == "fade":
-            vj.go(app, vj.FADE_BEATS * 60.0 / vj._tempo(app))
+            vj.launch(app, vj.FADE_BEATS * 60.0 / vj._tempo(app))
         elif cmd["k"] == "air":
             vj_ui.set_on(app, not vj.on(app))
         else:

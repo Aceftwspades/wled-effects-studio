@@ -156,6 +156,19 @@ def _thermal(ctx, st):
                      np.clip(1.0 - abs(l - 0.25) * 4.0, 0, 1) * 0.9 + np.clip(l * 4 - 3.2, 0, 1)], axis=-1)
 
 
+@look("Gradient Map", "video", "the video's brightness through the deck's colours (dark the gradient's start, bright its "
+                               "end) - any clip in the set's palette; amount the contrast", video=True)
+def _gradient_map(ctx, st):
+    l = luma(_video(ctx))
+    lo, hi = np.percentile(l, (2.0, 99.5))                                # the frame's own range stretched to 0..1 first:
+    st["lo"] = lo = st.get("lo", lo) + (lo - st.get("lo", lo)) * 0.1      # dark footage (LEDs on black) keeps its
+    st["hi"] = hi = st.get("hi", hi) + (hi - st.get("hi", hi)) * 0.1      # detail; eased, so a flash does not pump it
+    l = np.clip((l - lo) / max(hi - lo, 0.05), 0, 1)
+    k = 1.0 + ctx.amount * 3.0                                            # contrast about the middle
+    l = np.clip((l - 0.5) * k + 0.5, 0, 1)
+    return np.clip(ctx.grad(l) * (0.15 + 0.85 * l)[..., None], 0, 1)
+
+
 @look("Halftone", "video", "dots as big as the picture is bright - amount the dots' size", video=True)
 def _halftone(ctx, st):
     img = _video(ctx)
@@ -376,6 +389,13 @@ def _p(v, c):
     return float(v(c)) if callable(v) else float(v)
 
 
+def _grad_colour(ctx, x):
+    """One colour of the deck's colours at x (wrapping, as a hue does), at full brightness: a preset's hue sweep
+    becomes a sweep through the deck's gradient (rainbow: the hues, as MilkDrop's own)."""
+    c = np.asarray(ctx.grad(np.array([math.fmod(x, 1.0) % 1.0], np.float32)), np.float32).reshape(-1)[:3]
+    return c / max(float(c.max()), 0.2)
+
+
 def milkdrop_frame(ctx, st, pre):
     """One frame of a MilkDrop preset: the last frame warped and faded, the sound drawn over it."""
     h, w = ctx.h, ctx.w
@@ -402,7 +422,7 @@ def milkdrop_frame(ctx, st, pre):
     fb = sample(fb, u, v) * (_p(pre.get("decay", 0.95), ctx) ** k)
     fb = blur(fb, 1) if ctx.h > 40 else fb
     hue = _p(pre.get("hue", 0.0), ctx)
-    col = hsv(np.array([hue]), np.array([0.8]), np.array([1.0]))[0]
+    col = _grad_colour(ctx, hue)                                       # the deck's colours, swept as the preset's hue
     wave = pre.get("wave")
     lvl = 0.6 + ctx.level * 0.8
     if wave:
@@ -424,7 +444,7 @@ def milkdrop_frame(ctx, st, pre):
             fb[jy, jx] = np.maximum(fb[jy, jx], col * lvl * f)
     if pre.get("shape") and ctx.beat_hit:
         ring = np.clip(1.0 - np.abs(ctx.r - 0.25) / 0.03, 0, 1)
-        fb = np.maximum(fb, ring[..., None] * hsv(np.array([hue + 0.5]), np.array([0.7]), np.array([1.0]))[0])
+        fb = np.maximum(fb, ring[..., None] * _grad_colour(ctx, hue + 0.5))
     if pre.get("grid"):
         g = ((np.abs(np.mod(ctx.x * 4, 1.0) - 0.5) < 0.04) | (np.abs(np.mod(ctx.y * 4, 1.0) - 0.5) < 0.04))
         fb = np.maximum(fb, g[..., None] * col * ctx.beat * 0.8)
@@ -587,6 +607,27 @@ def register_flame(name, flame):
     """A flame of the project's own (bred by Mutate) as a look."""
     LOOKS[name] = Look(name, "flame", lambda ctx, st, fl=flame: flame_frame(ctx, st, fl),
                        "a fractal flame bred by Mutate: points thrown through bent maps, counted, shown on a log scale")
+    LOOKS[name].bred = flame
+
+
+_FLAMES_SEEN = [None, ()]           # the project's flames last listed: (their dict, its names)
+
+
+def sync_flames(flames):
+    """The project's bred flames listed as looks, as they are now: one no longer kept (undone, renamed, another
+    project's) unlisted, one changed listed again. Cheap when nothing changed (it is asked every frame)."""
+    names = tuple(flames)
+    if _FLAMES_SEEN[0] is flames and _FLAMES_SEEN[1] == names:
+        return
+    _FLAMES_SEEN[0], _FLAMES_SEEN[1] = flames, names
+    for name in [n for n, lk in LOOKS.items() if getattr(lk, "bred", None) is not None and n not in flames]:
+        del LOOKS[name]
+    for name, fl in flames.items():
+        lk = LOOKS.get(name)
+        if lk is None or getattr(lk, "bred", None) is not fl:
+            if lk is not None and getattr(lk, "bred", None) is None:
+                continue                                      # a look of another kind has the name: it stays
+            register_flame(name, fl)
 
 
 # --- text and image: a deck's words or a picture of the user's ----------------------------------------
@@ -605,7 +646,8 @@ def _font(px):
     return f
 
 
-@look("Text", "layer", "the deck's words scrolling across, in its colours - amount their size, a jump on the beat")
+@look("Text", "layer", "the deck's words scrolling across, in its colours - amount their size, speed how fast (at 0 held "
+                       "still in the middle, fitted), a jump on the beat")
 def _text(ctx, st):
     from PIL import Image, ImageDraw
     words = str((getattr(ctx, "deck", None) or {}).get("text") or "WLED")
@@ -619,9 +661,18 @@ def _text(ctx, st):
         st["key"], st["mask"] = key, np.asarray(im, np.float32) / 255.0
     m = st["mask"]
     mh, mw = m.shape
-    st["x"] = (st.get("x", 0.0) + ctx.dt * ctx.w * 0.25 * ctx.speed) % (mw + ctx.w)
+    if ctx.speed < 0.05:                                    # still: the words held in the middle, made to fit
+        if mw > ctx.w:
+            from PIL import Image
+            k = ctx.w / mw
+            m = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).resize((ctx.w, max(1, int(mh * k))),
+                                                                             Image.BILINEAR), np.float32) / 255.0
+            mh, mw = m.shape
+        x0 = (ctx.w - mw) // 2
+    else:
+        st["x"] = (st.get("x", 0.0) + ctx.dt * ctx.w * 0.25 * ctx.speed) % (mw + ctx.w)
+        x0 = int(ctx.w - st["x"])
     out = np.zeros((ctx.h, ctx.w), np.float32)
-    x0 = int(ctx.w - st["x"])
     y0 = int((ctx.h - mh) / 2 - ctx.beat * ctx.h * 0.08)
     xs, xe = max(0, x0), min(ctx.w, x0 + mw)
     ys, ye = max(0, y0), min(ctx.h, y0 + mh)
@@ -753,7 +804,8 @@ def _load_file(path):
     ext = os.path.splitext(path)[1].lower()
     if ext == ".glsl":
         from native import vj_glsl
-        src = open(path, encoding="utf-8", errors="replace").read()
+        with open(path, encoding="utf-8", errors="replace") as f:
+            src = f.read()
         if "mainImage" not in src:
             raise ValueError("it has no mainImage(out vec4 fragColor, in vec2 fragCoord)")
         name = vj_glsl.name_of(src, base)
@@ -769,17 +821,25 @@ def _load_file(path):
     ns = {"np": np, "math": math, "sample": sample, "hsv": hsv, "blur": blur, "noise": noise, "fbm": fbm,
           "luma": luma, "milkdrop_frame": milkdrop_frame, "flame_frame": flame_frame, "new_flame": new_flame,
           "__file__": path, "__name__": "vj_look_" + base}
-    exec(compile(open(path, encoding="utf-8").read(), path, "exec"), ns)
+    with open(path, encoding="utf-8") as f:
+        code = f.read()
+    exec(compile(code, path, "exec"), ns)
     name = str(ns.get("NAME") or base)
     if not callable(ns.get("draw")):
         raise ValueError("it has no draw(c, st)")
     return Look(name, "yours", ns["draw"], str(ns.get("DESC") or "a look of the project's own"), bool(ns.get("VIDEO", False)))
 
 
+IMPORTS = (".milk", ".glsl")        # what Import... copies in (a Python look is made with New look..., not imported)
+
+
 def import_file(project, path):
-    """A .milk preset or a .glsl shader copied into the project's looks/ (a new name if one is taken): its path."""
+    """A .milk preset or a .glsl shader copied into the project's looks/ (a new name if one is taken): its path.
+    Another kind of file: ValueError."""
     import os
     import shutil
+    if os.path.splitext(path)[1].lower() not in IMPORTS:
+        raise ValueError(f"only {' and '.join(IMPORTS)} files are imported")
     d = user_dir(project)
     os.makedirs(d, exist_ok=True)
     base, ext = os.path.splitext(os.path.basename(path))

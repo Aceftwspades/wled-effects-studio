@@ -419,7 +419,7 @@ def look_draw(preset):
             uni = milk_md2.uniforms(v, w, h, ctx.t, st["frame"])
             uvmap = np.dstack([U, 1.0 - V]).astype(np.float32)
             warped, err = milk_md2.run(preset["md2"]["warp"], w, h, uni, st["fb"],
-                                       milk_md2.blurs(st["fb"], preset["md2"]["warp"]), uvmap, key=f"warp-{id(st)}")
+                                       milk_md2.blurs(st["fb"], preset["md2"]["warp"]), uvmap)
             if warped is None:
                 st["md2_off"]["warp"] = err
         if warped is not None:                                   # the preset's warp shader made the next frame (its decay its own)
@@ -440,7 +440,7 @@ def look_draw(preset):
         if "comp" in preset["md2"] and "comp" not in st.setdefault("md2_off", {}):
             from native import milk_md2
             shown, err = milk_md2.run(preset["md2"]["comp"], w, h, milk_md2.uniforms(v, w, h, ctx.t, st["frame"]),
-                                      out, milk_md2.blurs(out, preset["md2"]["comp"]), None, key=f"comp-{id(st)}")
+                                      out, milk_md2.blurs(out, preset["md2"]["comp"]), None)
             if shown is None:
                 st["md2_off"]["comp"] = err
             else:

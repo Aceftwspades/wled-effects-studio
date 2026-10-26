@@ -157,8 +157,23 @@ if ok:
     out3 = milk.look_draw(milk.parse(bad, "bad"))(ctx(), st3)
     check("comp shader left out" in st3.get("warn", "") and out3[24, int(0.2 * 63), 0] > 0.9,
           "a shader that will not compile: the preset runs without it, and says so")
+    g = vj_glsl._gl()
+    noisy = milk.parse(PRESET + "comp_1=`shader_body\ncomp_2=`{ ret = GetPixel(uv) + tex2D(sampler_noise_lq, uv).xyz * 0.1; }\n",
+                       "noisy")
+    for _ in range(2):
+        milk.look_draw(noisy)(ctx(), {})
+    n = (len(g.tex), len(g.static), len(g.progs))
+    for _ in range(6):                                           # six new states (six look changes): nothing more kept
+        milk.look_draw(noisy)(ctx(), {})
+    check((len(g.tex), len(g.static), len(g.progs)) == n and len(g.static) >= 1,
+          f"MD2's textures one a name and the noise once, however many states ({n})")
 else:
     print("skip the runs: " + why)
+
+# --- the GL thread's jobs: one a key, the newer in the older's place --------------------------------------
+jobs = vj_glsl._Jobs()
+jobs.put("a", 1); jobs.put("b", 2); jobs.put("a", 3)
+check([jobs.get(), jobs.get()] == [3, 2] and not jobs.jobs, "a deck's frame asked for again replaces the one waiting")
 
 
 # --- a project's Python looks: run only once allowed -----------------------------------------------------
@@ -177,6 +192,32 @@ errs = vj_looks.load_user(Proj, allow_py=False)
 check("Mine Test" not in vj_looks.LOOKS, "no longer allowed: unlisted")
 os.remove(os.path.join(d, "mine.py"))
 vj_looks.load_user(Proj)
+
+# --- a deck's channels: the shader's they were chosen for only -------------------------------------------
+from native import vj
+d = {"look": "Mine", "channels": ["", "", "", "picture"], "channels_look": "Mine"}
+check(vj.deck_channels(d) == ["", "", "", "picture"], "the channels for the look they were chosen for")
+d["look"] = "Another"
+check(vj.deck_channels(d) is None, "another look on the deck: its file's channels, not the last one's")
+
+# --- bred flames: unlisted when no longer the project's ----------------------------------------------------
+fl = vj_looks.new_flame(5)
+vj_looks.sync_flames({"Bred Test": fl})
+check("Bred Test" in vj_looks.LOOKS, "a bred flame listed")
+vj_looks.sync_flames({"Bred Renamed": fl})
+check("Bred Test" not in vj_looks.LOOKS and "Bred Renamed" in vj_looks.LOOKS and "Flame: Sheep" in vj_looks.LOOKS,
+      "renamed (or undone): the old name unlisted, the built-in flames kept")
+vj_looks.sync_flames({})
+check("Bred Renamed" not in vj_looks.LOOKS, "none kept: none listed")
+
+# --- Import... copies presets and shaders only -------------------------------------------------------------
+txt = os.path.join(tempfile.mkdtemp(), "notes.py")
+open(txt, "w").write("x = 1")
+try:
+    vj_looks.import_file(Proj, txt)
+    check(False, "a .py imported: refused")
+except ValueError:
+    check(True, "a .py imported: refused")
 
 # --- the phone's VJ commands -----------------------------------------------------------------------
 check(phone.check({"a": "vjlevel", "d": 2, "v": 0.5}) == {"a": "vjlevel", "d": 2, "v": 0.5}, "a deck's level")

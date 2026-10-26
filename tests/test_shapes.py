@@ -352,6 +352,25 @@ def test_beats_of_a_click_track():
     assert abs(found - bpm) < 1.0 and abs(first - 0.25) < 0.05 and len(beats) > 30
 
 
+def test_beats_of_a_phrased_track():
+    """A 128 bpm track whose first bar of every four is accented (its phrasing: lines 8 bpm either side of the
+    tempo) with hats on the off-beats: the tempo still 128 to a tenth, not a line beside it nor a relative."""
+    from native import audio
+    rate = 22050; secs = 60.0; bpm = 128.0
+    beat = 60.0 / bpm
+    t = np.arange(int(rate * secs)) / rate
+    x = (0.05 * np.sin(2 * np.pi * 110 * t)).astype(np.float32)        # a bed under it, as music has (not silence)
+    click = np.exp(-np.arange(800) / 120.0).astype(np.float32)
+    for k in range(int(secs / beat) - 1):
+        s0 = int((0.3 + k * beat) * rate)
+        x[s0:s0 + 800] += click * (1.0 if (k // 4) % 4 == 0 else 0.35)
+        h0 = int((0.3 + (k + 0.5) * beat) * rate)
+        x[h0:h0 + 200] += click[:200] * 0.15
+    found, first, _ = audio.beats_of(x, rate)
+    assert abs(found - bpm) < 0.1, found
+    assert abs(first - 0.3) < 0.02, first
+
+
 def test_audio_files_of_every_kind():
     """A 16-bit WAV read as it is; a float WAV (which Python's wave module
     refuses) and an MP3 and a FLAC made from it through ffmpeg, each the same

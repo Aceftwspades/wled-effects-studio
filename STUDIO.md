@@ -4072,6 +4072,36 @@ before they run:
       opens (as its graphs compile and run): worth a word when a project
       from elsewhere is opened, as .milk and .glsl files cannot do that.
 
+From the VJ code review and a VJ set made with it (2026-10-26) - a 2:22 showcase on a 16:9 panel (three
+decks, every family of look, cuts, wipes, modulators, the auto-mix, a show step), all done 2026-10-26:
+
+- [x] **MD2 textures leaked** on the graphics card: a set a deck state (about 7 MB each look change),
+      never let go, and the noise uploaded every frame. One texture a name now, the noise once; old
+      programs and replaced textures released.
+- [x] **A hung shader could freeze the studio** (a blocking put on a full queue) and **shader decks fell
+      behind** a slow card (eight frames queued). The GL thread's jobs are one a key now - a deck's frame
+      asked for again replaces the waiting one - and a stuck thread is said at once.
+- [x] **"Every beat" clips flashed black**, a deck's **channels carried over to the next shader**,
+      **undone flames stayed listed**, the **phone's look and level were not saved**, the Import tip was
+      stale, a flame could be named "Effect", a preview-only Effect deck ran at half speed.
+- [x] **The auto-mix's bars counted heard beats**, and the detector hears off-beats: "every 2 bars"
+      switched about every bar, mid-bar. The tempo's count now, kept on the beats heard near its own;
+      Tap's first tap is a bar's first beat.
+- [x] **The looks pulsed on every beat the detector heard**, off-beats and all: now on the bar grid,
+      each pulse eased in across its beat (or every beat heard, as before). The modulators' beat too.
+- [x] **The tempo finder** read a 128 bpm track as 118.9 (a song's phrasing puts lines either side of
+      its tempo): each tempo scored with its harmonics now - sixteen recordings right, the first beat to
+      a few ms.
+- [x] **Cut and Fade went at once**: now, or on the next beat or bar.
+- [x] **A look changed on a live deck jumped**: blended over a beat. **A cut to a feedback look landed on
+      black** (the deck off the mix was not drawn): it keeps running now, its video rolling on.
+- [x] **The built-in MilkDrop looks ignored the deck's colours**, **video looks could not take a set's
+      palette** (Gradient Map added), **Text could not be held still** (speed 0), **no 16:9 canvas**,
+      **shuffle dealt any look** (from its own family now, never another deck's), **an Effect deck's
+      colours missed palette effects** (Color Gradient set with them) and **its own sliders and checks
+      could not be set** (Flat mode, a size: now under its colours), **video files ran on the wall clock
+      in a render** (on the held clock now).
+
 ### From the second feature review (October 2026)
 
 The studio set again beside the software it shares ground with (2026-10-22),

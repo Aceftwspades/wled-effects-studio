@@ -166,17 +166,16 @@ def noise_textures():
     return _NOISE
 
 
-def run(src, w, h, uni, frame, blurs, uvmap=None, key="md2"):
+def run(src, w, h, uni, frame, blurs, uvmap=None):
     """The shader drawn: its picture (h, w, 3) float, row 0 the top - or (None, error)."""
     from native import vj_glsl
     tex = {"sampler_main": frame, "sampler_fw_main": frame, "sampler_fc_main": frame, "sampler_pw_main": frame,
            "sampler_pc_main": frame, "sampler_blur1": blurs[0], "sampler_blur2": blurs[1], "sampler_blur3": blurs[2]}
-    tex.update(noise_textures())
     u = dict(uni)
     u["vj_warp"] = 1.0 if uvmap is not None else 0.0
     if uvmap is not None:
         tex["vj_uvmap"] = uvmap
-    img, err = vj_glsl.run_frag(key, src, w, h, u, tex)
+    img, err = vj_glsl.run_frag(src, w, h, u, tex, static=noise_textures())
     if img is None:
         return None, err
     return np.flipud(img), ""
