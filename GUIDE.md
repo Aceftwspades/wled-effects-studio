@@ -1104,8 +1104,8 @@ and a click puts it on that deck; **look** lists them too:
   canvas and drifting slowly - a logo, a poster.
 - **Effect**: any effect of the studio's, run on the shape itself beside
   the main one (its **speed** and **amount** are the effect's Speed and
-  Intensity, its **colours** the effect's three colours, and **palette**
-  the effect's palette, or the effect's own).
+  Intensity; **its colours** and **palette** are the effect's own, or a
+  gradient's three colours and a palette of your choosing).
 - **Yours** (below): looks in Python, Shadertoy shaders, and MilkDrop
   presets imported.
 
@@ -1166,8 +1166,9 @@ Fade, Shuffle A and B and on air, and for each deck its look (along the
 list), every knob (amount, speed, hue, kaleidoscope, trails, blur), the
 next video file and pause. Modulators (Playback > Modulators...) move the
 decks' knobs too - "VJ A amount" and so on. The phone remote shows a VJ
-card (the fader, Cut, Fade, On air, Shuffle A and B) while the frame is
-open.
+card while the frame is open: the fader, Cut, Fade, On air, Shuffle A and
+B, and each deck's look (picked from the list) and level - deck C's "over"
+the mix.
 
 **In a show**: a step added (or updated) from the sim while the VJ is on
 air is the VJ's - its decks, fader, blend, wipe, map and canvas kept with
@@ -1186,16 +1187,35 @@ shadertoy.com over it (the code of its Image tab) and save, and it runs on
 its deck as it is, on the graphics card (OpenGL 3.3, through moderngl).
 It has what Shadertoy gives - iTime, iResolution, iFrame, iChannel0 (the
 deck's video) and iChannel1 (the sound, as Shadertoy's audio input) - and
-the studio's own iBeat, iBass, iMid, iTreble, iLevel and iAmount; a shader
-of several passes or one that reads the keyboard will not run, and one that
-does not compile says why, at its own line numbers. **Import...** copies
-MilkDrop presets (`.milk`) and shaders (`.glsl`) into `looks/`: a preset is
-listed with the MilkDrop looks and runs approximately - its zoom, rotation,
-warp, stretch and drift, decay, wave and its per-frame and per-pixel
-equations; its custom shapes, borders and MilkDrop 2 shaders are left out.
+the studio's own iBeat, iBass, iMid, iTreble, iLevel and iAmount. What its
+four channels hold is chosen per channel - the deck's **video**, the
+**sound** (Shadertoy's audio input), a **noise** texture (as Shadertoy's
+RGBA noise), the deck's **picture**, a buffer **A** to **D**, or **none**:
+by default iChannel0 is the video, 1 the sound, 2 the noise; the shader's
+file can say otherwise with a line like `//@ iChannel2 = picture`, and the
+deck's **channels** row (shown while a shader is on it) chooses again,
+"file: ..." being what the file says. A shader of several passes - Shadertoy's
+Buffer A to D and Common tabs - goes in one file, each pass after a line
+`//@ buffer A` (`//@ common`, `//@ image`), with `//@ iChannel0 = A` in a
+pass to read buffer A (its own: its last frame); they run A to D, then the
+image. One that reads the keyboard will not run, and one that does not
+compile says why, at its own line numbers. **Import...** copies MilkDrop
+presets (`.milk`) and shaders (`.glsl`) into `looks/`: a preset is listed
+with the MilkDrop looks and runs approximately - its zoom, rotation, warp,
+stretch and drift, decay, wave, its custom shapes (sides, colours, borders,
+instances, textured) and custom waves, and its per-frame, per-pixel and
+per-point equations; its MilkDrop 2 warp and composite shaders are
+translated to GLSL and run on the graphics card, and one that does not
+translate is left out, said under the decks while the rest runs.
 **New look...** makes a small Python file in the project's `looks/` folder
 from an example and opens it in your editor; saved, it reloads in the frame
-at once, listed under Yours (**Edit** opens it again). It is a function `draw(c, st)` that returns the picture for
+at once, listed under Yours (**Edit** opens it again). A Python look is a
+program and runs as one: a project opened from elsewhere with Python looks
+in it asks first, once, whether to run them (**Run them** allows that
+project on this computer - kept in the studio's own settings, so a project
+cannot allow itself); until then they are listed under the decks as not
+run. Shaders and MilkDrop presets cannot run anything but their own
+pictures and equations, and need no asking. It is a function `draw(c, st)` that returns the picture for
 every pixel at once - numpy arrays, in the Shadertoy manner - from where
 each pixel is (`c.u`, `c.v`, `c.x`, `c.y`, `c.r`, `c.a`), the time, the
 beat and the sound, the deck's video and knobs, and `st`, kept from frame

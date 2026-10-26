@@ -47,7 +47,8 @@ MAX_FRAME = 512 * 1024               # a camera frame: a 640-wide JPEG is 30-80 
 MAX_PIXELS = 4096 * 4096             # a frame's size as its header says, checked before it is decoded
 FRAME_W = 640                        # frames kept at most this wide: the video and mapping read far less
 HANDSHAKE_S = 10                     # a connection that does not finish its TLS handshake in this is dropped
-ACTIONS = {"fx", "check", "effect", "palette", "bri", "blackout", "play", "stop", "step", "next", "prev", "fader", "vj", "vjfader"}
+ACTIONS = {"fx", "check", "effect", "palette", "bri", "blackout", "play", "stop", "step", "next", "prev", "fader", "vj", "vjfader",
+           "vjlevel", "vjlook"}
 VJ_KEYS = ("cut", "fade", "shuffle_a", "shuffle_b", "air")       # the VJ card's buttons
 
 
@@ -82,7 +83,15 @@ def check(cmd):
         if cmd.get("k") not in VJ_KEYS:
             return None
         out["k"] = cmd["k"]
-    if cmd["a"] in ("fx", "check", "bri", "step", "blackout", "fader", "vjfader"):
+    if cmd["a"] in ("vjlevel", "vjlook"):                     # a deck's: A, B or C
+        try:
+            d = int(cmd.get("d", -1))
+        except (TypeError, ValueError):
+            return None
+        if d not in (0, 1, 2):
+            return None
+        out["d"] = d
+    if cmd["a"] in ("fx", "check", "bri", "step", "blackout", "fader", "vjfader", "vjlevel"):
         try:
             v = float(cmd.get("v", 0))
         except (TypeError, ValueError):
@@ -90,7 +99,7 @@ def check(cmd):
         if v != v:
             return None
         out["v"] = v
-    if cmd["a"] in ("effect", "palette"):
+    if cmd["a"] in ("effect", "palette", "vjlook"):
         v = cmd.get("v")
         if not isinstance(v, str) or not v or len(v) > 200:
             return None
@@ -345,6 +354,9 @@ button.on{border-color:var(--acc);color:var(--acc)}button.stop{color:var(--red)}
 .btnlink{display:block;color:var(--acc);text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .note{color:var(--dim);font-size:13px}
 [hidden]{display:none!important}
+.deck{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.deck .row{grid-template-columns:4em 1fr}
+.deck select{width:100%}
 </style></head><body><main>
 <h1>WLED Effects Studio</h1>
 <div id="msg">connecting...</div>
@@ -358,7 +370,13 @@ button.on{border-color:var(--acc);color:var(--acc)}button.stop{color:var(--red)}
 <section class="card" id="vjcard" hidden><div class="lab">VJ</div>
 <div class="row"><span>A</span><input type="range" id="vjfader" min="0" max="1000"><span>B</span></div>
 <div class="btns"><button id="vjcut">Cut</button><button id="vjfade">Fade</button><button id="vjair">On air</button></div>
-<div class="btns"><button id="vjsa">Shuffle A</button><button id="vjsb">Shuffle B</button></div></section>
+<div class="btns"><button id="vjsa">Shuffle A</button><button id="vjsb">Shuffle B</button></div>
+<div class="deck"><div class="row"><span>A</span><select id="vjlook0"></select></div>
+<div class="row"><span>level</span><input type="range" id="vjlvl0" min="0" max="1000"></div></div>
+<div class="deck"><div class="row"><span>B</span><select id="vjlook1"></select></div>
+<div class="row"><span>level</span><input type="range" id="vjlvl1" min="0" max="1000"></div></div>
+<div class="deck"><div class="row"><span>C</span><select id="vjlook2"></select></div>
+<div class="row"><span>over</span><input type="range" id="vjlvl2" min="0" max="1000"></div></div></section>
 <section class="card" id="mixcard" hidden><div class="lab">Mixer</div>
 <div class="row"><span>A</span><input type="range" id="fader" min="0" max="1000"><span>B</span></div></section>
 <section class="card"><div class="lab">Show</div>
@@ -403,6 +421,8 @@ function show(s){st=s;fill($("fx"),s.effects,s.effect);fill($("pal"),s.palettes,
  $("black").classList.toggle("on",s.blackout);
  const vj=s.vj||{};$("vjcard").hidden=!vj.open;$("vjair").classList.toggle("on",!!vj.on);
  if(touching!==$("vjfader"))$("vjfader").value=Math.round((vj.fader||0)*1000);
+ (vj.decks||[]).forEach((d,i)=>{fill($("vjlook"+i),vj.looks||[],d.look);
+  if(touching!==$("vjlvl"+i))$("vjlvl"+i).value=Math.round((d.level||0)*1000);});
  const mx=s.mixer||{};$("mixcard").hidden=!mx.on;if(touching!==$("fader"))$("fader").value=Math.round((mx.fader||0)*1000);
  $("msg").textContent=s.project+(s.playing?" - the show is playing":"");}
 async function poll(){try{const r=await fetch("state?k="+encodeURIComponent(key),{cache:"no-store"});
@@ -416,6 +436,9 @@ bri.onchange=()=>{send({a:"bri",v:+bri.value});touching=null;};
 const vjf=$("vjfader");vjf.oninput=()=>{touching=vjf;sendSoon({a:"vjfader",v:vjf.value/1000});};
 vjf.onchange=()=>{send({a:"vjfader",v:vjf.value/1000});touching=null;};
 [["vjcut","cut"],["vjfade","fade"],["vjair","air"],["vjsa","shuffle_a"],["vjsb","shuffle_b"]].forEach(([id,k])=>{$(id).onclick=()=>send({a:"vj",k:k});});
+[0,1,2].forEach(i=>{const l=$("vjlvl"+i);l.oninput=()=>{touching=l;sendSoon({a:"vjlevel",d:i,v:l.value/1000});};
+ l.onchange=()=>{send({a:"vjlevel",d:i,v:l.value/1000});touching=null;};
+ $("vjlook"+i).onchange=e=>send({a:"vjlook",d:i,v:e.target.value});});
 const fad=$("fader");fad.oninput=()=>{touching=fad;sendSoon({a:"fader",v:fad.value/1000});};
 fad.onchange=()=>{send({a:"fader",v:fad.value/1000});touching=null;};
 $("black").onclick=()=>send({a:"blackout",v:$("black").classList.contains("on")?0:1});

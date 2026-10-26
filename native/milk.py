@@ -9,11 +9,14 @@ sound drawn over it as its wave.
     draw = look_draw(preset)               # a VJ look's draw(ctx, st)
 
 Approximate by design: the motion, the decay, the wave (its mode, colour,
-place, size), the per-frame and per-pixel equations, the q variables, and
-the brighten / darken / invert / solarize / gamma flags are run; the custom
-shapes and waves, the borders, the motion vectors, the echo, and MilkDrop 2's
-warp and composite shaders are left out. Most classic presets read as
-themselves, the ones made of shapes or shaders as their motion only.
+place, size), the per-frame and per-pixel equations, the q variables, the
+brighten / darken / invert / solarize / gamma flags, the custom shapes (their
+sides, colours, borders, instances and texture) and the custom waves (their
+per-point equations, dots or lines, spectrum or wave) are run; MilkDrop 2's
+warp and composite shaders are translated to GLSL and run on the graphics card
+(milk_md2.py) where that is there and the translation compiles - else the
+preset runs without them and says so. The borders, the motion vectors and the
+echo are left out.
 
 The equations are MilkDrop's expression language (ns-eel): C-like
 statements ended by ';', `=` and `+=`-style assignments, arithmetic and
@@ -256,9 +259,26 @@ def load(path):
     return parse(text, os.path.splitext(os.path.basename(path))[0])
 
 
+SHAPE = {"enabled": 0, "sides": 4, "additive": 0, "thick": 0, "textured": 0, "num_inst": 1, "x": 0.5, "y": 0.5,
+         "rad": 0.1, "ang": 0.0, "tex_ang": 0.0, "tex_zoom": 1.0, "r": 1.0, "g": 0.0, "b": 0.0, "a": 1.0, "r2": 0.0,
+         "g2": 1.0, "b2": 0.0, "a2": 0.0, "border_r": 1.0, "border_g": 1.0, "border_b": 1.0, "border_a": 0.1}
+WAVE = {"enabled": 0, "samples": 512, "sep": 0, "spectrum": 0, "usedots": 0, "thick": 0, "additive": 0,
+        "scaling": 1.0, "smoothing": 0.5, "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0}
+_PROP = {"thickoutline": "thick", "bspectrum": "spectrum", "busedots": "usedots", "bdrawthick": "thick",
+         "badditive": "additive"}
+
+
+def _num_val(val):
+    try:
+        return float(val.strip())
+    except ValueError:
+        return None
+
+
 def parse(text, name="preset"):
     base = {v: d for v, d in BASE.values()}
     eq = {"init": {}, "frame": {}, "pixel": {}}
+    shapes, waves, shaders = {}, {}, {"warp": {}, "comp": {}}
     for line in text.splitlines():
         if "=" not in line or line.lstrip().startswith(("[", ";", "//")):
             continue
@@ -269,13 +289,49 @@ def parse(text, name="preset"):
             which = {"per_frame_init": "init", "per_frame": "frame", "per_pixel": "pixel"}[m.group(1).lower()]
             eq[which][int(m.group(2))] = val
             continue
+        m = re.match(r"^(warp|comp)_(\d+)$", k, re.I)
+        if m:                                                     # MilkDrop 2's shaders: a line each, after a `
+            shaders[m.group(1).lower()][int(m.group(2))] = val[1:] if val.startswith("`") else val
+            continue
+        m = re.match(r"^(shape|wave)code_(\d+)_(\w+)$", k, re.I)
+        if m:
+            d = (shapes if m.group(1).lower() == "shape" else waves).setdefault(int(m.group(2)), {"p": {}, "eq": {}})
+            prop = m.group(3).lower()
+            n = _num_val(val)
+            if n is not None:
+                d["p"][_PROP.get(prop, prop)] = n
+            continue
+        m = re.match(r"^(shape|wave)_(\d+)_(init|per_frame|per_point)(\d+)$", k, re.I)
+        if m:
+            d = (shapes if m.group(1).lower() == "shape" else waves).setdefault(int(m.group(2)), {"p": {}, "eq": {}})
+            d["eq"].setdefault(m.group(3).lower(), {})[int(m.group(4))] = val
+            continue
         if k in BASE:
-            try:
-                base[BASE[k][0]] = float(val.strip())
-            except ValueError:
-                pass
+            n = _num_val(val)
+            if n is not None:
+                base[BASE[k][0]] = n
     code = {w: "\n".join(eq[w][n] for n in sorted(eq[w])) for w in eq}
-    return {"name": name, "base": base, "src": code,
+
+    def compiled(d, defaults, what):
+        p = dict(defaults)
+        p.update(d["p"])
+        src = {w: "\n".join(d["eq"].get(w, {})[n] for n in sorted(d["eq"].get(w, {}))) for w in ("init", "per_frame", "per_point")}
+        return {"p": p, "init": compile_code(src["init"], f"{what} init equations"),
+                "frame": compile_code(src["per_frame"], f"{what} per-frame equations"),
+                "point": compile_code(src["per_point"], f"{what} per-point equations") if src["per_point"].strip() else None}
+    out_shapes = [compiled(shapes[n], SHAPE, f"shape {n}") for n in sorted(shapes) if shapes[n]["p"].get("enabled")]
+    out_waves = [compiled(waves[n], WAVE, f"wave {n}") for n in sorted(waves) if waves[n]["p"].get("enabled")]
+    md2 = {}
+    notes = []
+    for which in ("warp", "comp"):
+        hlsl = "\n".join(shaders[which][n] for n in sorted(shaders[which]))
+        if hlsl.strip():
+            from native import milk_md2
+            try:
+                md2[which] = milk_md2.translate(hlsl, which)
+            except ValueError as e:
+                notes.append(f"its {which} shader left out: {e}")
+    return {"name": name, "base": base, "src": code, "shapes": out_shapes, "waves": out_waves, "md2": md2, "notes": notes,
             "init": compile_code(code["init"], "per-frame-init equations"),
             "frame": compile_code(code["frame"], "per-frame equations"),
             "pixel": compile_code(code["pixel"], "per-pixel equations") if code["pixel"].strip() else None}
@@ -357,16 +413,41 @@ def look_draw(preset):
         from PIL import Image
         U = np.asarray(Image.fromarray(u.astype(np.float32), "F").resize((w, h), Image.BILINEAR))
         V = np.asarray(Image.fromarray(vv.astype(np.float32), "F").resize((w, h), Image.BILINEAR))
-        fb = vj_looks.sample(st["fb"], U, 1.0 - V, wrap=True)
-        decay = float(v.get("decay", 0.98))
-        fb = fb * (decay ** k30)
+        warped = None
+        if "warp" in preset["md2"] and "warp" not in st.setdefault("md2_off", {}):
+            from native import milk_md2
+            uni = milk_md2.uniforms(v, w, h, ctx.t, st["frame"])
+            uvmap = np.dstack([U, 1.0 - V]).astype(np.float32)
+            warped, err = milk_md2.run(preset["md2"]["warp"], w, h, uni, st["fb"],
+                                       milk_md2.blurs(st["fb"], preset["md2"]["warp"]), uvmap, key=f"warp-{id(st)}")
+            if warped is None:
+                st["md2_off"]["warp"] = err
+        if warped is not None:                                   # the preset's warp shader made the next frame (its decay its own)
+            fb = warped
+        else:
+            fb = vj_looks.sample(st["fb"], U, 1.0 - V, wrap=True)
+            decay = float(v.get("decay", 0.98))
+            fb = fb * (decay ** k30)
         if v.get("darken_center"):
             fb = fb * np.clip(ctx.r / 0.25, 0.6, 1.0)[..., None]
         fb = _wave(ctx, v, fb)
+        fb = _custom_waves(ctx, st, preset, v, fb)
+        fb = _shapes(ctx, st, preset, v, fb)
         if ctx.video is not None:                                # a deck's video seeds it, as the built-in presets' does
             fb = np.maximum(fb, ctx.video * 0.06 * (0.5 + ctx.amount))
         st["fb"] = np.clip(fb, 0, 1)
         out = st["fb"]
+        if "comp" in preset["md2"] and "comp" not in st.setdefault("md2_off", {}):
+            from native import milk_md2
+            shown, err = milk_md2.run(preset["md2"]["comp"], w, h, milk_md2.uniforms(v, w, h, ctx.t, st["frame"]),
+                                      out, milk_md2.blurs(out, preset["md2"]["comp"]), None, key=f"comp-{id(st)}")
+            if shown is None:
+                st["md2_off"]["comp"] = err
+            else:
+                st["q"] = {k: v[k] for k in v if re.match(r"q\d+$", k)}
+                _warn(st, preset)
+                return np.clip(shown, 0, 1)                      # the composite shader: what is shown, the flags its own
+        _warn(st, preset)
         gamma = float(v.get("gamma", 1.0))
         if gamma != 1.0:
             out = np.clip(out * gamma, 0, 1)
@@ -381,6 +462,148 @@ def look_draw(preset):
         st["q"] = {k: v[k] for k in v if re.match(r"q\d+$", k)}
         return out
     return draw
+
+
+def _warn(st, preset):
+    """What of the preset could not run, said by the deck (vj.draw_deck shows st["warn"])."""
+    off = st.get("md2_off") or {}
+    notes = list(preset.get("notes") or []) + [f"its {w} shader left out: {e}" for w, e in off.items()]
+    st["warn"] = "; ".join(notes)
+
+
+def _carry(base, v):
+    """A shape's or wave's variables for this frame: its settings, the preset's q's, its t's from its init."""
+    out = dict(base)
+    out.update({k: v[k] for k in v if re.match(r"q\d+$", k)})
+    for k in ("time", "fps", "frame", "progress", "bass", "mid", "treb", "bass_att", "mid_att", "treb_att"):
+        out[k] = v.get(k, 0.0)
+    return out
+
+
+def _shapes(ctx, st, preset, v, fb):
+    """The preset's custom shapes: each a regular polygon of `sides`, its middle one colour and its rim another,
+    a border round it, alpha-blended or added, its inside the last frame when textured - once an instance."""
+    if not preset["shapes"]:
+        return fb
+    h, w = fb.shape[:2]
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
+    tinit = st.setdefault("shape_t", {})
+    for n, sh in enumerate(preset["shapes"]):
+        if n not in tinit:                                       # its init: run once, its t1..t8 kept for every frame
+            iv = _carry(sh["p"], v)
+            sh["init"](iv)
+            tinit[n] = {k: iv[k] for k in iv if re.match(r"t\d$", k)}
+        for inst in range(max(1, min(64, int(sh["p"].get("num_inst", 1))))):
+            s = _carry(sh["p"], v)
+            s.update(tinit[n])
+            s.update(instance=float(inst), num_inst=float(sh["p"].get("num_inst", 1)))
+            sh["frame"](s)
+            sides = max(3, min(100, int(round(float(s.get("sides", 4))))))
+            cx, cy = float(s.get("x", 0.5)) * (w - 1), (1.0 - float(s.get("y", 0.5))) * (h - 1)
+            rad = max(0.0, float(s.get("rad", 0.1))) * min(w, h)
+            if rad < 0.5:
+                continue
+            ang = float(s.get("ang", 0.0))
+            pad = 2.0
+            x0, x1 = max(0, int(cx - rad - pad)), min(w, int(cx + rad + pad) + 1)
+            y0, y1 = max(0, int(cy - rad - pad)), min(h, int(cy + rad + pad) + 1)
+            if x0 >= x1 or y0 >= y1:
+                continue
+            box = (slice(y0, y1), slice(x0, x1))
+            full = fb
+            fb = fb[box].copy()
+            dx, dy = xs[box] - cx, -(ys[box] - cy)
+            r = np.hypot(dx, dy)
+            th = np.arctan2(dy, dx) - ang
+            seg = 2 * math.pi / sides
+            edge = rad * math.cos(math.pi / sides) / np.maximum(np.cos(np.mod(th, seg) - seg / 2), 1e-3)
+            inside = r <= edge
+            f = np.clip(r / np.maximum(edge, 1e-3), 0, 1)[..., None]
+            c1 = np.array([s.get("r", 1), s.get("g", 0), s.get("b", 0)], np.float32)
+            c2 = np.array([s.get("r2", 0), s.get("g2", 1), s.get("b2", 0)], np.float32)
+            col = np.clip(np.nan_to_num(c1 * (1 - f) + c2 * f), 0, 1)
+            al = np.clip(np.nan_to_num(float(s.get("a", 1)) * (1 - f[..., 0]) + float(s.get("a2", 0)) * f[..., 0]), 0, 1)
+            if s.get("textured"):
+                from native import vj_looks
+                tz = max(1e-3, float(s.get("tex_zoom", 1.0)))
+                ta = float(s.get("tex_ang", 0.0))
+                ux, uy = dx / (rad * 2 * tz), dy / (rad * 2 * tz)
+                cs, sn = math.cos(ta), math.sin(ta)
+                tu, tv = ux * cs - uy * sn + 0.5, -(ux * sn + uy * cs) + 0.5
+                col = col * vj_looks.sample(full, tu, tv, wrap=True)
+            m = inside[..., None]
+            a = (al * inside)[..., None]
+            if s.get("additive"):
+                fb = np.where(m, np.minimum(1.0, fb + col * a), fb)
+            else:
+                fb = np.where(m, fb * (1 - a) + col * a, fb)
+            ba = float(s.get("border_a", 0.0))
+            if ba > 0.01:
+                width = 1.5 if s.get("thick") else 0.8
+                rim = (np.abs(r - edge) < width) & (r <= edge + width)
+                bc = np.clip(np.array([s.get("border_r", 1), s.get("border_g", 1), s.get("border_b", 1)], np.float32), 0, 1)
+                fb = np.where(rim[..., None], fb * (1 - ba) + bc * ba, fb)
+            full[box] = fb
+            fb = full
+    return fb
+
+
+def _custom_waves(ctx, st, preset, v, fb):
+    """The preset's custom waves: each its per-frame equations, then its per-point ones over every sample at once
+    (sample 0..1, value1 and value2 the sound or its spectrum), drawn as dots or joined lines in their colours."""
+    if not preset["waves"]:
+        return fb
+    h, w = fb.shape[:2]
+    tinit = st.setdefault("wave_t", {})
+    for n, wv in enumerate(preset["waves"]):
+        if n not in tinit:
+            iv = _carry(wv["p"], v)
+            wv["init"](iv)
+            tinit[n] = {k: iv[k] for k in iv if re.match(r"t\d$", k)}
+        s = _carry(wv["p"], v)
+        s.update(tinit[n])
+        wv["frame"](s)
+        count = max(2, min(256, int(s.get("samples", 512)) // 2))     # the canvas is small: half MilkDrop's points
+        k = np.linspace(0, 1, count)
+        if wv["p"].get("spectrum"):
+            bands = np.asarray(getattr(ctx, "bands", None) if getattr(ctx, "bands", None) is not None
+                               else np.full(16, ctx.bass), np.float32)
+            val = np.interp(k * (len(bands) - 1), np.arange(len(bands)), bands)
+        else:
+            val = np.interp(k * (len(ctx.wave) - 1), np.arange(len(ctx.wave)), ctx.wave)
+        val = val * float(wv["p"].get("scaling", 1.0))
+        sep = int(float(wv["p"].get("sep", 0)))
+        pv = dict(s)
+        pv.update(sample=k, value1=val, value2=np.roll(val, sep), x=k, y=0.5 + val * 0.25,
+                  r=np.full(count, float(s.get("r", 1))), g=np.full(count, float(s.get("g", 1))),
+                  b=np.full(count, float(s.get("b", 1))), a=np.full(count, float(s.get("a", 1))))
+        if wv["point"] is not None:
+            wv["point"](pv)
+        X = np.broadcast_to(np.asarray(pv["x"], np.float64), (count,))
+        Y = np.broadcast_to(np.asarray(pv["y"], np.float64), (count,))
+        cols = np.stack([np.broadcast_to(np.asarray(pv[c], np.float64), (count,)) for c in "rgb"], -1)
+        A = np.clip(np.broadcast_to(np.asarray(pv["a"], np.float64), (count,)), 0, 1)
+        cols = np.clip(np.nan_to_num(cols), 0, 1)
+        if wv["p"].get("usedots"):
+            px, py, pc, pa = X, Y, cols, A
+        else:                                                     # joined: points filled in between, a few a segment
+            steps = 4
+            t = np.linspace(0, 1, steps, endpoint=False)
+            px = (X[:-1, None] + (X[1:, None] - X[:-1, None]) * t).ravel()
+            py = (Y[:-1, None] + (Y[1:, None] - Y[:-1, None]) * t).ravel()
+            pc = np.repeat(cols[:-1], steps, axis=0)
+            pa = np.repeat(A[:-1], steps)
+        ix = np.clip((np.nan_to_num(px) * (w - 1)).astype(int), 0, w - 1)
+        iy = np.clip(((1.0 - np.nan_to_num(py)) * (h - 1)).astype(int), 0, h - 1)
+        offs = ((0, 0), (1, 0), (0, 1)) if wv["p"].get("thick") else ((0, 0),)
+        for oy, ox in offs:
+            jy, jx = np.clip(iy + oy, 0, h - 1), np.clip(ix + ox, 0, w - 1)
+            add = pc * pa[:, None]
+            if wv["p"].get("additive"):
+                fb[jy, jx] = np.minimum(1.0, fb[jy, jx] + add)
+            else:
+                fb[jy, jx] = fb[jy, jx] * (1 - pa[:, None]) + add
+    return fb
 
 
 def _wave(ctx, v, fb):
@@ -426,5 +649,6 @@ def _wave(ctx, v, fb):
     return fb
 
 
-TEMPLATE_NOTE = "a MilkDrop preset (.milk), run approximately: its motion, decay, wave and equations"
+TEMPLATE_NOTE = ("a MilkDrop preset (.milk), run approximately: its motion, decay, wave, shapes, custom waves and "
+                 "equations, and its MilkDrop 2 shaders where they translate")
 # AI: end

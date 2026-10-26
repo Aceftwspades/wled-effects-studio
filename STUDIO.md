@@ -4053,19 +4053,22 @@ What the VJ still lacks, from its review:
       assets/vj, right-click Learn MIDI, a level a deck, the cue in the
       pop-out, an Effect deck's palette and colours.
 
-From the review before 1.18.0 (2026-10-23), still to do:
+From the review before 1.18.0 (2026-10-23) - all done 2026-10-26: the phone card's decks, a shader's
+channels chosen and its passes (Buffer A-D, Common), a .milk preset's shapes and custom waves and its
+MilkDrop 2 shaders translated to GLSL, an Effect deck's own colours, a project's Python looks asked about
+before they run:
 
-- [ ] **The phone's VJ card** has the fader and the buttons only: deck C, the
+- [x] **The phone's VJ card** has the fader and the buttons only: deck C, the
       decks' levels and a look picker would make it a remote for a set.
-- [ ] **Shader channels**: many Shadertoy shaders read a noise texture or an
+- [x] **Shader channels**: many Shadertoy shaders read a noise texture or an
       image on iChannel0..3; the studio gives the deck's video and the
       sound. A choice per channel (video, sound, noise, a picture) would
       run most of the rest; several passes (Buffer A-D) are further off.
-- [ ] **MilkDrop's custom shapes and waves**, and its MilkDrop 2 warp and
+- [x] **MilkDrop's custom shapes and waves**, and its MilkDrop 2 warp and
       composite shaders, are left out of an imported preset.
-- [ ] **An Effect deck's colours** have no "the effect's own": the deck's
+- [x] **An Effect deck's colours** have no "the effect's own": the deck's
       gradient always sets them (its palette has the choice).
-- [ ] **A shared project's Python looks run as code** when its VJ frame
+- [x] **A shared project's Python looks run as code** when its VJ frame
       opens (as its graphs compile and run): worth a word when a project
       from elsewhere is opened, as .milk and .glsl files cannot do that.
 

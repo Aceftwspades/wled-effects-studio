@@ -695,10 +695,22 @@ def user_dir(project):
     return os.path.join(project.path, "looks")
 
 
-def load_user(project):
+NOT_ALLOWED = "a Python look is code: it runs once this project's Python looks are allowed (the VJ frame asks)"
+
+
+def py_files(project):
+    """The project's Python look files."""
+    import os
+    d = user_dir(project)
+    return sorted(f for f in os.listdir(d) if f.lower().endswith(".py")) if os.path.isdir(d) else []
+
+
+def load_user(project, allow_py=True):
     """The project's own looks registered - Python looks (looks/*.py), Shadertoy shaders (*.glsl) and MilkDrop
     presets (*.milk) - again when a file has changed, gone when it has gone. [(file, error)] for every one that
-    could not be loaded (as long as it cannot)."""
+    could not be loaded (as long as it cannot). A Python look is code, run as it is: with `allow_py` False (a
+    project from elsewhere, not yet allowed on this machine) it is listed as not run, and nothing of it runs - a
+    .glsl or a .milk cannot run anything but its own shader or equations."""
     import os
     d = user_dir(project)
     seen = set()
@@ -709,6 +721,12 @@ def load_user(project):
         try:
             mt = os.path.getmtime(path)
         except OSError:
+            continue
+        if f.lower().endswith(".py") and not allow_py:
+            old = _USER.get(path, (None, None, ""))[1]
+            if old:
+                LOOKS.pop(old, None)
+            _USER[path] = (None, None, NOT_ALLOWED)               # read again once allowed
             continue
         if _USER.get(path, (None,))[0] == mt:
             continue
@@ -739,8 +757,10 @@ def _load_file(path):
         if "mainImage" not in src:
             raise ValueError("it has no mainImage(out vec4 fragColor, in vec2 fragCoord)")
         name = vj_glsl.name_of(src, base)
-        return Look(name, "yours", vj_glsl.look_draw(src, name), "a Shadertoy shader of the project's, on the graphics card",
-                    "iChannel0" in src)
+        lk = Look(name, "yours", vj_glsl.look_draw(src, name), "a Shadertoy shader of the project's, on the graphics card",
+                  "iChannel0" in src)
+        lk.glsl = src                                             # the deck's channels row reads its channels from it
+        return lk
     if ext == ".milk":
         from native import milk
         pre = milk.load(path)

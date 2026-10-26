@@ -193,10 +193,16 @@ def apply(app, cmd):
             app.on_palette(None, cmd["v"])
             if dpg.does_item_exist("pal_combo"):
                 dpg.set_value("pal_combo", cmd["v"])
-    elif a in ("vj", "vjfader"):                         # the VJ frame's (vj.py)
+    elif a in ("vj", "vjfader", "vjlevel", "vjlook"):    # the VJ frame's (vj.py)
         from native import vj, vj_ui
         if a == "vjfader":
             vj.set_fader(app, cmd["v"])
+        elif a == "vjlevel":
+            vj.knob_set(app, cmd["d"], "level", cmd["v"])
+        elif a == "vjlook":
+            if cmd["v"] in vj_ui.look_names():
+                vj.options(app)["decks"][cmd["d"]]["look"] = cmd["v"]
+                app._vj_dirty = True
         elif cmd["k"] == "cut":
             vj.cut(app)
         elif cmd["k"] == "fade":
@@ -252,11 +258,19 @@ def state(app):
             "effects": list(eng.names), "effect": eng.names[eng.idx] if eng.names else "",
             "sliders": sliders, "palettes": [n for n, _ in pals], "palette": pal,
             "bri": int(getattr(app, "master_bri", 255)), "blackout": bool(getattr(app, "blackout", False)),
-            "vj": {"open": bool(getattr(app, "_vj_open", False)), "on": __import__("native.vj", fromlist=["v"]).on(app),
-                   "fader": float(__import__("native.vj", fromlist=["v"]).options(app)["fader"])},
+            "vj": _vj_state(app),
             "mixer": {"on": __import__("native.mixer", fromlist=["m"]).on(app),
                       "fader": float(__import__("native.mixer", fromlist=["m"]).options(app)["fader"])},
             "steps": [str(s.get("name") or f"step {i + 1}") for i, s in enumerate(S["steps"])],
             "step": play["i"] if play else getattr(app, "_seq_sel", -1),
             "playing": bool(play) and play.get("paused") is None}
+
+
+def _vj_state(app):
+    """The VJ card's: whether the frame is open, on air, the fader, each deck's look and level, the looks to pick."""
+    from native import vj, vj_ui
+    o = vj.options(app)
+    return {"open": bool(getattr(app, "_vj_open", False)), "on": vj.on(app), "fader": float(o["fader"]),
+            "decks": [{"look": d["look"], "level": float(d.get("level", 1.0))} for d in o["decks"]],
+            "looks": vj_ui.look_names()}
 # AI: end

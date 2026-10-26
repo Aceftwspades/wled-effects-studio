@@ -181,7 +181,7 @@ class FakeEng:
     def __init__(self):
         self.fx = {}
         self.fft = np.zeros(16, np.uint8)
-        self.pal, self.cols = 0, None
+        self.pal, self.colours = 0, None
 
     def palette_list(self):
         return [("Default", 0), ("Lava", 8)]
@@ -190,7 +190,7 @@ class FakeEng:
         self.cols, self.rows = geom.w, geom.h
 
     def colors(self, *c):
-        self.cols = c
+        self.colours = c
 
     def select(self, k):
         pass
@@ -447,12 +447,21 @@ inside = vj.media(app, kept)
 check(vj.keep_media(app, inside) == kept, "a file already in the project: kept where it is")
 
 # an Effect deck's palette and colours
-fe.pal, fe.cols = 0, None
-o["decks"][0].update(look=vj.EFFECT, effect="Rainbow", palette="Lava", colours="fire")
+fe.pal, fe.colours = 0, None
+o["decks"][0].update(look=vj.EFFECT, effect="Rainbow", palette="Lava", fx_colours="")
 vj._runs(app)[0].state = {}
 vj.update(app, 1 / 40)
-check(fe.pal == 8 and fe.cols is not None and len(fe.cols) == 3, f"an Effect deck: its palette and colours ({fe.pal})")
-o["decks"][0].update(look="Plasma", palette="")
+check(fe.pal == 8 and fe.colours is None, f"an Effect deck: its palette, its colours the effect's own ({fe.pal})")
+o["decks"][0]["fx_colours"] = "fire"
+vj.update(app, 1 / 40)
+check(fe.colours is not None and len(fe.colours) == 3, "its colours a gradient's")
+reselected = []
+fe.select = lambda k: reselected.append(k)
+o["decks"][0]["fx_colours"] = ""
+vj.update(app, 1 / 40)
+check(reselected, "back to the effect's own colours: the effect chosen again")
+del fe.select
+o["decks"][0].update(look="Plasma", palette="", fx_colours="")
 
 # a shader and a MilkDrop preset of the project's
 from native import vj_glsl

@@ -184,6 +184,15 @@ def _deck(app, i):
                                          callback=lambda s, v: _set_deck(app, i, "effect", v)), tag=f"vj_fxrow{i}")
     _row("words", lambda: dpg.add_input_text(tag=f"vj_text{i}", width=-1, default_value=d.get("text", ""),
                                              callback=lambda s, v: _set_deck(app, i, "text", v)), tag=f"vj_textrow{i}")
+    with dpg.group(tag=f"vj_chrow{i}"):                      # a shader's channels, two to a row
+        for row in (0, 2):
+            with dpg.group(horizontal=True):
+                for k in (row, row + 1):
+                    dpg.add_text(f"iChannel{k}", color=c.DIM)
+                    dpg.add_combo([], tag=f"vj_ch{i}_{k}", width=px(88),
+                                  callback=lambda s, v, k=k: _set_channel(app, i, k, v))
+                    c.tip(f"what the shader's iChannel{k} holds: the deck's video, the sound, a noise texture, its "
+                          "picture, a buffer (A..D), nothing - or what its file says (file: ...)")
     with dpg.group(horizontal=True, tag=f"vj_imgrow{i}"):
         dpg.add_text("picture", color=c.DIM)
         dpg.add_text("", tag=f"vj_imgname{i}")
@@ -201,7 +210,10 @@ def _deck(app, i):
                                   callback=lambda s, v: _set_deck(app, i, "speed", float(v))))
     _learnable(app, f"vj_spd{i}", {"kind": "vj_knob", "deck": i, "key": "speed"})
     _row("colours", lambda: dpg.add_combo(list(vj_looks.GRADIENTS), tag=f"vj_col{i}", width=-1, default_value=d["colours"],
-                                          callback=lambda s, v: _set_deck(app, i, "colours", v)))
+                                          callback=lambda s, v: _set_deck(app, i, "colours", v)), tag=f"vj_colrow{i}")
+    _row("its colours", lambda: dpg.add_combo([OWN_COLS] + list(vj_looks.GRADIENTS), tag=f"vj_fxcol{i}", width=-1,
+                                              callback=lambda s, v: _set_deck(app, i, "fx_colours", "" if v == OWN_COLS else v)),
+         tag=f"vj_fxcolrow{i}")
     _row("palette", lambda: dpg.add_combo([], tag=f"vj_pal{i}", width=-1,
                                           callback=lambda s, v: _set_deck(app, i, "palette", "" if v == OWN_PAL else v)),
          tag=f"vj_palrow{i}")
@@ -284,6 +296,7 @@ def _deck(app, i):
 
 
 OWN_PAL = "the effect's own"
+OWN_COLS = "the effect's own"
 
 
 def _learnable(app, item, target):
@@ -461,6 +474,15 @@ def _set_deck(app, i, key, v):
         refresh(app)
 
 
+def _set_channel(app, i, k, v):
+    d = vj.options(app)["decks"][i]
+    ch = list(d.get("channels") or ["", "", "", ""])
+    ch[k] = "" if v.startswith("file:") else v
+    d["channels"] = ch
+    _save(app)
+    refresh(app)                                                     # a picture chosen: its row shown
+
+
 def _set_react(app, i, **kw):
     vj.options(app)["decks"][i]["react"].update(kw)
     _save(app)
@@ -516,7 +538,7 @@ def _import(app, a):
     sel = [f for f in (list((a.get("selections") or {}).values()) or [a.get("file_path_name", "")]) if f and os.path.isfile(f)]
     for f in sel:
         vj_looks.import_file(app.project, f)
-    errs = vj_looks.load_user(app.project)
+    errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
     app._vj_file_errs = errs
     app._vj_thumbs = None
     refresh(app)
@@ -531,7 +553,7 @@ def _new_shader(app):
             return
         ok, why = __import__("native.vj_glsl", fromlist=["g"]).available()
         path = vj_looks.new_shader(app.project, name)
-        vj_looks.load_user(app.project)
+        vj_looks.load_user(app.project, allow_py=py_allowed(app))
         o = vj.options(app)
         cue = vj.cue_deck(app)
         lk = next((n for n, l in vj_looks.LOOKS.items() if l.family == "yours" and _user_path(n) == path), None)
@@ -663,6 +685,8 @@ def _new_look(app):
         if not name:
             return
         path = vj_looks.new_user_look(app.project, name)
+        if not py_allowed(app):
+            allow_py(app, True)                                      # the look is the user's own: this project is allowed
         vj_looks.load_user(app.project)
         o = vj.options(app)
         cue = 1 if float(o["fader"]) < 0.5 else 0                  # the deck off the mix: seen in its preview first
@@ -674,6 +698,38 @@ def _new_look(app):
         _open(app, path)
         app.gp.status(f"{os.path.basename(path)} made in the project's looks/ - on deck {LETTER[cue]}; save it to see it")
     _c().ask(app, "A look of your own", "its name", "My look", made)
+
+
+def py_allowed(app):
+    """Whether this project's Python looks may run: the projects allowed on this machine (the studio's own
+    settings, never the project's - a project from elsewhere cannot allow itself)."""
+    root = os.path.normcase(os.path.abspath(app.project.path))
+    return root in {os.path.normcase(p) for p in app.prefs.get("vj_py_projects", [])}
+
+
+def allow_py(app, on=True):
+    from native.project import save_prefs
+    root = os.path.normcase(os.path.abspath(app.project.path))
+    have = [p for p in app.prefs.get("vj_py_projects", []) if os.path.normcase(p) != root]
+    app.prefs["vj_py_projects"] = have + ([os.path.abspath(app.project.path)] if on else [])
+    save_prefs(app.prefs)
+    app._vj_files_at = 0.0                                           # read again now
+    app._vj_dirty = True
+
+
+def _ask_py(app):
+    """A project with Python looks not yet allowed here: asked once a session whether to run them."""
+    asked = app.__dict__.setdefault("_vj_py_asked", set())
+    root = os.path.abspath(app.project.path)
+    files = vj_looks.py_files(app.project)
+    if not files or py_allowed(app) or root in asked:
+        return
+    asked.add(root)
+    names = ", ".join(files[:4]) + (f" and {len(files) - 4} more" if len(files) > 4 else "")
+    _c().confirm(app, "Python looks", f"This project has looks written in Python ({names}). A Python look is a program: "
+                 "it runs on this computer as it is, as the project's graphs and effects do. Run them only if you trust "
+                 "where the project came from.",
+                 [("Run them", lambda: allow_py(app, True)), ("Not now", None)])
 
 
 def _user_path(name):
@@ -739,11 +795,25 @@ def refresh(app):
         dpg.set_value(f"vj_fx{i}", d.get("effect", ""))
         dpg.configure_item(f"vj_fxrow{i}", show=eff)
         dpg.configure_item(f"vj_palrow{i}", show=eff)
+        dpg.configure_item(f"vj_fxcolrow{i}", show=eff)
+        dpg.configure_item(f"vj_colrow{i}", show=not eff)
+        dpg.set_value(f"vj_fxcol{i}", d.get("fx_colours") or OWN_COLS)
         dpg.configure_item(f"vj_pal{i}", items=pals)
         dpg.set_value(f"vj_pal{i}", d.get("palette") or OWN_PAL)
         dpg.configure_item(f"vj_textrow{i}", show=d["look"] == "Text")
         dpg.set_value(f"vj_text{i}", d.get("text", ""))
-        dpg.configure_item(f"vj_imgrow{i}", show=d["look"] == "Image")
+        glsl = getattr(lk, "glsl", None) if lk else None
+        dpg.configure_item(f"vj_imgrow{i}", show=d["look"] == "Image" or bool(glsl and (
+            "picture" in glsl or "picture" in (d.get("channels") or []))))
+        dpg.configure_item(f"vj_chrow{i}", show=bool(glsl))
+        if glsl:
+            from native import vj_glsl
+            own = vj_glsl.channels_of(glsl)
+            ch = list(d.get("channels") or ["", "", "", ""])
+            for k in range(4):
+                first = f"file: {own[k]}"
+                dpg.configure_item(f"vj_ch{i}_{k}", items=[first] + list(vj_glsl.CHANNELS))
+                dpg.set_value(f"vj_ch{i}_{k}", ch[k] or first)
         dpg.set_value(f"vj_imgname{i}", os.path.basename(d.get("image") or "") or "none")
         dpg.configure_item(f"vj_vidhead{i}", show=not eff)
         kind = s.get("kind", "none")
@@ -832,7 +902,9 @@ def poll(app):
     if time.monotonic() - getattr(app, "_vj_files_at", 0.0) > 1.0:     # the project's own looks, as they are saved
         app._vj_files_at = time.monotonic()
         before = set(vj_looks.LOOKS)
-        app._vj_file_errs = vj_looks.load_user(app.project)
+        app._vj_file_errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
+        if any(e == vj_looks.NOT_ALLOWED for _, e in app._vj_file_errs) and shown:
+            _ask_py(app)
         if set(vj_looks.LOOKS) != before:
             app._vj_dirty = True
             app._vj_thumbs = None if not dpg.is_item_shown(BROWSE) else app._vj_thumbs

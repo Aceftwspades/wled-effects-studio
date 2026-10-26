@@ -46,7 +46,9 @@ SOURCE = {"kind": "none", "path": "", "name": "", "url": "", "files": [], "clip"
           "out": 0.0, "advance": "off"}
 DECK = {"look": "Plasma", "source": SOURCE, "amount": 0.5, "speed": 1.0, "colours": "neon", "kaleido": 0,
         "mirror": False, "hue": 0.0, "strobe": False, "trails": 0.0, "blur": 0, "level": 1.0,
-        "react": {"to": "off", "what": "amount", "depth": 0.5}, "text": "WLED", "image": "", "effect": "", "palette": ""}
+        "react": {"to": "off", "what": "amount", "depth": 0.5}, "text": "WLED", "image": "", "effect": "", "palette": "",
+        "fx_colours": "",           # an Effect deck's colours: "" the effect's own, else a gradient's
+        "channels": ["", "", "", ""]}   # a shader's iChannel0..3: "" what its file says (vj_glsl.CHANNELS)
 DECKS = 3                         # A and B on the fader, C over the mix (a logo, words, a layer of its own)
 LETTERS = "ABC"
 C_MODES = ("screen", "add", "lighten", "multiply", "difference", "over")   # how deck C goes over the mix
@@ -525,6 +527,8 @@ def draw_deck(app, i, dt, snd, beat, hit):
     except Exception as e:                                          # a look of the user's that fails: said, dark
         run.error = f"{lk.name}: {type(e).__name__}: {e}"
         img = np.zeros((h, w, 3), np.float32)
+    if run.state.get("warn") and not run.error:              # what of a look could not run, though it draws
+        run.error = f"{lk.name}: {run.state['warn']}"
     img = post(app, i, c, img, beat, what, rv)
     run.canvas = np.clip(img, 0, 1).astype(np.float32)
 
@@ -579,19 +583,20 @@ def _effect_frame(app, i, run, deck, speed, amount):
     if run.state.get("sel") != name:
         eng.select(eng.names.index(name))
         run.state = {"sel": name}
-    look = (deck.get("palette") or "", deck.get("colours") or "")
-    if run.state.get("look") != look:                         # its palette (else the effect's own) and colours
+    look = (deck.get("palette") or "", deck.get("fx_colours") or "")
+    if run.state.get("look") != look:                         # its palette and colours, each a choice or the effect's own
         was = run.state.get("look")
         run.state["look"] = look
+        if was and ((was[0] and not look[0]) or (was[1] and not look[1])):
+            eng.select(eng.names.index(name))                 # back to the effect's own: the effect chosen again
         pals = dict(eng.palette_list())
         if look[0] in pals:
             eng.pal = pals[look[0]]
-        elif was and was[0]:                                  # back to the effect's own: the effect chosen again
-            eng.select(eng.names.index(name))
-        g = vj_looks.gradient(look[1] or "neon")
-        rgb = [(np.clip(np.asarray(g(np.array([q], np.float32))).reshape(-1)[:3], 0, 1) * 255).astype(int)
-               for q in (0.3, 0.65, 0.95)]
-        eng.colors(*[(int(c[0]) << 16) | (int(c[1]) << 8) | int(c[2]) for c in rgb])
+        if look[1]:
+            g = vj_looks.gradient(look[1])
+            rgb = [(np.clip(np.asarray(g(np.array([q], np.float32))).reshape(-1)[:3], 0, 1) * 255).astype(int)
+                   for q in (0.3, 0.65, 0.95)]
+            eng.colors(*[(int(c[0]) << 16) | (int(c[1]) << 8) | int(c[2]) for c in rgb])
     # its Speed from the deck's (1.0 is the slider's middle, 2.0 and more its top) and its Intensity the amount
     eng.fx["sx"] = int(max(0, min(255, round(speed * 128))))
     eng.fx["ix"] = int(max(0, min(255, round(amount * 255))))
@@ -959,7 +964,7 @@ def step_name(app):
 
 # --- your own: presets, mutated flames, look files -------------------------------------------------
 PRESET_KEYS = ("look", "effect", "amount", "speed", "colours", "kaleido", "mirror", "hue", "strobe", "trails",
-               "blur", "react", "text", "image", "palette")
+               "blur", "react", "text", "image", "palette", "fx_colours", "channels")
 
 
 def save_preset(app, i, name):
