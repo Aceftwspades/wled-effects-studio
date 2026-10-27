@@ -687,6 +687,210 @@ cold = float(app._vj_out.mean())
 check(warm > 2.0 * cold, f"a cut to a MilkDrop look kept running: its picture at once ({warm:.1f} against {cold:.1f} cold)")
 vj.close(app)
 
+# --- deck C in and out, as A and B have Cut and Fade -------------------------------------------------------
+clock.hold()
+o["quant"], o["c_up"], o["c_fade"] = "now", 0.8, 2.0
+o["decks"][2]["level"] = 0.0
+beat = 60.0 / vj._tempo(app)
+vj.c_launch(app, "in")
+clock.step(beat)
+vj._c_update(app)
+half = o["decks"][2]["level"]
+clock.step(beat + 0.01)
+vj._c_update(app)
+check(0.3 < half < 0.5 and abs(o["decks"][2]["level"] - 0.8) < 1e-6,
+      f"deck C's In: eased up to its 'in to' level over its fade ({half:.2f} halfway)")
+vj.c_launch(app, "toggle")
+clock.step(2 * beat + 0.01)
+vj._c_update(app)
+check(o["decks"][2]["level"] == 0.0, "In/Out on a deck C that is in: out")
+vj.c_launch(app, "flash")
+up = o["decks"][2]["level"]
+clock.step(0.2 * beat)
+vj._c_update(app)
+held = o["decks"][2]["level"]
+clock.step(1.2 * beat)
+vj._c_update(app)
+check(up == 0.8 and held == 0.8 and o["decks"][2]["level"] == 0.0, "a Flash: up at once, held a moment, out over a beat")
+vj.c_launch(app, "in")
+clock.step(0.5 * beat)
+vj._c_update(app)
+vj.knob_set(app, 2, "level", 0.3)
+clock.step(2 * beat)
+vj._c_update(app)
+check(abs(o["decks"][2]["level"] - 0.3) < 1e-6, "deck C's level by hand: its In let go")
+o["decks"][2]["level"], o["quant"] = 0.0, "bar"
+app._vj_beats = 20.5
+waits = vj.c_launch(app, "in")
+vj._c_update(app)
+early = o["decks"][2]["level"]
+o["c_fade"] = 0.0
+app._vj_beats = 24.0
+vj._c_update(app)
+check(waits == "the next bar" and early == 0.0 and o["decks"][2]["level"] == 0.8, "deck C's In waits for the next bar")
+o["quant"] = "now"
+o["auto"].update(c="bars", c_bars=1)
+o["decks"][2]["level"] = 0.0
+app._vj_beats = 28.5
+vj._c_update(app)
+app._vj_beats = 32.1
+vj._c_update(app)
+inn = o["decks"][2]["level"]
+app._vj_beats = 36.1
+vj._c_update(app)
+check(inn == 0.8 and o["decks"][2]["level"] == 0.0, "deck C by itself: in for a bar, out for a bar")
+o["auto"]["c"] = "off"
+check("c_up" in vj.snapshot(app) and "c_fade" in vj.snapshot(app), "a show's step keeps deck C's In level and fade")
+clock.release()
+
+# the Text look's own size, place and movement
+def ink(img):
+    ys, xs = np.where(img.max(axis=2) > 0.2)
+    return (xs.min(), xs.max(), ys.min(), ys.max()) if len(xs) else None
+
+
+base = {"text": "HI", "text_move": "still", "text_size": 0.5}
+mid = ink(vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base)), {}))
+big = ink(vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text_size=0.9)), {}))
+check(big[3] - big[2] > 1.5 * (mid[3] - mid[2]), "Text: its size knob sets the words' height")
+left = ink(vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text_x=-0.6, text_y=0.5)), {}))
+check(left[1] < mid[0] and left[3] < mid[3], f"Text: placed left and up ({left} against {mid} in the middle)")
+z0 = ink(vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text_move="zoom"), beat=0.0, amount=1.0), {}))
+z1 = ink(vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text_move="zoom"), beat=1.0, amount=1.0), {}))
+check(z1[1] - z1[0] > 1.3 * (z0[1] - z0[0]), "Text zoomed on the beat: bigger on it")
+w0 = vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text="ONE TWO", text_move="words"), beats=0.2), {})
+w1 = vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text="ONE TWO", text_move="words"), beats=1.2), {})
+check(not np.allclose(w0, w1), "Text a word a beat: another word on the next beat")
+f0 = vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text_move="flash"), beat=0.0, amount=1.0), {})
+f1 = vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text_move="flash"), beat=1.0, amount=1.0), {})
+check(f0.max() < 0.05 and f1.max() > 0.5, "Text flashed on the beat: dark between, lit on it")
+g0 = vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base)), {})
+g1 = vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text_glow=1.0)), {})
+check(float((g1.max(axis=2) > 0.05).mean()) > float((g0.max(axis=2) > 0.05).mean()), "Text's glow: a halo round the letters")
+for mv, _ in vj_looks.TEXT_MOVES:
+    st = {}
+    for k in range(5):
+        img = vj_looks.LOOKS["Text"].draw(ctx_of(deck=dict(base, text_move=mv), beat=k / 4, beats=k), st)
+    check(img.shape == (36, 64, 3), f"Text {mv}: draws")
+check(all(k in vj.PRESET_KEYS for k in ("text_move", "text_size", "text_x", "text_y", "text_glow")) and
+      any(k == "text_x" for k, _, _ in vj.KNOBS), "the text's knobs kept in presets, and MIDI and the modulators move them")
+
+# --- flames: the classic fractals, morphs between a flame and its child, drift, knobs, edits --------------------
+for n in ("Flame: Sierpinski", "Flame: Sierpinski Carpet", "Flame: Fern", "Flame: Dragon", "Flame: Sierpinski Star"):
+    st = {}
+    for _ in range(25):
+        img = vj_looks.LOOKS[n].draw(ctx_of(w=96, h=72), st)
+    check(0.1 < float((img.max(axis=2) > 0.1).mean()) < 0.8, f"{n} draws, filling some of the canvas and not all")
+st = {}
+for _ in range(25):
+    img = vj_looks.LOOKS["Flame: Sierpinski"].draw(ctx_of(w=96, h=72, deck={"fl_spin": 0.0}), st)
+cx, cy, ext = st["frame"]
+zoom = (0.55 + 0.5 * 0.6) / ext
+
+
+def at(x, y):                                          # where a point of the flame's lands on the canvas
+    return (int((((y - cy) * zoom) * 0.5 + 0.5) * 71), int((((x - cx) * zoom * 72 / 96) * 0.5 + 0.5) * 95))
+
+
+hole, corner = at(0.0, -0.1), at(-0.7, 0.4)
+lum = img.max(axis=2)
+check(lum[hole] < 0.05 and lum[corner[0] - 1:corner[0] + 2, corner[1] - 1:corner[1] + 2].max() > 0.2,
+      f"Sierpinski's triangle: the hole in its middle dark, a corner lit ({lum[hole]:.2f})")
+with np.errstate(all="ignore"):
+    xs, ys = np.meshgrid(np.linspace(-2, 2, 21), np.linspace(-2, 2, 21))
+    for v in vj_looks.VARIATIONS:
+        ex, ey = vj_looks._vary(v, xs, ys)
+        check(ex.shape == xs.shape and float(np.isfinite(ex).mean()) > 0.8, f"the {v} variation")
+check(vj_looks.new_flame(292) == vj_looks.FLAMES["Flame: Sheep"] and
+      all(v in vj_looks.CLASSIC for m in vj_looks.new_flame(77)["maps"] for v in m["var"]),
+      "new flames bred from the first ten variations: the built-in ones keep their shapes")
+check(vj.midi_looks().index("Flame: Swirl") < vj.midi_looks().index("Text") < vj.midi_looks().index("Flame: Sierpinski"),
+      "the new flames after the looks that shipped before them: MIDI's places kept")
+
+a, b = vj_looks.FLAMES["Flame: Sierpinski"], vj_looks.FLAMES["Flame: Sierpinski Carpet"]
+check(vj_looks.blend(a, b, 0.0) is a and vj_looks.blend(a, b, 1.0) is b, "a morph's ends: the two flames")
+h = vj_looks.blend(a, b, 0.5)
+check(len(h["maps"]) == 8 and abs(h["maps"][5]["w"] - 0.5) < 1e-9 and abs(h["maps"][0]["a"][0] - (0.5 + 1 / 3) / 2) < 1e-9,
+      "halfway: the maps between, one only the other has there by half")
+c2 = vj_looks.FLAMES["Flame: Sierpinski Swirl"]
+hv = vj_looks.blend(a, c2, 0.5)
+check(dict(zip(hv["maps"][0]["var"], hv["maps"][0]["vw"])) == {"linear": 0.85, "swirl": 0.15000000000000002} or
+      abs(dict(zip(hv["maps"][0]["var"], hv["maps"][0]["vw"]))["swirl"] - 0.15) < 1e-9, "variations faded one into the other")
+dr = vj_looks.drift(a, 3.0)
+check(dr["maps"][0]["a"] != a["maps"][0]["a"] and abs((vj_looks.drift(b, 3.0)["maps"][0]["a"][0] - b["maps"][0]["a"][0]) -
+                                                    (dr["maps"][0]["a"][0] - a["maps"][0]["a"][0])) < 1e-12,
+      "drift: the maps wandered, the same way for every flame")
+
+# a flame's knobs change what it draws
+def flame_img(**deck):
+    st = {}
+    for _ in range(20):
+        img = vj_looks.LOOKS["Flame: Sierpinski"].draw(ctx_of(w=96, h=72, deck=dict(deck)), st)
+    return img
+
+
+base_img = flame_img()
+check(float(flame_img(fl_gamma=0.25).mean()) > float(base_img.mean()), "a lower gamma shows more of the faint detail")
+check(float(flame_img(fl_trail=0.0).mean()) < float(base_img.mean()), "no trails: only this frame's landings")
+check(not np.allclose(flame_img(fl_sym=3), base_img, atol=0.05), "symmetry: turned copies")
+check(float((flame_img(fl_w1=0.0)[:30].max(axis=2) > 0.1).mean()) < float((base_img[:30].max(axis=2) > 0.1).mean()),
+      "an arm's weight at 0: its corner gone")
+sh = flame_img(fl_x=0.5)
+check(float(sh[:, :30].mean()) < float(base_img[:, :30].mean()), "moved right: the left side darker")
+
+# Mutate over bars: the child grown out of the parent, handed over at the end with the picture going on
+clock.hold()
+o["quant"] = "now"
+o["fader"] = 0.0
+o["decks"][0].update(look="Flame: Sierpinski", mutate_bars=1, breathe=0, morph=0.0, morph_to="", level=1.0)
+app._vj_preview = ()
+vj.update(app, 1 / 30)
+app._vj_beats = 40.0
+child = vj.mutate_flame(app, 0)
+check(child and o["decks"][0]["morph_to"] == child and o["decks"][0]["look"] == "Flame: Sierpinski",
+      f"Mutate over a bar: the deck becoming {child}")
+app._vj_beats = 42.0
+vj.update(app, 1 / 30)
+half = o["decks"][0]["morph"]
+state = vj._runs(app)[0].state
+app._vj_beats = 44.01
+vj.update(app, 1 / 30)
+vj.update(app, 1 / 30)
+check(0.4 < half < 0.6 and o["decks"][0]["look"] == child and o["decks"][0]["morph_to"] == "" and
+      vj._runs(app)[0].state is state and vj._runs(app)[0].xfade is None,
+      f"halfway at half a bar ({half}), then handed over: the same picture going on, no blend")
+# breathing: there and back
+to = vj.set_breathe(app, 0, 1)
+app._vj_beats = 48.0
+vj.update(app, 1 / 30)
+m0 = o["decks"][0]["morph"]
+app._vj_beats = 50.0
+vj.update(app, 1 / 30)
+m1 = o["decks"][0]["morph"]
+check(to and m0 < 0.01 and m1 > 0.99, f"breathing every bar: itself on the bar, the child halfway ({m0}, {m1})")
+app._vj_beats = 49.0
+vj.update(app, 1 / 30)
+kept = vj.keep_morph(app, 0)
+check(kept and o["decks"][0]["look"] == kept and kept in o["flames"] and not o["decks"][0]["morph_to"] and
+      o["decks"][0]["breathe"] == 0, f"Keep: the flame halfway kept as {kept}")
+vj.knob_set(app, 0, "morph", 0.3)
+check("morph" in [k for k, _, _ in vj.KNOBS], "the morph a knob MIDI and the modulators move")
+# edits: a built-in flame copied first
+o["decks"][0].update(look="Flame: Dragon", morph_to="", morph=0.0, mutate_bars=0)
+copied = vj.edit_flame(app, 0, 1, "var2", "swirl")
+fl = o["flames"].get(copied)
+check(copied and o["decks"][0]["look"] == copied and fl["maps"][1]["var"] == ["linear", "swirl"] and
+      vj_looks.FLAMES["Flame: Dragon"]["maps"][1]["var"] == ["linear"], f"an edit to a built-in flame: copied to {copied}")
+check(vj.edit_flame(app, 0, 1, "mix", 0.2) == "" and fl["maps"][1]["vw"] == [0.8, 0.2], "the mix of an arm's two")
+vj.edit_flame(app, 0, -1, "final", "bubble")
+check(fl["final"]["var"] == ["bubble"], "a final map")
+vj.edit_flame(app, 0, -1, "final", vj.NO_VAR)
+check("final" not in fl, "the final map taken off")
+check(vj.forget_flame(app, child) and not any(d.get("morph_to") == child for d in o["decks"]), "a flame forgotten")
+check(all(k in vj.PRESET_KEYS for k in ("fl_trail", "fl_w3", "drift", "breathe")), "a flame's knobs kept in presets")
+clock.release()
+vj.close(app)
+
 print("FAILED:", fails if fails else "none")
 sys.exit(1 if fails else 0)
 # AI: end

@@ -50,7 +50,7 @@ FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
 CHECK_KEYS = ("o1", "o2", "o3")
 # the VJ frame's buttons (vj.py): fired once as the control rises, as next and previous are
 VJ_BUTTONS = ("vj_cut", "vj_fade", "vj_shuffle_a", "vj_shuffle_b", "vj_air", "vj_clip_a", "vj_clip_b", "vj_clip_c",
-              "vj_pause_a", "vj_pause_b", "vj_pause_c")
+              "vj_pause_a", "vj_pause_b", "vj_pause_c", "vj_c_in", "vj_c_out", "vj_c_toggle", "vj_c_flash")
 SWITCHES = ("effect", "palette", "setlist", "next", "prev") + VJ_BUTTONS   # targets that pick, not set: a note-off never fires them
 STEPS = ("next", "prev") + VJ_BUTTONS                         # fired once as the control rises
 

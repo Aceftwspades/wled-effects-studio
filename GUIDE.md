@@ -1104,11 +1104,45 @@ and a click puts it on that deck; **look** lists them too:
   it has one, seeds the feedback.
 - **Flames**: fractal flames (Scott Draves' algorithm, Electric Sheep's) -
   points thrown at random through a few bent maps, where they land counted
-  and shown on a log scale, turning slowly. **Mutate** breeds a new flame
-  from the one on the deck, kept with the project.
-- **Text and image**: **Text** scrolls the deck's **words** across in its
-  colours (speed 0 holds them still in the middle, fitted to the canvas -
-  a logo); **Image** shows a picture file (**picture ...**), filling the
+  and shown on a log scale, turning slowly. Besides the six random ones
+  there are the classic fractals as flames - **Sierpinski**'s triangle and
+  carpet, the **Pentaflake** and **Hexaflake**, **Vicsek**'s, Barnsley's
+  **Fern**, Heighway's **Dragon** and the **Levy C** curve - and children of
+  theirs, their maps bent a little by a variation (**Sierpinski Bloom**,
+  **Swirl** and **Star**, **Carpet Lace**, **Pentaflake Rose**, **Dragon
+  Ring**). **Mutate** breeds a new flame from the one on the deck, kept with
+  the project.
+
+  A flame's **FLAME** panel plays it:
+  - **Mutate** puts the child on **at once**, or grows it out of the parent
+    **over** 1 to 16 bars: a morph, map by map - each map's numbers moving
+    between the two, a swapped variation fading out as its new one fades
+    in - handed over to the child at the end with the picture going on.
+  - **breathe** swings the flame to a child and back **every** 1 to 16 bars
+    (one bred if it has none; Mutate breeds another to breathe to).
+  - **morph** is how far it has become the other (by hand, MIDI or a
+    modulator; moved by hand, a Mutate over bars lets go), **Keep** keeps
+    the flame as it is partway as one of its own.
+  - **drift** wanders it by itself, never quite the same.
+  - **symmetry** (0 its own), **mirrored**, **trails** (crisp to smoky),
+    **gamma** (how much faint detail shows), **colour spread** (one sweep
+    to an arm a colour), **points** (detail against the machine's time),
+    **spin**, **across** and **up / down**, and **hold the view** (the view
+    does not follow the flame as it changes).
+  - **ARMS**: each of the flame's maps - how often it is picked (its
+    **arm** knob), its variation, a second one and how much of the second -
+    and a **final** variation put over the whole flame as it is drawn.
+    There are 25 variations, from the paper's linear to cross. Changing a
+    built-in flame copies it first (its name, #2).
+- **Text and image**: **Text** shows the deck's **words** in its colours,
+  **moving** as you choose: scrolling left or right, rising up, held still
+  (fitted to the canvas - a logo), bouncing side to side, zoomed or flashed
+  on the beat, a word on each beat, or scrolling on a wave. Its own knobs
+  set the words' **size** (of the canvas's height), where they sit
+  (**across** and **up / down**, -1 to 1 with 0 the middle) and a **glow**
+  around the letters; **speed** is how fast they move (scrolling at 0: held
+  still) and **amount** how hard the beat hits them. MIDI and the
+  modulators move the text's knobs as they do the others; **Image** shows a picture file (**picture ...**), filling the
   canvas and drifting slowly - a logo, a poster.
 - **Effect**: any effect of the studio's, run on the shape itself beside
   the main one (its **speed** and **amount** are the effect's Speed and
@@ -1161,7 +1195,19 @@ away in four sections:
   own **Rename...** and **Forget** (the deck goes back to the flame it came
   from).
 
-**DECK C - over the mix** (folded away under AUTO) is a third deck with
+**C** - the row under AUTO - brings deck C in and takes it out as Cut and
+Fade do for A and B: **In** sweeps its level up to its **in to** level,
+**Out** down to 0, over its fade (a cut, a beat, two, four or sixteen),
+**In/Out** does whichever it is not, and **Flash** puts it up at once,
+holds it a moment and takes it out over a beat. They go now or on the next
+beat or bar, as Cut and Fade wait. The slider beside them is deck C's level
+by hand (moving it lets go of an In or Out on its way). Under **DECK C**,
+**by itself** moves it on the bar grid: in for a few bars and out for as
+many, a flash every few bars, or in for the show's drops and choruses (at
+once into a drop) - with **shuffle looks** on, it is dealt a new look each
+time it goes out.
+
+**DECK C - over the mix** (folded away under the C row) is a third deck with
 everything A and B have, laid over their mix at its **level** (0, the
 default: not there) through its own blend - screened, added, the lighter of
 each, multiplied, their difference, or **over** (what it draws covers the
@@ -1188,13 +1234,15 @@ looks** deals the deck the mix just left a new look - one no deck has,
 that keeps of a piece) - so with both it plays by itself.
 
 **Playing it**: the MIDI frame's learn lists the VJ's crossfader, Cut,
-Fade, Shuffle A and B and on air, and for each deck its look (along the
-list), every knob (amount, speed, hue, kaleidoscope, trails, blur), the
+Fade, Shuffle A and B, on air, deck C's In, Out, In/Out and Flash, and for each deck its look (along the
+list), every knob (amount, speed, hue, kaleidoscope, trails, blur, the text's
+size, place and glow, a flame's morph, drift, symmetry, trails, gamma,
+colour spread, points, spin, place and each arm's weight), the
 next video file and pause. Modulators (Playback > Modulators...) move the
 decks' knobs too - "VJ A amount" and so on. The phone remote shows a VJ
 card while the frame is open: the fader, Cut, Fade, On air, Shuffle A and
 B, and each deck's look (picked from the list) and level - deck C's "over"
-the mix.
+the mix, with C in, C out and Flash C.
 
 **In a show**: a step added (or updated) from the sim while the VJ is on
 air is the VJ's - its decks, fader, blend, wipe, map and canvas kept with
@@ -2074,7 +2122,7 @@ Every button, with what its tooltip says.
 
 **Audio input frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Read the device's` — what the device's audioreactive is set to now (its type, pins and levels), into these fields; `Send the audio input` — over /json/cfg; the levels take at once, a new type or new pins after a reboot (offered when needed); `Reboot the device` — restarts the device so a new type or new pins take effect; the LEDs go dark for a few seconds
 
-**VJ frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the VJ's last change undone (Ctrl+Z with the frame focused, Ctrl+Y redoes); `New look...` — a look of your own: a small Python file in the project's looks/ folder, made from an example and opened in your editor - it reloads here each time it is saved; it goes on the deck off the mix; `New shader...` — a Shadertoy shader of your own: a .glsl file to paste one from shadertoy.com into (its Image tab's code) - it runs as it is, on the graphics card; `Import...` — a MilkDrop preset (.milk) or a Shadertoy shader (.glsl) copied into the project's looks/ and listed - a preset runs its motion, decay, wave, shapes, custom waves and equations, and its MilkDrop 2 shaders translated (one that does not translate is left out, and said); `Tap` — tap on the beat: the show's tempo from the gaps (the Sequence's Tap) - the first tap is the first beat of a bar; `Browse...` — every look as a moving thumbnail: click one to put it on this deck; `Shuffle` — a look this deck does not have, at random; `Mutate` — a new flame bred from this one (its maps nudged, a variation swapped) - kept with the project; `Edit` — this look's file in your editor: saved, it reloads here; `...` — the picture file the Image look shows; `||` — the video paused (the picture holds) or played on; `>` — the next file; `x` — this file off the list; `Save as...`; `Rename...`; `Delete`; `Forget` — this bred flame no longer kept; the deck goes back to the flame it came from; `A` — all deck A; `B` — all deck B; `Cut` — straight to the other deck (now, or on the next beat or bar - the choice beside Fade); `Fade` — to the other deck over two beats (now, or from the next beat or bar)
+**VJ frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the VJ's last change undone (Ctrl+Z with the frame focused, Ctrl+Y redoes); `New look...` — a look of your own: a small Python file in the project's looks/ folder, made from an example and opened in your editor - it reloads here each time it is saved; it goes on the deck off the mix; `New shader...` — a Shadertoy shader of your own: a .glsl file to paste one from shadertoy.com into (its Image tab's code) - it runs as it is, on the graphics card; `Import...` — a MilkDrop preset (.milk) or a Shadertoy shader (.glsl) copied into the project's looks/ and listed - a preset runs its motion, decay, wave, shapes, custom waves and equations, and its MilkDrop 2 shaders translated (one that does not translate is left out, and said); `Tap` — tap on the beat: the show's tempo from the gaps (the Sequence's Tap) - the first tap is the first beat of a bar; `Browse...` — every look as a moving thumbnail: click one to put it on this deck; `Shuffle` — a look this deck does not have, at random; `Mutate` — a new flame bred from this one (its maps nudged, a variation swapped) - kept with the project; `Edit` — this look's file in your editor: saved, it reloads here; `...` — the picture file the Image look shows; `Keep` — the flame as it is now, partway to the other, kept as a flame of its own and put on the deck; `||` — the video paused (the picture holds) or played on; `>` — the next file; `x` — this file off the list; `Save as...`; `Rename...`; `Delete`; `Forget` — this bred flame no longer kept; the deck goes back to the flame it came from; `A` — all deck A; `B` — all deck B; `Cut` — straight to the other deck (now, or on the next beat or bar - the choice beside Fade); `Fade` — to the other deck over two beats (now, or from the next beat or bar); `In` — deck C brought in over the mix, to its "in to" level, over its fade (now, or on the next beat or bar - as Cut and Fade wait); `Out` — deck C taken out, over its fade (now, or on the next beat or bar - as Cut and Fade wait); `In/Out` — deck C in if it is out, out if it is in - one button for MIDI (now, or on the next beat or bar - as Cut and Fade wait); `Flash` — deck C up at once, held a moment, then out over a beat - a hit (now, or on the next beat or bar - as Cut and Fade wait)
 
 **Keyboard shortcuts**: `close` — close (Esc while it has the focus); `Reset all to defaults`
 

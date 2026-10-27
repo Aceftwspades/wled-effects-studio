@@ -169,7 +169,9 @@ def targets(app):
     out.append(("the mixer's fader", {"kind": "mixer"}))
     out += [("VJ: the crossfader", {"kind": "vj_fader"}), ("VJ: cut to the other deck", {"kind": "vj_cut"}),
             ("VJ: fade to the other deck", {"kind": "vj_fade"}), ("VJ: shuffle deck A", {"kind": "vj_shuffle_a"}),
-            ("VJ: shuffle deck B", {"kind": "vj_shuffle_b"}), ("VJ: on air, on or off", {"kind": "vj_air"})]
+            ("VJ: shuffle deck B", {"kind": "vj_shuffle_b"}), ("VJ: on air, on or off", {"kind": "vj_air"}),
+            ("VJ C: in", {"kind": "vj_c_in"}), ("VJ C: out", {"kind": "vj_c_out"}),
+            ("VJ C: in or out", {"kind": "vj_c_toggle"}), ("VJ C: a flash", {"kind": "vj_c_flash"})]
     from native import vj
     for i, d in enumerate(vj.LETTERS):
         out.append((f"VJ {d}: the look, along the list", {"kind": "vj_look", "deck": i}))
@@ -681,6 +683,8 @@ def apply_target(app, t, v, full=127.0, ctl=None):
             vj.shuffle(app, 0 if kind.endswith("a") else 1)
         elif kind == "vj_air":
             vj_ui.set_on(app, not vj.on(app))
+        elif kind.startswith("vj_c_"):
+            vj.c_launch(app, kind[5:])
         return
     if kind in midi.STEPS:
         switch_effect(app, midi.step_effect(app.eng.names, _st(app)["setlist"], app.eng.names[app.eng.idx],

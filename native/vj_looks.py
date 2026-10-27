@@ -460,10 +460,18 @@ for _name, _pre in MILKDROP.items():
 
 
 # --- fractal flames ------------------------------------------------------------------------------
-VARIATIONS = ("linear", "sinusoidal", "spherical", "swirl", "horseshoe", "polar", "heart", "disc", "spiral", "julia")
+# A flame (Scott Draves' algorithm, "The Fractal Flame Algorithm", Draves and Reckase 2003, flam3.com/flame_draves.pdf):
+#   {"seed", "maps": [{"a": [six], "var": [names], "vw": [their weights], "w": how often it is picked, "col": 0..1}],
+#    "sym": n-fold symmetry, "mirror": bool, "final": a map put over every point as it is shown, or absent}
+# A map's affine is x' = a0 x + a1 y + a2 / 2, y' = a3 x + a4 y + a5 / 2, then bent by its variations, summed by vw.
+VARIATIONS = ("linear", "sinusoidal", "spherical", "swirl", "horseshoe", "polar", "heart", "disc", "spiral", "julia",
+              "handkerchief", "hyperbolic", "diamond", "ex", "bent", "waves", "fisheye", "exponential", "power",
+              "cosine", "bubble", "cylinder", "eyefish", "tangent", "cross")
+CLASSIC = VARIATIONS[:10]        # what new_flame picks among: the built-in random flames' seeds keep their shapes
 
 
 def _vary(kind, x, y, rng=None):
+    """A variation (the paper's numbering: 0 linear .. 48 cross) on points (x, y)."""
     r2 = x * x + y * y + 1e-9
     r = np.sqrt(r2)
     th = np.arctan2(x, y)
@@ -488,7 +496,68 @@ def _vary(kind, x, y, rng=None):
         sr = np.sqrt(r)
         om = (np.random.default_rng().random(x.shape) < 0.5) * math.pi
         return sr * np.cos(th / 2 + om), sr * np.sin(th / 2 + om)
+    if kind == "handkerchief":
+        return r * np.sin(th + r), r * np.cos(th - r)
+    if kind == "hyperbolic":
+        return np.sin(th) / r, r * np.cos(th)
+    if kind == "diamond":
+        return np.sin(th) * np.cos(r), np.cos(th) * np.sin(r)
+    if kind == "ex":
+        p0, p1 = np.sin(th + r) ** 3, np.cos(th - r) ** 3
+        return r * (p0 + p1), r * (p0 - p1)
+    if kind == "bent":
+        return np.where(x < 0, 2 * x, x), np.where(y < 0, y / 2, y)
+    if kind == "waves":                                   # the paper's takes its map's affine; a fixed ripple here
+        return x + 0.25 * np.sin(y * 3.0), y + 0.25 * np.sin(x * 3.0)
+    if kind == "fisheye":
+        k = 2 / (r + 1)
+        return k * y, k * x
+    if kind == "exponential":
+        e = np.exp(np.minimum(x, 20.0) - 1)
+        return e * np.cos(math.pi * y), e * np.sin(math.pi * y)
+    if kind == "power":
+        rs = r ** np.sin(th)
+        return rs * np.cos(th), rs * np.sin(th)
+    if kind == "cosine":
+        yy = np.clip(y, -20.0, 20.0)
+        return np.cos(math.pi * x) * np.cosh(yy), -np.sin(math.pi * x) * np.sinh(yy)
+    if kind == "bubble":
+        k = 4 / (r2 + 4)
+        return k * x, k * y
+    if kind == "cylinder":
+        return np.sin(x), y
+    if kind == "eyefish":
+        k = 2 / (r + 1)
+        return k * x, k * y
+    if kind == "tangent":
+        return np.sin(x) / np.cos(y), np.tan(y)
+    if kind == "cross":
+        k = 1 / (np.abs(x * x - y * y) + 1e-9)
+        return k * x, k * y
     return x, y
+
+
+def _var_weights(m):
+    """A map's variations with their weights, summing to 1 (none given: an even share each)."""
+    var = list(m.get("var") or ["linear"])
+    vw = list(m.get("vw") or [1.0] * len(var))[:len(var)]
+    vw += [1.0] * (len(var) - len(vw))
+    tot = sum(max(0.0, float(w)) for w in vw) or 1.0
+    return [(v, max(0.0, float(w)) / tot) for v, w in zip(var, vw)]
+
+
+def _map_points(m, x, y):
+    """Points through a map: its affine, then its variations summed by their weights."""
+    a = m["a"]
+    ax = a[0] * x + a[1] * y + a[2] * 0.5
+    ay = a[3] * x + a[4] * y + a[5] * 0.5
+    vx, vy = np.zeros_like(ax), np.zeros_like(ay)
+    for var, wt in _var_weights(m):
+        if wt <= 0.0:
+            continue
+        ex, ey = _vary(var, ax, ay)
+        vx += wt * ex; vy += wt * ey
+    return vx, vy
 
 
 def new_flame(seed):
@@ -497,31 +566,152 @@ def new_flame(seed):
     maps = []
     for k in range(int(rng.integers(2, 5))):
         a = rng.uniform(-1, 1, 6)
-        vs = list(rng.choice(VARIATIONS[1:], size=int(rng.integers(1, 3)), replace=False))
+        vs = list(rng.choice(CLASSIC[1:], size=int(rng.integers(1, 3)), replace=False))
         maps.append({"a": a.tolist(), "var": [str(v) for v in vs], "w": float(rng.uniform(0.5, 1.5)),
                      "col": float(k / 3.0 + rng.uniform(0, 0.2))})
     return {"seed": int(seed), "maps": maps, "sym": int(rng.choice([1, 1, 2, 3, 4]))}
 
 
 def mutate(flame, seed):
-    """A flame bred from another: its maps nudged, one variation perhaps swapped."""
+    """A flame bred from another: its maps nudged, one variation perhaps swapped (from all of them)."""
     rng = np.random.default_rng(seed)
-    out = {"seed": int(seed), "sym": flame["sym"], "maps": []}
+    out = {"seed": int(seed), "sym": flame.get("sym", 1), "maps": []}
+    for k in ("mirror", "final"):
+        if k in flame:
+            out[k] = json_copy(flame[k])
     for m in flame["maps"]:
-        a = (np.array(m["a"]) + rng.normal(0, 0.15, 6)).clip(-1.2, 1.2)
+        a = (np.array(m["a"]) + rng.normal(0, 0.15, 6)).clip(-1.4, 1.4)
         var = list(m["var"])
         if rng.random() < 0.3:
             var[int(rng.integers(len(var)))] = str(rng.choice(VARIATIONS[1:]))
-        out["maps"].append({"a": a.tolist(), "var": var, "w": m["w"], "col": m["col"]})
+        nm = {"a": a.tolist(), "var": var, "w": m["w"], "col": m["col"]}
+        if "vw" in m:
+            nm["vw"] = list(m["vw"])
+        out["maps"].append(nm)
     return out
 
 
+def json_copy(v):
+    import json
+    return json.loads(json.dumps(v))
+
+
+def _blend_vars(ma, mb, k):
+    """Two maps' variations as one: each weighted by how much of either map there is."""
+    da, db = dict(_var_weights(ma)), dict(_var_weights(mb))
+    names = list(da) + [v for v in db if v not in da]
+    out = [(v, (1 - k) * da.get(v, 0.0) + k * db.get(v, 0.0)) for v in names]
+    out = [(v, w) for v, w in out if w > 1e-4] or [("linear", 1.0)]
+    return [v for v, _ in out], [w for _, w in out]
+
+
+def _blend_map(ma, mb, k):
+    if ma is None or mb is None:                           # a map only one has: there as much as that one is
+        m = dict(ma or mb)
+        m["w"] = float(m["w"]) * ((1 - k) if mb is None else k)
+        return m
+    var, vw = _blend_vars(ma, mb, k)
+    return {"a": [(1 - k) * p + k * q for p, q in zip(ma["a"], mb["a"])], "var": var, "vw": vw,
+            "w": (1 - k) * float(ma["w"]) + k * float(mb["w"]), "col": (1 - k) * float(ma["col"]) + k * float(mb["col"])}
+
+
+def blend(a, b, k):
+    """A flame between two, map by map (k 0: a, 1: b): their affines and weights between, their variations faded
+    one into the other, a map only one has faded in or out. The symmetry a share of the points each; the final
+    map faded in or out as one or both have it."""
+    k = float(max(0.0, min(1.0, k)))
+    if k <= 0.0:
+        return a
+    if k >= 1.0:
+        return b
+    n = max(len(a["maps"]), len(b["maps"]))
+    maps = [_blend_map(a["maps"][j] if j < len(a["maps"]) else None, b["maps"][j] if j < len(b["maps"]) else None, k)
+            for j in range(n)]
+    out = {"seed": a.get("seed", 0), "maps": maps, "sym": a.get("sym", 1), "sym_to": (b.get("sym", 1), k),
+           "mirror": (b if k >= 0.5 else a).get("mirror", False)}
+    fa, fb = a.get("final"), b.get("final")
+    if fa or fb:
+        fin = _blend_map(fa, fb, k) if fa and fb else dict(fa or fb)
+        fin["amt"] = 1.0 if fa and fb else ((1 - k) if fa else k) * float((fa or fb).get("amt", 1.0))
+        out["final"] = fin
+    return out
+
+
+DRIFT = 0.18                       # how far drift wanders a map's numbers
+
+
+def drift(flame, phase):
+    """The flame wandered: each number of each map swung on a slow sine of its own (the same for every flame, so a
+    morph's child hands over without a jump)."""
+    rng = np.random.default_rng(7)
+    out = dict(flame)
+    out["maps"] = []
+    for m in flame["maps"]:
+        f, ph = rng.uniform(0.3, 1.0, 6), rng.uniform(0, 2 * math.pi, 6)
+        mm = dict(m)
+        mm["a"] = [p + DRIFT * math.sin(phase * fj + pj) for p, fj, pj in zip(m["a"], f, ph)]
+        out["maps"].append(mm)
+    return out
+
+
+# the classic iterated function systems, as flames (maps in screen space: y down), and children of theirs
+def _ifs(maps, sym=1, var=None, vw=None, final=None, seed=0):
+    out = []
+    for k, (a, w) in enumerate(maps):
+        m = {"a": [float(v) for v in a], "var": list(var or ["linear"]), "w": float(w),
+             "col": k / max(1, len(maps) - 1)}
+        if vw:
+            m["vw"] = list(vw)
+        out.append(m)
+    fl = {"seed": seed, "maps": out, "sym": sym}
+    if final:
+        fl["final"] = {"a": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0], "var": [final], "w": 1.0, "col": 0.5}
+    return fl
+
+
+def _shrink_to(points, s):
+    """Maps x' = s x + (1 - s) v toward each point v (affine as a0..a5, the shifts doubled)."""
+    return [([s, 0, 2 * (1 - s) * vx, 0, s, 2 * (1 - s) * vy], 1.0) for vx, vy in points]
+
+
+_TRI = [(0.0, -1.0), (-0.866, 0.5), (0.866, 0.5)]
+_PENT = [(math.cos(math.radians(-90 + 72 * k)), math.sin(math.radians(-90 + 72 * k))) for k in range(5)]
+_HEX = [(math.cos(math.radians(30 + 60 * k)), math.sin(math.radians(30 + 60 * k))) for k in range(6)]
+_SQUARE8 = [(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if (i, j) != (0, 0)]
+SIERPINSKI = _shrink_to(_TRI, 0.5)
+CARPET = _shrink_to(_SQUARE8, 1 / 3)
+PENTAFLAKE = _shrink_to(_PENT, 0.382)                   # the golden ratio's: the five just touch
+HEXAFLAKE = _shrink_to(_HEX, 1 / 3)
+VICSEK = _shrink_to([(0, 0), (-1, -1), (1, -1), (-1, 1), (1, 1)], 1 / 3)
+# Barnsley's fern (his 1988 coefficients), turned upright for a screen whose y runs down
+FERN = [([0.0, 0.0, 0.0, 0.0, 0.16, 0.0], 0.01), ([0.85, -0.04, 0.0, 0.04, 0.85, -3.2], 0.85),
+        ([0.2, 0.26, 0.0, -0.23, 0.22, -3.2], 0.07), ([-0.15, -0.28, 0.0, -0.26, 0.24, -0.88], 0.07)]
+DRAGON = [([0.5, -0.5, 0.0, 0.5, 0.5, 0.0], 1.0), ([-0.5, -0.5, 2.0, 0.5, -0.5, 0.0], 1.0)]   # Heighway's
+LEVY = [([0.5, -0.5, 0.0, 0.5, 0.5, 0.0], 1.0), ([0.5, 0.5, 1.0, -0.5, 0.5, 1.0], 1.0)]
+
 # seeds picked from the first three hundred for how much of the frame they fill and how much detail they have
 FLAMES = {"Flame: Sheep": new_flame(292), "Flame: Coral": new_flame(99), "Flame: Orchid": new_flame(39),
-          "Flame: Galaxy": new_flame(130), "Flame: Lace": new_flame(0), "Flame: Swirl": new_flame(168)}
+          "Flame: Galaxy": new_flame(130), "Flame: Lace": new_flame(0), "Flame: Swirl": new_flame(168),
+          "Flame: Sierpinski": _ifs(SIERPINSKI, seed=301),
+          "Flame: Sierpinski Carpet": _ifs(CARPET, seed=302),
+          "Flame: Pentaflake": _ifs(PENTAFLAKE, seed=303),
+          "Flame: Hexaflake": _ifs(HEXAFLAKE, seed=304),
+          "Flame: Vicsek": _ifs(VICSEK, seed=305),
+          "Flame: Fern": _ifs(FERN, seed=306),
+          "Flame: Dragon": _ifs(DRAGON, seed=307),
+          "Flame: Levy C": _ifs(LEVY, seed=308),
+          # children of Sierpinski's and the others: their maps bent a little by a variation
+          "Flame: Sierpinski Bloom": _ifs(SIERPINSKI, var=["linear", "spherical"], vw=[0.75, 0.25], seed=311),
+          "Flame: Sierpinski Swirl": _ifs(SIERPINSKI, var=["linear", "swirl"], vw=[0.7, 0.3], seed=312),
+          "Flame: Sierpinski Star": _ifs(SIERPINSKI, sym=2, final="bubble", seed=313),
+          "Flame: Carpet Lace": _ifs(CARPET, var=["linear", "handkerchief"], vw=[0.8, 0.2], seed=314),
+          "Flame: Pentaflake Rose": _ifs(PENTAFLAKE, var=["linear", "diamond"], vw=[0.7, 0.3], sym=2, seed=315),
+          "Flame: Dragon Ring": _ifs(DRAGON, final="disc", seed=316)}
 
 
 FLAME_POINTS = 3000
+FLAME_PASSES = 3                 # each frame's: the first only moves the points on, the rest are counted
+ARMS = 8                         # a flame's maps with a weight knob each on the deck (fl_w1..fl_w8)
 
 
 def _flame_frame_of(q):
@@ -529,85 +719,171 @@ def _flame_frame_of(q):
     lo = np.percentile(q, 4, axis=0)
     hi = np.percentile(q, 96, axis=0)
     return float((lo[0] + hi[0]) / 2), float((lo[1] + hi[1]) / 2), float(max(0.05, (hi - lo).max() / 2))
-FLAME_PASSES = 3                 # each frame's: the first only moves the points on, the rest are counted
+
+
+FUSE = 15                        # passes a new flame's points take before the first is counted (flam3's "fuse")
+
+
+def _fuse(maps, p, rng):
+    """Points thrown through the maps FUSE times, uncounted: on the fractal, not where they started."""
+    w = np.cumsum([max(1e-6, float(m["w"])) for m in maps]); w = w / w[-1]
+    with np.errstate(all="ignore"):
+        for _ in range(FUSE):
+            pick = np.searchsorted(w, rng.random(len(p)))
+            nx, ny = np.empty(len(p)), np.empty(len(p))
+            for k, m in enumerate(maps):
+                sel = pick == k
+                if sel.any():
+                    nx[sel], ny[sel] = _map_points(m, p[sel, 0], p[sel, 1])
+            bad = ~np.isfinite(nx) | ~np.isfinite(ny) | (np.abs(nx) > 50) | (np.abs(ny) > 50)
+            nx[bad], ny[bad] = rng.uniform(-1, 1, int(bad.sum())), rng.uniform(-1, 1, int(bad.sum()))
+            p = np.column_stack([nx, ny])
+    return p
+
+
+def _kn(ctx, key, default):
+    """A deck's knob as it draws (a modulator's over it), else what the deck has, else the default."""
+    f = getattr(ctx, "knob", None)
+    if f is not None:
+        try:
+            return float(f(key))
+        except Exception:
+            pass
+    v = (getattr(ctx, "deck", None) or {}).get(key)
+    return default if v is None else float(v)
+
+
+def _turn(q, ang):
+    cs, sn = np.cos(ang), np.sin(ang)
+    return np.column_stack([q[:, 0] * cs - q[:, 1] * sn, q[:, 0] * sn + q[:, 1] * cs])
 
 
 def flame_frame(ctx, st, flame):
-    """A fractal flame: points thrown through the maps (turning slowly), their landings counted, log-scaled."""
+    """A fractal flame: points thrown through the maps (turning slowly), their landings counted, log-scaled. The
+    deck's flame knobs (fl_*) shape how: its symmetry and mirror, the trails, gamma, colour spread, the points
+    thrown, spin, where it sits and whether the view follows it, each map's weight."""
     h, w = ctx.h, ctx.w
     maps = flame["maps"]
-    if st.get("flame_id") is not flame:
-        st.clear()
-        st["flame_id"] = flame
-        rng = np.random.default_rng(flame["seed"])
-        st["p"] = rng.uniform(-1, 1, (FLAME_POINTS, 2))
-        st["c"] = rng.random(FLAME_POINTS)
+    n = int(max(300, min(30000, _kn(ctx, "fl_points", FLAME_POINTS))))
+    if "p" not in st or st["hist"].shape != (h, w):
+        rng0 = np.random.default_rng(flame.get("seed", 0))
+        st["p"] = rng0.uniform(-1, 1, (n, 2))
+        st["c"] = rng0.random(n)
         st["hist"] = np.zeros((h, w), np.float32)
         st["colh"] = np.zeros((h, w), np.float32)
+        st["ang"] = ctx.t * 0.05
     rng = np.random.default_rng()
     p, c = st["p"], st["c"]
-    cum = np.cumsum([m["w"] for m in maps]); cum = cum / cum[-1]
-    ang = ctx.t * 0.05 * ctx.speed + ctx.beat * 0.02
-    spin = np.array([[math.cos(ang), -math.sin(ang)], [math.sin(ang), math.cos(ang)]])
-    hist = st["hist"] * 0.93
-    colh = st["colh"] * 0.93
+    if not st.get("fused"):                                           # settled on the fractal before anything is
+        p = _fuse(maps, p, rng)                                       # counted or framed: no zoom smeared into trails
+        st["fused"] = True
+    if len(p) != n:                                                   # more points or fewer: some thrown or let go
+        if len(p) < n:
+            more = rng.uniform(-1, 1, (n - len(p), 2))
+            p, c = np.vstack([p, more]), np.concatenate([c, rng.random(n - len(c))])
+        else:
+            p, c = p[:n], c[:n]
+    arm = [max(0.0, _kn(ctx, f"fl_w{k + 1}", 1.0)) if k < ARMS else 1.0 for k in range(len(maps))]
+    wts = np.array([max(0.0, float(m["w"])) * a for m, a in zip(maps, arm)], np.float64)
+    if wts.sum() <= 0:
+        wts = np.ones(len(maps))
+    cum = np.cumsum(wts); cum = cum / cum[-1]
+    st["ang"] = st.get("ang", 0.0) + ctx.dt * 0.05 * _kn(ctx, "fl_spin", 1.0)
+    ang = st["ang"] + ctx.beat * 0.02
+    decay = float(np.clip(_kn(ctx, "fl_trail", 0.94), 0.0, 1.0)) * 0.99
+    spread = float(np.clip(_kn(ctx, "fl_colour", 0.5), 0.0, 1.0))
+    gamma = float(np.clip(_kn(ctx, "fl_gamma", 0.6), 0.15, 2.0))
+    sym_k = int(round(_kn(ctx, "fl_sym", 0)))
+    sym, sym_to = (sym_k, None) if sym_k > 0 else (int(flame.get("sym", 1)), flame.get("sym_to"))
+    mirror = _kn(ctx, "fl_mirror", 0) >= 0.5 or bool(flame.get("mirror"))
+    lock = _kn(ctx, "fl_lock", 0) >= 0.5
+    fin = flame.get("final")
+    hist = st["hist"] * decay
+    colh = st["colh"] * decay
     fr = st.get("frame")                                              # where the points land: the view follows it
-    for it in range(FLAME_PASSES):
-        pick = np.searchsorted(cum, rng.random(len(p)))
-        nx = np.empty(len(p)); ny = np.empty(len(p))
-        for k, m in enumerate(maps):
-            sel = pick == k
-            if not sel.any():
+    with np.errstate(all="ignore"):
+        for it in range(FLAME_PASSES):
+            pick = np.searchsorted(cum, rng.random(len(p)))
+            nx = np.empty(len(p)); ny = np.empty(len(p))
+            for k, m in enumerate(maps):
+                sel = pick == k
+                if not sel.any():
+                    continue
+                nx[sel], ny[sel] = _map_points(m, p[sel, 0], p[sel, 1])
+                c[sel] = c[sel] * (1.0 - spread) + float(m["col"]) * spread
+            bad = ~np.isfinite(nx) | ~np.isfinite(ny) | (np.abs(nx) > 50) | (np.abs(ny) > 50)
+            nx[bad] = rng.uniform(-1, 1, int(bad.sum())); ny[bad] = rng.uniform(-1, 1, int(bad.sum()))
+            p = np.column_stack([nx, ny])
+            if it < 1:
                 continue
-            a = m["a"]
-            x = a[0] * p[sel, 0] + a[1] * p[sel, 1] + a[2] * 0.5
-            y = a[3] * p[sel, 0] + a[4] * p[sel, 1] + a[5] * 0.5
-            vx, vy = np.zeros_like(x), np.zeros_like(y)
-            for var in m["var"]:
-                ex, ey = _vary(var, x, y)
-                vx += ex; vy += ey
-            nx[sel], ny[sel] = vx / len(m["var"]), vy / len(m["var"])
-            c[sel] = (c[sel] + m["col"]) * 0.5
-        bad = ~np.isfinite(nx) | ~np.isfinite(ny) | (np.abs(nx) > 50) | (np.abs(ny) > 50)
-        nx[bad] = rng.uniform(-1, 1, int(bad.sum())); ny[bad] = rng.uniform(-1, 1, int(bad.sum()))
-        p = np.column_stack([nx, ny])
-        if it < 1:
-            continue
-        q = p @ spin.T
-        sym = flame["sym"]
-        if sym > 1:
-            k = rng.integers(sym, size=len(q)) * (2 * math.pi / sym)
-            cs, sn = np.cos(k), np.sin(k)
-            q = np.column_stack([q[:, 0] * cs - q[:, 1] * sn, q[:, 0] * sn + q[:, 1] * cs])
-        if fr is None:
-            fr = _flame_frame_of(q)
-        cx, cy, ext = fr
-        zoom = (0.55 + ctx.amount * 0.6) / ext
-        ix = (((q[:, 0] - cx) * zoom * ctx.h / ctx.w) * 0.5 + 0.5) * (w - 1)
-        iy = (((q[:, 1] - cy) * zoom) * 0.5 + 0.5) * (h - 1)
-        ok = (ix >= 0) & (ix < w) & (iy >= 0) & (iy < h)
-        flat = iy[ok].astype(np.int64) * w + ix[ok].astype(np.int64)
-        hist += np.bincount(flat, minlength=h * w).reshape(h, w)
-        colh += np.bincount(flat, weights=c[ok], minlength=h * w).reshape(h, w)
+            q = p
+            if fin:                                                   # the final map: on what is shown, not fed back
+                fx, fy = _map_points(fin, p[:, 0], p[:, 1])
+                amt = float(fin.get("amt", 1.0))
+                q = np.column_stack([p[:, 0] * (1 - amt) + fx * amt, p[:, 1] * (1 - amt) + fy * amt])
+                q[~np.isfinite(q).all(axis=1)] = 0.0
+            q = _turn(q, ang)
+            if mirror:                                                # half the points the other way round
+                flip = rng.random(len(q)) < 0.5
+                q[flip, 0] = -q[flip, 0]
+            nsym = np.full(len(q), sym)
+            if sym_to is not None and sym_to[0] != sym:               # a morph between two symmetries: a share each
+                nsym = np.where(rng.random(len(q)) < sym_to[1], sym_to[0], sym)
+            if (nsym > 1).any():
+                q = _turn(q, rng.integers(0, 1 << 30, size=len(q)) % np.maximum(nsym, 1) * (2 * math.pi / np.maximum(nsym, 1)))
+            if fr is None:
+                fr = _flame_frame_of(q)
+            cx, cy, ext = fr
+            zoom = (0.55 + ctx.amount * 0.6) / ext
+            ix = (((q[:, 0] - cx) * zoom * ctx.h / ctx.w) * 0.5 + 0.5 + _kn(ctx, "fl_x", 0.0) * 0.5) * (w - 1)
+            iy = (((q[:, 1] - cy) * zoom) * 0.5 + 0.5 - _kn(ctx, "fl_y", 0.0) * 0.5) * (h - 1)
+            ok = (ix >= 0) & (ix < w) & (iy >= 0) & (iy < h)
+            flat = iy[ok].astype(np.int64) * w + ix[ok].astype(np.int64)
+            hist += np.bincount(flat, minlength=h * w).reshape(h, w)
+            colh += np.bincount(flat, weights=c[ok], minlength=h * w).reshape(h, w)
     st["p"], st["c"], st["hist"], st["colh"] = p, c, hist, colh
-    nf = _flame_frame_of(q)
-    k = 1.0 - math.exp(-ctx.dt * 1.5)
-    st["frame"] = tuple(a + (b - a) * k for a, b in zip(fr, nf))
+    if not (lock and st.get("frame") is not None):                    # locked: the view held where it is
+        nf = _flame_frame_of(q)
+        k = 1.0 - math.exp(-ctx.dt * 1.5)
+        st["frame"] = tuple(a + (b - a) * k for a, b in zip(fr, nf))
     dens = np.log1p(hist) / max(1e-6, float(np.log1p(hist.max())))
     hue = colh / np.maximum(hist, 1e-6)
-    return np.clip(ctx.grad(hue) * (dens ** 0.6)[..., None] * (1.0 + ctx.bass * 0.5), 0, 1)
+    return np.clip(ctx.grad(hue) * (dens ** gamma)[..., None] * (1.0 + ctx.bass * 0.5), 0, 1)
 
 
-for _name, _fl in FLAMES.items():
-    LOOKS[_name] = Look(_name, "flame", (lambda fl: lambda ctx, st: flame_frame(ctx, st, fl))(_fl),
-                        "a fractal flame: points thrown through bent maps, counted, shown on a log scale")
+def flame_now(ctx, st, base):
+    """The flame a deck shows this frame: its own, morphed toward the one it is becoming (ctx.flame_to, by its morph
+    knob), wandered by its drift."""
+    fl = base
+    to = getattr(ctx, "flame_to", None)
+    m = _kn(ctx, "morph", 0.0)
+    if to is not None and m > 0.0:
+        fl = blend(base, to, m)
+    st["drift"] = st.get("drift", 0.0) + ctx.dt * _kn(ctx, "drift", 0.0) * 0.8
+    if st["drift"]:
+        fl = drift(fl, st["drift"])
+    return fl
+
+
+def _flame_look(name, flame, desc, bred=False):
+    lk = Look(name, "flame", lambda ctx, st, fl=flame: flame_frame(ctx, st, flame_now(ctx, st, fl)), desc)
+    lk.flame = flame
+    if bred:
+        lk.bred = flame
+    LOOKS[name] = lk
+    return lk
+
+
+FLAME_DESC = "a fractal flame: points thrown through bent maps, counted, shown on a log scale"
+FIRST_FLAMES = ("Flame: Sheep", "Flame: Coral", "Flame: Orchid", "Flame: Galaxy", "Flame: Lace", "Flame: Swirl")
+for _name in FIRST_FLAMES:          # the rest go after every look that shipped before them: MIDI's places kept
+    _flame_look(_name, FLAMES[_name], FLAME_DESC)
 
 
 def register_flame(name, flame):
     """A flame of the project's own (bred by Mutate) as a look."""
-    LOOKS[name] = Look(name, "flame", lambda ctx, st, fl=flame: flame_frame(ctx, st, fl),
-                       "a fractal flame bred by Mutate: points thrown through bent maps, counted, shown on a log scale")
-    LOOKS[name].bred = flame
+    _flame_look(name, flame, "a fractal flame bred by Mutate: points thrown through bent maps, counted, shown on a "
+                             "log scale", bred=True)
 
 
 _FLAMES_SEEN = [None, ()]           # the project's flames last listed: (their dict, its names)
@@ -646,38 +922,103 @@ def _font(px):
     return f
 
 
-@look("Text", "layer", "the deck's words scrolling across, in its colours - amount their size, speed how fast (at 0 held "
-                       "still in the middle, fitted), a jump on the beat")
-def _text(ctx, st):
+TEXT_MOVES = (("scroll", "scrolling left"), ("scroll_right", "scrolling right"), ("rise", "rising up"),
+              ("still", "held still"), ("bounce", "bouncing side to side"), ("zoom", "zooming on the beat"),
+              ("words", "a word a beat"), ("wave", "scrolling on a wave"), ("flash", "flashing on the beat"))
+_SCROLLS = ("scroll", "scroll_right", "rise", "wave")   # at speed 0 these are held still, as Text always was
+_HELD = ("still", "zoom", "words", "flash")              # where the words stay: shrunk to fit when too wide
+TEXT_SIZE = (0.1, 2.0)                                   # the words' height, of the canvas's
+MASKS = 16                                               # the words drawn at a size kept at most (a word a beat: one each)
+
+
+def _text_mask(st, words, px):
+    """The words in white at px high, cut to their ink, as 0..1 - kept for the next frames."""
     from PIL import Image, ImageDraw
-    words = str((getattr(ctx, "deck", None) or {}).get("text") or "WLED")
-    px = max(8, int(ctx.h * (0.35 + ctx.amount * 0.6)))
-    key = (words, px)
-    if st.get("key") != key:
+    cache = st.setdefault("masks", {})
+    m = cache.get((words, px))
+    if m is None:
         f = _font(px)
         l, t, r, b = ImageDraw.Draw(Image.new("L", (1, 1))).textbbox((0, 0), words, font=f)
-        im = Image.new("L", (max(1, r - l) + px, max(1, b - t) + 2))
-        ImageDraw.Draw(im).text((-l + px // 2, -t + 1), words, fill=255, font=f)
-        st["key"], st["mask"] = key, np.asarray(im, np.float32) / 255.0
-    m = st["mask"]
+        im = Image.new("L", (max(1, r - l) + 2, max(1, b - t) + 2))
+        ImageDraw.Draw(im).text((-l + 1, -t + 1), words, fill=255, font=f)
+        if len(cache) >= MASKS:
+            cache.pop(next(iter(cache)))
+        m = cache[(words, px)] = np.asarray(im, np.float32) / 255.0
+    return m
+
+
+def _scaled(m, k):
+    from PIL import Image
+    h, w = m.shape
+    size = (max(1, int(round(w * k))), max(1, int(round(h * k))))
+    return np.asarray(Image.fromarray((m * 255).astype(np.uint8)).resize(size, Image.BILINEAR), np.float32) / 255.0
+
+
+def _paste(out, m, x0, y0):
+    h, w = out.shape
     mh, mw = m.shape
-    if ctx.speed < 0.05:                                    # still: the words held in the middle, made to fit
-        if mw > ctx.w:
-            from PIL import Image
-            k = ctx.w / mw
-            m = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).resize((ctx.w, max(1, int(mh * k))),
-                                                                             Image.BILINEAR), np.float32) / 255.0
-            mh, mw = m.shape
-        x0 = (ctx.w - mw) // 2
-    else:
-        st["x"] = (st.get("x", 0.0) + ctx.dt * ctx.w * 0.25 * ctx.speed) % (mw + ctx.w)
-        x0 = int(ctx.w - st["x"])
-    out = np.zeros((ctx.h, ctx.w), np.float32)
-    y0 = int((ctx.h - mh) / 2 - ctx.beat * ctx.h * 0.08)
-    xs, xe = max(0, x0), min(ctx.w, x0 + mw)
-    ys, ye = max(0, y0), min(ctx.h, y0 + mh)
+    xs, xe = max(0, x0), min(w, x0 + mw)
+    ys, ye = max(0, y0), min(h, y0 + mh)
     if xe > xs and ye > ys:
-        out[ys:ye, xs:xe] = m[ys - y0:ye - y0, xs - x0:xe - x0]
+        out[ys:ye, xs:xe] = np.maximum(out[ys:ye, xs:xe], m[ys - y0:ye - y0, xs - x0:xe - x0])
+
+
+@look("Text", "layer", "the deck's words, in its colours: scrolling, rising, held still, bouncing, zoomed or flashed on "
+                       "the beat, a word a beat or on a wave - their size, place and glow the deck's text knobs, speed "
+                       "how fast they move (scrolling at 0: held still), amount how hard the beat hits them")
+def _text(ctx, st):
+    d = getattr(ctx, "deck", None) or {}
+    knob = getattr(ctx, "knob", None) or (lambda k: float(d.get(k, 0.0) or 0.0))   # a modulator's over the deck's
+    words = str(d.get("text") or "WLED")
+    move = d.get("text_move", "scroll")
+    if move in _SCROLLS and ctx.speed < 0.05:
+        move = "still"
+    size = min(TEXT_SIZE[1], max(TEXT_SIZE[0], float(knob("text_size") or 0.65)))
+    px = max(6, int(ctx.h * size))
+    if move == "words":                                       # one word on each beat of the count
+        parts = words.split() or [words]
+        words = parts[int(getattr(ctx, "beats", 0.0)) % len(parts)]
+    m = _text_mask(st, words, px)
+    mh, mw = m.shape
+    if move in _HELD and mw > ctx.w:                          # held: made to fit across
+        m = _scaled(m, ctx.w / mw)
+    if move == "zoom":                                        # swelling on each beat, by the amount
+        m = _scaled(m, 1.0 + ctx.amount * 0.6 * ctx.beat)
+    mh, mw = m.shape
+    # the words' middle: x -1..1 left to right, y -1..1 bottom to top, 0 the canvas's middle
+    cx = ctx.w * 0.5 * (1.0 + float(knob("text_x")))
+    cy = ctx.h * 0.5 * (1.0 - float(knob("text_y")))
+    x0, y0 = int(round(cx - mw / 2)), int(round(cy - mh / 2))
+    run = ctx.dt * 0.25                                       # canvas widths a second at speed 1
+    if move in ("scroll", "scroll_right", "wave"):
+        st["x"] = (st.get("x", 0.0) + run * ctx.w) % (mw + ctx.w)
+        x0 = int(ctx.w - st["x"]) if move != "scroll_right" else int(st["x"] - mw)
+    elif move == "rise":
+        st["y"] = (st.get("y", 0.0) + run * ctx.h) % (mh + ctx.h)
+        y0 = int(ctx.h - st["y"])
+    elif move == "bounce":                                    # side to side across the room it has (a long line: panned)
+        st["p"] = st.get("p", 0.0) + ctx.dt * 1.5
+        x0 = int(round((ctx.w - mw) / 2 + math.sin(st["p"]) * abs(ctx.w - mw) / 2))
+    if move not in ("zoom", "flash"):                         # a jump up on the beat, by the amount
+        y0 -= int(ctx.beat * ctx.h * 0.16 * ctx.amount)
+    out = np.zeros((ctx.h, ctx.w), np.float32)
+    if move == "wave":                                        # each column lifted along a sine running through the line
+        st["w"] = st.get("w", 0.0) + ctx.dt * 4.0
+        lift = np.sin(np.arange(ctx.w) * (2 * math.pi / max(8, px * 2)) + st["w"]) * ctx.h * 0.06 * (1 + ctx.amount)
+        for x in range(max(0, x0), min(ctx.w, x0 + mw)):
+            col = np.zeros((ctx.h, 1), np.float32)
+            _paste(col, m[:, x - x0:x - x0 + 1], 0, y0 + int(lift[x]))
+            out[:, x] = col[:, 0]
+    else:
+        _paste(out, m, x0, y0)
+    if move == "flash":                                       # lit on the beat, down to 1 - amount between
+        out *= (1.0 - ctx.amount) + ctx.amount * ctx.beat
+    glow = float(knob("text_glow"))
+    if glow > 0.0:                                            # a soft halo around the letters
+        from PIL import Image, ImageFilter
+        halo = np.asarray(Image.fromarray((out * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(max(1.0, px * 0.12))), np.float32) / 255.0
+        out = np.maximum(out, np.clip(halo * (1.0 + 2.0 * glow), 0, 1) * glow)
     col = ctx.grad((ctx.u + ctx.t * 0.1) % 1.0)
     col = col / np.maximum(col.max(axis=2, keepdims=True), 0.2)       # the words at the colours' full brightness
     return np.clip(col, 0, 1) * out[..., None]
@@ -706,6 +1047,12 @@ def _image(ctx, st):
     return sample(img, u, v)
 
 
+IFS_DESC = "a classic fractal (an iterated function system) as a flame - its maps' points counted, log-scaled"
+CHILD_DESC = "a child of a classic fractal: its maps bent a little by a variation, as a flame"
+for _name in FLAMES:
+    if _name not in FIRST_FLAMES:
+        _flame_look(_name, FLAMES[_name], CHILD_DESC if any(len(m["var"]) > 1 for m in FLAMES[_name]["maps"]) or
+                    "final" in FLAMES[_name] else IFS_DESC)
 BUILTIN = tuple(LOOKS)            # the looks that ship, in their order (MIDI's look target counts along these first)
 
 

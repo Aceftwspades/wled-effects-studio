@@ -4104,6 +4104,30 @@ shaders, the phone's decks and Python looks asked about:
       could not be set** (Flat mode, a size: now under its colours), **video files ran on the wall clock
       in a render** (on the held clock now).
 
+Asked for after the set (2026-10-26) - deck C as playable as A and B, and the words of the Text look
+placed and moved with care. Done 2026-10-26, not yet released:
+
+- [x] **Deck C had only its level knob** to come and go by. Now **In**, **Out**, **In/Out** and **Flash**
+      (beside the mix, not folded away), over a fade of its own to an "in to" level, now or on the next beat
+      or bar as Cut and Fade go; its level slider on the same row; **by itself** in and out every few
+      bars, a flash every few bars, or in for the show's drops and choruses, shuffled as it goes out;
+      the four on MIDI's learn list, In, Out and Flash on the phone's VJ card.
+- [x] **Text's size was its amount and its place fixed.** Now a **size**, **across**, **up / down** and
+      **glow** of its own (knobs MIDI and the modulators move, kept in presets), and nine ways of moving:
+      scrolling left or right, rising, held still, bouncing, zoomed or flashed on the beat, a word a beat,
+      on a wave. Amount is how hard the beat hits the words.
+- [x] **Flames had two controls and Mutate jumped.** Now a FLAME panel: Mutate grown out of the parent over 1-16
+      bars (a morph map by map: affines between, a swapped variation faded out as its new one fades in, the
+      picture handed over at the end), breathing to a child and back on the bars, the morph a knob and Keep for
+      its halfway, drift; symmetry, mirror, trails, gamma, colour spread, points, spin, place, hold the view;
+      each arm's weight, its two variations and their mix, and a final variation (a built-in flame copied
+      first). Fifteen more variations from Draves and Reckase's paper (25 in all; new random flames still pick
+      from the first ten, so the six built-in ones keep their shapes), and the classic fractals as flames -
+      Sierpinski's triangle and carpet, Pentaflake, Hexaflake, Vicsek, Barnsley's fern, Heighway's dragon,
+      Levy C - with six children of theirs, listed after the looks that shipped before (MIDI's places kept).
+      A new flame's points are run through its maps fifteen times before any is counted (flam3's fuse), so it
+      no longer opens on a zoom smeared into its trails.
+
 ### From the second feature review (October 2026)
 
 The studio set again beside the software it shares ground with (2026-10-22),

@@ -154,6 +154,25 @@ def build(app):
                           callback=lambda s, v: _set_auto(app, "shuffle_from", next(k for k, w in vj.SHUFFLE_FROM if w == v)))
             c.tip("what shuffle deals from: any look, or only the deck's own family (a flame for a flame, a shader "
                   "for a shader) - a set that keeps of a piece")
+        with dpg.group(horizontal=True):                  # deck C in and out, as A and B have Cut and Fade
+            typeface.label(dpg.add_text("C", color=c.ACCENT))
+            for label, what, tip in (
+                    ("In", "in", "deck C brought in over the mix, to its \"in to\" level, over its fade"),
+                    ("Out", "out", "deck C taken out, over its fade"),
+                    ("In/Out", "toggle", "deck C in if it is out, out if it is in - one button for MIDI"),
+                    ("Flash", "flash", "deck C up at once, held a moment, then out over a beat - a hit")):
+                dpg.add_button(label=label, tag=f"vj_c{what}", small=True, callback=lambda s, a, u: _c_launch(app, u),
+                               user_data=what)
+                c.tip(tip + " (now, or on the next beat or bar - as Cut and Fade wait)")
+            dpg.add_combo([w for _, w in vj.C_FADES], tag="vj_cfade", width=px(140),
+                          default_value=dict(vj.C_FADES).get(float(o["c_fade"]), "over two beats"),
+                          callback=lambda s, v: _set(app, "c_fade", next(k for k, w in vj.C_FADES if w == v)))
+            c.tip("how long deck C's In and Out take")
+            dpg.add_text("level", color=c.DIM)
+            num.add("vj_clvl", float(o["decks"][2]["level"]), 0.0, 1.0, digits=2, width=px(120),
+                    callback=lambda s, v: _set_deck(app, 2, "level", float(v)))
+            c.tip("deck C's level now, faded by hand (as its level in the deck below) - right-click: learn MIDI")
+            _learnable(app, "vj_clvl", {"kind": "vj_knob", "deck": 2, "key": "level"})
         with dpg.collapsing_header(label="DECK C - over the mix", tag="vj_chead", default_open=False):
             with dpg.group(horizontal=True):
                 dpg.add_text("over the mix by", color=c.DIM)
@@ -161,6 +180,21 @@ def build(app):
                               callback=lambda s, v: _set(app, "c_mode", v))
                 c.tip("how deck C goes over A and B's mix: lightened into it, added, the lighter of each, multiplied, "
                       "their difference, or over it (its black lets the mix through) - at its level")
+            with dpg.group(horizontal=True):
+                dpg.add_text("in to", color=c.DIM)
+                num.add("vj_cup", float(o["c_up"]), 0.05, 1.0, digits=2, width=px(110),
+                        callback=lambda s, v: _set(app, "c_up", float(v)))
+                c.tip("the level In and Flash bring deck C to")
+                dpg.add_text("by itself", color=c.DIM)
+                dpg.add_combo([w for _, w in vj.C_AUTO], tag="vj_cauto", width=px(190),
+                              default_value=dict(vj.C_AUTO)[o["auto"]["c"]],
+                              callback=lambda s, v: _set_auto(app, "c", next(k for k, w in vj.C_AUTO if w == v)))
+                c.tip("deck C moved by itself on the bar grid: in for a few bars and out for as many, a flash every few "
+                      "bars, or in for the show's drops and choruses (out for the rest) - with shuffle looks on, "
+                      "dealt a new look each time it goes out")
+                dpg.add_combo([f"{b} bars" for b in (1, 2, 4, 8, 16)], tag="vj_cbars", width=px(80),
+                              default_value=f"{o['auto']['c_bars']} bars",
+                              callback=lambda s, v: _set_auto(app, "c_bars", int(v.split()[0])))
             with dpg.child_window(tag="vj_deck2", width=px(326), height=px(500), border=True):
                 _deck(app, 2)
         dpg.add_text("", tag="vj_words", color=c.DIM, wrap=0)
@@ -202,6 +236,22 @@ def _deck(app, i):
                                          callback=lambda s, v: _set_deck(app, i, "effect", v)), tag=f"vj_fxrow{i}")
     _row("words", lambda: dpg.add_input_text(tag=f"vj_text{i}", width=-1, default_value=d.get("text", ""),
                                              callback=lambda s, v: _set_deck(app, i, "text", v)), tag=f"vj_textrow{i}")
+    with dpg.group(tag=f"vj_textknobs{i}"):                  # the Text look's own: how the words move, their size and place
+        _row("moving", lambda: dpg.add_combo([w for _, w in vj_looks.TEXT_MOVES], tag=f"vj_tmove{i}", width=-1,
+                                             default_value=dict(vj_looks.TEXT_MOVES).get(d["text_move"], "scrolling left"),
+                                             callback=lambda s, v: _set_deck(app, i, "text_move", next(
+                                                 k for k, w in vj_looks.TEXT_MOVES if w == v))))
+        c.tip("how the words move: scrolling either way, rising, held still, bouncing, zoomed or flashed on the beat, "
+              "a word on each beat, or scrolling on a wave - speed how fast, amount how hard the beat hits them")
+        for key, tag, label, lo, hi, tip in (
+                ("text_size", "vj_tsz", "size", 0.1, 2.0, "the words' height, of the canvas's (1: as tall as it)"),
+                ("text_x", "vj_tx", "across", -1.0, 1.0, "where the words sit, left (-1) to right (1); 0 the middle"),
+                ("text_y", "vj_ty", "up / down", -1.0, 1.0, "where the words sit, bottom (-1) to top (1); 0 the middle"),
+                ("text_glow", "vj_tgl", "glow", 0.0, 1.0, "a soft halo around the letters")):
+            _row(label, lambda key=key, tag=tag, lo=lo, hi=hi: num.add(
+                f"{tag}{i}", float(d[key]), lo, hi, digits=2, callback=lambda s, v, key=key: _set_deck(app, i, key, float(v))))
+            c.tip(tip + " (right-click: learn MIDI)")
+            _learnable(app, f"{tag}{i}", {"kind": "vj_knob", "deck": i, "key": key})
     with dpg.group(tag=f"vj_chrow{i}"):                      # a shader's channels, two to a row
         for row in (0, 2):
             with dpg.group(horizontal=True):
@@ -247,6 +297,8 @@ def _deck(app, i):
                                  callback=lambda s, v, k=k: _set_fx(app, i, k, 1 if v else 0))
         c.tip("the effect's own sliders and checks, as the effect names them (Flat mode, a size, a shape...) - "
               "kept with the deck and its presets; another effect starts from its own")
+    with dpg.collapsing_header(label="FLAME", tag=f"vj_flhead{i}", default_open=False):
+        _flame_panel(app, i, d)
     with dpg.collapsing_header(label="VIDEO", tag=f"vj_vidhead{i}", default_open=False):
         with dpg.group(horizontal=True, tag=f"vj_srcrow{i}"):
             dpg.add_combo([w for _, w in vj.SOURCES], tag=f"vj_src{i}", width=px(140),
@@ -323,6 +375,152 @@ def _deck(app, i):
             weight.danger(dpg.last_item())
             c.tip("this bred flame no longer kept; the deck goes back to the flame it came from")
     dpg.add_text("", tag=f"vj_desc{i}", color=c.DIM, wrap=px(300))
+
+
+MUTATE_WORDS = {0: "at once", 1: "over a bar"}
+BREATHE_WORDS = {0: "still", 1: "every bar"}
+# the flame's knobs on its panel: (deck key, tag, label, low, high, whole numbers, tip)
+FL_NUMS = (("morph", "vj_flm", "morph", 0.0, 1.0, False,
+            "how far the flame has become the one it is becoming: 0 itself, 1 that one (Mutate over bars and breathing "
+            "move it; moved by hand, a Mutate over bars lets go)"),
+           ("drift", "vj_fld", "drift", 0.0, 1.0, False, "the flame wandering by itself, never quite the same: how fast"),
+           ("fl_sym", "vj_fls", "symmetry", 0, 6, True, "turned copies of the flame around its middle: 0 its own, 1 none"),
+           ("fl_trail", "vj_flt", "trails", 0.0, 1.0, False,
+            "how long where the points land stays lit: low, crisp and flickering; high, smoky"),
+           ("fl_gamma", "vj_flg", "gamma", 0.15, 2.0, False,
+            "how much the faint outer detail shows against the bright core: lower shows more"),
+           ("fl_colour", "vj_flc", "colour spread", 0.0, 1.0, False,
+            "how strongly each arm pulls the colour: low, one smooth sweep; high, an arm a colour"),
+           ("fl_points", "vj_flp", "points", 500, 20000, True,
+            "points thrown each pass: more, finer detail on a big panel; fewer, lighter on the machine"),
+           ("fl_spin", "vj_flsp", "spin", -2.0, 2.0, False, "how fast and which way the flame turns (with the speed)"),
+           ("fl_x", "vj_flx", "across", -1.0, 1.0, False, "where the flame sits, left (-1) to right (1)"),
+           ("fl_y", "vj_fly", "up / down", -1.0, 1.0, False, "where the flame sits, bottom (-1) to top (1)"))
+VAR_CHOICES = list(vj_looks.VARIATIONS)
+
+
+def _bars_words(n, words, each):
+    return words.get(n) or each.format(n)
+
+
+def _flame_panel(app, i, d):
+    """A flame's own controls: Mutate grown over bars, breathing, its morph kept, its drift and knobs, each arm's
+    weight and variations, its final map."""
+    c = _c()
+    with dpg.group(horizontal=True):
+        dpg.add_text("Mutate", color=c.DIM)
+        dpg.add_combo([_bars_words(n, MUTATE_WORDS, "over {} bars") for n in vj.MUTATE_BARS], tag=f"vj_flmut{i}",
+                      width=px(110), callback=lambda s, v: _set_deck(app, i, "mutate_bars", next(
+                          n for n in vj.MUTATE_BARS if _bars_words(n, MUTATE_WORDS, "over {} bars") == v)))
+        c.tip("Mutate puts the bred flame on at once, or grows it out of this one over a few bars (on the bar grid)")
+        dpg.add_text("breathe", color=c.DIM)
+        dpg.add_combo([_bars_words(n, BREATHE_WORDS, "every {} bars") for n in vj.BREATHE_BARS], tag=f"vj_flbr{i}",
+                      width=px(110), callback=lambda s, v: _set_breathe(app, i, next(
+                          n for n in vj.BREATHE_BARS if _bars_words(n, BREATHE_WORDS, "every {} bars") == v)))
+        c.tip("the flame swung to a child of its own and back on the bars (one bred if it has none; Mutate breeds "
+              "another to breathe to)")
+    with dpg.group(horizontal=True):
+        dpg.add_text("", tag=f"vj_flto{i}", color=c.DIM)
+        dpg.add_button(label="Keep", tag=f"vj_flkeep{i}", small=True, callback=lambda: _keep_morph(app, i))
+        c.tip("the flame as it is now, partway to the other, kept as a flame of its own and put on the deck")
+    for key, tag, label, lo, hi, whole, tip in FL_NUMS:
+        _row(label, lambda key=key, tag=tag, lo=lo, hi=hi, whole=whole: num.add(
+            f"{tag}{i}", d[key], lo, hi, integer=whole, digits=0 if whole else 2,
+            callback=lambda s, v, key=key, whole=whole: _set_deck(app, i, key, int(v) if whole else float(v))))
+        c.tip(tip + " (right-click: learn MIDI)")
+        _learnable(app, f"{tag}{i}", {"kind": "vj_knob", "deck": i, "key": key})
+    with dpg.group(horizontal=True):
+        dpg.add_checkbox(label="mirrored", tag=f"vj_flmir{i}", default_value=bool(d["fl_mirror"]),
+                         callback=lambda s, v: _set_deck(app, i, "fl_mirror", 1 if v else 0))
+        c.tip("half the points drawn the other way round: the flame mirrored left to right")
+        dpg.add_checkbox(label="hold the view", tag=f"vj_fllock{i}", default_value=bool(d["fl_lock"]),
+                         callback=lambda s, v: _set_deck(app, i, "fl_lock", 1 if v else 0))
+        c.tip("the view stays where it is, not following the flame as it changes (a morph grows out of frame)")
+    typeface.label(dpg.add_text("ARMS", color=c.ACCENT))
+    c.tip("each map of the flame: how often it is picked, and the variations that bend it - a built-in flame is copied "
+          "(its name, #2) the first time one is changed")
+    for j in range(vj_looks.ARMS):
+        with dpg.group(tag=f"vj_flarm{i}_{j}"):
+            _row(f"arm {j + 1}", lambda j=j: num.add(
+                f"vj_flw{i}_{j}", d[f"fl_w{j + 1}"], 0.0, 2.0, digits=2,
+                callback=lambda s, v, j=j: _set_deck(app, i, f"fl_w{j + 1}", float(v))))
+            _learnable(app, f"vj_flw{i}_{j}", {"kind": "vj_knob", "deck": i, "key": f"fl_w{j + 1}"})
+            with dpg.group(horizontal=True):
+                dpg.add_combo(VAR_CHOICES, tag=f"vj_flv1{i}_{j}", width=px(100),
+                              callback=lambda s, v, j=j: _flame_edit(app, i, j, "var1", v))
+                dpg.add_combo([vj.NO_VAR] + VAR_CHOICES, tag=f"vj_flv2{i}_{j}", width=px(100),
+                              callback=lambda s, v, j=j: _flame_edit(app, i, j, "var2", v))
+                num.add(f"vj_flmix{i}_{j}", 0.5, 0.0, 1.0, digits=2, width=px(80),
+                        callback=lambda s, v, j=j: _flame_edit(app, i, j, "mix", float(v)))
+            c.tip("this arm's variation, a second one, and how much of the second")
+    _row("final", lambda: dpg.add_combo([vj.NO_VAR] + VAR_CHOICES, tag=f"vj_flfin{i}", width=-1,
+                                        callback=lambda s, v: _flame_edit(app, i, -1, "final", v)))
+    c.tip("a last variation put over the whole flame as it is drawn (not fed back): bubble rounds it, disc rings it...")
+
+
+def _set_breathe(app, i, bars):
+    to = vj.set_breathe(app, i, bars)
+    _save(app)
+    refresh(app)
+    if bars and to:
+        app.gp.status(f"deck {LETTER[i]} breathing to {to}")
+
+
+def _keep_morph(app, i):
+    name = vj.keep_morph(app, i)
+    if name:
+        _save(app)
+        refresh(app)
+        app.gp.status(f"kept as {name}")
+
+
+def _flame_edit(app, i, j, field, v):
+    copied = vj.edit_flame(app, i, j, field, v)
+    _save(app)
+    if copied:
+        refresh(app)
+        app.gp.status(f"the built-in flame copied to {copied} to be changed")
+
+
+KNOB_TAGS = (("vj_lvl", "level"), ("vj_amt", "amount"), ("vj_spd", "speed"), ("vj_kal", "kaleido"), ("vj_hue", "hue"),
+             ("vj_trl", "trails"), ("vj_blr", "blur"), ("vj_tsz", "text_size"), ("vj_tx", "text_x"), ("vj_ty", "text_y"),
+             ("vj_tgl", "text_glow")) + tuple((tag, key) for key, tag, *_ in FL_NUMS)
+
+
+def _sync_knobs(i, d):
+    """Deck i's knobs shown as they are (MIDI, a modulator, a sweep or a breath moved them)."""
+    for tag, key in KNOB_TAGS:
+        num.set(f"{tag}{i}", d[key])
+    for j in range(vj_looks.ARMS):
+        num.set(f"vj_flw{i}_{j}", d[f"fl_w{j + 1}"])
+
+
+def _refresh_flame(app, i, d):
+    lk = vj_looks.LOOKS.get(d["look"])
+    fl = getattr(lk, "flame", None)
+    dpg.configure_item(f"vj_flhead{i}", show=fl is not None)
+    if fl is None:
+        return
+    dpg.set_value(f"vj_flmut{i}", _bars_words(int(d.get("mutate_bars", 0)), MUTATE_WORDS, "over {} bars"))
+    dpg.set_value(f"vj_flbr{i}", _bars_words(int(d.get("breathe", 0)), BREATHE_WORDS, "every {} bars"))
+    to = d.get("morph_to") or ""
+    dpg.set_value(f"vj_flto{i}", f"becoming {to}" if to else "not morphing")
+    dpg.configure_item(f"vj_flkeep{i}", show=bool(to))
+    for key, tag, *_ in FL_NUMS:
+        num.set(f"{tag}{i}", d[key])
+    dpg.set_value(f"vj_flmir{i}", bool(d["fl_mirror"]))
+    dpg.set_value(f"vj_fllock{i}", bool(d["fl_lock"]))
+    maps = fl["maps"]
+    for j in range(vj_looks.ARMS):
+        dpg.configure_item(f"vj_flarm{i}_{j}", show=j < len(maps))
+        if j >= len(maps):
+            continue
+        num.set(f"vj_flw{i}_{j}", d[f"fl_w{j + 1}"])
+        vw = vj_looks._var_weights(maps[j])
+        dpg.set_value(f"vj_flv1{i}_{j}", vw[0][0])
+        dpg.set_value(f"vj_flv2{i}_{j}", vw[1][0] if len(vw) > 1 else vj.NO_VAR)
+        num.set(f"vj_flmix{i}_{j}", vw[1][1] if len(vw) > 1 else 0.5)
+    dpg.set_value(f"vj_flfin{i}", (fl.get("final") or {}).get("var", [vj.NO_VAR])[0])
 
 
 OWN_PAL = "the effect's own"
@@ -490,6 +688,15 @@ def _launch(app, seconds):
         app.gp.status(("Cut" if seconds <= 0 else "Fade") + f" on {waits}")
 
 
+def _c_launch(app, what):
+    waits = vj.c_launch(app, what)
+    if waits:
+        app.gp.status(f"deck C's {dict(IN_OUT)[what]} on {waits}")
+
+
+IN_OUT = (("in", "In"), ("out", "Out"), ("toggle", "In/Out"), ("flash", "Flash"))
+
+
 def _set_auto(app, key, v):
     vj.options(app)["auto"][key] = v
     _save(app)
@@ -513,6 +720,10 @@ def _set_deck(app, i, key, v):
     if key == "effect" and vj.options(app)["decks"][i].get("effect") != v:
         vj.options(app)["decks"][i]["fx_set"] = {}                   # another effect: its own settings, not the last's
     vj.options(app)["decks"][i][key] = v
+    if i == 2 and key == "level":
+        vj.c_hand(app)                                             # deck C's level by hand: its In or Out let go
+    if key == "morph":
+        vj.morph_hand(app, i)                                      # the morph by hand: a Mutate over bars let go
     _save(app)
     if key in ("look", "effect", "image"):
         refresh(app)
@@ -852,6 +1063,11 @@ def refresh(app):
     dpg.set_value("vj_shuffle_from", dict(vj.SHUFFLE_FROM)[o["auto"]["shuffle_from"]])
     dpg.set_value("vj_cue", bool(o.get("cue")))
     dpg.set_value("vj_cmode", o.get("c_mode", "screen"))
+    dpg.set_value("vj_cfade", dict(vj.C_FADES).get(float(o["c_fade"]), "over two beats"))
+    num.set("vj_cup", float(o["c_up"]))
+    num.set("vj_clvl", float(o["decks"][2]["level"]))
+    dpg.set_value("vj_cauto", dict(vj.C_AUTO)[o["auto"]["c"]])
+    dpg.set_value("vj_cbars", f"{o['auto']['c_bars']} bars")
     pals = [OWN_PAL] + [n for n, _ in app.eng.palette_list()]
     for i in range(vj.DECKS):
         d = o["decks"][i]
@@ -882,6 +1098,8 @@ def refresh(app):
         dpg.set_value(f"vj_pal{i}", d.get("palette") or OWN_PAL)
         dpg.configure_item(f"vj_textrow{i}", show=d["look"] == "Text")
         dpg.set_value(f"vj_text{i}", d.get("text", ""))
+        dpg.configure_item(f"vj_textknobs{i}", show=d["look"] == "Text")
+        dpg.set_value(f"vj_tmove{i}", dict(vj_looks.TEXT_MOVES).get(d.get("text_move"), "scrolling left"))
         glsl = getattr(lk, "glsl", None) if lk else None
         dpg.configure_item(f"vj_imgrow{i}", show=d["look"] == "Image" or bool(glsl and (
             "picture" in glsl or "picture" in (vj.deck_channels(d) or []))))
@@ -912,9 +1130,7 @@ def refresh(app):
         for tag, key in (("vj_csp", "speed"), ("vj_cin", "in"), ("vj_cout", "out")):
             num.set(f"{tag}{i}", float(s.get(key, 0.0)))
         dpg.set_value(f"vj_adv{i}", dict(vj.ADVANCE).get(s.get("advance", "off"), "by hand"))
-        for tag, key in (("vj_lvl", "level"), ("vj_amt", "amount"), ("vj_spd", "speed"), ("vj_kal", "kaleido"),
-                         ("vj_hue", "hue"), ("vj_trl", "trails"), ("vj_blr", "blur")):
-            num.set(f"{tag}{i}", d[key])
+        _sync_knobs(i, d)
         dpg.set_value(f"vj_col{i}", d["colours"])
         dpg.set_value(f"vj_mir{i}", bool(d["mirror"]))
         dpg.set_value(f"vj_str{i}", bool(d["strobe"]))
@@ -924,6 +1140,7 @@ def refresh(app):
         dpg.configure_item(f"vj_mut{i}", show=bool(lk) and lk.family == "flame")
         dpg.configure_item(f"vj_edit{i}", show=bool(lk) and lk.family == "yours")
         dpg.configure_item(f"vj_flamerow{i}", show=d["look"] in o["flames"])
+        _refresh_flame(app, i, d)
         dpg.configure_item(f"vj_pre{i}", items=sorted(o["presets"]))
         desc = "an effect of the studio's, on the shape itself (speed and amount are its Speed and Intensity)" if eff \
             else (lk.desc if lk else "")
@@ -1002,11 +1219,10 @@ def poll(app):
             num.set("vj_fader", float(o["fader"]))
         if getattr(app, "_vj_knobs_moved", False) and not num.busy():       # MIDI or a modulator moved a knob
             app._vj_knobs_moved = False
+            num.set("vj_clvl", o["decks"][2]["level"])
             for i in range(vj.DECKS):
                 d = o["decks"][i]
-                for tag, key in (("vj_lvl", "level"), ("vj_amt", "amount"), ("vj_spd", "speed"), ("vj_kal", "kaleido"),
-                                 ("vj_hue", "hue"), ("vj_trl", "trails"), ("vj_blr", "blur")):
-                    num.set(f"{tag}{i}", d[key])
+                _sync_knobs(i, d)
         if getattr(app, "_vj_dirty", False):
             app._vj_dirty = False
             refresh(app)

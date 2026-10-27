@@ -49,7 +49,7 @@ FRAME_W = 640                        # frames kept at most this wide: the video 
 HANDSHAKE_S = 10                     # a connection that does not finish its TLS handshake in this is dropped
 ACTIONS = {"fx", "check", "effect", "palette", "bri", "blackout", "play", "stop", "step", "next", "prev", "fader", "vj", "vjfader",
            "vjlevel", "vjlook"}
-VJ_KEYS = ("cut", "fade", "shuffle_a", "shuffle_b", "air")       # the VJ card's buttons
+VJ_KEYS = ("cut", "fade", "shuffle_a", "shuffle_b", "air", "c_in", "c_out", "c_flash")   # the VJ card's buttons
 
 
 def new_key():
@@ -376,7 +376,8 @@ button.on{border-color:var(--acc);color:var(--acc)}button.stop{color:var(--red)}
 <div class="deck"><div class="row"><span>B</span><select id="vjlook1"></select></div>
 <div class="row"><span>level</span><input type="range" id="vjlvl1" min="0" max="1000"></div></div>
 <div class="deck"><div class="row"><span>C</span><select id="vjlook2"></select></div>
-<div class="row"><span>over</span><input type="range" id="vjlvl2" min="0" max="1000"></div></div></section>
+<div class="row"><span>over</span><input type="range" id="vjlvl2" min="0" max="1000"></div>
+<div class="btns"><button id="vjcin">C in</button><button id="vjcout">C out</button><button id="vjcflash">Flash C</button></div></div></section>
 <section class="card" id="mixcard" hidden><div class="lab">Mixer</div>
 <div class="row"><span>A</span><input type="range" id="fader" min="0" max="1000"><span>B</span></div></section>
 <section class="card"><div class="lab">Show</div>
@@ -435,7 +436,7 @@ const bri=$("bri");bri.oninput=()=>{touching=bri;$("briv").textContent=bri.value
 bri.onchange=()=>{send({a:"bri",v:+bri.value});touching=null;};
 const vjf=$("vjfader");vjf.oninput=()=>{touching=vjf;sendSoon({a:"vjfader",v:vjf.value/1000});};
 vjf.onchange=()=>{send({a:"vjfader",v:vjf.value/1000});touching=null;};
-[["vjcut","cut"],["vjfade","fade"],["vjair","air"],["vjsa","shuffle_a"],["vjsb","shuffle_b"]].forEach(([id,k])=>{$(id).onclick=()=>send({a:"vj",k:k});});
+[["vjcut","cut"],["vjfade","fade"],["vjair","air"],["vjsa","shuffle_a"],["vjsb","shuffle_b"],["vjcin","c_in"],["vjcout","c_out"],["vjcflash","c_flash"]].forEach(([id,k])=>{$(id).onclick=()=>send({a:"vj",k:k});});
 [0,1,2].forEach(i=>{const l=$("vjlvl"+i);l.oninput=()=>{touching=l;sendSoon({a:"vjlevel",d:i,v:l.value/1000});};
  l.onchange=()=>{send({a:"vjlevel",d:i,v:l.value/1000});touching=null;};
  $("vjlook"+i).onchange=e=>send({a:"vjlook",d:i,v:e.target.value});});

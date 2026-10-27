@@ -47,11 +47,21 @@ SOURCE = {"kind": "none", "path": "", "name": "", "url": "", "files": [], "clip"
           "out": 0.0, "advance": "off"}
 DECK = {"look": "Plasma", "source": SOURCE, "amount": 0.5, "speed": 1.0, "colours": "neon", "kaleido": 0,
         "mirror": False, "hue": 0.0, "strobe": False, "trails": 0.0, "blur": 0, "level": 1.0,
-        "react": {"to": "off", "what": "amount", "depth": 0.5}, "text": "WLED", "image": "", "effect": "", "palette": "",
+        "react": {"to": "off", "what": "amount", "depth": 0.5}, "text": "WLED",
+        "text_move": "scroll", "text_size": 0.65, "text_x": 0.0, "text_y": 0.0, "text_glow": 0.0,   # the Text look's
+        "image": "", "effect": "", "palette": "",
         "fx_colours": "",           # an Effect deck's colours: "" the effect's own, else a gradient's
         "fx_set": {},               # an Effect deck's own sliders and checks set ({"c1": 200, "o3": 1}): the rest its own
         "channels": ["", "", "", ""],   # a shader's iChannel0..3: "" what its file says (vj_glsl.CHANNELS)
-        "channels_look": ""}            # the look they were chosen for: another look on the deck reads its file's
+        "channels_look": "",            # the look they were chosen for: another look on the deck reads its file's
+        "morph_to": "", "morph": 0.0,   # a flame's: the one it is becoming, and how far (0 itself, 1 that one)
+        "drift": 0.0, "breathe": 0, "mutate_bars": 0}
+# a flame's own knobs (vj_looks.flame_frame reads them): its symmetry (0 its own), mirrored, the view held still,
+# trails, gamma, colour spread, points thrown a pass, spin, where it sits, and each map's weight (fl_w1..fl_w8)
+FLAME_KNOBS = {"fl_sym": 0, "fl_mirror": 0, "fl_lock": 0, "fl_trail": 0.94, "fl_gamma": 0.6, "fl_colour": 0.5,
+               "fl_points": 3000, "fl_spin": 1.0, "fl_x": 0.0, "fl_y": 0.0}
+FLAME_KNOBS.update({f"fl_w{k}": 1.0 for k in range(1, vj_looks.ARMS + 1)})
+DECK.update(FLAME_KNOBS)
 DECKS = 3                         # A and B on the fader, C over the mix (a logo, words, a layer of its own)
 LETTERS = "ABC"
 C_MODES = ("screen", "add", "lighten", "multiply", "difference", "over")   # how deck C goes over the mix
@@ -67,6 +77,8 @@ def options(app):
     o.setdefault("map", "picture")
     o.setdefault("canvas", "96x72")
     o.setdefault("c_mode", "screen")
+    o.setdefault("c_up", 1.0)           # the level deck C's In (and Flash) brings it to
+    o.setdefault("c_fade", 2.0)         # deck C's In and Out, in beats (0: a cut)
     o.setdefault("cue", False)
     o.setdefault("pulse", "grid")       # the decks' beat: "grid" (on the bar grid) or "heard" (every beat heard)
     o.setdefault("quant", "now")        # Cut and Fade by hand: "now", or waiting for the next "beat" or "bar"
@@ -93,7 +105,9 @@ def options(app):
     a.setdefault("mix", "off")          # "off", "bars" (every n bars) or "sections" (the show's song sections)
     a.setdefault("bars", 4)
     a.setdefault("shuffle", False)
-    a.setdefault("shuffle_from", "any")  # "any" look, or the deck's own "family" (flames to flames): a set kept of a piece
+    a.setdefault("shuffle_from", "any")
+    a.setdefault("c", "off")            # deck C by itself: "off", in and out every few "bars", a "flash", "sections"
+    a.setdefault("c_bars", 4)  # "any" look, or the deck's own "family" (flames to flames): a set kept of a piece
     return o
 
 
@@ -592,6 +606,9 @@ def draw_deck(app, i, dt, snd, beat, hit):
     _take_video(app, i, run, deck)
     lk = vj_looks.LOOKS.get(deck["look"]) or vj_looks.LOOKS["Plasma"]
     w, h = canvas_size(app)
+    if run.look != lk.name and getattr(run, "handoff", None) == lk.name and run.size == (w, h):
+        run.look = lk.name                                  # a flame handed over: the picture goes on from where it was
+    run.handoff = None
     if run.look != lk.name or run.size != (w, h):           # another look, or the canvas resized: it starts again
         last = getattr(run, "canvas", None)
         recent = clock.now() - getattr(run, "drawn_at", -1e9) < 0.2           # it was being drawn, not long put away
@@ -623,7 +640,9 @@ def draw_deck(app, i, dt, snd, beat, hit):
         run.video_prev = None
     c.video, c.video_prev = run.video, run.video_prev
     c.amount, c.speed = amount, speed
+    c.knob = lambda key: knob_value(app, i, key)          # a knob as it draws, a modulator's over it
     c.grad = vj_looks.gradient(deck.get("colours", "neon"))
+    c.flame_to = _flame_of(deck.get("morph_to")) if lk.family == "flame" else None
     try:
         img = lk.draw(c, run.state)
         if img.shape[:2] != (h, w):
@@ -837,6 +856,7 @@ def update(app, dt=None):
     app._vj_last_hit = last
     beat, hit = _beat(app, now, heard)
     app._vj_pulse = beat
+    _flames(app)
     f = float(o["fader"])
     app._vj_tick = getattr(app, "_vj_tick", 0) + 1
     cue = cue_deck(app) if o.get("cue") else -1
@@ -861,6 +881,7 @@ def update(app, dt=None):
                 _take_video(app, i, _runs(app)[i], d)         # its video rolling on off the mix
     _launch_due(app)
     _auto(app, hit)
+    _c_update(app)
     shape = (app.eng.rows, app.eng.cols, 3)
     pics = []
     for i in range(len(o["decks"])):
@@ -1064,9 +1085,120 @@ def set_fader(app, v, hand=True):
         app._vj_hand_at = clock.now()
 
 
+# --- deck C: brought in and taken out over the mix ----------------------------------------------------
+C_FADES = ((0.0, "a cut"), (1.0, "over a beat"), (2.0, "over two beats"), (4.0, "over four beats"),
+           (16.0, "over sixteen beats"))
+C_AUTO = (("off", "by hand"), ("bars", "in and out every few bars"), ("flash", "a flash every few bars"),
+          ("sections", "in for the drops and choruses"))
+C_LOUD = ("drop", "chorus")      # the sections deck C comes in for, on "sections"
+FLASH_HOLD = 0.25                # a flash: deck C at its "in to" level this much of a beat, then out over a beat
+
+
+def c_level(app):
+    return float(options(app)["decks"][2].get("level", 0.0) or 0.0)
+
+
+def c_is_in(app):
+    """Deck C in, or on its way in: where a sweep is headed (a flash counts as out), else whether its level is up."""
+    sw = getattr(app, "_vj_csweep", None)
+    if sw is not None:
+        return sw[3] > 0.0
+    return c_level(app) > 0.0
+
+
+def c_go(app, up, beats=None, flash=False):
+    """Deck C's level swept to its "in to" level (up) or to 0 over `beats` (None: its fade length; 0: a cut),
+    eased. A flash: up at once, held a moment, then out over a beat."""
+    o = options(app)
+    beat = 60.0 / _tempo(app)
+    l0 = c_level(app)
+    if flash:
+        up_to = float(o["c_up"])
+        o["decks"][2]["level"] = up_to
+        app._vj_csweep = (clock.now(), beat, up_to, 0.0, FLASH_HOLD * beat)
+        app._vj_knobs_moved = True
+        return
+    l1 = float(o["c_up"]) if up else 0.0
+    dur = (float(o["c_fade"]) if beats is None else float(beats)) * beat
+    if dur <= 0.0:
+        o["decks"][2]["level"] = l1
+        app._vj_csweep = None
+        app._vj_knobs_moved = True
+        _c_left(app, l0, l1)
+        return
+    app._vj_csweep = (clock.now(), dur, l0, l1, 0.0)
+
+
+C_PRESSES = ("in", "out", "toggle", "flash")
+
+
+def c_launch(app, what):
+    """Deck C's In, Out, In/Out (toggle) or Flash by hand - the frame's buttons, MIDI, the phone: at once or on
+    the next beat or bar, as Cut and Fade go (quant). What it waits for, in words, or "" when it went at once."""
+    if what == "toggle":
+        what = "out" if c_is_in(app) else "in"
+    q = options(app).get("quant", "now")
+    if q not in ("beat", "bar"):
+        app._vj_cpending = None
+        c_go(app, what == "in", flash=what == "flash")
+        return ""
+    beats, src = beat_count(app)
+    unit = 1 if q == "beat" else _per_bar(app, src)
+    app._vj_cpending = (float((math.floor(beats / unit + 1e-6) + 1) * unit), what)
+    return "the next beat" if q == "beat" else "the next bar"
+
+
+def c_hand(app):
+    """Deck C's level set by hand (the knob, MIDI, the phone): a sweep under way, and a press waiting, let go."""
+    app._vj_csweep = None
+    app._vj_cpending = None
+
+
+def _c_left(app, l0, l1):
+    """Deck C just went out under its auto-mix: dealt a new look while shuffling, so it comes back as another."""
+    a = options(app)["auto"]
+    if l0 > 0.0 and l1 <= 0.0 and a.get("shuffle") and a.get("c", "off") != "off":
+        shuffle(app, 2)
+
+
+def _c_update(app):
+    """Each frame: a press waiting for its beat gone, deck C's sweep moved on, and its own auto-mix."""
+    o = options(app)
+    p = getattr(app, "_vj_cpending", None)
+    if p is not None and beat_count(app)[0] >= p[0] - 1e-6:
+        app._vj_cpending = None
+        c_go(app, p[1] == "in", flash=p[1] == "flash")
+    sw = getattr(app, "_vj_csweep", None)
+    if sw is not None:
+        t0, dur, l0, l1, hold = sw
+        t = clock.now() - t0 - hold
+        k = 1.0 if t >= dur else max(0.0, t / dur)
+        o["decks"][2]["level"] = round(l0 + (l1 - l0) * (0.5 - 0.5 * math.cos(math.pi * k)), 4)
+        app._vj_knobs_moved = True
+        if k >= 1.0:
+            app._vj_csweep = None
+            _c_left(app, l0, l1)
+    a = o["auto"]
+    mode = a.get("c", "off")
+    if mode in ("bars", "flash"):
+        per = max(1, int(a.get("c_bars", 4)))
+        k = int(bar_count(app)[0] // per)
+        if k != getattr(app, "_vj_cbar_k", k):
+            c_go(app, not c_is_in(app), flash=mode == "flash")
+        app._vj_cbar_k = k
+    elif mode == "sections":
+        sec = _section_now(app)
+        was = getattr(app, "_vj_csec", sec)
+        app._vj_csec = sec
+        if sec is not None and sec != was:
+            loud = sec[1] in C_LOUD
+            if loud != c_is_in(app):
+                c_go(app, loud, beats=0.0 if sec[1] == "drop" else None)   # into a drop at once, else its fade
+
+
 # --- the show: a step that is the VJ's --------------------------------------------------------------
 SHUFFLE_FROM = (("any", "from any look"), ("family", "from its own family"))
-SNAP_KEYS = ("decks", "fader", "mode", "wipe", "map", "canvas", "c_mode")
+SNAP_KEYS = ("decks", "fader", "mode", "wipe", "map", "canvas", "c_mode", "c_up", "c_fade")
 
 
 def snapshot(app):
@@ -1153,7 +1285,8 @@ def step_name(app):
 
 # --- your own: presets, mutated flames, look files -------------------------------------------------
 PRESET_KEYS = ("look", "effect", "amount", "speed", "colours", "kaleido", "mirror", "hue", "strobe", "trails",
-               "blur", "react", "text", "image", "palette", "fx_colours", "fx_set", "channels", "channels_look")
+               "blur", "react", "text", "text_move", "text_size", "text_x", "text_y", "text_glow", "image", "palette",
+               "fx_colours", "fx_set", "channels", "channels_look", "drift", "breathe", "mutate_bars") + tuple(FLAME_KNOBS)
 
 
 def save_preset(app, i, name):
@@ -1182,27 +1315,172 @@ def rename_preset(app, old, new):
     return True
 
 
-def mutate_flame(app, i):
-    """Deck i's flame bred into a new one, kept with the project and put on the deck: its name."""
-    import random
-    o = options(app)
-    d = o["decks"][i]
-    lk = vj_looks.LOOKS.get(d["look"])
-    if lk is None or lk.family != "flame":
-        return None
-    base = vj_looks.FLAMES.get(d["look"]) or o["flames"].get(d["look"])
-    if base is None:
-        return None
-    child = vj_looks.mutate(base, random.randrange(1 << 30))
-    stem = d["look"].split(" #")[0]
+# --- a flame's morphs: Mutate grown over bars, breathing between two, the halfway kept, edits ----------------
+MUTATE_BARS = (0, 1, 2, 4, 8, 16)  # Mutate: at once (0), or the child grown out of the parent over so many bars
+BREATHE_BARS = (0, 1, 2, 4, 8, 16)  # breathing: there and back between the flame and its child over so many bars
+
+
+def _flame_of(name):
+    lk = vj_looks.LOOKS.get(name or "")
+    return getattr(lk, "flame", None) if lk is not None else None
+
+
+def _bred_name(app, stem):
+    stem = stem.split(" #")[0]
     k = 2
     while f"{stem} #{k}" in vj_looks.LOOKS:
         k += 1
-    name = f"{stem} #{k}"
-    o["flames"][name] = child
-    vj_looks.register_flame(name, child)
-    d["look"] = name
+    return f"{stem} #{k}"
+
+
+def _keep_flame(app, stem, fl):
+    """A flame kept with the project under a new bred name, listed as a look: its name."""
+    name = _bred_name(app, stem)
+    options(app)["flames"][name] = fl
+    vj_looks.register_flame(name, fl)
     return name
+
+
+def _hand_over(app, i, name):
+    """Deck i on another flame, the picture going on from where it was (the same points, no blend): a morph
+    finished, its halfway kept, a built-in flame copied to be edited."""
+    options(app)["decks"][i]["look"] = name
+    _runs(app)[i].handoff = name
+
+
+def _morph_done(app, i):
+    d = options(app)["decks"][i]
+    getattr(app, "_vj_morphs", {}).pop(i, None)
+    to = d.get("morph_to") or ""
+    d["morph_to"], d["morph"] = "", 0.0
+    if to in vj_looks.LOOKS:
+        _hand_over(app, i, to)
+
+
+def morph_hand(app, i):
+    """Deck i's morph moved by hand (the knob, MIDI, a modulator): a Mutate growing over bars let go."""
+    getattr(app, "_vj_morphs", {}).pop(i, None)
+
+
+def mutate_flame(app, i):
+    """Deck i's flame bred into a new one, kept with the project: put on the deck at once, grown out of the parent
+    over its Mutate bars, or - while it breathes - the one it breathes to. Its name."""
+    import random
+    o = options(app)
+    d = o["decks"][i]
+    breathing = int(d.get("breathe", 0) or 0) > 0
+    if d.get("morph_to") and not breathing:
+        _morph_done(app, i)                                  # a morph under way: finished, then bred from
+    base = _flame_of(d["look"])
+    if base is None:
+        return None
+    name = _keep_flame(app, d["look"], vj_looks.mutate(base, random.randrange(1 << 30)))
+    bars = int(d.get("mutate_bars", 0) or 0)
+    if breathing:
+        d["morph_to"] = name
+    elif bars <= 0:
+        d["look"], d["morph_to"], d["morph"] = name, "", 0.0
+    else:
+        d["morph_to"], d["morph"] = name, 0.0
+        beats, src = beat_count(app)
+        app._vj_morphs = getattr(app, "_vj_morphs", {})
+        app._vj_morphs[i] = (beats, float(bars * _per_bar(app, src)))
+    return name
+
+
+def set_breathe(app, i, bars):
+    """Deck i breathing between its flame and a child over `bars` (0: still) - a child bred if it has none."""
+    d = options(app)["decks"][i]
+    d["breathe"] = int(bars)
+    getattr(app, "_vj_morphs", {}).pop(i, None)
+    if bars and not d.get("morph_to") and _flame_of(d["look"]) is not None:
+        import random
+        d["morph_to"] = _keep_flame(app, d["look"], vj_looks.mutate(_flame_of(d["look"]), random.randrange(1 << 30)))
+    elif not bars and d.get("morph_to"):
+        d["morph"] = 0.0
+    return d.get("morph_to") or ""
+
+
+def keep_morph(app, i):
+    """The flame deck i shows halfway through a morph kept as a flame of its own and put on the deck: its name."""
+    d = options(app)["decks"][i]
+    base, to = _flame_of(d["look"]), _flame_of(d.get("morph_to"))
+    if base is None or to is None:
+        return None
+    m = float(d.get("morph", 0.0) or 0.0)
+    fl = json_copy(vj_looks.blend(base, to, m))
+    if "sym_to" in fl:
+        fl["sym"] = int(fl.pop("sym_to")[0]) if m >= 0.5 else fl["sym"]
+    name = _keep_flame(app, d["look"], fl)
+    getattr(app, "_vj_morphs", {}).pop(i, None)
+    d["morph_to"], d["morph"], d["breathe"] = "", 0.0, 0
+    _hand_over(app, i, name)
+    return name
+
+
+def _flames(app):
+    """Each frame: a Mutate growing over bars moved on (and handed over at its end), a breathing flame breathed."""
+    o = options(app)
+    morphs = getattr(app, "_vj_morphs", {})
+    beats, src = beat_count(app)
+    for i, d in enumerate(o["decks"]):
+        to = d.get("morph_to") or ""
+        if to and to not in vj_looks.LOOKS:                  # the one it was becoming forgotten
+            d["morph_to"], d["morph"] = "", 0.0
+            morphs.pop(i, None)
+            continue
+        if i in morphs:
+            t0, n = morphs[i]
+            k = 1.0 if n <= 0 else max(0.0, (beats - t0) / n)
+            d["morph"] = round(min(1.0, k), 4)
+            app._vj_knobs_moved = True
+            if k >= 1.0:
+                _morph_done(app, i)
+        elif to and int(d.get("breathe", 0) or 0) > 0:
+            n = int(d["breathe"]) * _per_bar(app, src)
+            d["morph"] = round(0.5 - 0.5 * math.cos(2 * math.pi * beats / n), 4)
+            app._vj_knobs_moved = True
+
+
+FLAME_EDITS = ("var1", "var2", "mix", "final")
+NO_VAR = "none"
+
+
+def edit_flame(app, i, j, field, value):
+    """Deck i's flame changed: map j's first or second variation, the mix between them, or the flame's final map.
+    A built-in flame copied first (its name and " #2", put on the deck) - the ones that ship stay as they are.
+    The flame's name when it was copied, else ""."""
+    d = options(app)["decks"][i]
+    lk = vj_looks.LOOKS.get(d["look"])
+    if lk is None or getattr(lk, "flame", None) is None:
+        return ""
+    fl = getattr(lk, "bred", None)
+    copied = ""
+    if fl is None:
+        fl = json_copy(lk.flame)
+        copied = _keep_flame(app, d["look"], fl)
+        _hand_over(app, i, copied)
+    if field == "final":
+        if value == NO_VAR:
+            fl.pop("final", None)
+        else:
+            fl["final"] = {"a": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0], "var": [value], "w": 1.0, "col": 0.5}
+        return copied
+    if not 0 <= j < len(fl["maps"]):
+        return copied
+    m = fl["maps"][j]
+    var = list(m.get("var") or ["linear"])
+    vw = [w for _, w in vj_looks._var_weights(m)]
+    mix = vw[1] if len(var) > 1 else 0.5
+    if field == "var1":
+        var[0] = value
+    elif field == "var2":
+        var = var[:1] if value == NO_VAR else var[:1] + [value]
+    elif field == "mix" and len(var) > 1:
+        mix = float(max(0.0, min(1.0, value)))
+    m["var"] = var
+    m["vw"] = [1.0 - mix, mix] if len(var) > 1 else [1.0]
+    return copied
 
 
 def forget_flame(app, name):
@@ -1214,6 +1492,8 @@ def forget_flame(app, name):
     vj_looks.LOOKS.pop(name, None)
     stem = name.split(" #")[0]
     for d in o["decks"]:
+        if d.get("morph_to") == name:
+            d["morph_to"], d["morph"] = "", 0.0
         if d["look"] == name:
             d["look"] = stem if stem in vj_looks.LOOKS else "Plasma"
     return True
@@ -1228,15 +1508,19 @@ def rename_flame(app, old, new):
     o["flames"][new] = fl
     vj_looks.LOOKS.pop(old, None)
     vj_looks.register_flame(new, fl)
-    for d in o["decks"]:
+    for i, d in enumerate(o["decks"]):
+        if d.get("morph_to") == old:
+            d["morph_to"] = new
         if d["look"] == old:
-            d["look"] = new
+            _hand_over(app, i, new)                     # the same flame by another name: its picture goes on
     return True
 
 
 def project_changed(app):
     """Another project opened: the last one's show desk, sources, decks' state and bred flames let go."""
     app._vj_by_show, app._vj_desk, app._vj_fade, app._vj_sweep = False, None, None, None
+    app._vj_csweep = app._vj_cpending = None
+    app._vj_morphs = {}
     app._vj_mod = {}
     close(app)
     app._vj_runs = None
@@ -1254,9 +1538,17 @@ def midi_looks():
 
 # --- a deck's controls by name: MIDI's and the modulators' -----------------------------------------
 KNOBS = (("level", 0.0, 1.0), ("amount", 0.0, 1.0), ("speed", 0.0, SPEED_MAX), ("hue", 0.0, 1.0), ("kaleido", 0, 12),
-         ("trails", 0.0, 1.0), ("blur", 0, 3))
+         ("trails", 0.0, 1.0), ("blur", 0, 3), ("text_size", 0.1, 2.0), ("text_x", -1.0, 1.0), ("text_y", -1.0, 1.0),
+         ("text_glow", 0.0, 1.0), ("morph", 0.0, 1.0), ("drift", 0.0, 1.0), ("fl_sym", 0, 6), ("fl_trail", 0.0, 1.0),
+         ("fl_gamma", 0.15, 2.0), ("fl_colour", 0.0, 1.0), ("fl_points", 500, 20000), ("fl_spin", -2.0, 2.0),
+         ("fl_x", -1.0, 1.0), ("fl_y", -1.0, 1.0)) + tuple((f"fl_w{k}", 0.0, 2.0) for k in range(1, vj_looks.ARMS + 1))
 KNOB_WORDS = {"level": "level", "amount": "amount", "speed": "speed", "hue": "hue", "kaleido": "kaleidoscope",
-              "trails": "trails", "blur": "blur"}
+              "trails": "trails", "blur": "blur", "text_size": "text size", "text_x": "text across",
+              "text_y": "text up and down", "text_glow": "text glow", "morph": "flame morph", "drift": "flame drift",
+              "fl_sym": "flame symmetry", "fl_trail": "flame trails", "fl_gamma": "flame gamma",
+              "fl_colour": "flame colour spread", "fl_points": "flame points", "fl_spin": "flame spin",
+              "fl_x": "flame across", "fl_y": "flame up and down"}
+KNOB_WORDS.update({f"fl_w{k}": f"flame arm {k}" for k in range(1, vj_looks.ARMS + 1)})
 
 
 def knob_value(app, i, key):
@@ -1283,4 +1575,8 @@ def knob_set(app, i, key, f):
     v = lo + (hi - lo) * f
     options(app)["decks"][i][key] = int(round(v)) if isinstance(hi, int) else round(v, 4)
     app._vj_knobs_moved = True
+    if i == 2 and key == "level":
+        c_hand(app)
+    if key == "morph":
+        morph_hand(app, i)
 # AI: end

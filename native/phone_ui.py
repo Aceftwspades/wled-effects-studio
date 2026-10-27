@@ -209,6 +209,8 @@ def apply(app, cmd):
             vj.launch(app, 0.0)
         elif cmd["k"] == "fade":
             vj.launch(app, vj.FADE_BEATS * 60.0 / vj._tempo(app))
+        elif cmd["k"].startswith("c_"):
+            vj.c_launch(app, cmd["k"][2:])
         elif cmd["k"] == "air":
             vj_ui.set_on(app, not vj.on(app))
         else:
