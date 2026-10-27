@@ -4073,7 +4073,9 @@ before they run:
       from elsewhere is opened, as .milk and .glsl files cannot do that.
 
 From the VJ code review and a VJ set made with it (2026-10-26) - a 2:22 showcase on a 16:9 panel (three
-decks, every family of look, cuts, wipes, modulators, the auto-mix, a show step), all done 2026-10-26:
+decks, every family of look, cuts, wipes, modulators, the auto-mix, a show step), all done 2026-10-26.
+Released as 1.19.0 (2026-10-26), with the shader channels and passes, MilkDrop shapes, waves and MD2
+shaders, the phone's decks and Python looks asked about:
 
 - [x] **MD2 textures leaked** on the graphics card: a set a deck state (about 7 MB each look change),
       never let go, and the noise uploaded every frame. One texture a name now, the noise once; old
