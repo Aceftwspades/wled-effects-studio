@@ -4105,7 +4105,7 @@ shaders, the phone's decks and Python looks asked about:
       in a render** (on the held clock now).
 
 Asked for after the set (2026-10-26) - deck C as playable as A and B, and the words of the Text look
-placed and moved with care. Done 2026-10-26, not yet released:
+placed and moved with care. Done 2026-10-26. Released as 1.20.0 (2026-10-27), with the flames:
 
 - [x] **Deck C had only its level knob** to come and go by. Now **In**, **Out**, **In/Out** and **Flash**
       (beside the mix, not folded away), over a fade of its own to an "in to" level, now or on the next beat
