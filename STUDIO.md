@@ -4184,6 +4184,9 @@ picker opened, an area typed and used, the Outputs row dimming the view and not 
 fourth protocol; a YouTube link played (yt-dlp as a module, 31 frames in a few seconds).
 Not tried: DDP over the WebSocket against a real device; yt-dlp.exe from the PATH; the area on macOS and X11.
 
+Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
+and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).
+
 Asked for after the Shadertoy test (2026-10-28): a picture of your own for a shader that asks for a texture, and
 pictures and video with transparency, and control over how they are shown. Found: the Image look read a picture as
 RGB (its transparency gone - a clear area showed whatever colour was under it, often white), every video was read as
