@@ -1185,10 +1185,22 @@ def load_user(project, allow_py=True):
     project from elsewhere, not yet allowed on this machine) it is listed as not run, and nothing of it runs - a
     .glsl or a .milk cannot run anything but its own shader or equations."""
     import os
-    d = user_dir(project)
+    from native import addons
     seen = set()
-    files = sorted(f for f in os.listdir(d) if f.lower().endswith((".py", ".glsl", ".milk"))) if os.path.isdir(d) else []
-    for f in files:
+    # the installed add-on packs first (no Python in them: a pack is .milk and .glsl), then the project's own -
+    # which win a name both have
+    places = []
+    try:
+        places = [(pd, False) for pd in addons.dirs()]
+    except OSError:
+        pass
+    places.append((user_dir(project), True))
+    files = []
+    for d, own in places:
+        if os.path.isdir(d):
+            files += [(d, f) for f in sorted(os.listdir(d))
+                      if f.lower().endswith((".py", ".glsl", ".milk") if own else (".glsl", ".milk"))]
+    for d, f in files:
         path = os.path.join(d, f)
         seen.add(path)
         try:
@@ -1217,6 +1229,23 @@ def load_user(project, allow_py=True):
         if name:
             LOOKS.pop(name, None)
     return [(os.path.basename(p), e[2]) for p, e in _USER.items() if e[2]]
+
+
+def look_source(name):
+    """Where a look comes from: ("builtin", None), ("project", None), ("addon", its pack's id) - or (None, None)."""
+    if name in BUILTIN:
+        return "builtin", None
+    for path, e in _USER.items():
+        if e[1] == name:
+            from native import addons
+            pid = addons.pack_of(path)
+            return ("addon", pid) if pid else ("project", None)
+    return None, None
+
+
+def look_path(name):
+    """The file a project's or an add-on's look was read from, or None."""
+    return next((p for p, e in _USER.items() if e[1] == name), None)
 
 
 def _load_file(path):

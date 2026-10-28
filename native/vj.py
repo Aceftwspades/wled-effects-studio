@@ -54,6 +54,7 @@ DECK = {"look": "Plasma", "source": SOURCE, "amount": 0.5, "speed": 1.0, "colour
         "pic_fit": "fill", "pic_scale": 1.0, "pic_x": 0.0, "pic_y": 0.0, "pic_rot": 0.0,             # as a layer
         "pic_flip": "none", "pic_drift": 1.0,                                                         # (vj_layer)
         "channel_images": ["", "", "", ""],   # a shader's iChannel0..3 set to "image": the picture each reads
+        "sh_mouse": False, "sh_mx": 0.5, "sh_my": 0.5,   # a shader's mouse (iMouse) steered by two knobs, or still
         "image": "", "effect": "", "palette": "",
         "fx_colours": "",           # an Effect deck's colours: "" the effect's own, else a gradient's
         "fx_set": {},               # an Effect deck's own sliders and checks set ({"c1": 200, "o3": 1}): the rest its own
@@ -146,6 +147,28 @@ def deck_channels(d):
     """The deck's choice of its shader's channels, when made for the look it has now (else None: the file's)."""
     ch = d.get("channels")
     return ch if ch and any(ch) and d.get("channels_look") == d.get("look") else None
+
+
+def favourites(app):
+    """The looks starred as favourites - the studio's, whichever project is open (its settings keep them)."""
+    fav = app.prefs.setdefault("vj_favourites", []) if hasattr(app, "prefs") else []
+    return fav if isinstance(fav, list) else []
+
+
+def toggle_favourite(app, name):
+    """A look starred, or its star taken off: whether it is a favourite now."""
+    fav = favourites(app)
+    on = name not in fav
+    if on:
+        fav.append(name)
+    else:
+        fav.remove(name)
+    try:
+        from native.project import save_prefs
+        save_prefs(app.prefs)
+    except Exception:
+        pass
+    return on
 
 
 def json_copy(v):
@@ -1369,7 +1392,7 @@ PRESET_KEYS = ("look", "effect", "amount", "speed", "colours", "kaleido", "mirro
                "blur", "react", "text", "text_move", "text_size", "text_x", "text_y", "text_glow", "image", "palette",
                "text_align", "text_font", "text_shadow", "text_outline", "pic_key", "pic_key_col", "pic_tol",
                "pic_soft", "pic_fit", "pic_scale", "pic_x", "pic_y", "pic_rot", "pic_flip", "pic_drift",
-               "channel_images",
+               "channel_images", "sh_mouse", "sh_mx", "sh_my",
                "fx_colours", "fx_set", "channels", "channels_look", "drift", "breathe", "mutate_bars") + tuple(FLAME_KNOBS)
 
 
@@ -1625,7 +1648,8 @@ KNOBS = (("level", 0.0, 1.0), ("amount", 0.0, 1.0), ("speed", 0.0, SPEED_MAX), (
          ("trails", 0.0, 1.0), ("blur", 0, 3), ("text_size", 0.1, 2.0), ("text_x", -1.0, 1.0), ("text_y", -1.0, 1.0),
          ("text_glow", 0.0, 1.0), ("text_shadow", 0.0, 1.0), ("text_outline", 0.0, 1.0), ("pic_scale", 0.1, 4.0),
          ("pic_x", -1.0, 1.0), ("pic_y", -1.0, 1.0), ("pic_rot", -180.0, 180.0), ("pic_tol", 0.0, 1.0),
-         ("pic_soft", 0.0, 0.5), ("pic_drift", 0.0, 1.0), ("morph", 0.0, 1.0), ("drift", 0.0, 1.0), ("fl_sym", 0, 6), ("fl_trail", 0.0, 1.0),
+         ("pic_soft", 0.0, 0.5), ("pic_drift", 0.0, 1.0), ("sh_mx", 0.0, 1.0), ("sh_my", 0.0, 1.0),
+         ("morph", 0.0, 1.0), ("drift", 0.0, 1.0), ("fl_sym", 0, 6), ("fl_trail", 0.0, 1.0),
          ("fl_gamma", 0.15, 2.0), ("fl_colour", 0.0, 1.0), ("fl_points", 500, 20000), ("fl_spin", -2.0, 2.0),
          ("fl_x", -1.0, 1.0), ("fl_y", -1.0, 1.0)) + tuple((f"fl_w{k}", 0.0, 2.0) for k in range(1, vj_looks.ARMS + 1))
 KNOB_WORDS = {"level": "level", "amount": "amount", "speed": "speed", "hue": "hue", "kaleido": "kaleidoscope",
@@ -1633,7 +1657,8 @@ KNOB_WORDS = {"level": "level", "amount": "amount", "speed": "speed", "hue": "hu
               "text_y": "text up and down", "text_glow": "text glow", "text_shadow": "text shadow",
               "text_outline": "text outline", "pic_scale": "picture scale", "pic_x": "picture across",
               "pic_y": "picture up and down", "pic_rot": "picture turn", "pic_tol": "key tolerance",
-              "pic_soft": "key softness", "pic_drift": "picture drift", "morph": "flame morph", "drift": "flame drift",
+              "pic_soft": "key softness", "pic_drift": "picture drift", "sh_mx": "shader steer across",
+              "sh_my": "shader steer up and down", "morph": "flame morph", "drift": "flame drift",
               "fl_sym": "flame symmetry", "fl_trail": "flame trails", "fl_gamma": "flame gamma",
               "fl_colour": "flame colour spread", "fl_points": "flame points", "fl_spin": "flame spin",
               "fl_x": "flame across", "fl_y": "flame up and down"}

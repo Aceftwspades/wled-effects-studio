@@ -75,6 +75,9 @@ def build(app):
                           "site's API, a save-shader extension: every pass and its inputs) into the project's looks/ and "
                           "listed - a preset runs its motion, decay, wave, shapes, custom waves and equations, and its "
                           "MilkDrop 2 shaders translated (one that does not translate is left out, and said)")
+                    dpg.add_button(label="Packs...", tag="vj_packs", small=True, callback=lambda: _packs(app))
+                    c.tip("add-on packs from the gallery - MilkDrop presets and Shadertoy shaders - installed for "
+                          "every project, a pack or a look at a time")
                 with dpg.group(horizontal=True):
                     typeface.label(dpg.add_text("MAP", color=c.ACCENT))
                     dpg.add_combo([w for _, w in vj.MAPS], tag="vj_map", width=px(190),
@@ -278,6 +281,18 @@ def _deck(app, i):
                  "a ring round each letter in the far end of the deck's colours: how bright")):
             _row(label, lambda key=key, tag=tag, lo=lo, hi=hi: num.add(
                 f"{tag}{i}", float(d[key]), lo, hi, digits=2, callback=lambda s, v, key=key: _set_deck(app, i, key, float(v))))
+            c.tip(tip + " (right-click: learn MIDI)")
+            _learnable(app, f"{tag}{i}", {"kind": "vj_knob", "deck": i, "key": key})
+    with dpg.group(tag=f"vj_steerrow{i}"):                   # a shader that reads the mouse: steered by knobs
+        dpg.add_checkbox(label="steer it", tag=f"vj_steer{i}", default_value=bool(d.get("sh_mouse")),
+                         callback=lambda s, v: _set_deck(app, i, "sh_mouse", bool(v)))
+        c.tip("the shader reads the mouse (iMouse) - most turn their camera or move their light by it: steer it "
+              "with the two knobs below (MIDI, the phone, a modulator), or leave it still as no one touches it")
+        for key, tag, label, tip in (("sh_mx", "vj_shx", "across", "where the mouse is, left (0) to right (1)"),
+                                     ("sh_my", "vj_shy", "up / down", "where the mouse is, bottom (0) to top (1)")):
+            _row(label, lambda key=key, tag=tag: num.add(
+                f"{tag}{i}", float(d.get(key, 0.5)), 0.0, 1.0, digits=2,
+                callback=lambda s, v, key=key: _set_deck(app, i, key, float(v))))
             c.tip(tip + " (right-click: learn MIDI)")
             _learnable(app, f"{tag}{i}", {"kind": "vj_knob", "deck": i, "key": key})
     with dpg.group(tag=f"vj_chrow{i}"):                      # a shader's channels, two to a row
@@ -522,7 +537,7 @@ KNOB_TAGS = (("vj_lvl", "level"), ("vj_amt", "amount"), ("vj_spd", "speed"), ("v
              ("vj_trl", "trails"), ("vj_blr", "blur"), ("vj_tsz", "text_size"), ("vj_tx", "text_x"), ("vj_ty", "text_y"),
              ("vj_tgl", "text_glow"), ("vj_tsh", "text_shadow"), ("vj_tol", "text_outline"), ("vj_pscale", "pic_scale"),
              ("vj_px", "pic_x"), ("vj_py", "pic_y"), ("vj_prot", "pic_rot"), ("vj_ptol", "pic_tol"),
-             ("vj_psoft", "pic_soft"), ("vj_pdrift", "pic_drift")) + tuple((tag, key) for key, tag, *_ in FL_NUMS)
+             ("vj_psoft", "pic_soft"), ("vj_pdrift", "pic_drift"), ("vj_shx", "sh_mx"), ("vj_shy", "sh_my")) + tuple((tag, key) for key, tag, *_ in FL_NUMS)
 
 
 def _sync_knobs(i, d):
@@ -591,46 +606,157 @@ def _row(label, make, tag=None):
 
 
 # --- the look browser ----------------------------------------------------------------------------
+BR_FILTERS = (("all", "all looks"), ("fav", "favourites"), ("builtin", "built in"), ("project", "the project's own"),
+              ("addons", "all add-on packs"))
+
+
 def _build_browser(app):
     c = _c()
-    with dpg.window(tag=BROWSE, show=False, no_title_bar=True, no_collapse=True, width=px(560), height=px(520)):
+    with dpg.window(tag=BROWSE, show=False, no_title_bar=True, no_collapse=True, width=px(600), height=px(560)):
         c.dialog_header(BROWSE, "Looks")
+        with dpg.group(horizontal=True):
+            dpg.add_combo([w for _, w in BR_FILTERS], tag="vj_br_filter", width=px(170), default_value="all looks",
+                          callback=lambda s, v: _set_browse_filter(app, v))
+            c.tip("which looks: all, your favourites (the star on a look), the ones that ship, the project's own, "
+                  "the add-on packs - or one pack")
+            dpg.add_input_text(tag="vj_br_find", width=px(150), hint="find...", callback=lambda s, v: _fill_browser(app))
+            c.tip("looks whose name has this in it")
+            dpg.add_button(label="Packs...", small=True, callback=lambda: _packs(app))
+            c.tip("add-on packs from the gallery - MilkDrop presets and Shadertoy shaders - installed for every "
+                  "project, a pack or a look at a time")
         dpg.add_text("", tag="vj_br_words", color=c.DIM)
         dpg.add_group(tag="vj_br_grid")
 
 
+def _packs(app):
+    from native import vj_packs_ui
+    vj_packs_ui.show(app)
+
+
+def _set_browse_filter(app, v):
+    app._vj_br_filter = v
+    _fill_browser(app)
+
+
+def browse_sections(app, flt="all looks", find=""):
+    """The browser's sections for a filter and a search: [(title, [look names])] - the built-in families, the
+    project's own, then each installed pack, favourites first among them when that is the filter."""
+    from native import addons
+    find = (find or "").strip().lower()
+    fav = set(vj.favourites(app))
+    src = {n: vj_looks.look_source(n) for n in vj_looks.LOOKS}
+    try:
+        packs = addons.installed()
+    except OSError:
+        packs = {}
+
+    def keep(n):
+        kind, pid = src[n]
+        if find and find not in n.lower():
+            return False
+        if flt == "favourites":
+            return n in fav
+        if flt == "built in":
+            return kind == "builtin"
+        if flt == "the project's own":
+            return kind == "project"
+        if flt == "all add-on packs":
+            return kind == "addon"
+        if flt.startswith("pack: "):
+            return kind == "addon" and packs.get(pid) is not None and packs[pid].name == flt[6:]
+        return True
+    out = []
+    for fam, words in vj_looks.FAMILIES:
+        names = [n for n, lk in vj_looks.LOOKS.items() if lk.family == fam and src[n][0] == "builtin" and keep(n)]
+        if names:
+            out.append((words, names))
+    own = [n for n in vj_looks.LOOKS if src[n][0] == "project" and keep(n)]
+    if own:
+        out.append(("The project's own", own))
+    for pid, pk in packs.items():
+        names = [n for n in vj_looks.LOOKS if src[n] == ("addon", pid) and keep(n)]
+        if names:
+            out.append((pk.name + ("  (non-commercial)" if pk.noncommercial else ""), names))
+    return out
+
+
 def _fill_browser(app):
+    from native import addons
     c = _c()
     dpg.delete_item("vj_br_grid", children_only=True)
     app._vj_thumbs = {}
+    try:
+        packs = addons.installed()
+    except OSError:
+        packs = {}
+    items = [w for _, w in BR_FILTERS] + [f"pack: {pk.name}" for pk in packs.values()]
+    flt = getattr(app, "_vj_br_filter", "all looks")
+    if flt not in items:
+        flt = app._vj_br_filter = "all looks"
+    dpg.configure_item("vj_br_filter", items=items)
+    dpg.set_value("vj_br_filter", flt)
+    fav = set(vj.favourites(app))
     per_row = 6
-    for fam, words in vj_looks.FAMILIES:
-        names = [n for n, lk in vj_looks.LOOKS.items() if lk.family == fam]
-        if not names:
-            continue
-        typeface.label(dpg.add_text(words.upper(), color=c.ACCENT, parent="vj_br_grid"))
+    shown = 0
+    for title, names in browse_sections(app, flt, dpg.get_value("vj_br_find") or ""):
+        typeface.label(dpg.add_text(title.upper(), color=c.ACCENT, parent="vj_br_grid"))
         row = None
         for k, n in enumerate(names):
             if k % per_row == 0:
                 row = dpg.add_group(horizontal=True, parent="vj_br_grid")
             tag = f"vj_th_{abs(hash(n)) % 10 ** 9}"
             _tex(tag, TH_W, TH_H)
+            addon = vj_looks.look_source(n)[0] == "addon"
             with dpg.group(parent=row):
                 dpg.add_image_button(tag, width=px(TH_W * 1.4), height=px(TH_H * 1.4),
                                      callback=lambda s, a, u: _browse_pick(app, u), user_data=n)
                 c.tip(f"{n}: {vj_looks.LOOKS[n].desc}")
-                dpg.add_text(n.replace("Drop: ", "").replace("Flame: ", "")[:11], color=c.DIM)
+                with dpg.group(horizontal=True):
+                    star = dpg.add_button(label="*" if n in fav else ".", small=True, user_data=n,
+                                          callback=lambda s, a, u: _star(app, s, u))
+                    c.tip("a favourite: the star keeps it in the favourites (every project's)")
+                    if n in fav:
+                        weight.primary(star)
+                    if addon:
+                        dpg.add_button(label="x", small=True, user_data=n, callback=lambda s, a, u: _unpack(app, u))
+                        c.tip("take this add-on look off this computer (Packs installs it again)")
+                    dpg.add_text(_short(n)[:9 if addon else 11], color=c.DIM)
             app._vj_thumbs[n] = {"tag": tag, "state": {}, "t": 0.0}
+            shown += 1
+    if not shown:
+        dpg.add_text("No looks here" + (" - star one with its . to make it a favourite" if flt == "favourites" else "")
+                     + ("; Packs... has more from the gallery" if flt in ("all add-on packs",) else ""),
+                     parent="vj_br_grid", color=c.DIM)
     dpg.add_button(label="Effect", parent="vj_br_grid",
                    callback=lambda: _browse_pick(app, vj.EFFECT))
+
+
+def _short(n):
+    for pre in ("Drop: ", "Flame: ", "Milk: "):
+        if n.startswith(pre):
+            return n[len(pre):]
+    return n
+
+
+def _star(app, sender, name):
+    on = vj.toggle_favourite(app, name)
+    dpg.configure_item(sender, label="*" if on else ".")
+    app.gp.status(f"{name}: {'a favourite' if on else 'not a favourite'}")
+    if getattr(app, "_vj_br_filter", "") == "favourites":
+        _fill_browser(app)
+
+
+def _unpack(app, name):
+    from native import vj_packs_ui
+    if vj_packs_ui.remove_look(app, name):
+        _fill_browser(app)
 
 
 def browse(app, i):
     """The looks as moving thumbnails; a click puts one on deck i."""
     from native import chrome
     app._vj_browse_deck = i
-    if not getattr(app, "_vj_thumbs", None) or set(app._vj_thumbs) != {n for n in vj_looks.LOOKS}:
-        _fill_browser(app)
+    _fill_browser(app)
     dpg.set_value("vj_br_words", f"a click puts the look on deck {LETTER[i]}")
     chrome._centre(BROWSE, 560, 520)
     dpg.show_item(BROWSE)
@@ -1243,6 +1369,8 @@ def refresh(app):
         dpg.configure_item(f"vj_imgrow{i}", show=d["look"] == "Image" or bool(glsl and (
             "picture" in glsl or "picture" in (vj.deck_channels(d) or []))))
         dpg.configure_item(f"vj_chrow{i}", show=bool(glsl))
+        dpg.configure_item(f"vj_steerrow{i}", show=bool(glsl and "iMouse" in glsl))
+        dpg.set_value(f"vj_steer{i}", bool(d.get("sh_mouse")))
         if glsl:
             from native import vj_glsl
             own = vj_glsl.channels_of(glsl)

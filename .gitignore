@@ -29,3 +29,6 @@ gallery/
 
 # the phone remote's self-signed certificate and its key (native/phone_tls.py), made where the studio runs from
 phone/
+
+# the VJ add-on packs installed from the gallery (native/addons.py), kept where the studio runs from
+addons/

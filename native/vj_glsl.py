@@ -739,11 +739,24 @@ def uniforms(ctx, frame):
     """The uniforms of a deck's frame, from its look ctx."""
     lt = time.localtime()
     return {"iResolution": (float(ctx.w), float(ctx.h), 1.0), "iTime": float(ctx.t), "iTimeDelta": float(ctx.dt),
-            "iFrame": int(frame), "iMouse": (0.0, 0.0, 0.0, 0.0),
+            "iFrame": int(frame), "iMouse": _mouse(ctx),
             "iDate": (float(lt.tm_year), float(lt.tm_mon - 1), float(lt.tm_mday),
                       float(lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec)),
             "iBeat": float(ctx.beat), "iBass": float(ctx.bass), "iMid": float(ctx.mid), "iTreble": float(ctx.treb),
             "iLevel": float(ctx.level), "iAmount": float(ctx.amount)}
+
+
+def _mouse(ctx):
+    """Shadertoy's iMouse from the deck: still (0) - as a shader no one touches sees it - or, steered, the deck's
+    two knobs as a mouse held down there (x, y in pixels; z and w positive: pressed, so a shader that waits for a
+    click to take the mouse takes it)."""
+    deck = getattr(ctx, "deck", None) or {}
+    if not deck.get("sh_mouse"):
+        return (0.0, 0.0, 0.0, 0.0)
+    knob = getattr(ctx, "knob", None) or (lambda k: float(deck.get(k, 0.5)))
+    x = max(0.0, min(1.0, float(knob("sh_mx")))) * ctx.w
+    y = max(0.0, min(1.0, float(knob("sh_my")))) * ctx.h
+    return (x, y, max(x, 1.0), max(y, 1.0))
 
 
 def look_draw(src, name):

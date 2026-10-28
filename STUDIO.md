@@ -4184,6 +4184,40 @@ picker opened, an area typed and used, the Outputs row dimming the view and not 
 fourth protocol; a YouTube link played (yt-dlp as a module, 31 frames in a few seconds).
 Not tried: DDP over the WebSocket against a real device; yt-dlp.exe from the PATH; the area on macOS and X11.
 
+Asked for after 1.21.0 (2026-10-28): the curated MilkDrop presets and Shadertoy shaders in the gallery repository
+as add-ons to download, made to move with the music where they can, and the VJ's looks managed - favourites, packs
+and single looks added and removed. Licences: the open shaders by their own, Shadertoy's default CC BY-NC-SA in
+packs marked non-commercial. Done 2026-10-28:
+
+- [x] **Packs in the gallery** (`packs.json`, `looks/<pack>/`, `previews/packs/<pack>.png` in wled-effects-gallery;
+      its `check.py` holds them to the studio's limits): eight themed packs, 28 presets and 27 shaders - MilkDrop
+      tunnels, kaleidoscopes, liquid and fire, shapes and waves; Shadertoy raymarched and colour (CC0, MIT, CC BY)
+      and patterns and worlds (CC BY-NC-SA, marked). Each file names its author, source and licence at its top. Left
+      out: the five that misbehaved (Bossa City, Nuclear, Tie-Dye; two shaders).
+- [x] **Made to move with the music**: every shader's Image pass wrapped (its mainImage renamed by a #define - one
+      a macro declares too - and a mainImage of ours around it): the beat swells it from the middle and the bass lifts
+      its light, scaled by the deck's amount (0: the shader as it was). Presets that barely moved (bass against
+      brightness and motion, under 0.15) got two per-frame lines: bass_att above its usual pushes the zoom, treb_att
+      the rotation (onsets only, slewed as _att is; the measure is noisy for feedback looks, shaders clearly rose).
+- [x] **Installing** (`native/addons.py`, `native/vj_packs_ui.py`): Packs... (the VJ's top bar and the browser) lists
+      them with their picture, description and licence (amber when non-commercial); a pack or one look installed,
+      updated (the gallery's sha256 differs) or removed. Studio-wide: `HOME/addons/looks/<pack>/` with a pack.json;
+      `vj_looks.load_user` reads them before the project's own (which win a name), .milk and .glsl only. Names,
+      sizes and sha256 are checked as the graphs' are; a file is written through `.part`.
+- [x] **The browser** (`vj_ui.browse_sections`): a filter (all, favourites, built in, the project's own, all packs,
+      one pack), a find box, a star on each tile (favourites in the studio's prefs, `vj.favourites`), an x on an
+      add-on look.
+- [x] **Steering a shader** (`vj_glsl._mouse`): a shader whose source reads iMouse gets "steer it" and two knobs
+      (`sh_mouse`, `sh_mx`, `sh_my` - learn MIDI, kept in presets); off, iMouse is 0 as on Shadertoy untouched.
+
+Tested: `test_addons` (packs.json with bad ids, names, paths, kinds and hashes left out; one look installed, the
+rest, one changed in the gallery seen as an update and fetched, one removed, the last taking its pack; a tampered
+file refused and not written; installed looks in the VJ beside the project's, where each comes from, favourites
+kept in the studio's settings, the browser's sections by each filter and the find box, a removed pack's looks gone).
+The packs measured as before (bass against brightness and motion, 8 s each) and every look run; the gallery's
+check on the built packs and on a stray and a changed file. By hand: the Packs window against the local clone
+(`STUDIO_GALLERY_URL`), the browser's filters and stars, a shader steered.
+
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).
 

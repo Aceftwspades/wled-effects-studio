@@ -36,4 +36,23 @@ def make(folder, extra=None):
                         "tags": ["test"], "sha256": hashlib.sha256(data).hexdigest(), "requires": []})
     with open(os.path.join(folder, "index.json"), "w", encoding="utf-8") as f:
         json.dump({"gallery": 1, "entries": entries + list(extra or [])}, f, indent=1)
+    # a pack of VJ looks (native/addons.py): a preset and a shader, its picture
+    looks = {"Smoke spin.milk": "[preset00]\nzoom=1.02\nper_frame_1=rot = rot + 0.02*max(bass_att - 1, 0);\n",
+             "Smoke rings by the tests.glsl": "// NAME: Smoke rings (the tests)\n"
+             "void mainImage(out vec4 fragColor, in vec2 fragCoord) {\n    vec2 uv = fragCoord / iResolution.xy;\n"
+             "    fragColor = vec4(0.5 + 0.5 * sin(12.0 * length(uv - 0.5) - iTime), uv.x, iMouse.x / iResolution.x, 1.0);\n}\n"}
+    os.makedirs(os.path.join(folder, "looks", "smoke-pack"), exist_ok=True)
+    items = []
+    for name, text in looks.items():
+        data = text.encode("utf-8")
+        with open(os.path.join(folder, "looks", "smoke-pack", name), "wb") as f:
+            f.write(data)
+        items.append({"file": name, "author": "the tests", "licence": "test", "sha256": hashlib.sha256(data).hexdigest()})
+    os.makedirs(os.path.join(folder, "previews", "packs"), exist_ok=True)
+    from PIL import Image
+    Image.fromarray(np.full((72, 256, 3), (30, 120, 200), np.uint8)).save(os.path.join(folder, "previews", "packs", "smoke-pack.png"))
+    with open(os.path.join(folder, "packs.json"), "w", encoding="utf-8") as f:
+        json.dump({"packs": 1, "list": [{"id": "smoke-pack", "name": "Smoke: test looks", "kind": "milkdrop",
+                                         "description": "A preset and a shader for the tests.", "licence": "CC BY-NC-SA 3.0",
+                                         "noncommercial": True, "items": items}]}, f, indent=1)
     return pathlib.Path(folder).resolve().as_uri() + "/"
