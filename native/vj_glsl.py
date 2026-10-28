@@ -404,7 +404,10 @@ class _GL:
         for k, val in uni.items():
             if k in prog:
                 try:
-                    prog[k].value = val
+                    if isinstance(val, list):                   # an array (MilkDrop's turning matrices): its kept length
+                        _set_array(prog[k], val)
+                    else:
+                        prog[k].value = val
                 except Exception:
                     pass
         fbo = self.fbos.get(("frag", w, h))
@@ -456,9 +459,9 @@ class _GL:
                 if k in prog:
                     prog[k].value = val
             if "iChannelResolution" in prog:
-                prog["iChannelResolution"].value = res
+                _set_array(prog["iChannelResolution"], res)
             if "iChannelTime" in prog:
-                prog["iChannelTime"].value = [float(uni.get("iTime", 0.0))] * 4
+                _set_array(prog["iChannelTime"], [float(uni.get("iTime", 0.0))] * 4)
             if "iSampleRate" in prog:
                 prog["iSampleRate"].value = 44100.0
             if image:
@@ -624,6 +627,14 @@ def _webgl(code):
         code = re.sub(r"\b(" + "|".join(sorted(map(re.escape, names), key=len, reverse=True)) + r")(\s*\()",
                       lambda m: f"vjm_{m.group(1)}{m.group(2)}", code)
     return code
+
+
+def _set_array(uniform, items):
+    """An array uniform set to `items`, as many of them as the program keeps: a driver may cut an array down to the
+    elements the shader reads (macOS does - a shader reading iChannelTime[0] alone has a float there, and four
+    refused it)."""
+    n = max(1, int(getattr(uniform, "array_length", len(items)) or 1))
+    uniform.value = items[0] if n == 1 else list(items[:n])
 
 
 def _compile_error(msg, final=""):
