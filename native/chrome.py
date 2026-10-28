@@ -502,7 +502,7 @@ def build_toolbar(app):
 TOOLBAR_FRAMES = (("devices", "devices", "Devices", "Devices on the network", "devices"),
                   ("flash", "flash", "Flash", "Build the firmware and flash the device", "flash"),
                   ("send", "send", "Send", "Send to the device: the effects, a script, the shape", "send_frame"),
-                  (None, "stream", "Stream", "Stream the sim to the device (DDP, E1.31 or Art-Net)", "stream"),
+                  (None, "stream", "Stream", "Stream the sim to the device (DDP, E1.31, Art-Net or WebSocket)", "stream"),
                   ("|", "", "", "", ""),
                   ("shape", "shape", "Shape", "Shape editor", "shape"),
                   ("sequence", "sequence", "Sequence", "Sequence: presets, a playlist and the schedule", "sequence"),

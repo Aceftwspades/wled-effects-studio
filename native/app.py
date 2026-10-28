@@ -430,7 +430,7 @@ class App(Features, Recorder, EditBuild):
         """The logical view: the segment as the effect sees it. A 1-D strip is
         one row, drawn tall enough to look at."""
         eng = eng or self.eng
-        rgb = self.frame_rgb(eng).copy()
+        rgb = np.array(self.view_rgb(eng))
         if not eng.fx.get("o3"):
             # Cube mode: the gap corners are not pixels and effects skip them,
             # so without this they keep whatever flat mode last left there.
@@ -493,7 +493,7 @@ class App(Features, Recorder, EditBuild):
         if g is not None and g.kind == "cube":
             # flat mode too: it changes how an effect draws, not where the LEDs are - the net's faces are the
             # cube's whichever way the picture was made (drawn as dots, its LEDs stood apart and cost a CPU render)
-            src = net if net.shape[0] == eng.rows else self.frame_rgb(eng)
+            src = net if net.shape[0] == eng.rows else self.view_rgb(eng)
             lk = self.view_look()
             if lk["glow"] > 0 or lk["diffuse"] > 0:        # the glowing or diffused LEDs, as the live view's texture has them
                 k = 8                                      # finer than the live texture: no GPU smooths a picture's dots
@@ -502,7 +502,7 @@ class App(Features, Recorder, EditBuild):
                                      reflect=lk["reflect"], **view3d.kw(self))
             return render.render(src, eng.B, px, self.yaw, self.pitch, self.dist, six=eng.six, bg=bgv,
                                  unlit=unlit, floor=floor, reflect=lk["reflect"], **view3d.kw(self))
-        rgb = self.frame_rgb(eng).reshape(-1, 3)
+        rgb = self.view_rgb(eng).reshape(-1, 3)
         if g is None:
             return np.zeros((px, px, 3), np.uint8)
         lk = self.view_look()
@@ -3616,7 +3616,7 @@ class App(Features, Recorder, EditBuild):
         big = img = None
         _u, _f = self.view_extras()
         if self.popouts.jobs:
-            shown = rgb if rgb is not None else self.frame_rgb(self.eng)   # what the views show, not the engine's own
+            shown = self.view_rgb(self.eng, rgb)          # what the views show, not the engine's own
             pop_net = net
             cue = vj.cue_picture(self) if vj.on(self) else None           # the VJ's cue: the deck off the mix there
             if cue is not None and cue.shape == shown.shape:
@@ -3666,7 +3666,7 @@ class App(Features, Recorder, EditBuild):
             pq.camera(self.yaw, self.pitch, self.dist, floor_step=view3d.floor_step(self), **view3d.kw(self))
             pq.background(self.view_background(self.view_side, pq.w, pq.h) if self.prefs.get("view_bg") else None)
             lk = self.view_look()
-            cols = shape_ui.view_colours(self, (rgb if rgb is not None else self.frame_rgb(self.eng)).reshape(-1, 3))
+            cols = shape_ui.view_colours(self, self.view_rgb(self.eng, rgb).reshape(-1, 3))
             cols = look.diffuse_points(pos, cols, lk)          # through the diffuser: light shared by distance
             pq.reflect = lk["reflect"]
             pq.colours(look.tone(cols, lk), unlit=unlit, lk=lk)

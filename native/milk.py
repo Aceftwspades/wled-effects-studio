@@ -15,8 +15,9 @@ sides, colours, borders, instances and texture) and the custom waves (their
 per-point equations, dots or lines, spectrum or wave) are run; MilkDrop 2's
 warp and composite shaders are translated to GLSL and run on the graphics card
 (milk_md2.py) where that is there and the translation compiles - else the
-preset runs without them and says so. The borders, the motion vectors and the
-echo are left out.
+preset runs without them and says so. The outer and inner borders and the video
+echo are drawn; the feedback frame keeps MilkDrop's 8 bits a channel (a preset's
+fade and dither count on its steps). The motion vectors are left out.
 
 The equations are MilkDrop's expression language (ns-eel): C-like
 statements ended by ';', `=` and `+=`-style assignments, arithmetic and
@@ -32,11 +33,14 @@ import re
 import numpy as np
 
 # --- the expression language -----------------------------------------------------------------------
-_TOKEN = re.compile(r"\s*(?:(\d+\.\d*|\.\d+|\d+)([eE][-+]?\d+)?|([A-Za-z_][A-Za-z0-9_]*)|(==|!=|<=|>=|&&|\|\||[-+*/%]=|[-+*/%^=<>!(),;&|]))")
+_TOKEN = re.compile(r"\s*(?:(\d+\.\d*|\.\d+|\d+)([eE][-+]?\d+)?|(\$x[0-9A-Fa-f]+|\$[A-Za-z]+)|([A-Za-z_][A-Za-z0-9_]*)"
+                    r"|(==|!=|<=|>=|&&|\|\||[-+*/%]=|[-+*/%^=<>!(),;&|?:]))")
+_CONSTS = {"$pi": math.pi, "$e": math.e, "$phi": (1 + 5 ** 0.5) / 2}
 
 
 def _tokens(src):
     out, i = [], 0
+    src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
     src = re.sub(r"//[^\n]*", "", src)
     while i < len(src):
         m = _TOKEN.match(src, i)
@@ -46,26 +50,41 @@ def _tokens(src):
             raise SyntaxError(f"cannot read {src[i:i + 12]!r}")
         if m.group(1) is not None:
             out.append(("num", m.group(1) + (m.group(2) or "")))
-        elif m.group(3) is not None:
-            out.append(("id", m.group(3).lower()))
+        elif m.group(3) is not None:                      # ns-eel's constants: $pi, $e, $phi, $x1F
+            c = m.group(3).lower()
+            if c.startswith("$x"):
+                out.append(("num", str(int(c[2:], 16))))
+            elif c in _CONSTS:
+                out.append(("num", repr(_CONSTS[c])))
+            else:
+                raise SyntaxError(f"cannot read {m.group(3)!r}")
+        elif m.group(4) is not None:
+            out.append(("id", m.group(4).lower()))
         else:
-            out.append(("op", m.group(4)))
+            out.append(("op", m.group(5)))
         i = m.end()
     return out
 
 
 _BIN = {"||": 1, "|": 1, "&&": 2, "&": 2, "==": 3, "!=": 3, "<": 4, ">": 4, "<=": 4, ">=": 4, "+": 5, "-": 5,
         "*": 6, "/": 6, "%": 6, "^": 7}
+_ASSIGN = ("=", "+=", "-=", "*=", "/=", "%=")
+_BUFS = ("megabuf", "gmegabuf")
+_MAX_LOOP = 1 << 20                                      # ns-eel2's own limit on loop() and while()
 
 
 class _Parser:
-    """ns-eel to Python source: statements become assignments to vars (a dict), expressions numpy-safe calls."""
+    """ns-eel2 to Python source. Everything is an expression, as in ns-eel2: an assignment is worth what it
+    assigned (so `a = b = 0` and `if(c, x = 1, y = 2)` work), `(a; b; c)` is worth its last, and a statement list
+    is expressions between ';'. Variables live in a dict (v), megabuf in the block's own memory and gmegabuf in
+    one shared by every preset; if(), ?:, loop() and while() run only what they must (lambdas)."""
 
     def __init__(self, toks):
         self.t, self.k = toks, 0
 
-    def peek(self):
-        return self.t[self.k] if self.k < len(self.t) else (None, None)
+    def peek(self, ahead=0):
+        k = self.k + ahead
+        return self.t[k] if k < len(self.t) else (None, None)
 
     def take(self, want=None):
         tok = self.peek()
@@ -75,28 +94,80 @@ class _Parser:
         return tok
 
     def statements(self):
+        """The top level: each expression a line of the function."""
         out = []
         while self.peek()[0] is not None:
             if self.peek()[1] == ";":
                 self.take(); continue
-            out.append(self.statement())
+            out.append(f"_ = {self.assign()}")
             if self.peek()[1] == ";":
                 self.take()
             elif self.peek()[0] is not None:
+                # a missing ';' between two statements (a preset's line without one): ns-eel2 is as forgiving
+                # where the next token can only start a new statement
+                if self.peek()[0] in ("id", "num") or self.peek()[1] in ("(", "-", "!"):
+                    continue
                 raise SyntaxError(f"expected ';', found {self.peek()[1]!r}")
         return out
 
-    def statement(self):
+    def sequence(self, ends):
+        """Expressions between ';' up to one of `ends` (not taken): one expression, or _seq(...) of them."""
+        parts = []
+        while self.peek()[1] not in ends:
+            if self.peek()[0] is None:
+                raise SyntaxError(f"expected {' or '.join(map(repr, ends))}, found the end")
+            if self.peek()[1] == ";":
+                self.take(); continue
+            parts.append(self.assign())
+            if self.peek()[1] == ";":
+                self.take()
+            elif self.peek()[1] not in ends:
+                raise SyntaxError(f"expected ';', found {self.peek()[1]!r}")
+        if not parts:
+            return "0.0"
+        return parts[0] if len(parts) == 1 else f"_seq({', '.join(parts)})"
+
+    def assign(self):
         kind, val = self.peek()
-        if kind == "id" and self.k + 1 < len(self.t) and self.t[self.k + 1][1] in ("=", "+=", "-=", "*=", "/=", "%="):
+        if kind == "id" and val not in _BUFS and self.peek(1)[1] in _ASSIGN:
             self.take()
             op = self.take()[1]
-            rhs = self.expr(0)
-            if op == "=":
-                return f"v[{val!r}] = {rhs}"
-            return f"v[{val!r}] = _g(v, {val!r}) {op[0]} ({rhs})" if op[0] != "/" else \
-                f"v[{val!r}] = _div(_g(v, {val!r}), {rhs})"
-        return f"_ = {self.expr(0)}"
+            rhs = self.assign()
+            return self._store(f"_s(v, {val!r}, {{}})", f"_g(v, {val!r})", op, rhs)
+        if kind == "id" and val in _BUFS and self.peek(1)[1] == "(":
+            save = self.k
+            self.take(); self.take()
+            idx = self.sequence((")",))
+            self.take(")")
+            if self.peek()[1] in _ASSIGN:
+                op = self.take()[1]
+                rhs = self.assign()
+                mem = "_mem" if val == "megabuf" else "_GMEM"
+                return self._store(f"_mbs({mem}, {idx}, {{}})", f"_mb({mem}, {idx})", op, rhs)
+            self.k = save
+        return self.ternary()
+
+    @staticmethod
+    def _store(setter, getter, op, rhs):
+        if op == "=":
+            return setter.format(rhs)
+        if op == "/=":
+            return setter.format(f"_div({getter}, {rhs})")
+        if op == "%=":
+            return setter.format(f"_mod({getter}, {rhs})")
+        return setter.format(f"({getter} {op[0]} ({rhs}))")
+
+    def ternary(self):
+        c = self.expr(0)
+        if self.peek()[1] == "?":
+            self.take()
+            a = self.assign()
+            b = "0.0"
+            if self.peek()[1] == ":":
+                self.take()
+                b = self.assign()
+            return f"_if({c}, lambda: {a}, lambda: {b})"
+        return c
 
     def expr(self, prec):
         """Precedence climbing: operators at least `prec` bind here; ^ to the right, the rest to the left."""
@@ -121,24 +192,43 @@ class _Parser:
             self.take(); return f"_not({self.unary()})"
         return self.primary()
 
+    def args(self):
+        """A call's arguments: each a sequence (ns-eel2 lets one hold several statements)."""
+        out = []
+        while self.peek()[1] != ")":
+            out.append(self.sequence((",", ")")))
+            if self.peek()[1] == ",":
+                self.take()
+        self.take(")")
+        return out
+
     def primary(self):
         kind, val = self.take()
         if kind == "num":
             return f"{float(val)!r}"
         if val == "(":
-            e = self.expr(0)
+            e = self.sequence((")",))
             self.take(")")
             return f"({e})"
         if kind == "id":
             if self.peek()[1] == "(":
                 self.take()
-                args = []
-                while self.peek()[1] != ")":
-                    args.append(self.expr(0))
-                    if self.peek()[1] == ",":
-                        self.take()
-                self.take(")")
-                return f"_f_{val}({', '.join(args)})" if val in _FUNCS else f"_unknown({val!r})"
+                a = self.args()
+                if val in ("if",) and len(a) == 3:
+                    return f"_if({a[0]}, lambda: {a[1]}, lambda: {a[2]})"
+                if val == "loop" and len(a) == 2:
+                    return f"_loop({a[0]}, lambda: {a[1]})"
+                if val == "while" and len(a) == 1:
+                    return f"_while(lambda: {a[0]})"
+                if val in ("exec2", "exec3"):
+                    return f"_seq({', '.join(a)})" if a else "0.0"
+                if val in _BUFS and len(a) == 1:
+                    return f"_mb({'_mem' if val == 'megabuf' else '_GMEM'}, {a[0]})"
+                if val in ("memset", "memcpy", "freembuf"):
+                    return f"_{val}(_mem, {', '.join(a)})"
+                if val == "assign" and len(a) == 2 and re.fullmatch(r"_g\(v, '(\w+)'\)", a[0]):
+                    return f"_s(v, {a[0][7:-1]}, {a[1]})"
+                return f"_f_{val}({', '.join(a)})" if val in _FUNCS else f"_unknown({val!r}, {', '.join(a)})"
             return f"_g(v, {val!r})"
         raise SyntaxError(f"unexpected {val!r}")
 
@@ -163,7 +253,7 @@ def _div(a, b):
 
 def _mod(a, b):
     a, b = np.floor(a), np.floor(b)
-    if isinstance(b, np.ndarray):
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):          # over a grid (a per-pixel or a point's)
         return np.where(b != 0, np.fmod(a, np.where(b == 0, 1, b)), 0.0)
     return float(np.fmod(a, b)) if b != 0 else 0.0
 
@@ -212,24 +302,133 @@ for _n, _impl in {
 }.items():
     _FUNCS[_n] = _impl
 
-_ENV = {"_div": _div, "_mod": _mod, "_pow": _pow,
+_REG = {}                                                # reg00..reg99: ns-eel2's globals, shared by every preset
+_GMEM = {}                                               # gmegabuf: one memory shared by every preset
+_MEM_MAX = 1 << 23                                       # ns-eel2's megabuf holds 8M values
+
+
+def _get(v, k):
+    if k[:3] == "reg" and k[3:].isdigit():
+        return _REG.get(k, 0.0)
+    return v.get(k, 0.0)
+
+
+def _set(v, k, x):
+    if k[:3] == "reg" and k[3:].isdigit():
+        _REG[k] = x
+    else:
+        v[k] = x
+    return x
+
+
+def _seq(*parts):
+    return parts[-1]
+
+
+def _if(c, a, b):
+    """ns-eel2's if() and ?: - only the branch taken is run; over a grid of points (per-pixel), both, picked by point."""
+    if isinstance(c, np.ndarray):
+        x, y = a(), b()
+        return np.where(c != 0, x, y)
+    return a() if c != 0 else b()
+
+
+def _count(n):
+    n = float(np.max(n)) if isinstance(n, np.ndarray) else float(n)
+    return int(max(0, min(_MAX_LOOP, n))) if math.isfinite(n) else 0
+
+
+def _loop(n, body):
+    out = 0.0
+    for _ in range(_count(n)):
+        out = body()
+    return out
+
+
+def _while(body):
+    for _ in range(_MAX_LOOP):
+        r = body()
+        if not np.any(r != 0) if isinstance(r, np.ndarray) else r == 0:
+            break
+    return 0.0
+
+
+def _slot(i):
+    i = float(i)
+    if not math.isfinite(i):
+        return -1
+    k = int(math.floor(i + 1e-5))
+    return k if 0 <= k < _MEM_MAX else -1
+
+
+def _mb(mem, i):
+    """megabuf(i) / gmegabuf(i): a value of the memory (0 where nothing was put)."""
+    if isinstance(i, np.ndarray):
+        return np.vectorize(lambda j: mem.get(_slot(j), 0.0), otypes=[np.float64])(i)
+    return mem.get(_slot(i), 0.0)
+
+
+def _mbs(mem, i, x):
+    if isinstance(i, np.ndarray) or isinstance(x, np.ndarray):
+        ii = np.broadcast_to(np.asarray(i, np.float64), np.shape(x) if np.ndim(x) else np.shape(i)).ravel()
+        xx = np.broadcast_to(np.asarray(x, np.float64), ii.shape).ravel()
+        for j, val in zip(ii, xx):
+            k = _slot(j)
+            if k >= 0:
+                mem[k] = float(val)
+        return x
+    k = _slot(i)
+    if k >= 0:
+        mem[k] = x
+    return x
+
+
+def _memset(mem, dest, val, n):
+    d = _slot(dest)
+    for k in range(d, d + _count(n)) if d >= 0 else ():
+        if k < _MEM_MAX:
+            mem[k] = float(val)
+    return dest
+
+
+def _memcpy(mem, dest, src, n):
+    d, s = _slot(dest), _slot(src)
+    if d >= 0 and s >= 0:
+        vals = [mem.get(s + k, 0.0) for k in range(_count(n))]
+        for k, val in enumerate(vals):
+            if d + k < _MEM_MAX:
+                mem[d + k] = val
+    return dest
+
+
+def _freembuf(mem, at):
+    for k in [k for k in mem if k >= _slot(at)]:
+        del mem[k]
+    return at
+
+
+_ENV = {"_div": _div, "_mod": _mod, "_pow": _pow, "_s": _set, "_seq": _seq, "_if": _if, "_loop": _loop,
+        "_while": _while, "_mb": _mb, "_mbs": _mbs, "_memset": _memset, "_memcpy": _memcpy, "_freembuf": _freembuf,
+        "_GMEM": _GMEM,
         "_eq": lambda a, b: _f(np.asarray(a) == b), "_ne": lambda a, b: _f(np.asarray(a) != b),
         "_lt": lambda a, b: _f(np.asarray(a) < b), "_gt": lambda a, b: _f(np.asarray(a) > b),
         "_le": lambda a, b: _f(np.asarray(a) <= b), "_ge": lambda a, b: _f(np.asarray(a) >= b),
         "_and": lambda a, b: _f(_bool(a) & _bool(b)), "_or": lambda a, b: _f(_bool(a) | _bool(b)),
-        "_not": lambda a: _f(~_bool(a)), "_g": lambda v, k: v.get(k, 0.0),
-        "_unknown": lambda name: 0.0, "np": np}
+        "_not": lambda a: _f(~_bool(a)), "_g": _get,
+        "_unknown": lambda name, *args: 0.0, "np": np}
 _ENV.update({f"_f_{k}": f for k, f in _FUNCS.items()})
 
 
-def compile_code(src, what="equations"):
-    """ns-eel statements as a Python function run(v) on a dict of the variables; SyntaxError said with `what`."""
+def compile_code(src, what="equations", mem=None):
+    """ns-eel statements as a Python function run(v) on a dict of the variables; SyntaxError said with `what`.
+    `mem`: the block's megabuf (a dict, kept by the caller for as long as the preset runs)."""
     try:
         body = _Parser(_tokens(src)).statements()
     except SyntaxError as e:
         raise SyntaxError(f"the preset's {what}: {e}")
     code = "def run(v):\n" + ("".join(f"    {s}\n" for s in body) or "    pass\n")
     ns = dict(_ENV)
+    ns["_mem"] = {} if mem is None else mem
     with np.errstate(all="ignore"):
         exec(compile(code, f"<{what}>", "exec"), ns)
     run = ns["run"]
@@ -249,7 +448,11 @@ BASE = {"fDecay": ("decay", 0.98), "zoom": ("zoom", 1.0), "fZoomExponent": ("zoo
         "fWaveParam": ("wave_mystery", 0.0), "bMaximizeWaveColor": ("wave_brighten", 1), "bWaveDots": ("wave_usedots", 0),
         "bWaveThick": ("wave_thick", 0), "bAdditiveWaves": ("wave_additive", 0), "fGammaAdj": ("gamma", 1.0),
         "bBrighten": ("brighten", 0), "bDarken": ("darken", 0), "bSolarize": ("solarize", 0), "bInvert": ("invert", 0),
-        "bDarkenCenter": ("darken_center", 0)}
+        "bDarkenCenter": ("darken_center", 0),
+        "ob_size": ("ob_size", 0.01), "ob_r": ("ob_r", 0.0), "ob_g": ("ob_g", 0.0), "ob_b": ("ob_b", 0.0),
+        "ob_a": ("ob_a", 0.0), "ib_size": ("ib_size", 0.01), "ib_r": ("ib_r", 0.25), "ib_g": ("ib_g", 0.25),
+        "ib_b": ("ib_b", 0.25), "ib_a": ("ib_a", 0.0), "fVideoEchoZoom": ("echo_zoom", 2.0),
+        "fVideoEchoAlpha": ("echo_alpha", 0.0), "nVideoEchoOrientation": ("echo_orient", 0)}
 
 
 def load(path):
@@ -316,13 +519,16 @@ def parse(text, name="preset"):
         p = dict(defaults)
         p.update(d["p"])
         src = {w: "\n".join(d["eq"].get(w, {})[n] for n in sorted(d["eq"].get(w, {}))) for w in ("init", "per_frame", "per_point")}
-        return {"p": p, "init": compile_code(src["init"], f"{what} init equations"),
-                "frame": compile_code(src["per_frame"], f"{what} per-frame equations"),
-                "point": compile_code(src["per_point"], f"{what} per-point equations") if src["per_point"].strip() else None}
+        mem = {}
+        return {"p": p, "init": compile_code(src["init"], f"{what} init equations", mem),
+                "frame": compile_code(src["per_frame"], f"{what} per-frame equations", mem),
+                "point": compile_code(src["per_point"], f"{what} per-point equations", mem) if src["per_point"].strip() else None,
+                "carried": _carried(src["per_point"])}
     out_shapes = [compiled(shapes[n], SHAPE, f"shape {n}") for n in sorted(shapes) if shapes[n]["p"].get("enabled")]
     out_waves = [compiled(waves[n], WAVE, f"wave {n}") for n in sorted(waves) if waves[n]["p"].get("enabled")]
     md2 = {}
     notes = []
+    mem = {}                                                  # the preset's own megabuf
     for which in ("warp", "comp"):
         hlsl = "\n".join(shaders[which][n] for n in sorted(shaders[which]))
         if hlsl.strip():
@@ -332,9 +538,9 @@ def parse(text, name="preset"):
             except ValueError as e:
                 notes.append(f"its {which} shader left out: {e}")
     return {"name": name, "base": base, "src": code, "shapes": out_shapes, "waves": out_waves, "md2": md2, "notes": notes,
-            "init": compile_code(code["init"], "per-frame-init equations"),
-            "frame": compile_code(code["frame"], "per-frame equations"),
-            "pixel": compile_code(code["pixel"], "per-pixel equations") if code["pixel"].strip() else None}
+            "init": compile_code(code["init"], "per-frame-init equations", mem),
+            "frame": compile_code(code["frame"], "per-frame equations", mem),
+            "pixel": compile_code(code["pixel"], "per-pixel equations", mem) if code["pixel"].strip() else None}
 
 
 # --- the drawing -----------------------------------------------------------------------------------
@@ -363,23 +569,30 @@ def look_draw(preset):
             st["v"] = dict(preset["base"])
             st["q"] = {}
             st["frame"] = 0
-            st["att"] = [0.0, 0.0, 0.0]
+            st["att"] = [1.0, 1.0, 1.0]
             v = st["v"]
             v.update(time=0.0, fps=30.0, frame=0, bass=1.0, mid=1.0, treb=1.0, bass_att=1.0, mid_att=1.0, treb_att=1.0,
                      progress=0.0, meshx=GRID_W, meshy=GRID_H, aspectx=1.0, aspecty=1.0)
             preset["init"](v)
             st["q"] = {k: v[k] for k in v if re.match(r"q\d+$", k)}
         v = st["v"]
-        # the sound as MilkDrop gives it: 1 its usual level, above it louder (the effects' bands, 0..1, made so)
-        att = st["att"]
+        # the sound as MilkDrop gives it: each band against its own last few seconds, so 1 is the music's usual level,
+        # 1.3 and over a hit, below 0.7 quiet - however loud or soft the track (a preset that widens its border past
+        # 1.3 filled the frame while the bands were taken as they are); the _att ones the same, smoothed
+        lavg = st.setdefault("lavg", [0.3, 0.3, 0.3])
+        rel = []
         for k, val in enumerate((ctx.bass, ctx.mid, ctx.treb)):
-            att[k] = att[k] * 0.9 + val * 0.1
+            val = float(np.nan_to_num(val))
+            lavg[k] = lavg[k] * 0.985 + val * 0.015
+            rel.append(min(4.0, val / max(lavg[k], 0.04)))
+        att = st["att"]
+        for k in range(3):
+            att[k] = att[k] * 0.9 + rel[k] * 0.1
         for k in preset["base"]:                                   # each frame from the settings again, as MilkDrop does
             v[k] = preset["base"][k]
         v.update(st["q"])
         v.update(time=float(ctx.t), fps=1.0 / max(1e-3, ctx.dt), frame=st["frame"],
-                 bass=0.5 + 1.5 * ctx.bass, mid=0.5 + 1.5 * ctx.mid, treb=0.5 + 1.5 * ctx.treb,
-                 bass_att=0.5 + 1.5 * att[0], mid_att=0.5 + 1.5 * att[1], treb_att=0.5 + 1.5 * att[2])
+                 bass=rel[0], mid=rel[1], treb=rel[2], bass_att=att[0], mid_att=att[1], treb_att=att[2])
         preset["frame"](v)
         st["frame"] += 1
         # the motion over the mesh: the per-frame values everywhere, the per-pixel equations changing them point by point
@@ -433,10 +646,13 @@ def look_draw(preset):
         fb = _wave(ctx, v, fb)
         fb = _custom_waves(ctx, st, preset, v, fb)
         fb = _shapes(ctx, st, preset, v, fb)
+        fb = _borders(v, fb)
         if ctx.video is not None:                                # a deck's video seeds it, as the built-in presets' does
             fb = np.maximum(fb, ctx.video * 0.06 * (0.5 + ctx.amount))
-        st["fb"] = np.clip(fb, 0, 1)
-        out = st["fb"]
+        # MilkDrop's frame is 8 bits a channel: kept so, a preset's slow fade stops where its steps do, as it does there
+        st["fb"] = np.round(np.clip(fb, 0, 1) * 255.0) / 255.0
+        st["fb"] = st["fb"].astype(np.float32)
+        out = _echo(v, st["fb"])
         if "comp" in preset["md2"] and "comp" not in st.setdefault("md2_off", {}):
             from native import milk_md2
             shown, err = milk_md2.run(preset["md2"]["comp"], w, h, milk_md2.uniforms(v, w, h, ctx.t, st["frame"]),
@@ -548,6 +764,59 @@ def _shapes(ctx, st, preset, v, fb):
     return fb
 
 
+_POINT_IN = {"sample", "value1", "value2", "x", "y", "r", "g", "b", "a"}
+
+
+def _carried(src):
+    """Whether per-point code hands a value from one point to the next, as MilkDrop runs it (one point after
+    another, every variable left as the last point left it): a variable read before it is first set (`it = it + 1`,
+    `sw = 1 - sw`), or the memory. Then the points run one by one; else all at once, as arrays."""
+    if not src.strip():
+        return False
+    try:
+        toks = _tokens(src)
+    except SyntaxError:
+        return False
+    if any(t[1] in _BUFS for t in toks):
+        return True
+    assigned, depth, start = set(), 0, 0
+    stmts = []
+    for i, (kind, val) in enumerate(toks + [("op", ";")]):        # statements: between ';' outside brackets
+        depth += {"(": 1, ")": -1}.get(val, 0)
+        if val == ";" and depth <= 0:
+            stmts.append(toks[start:i])
+            start, depth = i + 1, 0
+    lhs_of = [st[0][1] if len(st) > 1 and st[0][0] == "id" and st[1][1] in _ASSIGN else None for st in stmts]
+    set_somewhere = {x for x in lhs_of if x}
+    for st, lhs in zip(stmts, lhs_of):
+        body = st[2:] if lhs else st
+        if lhs and st[1][1] != "=":
+            body = [st[0]] + body                                   # it += 1 reads it
+        for kind, val in body:
+            if kind == "id" and val in set_somewhere and val not in assigned and val not in _POINT_IN \
+                    and not re.match(r"[qt]\d+$", val):
+                return True                                         # read before this point set it: the last point's
+        if lhs:
+            assigned.add(lhs)
+    return False
+
+
+def _points_in_order(run, pv, count):
+    """The per-point code run point by point (MilkDrop's way): each point's sample, values and colour set, the
+    rest as the last point left them; x, y, r, g, b, a gathered."""
+    keys = ("x", "y", "r", "g", "b", "a")
+    arrays = {k: np.broadcast_to(np.asarray(pv[k], np.float64), (count,)).copy() for k in keys + ("sample", "value1", "value2")}
+    out = {k: np.zeros(count) for k in keys}
+    p = {k: (float(np.asarray(x).ravel()[0]) if isinstance(x, np.ndarray) else x) for k, x in pv.items()}
+    for i in range(count):
+        for k in arrays:
+            p[k] = float(arrays[k][i])
+        run(p)
+        for k in keys:
+            out[k][i] = float(np.nan_to_num(p.get(k, 0.0)))
+    pv.update(out)
+
+
 def _custom_waves(ctx, st, preset, v, fb):
     """The preset's custom waves: each its per-frame equations, then its per-point ones over every sample at once
     (sample 0..1, value1 and value2 the sound or its spectrum), drawn as dots or joined lines in their colours."""
@@ -564,6 +833,8 @@ def _custom_waves(ctx, st, preset, v, fb):
         s.update(tinit[n])
         wv["frame"](s)
         count = max(2, min(256, int(s.get("samples", 512)) // 2))     # the canvas is small: half MilkDrop's points
+        if wv.get("carried"):
+            count = min(count, 64)                                # point by point is slow: a quarter of those
         k = np.linspace(0, 1, count)
         if wv["p"].get("spectrum"):
             bands = np.asarray(getattr(ctx, "bands", None) if getattr(ctx, "bands", None) is not None
@@ -578,7 +849,10 @@ def _custom_waves(ctx, st, preset, v, fb):
                   r=np.full(count, float(s.get("r", 1))), g=np.full(count, float(s.get("g", 1))),
                   b=np.full(count, float(s.get("b", 1))), a=np.full(count, float(s.get("a", 1))))
         if wv["point"] is not None:
-            wv["point"](pv)
+            if wv.get("carried"):
+                _points_in_order(wv["point"], pv, count)
+            else:
+                wv["point"](pv)
         X = np.broadcast_to(np.asarray(pv["x"], np.float64), (count,))
         Y = np.broadcast_to(np.asarray(pv["y"], np.float64), (count,))
         cols = np.stack([np.broadcast_to(np.asarray(pv[c], np.float64), (count,)) for c in "rgb"], -1)
@@ -604,6 +878,54 @@ def _custom_waves(ctx, st, preset, v, fb):
             else:
                 fb[jy, jx] = fb[jy, jx] * (1 - pa[:, None]) + add
     return fb
+
+
+def _borders(v, fb):
+    """MilkDrop's outer border round the edge of the frame and its inner border inside it, each its colour at its
+    alpha, its width a share of the frame (projectM's Border.cpp: a band from 1 - size to 1 in -1..1). Drawn into the
+    feedback, so the motion carries them in; a band thinner than a pixel lights it as much as it covers it."""
+    h, w = fb.shape[:2]
+    out_s = max(0.0, float(np.nan_to_num(v.get("ob_size", 0.0))))
+    in_s = max(0.0, float(np.nan_to_num(v.get("ib_size", 0.0))))
+
+    def cover(n, lo, hi):
+        """How much of each of n pixels a band lo..hi in from both ends (a share of the half) covers, 0..1."""
+        a, b = lo * 0.5 * n, hi * 0.5 * n
+        k = np.arange(n, dtype=np.float32)
+        left = np.clip(np.minimum(k + 1, b) - np.maximum(k, a), 0, 1)
+        return np.maximum(left, left[::-1]), int(np.floor(a))
+    for lo, hi, key in ((0.0, out_s, "ob"), (out_s, out_s + in_s, "ib")):
+        a = float(np.clip(np.nan_to_num(v.get(key + "_a", 0.0)), 0, 1))
+        if a <= 0.001 or hi <= lo:
+            continue
+        col = np.clip(np.nan_to_num(np.array([v.get(key + c, 0.0) for c in ("_r", "_g", "_b")], np.float32)), 0, 1)
+        cx, ix = cover(w, lo, hi)
+        cy, iy = cover(h, lo, hi)
+        inside_x = np.zeros(w, np.float32); inside_x[ix:w - ix] = 1        # the band runs between the outer edges
+        inside_y = np.zeros(h, np.float32); inside_y[iy:h - iy] = 1
+        m = np.maximum(cx[None, :] * inside_y[:, None], cy[:, None] * inside_x[None, :]) * a
+        fb = fb * (1 - m[..., None]) + col * m[..., None]
+    return fb
+
+
+def _echo(v, fb):
+    """The video echo: the frame shown with a zoomed (and flipped, by its orientation) copy of itself over it at its
+    alpha - for what is shown, not fed back."""
+    a = float(np.clip(np.nan_to_num(v.get("echo_alpha", 0.0)), 0, 1))
+    if a <= 0.001:
+        return fb
+    from native import vj_looks
+    h, w = fb.shape[:2]
+    z = max(0.05, float(np.nan_to_num(v.get("echo_zoom", 1.0))))
+    u, vv = np.meshgrid(np.linspace(0, 1, w, dtype=np.float32), np.linspace(0, 1, h, dtype=np.float32))
+    u, vv = (u - 0.5) / z + 0.5, (vv - 0.5) / z + 0.5
+    o = int(v.get("echo_orient", 0)) % 4
+    if o in (1, 3):
+        u = 1.0 - u
+    if o in (2, 3):
+        vv = 1.0 - vv
+    echo = vj_looks.sample(fb, u, vv, wrap=True)
+    return fb * (1 - a) + echo * a
 
 
 def _wave(ctx, v, fb):

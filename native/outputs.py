@@ -114,6 +114,34 @@ def from_wled_cfg(cfg):
 
 
 MA_FOR_ESP = 120                                               # what the ESP32 itself draws, as WLED subtracts it
+GAMMA_DEFAULT = 2.2                                            # WLED's gammaCorrectVal as it ships
+SCREEN_GAMMA = 2.2                                             # the monitor's: what turns LED light back into pixels
+
+
+def device_lut(gamma=GAMMA_DEFAULT, colour=True, bri=255, gamma_bri=False):
+    """A 256-entry table from a colour the effect draws to the pixel the view shows for it on the device: WLED's
+    gamma table on the colour (NeoGammaWLEDMethod::calcGammaTable, when colour gamma is on), its brightness scaled
+    in as scale8 does (gamma'd too when brightness gamma is on), in whole steps - then the LED's linear light shown
+    through the screen's gamma. So a dim gradient bands, and a dimmed device darkens, as on the LEDs."""
+    i = np.arange(256, dtype=np.float64)
+    g = float(gamma) if 0.1 <= float(gamma) <= 3.0 else 1.0     # WLED's own bounds: outside them, no correction
+    led = np.floor((i / 255.0) ** g * 255.0 + 0.5) if (colour and g != 1.0) else i
+    b = int(max(0, min(255, bri)))
+    if gamma_bri and g != 1.0:
+        b = int((b / 255.0) ** g * 255.0 + 0.5)
+    led = np.floor(led * (1 + b) / 256.0)                        # scale8: (i * (1 + scale)) >> 8
+    return np.clip(np.floor((led / 255.0) ** (1.0 / SCREEN_GAMMA) * 255.0 + 0.5), 0, 255).astype(np.uint8)
+
+
+def gamma_from_cfg(cfg):
+    """(gamma, colour gamma on, brightness gamma on) from a device's /json/cfg (light.gc), as cfg.cpp reads it."""
+    gc = (((cfg or {}).get("light") or {}).get("gc")) or {}
+    val = float(gc.get("val", GAMMA_DEFAULT) or GAMMA_DEFAULT)
+    col = float(gc.get("col", val) if gc.get("col") is not None else val) != 1.0
+    bri = float(gc.get("bri", 1.0) if gc.get("bri") is not None else 1.0) != 1.0
+    if val < 0.1 or val > 3.0:
+        return 1.0, False, False
+    return val, col, bri
 
 
 def power(rgb, phys, ma_per_led=LED_MA_DEFAULT, max_ma=MAX_MA_DEFAULT, bri=255):

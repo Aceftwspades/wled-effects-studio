@@ -7,6 +7,7 @@ stream (Device > Stream), which sends the sim's picture as it is.
     src = video.open_source("webcam", name="Integrated Camera")
     src = video.open_source("screen", name="the whole desktop")   # a name from screens()
     src = video.open_source("stream", path="rtsp://192.168.1.20:8554/live")   # a phone app's, OBS's, an IP camera's
+    src = video.open_source("stream", path="https://youtu.be/...")   # a web page's video, by yt-dlp (WebSource)
     src = video.open_source("phone")             # the phone remote's camera page (native/phone.py), no ffmpeg
     src = video.open_source("test")              # no ffmpeg needed
     frame, n = src.latest()                      # (h, w, 3) uint8 and its number, or (None, 0)
@@ -100,8 +101,9 @@ class FfmpegSource:
     """A file or a webcam through ffmpeg, frames read on a thread; latest() is the newest decoded."""
 
     def __init__(self, input_args, label, kind, width=WIDTH, height=HEIGHT, realtime=True, loop=False, fit=False,
-                 fps=None):
+                 fps=None, crop=None, alpha=False):
         self.kind, self.label = kind, label
+        self.comps = 4 if alpha else 3                            # RGBA: a file with transparency (alpha_of)
         self.w, self.h = int(width), int(height) // 2 * 2
         self.error = None
         self.n = 0
@@ -122,9 +124,12 @@ class FfmpegSource:
             vf = f"scale={self.w}:{self.h}:force_original_aspect_ratio=decrease,pad={self.w}:{self.h}:(ow-iw)/2:(oh-ih)/2"
         else:                                                    # the frame filled (the LEDs: no black bars)
             vf = f"scale={self.w}:{self.h}:force_original_aspect_ratio=increase,crop={self.w}:{self.h}"
+        if crop:                                                 # (x, y, w, h) of the picture first: an area of the screen
+            cx, cy, cw, ch = (int(v) for v in crop)
+            vf = f"crop={cw}:{ch}:{cx}:{cy}," + vf
         if fps:
             vf = f"fps={fps}," + vf
-        self.cmd = [exe, "-v", "error", "-nostdin"] + pre + list(input_args) + ["-vf", vf, "-an", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
+        self.cmd = [exe, "-v", "error", "-nostdin"] + pre + list(input_args) + ["-vf", vf, "-an", "-f", "rawvideo", "-pix_fmt", "rgba" if alpha else "rgb24", "-"]
         from native import procs
         self.proc = procs.popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # ffmpeg's messages read as they come, the last few kept for the error: read only after the video ended,
@@ -138,7 +143,7 @@ class FfmpegSource:
         return f"{self.label}, {self.w} x {self.h}"
 
     def _read(self):
-        size = self.w * self.h * 3
+        size = self.w * self.h * self.comps
         out = self.proc.stdout
         from native import clock
         try:
@@ -151,7 +156,7 @@ class FfmpegSource:
                     break
                 with self._cv:
                     if not self._paused:                     # paused: the picture holds (the video runs on)
-                        self._frame = np.frombuffer(buf, np.uint8).reshape(self.h, self.w, 3)
+                        self._frame = np.frombuffer(buf, np.uint8).reshape(self.h, self.w, self.comps)
                         self.n += 1
                     self._reads += 1
                     self._cv.notify_all()
@@ -202,6 +207,41 @@ class FfmpegSource:
             pass
 
 
+_ALPHA = {}
+
+
+def alpha_of(path):
+    """Whether a video file has transparency, and what must decode it so: ([decoder args before -i], True) - a VP8
+    or VP9 WebM made with alpha (libvpx keeps it; ffmpeg's own decoder drops it), ProRes 4444, PNG, QuickTime
+    Animation and the like (their pixel format has it) - else ([], False). Asked of ffprobe once a file and its
+    time."""
+    import os
+    try:
+        key = (path, os.path.getmtime(path))
+    except OSError:
+        return [], False
+    if key in _ALPHA:
+        return _ALPHA[key]
+    got = ([], False)
+    probe = shutil.which("ffprobe")
+    if probe:
+        from native import procs
+        try:
+            out = procs.run([probe, "-v", "error", "-select_streams", "v:0", "-show_entries",
+                             "stream=codec_name,pix_fmt:stream_tags=alpha_mode", "-of", "default=nw=1", path],
+                            capture_output=True, text=True, timeout=10).stdout
+        except Exception:
+            out = ""
+        info = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+        codec, fmt = info.get("codec_name", ""), info.get("pix_fmt", "")
+        if info.get("TAG:alpha_mode") == "1" and codec in ("vp8", "vp9"):
+            got = (["-c:v", "libvpx" if codec == "vp8" else "libvpx-vp9"], True)
+        elif fmt.startswith(("yuva", "rgba", "bgra", "argb", "abgr", "gbrap", "ya")) or fmt in ("pal8",):
+            got = ([], True)
+    _ALPHA[key] = got
+    return got
+
+
 def webcams():
     """The cameras ffmpeg can open here: [(name shown, input args)]."""
     exe = ffmpeg()
@@ -234,6 +274,55 @@ def webcams():
 # --- the screen ------------------------------------------------------------------------------------
 SCREEN_FPS = 30
 WINDOW = "window: "                 # a window's entry: its title after this
+AREA = "area: "                     # an area of the screen's entry: "area: x,y wxh" in the desktop's pixels
+
+
+def area_name(x, y, w, h):
+    """The entry for an area of the screen, its left and top in the desktop's pixels (a monitor left of the main
+    one has them below 0 on Windows), its width and height."""
+    return f"{AREA}{int(x)},{int(y)} {max(2, int(w))}x{max(2, int(h))}"
+
+
+def parse_area(name):
+    """(x, y, w, h) of an area entry, or None for any other name."""
+    m = re.match(r"^" + re.escape(AREA) + r"\s*(-?\d+)\s*,\s*(-?\d+)\s+(\d+)\s*x\s*(\d+)\s*$", name or "")
+    if not m:
+        return None
+    x, y, w, h = (int(v) for v in m.groups())
+    return (x, y, w, h) if w >= 2 and h >= 2 else None
+
+
+def desktop_origin():
+    """Where the screenshot of the whole desktop starts, in the desktop's pixels: (0, 0) except on Windows with a
+    monitor left of or above the main one - so a point in that picture is (x + left, y + top) to ffmpeg."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            m = ctypes.windll.user32.GetSystemMetrics
+            return int(m(76)), int(m(77))                    # SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN
+        except Exception:
+            pass
+    return 0, 0
+
+
+def area_args(x, y, w, h):
+    """ffmpeg's input for an area of the screen, and a crop to make of what it reads (or None): Windows and X11
+    read just the area; macOS reads its first screen whole and crops it."""
+    w, h = max(2, int(w)) // 2 * 2, max(2, int(h)) // 2 * 2
+    if sys.platform == "win32":
+        return (["-f", "gdigrab", "-framerate", str(SCREEN_FPS), "-draw_mouse", "0", "-offset_x", str(int(x)),
+                 "-offset_y", str(int(y)), "-video_size", f"{w}x{h}", "-i", "desktop"], None)
+    if sys.platform == "darwin":
+        found = [a for n, a in screens(windows=False)]
+        if not found:
+            raise ValueError(screen_note() or "no screen to read")
+        return found[0], (int(x), int(y), w, h)
+    import os
+    disp = os.environ.get("DISPLAY")
+    if not disp:
+        raise ValueError(screen_note() or "no screen to read")
+    return (["-f", "x11grab", "-framerate", str(SCREEN_FPS), "-draw_mouse", "0", "-video_size", f"{w}x{h}",
+             "-i", f"{disp}+{int(x)},{int(y)}"], None)
 
 
 def _win_monitors():
@@ -426,6 +515,134 @@ def stream_args(url):
     return low + ["-i", url]
 
 
+# AI: below section was generated by an AI
+# sites whose links are pages, not video: yt-dlp (github.com/yt-dlp/yt-dlp) finds the video in them
+PAGE_HOSTS = ("youtube.com", "youtu.be", "vimeo.com", "twitch.tv", "dailymotion.com", "dai.ly", "kick.com",
+              "tiktok.com", "instagram.com", "facebook.com", "x.com", "twitter.com", "bilibili.com", "streamable.com")
+WEB_HEIGHT = 480                       # the video asked of the site: no taller (the LEDs take a few dozen rows)
+YTDLP_HINT = "a web video needs yt-dlp: pip install yt-dlp, or yt-dlp.exe from github.com/yt-dlp/yt-dlp on the PATH"
+
+
+def page_link(url):
+    """The link is a web page with a video in it (a site of PAGE_HOSTS), not a stream ffmpeg can open as it is."""
+    from urllib.parse import urlparse
+    try:
+        host = (urlparse((url or "").strip()).hostname or "").lower()
+    except ValueError:
+        return False
+    return any(host == h or host.endswith("." + h) for h in PAGE_HOSTS)
+
+
+def ytdlp():
+    """How yt-dlp can be run here: ("exe", path) on the PATH, ("module", None) installed for this Python, or None."""
+    exe = shutil.which("yt-dlp")
+    if exe:
+        return "exe", exe
+    try:
+        import yt_dlp  # noqa: F401  (imported, not looked up: a packaged studio's modules have no spec to find)
+        return "module", None
+    except ImportError:
+        return None
+
+
+def resolve_page(url, timeout=40.0):
+    """(media address, live) for the video in a web page: the best single file no taller than WEB_HEIGHT, or a
+    live stream's playlist. ValueError when yt-dlp is not here or cannot find one."""
+    how = ytdlp()
+    if how is None:
+        raise ValueError(YTDLP_HINT)
+    fmt = f"b[height<={WEB_HEIGHT}]/b/bv*[height<={WEB_HEIGHT}]/bv*"
+    if how[0] == "module":
+        import yt_dlp
+        opts = {"format": fmt, "noplaylist": True, "quiet": True, "no_warnings": True, "socket_timeout": 15}
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url.strip(), download=False)
+        except Exception as e:                                   # yt-dlp's own errors, a page with no video
+            raise ValueError(f"yt-dlp found no video there: {e}")
+        media = info.get("url") or next((f.get("url") for f in (info.get("requested_formats") or []) if f.get("url")), None)
+        if not media:
+            raise ValueError("yt-dlp found no single video stream there")
+        return media, bool(info.get("is_live"))
+    from native import procs
+    try:
+        r = procs.run([how[1], "--no-playlist", "--no-warnings", "-f", fmt, "--print", "is_live", "--print", "urls",
+                       url.strip()], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise ValueError("yt-dlp took too long to find the video")
+    lines = [l.strip() for l in (r.stdout or "").splitlines() if l.strip()]
+    if r.returncode != 0 or len(lines) < 2:
+        err = [l for l in (r.stderr or "").splitlines() if l.strip()]
+        raise ValueError(f"yt-dlp found no video there: {err[-1] if err else 'no answer'}")
+    return lines[1], lines[0].lower() == "true"
+
+
+class WebSource:
+    """A web page's video (YouTube and the like): its address found by yt-dlp on a thread - which takes a few
+    seconds, and the studio does not wait - then read by ffmpeg like any stream. A video plays at its own speed and
+    round again; a live one as it comes. Until it starts, latest() has no frame and describe() says it is looking."""
+    kind = "stream"
+
+    def __init__(self, url, width=WIDTH, height=HEIGHT, fit=False):
+        self.url, self.label = url.strip(), STREAM + url.strip()
+        self.w, self.h, self.fit = int(width), int(height) // 2 * 2, fit
+        self.error = None
+        self.fps = None
+        self._src = None
+        self._closed = False
+        self._paused = False
+        if not ffmpeg():
+            raise ValueError("video needs ffmpeg on the PATH (ffmpeg.org) - the test pattern works without it")
+        if ytdlp() is None:
+            raise ValueError(YTDLP_HINT)
+        threading.Thread(target=self._open, daemon=True).start()
+
+    def _open(self):
+        try:
+            media, live = resolve_page(self.url)
+            args = (stream_args(media) if live else
+                    ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5", "-i", media])
+            src = FfmpegSource(args, self.label, "stream", self.w, self.h, realtime=not live, loop=not live,
+                               fit=self.fit)
+        except ValueError as e:
+            self.error = str(e); return
+        if self._closed:
+            src.close(); return
+        src.pause(self._paused)
+        self._src = src
+
+    @property
+    def n(self):
+        return self._src.n if self._src else 0
+
+    def describe(self):
+        if self._src:
+            return f"{self.url} (web video), {self.w} x {self.h}"
+        return f"{self.url}: finding its video..." if self.error is None else f"{self.url}: {self.error}"
+
+    def latest(self):
+        if self._src is None:
+            return None, 0
+        if self._src.error and self.error is None:
+            self.error = self._src.error
+        return self._src.latest()
+
+    def pause(self, on=True):
+        self._paused = bool(on)
+        if self._src:
+            self._src.pause(on)
+
+    @property
+    def paused(self):
+        return self._paused
+
+    def close(self):
+        self._closed = True
+        if self._src:
+            self._src.close()
+# AI: end
+
+
 def open_camera(name, width=WIDTH, height=HEIGHT, fit=False):
     """A camera by its entry in a camera list: PHONE, STREAM + an address, or a webcam's name (the mapping
     window's list holds all three)."""
@@ -445,6 +662,8 @@ def open_source(kind, path=None, name=None, width=WIDTH, height=HEIGHT, loop=Tru
         from native import phone
         return PhoneSource(phone.CAMERA, width, height, fit=fit)
     if kind == "stream":
+        if page_link(path):
+            return WebSource(path, width, height, fit=fit)
         args = stream_args(path)
         return FfmpegSource(args, STREAM + path.strip(), "stream", width, height, realtime=False, fit=fit)
     if kind == "file":
@@ -460,6 +679,12 @@ def open_source(kind, path=None, name=None, width=WIDTH, height=HEIGHT, loop=Tru
         return FfmpegSource(cams[name], name, "webcam", width, height, realtime=False, fit=fit)
     if kind == "screen":
         name = name or ""
+        area = parse_area(name)
+        if area is not None:
+            if not ffmpeg():
+                raise ValueError(screen_note())
+            args, crop = area_args(*area)
+            return FfmpegSource(args, name, "screen", width, height, realtime=False, fit=fit, crop=crop)
         if name.startswith(WINDOW) and sys.platform == "win32" and ffmpeg():
             # a window by its title, whether or not it was on screen when the list was made
             return FfmpegSource(_win_window_args(name[len(WINDOW):]), name, "screen", width, height, realtime=False, fit=fit)

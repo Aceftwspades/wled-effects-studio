@@ -147,7 +147,30 @@ def cube_params(tab, B):
 
 
 # --- over the studio's geometry ------------------------------------------------------------------
+def trailing(info):
+    """LEDs a device's 2-D ledmap lists after its matrix - a trailing strip (WLED 17's sparse ledmaps, wled/WLED
+    #5745: entries past width x height run on as a 1-D strip after the matrix). The studio's frame is the matrix:
+    those LEDs are left out, dark in a stream. 0 for a map with none, or a 1-D map."""
+    lm = (info or {}).get("ledmap")
+    if not lm:
+        return 0
+    w, h = int(lm.get("width") or 0), int(lm.get("height") or 0)
+    m = lm.get("map") or []
+    if not (w > 0 and h > 0) or len(m) <= w * h:
+        return 0
+    return sum(1 for v in m[w * h:] if isinstance(v, (int, float)) and int(v) >= 0)
+
+
 def apply(geom, info, host="the device"):
+    """The geometry for the device's wiring (see _apply), its words saying a trailing strip it leaves out."""
+    g, words = _apply(geom, info, host)
+    n = trailing(info)
+    if n:
+        words += f"; and {n} LEDs after the matrix, a trailing strip, left out (dark in a stream)"
+    return g, words
+
+
+def _apply(geom, info, host="the device"):
     """The geometry the studio has, wired as the device is: (a new Geometry,
     words). The kind stays; a cube takes the device's face size if it
     differs. ValueError when the device's layout cannot be this kind's."""

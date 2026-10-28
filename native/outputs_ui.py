@@ -31,7 +31,7 @@ def _state(app):
 def build(app):
     c = _c()
     from native import device_ui
-    with dpg.window(tag=TAG, show=False, width=px(680), height=px(460), no_collapse=True, no_title_bar=True):
+    with dpg.window(tag=TAG, show=False, width=px(680), height=px(490), no_collapse=True, no_title_bar=True):
         device_ui.header(app, "outputs")
         dpg.add_text("", tag="out_desc", color=c.DIM, wrap=0)
         with dpg.group(horizontal=True):
@@ -63,6 +63,25 @@ def build(app):
             dpg.add_checkbox(label="limiter in the sim", tag="out_abl",
                              callback=lambda s, v: _set(app, "abl_preview", bool(v)))
         with dpg.group(horizontal=True):
+            typeface.label(dpg.add_text("ON THE LEDS", color=c.ACCENT))
+            dpg.add_checkbox(label="in the view", tag="out_devview", callback=lambda s, v: _set(app, "dev_view", bool(v)))
+            c.tip("the views show the picture as the device will light it: through its gamma and at its brightness, "
+                  "in its whole steps - a dim gradient bands as it does on the LEDs (the stream is sent as it is)")
+            form.inline("gamma")
+            typeface.mono(dpg.add_input_float(tag="out_gamma", width=px(60), step=0, format="%.2f", min_value=0.1,
+                                              max_value=3.0, min_clamped=True, max_clamped=True,
+                                              callback=lambda s, v: _set(app, "gamma", round(float(v), 2))))
+            c.tip("the device's gamma (Config > LED preferences; WLED's default 2.2)")
+            dpg.add_checkbox(label="on colours", tag="out_gcol", callback=lambda s, v: _set(app, "gamma_col", bool(v)))
+            c.tip("the device corrects colours by the gamma (WLED's default: on)")
+            dpg.add_checkbox(label="on brightness", tag="out_gbri", callback=lambda s, v: _set(app, "gamma_bri", bool(v)))
+            c.tip("the device corrects its brightness by the gamma too (WLED's default: off)")
+            form.inline("brightness")
+            typeface.mono(dpg.add_input_int(tag="out_devbri", width=px(56), step=0, min_value=0, max_value=255,
+                                            min_clamped=True, max_clamped=True,
+                                            callback=lambda s, v: _set(app, "dev_bri", int(v))))
+            c.tip("the device's brightness, 0-255: low, its few steps show")
+        with dpg.group(horizontal=True):
             dpg.add_text("", tag="out_power", color=c.TEXT, wrap=0)
             c.info("What this frame draws, by WLED's own maths: full white is the mA per LED (55 is WLED's default; ~12 for WS2815 at 12 V). "
                    "The supply less the ESP's 120 mA is what the device's auto brightness limiter dims to fit; the sim previews that dimming.")
@@ -88,6 +107,11 @@ def refresh(app):
                   + ("" if covered == g.count else f" - {'short by' if covered < g.count else 'over by'} {abs(g.count - covered)}"))
     dpg.set_value("out_ledma", int(S.get("ma_per_led", 55))); dpg.set_value("out_maxma", int(S.get("max_ma", 850)))
     dpg.set_value("out_abl", bool(S.get("abl_preview")))
+    dpg.set_value("out_devview", bool(S.get("dev_view")))
+    dpg.set_value("out_gamma", float(S.get("gamma", outputs.GAMMA_DEFAULT)))
+    dpg.set_value("out_gcol", bool(S.get("gamma_col", True)))
+    dpg.set_value("out_gbri", bool(S.get("gamma_bri", False)))
+    dpg.set_value("out_devbri", int(S.get("dev_bri", 255)))
     dpg.delete_item("out_rows", children_only=True)
     types = [t[1] for t in outputs.TYPES]; orders = [o[1] for o in outputs.ORDERS]
     cb = lambda s, v, u: _field(app, u[0], u[1], v)
@@ -154,7 +178,7 @@ def _field(app, k, key, value):
 def _set(app, key, value):
     _state(app)[key] = value
     app.project.save()
-    if key != "abl_preview":
+    if key not in ("abl_preview", "dev_view", "gamma", "gamma_col", "gamma_bri", "dev_bri"):
         refresh(app)
 
 
@@ -193,18 +217,29 @@ def read_device(app):
 
     def work():                                           # on a worker: a device that does not answer froze the studio
         try:
-            return True, devices._get(host, "/json/cfg", 6)
+            cfg = devices._get(host, "/json/cfg", 6)
+            try:
+                bri = (devices._get(host, "/json/state", 6) or {}).get("bri")
+            except Exception:
+                bri = None
+            return True, (cfg, bri)
         except Exception as e:
             return False, e
 
     def done(r):
-        ok, cfg = r
+        ok, got = r
         if not ok:
-            dpg.set_value("out_log", f"could not read the device's config: {cfg}"); return
+            dpg.set_value("out_log", f"could not read the device's config: {got}"); return
+        cfg, bri = got
         outs, ledma, maxma = outputs.from_wled_cfg(cfg)
         S = _state(app); S["outs"] = outs; S["ma_per_led"] = ledma; S["max_ma"] = maxma
+        S["gamma"], S["gamma_col"], S["gamma_bri"] = outputs.gamma_from_cfg(cfg)
+        if isinstance(bri, int):
+            S["dev_bri"] = max(0, min(255, bri))
         app.project.save(); refresh(app)
-        dpg.set_value("out_log", f"the device's {len(outs)} output(s) read: " + ", ".join(f"pin {o['pin']} x{o['len']}" for o in outs))
+        dpg.set_value("out_log", f"the device's {len(outs)} output(s) read: " + ", ".join(f"pin {o['pin']} x{o['len']}" for o in outs)
+                      + f"; gamma {S['gamma']:g}" + (" on colours" if S["gamma_col"] else " (off)")
+                      + (f", brightness {S['dev_bri']}" if isinstance(bri, int) else ""))
     tasks.run(app, "send:outputs", f"reading {host}'s outputs", work, done)
 
 

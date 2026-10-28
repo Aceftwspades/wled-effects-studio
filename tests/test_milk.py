@@ -28,6 +28,37 @@ check(v["b"] == 7.0 and v["c"] == 10.0 and v["e"] == 1.0, f"arithmetic, if and a
 check(v["a"] == 3.0 and v["f"] == 1.0 and v["g"] == 1.0, "+=, ! and &&, sqr and pow")
 check(v["h"] == 7.0 and v["i"] == 9.0 and v["j"] == -5.0 and v["k"] == 2.0, "the operators' order and grouping")
 check(v["l"] == 0.0 and v["m"] == 2.0, "a division by zero is 0; min and max")
+
+# ns-eel2, as MilkDrop 2's presets write it: an assignment is an expression, sequences, loops, memory, ?:
+v = {}
+milk.compile_code("a = b = 3; c = if(above(a, 2), d = 5, e = 6); f = a > 2 ? 10 : 20; g = (h = 1; h + 4); "
+                  "i = exec2(j = 2, j * 3)")(v)
+check(v["a"] == v["b"] == 3.0 and v["c"] == v["d"] == 5.0 and "e" not in v and v["f"] == 10.0 and v["g"] == 5.0
+      and v["i"] == 6.0, f"assignments as values, if() running one branch, ?:, (a; b), exec2 ({v})")
+v = {}
+milk.compile_code("n = 0; loop(5, megabuf(n) = n * n; n += 1); s = megabuf(3) + megabuf(4); "
+                  "k = 0; while(k += 1; k < 7); gmegabuf(2) = 9")(v)
+check(v["s"] == 25.0 and v["k"] == 7.0, f"loop(), while() and megabuf ({v})")
+w = {}
+milk.compile_code("g = gmegabuf(2); reg07 = 4")(w)
+x = {}
+milk.compile_code("r = reg07; p = $pi; h = $x10")(x)
+check(w["g"] == 9.0 and x["r"] == 4.0 and abs(x["p"] - math.pi) < 1e-9 and x["h"] == 16.0,
+      "gmegabuf and reg00..99 shared by every block; $pi and hex")
+v = {}
+milk.compile_code("a = 1\nb = 2; c = a + b")(v)
+check(v["c"] == 3.0, "a line without its ';' (MilkDrop takes it)")
+v = {"x": np.array([0.2, 0.7, 1.5])}
+milk.compile_code("y = if(above(x, .5), x * 2, 0); z = x % 2; megabuf(1) = 5; m = megabuf(1)")(v)
+check(np.allclose(v["y"], [0, 1.4, 3.0]) and np.allclose(v["z"], [0, 0, 1]) and v["m"] == 5.0,
+      "per-pixel: if() by point, % on a grid, megabuf")
+check(milk._carried("it = (it + 1)*above(sample,0); sw = (1-sw); x = sw") and milk._carried("n += 1; y = n")
+      and not milk._carried("ti = q1; xa = sin(ti*t1); x = xa*sample") and not milk._carried("x = sample; x = x * 2"),
+      "per-point code handing a value to the next point found (it runs point by point)")
+pv = {"sample": np.linspace(0, 1, 6), "value1": np.zeros(6), "value2": np.zeros(6), "x": np.zeros(6), "y": np.zeros(6),
+      "r": np.ones(6), "g": np.ones(6), "b": np.ones(6), "a": np.ones(6)}
+milk._points_in_order(milk.compile_code("sw = 1 - sw; x = sw"), pv, 6)
+check(list(pv["x"]) == [1, 0, 1, 0, 1, 0], f"point by point: a toggle alternates ({list(pv['x'])})")
 check(milk.compile_code("// a comment\nx = 1; // another\ny = x + q1;")({}) is None, "comments; an unset variable is 0")
 x = np.linspace(0, 1, 5)
 pv = {"x": x, "zoom": np.ones(5)}

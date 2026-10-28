@@ -417,7 +417,12 @@ and kept as the device's own map when it is not (then its button
 another face size takes the device's. A
 matrix with a ledmap on the device takes the ledmap (WLED uses it over its
 2-D setup); one panel of a 2-D setup becomes the matrix's switches,
-several (or a gaps file) the map WLED makes of them. A strip, cylinder,
+several (or a gaps file) the map WLED makes of them. A ledmap that lists
+LEDs after its matrix - a trailing strip, which WLED 17 runs on as a 1-D
+strip after the matrix - keeps the matrix, and the studio says how many
+LEDs it left out (in a stream they stay dark). The ledmap the studio
+writes puts its size before the map, nothing after it, so a firmware
+whose parser read on past the map's end takes it as it is. A strip, cylinder,
 sphere or torus takes it at its size; a shape's wiring is its parts' own
 order. Audio
 comes from the synth (sliders, a beat clock), a live capture, or an audio
@@ -972,13 +977,19 @@ Video node shows black there when it is flashed instead of streamed.
    the cameras on this computer) or **the screen** (**Find** lists the
    whole desktop, each monitor when there are several, and on Windows each
    window on screen by its title - a music visualiser, a game, a browser
-   tab's video: whatever is there reaches the LEDs), **the phone's camera**
+   tab's video: whatever is there reaches the LEDs; **Area...** shows a
+   picture of the desktop to drag a box over, or type its left, top, width
+   and height, and reads just that part), **the phone's camera**
    (the phone remote's page, Window > MIDI, OSC and phone: its **Camera**
    link on the phone, then **Start** - the panel shows the link, and needs
-   the remote served over HTTPS) or **a network stream** (**address**: an
+   the remote served over HTTPS) or **a stream or web video** (**address**: an
    `rtsp://`, `rtmp://`, `srt://` or `http://` stream - a phone camera
-   app's such as IP Webcam, DroidCam or Larix, OBS's, an IP camera's; Enter
-   plays it). **size** is how many
+   app's such as IP Webcam, DroidCam or Larix, OBS's, an IP camera's - or a
+   link to a web page's video: YouTube, Vimeo, Twitch, Dailymotion and the
+   like, found by [yt-dlp](https://github.com/yt-dlp/yt-dlp), which must be
+   installed (`pip install yt-dlp`, or `yt-dlp.exe` on the PATH); it is
+   asked for the video no taller than 480 rows, a video plays round again,
+   a live one as it comes. Enter plays it). **size** is how many
    pixels across the frame is decoded at - 96 is plenty for most shapes.
    **Play** starts it (again: pause, the picture holds), **Stop** closes
    it - a webcam is switched off. A small preview shows what is coming in.
@@ -1139,11 +1150,29 @@ and a click puts it on that deck; **look** lists them too:
   (fitted to the canvas - a logo), bouncing side to side, zoomed or flashed
   on the beat, a word on each beat, or scrolling on a wave. Its own knobs
   set the words' **size** (of the canvas's height), where they sit
-  (**across** and **up / down**, -1 to 1 with 0 the middle) and a **glow**
-  around the letters; **speed** is how fast they move (scrolling at 0: held
-  still) and **amount** how hard the beat hits them. MIDI and the
+  (**across** and **up / down**, -1 to 1 with 0 the middle), a **glow**
+  around the letters, a **shadow** (the words again a little down and to
+  the right, dimmer) and an **outline** (a ring round each letter in the
+  far end of the deck's colours); **placed** puts words that are held,
+  zoomed, flashed or bouncing against the left or right side or in the
+  middle, and **font ...** takes a font file of your own (.ttf or .otf,
+  copied into the project; **built-in** goes back). **speed** is how fast
+  they move (scrolling at 0: held still) and **amount** how hard the beat
+  hits them. MIDI and the
   modulators move the text's knobs as they do the others; **Image** shows a picture file (**picture ...**), filling the
-  canvas and drifting slowly - a logo, a poster.
+  canvas and drifting slowly - a logo, a poster. A PNG's (or GIF's, WebP's)
+  transparency is kept. The deck's **PICTURE** section (shown for Image and
+  for a deck with video) says how a picture or video is laid on the canvas:
+  **clear** - its own transparency, none (shown whole, on black), **a colour
+  keyed out** (a green screen: the **key colour**, a **tolerance** and a
+  **softness** for its edge) or **the dark keyed out**; **fit** - fill (cut
+  to fit), fit (all of it, clear round it), stretched or tiled; **scale**,
+  **across**, **up / down**, **turn** (degrees), **flip**, and **drift** (the
+  Image look's slow wander and swell; 0 holds it still). A video file with
+  transparency - a WebM made with alpha (VP8 or VP9), ProRes 4444, PNG or
+  QuickTime Animation - is read with it; any video can be keyed. The knobs
+  learn MIDI and are kept in presets. On deck C over the mix, wherever the
+  picture is clear the mix shows through.
 - **Effect**: any effect of the studio's, run on the shape itself beside
   the main one (its **speed** and **amount** are the effect's Speed and
   Intensity; **its colours** and **palette** are the effect's own, or a
@@ -1172,8 +1201,10 @@ its picture by the time it is cut to. The rest is folded
 away in four sections:
 
 - **VIDEO**: the deck's source - no video, the test pattern, video files,
-  a webcam, the screen (or a window), the phone's camera or a network
-  stream; **...** adds files to the deck's list (several at once - each
+  a webcam, the screen (or a window, or an area of it: **area** drags a box
+  over a picture of the desktop), the phone's camera, or a network stream
+  or a web page's video (a YouTube link, as the VIDEO section takes it);
+  **...** adds files to the deck's list (several at once - each
   copied into the project's `assets/vj`, so the project keeps them when it
   is moved or shared), or picks the camera, the screen or the address; **||** pauses the video (the picture holds). Two
   decks on the same source share it (a webcam opens once). With files, the
@@ -1212,7 +1243,9 @@ everything A and B have, laid over their mix at its **level** (0, the
 default: not there) through its own blend - screened, added, the lighter of
 each, multiplied, their difference, or **over** (what it draws covers the
 mix and its black lets the mix through): words or a logo over whatever the
-fader does, a strobe or a flame on top of both.
+fader does, a strobe or a flame on top of both. A picture or video with
+transparency (its own, or keyed out in PICTURE) is clear there in every
+blend: **over** shows the mix through it, black parts of it included.
 
 **MIX**: the crossfader (deck A at 0, B at 1), **A** and **B** throw it to
 an end, **Cut** goes straight to the other deck, **Fade** sweeps there
@@ -1260,11 +1293,17 @@ project's `looks/` folder and opens it in your editor: paste a shader from
 shadertoy.com over it (the code of its Image tab) and save, and it runs on
 its deck as it is, on the graphics card (OpenGL 3.3, through moderngl).
 It has what Shadertoy gives - iTime, iResolution, iFrame, iChannel0 (the
-deck's video) and iChannel1 (the sound, as Shadertoy's audio input) - and
+deck's video) and iChannel1 (the sound, as Shadertoy's audio input),
+iChannelResolution, iChannelTime, iSampleRate - and
 the studio's own iBeat, iBass, iMid, iTreble, iLevel and iAmount. What its
 four channels hold is chosen per channel - the deck's **video**, the
 **sound** (Shadertoy's audio input), a **noise** texture (as Shadertoy's
-RGBA noise), the deck's **picture**, a buffer **A** to **D**, or **none**:
+RGBA noise), the deck's **picture**, an **image** of its own (the **...**
+beside the channel: a texture the shader asks for - a photo, a pattern -
+noise until one is chosen), a **cube** (a sky of the studio's own,
+for a shader that reads Shadertoy's cubemaps), the **font** (laid out as
+Shadertoy's "Font 1", for a shader that writes text), a buffer **A** to
+**D**, or **none**:
 by default iChannel0 is the video, 1 the sound, 2 the noise; the shader's
 file can say otherwise with a line like `//@ iChannel2 = picture`, and the
 deck's **channels** row (shown while a shader is on it) chooses again,
@@ -1272,15 +1311,37 @@ deck's **channels** row (shown while a shader is on it) chooses again,
 Buffer A to D and Common tabs - goes in one file, each pass after a line
 `//@ buffer A` (`//@ common`, `//@ image`), with `//@ iChannel0 = A` in a
 pass to read buffer A (its own: its last frame); they run A to D, then the
-image. One that reads the keyboard will not run, and one that does not
-compile says why, at its own line numbers. **Import...** copies MilkDrop
-presets (`.milk`) and shaders (`.glsl`) into `looks/`: a preset is listed
+image. Shadertoy's GLSL is WebGL's: where the desktop's reads it otherwise
+(a shader's own `noise2`, a macro named like a variable) the studio makes it
+read as it does there. One that does not compile says why, at its own line
+numbers. **Import...** copies MilkDrop presets (`.milk`) and shaders
+(`.glsl`) into `looks/`, and takes a Shadertoy shader's **`.json`** (what
+the site's API gives, or a save-shader browser extension) whole: its Common,
+Buffer and Image passes and what each reads - a buffer, a cubemap (the sky),
+its font, a texture (noise stands in), music or the microphone (the sound),
+a webcam (the deck's video) - written as a `.glsl` named after it (a
+texture of the site's comes in as an **image** channel, for a picture of
+your own; the file says which), its
+author and page at the top; a keyboard (no key is ever pressed), a 3-D
+texture, a cubemap pass or a sound pass are left out, and said. Tried on
+304 shaders from shadertoy.com (204 single-pass, 100 from its API with
+every pass, 30 of them multi-pass): all of them compile and run. A shader
+is its author's - Shadertoy's default licence is CC BY-NC-SA 3.0. A preset is listed
 with the MilkDrop looks and runs approximately - its zoom, rotation, warp,
 stretch and drift, decay, wave, its custom shapes (sides, colours, borders,
-instances, textured) and custom waves, and its per-frame, per-pixel and
-per-point equations; its MilkDrop 2 warp and composite shaders are
-translated to GLSL and run on the graphics card, and one that does not
-translate is left out, said under the decks while the rest runs.
+instances, textured) and custom waves, its outer and inner borders and video
+echo, and its per-frame, per-pixel and per-point equations in MilkDrop 2's
+language (an assignment inside an expression, `if()`, `?:`, `loop()`,
+`while()`, `megabuf` and `gmegabuf`, `reg00`-`reg99`); the sound reaches it
+as MilkDrop's does, each band against its own last few seconds (1 the
+music's usual level). Its MilkDrop 2 warp and composite shaders are
+translated to GLSL by type - what HLSL converts by itself (a number where a
+vector goes, a vector cut to a smaller one, an int as a float) written out -
+and run on the graphics card; a texture the preset brings of its own is
+noise here, and a shader that does not translate is left out, said under the
+decks while the rest runs. Tried on 300 presets of projectM's
+cream-of-the-crop pack: all of them load and run, 478 of their 479 shaders
+compile.
 **New look...** makes a small Python file in the project's `looks/` folder
 from an example and opens it in your editor; saved, it reloads in the frame
 at once, listed under Yours (**Edit** opens it again). A Python look is a
@@ -1605,7 +1666,11 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
   DDP, or **E1.31 (sACN)** or **Art-Net**, 170 LEDs a universe from the
   **universe** beside it - for a WLED with that receiver on in its Sync
   settings (DMX mode Multiple RGB), or a Falcon, ESPixelStick or FPP
-  controller. The line under it says how the stream is going, once a
+  controller - or **DDP over WebSocket**: DDP through the device's web
+  port (its `/ws`, WLED 0.16 and later), for a network where UDP does not
+  get through - a guest Wi-Fi, a firewall, a VPN. It is TCP, so a slow
+  link drops frames rather than falling behind, and it connects again by
+  itself after a drop. The line under it says how the stream is going, once a
   second: the frames sent against the rate asked, the kbit/s, the
   device's own fps and how long it takes to answer (asked every two
   seconds), any send errors - and a trace of the rate beside it. The frame goes in the order the device takes it,
@@ -1642,7 +1707,14 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
   the frame on screen draws at the LED's full-white current (55 mA by
   default) against the supply you enter, and how far WLED's auto
   brightness limiter would dim it; "preview the limiter" dims the sim
-  the same way, and the footer shows the amps all the time.
+  the same way, and the footer shows the amps all the time. **ON THE
+  LEDS** > **in the view** shows the picture as the device will light it:
+  through its **gamma** (on **colours**, WLED's default, and on
+  **brightness** if the device does that too) and at its **brightness**,
+  in its whole steps - so a dim gradient bands, and a dimmed device loses
+  its darks, as on the LEDs. "Read the device's" fills them in from the
+  device. Only the views change: the stream is sent as it is, the device
+  applying its own.
 - **Audio input** (Window menu, Ctrl+Shift+M): what the device listens
   through - a microphone (INMP441, SPH0645, a PDM mic, an ES7243 module)
   or a **line-in**: a PCM1808 / WM8782 ADC breakout (the four I2S wires,
@@ -2122,7 +2194,7 @@ Every button, with what its tooltip says.
 
 **Audio input frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Read the device's` — what the device's audioreactive is set to now (its type, pins and levels), into these fields; `Send the audio input` — over /json/cfg; the levels take at once, a new type or new pins after a reboot (offered when needed); `Reboot the device` — restarts the device so a new type or new pins take effect; the LEDs go dark for a few seconds
 
-**VJ frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the VJ's last change undone (Ctrl+Z with the frame focused, Ctrl+Y redoes); `New look...` — a look of your own: a small Python file in the project's looks/ folder, made from an example and opened in your editor - it reloads here each time it is saved; it goes on the deck off the mix; `New shader...` — a Shadertoy shader of your own: a .glsl file to paste one from shadertoy.com into (its Image tab's code) - it runs as it is, on the graphics card; `Import...` — a MilkDrop preset (.milk) or a Shadertoy shader (.glsl) copied into the project's looks/ and listed - a preset runs its motion, decay, wave, shapes, custom waves and equations, and its MilkDrop 2 shaders translated (one that does not translate is left out, and said); `Tap` — tap on the beat: the show's tempo from the gaps (the Sequence's Tap) - the first tap is the first beat of a bar; `Browse...` — every look as a moving thumbnail: click one to put it on this deck; `Shuffle` — a look this deck does not have, at random; `Mutate` — a new flame bred from this one (its maps nudged, a variation swapped) - kept with the project; `Edit` — this look's file in your editor: saved, it reloads here; `...` — the picture file the Image look shows; `Keep` — the flame as it is now, partway to the other, kept as a flame of its own and put on the deck; `||` — the video paused (the picture holds) or played on; `>` — the next file; `x` — this file off the list; `Save as...`; `Rename...`; `Delete`; `Forget` — this bred flame no longer kept; the deck goes back to the flame it came from; `A` — all deck A; `B` — all deck B; `Cut` — straight to the other deck (now, or on the next beat or bar - the choice beside Fade); `Fade` — to the other deck over two beats (now, or from the next beat or bar); `In` — deck C brought in over the mix, to its "in to" level, over its fade (now, or on the next beat or bar - as Cut and Fade wait); `Out` — deck C taken out, over its fade (now, or on the next beat or bar - as Cut and Fade wait); `In/Out` — deck C in if it is out, out if it is in - one button for MIDI (now, or on the next beat or bar - as Cut and Fade wait); `Flash` — deck C up at once, held a moment, then out over a beat - a hit (now, or on the next beat or bar - as Cut and Fade wait)
+**VJ frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the VJ's last change undone (Ctrl+Z with the frame focused, Ctrl+Y redoes); `New look...` — a look of your own: a small Python file in the project's looks/ folder, made from an example and opened in your editor - it reloads here each time it is saved; it goes on the deck off the mix; `New shader...` — a Shadertoy shader of your own: a .glsl file to paste one from shadertoy.com into (its Image tab's code) - it runs as it is, on the graphics card; `Import...` — a MilkDrop preset (.milk), a Shadertoy shader (.glsl), or a Shadertoy shader's .json (the site's API, a save-shader extension: every pass and its inputs) into the project's looks/ and listed - a preset runs its motion, decay, wave, shapes, custom waves and equations, and its MilkDrop 2 shaders translated (one that does not translate is left out, and said); `Tap` — tap on the beat: the show's tempo from the gaps (the Sequence's Tap) - the first tap is the first beat of a bar; `Browse...` — every look as a moving thumbnail: click one to put it on this deck; `Shuffle` — a look this deck does not have, at random; `Mutate` — a new flame bred from this one (its maps nudged, a variation swapped) - kept with the project; `Edit` — this look's file in your editor: saved, it reloads here; `...` — a font file of your own (.ttf or .otf) for the words; `built-in` — back to the studio's own font; `Keep` — the flame as it is now, partway to the other, kept as a flame of its own and put on the deck; `area` — an area of the screen: a box dragged over a picture of the desktop; `||` — the video paused (the picture holds) or played on; `>` — the next file; `x` — this file off the list; `Save as...`; `Rename...`; `Delete`; `Forget` — this bred flame no longer kept; the deck goes back to the flame it came from; `A` — all deck A; `B` — all deck B; `Cut` — straight to the other deck (now, or on the next beat or bar - the choice beside Fade); `Fade` — to the other deck over two beats (now, or from the next beat or bar); `In` — deck C brought in over the mix, to its "in to" level, over its fade (now, or on the next beat or bar - as Cut and Fade wait); `Out` — deck C taken out, over its fade (now, or on the next beat or bar - as Cut and Fade wait); `In/Out` — deck C in if it is out, out if it is in - one button for MIDI (now, or on the next beat or bar - as Cut and Fade wait); `Flash` — deck C up at once, held a moment, then out over a beat - a hit (now, or on the next beat or bar - as Cut and Fade wait)
 
 **Keyboard shortcuts**: `close` — close (Esc while it has the focus); `Reset all to defaults`
 
@@ -2148,6 +2220,6 @@ Every button, with what its tooltip says.
 
 **Message log**: `close` — close (Esc while it has the focus); `copy all` — the log as text, to paste into an issue or a note; `clear` — empties the recent messages; the problems stay until they are fixed
 
-**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `VJ` — VJ: two decks of video and looks, crossfaded onto the shape  Ctrl+Shift+J; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP, E1.31 or Art-Net)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `pip_max`; `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `Lay the shape out as a grid` — the shape's LEDs projected onto a grid (the best fit), so a matrix effect draws on it - the Shape frame's Shape tab says how, and can change it; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `Shape settings...` — the Shape frame on the whole shape's settings: its sizes, what the effects see and how a grid is projected, power; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play an audio file...`; `sec_video_arrow`; `Choose...` — a video file: mp4, mov, mkv, webm, avi, gif - read by ffmpeg; `Find` — the webcams ffmpeg can open on this computer, into the list; `Stop` — the source closed (a webcam switched off); the Video node goes black; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or an audio file - goes to it; `VIDEO` — VIDEO: a webcam, a file, the screen, a phone or a stream, for the Video node - goes to it; `VJ - in the dock` — VJ - in the dock: opens it beside the rail; `Panel` — Panel - brings it to the front; `VJ - brings it to the front`; `x` — close VJ (the menus open it again); `Devices - brings it to the front`; `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
+**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP, E1.31, Art-Net or WebSocket)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `VJ` — VJ: two decks of video and looks, crossfaded onto the shape  Ctrl+Shift+J; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP, E1.31, Art-Net or WebSocket)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all`; `read from file`; `apply to file`; `< back`; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `pip_max`; `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `sec_effect_arrow`; `Lay the shape out as a grid` — the shape's LEDs projected onto a grid (the best fit), so a matrix effect draws on it - the Shape frame's Shape tab says how, and can change it; `sec_segments_arrow`; `+`; `-`; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `sec_geometry_arrow`; `Edit the shape...`; `Shape settings...` — the Shape frame on the whole shape's settings: its sizes, what the effects see and how a grid is projected, power; `sec_colours_arrow`; `sec_parameters_arrow`; `sec_audio_arrow`; `sec_live_arrow`; `use live audio`; `play an audio file...`; `sec_video_arrow`; `Choose...` — a video file: mp4, mov, mkv, webm, avi, gif - read by ffmpeg; `Find` — the webcams ffmpeg can open on this computer, into the list; `Area...` — an area of the screen: a box dragged over a picture of the desktop; `Stop` — the source closed (a webcam switched off); the Video node goes black; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or an audio file - goes to it; `VIDEO` — VIDEO: a webcam, a file, the screen, a phone or a stream, for the Video node - goes to it; `VJ - in the dock` — VJ - in the dock: opens it beside the rail; `Panel` — Panel - brings it to the front; `VJ - brings it to the front`; `x` — close VJ (the menus open it again); `Devices - brings it to the front`; `Flash - brings it to the front`; `Send - brings it to the front`; `Shape - brings it to the front`; `Sequence - brings it to the front`; `Library - brings it to the front`; `Palettes - brings it to the front`; `LED outputs - in front`; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
 
 <!-- uiref end -->

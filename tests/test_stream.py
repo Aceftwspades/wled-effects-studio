@@ -182,6 +182,99 @@ def test_a_device_name_is_resolved_once():
     assert a._to == ("127.0.0.1", audio_sync.PORT) and a.addr == "localhost"
 
 
+def _ws_server(got, ping=True):
+    """A WebSocket server on this machine taking binary messages as WLED's ws.cpp does, its port; each message
+    (opcode, unmasked body) into `got`. It sends a state message and a ping first, as a device may."""
+    import base64
+    import hashlib
+    import threading
+    ls = socket.socket()
+    ls.bind(("127.0.0.1", 0))
+    ls.listen(1)
+
+    def serve():
+        c, _ = ls.accept()
+        req = b""
+        while b"\r\n\r\n" not in req:
+            req += c.recv(1024)
+        key = [l.split(b":", 1)[1].strip() for l in req.split(b"\r\n") if l.lower().startswith(b"sec-websocket-key")][0]
+        acc = base64.b64encode(hashlib.sha1(key + b"258EAFA5-E914-47DA-95CA-C5AB0B11DC85").digest())
+        st = b'{"state":{"on":true}}'
+        c.sendall(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                  b"Sec-WebSocket-Accept: " + acc + b"\r\n\r\n" + bytes([0x81, len(st)]) + st
+                  + (bytes([0x89, 2]) + b"hi" if ping else b""))
+        buf = b""
+        c.settimeout(2)
+        try:
+            while True:
+                d = c.recv(65536)
+                if not d:
+                    break
+                buf += d
+                while len(buf) >= 2:
+                    op, n, at = buf[0] & 15, buf[1] & 127, 2
+                    if n == 126:
+                        if len(buf) < 4:
+                            break
+                        n, at = struct.unpack("!H", buf[2:4])[0], 4
+                    if len(buf) < at + 4 + n:
+                        break
+                    mask = buf[at:at + 4]
+                    got.append((op, bytes(b ^ mask[i % 4] for i, b in enumerate(buf[at + 4:at + 4 + n]))))
+                    buf = buf[at + 4 + n:]
+        except (socket.timeout, OSError):
+            pass
+    threading.Thread(target=serve, daemon=True).start()
+    return ls, ls.getsockname()[1]
+
+
+def test_ddp_over_the_websocket():
+    """DDP through the device's web port (WLED's /ws, wled/WLED#4997): the handshake checked, each DDP packet one
+    masked binary message starting 0x02, no message over WLED's 1428 bytes, the frame's offsets and push as over
+    UDP, the device's ping answered - and it is one of the stream's protocols."""
+    import time
+    got = []
+    ls, port = _ws_server(got)
+    out = L.make_out("ddpws", f"127.0.0.1:{port}")
+    assert isinstance(out, L.WsDdpOut) and out.NAME.startswith("DDP")
+    frame = bytes(range(256)) * 12                               # 1024 LEDs: three messages
+    for _ in range(4):
+        out.send(frame)
+        time.sleep(0.1)
+    deadline = time.time() + 3
+    while out.frames < 1 and time.time() < deadline:
+        time.sleep(0.05)
+    time.sleep(0.3)
+    out.close()
+    ls.close()
+    time.sleep(0.2)
+    data = [b for op, b in got if op == 0x2]
+    assert out.frames >= 1 and out.errors == 0, (out.frames, out.errors, out.last_error)
+    assert any(op == 0xA and b == b"hi" for op, b in got)                          # the ping's pong
+    assert data and all(b[0] == L.WS_DDP for b in data) and max(len(b) for b in data) <= 1428
+    first = data[:3]
+    assert [struct.unpack("!I", b[5:9])[0] for b in first] == [0, L.WS_DDP_MAX, 2 * L.WS_DDP_MAX]
+    assert [bool(b[1] & L.FLAG_PUSH) for b in first] == [False, False, True]
+    assert b"".join(b[11:] for b in first) == frame
+    assert "ddpws" in [p[0] for p in L.PROTOCOLS]
+
+
+def test_ddp_over_the_websocket_where_there_is_none():
+    """No WebSocket there: counted and said, tried again, never raised into the studio's loop."""
+    import time
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()                                                    # nothing listens there now
+    out = L.WsDdpOut(f"127.0.0.1:{port}", timeout=0.5)
+    out.send(b"\x00" * 30)
+    deadline = time.time() + 3
+    while not out.errors and time.time() < deadline:
+        time.sleep(0.05)
+    out.close()
+    assert out.errors >= 1 and "no WebSocket" in out.last_error and out.frames == 0
+
+
 if __name__ == "__main__":                        # without pytest: every test_ function, in order
     import inspect
     bad = 0

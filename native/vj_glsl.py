@@ -7,7 +7,9 @@ the graphics card, at the deck's canvas size.
     img, err = render(key, src, w, h, uniforms, video, audio, picture, channels)   # (h, w, 3) float 0..1
 
 What a shader has, as on Shadertoy: iResolution, iTime, iTimeDelta, iFrame,
-iMouse (still), iDate, iChannel0..3 and iChannelResolution. And the
+iMouse (still), iDate, iChannel0..3, iChannelResolution, iChannelTime and
+iSampleRate. Shadertoy's GLSL is WebGL's; where the desktop's differs, a shader
+is made to read as it does there (`_webgl`). And the
 studio's own: iBeat (a pulse on each beat), iBass, iMid, iTreble, iLevel and
 iAmount (the deck's knob), all 0..1.
 
@@ -17,6 +19,16 @@ What its channels hold - Shadertoy's inputs - is chosen per channel:
     sound     the sound as Shadertoy's audio input: 512 x 2, the spectrum over the wave
     noise     a 256 x 256 RGBA noise texture (as Shadertoy's "RGBA Noise Medium"), repeating
     picture   the deck's picture file
+    cube      a cubemap (samplerCube): a sky of the studio's own - blue above, a bright horizon, dark ground -
+              for a shader that reads Shadertoy's cubemaps with a direction
+    image     a picture of the deck's own for this channel (its "..." beside the channel): a texture a shader
+              asks for - a photo, a pattern - and noise until one is chosen
+    font      a font atlas laid out as Shadertoy's "Font 1": 16 x 16 cells, character c at column c % 16 and
+              row c / 16 from the top; the letter in r, g and b, a distance field in a (0.5 at its edge, lower
+              inside) - for a shader that writes text with it
+
+A shader from shadertoy.com can be imported whole from its JSON (the site's API gives it, as do the browser
+extensions that save a shader): from_shadertoy() writes its passes and its inputs as such a file.
     A..D      a buffer's last frame (one pass of a multi-pass shader)
     none      black
 
@@ -64,6 +76,8 @@ uniform sampler2D iChannel1;
 uniform sampler2D iChannel2;
 uniform sampler2D iChannel3;
 uniform vec3 iChannelResolution[4];
+uniform float iChannelTime[4];
+uniform float iSampleRate;
 uniform float iBeat;
 uniform float iBass;
 uniform float iMid;
@@ -88,7 +102,7 @@ void main() { gl_Position = vec4(vj_pos, 0.0, 1.0); }
 HEADER_LINES = HEADER.count("\n")
 AUDIO_W = 512
 NOISE_N = 256
-CHANNELS = ("video", "sound", "noise", "picture", "A", "B", "C", "D", "none")
+CHANNELS = ("video", "sound", "noise", "picture", "image", "cube", "font", "A", "B", "C", "D", "none")
 DEFAULT_CHANNELS = ("video", "sound", "noise", "none")
 BUFFERS = ("A", "B", "C", "D")
 
@@ -247,6 +261,8 @@ class _GL:
         self.noise = self.ctx.texture((NOISE_N, NOISE_N), 4, rng.integers(0, 256, (NOISE_N, NOISE_N, 4), dtype=np.uint8).tobytes())
         self.noise.repeat_x = self.noise.repeat_y = True
         self.black = self.ctx.texture((1, 1), 4, bytes(4))
+        self.cube = self.ctx.texture_cube((CUBE_N, CUBE_N), 3, sky_cube().tobytes())
+        self.font = None                                          # made the first time a shader asks for it
         while True:
             job = self.q.get()
             key = job[0]
@@ -295,8 +311,11 @@ class _GL:
             raise RuntimeError(p)
         return p
 
-    def _program(self, code, final):
-        return self._compiled(HEADER + final + code + FOOTER, final)
+    def _program(self, code, final, cubes=()):
+        head = HEADER
+        for k in cubes:                                          # a cubemap channel: read with a direction
+            head = head.replace(f"uniform sampler2D iChannel{k};", f"uniform samplerCube iChannel{k};")
+        return self._compiled(head + final + _webgl(code) + FOOTER, final)
 
     def _texture(self, name, w, h, comps, data):
         t = self.tex.get(name)
@@ -409,9 +428,10 @@ class _GL:
         out = None
         for name, code, chans in plan:
             image = name == "image"
-            prog, vao = self._program(code, FINAL_IMAGE if image else FINAL_BUFFER)
             if image and chosen:                                  # the deck's own choice over the file's
                 chans = {k: (chosen[k] or chans[k]) for k in range(4)}
+            prog, vao = self._program(code, FINAL_IMAGE if image else FINAL_BUFFER,
+                                      tuple(k for k in range(4) if chans[k] == "cube"))
             res = []
             for unit in range(4):
                 what = chans[unit]
@@ -419,9 +439,17 @@ class _GL:
                     b = self._buffer(key, what, w, h)
                     t = b[0][b[1]][0]                              # its last: this frame's if drawn already, else the one before
                 else:
-                    t = {"video": tv, "sound": ta, "noise": self.noise, "picture": tp}.get(what, self.black)
+                    if what == "font" and self.font is None:
+                        a = font_atlas()
+                        self.font = self.ctx.texture((a.shape[1], a.shape[0]), 4, np.ascontiguousarray(a).tobytes())
+                        self.font.build_mipmaps()
+                    if what.startswith("image:"):                 # the deck's picture for this channel
+                        t = self._picture(what[6:]) or self.noise
+                    else:
+                        t = {"video": tv, "sound": ta, "noise": self.noise, "picture": tp, "cube": self.cube,
+                             "font": self.font, "image": self.noise}.get(what, self.black)
                 t.use(unit)
-                res.append((float(t.width), float(t.height), 1.0))
+                res.append((float(t.size[0]), float(t.size[1]), 1.0))
                 if f"iChannel{unit}" in prog:
                     prog[f"iChannel{unit}"].value = unit
             for k, val in uni.items():
@@ -429,6 +457,10 @@ class _GL:
                     prog[k].value = val
             if "iChannelResolution" in prog:
                 prog["iChannelResolution"].value = res
+            if "iChannelTime" in prog:
+                prog["iChannelTime"].value = [float(uni.get("iTime", 0.0))] * 4
+            if "iSampleRate" in prog:
+                prog["iSampleRate"].value = 44100.0
             if image:
                 fbo = self.fbos.get((w, h))
                 if fbo is None:
@@ -445,6 +477,153 @@ class _GL:
                 vao.render()
                 b[1] = nxt                                          # what it drew is its last now
         return out
+
+
+CUBE_N = 64
+
+
+def sky_cube(n=CUBE_N):
+    """A cubemap's six faces (+x, -x, +y, -y, +z, -z), n x n RGB bytes each: a sky - deep blue overhead, pale at the
+    horizon, a dark ground below - with a little noise, so a reflection has something to show."""
+    k = (np.arange(n) + 0.5) / n * 2 - 1
+    a, b = np.meshgrid(k, k)
+    one = np.ones_like(a)
+    faces = [(one, -b, -a), (-one, -b, a), (a, one, b), (a, -one, -b), (a, -b, one), (-a, -b, -one)]
+    rng = np.random.default_rng(5)
+    out = []
+    for x, y, z in faces:
+        d = np.stack([x, y, z], -1)
+        d /= np.linalg.norm(d, axis=-1, keepdims=True)
+        up = d[..., 1:2]
+        sky = np.array([0.18, 0.35, 0.75]) * np.clip(up, 0, 1) + np.array([0.85, 0.82, 0.75]) * (1 - np.abs(up)) ** 6
+        ground = np.array([0.12, 0.1, 0.08]) * np.clip(-up, 0, 1) ** 0.5
+        c = np.clip(sky + ground + rng.normal(0, 0.02, d.shape), 0, 1)
+        out.append((c * 255).astype(np.uint8))
+    return np.stack(out)
+
+
+FONT_CELL = 64
+
+
+def font_atlas(cell=FONT_CELL):
+    """A font atlas as Shadertoy's "Font 1" lays its characters out - 16 x 16 cells, code c at column c % 16 and row
+    c // 16 from the top - each printable ASCII letter white in r, g and b, and in a a distance field (0.5 at the
+    letter's edge, lower inside, higher outside). RGBA bytes, (16 * cell)^2, its first row GL's bottom (as the
+    other textures go up)."""
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    n = 16 * cell
+    mask = Image.new("L", (n, n), 0)
+    d = ImageDraw.Draw(mask)
+    font = None
+    for name in ("consolab.ttf", "DejaVuSansMono-Bold.ttf", "Menlo.ttc", "LiberationMono-Bold.ttf"):
+        try:
+            font = ImageFont.truetype(name, int(cell * 0.78))
+            break
+        except OSError:
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+    for c in range(32, 127):
+        x, y = (c % 16) * cell, (c // 16) * cell
+        l, t, r, b = d.textbbox((0, 0), chr(c), font=font)
+        d.text((x + (cell - (r - l)) / 2 - l, y + (cell - (b - t)) / 2 - t), chr(c), fill=255, font=font)
+    m = np.asarray(mask, np.float32) / 255.0
+    soft = np.asarray(mask.filter(ImageFilter.GaussianBlur(cell / 12)), np.float32) / 255.0
+    dist = np.clip(1.0 - soft, 0, 1)                             # 1 - a blur of it: 0.5 about at the edge
+    rgba = np.dstack([m, m, m, dist])
+    return (np.flipud(rgba) * 255 + 0.5).astype(np.uint8)
+
+
+# Shadertoy's inputs as channels here (the textures it ships are not here: noise stands in, its font is drawn)
+_ST_INPUT = {"texture": "noise", "keyboard": "none", "webcam": "video", "video": "video", "music": "sound",
+             "musicstream": "sound", "mic": "sound", "cubemap": "cube", "volume": "none"}
+_ST_FONT = "08b42b43ae9d3c0605da11d0eac86618ea888e62cdd9518ee8b9097488b31560"    # its "Font 1" texture's file
+_ST_PASS = {"Buffer A": "A", "Buffer B": "B", "Buffer C": "C", "Buffer D": "D"}
+
+
+def from_shadertoy(data):
+    """A shader from shadertoy.com's JSON - the API's {"Shader": {...}}, or its inside - as a studio .glsl:
+    (source, name, [what of it is not here]). Its Common, Buffer A..D and Image passes as //@ sections, each pass's
+    inputs as its channels (a buffer as its letter, a cubemap as the sky, its font as the font, another texture as
+    noise, music or the microphone as the sound, a webcam or video as the deck's video); a keyboard, a 3-D
+    texture, a cubemap pass or a sound pass are left out, and said. Its name, author and page are kept at the top -
+    a shader on shadertoy.com is its author's (CC BY-NC-SA 3.0 unless it says otherwise)."""
+    s = data.get("Shader", data) if isinstance(data, dict) else None
+    if not isinstance(s, dict) or not isinstance(s.get("renderpass"), list):
+        raise ValueError("not a Shadertoy shader (no renderpass)")
+    info = s.get("info") or {}
+    rp = s["renderpass"]
+    letter = {}
+    for p in rp:
+        if p.get("type") == "buffer":
+            for o in p.get("outputs") or []:
+                letter[str(o.get("id"))] = _ST_PASS.get(p.get("name"), "A")
+    lost, notes = [], []
+    sid = info.get("id", "")
+    name = info.get("name") or sid or "shadertoy"
+    lines = [f"// NAME: {name}", f"// {name}" + (f" by {info['username']}" if info.get("username") else ""),
+             f"// https://www.shadertoy.com/view/{sid}" if sid else "// from shadertoy.com",
+             "// imported from its JSON - the author's (CC BY-NC-SA 3.0 unless the code says otherwise)"]
+    lines += [f"// {line}" for line in (info.get("description") or "").splitlines()[:6] if line.strip()]
+    for p in rp:
+        if p.get("type") == "common":
+            lines += ["//@ common", p.get("code", "")]
+    order = [p for p in rp if p.get("type") == "buffer"] + [p for p in rp if p.get("type") == "image"]
+    if not any(p.get("type") == "image" for p in rp):
+        raise ValueError("the shader has no Image pass")
+    for p in order:
+        image = p.get("type") == "image"
+        lines.append("//@ image" if image else f"//@ buffer {_ST_PASS.get(p.get('name'), 'A')}")
+        chans = {}
+        for i in p.get("inputs") or []:
+            kind = i.get("ctype") or i.get("type")
+            if kind == "buffer":
+                what = letter.get(str(i.get("id")), "none")
+            elif kind == "texture" and _ST_FONT in str(i.get("src") or i.get("filepath") or ""):
+                what = "font"
+            elif kind == "texture":                                # a photo or pattern of the site's: one of yours
+                what = "image"
+                notes.append(f"//   {p.get('name', 'a pass')}'s iChannel{i.get('channel')} was a texture on Shadertoy"
+                             " - choose a picture of your own for it beside the deck's channels (noise until then)")
+            else:
+                what = _ST_INPUT.get(kind, "none")
+                if kind in ("keyboard", "volume") or kind not in _ST_INPUT:
+                    lost.append(f"{p.get('name', 'a pass')}'s {kind} (iChannel{i.get('channel')})")
+            chans[int(i.get("channel", 0))] = what
+        lines += [f"//@ iChannel{k} = {chans.get(k, 'none')}" for k in range(4)]
+        lines.append(p.get("code", ""))
+    for p in rp:
+        if p.get("type") in ("cubemap", "sound"):
+            lost.append(f"its {p.get('name') or p.get('type')} pass")
+    if notes:
+        lines[4:4] = ["// textures:"] + notes
+    return "\n".join(lines) + "\n", name, lost
+
+
+_FN_MACRO = re.compile(r"^(\s*#\s*define\s+)([A-Za-z_]\w*)\(", re.M)
+
+
+def _webgl(code):
+    """A Shadertoy pass made to compile as it does in WebGL, where the desktop's GLSL differs - its lines kept, so
+    the compiler's line numbers stay the shader's:
+    - noise1..noise4 are desktop GLSL's (long dead) built-ins: a shader's own `noise2` clashed with them;
+    - a function-like macro's name used alone (`#define f(x) ...` and `float f = ...`) the desktop's preprocessor
+      would not take: the macro and its calls renamed, so the name alone is the variable again (only where it is a
+      variable - declared, assigned or a swizzle: a macro's name handed bare to another macro, tri(p, Fa), is the
+      macro's own and kept)."""
+    code = re.sub(r"\bnoise([1-4])\b", r"vj_noise\1", code)
+    body = re.sub(r"^\s*#.*$", "", code, flags=re.M)
+
+    def clashes(n):
+        n = re.escape(n)
+        return re.search(rf"\.\s*{n}\b(?!\s*\()|\b(?:float|int|bool|[iub]?vec[234]|mat[234])\s+{n}\b"
+                         rf"|\b{n}\s*[-+*/]?=(?!=)", body) is not None
+    names = set(m.group(2) for m in _FN_MACRO.finditer(code) if clashes(m.group(2)))
+    if names:
+        code = _FN_MACRO.sub(lambda m: f"{m.group(1)}vjm_{m.group(2)}(" if m.group(2) in names else m.group(0), code)
+        code = re.sub(r"\b(" + "|".join(sorted(map(re.escape, names), key=len, reverse=True)) + r")(\s*\()",
+                      lambda m: f"vjm_{m.group(1)}{m.group(2)}", code)
+    return code
 
 
 def _compile_error(msg, final=""):
@@ -568,9 +747,17 @@ def look_draw(src, name):
         key = st.setdefault("key", f"{name}-{id(st)}")
         deck = getattr(ctx, "deck", None) or {}
         # a video or an FSEQ being rendered (the clock held): this frame's own, not the one before
+        chosen = list(vj.deck_channels(deck) or ["", "", "", ""]) if deck else None
+        pics = list(getattr(ctx, "channel_images", None) or [])
+        if chosen is not None and any(pics):              # an "image" channel (the deck's or its file's): its picture
+            own = channels_of(src)
+            for k in range(min(4, len(pics))):
+                if pics[k] and (chosen[k] or own[k]) == "image":
+                    chosen[k] = "image:" + pics[k]
         img, err = render(key, src, ctx.w, ctx.h, uniforms(ctx, st["n"]), ctx.video, aud,
                           wait=bool(getattr(ctx, "wait", False)) or clock.held(),
-                          picture=getattr(ctx, "image_path", "") or "", channels=vj.deck_channels(deck) if deck else None)
+                          picture=getattr(ctx, "image_path", "") or "",
+                          channels=chosen if chosen and any(chosen) else None)
         if err:
             raise RuntimeError(err)
         if img is None or img.shape[:2] != (ctx.h, ctx.w):

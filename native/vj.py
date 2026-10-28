@@ -27,7 +27,7 @@ import math
 
 import numpy as np
 
-from native import clock, vj_looks
+from native import clock, vj_layer, vj_looks
 
 CANVASES = (("64x48", "64 x 48 (light)"), ("96x72", "96 x 72"), ("128x96", "128 x 96 (fine)"),
             ("64x64", "64 x 64 (square)"), ("128x72", "128 x 72 (16:9, a wide panel)"),
@@ -39,7 +39,7 @@ MODES = ("crossfade", "add", "screen", "multiply", "lighten", "difference")
 WIPES = ("blend",) + tuple(s for s in __import__("native.transition", fromlist=["t"]).STYLES if s != "fade")
 EFFECT = "Effect"                 # a deck's look that is an effect of the studio's, not a canvas
 SOURCES = (("none", "no video"), ("test", "test pattern"), ("file", "video files"), ("webcam", "a webcam"),
-           ("screen", "the screen"), ("phone", "the phone's camera"), ("stream", "a network stream"))
+           ("screen", "the screen"), ("phone", "the phone's camera"), ("stream", "a stream or web video"))
 REACT_TO = ("off", "bass", "mid", "treble", "level", "beat")
 REACT_WHAT = ("amount", "speed", "hue", "zoom", "brightness")
 ADVANCE = (("off", "by hand"), ("bars", "with the auto-mix's bars"), ("beat", "every beat"))
@@ -49,6 +49,11 @@ DECK = {"look": "Plasma", "source": SOURCE, "amount": 0.5, "speed": 1.0, "colour
         "mirror": False, "hue": 0.0, "strobe": False, "trails": 0.0, "blur": 0, "level": 1.0,
         "react": {"to": "off", "what": "amount", "depth": 0.5}, "text": "WLED",
         "text_move": "scroll", "text_size": 0.65, "text_x": 0.0, "text_y": 0.0, "text_glow": 0.0,   # the Text look's
+        "text_align": "centre", "text_font": "", "text_shadow": 0.0, "text_outline": 0.0,           # (font: a file, "" built in)
+        "pic_key": "alpha", "pic_key_col": [0.0, 1.0, 0.0], "pic_tol": 0.25, "pic_soft": 0.1,      # a picture or video
+        "pic_fit": "fill", "pic_scale": 1.0, "pic_x": 0.0, "pic_y": 0.0, "pic_rot": 0.0,             # as a layer
+        "pic_flip": "none", "pic_drift": 1.0,                                                         # (vj_layer)
+        "channel_images": ["", "", "", ""],   # a shader's iChannel0..3 set to "image": the picture each reads
         "image": "", "effect": "", "palette": "",
         "fx_colours": "",           # an Effect deck's colours: "" the effect's own, else a gradient's
         "fx_set": {},               # an Effect deck's own sliders and checks set ({"c1": 200, "o3": 1}): the rest its own
@@ -68,8 +73,33 @@ C_MODES = ("screen", "add", "lighten", "multiply", "difference", "over")   # how
 SPEED_MAX = 3.0
 
 
+_FILLED = [None]                  # the options and deck dicts options() last filled in: its defaults are not filled again
+
+
+def _filled_key(o):
+    """The dicts options() fills, themselves (held, and compared by identity: an id() alone is reused once its
+    object is freed, so another project's options could have passed for these)."""
+    decks = o.get("decks")
+    if not isinstance(decks, list):
+        return None
+    return (o, decks, o.get("auto"), o.get("flames"),
+            tuple((d, d.get("source"), d.get("react")) for d in decks))
+
+
+def _same(a, b):
+    if a is None or b is None or len(a) != len(b) or len(a[4]) != len(b[4]):
+        return False
+    return all(x is y for x, y in zip(a[:4], b[:4])) and all(
+        x is y for p, q in zip(a[4], b[4]) for x, y in zip(p, q))
+
+
 def options(app):
+    """The project's VJ options, every default filled in. Asked some fifty times a frame: the defaults are filled
+    once for these dicts (a project loaded, a deck or its source replaced fills them again), then handed back."""
     o = app.project.options.setdefault("vj", {})
+    if _same(_FILLED[0], _filled_key(o)):
+        vj_looks.sync_flames(o["flames"])
+        return o
     o.setdefault("on", False)
     o.setdefault("fader", 0.0)
     o.setdefault("mode", "crossfade")
@@ -108,6 +138,7 @@ def options(app):
     a.setdefault("shuffle_from", "any")
     a.setdefault("c", "off")            # deck C by itself: "off", in and out every few "bars", a "flash", "sections"
     a.setdefault("c_bars", 4)  # "any" look, or the deck's own "family" (flames to flames): a set kept of a piece
+    _FILLED[0] = _filled_key(o)
     return o
 
 
@@ -148,6 +179,8 @@ class DeckRun:
         self.look = None
         self.t = 0.0
         self.canvas = None              # (h, w, 3) float 0..1, the look's last picture
+        self.alpha = None               # (h, w) float 0..1: where it is clear (a picture's or a video's), or None
+        self.video_alpha = None         # the video's frame's, keyed and placed (vj_layer)
         self.led = None                 # (rows, cols, 3) uint8: an Effect deck's picture
         self.trail = None
         self.size = None                # the canvas the look's state was made for
@@ -271,8 +304,9 @@ def _open(app, s, key):
             args += ["-ss", f"{a:.3f}"]
         if b > a:
             args += ["-t", f"{(b - a):.3f}"]
-        return video.FfmpegSource(args + ["-i", path], os.path.basename(path), "file", w, h, realtime=True, loop=True,
-                                  fps=video.FILE_FPS)
+        dec, has_alpha = video.alpha_of(path)                 # a file with transparency: read as RGBA, kept
+        return video.FfmpegSource(args + dec + ["-i", path], os.path.basename(path), "file", w, h, realtime=True,
+                                  loop=True, fps=video.FILE_FPS, alpha=has_alpha)
     return video.open_source(kind, path=s.get("url") if kind == "stream" else s.get("path"), name=s.get("name"),
                              width=w, height=h, loop=True)
 
@@ -581,7 +615,13 @@ def _take_video(app, i, run, deck):
         if frame is not None and n != run.n:
             run.n = n
             run.video_prev = run.video
-            run.video = np.asarray(frame, np.float32) / 255.0
+            f = np.asarray(frame, np.float32) / 255.0
+            if f.shape[-1] == 4 or not vj_layer.plain(deck):   # transparency, or keyed / moved: as the deck lays it
+                h, w = f.shape[:2]
+                f, run.video_alpha = vj_layer.prepare(f, w, h, deck, drift=0.0)
+            else:
+                run.video_alpha = None
+            run.video = f
         err = getattr(src, "error", None)
         if err:
             run.error = str(err)
@@ -628,6 +668,7 @@ def draw_deck(app, i, dt, snd, beat, hit):
     c.beats = getattr(app, "_vj_beats", 0.0)
     c.deck = deck
     c.image_path = media(app, deck.get("image") or "")
+    c.font_path = media(app, deck.get("text_font") or "")
     try:
         c.bands = np.asarray(app.eng.fft, np.float32) / 255.0             # the sixteen bands, for a shader's spectrum
     except Exception:
@@ -639,6 +680,9 @@ def draw_deck(app, i, dt, snd, beat, hit):
         run.video = v
         run.video_prev = None
     c.video, c.video_prev = run.video, run.video_prev
+    va = run.video_alpha
+    c.video_alpha = va if va is not None and run.video is not None and va.shape == run.video.shape[:2] else None
+    c.channel_images = [media(app, p) if p else "" for p in (deck.get("channel_images") or ["", "", "", ""])][:4]
     c.amount, c.speed = amount, speed
     c.knob = lambda key: knob_value(app, i, key)          # a knob as it draws, a modulator's over it
     c.grad = vj_looks.gradient(deck.get("colours", "neon"))
@@ -652,7 +696,14 @@ def draw_deck(app, i, dt, snd, beat, hit):
         img = np.zeros((h, w, 3), np.float32)
     if run.state.get("warn") and not run.error:              # what of a look could not run, though it draws
         run.error = f"{lk.name}: {run.state['warn']}"
+    alpha = None
+    if img.ndim == 3 and img.shape[2] == 4:                   # a look with transparency (a picture, a video's)
+        img, alpha = img[..., :3], img[..., 3]
     img = post(app, i, c, img, beat, what, rv)
+    if alpha is not None:                                     # moved as the picture was by the deck's zoom, kaleidoscope, mirror
+        a3 = post_shape(app, i, c, np.repeat(alpha[..., None], 3, 2), what, rv)
+        alpha = a3[..., 0]
+    run.alpha = None if alpha is None else np.clip(alpha, 0, 1).astype(np.float32)
     xf = getattr(run, "xfade", None)
     if xf is not None:
         xf[1] += dt                                           # on the deck's own frames: a render's as the live run's
@@ -664,6 +715,19 @@ def draw_deck(app, i, dt, snd, beat, hit):
             img = xf[0] * (1.0 - e) + img * e
     run.canvas = np.clip(img, 0, 1).astype(np.float32)
     run.drawn_at = clock.now()
+
+
+def post_shape(app, i, c, img, what=None, rv=0.0):
+    """Only what of post() moves the picture - the zoom by the sound, the kaleidoscope, the mirror - for its alpha."""
+    deck = options(app)["decks"][i]
+    if what == "zoom":
+        img = _zoom(img, rv)
+    k = int(round(knob_value(app, i, "kaleido")))
+    if k > 0:
+        img = vj_looks.kaleido(c, img, k)
+    if deck.get("mirror"):
+        img = vj_looks.mirror(img)
+    return img
 
 
 def post(app, i, c, img, beat, what=None, rv=0.0):
@@ -786,6 +850,15 @@ def deck_led(app, i):
     return to_shape(app, run.canvas)
 
 
+def deck_alpha(app, i):
+    """Deck i's transparency on the shape, (rows, cols) float 0..1 - 1 where it shows - or None (all of it shows)."""
+    o = options(app)
+    run = _runs(app)[i]
+    if o["decks"][i]["look"] == EFFECT or run.alpha is None or run.canvas is None or run.alpha.shape != run.canvas.shape[:2]:
+        return None
+    return to_shape(app, np.repeat(run.alpha[..., None], 3, 2))[..., 0].astype(np.float32) / 255.0
+
+
 def deck_canvas(app, i):
     """Deck i's picture for its preview: its canvas, or an Effect deck's logical grid."""
     o = options(app)
@@ -801,9 +874,10 @@ def _level(img, lv):
     return (img.astype(np.float32) * max(0.0, lv)).astype(np.uint8)
 
 
-def mix(app, a, b, c=None):
+def mix(app, a, b, c=None, c_alpha=None):
     """The decks' pictures: A and B through the fader (a wipe, or the blend mode), each at its level, then deck C
-    over the mix at its level, through its own blend."""
+    over the mix at its level, through its own blend - where it is clear (c_alpha: a picture's or a video's
+    transparency, keyed or its own), not at all."""
     from native import mixer, transition
     o = options(app)
     f = float(o["fader"])
@@ -816,11 +890,17 @@ def mix(app, a, b, c=None):
     if c is not None and lc > 0.0 and c.shape == out.shape:
         mode = o.get("c_mode", "screen")
         base, top = out.astype(np.float32), c.astype(np.float32)
-        if mode == "over":                                    # what deck C draws covers the mix; its black lets it through
-            k = (top.max(axis=2, keepdims=True) / 255.0) * lc
-            out = base * (1.0 - k) + top * k
+        ca = None if c_alpha is None or c_alpha.shape != out.shape[:2] else c_alpha[..., None]
+        if mode == "over":                                    # what deck C draws covers the mix: where it is clear (its
+            if ca is not None:                                # alpha), or else its black, lets the mix through
+                k = ca * lc                                   # its colour already black where it is clear
+                out = base * (1.0 - k) + top * lc
+            else:
+                k = (top.max(axis=2, keepdims=True) / 255.0) * lc
+                out = base * (1.0 - k) + top * k
         else:
-            out = base + (mixer._blend(base, top, mode) - base) * lc
+            k = lc if ca is None else ca * lc
+            out = base + (mixer._blend(base, top, mode) - base) * k
         out = np.clip(out + 0.5, 0, 255).astype(np.uint8)
     return out
 
@@ -887,7 +967,8 @@ def update(app, dt=None):
     for i in range(len(o["decks"])):
         p = deck_led(app, i)
         pics.append(p if p is not None and p.shape == shape else np.zeros(shape, np.uint8))
-    app._vj_out = mix(app, pics[0], pics[1], pics[2] if len(pics) > 2 else None)
+    app._vj_out = mix(app, pics[0], pics[1], pics[2] if len(pics) > 2 else None,
+                      deck_alpha(app, 2) if len(pics) > 2 else None)
 
 
 def _advance_clips(app, i, hit):
@@ -1286,6 +1367,9 @@ def step_name(app):
 # --- your own: presets, mutated flames, look files -------------------------------------------------
 PRESET_KEYS = ("look", "effect", "amount", "speed", "colours", "kaleido", "mirror", "hue", "strobe", "trails",
                "blur", "react", "text", "text_move", "text_size", "text_x", "text_y", "text_glow", "image", "palette",
+               "text_align", "text_font", "text_shadow", "text_outline", "pic_key", "pic_key_col", "pic_tol",
+               "pic_soft", "pic_fit", "pic_scale", "pic_x", "pic_y", "pic_rot", "pic_flip", "pic_drift",
+               "channel_images",
                "fx_colours", "fx_set", "channels", "channels_look", "drift", "breathe", "mutate_bars") + tuple(FLAME_KNOBS)
 
 
@@ -1539,12 +1623,17 @@ def midi_looks():
 # --- a deck's controls by name: MIDI's and the modulators' -----------------------------------------
 KNOBS = (("level", 0.0, 1.0), ("amount", 0.0, 1.0), ("speed", 0.0, SPEED_MAX), ("hue", 0.0, 1.0), ("kaleido", 0, 12),
          ("trails", 0.0, 1.0), ("blur", 0, 3), ("text_size", 0.1, 2.0), ("text_x", -1.0, 1.0), ("text_y", -1.0, 1.0),
-         ("text_glow", 0.0, 1.0), ("morph", 0.0, 1.0), ("drift", 0.0, 1.0), ("fl_sym", 0, 6), ("fl_trail", 0.0, 1.0),
+         ("text_glow", 0.0, 1.0), ("text_shadow", 0.0, 1.0), ("text_outline", 0.0, 1.0), ("pic_scale", 0.1, 4.0),
+         ("pic_x", -1.0, 1.0), ("pic_y", -1.0, 1.0), ("pic_rot", -180.0, 180.0), ("pic_tol", 0.0, 1.0),
+         ("pic_soft", 0.0, 0.5), ("pic_drift", 0.0, 1.0), ("morph", 0.0, 1.0), ("drift", 0.0, 1.0), ("fl_sym", 0, 6), ("fl_trail", 0.0, 1.0),
          ("fl_gamma", 0.15, 2.0), ("fl_colour", 0.0, 1.0), ("fl_points", 500, 20000), ("fl_spin", -2.0, 2.0),
          ("fl_x", -1.0, 1.0), ("fl_y", -1.0, 1.0)) + tuple((f"fl_w{k}", 0.0, 2.0) for k in range(1, vj_looks.ARMS + 1))
 KNOB_WORDS = {"level": "level", "amount": "amount", "speed": "speed", "hue": "hue", "kaleido": "kaleidoscope",
               "trails": "trails", "blur": "blur", "text_size": "text size", "text_x": "text across",
-              "text_y": "text up and down", "text_glow": "text glow", "morph": "flame morph", "drift": "flame drift",
+              "text_y": "text up and down", "text_glow": "text glow", "text_shadow": "text shadow",
+              "text_outline": "text outline", "pic_scale": "picture scale", "pic_x": "picture across",
+              "pic_y": "picture up and down", "pic_rot": "picture turn", "pic_tol": "key tolerance",
+              "pic_soft": "key softness", "pic_drift": "picture drift", "morph": "flame morph", "drift": "flame drift",
               "fl_sym": "flame symmetry", "fl_trail": "flame trails", "fl_gamma": "flame gamma",
               "fl_colour": "flame colour spread", "fl_points": "flame points", "fl_spin": "flame spin",
               "fl_x": "flame across", "fl_y": "flame up and down"}

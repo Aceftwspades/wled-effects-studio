@@ -21,7 +21,7 @@ from native import form, video
 from native.typeface import px
 
 KINDS = (("none", "none"), ("test", "test pattern"), ("file", "a video file"), ("webcam", "a webcam"),
-         ("screen", "the screen"), ("phone", video.PHONE), ("stream", "a network stream"))
+         ("screen", "the screen"), ("phone", video.PHONE), ("stream", "a stream or web video"))
 EXTS = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".gif", ".mpg")
 PREVIEW_W, PREVIEW_H = video.WIDTH, video.HEIGHT
 
@@ -55,12 +55,14 @@ def build(app):
                       default_value=o.get("screen", ""), callback=lambda s, v: _set_screen(app, v))
         dpg.add_button(label="Find", tag="video_find_screen", callback=lambda: find_screens(app))
         _tip("the whole desktop, each monitor and the windows on screen (by their titles), into the list")
+        dpg.add_button(label="Area...", tag="video_area", callback=lambda: _pick_area(app))
+        _tip("an area of the screen: a box dragged over a picture of the desktop")
     with form.row("address", tag="video_url_row"):
         dpg.add_input_text(tag="video_url", width=-1, default_value=o.get("url", ""),
-                           hint="rtsp://, rtmp://, srt:// or http://...", on_enter=True,
+                           hint="rtsp://, srt://, http://... or a YouTube link", on_enter=True,
                            callback=lambda s, v: _set_url(app, v))
         _tip("a stream on the network, read by ffmpeg: a phone camera app's (IP Webcam, DroidCam, Larix), OBS's, "
-             "an IP camera's - Enter to play it")
+             "an IP camera's; or a web page's video (YouTube, Vimeo, Twitch...) found by yt-dlp - Enter to play it")
     with form.under(tag="video_phone_row"):
         dpg.add_text("", tag="video_phone_words", wrap=0)
     with dpg.file_dialog(directory_selector=False, show=False, tag="video_dialog", width=px(620), height=px(420),
@@ -150,6 +152,19 @@ def _set_url(app, url):
     _set(app, "url", url.strip())
     if getattr(app, "video_src", None) is not None or url.strip():
         start(app)                                   # Enter on an address: it plays
+
+
+def _pick_area(app):
+    from native import screen_area
+
+    def picked(name):
+        names = list(dpg.get_item_configuration("video_screen")["items"] or [])
+        dpg.configure_item("video_screen", items=[name] + [n for n in names if not n.startswith(video.AREA)])
+        dpg.set_value("video_screen", name)
+        _set_screen(app, name)
+        if getattr(app, "video_src", None) is None:
+            start(app)                               # an area chosen: it plays
+    screen_area.pick(app, _opts(app).get("screen", ""), picked)
 
 
 def _set_screen(app, name):

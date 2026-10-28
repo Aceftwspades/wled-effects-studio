@@ -11,3 +11,5 @@ python-rtmidi>=1.5
 cryptography>=41
 # optional: Shadertoy shaders in the VJ frame, run on the graphics card (OpenGL 3.3)
 moderngl>=5.8; sys_platform != "linux" or platform_machine == "x86_64"   # no ARM Linux wheel (needs X11 headers to build)
+# optional: a web page's video (YouTube, Vimeo, Twitch...) as a video source - or yt-dlp.exe on the PATH
+yt-dlp>=2024.1

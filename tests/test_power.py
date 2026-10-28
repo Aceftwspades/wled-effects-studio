@@ -78,6 +78,24 @@ def test_supply_wire_and_limiter():
     assert abs(p.limiter_amps - 4.88) < 1e-9 and any("limiter" in s for s in p.lines({}))
 
 
+def test_the_device_s_gamma_in_the_view():
+    """The view as the device lights it (outputs.device_lut): WLED's gamma table and its brightness in whole steps,
+    shown back through the screen's gamma - at full brightness and gamma 2.2 nearly the picture as it is, the darks
+    banding; dimmed, few levels left; with colour gamma off, washed out. And the device's settings read from its
+    /json/cfg as cfg.cpp reads them."""
+    from native import outputs as O
+    full = O.device_lut()
+    assert full[0] == 0 and full[255] == 255 and max(abs(int(v) - i) for i, v in enumerate(full)) < 20
+    assert len(set(full[:32].tolist())) < 20                    # the bottom steps band
+    dim = O.device_lut(bri=40)
+    assert len(set(dim.tolist())) <= 42 and dim[30] == 0 and dim[255] < 120
+    assert O.device_lut(colour=False)[64] > 120                 # no gamma on the device: a quarter shows far brighter
+    assert (O.device_lut(gamma=5.0) == O.device_lut(colour=False)).all()   # out of WLED's bounds: no correction
+    assert O.gamma_from_cfg({}) == (2.2, True, False)
+    assert O.gamma_from_cfg({"light": {"gc": {"bri": 2.8, "col": 2.8, "val": 2.8}}}) == (2.8, True, True)
+    assert O.gamma_from_cfg({"light": {"gc": {"col": 1.0, "val": 2.2}}}) == (2.2, False, False)
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

@@ -251,6 +251,43 @@ def test_a_device_build_reads_black():
     assert "#define GC_VIDEO(u, v) (0u)" in head                # outside the sim: black, nothing to link
 
 
+def test_a_web_page_s_video():
+    """A YouTube (or Vimeo, Twitch...) link is a page, not a stream: it goes to yt-dlp, which finds the video in
+    it; an address ffmpeg opens as it is (a camera's, OBS's) does not."""
+    from native import video
+    for url in ("https://www.youtube.com/watch?v=aqz-KE-bpKQ", "https://youtu.be/aqz-KE-bpKQ",
+                "https://m.youtube.com/watch?v=x", "https://vimeo.com/76979871", "https://www.twitch.tv/somebody"):
+        assert video.page_link(url), url
+    for url in ("http://192.168.1.20:8080/video", "rtsp://192.168.1.20:8554/live", "https://notyoutube.com/x",
+                "", "not a link"):
+        assert not video.page_link(url), url
+    if video.ytdlp() is None:                                    # no yt-dlp: said plainly, nothing started
+        try:
+            video.resolve_page("https://youtu.be/x")
+            assert False, "no error"
+        except ValueError as e:
+            assert "yt-dlp" in str(e)
+
+
+def test_an_area_of_the_screen():
+    """An area of the screen is an entry of its own ("area: x,y wxh", left of or above the main monitor below 0),
+    read back exactly; an area is read as that part of the desktop - on Windows with gdigrab's offsets."""
+    import sys
+    from native import video, screen_area
+    name = video.area_name(-1920, 40, 640, 360)
+    assert name == "area: -1920,40 640x360" and video.parse_area(name) == (-1920, 40, 640, 360)
+    for bad in ("area: 1,2 3x", "the whole desktop", "area: 0,0 1x1", None):
+        assert video.parse_area(bad) is None, bad
+    if sys.platform == "win32":
+        args, crop = video.area_args(100, -1080, 641, 361)
+        assert crop is None and args[args.index("-offset_x") + 1] == "100" and args[args.index("-offset_y") + 1] == "-1080"
+        assert args[args.index("-video_size") + 1] == "640x360"           # even: ffmpeg's frames are
+    # the box dragged on the half-size picture of a desktop starting above the main monitor, back in its pixels
+    assert screen_area.box_to_area((50, 100, 10, 20), 0.5, (0, -1080)) == (20, -1040, 80, 160)
+    assert screen_area.box_to_area(screen_area.area_to_box((20, -1040, 80, 160), 0.5, (0, -1080)), 0.5, (0, -1080)) \
+        == (20, -1040, 80, 160)
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

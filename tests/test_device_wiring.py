@@ -106,6 +106,24 @@ def test_the_stream_s_bytes():
             assert int(wiring[m[L], 0]) + 256 * int(wiring[m[L], 1]) == L
 
 
+def test_a_trailing_strip_and_the_map_s_order():
+    """A 2-D ledmap with entries after its matrix (WLED 17's trailing strip, wled/WLED#5745): the matrix kept, the
+    strip counted and said. And the studio's own map has its size first and nothing after the array - a firmware
+    before wled/WLED#5693 read on past "]" and took the keys there for more entries."""
+    import json
+    m = list(range(16)) + [-1, 16, 17, -1, 18]                  # a 4 x 4 matrix, then three LEDs of strip
+    info = {"ledmap": {"map": m, "width": 4, "height": 4}, "total": 19}
+    assert dw.trailing(info) == 3
+    assert dw.trailing({"ledmap": {"map": list(range(16)), "width": 4, "height": 4}}) == 0
+    assert dw.trailing({"ledmap": {"map": list(range(20))}}) == 0          # a strip's map: no matrix to trail
+    g, words = dw.apply(Geometry("matrix", w=4, h=4), info)
+    assert g.count == 16 and "trailing strip" in words
+    g = Geometry.from_ledmap({"map": m, "width": 4, "height": 4})
+    assert g.count == 16 and g.trailing == 3
+    lm = Geometry("matrix", w=4, h=4).ledmap()
+    assert list(lm) == ["width", "height", "map"] and json.dumps(lm).endswith("]}")
+
+
 if __name__ == "__main__":
     bad = 0
     for name, fn in list(globals().items()):

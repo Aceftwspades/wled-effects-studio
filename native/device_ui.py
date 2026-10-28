@@ -201,10 +201,12 @@ def build(app):
                                         callback=lambda s, v: app.stream_start(fps=int(v.split()[0])) if getattr(app, "ddp", None) else None))
         with dpg.group(horizontal=True):                   # a line of its own: one row overran the dock's width
             form.inline("over")
-            dpg.add_combo([p[1] for p in live_out.PROTOCOLS], tag="live_proto", width=px(120), default_value="DDP",
+            dpg.add_combo([p[1] for p in live_out.PROTOCOLS], tag="live_proto", width=px(170), default_value="DDP",
                           callback=lambda s, v: app.set_stream_out(protocol=next(p[0] for p in live_out.PROTOCOLS if p[1] == v)))
             c.tip("DDP: WLED takes it as it is. E1.31 (sACN) and Art-Net: 170 LEDs a universe from the first universe, for a "
-                  "WLED with that receiver on in its Sync settings (DMX mode Multiple RGB) or another pixel controller")
+                  "WLED with that receiver on in its Sync settings (DMX mode Multiple RGB) or another pixel controller. "
+                  "DDP over WebSocket: DDP through the device's web port, for a network where UDP does not get through "
+                  "(WLED 0.16 or later)")
             dpg.add_text("universe", tag="live_universe_label", color=form._dim())
             typeface.mono(dpg.add_input_int(tag="live_universe", width=px(90), default_value=1, min_value=0, min_clamped=True,
                                             callback=lambda s, v: app.set_stream_out(universe=int(v)), on_enter=True))
@@ -1077,7 +1079,7 @@ def refresh_live(app):
         dpg.set_value("live_universe", uni)
         for tag in ("live_universe", "live_universe_label"):
             if dpg.does_item_exist(tag):
-                dpg.configure_item(tag, show=proto != "ddp")
+                dpg.configure_item(tag, show=proto not in ("ddp", "ddpws"))
 
 
 def _wt_step(app, d):

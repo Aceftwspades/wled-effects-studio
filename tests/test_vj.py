@@ -888,6 +888,60 @@ vj.edit_flame(app, 0, -1, "final", vj.NO_VAR)
 check("final" not in fl, "the final map taken off")
 check(vj.forget_flame(app, child) and not any(d.get("morph_to") == child for d in o["decks"]), "a flame forgotten")
 check(all(k in vj.PRESET_KEYS for k in ("fl_trail", "fl_w3", "drift", "breathe")), "a flame's knobs kept in presets")
+# the speed: sample() keeps float32 and reads as the bilinear it was; options() fills its defaults once - a deck
+# replaced, or its source, gets them again
+img = np.random.RandomState(3).rand(9, 13, 3).astype(np.float32)
+uu, vv = np.meshgrid(np.linspace(-0.2, 1.2, 17, dtype=np.float32), np.linspace(0, 1, 11, dtype=np.float32))
+s = vj_looks.sample(img, uu, vv)
+x, y = np.clip(uu * 12, 0, 12), np.clip(vv * 8, 0, 8)
+x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
+x1, y1, fx, fy = np.minimum(x0 + 1, 12), np.minimum(y0 + 1, 8), (x - x0)[..., None], (y - y0)[..., None]
+ref = (img[y0, x0] * (1 - fx) + img[y0, x1] * fx) * (1 - fy) + (img[y1, x0] * (1 - fx) + img[y1, x1] * fx) * fy
+check(s.dtype == np.float32 and s.shape == (11, 17, 3) and np.abs(s - ref).max() < 1e-5, "sample stays float32, bilinear")
+w = vj_looks.sample(img, uu, vv, wrap=True)
+check(w.dtype == np.float32 and np.isfinite(w).all(), "sample wraps")
+bad_uv = uu.copy(); bad_uv[0, 0] = np.nan; bad_uv[0, 1] = np.inf; bad_uv[0, 2] = -np.inf
+check(np.isfinite(vj_looks.sample(img, bad_uv, vv)).all() and np.isfinite(vj_looks.sample(img, bad_uv, vv, wrap=True)).all(),
+      "sample takes NaN and infinite places (a MilkDrop equation's) without a wild index")
+o = vj.options(app)
+check(vj.options(app) is o, "the options handed back")
+o["decks"][1] = {"look": "Plasma"}
+d1 = vj.options(app)["decks"][1]
+check(d1.get("text_outline") == 0.0 and d1["source"].get("kind") == "none", "a replaced deck filled in again")
+o["decks"][1]["source"] = {}
+check(vj.options(app)["decks"][1]["source"].get("advance") == "off", "a replaced source filled in again")
+saved = app.project.options["vj"]
+app.project.options["vj"] = {"decks": [{"look": "Plasma"}]}     # another project's: filled, whatever ids it got
+check(vj.options(app)["decks"][0].get("text_size") == 0.65 and len(vj.options(app)["decks"]) == vj.DECKS,
+      "another project's options filled in")
+app.project.options["vj"] = saved
+o = vj.options(app)
+
+# the Text look's options: placed left or right, a shadow, an outline, a font file that will not load
+from native.vj import Ctx
+def _words(**kw):
+    c = Ctx()
+    c.w, c.h = 96, 32
+    c.u, c.v, c.x, c.y, c.r, c.a = vj._grid(96, 32)
+    c.t, c.dt, c.beat, c.beat_hit, c.beats = 1.0, 1 / 30, 0.0, False, 0.0
+    c.bass = c.mid = c.treb = c.level = 0.3
+    c.amount, c.speed = 0.5, 1.0
+    c.wave = np.zeros(64, np.float32)
+    c.video = c.video_prev = None
+    d = dict(vj.DECK, text="WLED", text_move="still", text_size=0.5)
+    d.update(kw)
+    c.deck = d
+    c.grad = vj_looks.gradient("neon")
+    return vj_looks.LOOKS["Text"].draw(c, {})
+def _cols(p):
+    lit = np.nonzero(p.max(axis=(0, 2)) > 0.05)[0]
+    return int(lit.min()), int(lit.max()), int((p.max(axis=2) > 0.05).sum())
+mid, left, right = _cols(_words()), _cols(_words(text_align="left")), _cols(_words(text_align="right"))
+check(left[0] < mid[0] and right[1] > mid[1] and left[0] <= 6 and right[1] >= 89, "the words placed left and right")
+check(_cols(_words(text_outline=1.0))[2] > mid[2] and _cols(_words(text_shadow=1.0))[2] > mid[2], "an outline and a shadow")
+check(_cols(_words(text_font="no such font.ttf"))[2] == mid[2], "a font file that will not load: the built-in")
+check(all(k in vj.PRESET_KEYS for k in ("text_align", "text_font", "text_shadow", "text_outline")), "kept in presets")
+
 clock.release()
 vj.close(app)
 

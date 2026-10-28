@@ -3109,8 +3109,9 @@ textured quads), so each part goes where it can.
       64 ms plain, 103 ms with the reflection and sprites (a frame without
       one, ~5 ms either way). Tested: `test_any_shape_has_the_look`; the
       smoke finds a sphere's sprites and reflection drawn.
-- [ ] **The device's limits in the view**: its gamma and brightness cap, so a
-      dim gradient bands as it will on the LEDs.
+- [x] **The device's limits in the view**: its gamma and brightness cap, so a
+      dim gradient bands as it will on the LEDs. Done 2026-10-27 (the Outputs
+      frame's ON THE LEDS).
 - [ ] **Camera moves for recordings**: a turntable, depth of field in renders;
       and a project remembering its look.
 
@@ -3661,9 +3662,10 @@ LedFx have added that matters here, in the order it helps most.
       the view; follow #5722.
 - [ ] **Ledmap fixes from main**: the parser reading past the end (#5693, in
       the fork) and trailing strips in sparse ledmaps (075abaff) - the studio
-      writes ledmaps.
-- [ ] **Streaming over the WebSocket** (DDP on `/ws`, nightly): a fallback
-      where UDP is blocked.
+      writes ledmaps. The studio's side done 2026-10-27 (its map's size first,
+      a trailing strip said); 075abaff not yet in the fork's firmware.
+- [x] **Streaming over the WebSocket** (DDP on `/ws`, nightly): a fallback
+      where UDP is blocked. Done 2026-10-27 (the LIVE row's DDP over WebSocket).
 - [ ] **cube_fx controls in WLED's own UI** through `/um.js` (wled/WLED#5741)
       once merged.
 - [ ] **Effect parity**: Dissolve Plus (main), multiple and slow meteors
@@ -4127,6 +4129,169 @@ placed and moved with care. Done 2026-10-26. Released as 1.20.0 (2026-10-27), wi
       Levy C - with six children of theirs, listed after the looks that shipped before (MIDI's places kept).
       A new flame's points are run through its maps fifteen times before any is counted (flam3's fuse), so it
       no longer opens on a zoom smeared into its trails.
+
+Asked for after a code review and a look at BradyMeighan/WLED-Studio (2026-10-27) - a Python streamer of
+video, camera, screen, YouTube, GIFs and scrolling text to WLED over UDP or serial (CustomTkinter, MIT; ideas
+only, nothing copied). The studio had most of it already (webcam, files, GIFs, the screen and windows, RTSP and
+the phone, fill or fit, several devices, mDNS and a subnet sweep, DDP, E1.31 and Art-Net); taken from it: web
+video, an area of the screen, and more of the text. Its gamma table was not taken: WLED 16 gamma-corrects a
+stream itself (#5666), so the studio doing it too would double it. Done 2026-10-27:
+
+- [x] **A VJ frame was 23 ms** (a flame and Melt on a 192 x 108 canvas, headless). `vj_looks.sample()` was half
+      of it: the four corners read by (y, x) indexing, and an int32 floor added to a float32 made every video
+      look's frame float64. Now gathered as rows of the flat image (`take`), float32 throughout: twice as quick
+      (4.5 to 2.2 ms a call). And `vj.options()`, asked some fifty times a frame, filled in every deck's
+      defaults each time (1,700 setdefaults, 1.7 ms); it fills them once for the dicts it has (a project loaded,
+      a deck or its source replaced fills them again). The frame: **15.6 ms**.
+- [x] **Text**: **placed** at the left, the right or in the middle (held, zoomed, flashed or bouncing words;
+      across moves them from there), a **font** file of your own (.ttf or .otf, copied into the project like a
+      picture; one that will not load gives the built-in), a **shadow** (the words again down and to the right,
+      a third as bright, behind them) and an **outline** (a ring in the far end of the deck's colours) - both
+      knobs MIDI and the modulators move, all four kept in presets.
+- [x] **Web video**: a YouTube, Vimeo, Twitch, Dailymotion... link in the stream address (the Video panel's
+      and a deck's) is a page, so yt-dlp finds the video in it - the best single file no taller than 480 rows,
+      or a live stream's playlist - on a thread (the studio does not wait), then ffmpeg reads it as any stream:
+      a video round again at its own speed, a live one as it comes. yt-dlp is optional, as python-rtmidi is
+      (`pip install yt-dlp` or `yt-dlp.exe` on the PATH); without it the link says so.
+- [x] **An area of the screen**: **Area...** in the Video panel and **area** on a deck with the screen as its
+      source show a picture of the whole desktop (every monitor, a monitor above or left of the main one
+      included) to drag a box over, or type its left, top, width and height; read with gdigrab's offsets on
+      Windows, x11grab's on X11, the first screen cropped on macOS.
+- [x] **The device's limits in the view** (the Outputs frame's ON THE LEDS): the picture through the device's
+      gamma (WLED's table, on colours and, if the device does, on brightness) and at its brightness in whole
+      steps (scale8), shown back through the screen's gamma - a dim gradient bands, a dimmed device loses its
+      darks, as on the LEDs. "Read the device's" fills them in from /json/cfg (light.gc) and /json/state. The
+      views only: the stream goes as it is.
+- [x] **DDP over the WebSocket** (wled/WLED#4997, on its `/ws` since 0.16): a fourth protocol in the LIVE row
+      for networks where UDP does not get through. Each DDP packet is one binary message starting 0x02, at most
+      1,428 bytes as WLED takes one whole (472 LEDs, as its common.js sends); TCP_NODELAY so none is split; a
+      thread connects, sends the newest frame (a slow link drops frames, never queues them), reads what the
+      device says back and answers its pings, and connects again a second after a drop.
+- [x] **Ledmaps from upstream, the studio's side**: the studio's ledmap now has its size before the map and
+      nothing after the array (a firmware before #5693 read on past "]" and took `"width":48` for more
+      entries); a device's 2-D ledmap with LEDs after its matrix (17.0's trailing strip, #5745) keeps the
+      matrix and says how many LEDs it left out. The fork has #5693 (d19d6d31); #5745 itself is firmware.
+
+Tested: `test_vj` (sample against the bilinear it was, float32, wrapped; a replaced deck and source filled in
+again; the words placed left and right, an outline and a shadow adding light, a bad font file giving the
+built-in), `test_video` (page links and not, the area's entry and gdigrab's offsets, the picker's box to the
+desktop and back), `test_stream` (DDP over a WebSocket server on this machine: the handshake, message sizes,
+offsets and push, the frame put back together, a ping answered; nothing listening: counted and said),
+`test_device_wiring` (a trailing strip counted and said, the map's order), `test_power` (the device's table:
+near the picture at full brightness, banding at the bottom, 41 levels at brightness 40, washed out with its
+gamma off, the cfg read as cfg.cpp reads it). By hand, in a running studio: the deck's new rows, the area
+picker opened, an area typed and used, the Outputs row dimming the view and not the stream, the LIVE row's
+fourth protocol; a YouTube link played (yt-dlp as a module, 31 frames in a few seconds).
+Not tried: DDP over the WebSocket against a real device; yt-dlp.exe from the PATH; the area on macOS and X11.
+
+Asked for after the Shadertoy test (2026-10-28): a picture of your own for a shader that asks for a texture, and
+pictures and video with transparency, and control over how they are shown. Found: the Image look read a picture as
+RGB (its transparency gone - a clear area showed whatever colour was under it, often white), every video was read as
+RGB (a WebM's or ProRes 4444's alpha gone), and deck C's "over" knew only black as clear. Done 2026-10-28:
+
+- [x] **A picture a channel of its own** (`image`): a shader's iChannel set to image reads a picture chosen beside it
+      (the "..." by the channel, kept with the project as a deck's picture is) - a texture the shader asks for;
+      noise until one is chosen. A Shadertoy JSON's texture comes in as image, the file saying which channel was one.
+      Imported shaders are named after themselves (a // NAME: line).
+- [x] **Transparency through the deck** (`native/vj_layer.py`): the Image look reads a picture's alpha; a video file
+      with alpha (ffprobe asked once: a VP8/VP9 WebM made with alpha - decoded by libvpx, as ffmpeg's own decoder
+      drops it - ProRes 4444, PNG, QuickTime Animation) is read as RGBA; the deck keeps the alpha (moved with its
+      zoom, kaleidoscope and mirror), and deck C goes over the mix by it in every blend - its clear parts show the
+      mix, its black parts cover it (black was the only clear before, and still is with no alpha).
+- [x] **PICTURE on each deck** (shown for Image and a deck with video): clear - its own transparency, none (on
+      black), a colour keyed out (key colour, tolerance, softness: a green screen), the dark keyed out; fit - fill,
+      fit, stretched, tiled; scale, across, up / down, turn, flip; drift (the Image look's wander and swell, 0
+      still). The knobs learn MIDI and are kept in presets; a video goes through it only when it has alpha or is
+      keyed or moved.
+
+Tested: `test_layer` (its own alpha and none; a colour and the dark keyed out; fit, fill, scale, place, up being up,
+flip, tile; a WebM VP9 and a ProRes 4444 made with alpha found and read as RGBA - clear corner, solid middle - an MP4
+not; deck C over the mix by its alpha, black shown, and without one as before; a shader channel reading its own
+picture, noise without). By hand: a PNG with alpha, keyed, fitted, turned, tiled; a WebM and a ProRes with alpha; a
+green-screen MP4 keyed - each as deck C over a Plasma; the PICTURE section and a channel's picture in a running
+studio. Not done: placement for video beyond what fills the canvas (a video is decoded at the canvas's shape, so
+"fit" cannot bring back what was cut).
+
+Asked for after the MilkDrop work (2026-10-28): the same test for the Shadertoy shaders. 304 shaders from
+shadertoy.com - 204 single-pass from the Shadereval benchmark (Vipitis/Shadereval-inputs: MIT, CC0 and the like,
+each's licence recorded) and 100 from the site's API (Vipitis/shadertoys-dataset's July 2024 sample: every pass
+and its inputs - 30 multi-pass, 68 buffer inputs, 26 textures, 9 keyboards, 2 cubemaps, 3 videos, a music) -
+written as the studio's .glsl, compiled and run 90 frames at 128 x 72 (toy_bench). Before: 296 of 304 ran (29 of
+the 30 multi-pass). After: **all 304, all 30 multi-pass**. Done 2026-10-28:
+
+- [x] **WebGL's GLSL where the desktop's differs** (`vj_glsl._webgl`, the lines kept so the compiler's numbers stay
+      the shader's): desktop GLSL still declares noise1..noise4, so a shader's own `noise2` clashed with them
+      (three shaders) - renamed; and the driver's preprocessor would not take a function-like macro's name used as
+      a variable (`#define f(a,b,x) ...` and `float f = ...`, `#define r(uv,lg)` and `float r = r(uv, 400.)`) -
+      such a macro and its calls renamed, only where the name is a variable, a swizzle or assigned (a macro's name
+      handed bare to another macro, `tri(p, Fa)`, is the macro's own: renaming it there broke a shader that ran).
+- [x] **A cubemap channel** (`cube`): a samplerCube with a sky of the studio's own - blue overhead, a pale horizon,
+      dark ground - for a shader that reads Shadertoy's cubemaps with a direction (two did, and stopped there).
+- [x] **A font channel** (`font`): an atlas laid out as Shadertoy's "Font 1" (16 x 16 cells, code c at c % 16, row
+      c / 16 from the top; the letter in rgb, a distance field in a), drawn from a system monospace font. A shader
+      that writes digits with it drew a white frame with the noise in its place.
+- [x] **iChannelTime and iSampleRate** declared (Shadertoy has them; a shader using either would not compile).
+- [x] **Import... takes a Shadertoy .json** (`vj_glsl.from_shadertoy`, `vj_looks.import_shadertoy`): the API's JSON
+      or its inside, one shader, a list, or one a line - its passes as //@ sections and each pass's inputs as its
+      channels (a buffer by its output's letter, a cubemap the sky, its font the font, another texture noise, music
+      or the microphone the sound, a webcam or video the deck's video), its name, author, page and the licence
+      note at the top; a keyboard, a 3-D texture, a cubemap pass or a sound pass left out, and said. The keyboard
+      no longer stops a shader: its channel is none (no key pressed).
+
+Tested: `test_vj_shaders` (WebGL's ways, each; a two-pass JSON with a keyboard, a cubemap, the font and a sound
+pass converted, its channels and Common, what is left out said; Import... of the .json; the atlas's 'A' in its cell;
+the imported shader run on the graphics card - its buffer, the sky, the font, iChannelTime). toy_bench on the 304,
+before and after. Of those that run, 10 are dark and 12 mostly white in 90 frames at this size: by eye, the white
+ones are drawings on white (diagrams, illustrations, a Mandelbrot); of the dark, two filter a video (none in the
+test), two wait for the mouse or keys, the rest dim by design. Not done: Shadertoy's own textures (photos, the
+noise of its sizes) - the files are the site's, so noise stands in; a cubemap or sound pass; the mouse.
+
+Asked for after the Drops, Effects & Flames showcase (2026-10-27), where real MilkDrop presets were tried: of
+sixteen classics from projectM's cream-of-the-crop pack, nine had a shader left out and one would not load. The
+importer measured on 300 presets of that pack drawn at random (milk_bench: each parsed, each shader translated and
+compiled on the graphics card, each run 40 frames): 284 loaded, 269 ran, 161 of 447 shaders compiled, 40 of 233
+presets with shaders had all of theirs. After: **all 300 load and run, 478 of 479 shaders compile, 248 of 249
+presets have every shader**. Done 2026-10-27:
+
+- [x] **The equations are MilkDrop 2's language** (ns-eel2): everything an expression, so an assignment is worth
+      what it assigned (`a = b = 0`, `if(c, x = 1, y = 2)` with only the branch taken run), `(a; b; c)` worth its
+      last, `?:`, `loop(n, ...)` and `while(...)` (ns-eel2's million at most), `exec2`/`exec3`, `megabuf` (each
+      block's own: the preset's, each shape's, each wave's) and `gmegabuf` and `reg00`-`reg99` (shared by every
+      preset), `memset`, `memcpy`, `$pi`, `$e`, `$x1F`, `/* */`; a line without its `;` taken as MilkDrop takes it.
+      And `%` on a per-pixel grid raised a TypeError (15 presets stopped there).
+- [x] **The shaders are translated by type** (`native/hlsl.py`): parsed, every expression's type worked out, and
+      what HLSL converts by itself written out for GLSL - a number where a vector goes, a vector cut to a smaller
+      one (`float x = tex2D(...)`, `v4 * v3`), a function's arguments to its types (`pow(c, 2)`), an int as a
+      float, a number or vector as a condition, a number swizzled (`x.xxx`), `%` on floats, comparisons of vectors;
+      `mul(v, M)` turned round for GLSL's column-major matrices (the old prelude multiplied the other way, so a
+      rotation turned backwards); #defines shared by head and body; a preset's names GLSL keeps (texture, input,
+      sample, noise1...) or forbids (`a__b`) renamed, as are its own of MilkDrop's helpers' names (`float lum =
+      lum(c)`); an input it writes to (HLSL lets it: `q25 = ...`) made a copy; global initialisers that read the
+      inputs moved into main(); `sampler_state` blocks passed over; arrays of vectors given number by number;
+      MilkDrop's turning matrices (rot_s1..rot_rand4), GetMain, `sampler_FC_main` and the like, `g_fTexSize`, mip_*
+      declared; a texture of the preset's own (sampler_lichen: an image MilkDrop ships) bound to noise. The approach
+      is projectM's (an HLSL front end that types the shader before writing GLSL); nothing of its code. A shader it
+      cannot read falls back to the old rewrite.
+- [x] **What MilkDrop draws that was left out**: the outer and inner borders (projectM's Border.cpp: a band from
+      1 - size to 1, a thin one lighting a pixel as much as it covers it) - Geiss's Swirlie 5 was black without
+      them - and the video echo (zoom, orientation, alpha). The feedback frame is kept at 8 bits a channel, as
+      MilkDrop's is: a preset's slow fade stops at its steps, its dither has steps to work on.
+- [x] **A custom wave's points one after another**: MilkDrop runs a wave's per-point code point by point, every
+      variable as the last point left it; the studio ran all the points at once, so a preset that counts or toggles
+      along its points (`sw = 1 - sw` drawing alternate ends of lines, `it += 1`) drew nothing of it. Code that reads a
+      variable before setting it (or uses megabuf) now runs in order - at 64 points, as that is slow in Python.
+- [x] **The sound as MilkDrop gives it**: each band against its own last few seconds, so 1 is the music's usual
+      level and 1.3 a hit (the bands were mapped straight to 0.5..2, so a loud track held a preset's "on a hit"
+      branch on: Strangermin's border widened past 1.3 and filled the frame).
+
+Tested: `test_milk` (the new language: assignments as values, if() running one branch, ?:, sequences, exec2, loop,
+while, megabuf, gmegabuf and reg shared, $pi and hex, a missing ';', per-pixel if/%/megabuf), `test_vj_shaders`
+(fifteen of HLSL's ways each written out, all compiling on the graphics card; a flat array; a sampler_state);
+milk_bench on the 300 presets, before and after. Not checked against MilkDrop or projectM themselves: compiling is
+not looking the same. Of the sixteen, 5D snowflake still turns white (a textured additive shape feeding the frame
+back into itself), skylight starts white (its warp shader's `frac(ret - 0.005)` wraps black round to white) and
+Geiss's Kaleidoscope 1 is near black - whether MilkDrop shows them so is not known. One shader of the 479 uses
+float2x3 (non-square matrices are not translated).
 
 ### From the second feature review (October 2026)
 

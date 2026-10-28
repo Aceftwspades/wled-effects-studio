@@ -1228,7 +1228,7 @@ STEPS = [
              "(__import__('io'), __import__('PIL.Image', fromlist=['Image']))"}], 1.2),
     ([{"check": "app.video_src is not None and app._video_n >= 1 and 'waiting' not in dpg.get_value('video_msg')"},
       {"check": "'HTTPS' in dpg.get_value('video_phone_words')"},
-      {"py": "video_ui.stop(app)"}, {"py": "video_ui._set_kind(app, 'a network stream')"}], 0.3),
+      {"py": "video_ui.stop(app)"}, {"py": "video_ui._set_kind(app, 'a stream or web video')"}], 0.3),
     ([{"check": "dpg.is_item_shown('video_url_row') and not dpg.is_item_shown('video_phone_row')"},
       {"py": "video_ui._set_url(app, 'file:///nothing')"}], 0.3),
     ([{"check": "app.video_src is None and 'not a stream address' in dpg.get_value('video_msg')"},

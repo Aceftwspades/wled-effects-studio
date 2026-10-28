@@ -88,7 +88,10 @@ class Geometry:
         if w > 0 and h > 0:
             if w > cls.LIMITS["w"][1] or h > cls.LIMITS["h"][1]:
                 raise ValueError(f"it is {w} x {h}: the studio holds a matrix of {cls.LIMITS['w'][1]} x {cls.LIMITS['h'][1]} at most")
-            return cls("matrix", w=w, h=h, map=list(m), source=source)
+            g = cls("matrix", w=w, h=h, map=list(m)[:w * h], source=source)
+            # entries past the matrix: a trailing strip (WLED 17, wled/WLED#5745) - the studio holds the matrix only
+            g.trailing = sum(1 for v in m[w * h:] if isinstance(v, (int, float)) and int(v) >= 0)
+            return g
         if len(m) > cls.LIMITS["n"][1]:
             raise ValueError(f"it has {len(m)} LEDs: the studio holds a strip of {cls.LIMITS['n'][1]} at most")
         return cls("strip", n=len(m), map=list(m), source=source)
@@ -403,9 +406,12 @@ class Geometry:
         for k, logical in enumerate(self.phys):
             if 0 <= int(logical) < n:
                 m[int(logical)] = int(ids[k]) if ids is not None else k
-        out = {"map": m}
+        out = {}
         if self.h > 1:
+            # the size before the map, nothing after it: a firmware before wled/WLED#5693 read on past the array's
+            # "]" and took the keys after it ("width":48) for more entries - LED 0 lit where they landed
             out["width"], out["height"] = int(self.w), int(self.h)
+        out["map"] = m
         return out
 
     def describe(self):

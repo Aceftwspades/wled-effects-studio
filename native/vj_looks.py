@@ -58,22 +58,36 @@ def luma(img):
 
 
 def sample(img, u, v, wrap=False):
-    """img (h, w, c) read at u, v (0..1, arrays), bilinear; clamped at the edges (or wrapped)."""
+    """img (h, w, c) read at u, v (0..1, arrays), bilinear; clamped at the edges (or wrapped). Float32 in, float32
+    out: the four corners gathered from the image as rows of a flat (h * w, c) array, which is twice as quick as
+    indexing it by (y, x) - and the old sum of an int32 and a float32 made every video look's frame float64."""
     h, w = img.shape[:2]
-    x = u * (w - 1)
-    y = v * (h - 1)
+    flat = img.reshape(h * w, -1)
+    if flat.dtype.kind != "f":
+        flat = flat.astype(np.float32)                            # a uint8 picture: blended in floats
+    x = np.asarray(u * (w - 1), np.float32)
+    y = np.asarray(v * (h - 1), np.float32)
+    # a NaN or an infinity (a MilkDrop equation's divide, a look's own) read as the first column: as an index it
+    # was a wild one - the corners are gathered by flat index, which nothing brings back in range
+    x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
+    y = np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
     if wrap:
         x = np.mod(x, w); y = np.mod(y, h)
     else:
         x = np.clip(x, 0, w - 1); y = np.clip(y, 0, h - 1)
-    x0 = np.floor(x).astype(np.int32); y0 = np.floor(y).astype(np.int32)
+    x0 = x.astype(np.int32); y0 = y.astype(np.int32)              # a floor: x and y are not below 0 here
     fx = (x - x0)[..., None]; fy = (y - y0)[..., None]
     x1 = (x0 + 1) % w if wrap else np.minimum(x0 + 1, w - 1)
     y1 = (y0 + 1) % h if wrap else np.minimum(y0 + 1, h - 1)
-    x0 %= w; y0 %= h
-    a = img[y0, x0] * (1 - fx) + img[y0, x1] * fx
-    b = img[y1, x0] * (1 - fx) + img[y1, x1] * fx
-    return a * (1 - fy) + b * fy
+    if wrap:
+        x0 %= w; y0 %= h
+    r0, r1 = y0 * w, y1 * w
+    a = flat.take(r0 + x0, 0)
+    a += (flat.take(r0 + x1, 0) - a) * fx
+    b = flat.take(r1 + x0, 0)
+    b += (flat.take(r1 + x1, 0) - b) * fx
+    a += (b - a) * fy
+    return a.reshape(np.shape(x) + img.shape[2:])
 
 
 def hsv(hh, s, v):
@@ -114,11 +128,14 @@ def fbm(x, y, oct=4, seed=0):
 
 
 # --- video ---------------------------------------------------------------------------------------
-@look("Clean", "video", "the video as it is - amount turns up its colour", video=True)
+@look("Clean", "video", "the video as it is - amount turns up its colour; a video's transparency (its own or keyed "
+                       "out) kept", video=True)
 def _clean(ctx, st):
     img = _video(ctx)
     m = luma(img)[..., None]
-    return np.clip(m + (img - m) * (1.0 + ctx.amount * 1.5), 0, 1)
+    out = np.clip(m + (img - m) * (1.0 + ctx.amount * 1.5), 0, 1)
+    a = getattr(ctx, "video_alpha", None)
+    return out if a is None or a.shape != out.shape[:2] else np.dstack([out, a])
 
 
 @look("Neon Edges", "video", "only the outlines, glowing in the video's own colour - amount the gain", video=True)
@@ -910,15 +927,26 @@ def sync_flames(flames):
 _FONTS = {}
 
 
-def _font(px):
+def _font(px, path=""):
+    """The font at px high: the file at `path` (a .ttf or .otf of the user's), else the built-in one - a file that
+    will not load gives the built-in, so the words still show."""
     from PIL import ImageFont
-    f = _FONTS.get(px)
+    f = _FONTS.get((px, path))
     if f is None:
-        try:
-            f = ImageFont.load_default(size=px)
-        except TypeError:                                          # a Pillow before 10.1: one size only
-            f = ImageFont.load_default()
-        _FONTS[px] = f
+        f = None
+        if path:
+            try:
+                f = ImageFont.truetype(path, px)
+            except (OSError, ValueError):
+                f = None
+        if f is None:
+            try:
+                f = ImageFont.load_default(size=px)
+            except TypeError:                                      # a Pillow before 10.1: one size only
+                f = ImageFont.load_default()
+        if len(_FONTS) >= 64:
+            _FONTS.pop(next(iter(_FONTS)))
+        _FONTS[(px, path)] = f
     return f
 
 
@@ -927,23 +955,25 @@ TEXT_MOVES = (("scroll", "scrolling left"), ("scroll_right", "scrolling right"),
               ("words", "a word a beat"), ("wave", "scrolling on a wave"), ("flash", "flashing on the beat"))
 _SCROLLS = ("scroll", "scroll_right", "rise", "wave")   # at speed 0 these are held still, as Text always was
 _HELD = ("still", "zoom", "words", "flash")              # where the words stay: shrunk to fit when too wide
+TEXT_ALIGNS = (("left", "at the left"), ("centre", "in the middle"), ("right", "at the right"))   # held words' place
 TEXT_SIZE = (0.1, 2.0)                                   # the words' height, of the canvas's
 MASKS = 16                                               # the words drawn at a size kept at most (a word a beat: one each)
 
 
-def _text_mask(st, words, px):
-    """The words in white at px high, cut to their ink, as 0..1 - kept for the next frames."""
+def _text_mask(st, words, px, font=""):
+    """The words in white at px high (in the font file `font`, "" the built-in), cut to their ink, as 0..1 - kept
+    for the next frames."""
     from PIL import Image, ImageDraw
     cache = st.setdefault("masks", {})
-    m = cache.get((words, px))
+    m = cache.get((words, px, font))
     if m is None:
-        f = _font(px)
+        f = _font(px, font)
         l, t, r, b = ImageDraw.Draw(Image.new("L", (1, 1))).textbbox((0, 0), words, font=f)
         im = Image.new("L", (max(1, r - l) + 2, max(1, b - t) + 2))
         ImageDraw.Draw(im).text((-l + 1, -t + 1), words, fill=255, font=f)
         if len(cache) >= MASKS:
             cache.pop(next(iter(cache)))
-        m = cache[(words, px)] = np.asarray(im, np.float32) / 255.0
+        m = cache[(words, px, font)] = np.asarray(im, np.float32) / 255.0
     return m
 
 
@@ -978,7 +1008,7 @@ def _text(ctx, st):
     if move == "words":                                       # one word on each beat of the count
         parts = words.split() or [words]
         words = parts[int(getattr(ctx, "beats", 0.0)) % len(parts)]
-    m = _text_mask(st, words, px)
+    m = _text_mask(st, words, px, str(getattr(ctx, "font_path", "") or d.get("text_font") or ""))
     mh, mw = m.shape
     if move in _HELD and mw > ctx.w:                          # held: made to fit across
         m = _scaled(m, ctx.w / mw)
@@ -989,6 +1019,11 @@ def _text(ctx, st):
     cx = ctx.w * 0.5 * (1.0 + float(knob("text_x")))
     cy = ctx.h * 0.5 * (1.0 - float(knob("text_y")))
     x0, y0 = int(round(cx - mw / 2)), int(round(cy - mh / 2))
+    align = d.get("text_align", "centre")
+    if align in ("left", "right"):                            # held words against a side, `across` moving them off it
+        edge = max(1, ctx.w // 32)
+        shift = int(round(ctx.w * 0.5 * float(knob("text_x"))))
+        x0 = (edge if align == "left" else ctx.w - mw - edge) + shift
     run = ctx.dt * 0.25                                       # canvas widths a second at speed 1
     if move in ("scroll", "scroll_right", "wave"):
         st["x"] = (st.get("x", 0.0) + run * ctx.w) % (mw + ctx.w)
@@ -1013,6 +1048,21 @@ def _text(ctx, st):
         _paste(out, m, x0, y0)
     if move == "flash":                                       # lit on the beat, down to 1 - amount between
         out *= (1.0 - ctx.amount) + ctx.amount * ctx.beat
+    edge = None
+    line = float(knob("text_outline"))
+    if line > 0.0:                                            # a ring round each letter, in the far end of the colours
+        r = max(1, int(round(px * 0.06)))
+        grown = out.copy()
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                if dx * dx + dy * dy <= r * r and (dx or dy):
+                    grown = np.maximum(grown, _shift(out, dx, dy))
+        edge = np.clip(grown - out, 0, 1) * line
+    shadow = float(knob("text_shadow"))
+    drop = None
+    if shadow > 0.0:                                          # the words again, down and to the right, dim, behind them
+        k = max(1, int(round(px * 0.1)))
+        drop = _shift(out if edge is None else np.maximum(out, edge), k, k) * shadow
     glow = float(knob("text_glow"))
     if glow > 0.0:                                            # a soft halo around the letters
         from PIL import Image, ImageFilter
@@ -1020,31 +1070,56 @@ def _text(ctx, st):
             ImageFilter.GaussianBlur(max(1.0, px * 0.12))), np.float32) / 255.0
         out = np.maximum(out, np.clip(halo * (1.0 + 2.0 * glow), 0, 1) * glow)
     col = ctx.grad((ctx.u + ctx.t * 0.1) % 1.0)
-    col = col / np.maximum(col.max(axis=2, keepdims=True), 0.2)       # the words at the colours' full brightness
-    return np.clip(col, 0, 1) * out[..., None]
+    col = np.clip(col / np.maximum(col.max(axis=2, keepdims=True), 0.2), 0, 1)   # the words at the colours' full brightness
+    pic = col * out[..., None]
+    if edge is not None:
+        far = ctx.grad((ctx.u + ctx.t * 0.1 + 0.5) % 1.0)
+        far = np.clip(far / np.maximum(far.max(axis=2, keepdims=True), 0.2), 0, 1)
+        pic = np.maximum(pic, far * edge[..., None])
+    if drop is not None:                                      # under the letters and their ring: a third as bright
+        lit = np.maximum(out, edge) if edge is not None else out
+        pic = pic + col * (0.35 * drop * (1.0 - lit))[..., None]
+    return np.clip(pic, 0, 1)
 
 
-@look("Image", "layer", "a picture file of the deck's, filling the canvas, drifting slowly - amount its zoom")
+def _shift(m, dx, dy):
+    """A 2-D mask moved dx right and dy down, what comes in empty."""
+    out = np.zeros_like(m)
+    h, w = m.shape
+    if abs(dx) >= w or abs(dy) >= h:
+        return out
+    out[max(0, dy):h + min(0, dy), max(0, dx):w + min(0, dx)] = m[max(0, -dy):h - max(0, dy), max(0, -dx):w - max(0, dx)]
+    return out
+
+
+@look("Image", "layer", "a picture file of the deck's - its transparency kept (or a colour or the dark keyed out), "
+                       "fitted, scaled, placed, turned and flipped as the deck's PICTURE settings say, drifting slowly "
+                       "- amount its swell")
 def _image(ctx, st):
+    from native import vj_layer
     path = str(getattr(ctx, "image_path", "") or (getattr(ctx, "deck", None) or {}).get("image") or "")
-    key = (path, ctx.w, ctx.h)
+    import os
+    try:
+        key = (path, os.path.getmtime(path), ctx.w, ctx.h) if path else None
+    except OSError:
+        key = (path, None, ctx.w, ctx.h)
     if st.get("key") != key:
         st["key"], st["img"] = key, None
         if path:
             try:
-                from PIL import Image, ImageOps
-                im = ImageOps.fit(Image.open(path).convert("RGB"), (ctx.w * 2, ctx.h * 2), Image.BILINEAR)
+                from PIL import Image
+                im = Image.open(path)
+                im = im.convert("RGBA" if ("A" in im.getbands() or "transparency" in im.info) else "RGB")
+                big = max(ctx.w, ctx.h) * 4                       # enough to zoom into, small enough to sample
+                im.thumbnail((big, big), Image.LANCZOS)
                 st["img"] = np.asarray(im, np.float32) / 255.0
             except Exception as e:
                 raise ValueError(f"could not read {path}: {e}")
     img = st["img"]
     if img is None:
         raise ValueError("no picture chosen (the deck's image ...)")
-    z = 1.0 + ctx.amount * 0.6 + ctx.beat * 0.05
-    a = ctx.t * 0.05
-    u = (ctx.u - 0.5) / z + 0.5 + math.sin(a) * 0.05
-    v = (ctx.v - 0.5) / z + 0.5 + math.cos(a * 0.7) * 0.05
-    return sample(img, u, v)
+    rgb, alpha = vj_layer.prepare(img, ctx.w, ctx.h, getattr(ctx, "deck", None) or {}, ctx.t, ctx.amount, ctx.beat)
+    return np.dstack([rgb, alpha])                                # RGBA: the deck keeps the alpha (vj.draw_deck)
 
 
 IFS_DESC = "a classic fractal (an iterated function system) as a flame - its maps' points counted, log-scaled"
@@ -1177,18 +1252,21 @@ def _load_file(path):
     return Look(name, "yours", ns["draw"], str(ns.get("DESC") or "a look of the project's own"), bool(ns.get("VIDEO", False)))
 
 
-IMPORTS = (".milk", ".glsl")        # what Import... copies in (a Python look is made with New look..., not imported)
+IMPORTS = (".milk", ".glsl", ".json")        # what Import... copies in (a Python look is made with New look..., not imported)
 
 
 def import_file(project, path):
-    """A .milk preset or a .glsl shader copied into the project's looks/ (a new name if one is taken): its path.
+    """A .milk preset or a .glsl shader copied into the project's looks/ (a new name if one is taken), or a Shadertoy
+    shader's .json written there as a .glsl (vj_glsl.from_shadertoy; a file of several, each): its path (the first).
     Another kind of file: ValueError."""
     import os
     import shutil
     if os.path.splitext(path)[1].lower() not in IMPORTS:
-        raise ValueError(f"only {' and '.join(IMPORTS)} files are imported")
+        raise ValueError(f"only {', '.join(IMPORTS)} files are imported")
     d = user_dir(project)
     os.makedirs(d, exist_ok=True)
+    if path.lower().endswith(".json"):
+        return import_shadertoy(project, path)[0]
     base, ext = os.path.splitext(os.path.basename(path))
     dest = os.path.join(d, base + ext.lower())
     k = 2
@@ -1197,6 +1275,37 @@ def import_file(project, path):
         k += 1
     shutil.copy2(path, dest)
     return dest
+
+
+def import_shadertoy(project, path):
+    """A Shadertoy JSON file's shaders (one, a list of them, or the API's {"Shader": ...} lines) each written to the
+    project's looks/ as a .glsl named after the shader: [(path, [what of it is not here])]."""
+    import json
+    import os
+    from native import vj_glsl
+    text = open(path, encoding="utf-8", errors="replace").read()
+    try:
+        data = json.loads(text)
+        items = data if isinstance(data, list) else [data]
+    except json.JSONDecodeError:
+        items = [json.loads(line) for line in text.splitlines() if line.strip()]   # one shader a line
+    d = user_dir(project)
+    os.makedirs(d, exist_ok=True)
+    out = []
+    for item in items:
+        src, name, lost = vj_glsl.from_shadertoy(item)
+        base = "".join(ch if ch.isalnum() else "_" for ch in name.strip().lower()).strip("_")[:48] or "shadertoy"
+        dest = os.path.join(d, base + ".glsl")
+        k = 2
+        while os.path.exists(dest):
+            dest = os.path.join(d, f"{base}_{k}.glsl")
+            k += 1
+        with open(dest, "w", encoding="utf-8") as f:
+            f.write(src)
+        out.append((dest, lost))
+    if not out:
+        raise ValueError("no shader in the file")
+    return [p for p, _ in out]
 
 
 def new_shader(project, name):

@@ -14,7 +14,7 @@ import time
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from native import num, typeface, vj, vj_looks, weight
+from native import form, num, typeface, vj, vj_looks, weight
 from native.typeface import px
 
 TAG = "vj_win"
@@ -71,7 +71,8 @@ def build(app):
                     c.tip("a Shadertoy shader of your own: a .glsl file to paste one from shadertoy.com into (its Image "
                           "tab's code) - it runs as it is, on the graphics card")
                     dpg.add_button(label="Import...", tag="vj_import", small=True, callback=lambda: dpg.show_item("vj_impfile"))
-                    c.tip("a MilkDrop preset (.milk) or a Shadertoy shader (.glsl) copied into the project's looks/ and "
+                    c.tip("a MilkDrop preset (.milk), a Shadertoy shader (.glsl), or a Shadertoy shader's .json (the "
+                          "site's API, a save-shader extension: every pass and its inputs) into the project's looks/ and "
                           "listed - a preset runs its motion, decay, wave, shapes, custom waves and equations, and its "
                           "MilkDrop 2 shaders translated (one that does not translate is left out, and said)")
                 with dpg.group(horizontal=True):
@@ -200,7 +201,7 @@ def build(app):
         dpg.add_text("", tag="vj_words", color=c.DIM, wrap=0)
     with dpg.file_dialog(directory_selector=False, show=False, tag="vj_impfile", width=px(620), height=px(420),
                          file_count=50, callback=lambda s, a: _import(app, a)):
-        dpg.add_file_extension("{.milk,.glsl}", color=(120, 170, 255))
+        dpg.add_file_extension("{.milk,.glsl,.json}", color=(120, 170, 255))
         dpg.add_file_extension(".*")
     for i in range(vj.DECKS):
         with dpg.file_dialog(directory_selector=False, show=False, tag=f"vj_file{i}", width=px(620), height=px(420),
@@ -210,6 +211,15 @@ def build(app):
         with dpg.file_dialog(directory_selector=False, show=False, tag=f"vj_imgfile{i}", width=px(620), height=px(420),
                              callback=lambda s, a, i=i: _set_image(app, i, a.get("file_path_name", ""))):
             dpg.add_file_extension("{.png,.jpg,.jpeg,.gif,.bmp,.webp}", color=(120, 170, 255))
+            dpg.add_file_extension(".*")
+        if i == 0:
+            with dpg.file_dialog(directory_selector=False, show=False, tag="vj_chimgfile", width=px(620), height=px(420),
+                                 callback=lambda s, a: _set_channel_image(app, a.get("file_path_name", ""))):
+                dpg.add_file_extension("{.png,.jpg,.jpeg,.gif,.bmp,.webp,.tga}", color=(120, 170, 255))
+                dpg.add_file_extension(".*")
+        with dpg.file_dialog(directory_selector=False, show=False, tag=f"vj_fontfile{i}", width=px(620), height=px(420),
+                             callback=lambda s, a, i=i: _set_font(app, i, a.get("file_path_name", ""))):
+            dpg.add_file_extension("{.ttf,.otf,.ttc}", color=(120, 170, 255))
             dpg.add_file_extension(".*")
     _build_browser(app)
     refresh(app)
@@ -243,11 +253,29 @@ def _deck(app, i):
                                                  k for k, w in vj_looks.TEXT_MOVES if w == v))))
         c.tip("how the words move: scrolling either way, rising, held still, bouncing, zoomed or flashed on the beat, "
               "a word on each beat, or scrolling on a wave - speed how fast, amount how hard the beat hits them")
+        _row("placed", lambda: dpg.add_combo([w for _, w in vj_looks.TEXT_ALIGNS], tag=f"vj_talign{i}", width=-1,
+                                             default_value=dict(vj_looks.TEXT_ALIGNS).get(d["text_align"], "in the middle"),
+                                             callback=lambda s, v: _set_deck(app, i, "text_align", next(
+                                                 k for k, w in vj_looks.TEXT_ALIGNS if w == v))))
+        c.tip("where words that are held, zoomed, flashed or bouncing sit across the canvas - against a side, or in "
+              "the middle (across moves them from there)")
+        with form.row("font"):
+            with dpg.group(horizontal=True):
+                dpg.add_text("", tag=f"vj_tfont{i}")
+                dpg.add_button(label="...", small=True, callback=lambda: dpg.show_item(f"vj_fontfile{i}"))
+                c.tip("a font file of your own (.ttf or .otf) for the words")
+                dpg.add_button(label="built-in", tag=f"vj_tfontx{i}", small=True,
+                               callback=lambda: _set_deck(app, i, "text_font", ""))
+                c.tip("back to the studio's own font")
         for key, tag, label, lo, hi, tip in (
                 ("text_size", "vj_tsz", "size", 0.1, 2.0, "the words' height, of the canvas's (1: as tall as it)"),
                 ("text_x", "vj_tx", "across", -1.0, 1.0, "where the words sit, left (-1) to right (1); 0 the middle"),
                 ("text_y", "vj_ty", "up / down", -1.0, 1.0, "where the words sit, bottom (-1) to top (1); 0 the middle"),
-                ("text_glow", "vj_tgl", "glow", 0.0, 1.0, "a soft halo around the letters")):
+                ("text_glow", "vj_tgl", "glow", 0.0, 1.0, "a soft halo around the letters"),
+                ("text_shadow", "vj_tsh", "shadow", 0.0, 1.0,
+                 "the words again a little down and to the right, dimmer, behind them: how strong"),
+                ("text_outline", "vj_tol", "outline", 0.0, 1.0,
+                 "a ring round each letter in the far end of the deck's colours: how bright")):
             _row(label, lambda key=key, tag=tag, lo=lo, hi=hi: num.add(
                 f"{tag}{i}", float(d[key]), lo, hi, digits=2, callback=lambda s, v, key=key: _set_deck(app, i, key, float(v))))
             c.tip(tip + " (right-click: learn MIDI)")
@@ -260,7 +288,11 @@ def _deck(app, i):
                     dpg.add_combo([], tag=f"vj_ch{i}_{k}", width=px(88),
                                   callback=lambda s, v, k=k: _set_channel(app, i, k, v))
                     c.tip(f"what the shader's iChannel{k} holds: the deck's video, the sound, a noise texture, its "
-                          "picture, a buffer (A..D), nothing - or what its file says (file: ...)")
+                          "picture, a picture of its own (image: the ... beside it), the sky (cube), the font, a "
+                          "buffer (A..D), nothing - or what its file says (file: ...)")
+                    dpg.add_button(label="...", tag=f"vj_chimg{i}_{k}", small=True, show=False,
+                                   callback=lambda s, a, k=k: _pick_channel_image(app, i, k))
+                    c.tip(f"the picture iChannel{k} reads - a texture the shader asks for (noise until one is chosen)")
     with dpg.group(horizontal=True, tag=f"vj_imgrow{i}"):
         dpg.add_text("picture", color=c.DIM)
         dpg.add_text("", tag=f"vj_imgname{i}")
@@ -308,10 +340,12 @@ def _deck(app, i):
                   "source share it")
             dpg.add_button(label="...", tag=f"vj_srcpick{i}", small=True, callback=lambda: _pick_source(app, i))
             c.tip("add files to the deck's list, or pick the camera, the screen or the address")
+            dpg.add_button(label="area", tag=f"vj_area{i}", small=True, callback=lambda: _pick_area(app, i))
+            c.tip("an area of the screen: a box dragged over a picture of the desktop")
             dpg.add_button(label="||", tag=f"vj_pause{i}", small=True, callback=lambda: (vj.pause(app, i), refresh(app)))
             c.tip("the video paused (the picture holds) or played on")
         dpg.add_combo([], tag=f"vj_srcname{i}", width=-1, show=False, callback=lambda s, v: _set_src(app, i, name=v))
-        dpg.add_input_text(tag=f"vj_url{i}", width=-1, show=False, hint="rtsp://... or http://...", on_enter=True,
+        dpg.add_input_text(tag=f"vj_url{i}", width=-1, show=False, hint="rtsp://..., http://... or a YouTube link", on_enter=True,
                            default_value=d["source"].get("url", ""), callback=lambda s, v: _set_src(app, i, url=v))
         with dpg.group(tag=f"vj_cliprows{i}"):
             with dpg.group(horizontal=True):
@@ -331,6 +365,8 @@ def _deck(app, i):
                                                     default_value=dict(vj.ADVANCE)[d["source"]["advance"]],
                                                     callback=lambda s, v: _set_src(app, i, advance=next(
                                                         k for k, w in vj.ADVANCE if w == v))))
+    with dpg.collapsing_header(label="PICTURE", tag=f"vj_pichead{i}", default_open=False):
+        _picture_panel(app, i, d)
     with dpg.collapsing_header(label="SOUND", tag=f"vj_sndhead{i}", default_open=False):
         with dpg.group(horizontal=True):
             dpg.add_combo(list(vj.REACT_TO), tag=f"vj_rto{i}", width=px(80), default_value=d["react"]["to"],
@@ -484,7 +520,9 @@ def _flame_edit(app, i, j, field, v):
 
 KNOB_TAGS = (("vj_lvl", "level"), ("vj_amt", "amount"), ("vj_spd", "speed"), ("vj_kal", "kaleido"), ("vj_hue", "hue"),
              ("vj_trl", "trails"), ("vj_blr", "blur"), ("vj_tsz", "text_size"), ("vj_tx", "text_x"), ("vj_ty", "text_y"),
-             ("vj_tgl", "text_glow")) + tuple((tag, key) for key, tag, *_ in FL_NUMS)
+             ("vj_tgl", "text_glow"), ("vj_tsh", "text_shadow"), ("vj_tol", "text_outline"), ("vj_pscale", "pic_scale"),
+             ("vj_px", "pic_x"), ("vj_py", "pic_y"), ("vj_prot", "pic_rot"), ("vj_ptol", "pic_tol"),
+             ("vj_psoft", "pic_soft"), ("vj_pdrift", "pic_drift")) + tuple((tag, key) for key, tag, *_ in FL_NUMS)
 
 
 def _sync_knobs(i, d):
@@ -725,7 +763,7 @@ def _set_deck(app, i, key, v):
     if key == "morph":
         vj.morph_hand(app, i)                                      # the morph by hand: a Mutate over bars let go
     _save(app)
-    if key in ("look", "effect", "image"):
+    if key in ("look", "effect", "image", "pic_key"):
         refresh(app)
 
 
@@ -807,8 +845,99 @@ def _set_image(app, i, path):
     _set_deck(app, i, "image", kept)
 
 
+def _picture_panel(app, i, d):
+    """A picture's or a video's layer: its transparency (its own, none, a colour or the dark keyed out) and where
+    it sits - fitted, scaled, moved, turned, flipped - and the Image look's drift."""
+    from native import vj_layer
+    c = _c()
+    _row("clear", lambda: dpg.add_combo([w for _, w in vj_layer.KEYS], tag=f"vj_pkey{i}", width=-1,
+                                        default_value=dict(vj_layer.KEYS).get(d.get("pic_key"), "its own transparency"),
+                                        callback=lambda s, v: _set_deck(app, i, "pic_key", next(
+                                            k for k, w in vj_layer.KEYS if w == v))))
+    c.tip("what of the picture or video is see-through: its own transparency (a PNG's, a WebM's or ProRes 4444's "
+          "alpha), none (shown whole, on black), a colour keyed out (a green screen), or the dark keyed out - on deck "
+          "C the mix shows through there")
+    with dpg.group(tag=f"vj_pkeyrow{i}"):
+        with form.row("key colour", tag=f"vj_pcolrow{i}"):
+            dpg.add_color_edit(tag=f"vj_pcol{i}", no_alpha=True, width=-1,
+                               default_value=[int(x * 255) for x in d.get("pic_key_col", [0, 1, 0])] + [255],
+                               callback=lambda s, v: _set_deck(app, i, "pic_key_col", [float(x) / (255.0 if max(v[:3]) > 1.0 else 1.0)
+                                                                                       for x in v[:3]]))
+            c.tip("the colour keyed out - the green (or blue) of a screen behind what was filmed")
+        for key, tag, label, lo, hi, tip in (
+                ("pic_tol", "vj_ptol", "tolerance", 0.0, 1.0, "how near the key (or how dark) is clear"),
+                ("pic_soft", "vj_psoft", "softness", 0.0, 0.5, "how far beyond that it fades in: a soft edge")):
+            _row(label, lambda key=key, tag=tag, lo=lo, hi=hi: num.add(
+                f"{tag}{i}", float(d.get(key, vj_layer.DEFAULTS[key])), lo, hi, digits=2,
+                callback=lambda s, v, key=key: _set_deck(app, i, key, float(v))))
+            c.tip(tip + " (right-click: learn MIDI)")
+            _learnable(app, f"{tag}{i}", {"kind": "vj_knob", "deck": i, "key": key})
+    _row("fit", lambda: dpg.add_combo([w for _, w in vj_layer.FITS], tag=f"vj_pfit{i}", width=-1,
+                                      default_value=dict(vj_layer.FITS).get(d.get("pic_fit"), "fill (cut to fit)"),
+                                      callback=lambda s, v: _set_deck(app, i, "pic_fit", next(
+                                          k for k, w in vj_layer.FITS if w == v))))
+    c.tip("how a picture meets the canvas: covering it (cut to fit), all of it (clear round it), stretched, or tiled "
+          "(a video is already the canvas's shape)")
+    for key, tag, label, lo, hi, tip in (
+            ("pic_scale", "vj_pscale", "scale", 0.1, 4.0, "how big: 1 as it fits"),
+            ("pic_x", "vj_px", "across", -1.0, 1.0, "where it sits, left (-1) to right (1)"),
+            ("pic_y", "vj_py", "up / down", -1.0, 1.0, "where it sits, bottom (-1) to top (1)"),
+            ("pic_rot", "vj_prot", "turn", -180.0, 180.0, "turned, in degrees"),
+            ("pic_drift", "vj_pdrift", "drift", 0.0, 1.0,
+             "the Image look's slow wander and its swell with the amount and the beat: 0 holds it still")):
+        _row(label, lambda key=key, tag=tag, lo=lo, hi=hi: num.add(
+            f"{tag}{i}", float(d.get(key, vj_layer.DEFAULTS[key])), lo, hi, digits=0 if key == "pic_rot" else 2,
+            callback=lambda s, v, key=key: _set_deck(app, i, key, float(v))))
+        c.tip(tip + " (right-click: learn MIDI)")
+        _learnable(app, f"{tag}{i}", {"kind": "vj_knob", "deck": i, "key": key})
+    _row("flip", lambda: dpg.add_combo([w for _, w in vj_layer.FLIPS], tag=f"vj_pflip{i}", width=-1,
+                                       default_value=dict(vj_layer.FLIPS).get(d.get("pic_flip"), "as it is"),
+                                       callback=lambda s, v: _set_deck(app, i, "pic_flip", next(
+                                           k for k, w in vj_layer.FLIPS if w == v))))
+
+
+def _pick_channel_image(app, i, k):
+    app._vj_ch_target = (i, k)
+    dpg.show_item("vj_chimgfile")
+
+
+def _set_channel_image(app, path):
+    """The picture a shader channel reads, kept with the project (as a deck's picture is)."""
+    i, k = getattr(app, "_vj_ch_target", (0, 0))
+    if not path or not os.path.isfile(path):
+        return
+    try:
+        kept = vj.keep_media(app, path)
+    except OSError as e:
+        app.gp.status(f"could not copy {os.path.basename(path)}: {e}", "warn"); return
+    d = vj.options(app)["decks"][i]
+    pics = list(d.get("channel_images") or ["", "", "", ""]) + ["", "", "", ""]
+    pics[k] = kept
+    d["channel_images"] = pics[:4]
+    _save(app)
+    refresh(app)
+    app.gp.status(f"deck {LETTER[i]}'s iChannel{k}: {os.path.basename(kept)}")
+
+
+def _set_font(app, i, path):
+    """A font file for deck i's words: tried first (one PIL cannot read is said, not taken), then kept with the
+    project as a picture is."""
+    if not path or not os.path.isfile(path):
+        return
+    try:
+        from PIL import ImageFont
+        ImageFont.truetype(path, 12)
+    except (OSError, ValueError) as e:
+        app.gp.status(f"not a font the studio can read: {os.path.basename(path)} ({e})", "warn"); return
+    try:
+        kept = vj.keep_media(app, path)
+    except OSError as e:
+        app.gp.status(f"could not copy {os.path.basename(path)}: {e}", "warn"); return
+    _set_deck(app, i, "text_font", kept)
+
+
 def _import(app, a):
-    """.milk presets and .glsl shaders copied into the project's looks/ and listed."""
+    """.milk presets and .glsl shaders copied into the project's looks/, Shadertoy .json written there, and listed."""
     sel = [f for f in (list((a.get("selections") or {}).values()) or [a.get("file_path_name", "")]) if f and os.path.isfile(f)]
     skipped = [f for f in sel if os.path.splitext(f)[1].lower() not in vj_looks.IMPORTS]
     sel = [f for f in sel if f not in skipped]
@@ -820,7 +949,7 @@ def _import(app, a):
     refresh(app)
     bad = [e for e in errs if any(os.path.basename(f).lower() in e[0].lower() for f in sel)]
     app.gp.status(f"{len(sel)} imported into the project's looks/" + (f" - {len(bad)} could not be read" if bad else "")
-                  + (f" - {len(skipped)} left out: only .milk and .glsl files are imported" if skipped else ""))
+                  + (f" - {len(skipped)} left out: only .milk, .glsl and .json files are imported" if skipped else ""))
 
 
 def _new_shader(app):
@@ -1024,6 +1153,12 @@ def _fade_to(app, v):
     num.set("vj_fader", v)
 
 
+def _pick_area(app, i):
+    from native import screen_area
+    screen_area.pick(app, vj.options(app)["decks"][i]["source"].get("name") or "",
+                     lambda name: _set_src(app, i, name=name))
+
+
 def _pick_source(app, i):
     """The chosen kind's own choice: files for the list, the cameras or screens to pick from, the address."""
     from native import video
@@ -1100,6 +1235,10 @@ def refresh(app):
         dpg.set_value(f"vj_text{i}", d.get("text", ""))
         dpg.configure_item(f"vj_textknobs{i}", show=d["look"] == "Text")
         dpg.set_value(f"vj_tmove{i}", dict(vj_looks.TEXT_MOVES).get(d.get("text_move"), "scrolling left"))
+        dpg.set_value(f"vj_talign{i}", dict(vj_looks.TEXT_ALIGNS).get(d.get("text_align"), "in the middle"))
+        font = d.get("text_font") or ""
+        dpg.set_value(f"vj_tfont{i}", os.path.basename(font) if font else "the studio's own")
+        dpg.configure_item(f"vj_tfontx{i}", show=bool(font))
         glsl = getattr(lk, "glsl", None) if lk else None
         dpg.configure_item(f"vj_imgrow{i}", show=d["look"] == "Image" or bool(glsl and (
             "picture" in glsl or "picture" in (vj.deck_channels(d) or []))))
@@ -1108,15 +1247,28 @@ def refresh(app):
             from native import vj_glsl
             own = vj_glsl.channels_of(glsl)
             ch = list(vj.deck_channels(d) or ["", "", "", ""])
+            pics = list(d.get("channel_images") or ["", "", "", ""]) + ["", "", "", ""]
             for k in range(4):
                 first = f"file: {own[k]}"
                 dpg.configure_item(f"vj_ch{i}_{k}", items=[first] + list(vj_glsl.CHANNELS))
                 dpg.set_value(f"vj_ch{i}_{k}", ch[k] or first)
+                is_img = (ch[k] or own[k]) == "image"
+                dpg.configure_item(f"vj_chimg{i}_{k}", show=is_img,
+                                   label=(os.path.basename(pics[k])[:10] or "...") if is_img else "...")
         dpg.set_value(f"vj_imgname{i}", os.path.basename(d.get("image") or "") or "none")
         dpg.configure_item(f"vj_vidhead{i}", show=not eff)
         kind = s.get("kind", "none")
+        from native import vj_layer
+        dpg.configure_item(f"vj_pichead{i}", show=not eff and (d["look"] == "Image" or kind != "none"))
+        dpg.set_value(f"vj_pkey{i}", dict(vj_layer.KEYS).get(d.get("pic_key"), "its own transparency"))
+        dpg.configure_item(f"vj_pkeyrow{i}", show=d.get("pic_key") in ("colour", "dark"))
+        dpg.configure_item(f"vj_pcolrow{i}", show=d.get("pic_key") == "colour")
+        dpg.set_value(f"vj_pcol{i}", [int(x * 255) for x in d.get("pic_key_col", [0, 1, 0])] + [255])
+        dpg.set_value(f"vj_pfit{i}", dict(vj_layer.FITS).get(d.get("pic_fit"), "fill (cut to fit)"))
+        dpg.set_value(f"vj_pflip{i}", dict(vj_layer.FLIPS).get(d.get("pic_flip"), "as it is"))
         dpg.set_value(f"vj_src{i}", dict(vj.SOURCES).get(kind, "no video"))
         dpg.configure_item(f"vj_srcpick{i}", show=kind in ("file", "webcam", "screen", "stream"))
+        dpg.configure_item(f"vj_area{i}", show=kind == "screen")
         dpg.configure_item(f"vj_pause{i}", show=kind != "none")
         dpg.configure_item(f"vj_srcname{i}", show=kind in ("webcam", "screen") and bool(s.get("name")))
         if s.get("name"):

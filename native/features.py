@@ -81,7 +81,9 @@ class Features:
         self.apply_geometry(g)
         dpg.set_value("geom_kind", g.kind)
         self.rebuild_geom_fields()
-        self.gp.status(f"geometry from {source}: {g.describe()}")
+        extra = getattr(g, "trailing", 0)
+        self.gp.status(f"geometry from {source}: {g.describe()}"
+                       + (f" - and {extra} LEDs after the matrix (a trailing strip), left out" if extra else ""))
     def read_device_wiring(self):
         """The active device's wiring - its ledmap, else its 2-D setup, else
         its LEDs in order - read (GET only) on a thread; poll_wiring_read
@@ -691,6 +693,22 @@ class Features:
             self._transition = None
             return eng.rgb()
 
+    def view_rgb(self, eng=None, rgb=None):
+        """The picture the views show: frame_rgb (or `rgb`, a scrubbed frame), and - when the Outputs frame asks -
+        as the device will light it, through its gamma and brightness (outputs.device_lut). Never streamed: the
+        device applies its own."""
+        rgb = self.frame_rgb(eng) if rgb is None else rgb
+        S = self.project.options.get("outputs") or {}
+        if not S.get("dev_view"):
+            return rgb
+        from native import outputs
+        key = (float(S.get("gamma", outputs.GAMMA_DEFAULT)), bool(S.get("gamma_col", True)), int(S.get("dev_bri", 255)),
+               bool(S.get("gamma_bri", False)))
+        lut = getattr(self, "_dev_lut", None)
+        if lut is None or lut[0] != key:
+            lut = self._dev_lut = (key, outputs.device_lut(*key))
+        return np.take(lut[1], np.asarray(rgb, np.uint8))
+
     def _limited(self, rgb):
         """The picture dimmed as the device's brightness limiter would dim
         it, when the Outputs frame asks for the preview."""
@@ -809,7 +827,7 @@ class Features:
 
     def stream_start(self, host=None, fps=30):
         """The sim's frames to the device (`host`), or to the devices the LIVE row chose, as they are drawn,
-        over DDP, E1.31 or Art-Net - each device its own protocol."""
+        over DDP, E1.31, Art-Net or DDP over the WebSocket - each device its own protocol."""
         plan = [(devices.clean_host(host), "all", 0, 0)] if host else self.stream_plan()
         if not plan:
             device_ui.show(self, "devices"); self.gp.status("choose a device first"); return False
@@ -830,6 +848,9 @@ class Features:
                            + "; ".join(f"{t.host} {t.out.NAME}, {t.describe()}" for t in targets))
         elif first.out.NAME == "DDP":
             self.gp.status(f"streaming to {first.host} over DDP at {int(fps)} fps - the device shows the sim while this runs")
+        elif first.out.NAME.startswith("DDP"):
+            self.gp.status(f"streaming to {first.host} over its WebSocket (DDP) at {int(fps)} fps - for where UDP does not "
+                           "get through; the device needs WLED 0.16 or later")
         else:
             uni = first.out.universe
             n = -(-len(live_out.stream_bytes(self.frame_rgb(), self.project.geometry, "logical")) // live_out.UNIVERSE_BYTES)
