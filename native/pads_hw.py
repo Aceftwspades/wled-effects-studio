@@ -10,7 +10,7 @@ and its row or column of side buttons for the banks - nothing to learn.
 
     DEVICES                    # (kind, words)
     hw(st)                     # the project's controller settings, filled in
-    events(app, evs)           # the MIDI frame's events: learned or played; True when one was taken by a learn
+    evs = events(app, evs)     # the MIDI frame's events learned or played; those the pads did not take
     lights(app, out)           # what the controller's lights should be, sent where it changed (out: a MidiOut)
     poll(app)                  # each frame (midi_ui.poll): the lights' port opened as set, and the lights
 
@@ -31,6 +31,7 @@ DEVICES = (("generic", "any (learned pads)"),       # lit by velocity 127 / 0
            ("apc_mk1", "APC mini (first)"))
 GRIDS = ("launchpad", "apc_mk2", "apc_mk1")     # the kinds with an 8 x 8 grid the pads can lie on
 LIGHTS_HZ = 20.0
+RETRY_S = 3.0                   # a lights port not there is looked for again this often (the controller plugged in)
 # Launchpad palette indexes (and the APC mini mk2's, which follows it): the pads' colours (bright, dim)
 PALETTE = {"grey": (3, 1), "red": (5, 7), "orange": (9, 11), "amber": (9, 11), "yellow": (13, 15),
            "lime": (17, 19), "green": (21, 23), "teal": (33, 35), "cyan": (37, 39), "blue": (45, 47),
@@ -155,8 +156,10 @@ def _controls_for(st, h, ctl):
 
 
 def events(app, evs):
-    """The MIDI frame's events [(ctl, value, full)] onto the pads. A learn waiting takes the first note or CC and
-    binds it (True: the MIDI window's own learn and maps do not see it). Otherwise every one is played."""
+    """The MIDI frame's events [(ctl, value, full)] onto the pads; those they did not take, for the MIDI window's
+    learn and maps. A learn waiting takes the first note or CC and binds it (and none go on). Otherwise each is
+    played - a bank button, a control of the bank shown (none while the pads are edited), a pressure pad held -
+    and one that played something goes no further: a pad's note mapped in the MIDI window too does one thing."""
     from native import pads_ui
     st = pads_ui._st(app)
     h = hw(st)
@@ -174,19 +177,27 @@ def events(app, evs):
             app._pads_learn = None
             app.project.save()
             app.gp.status(f"pads: learned {_words(ctl)}")
+            pads_ui._fill_banks(app)
             pads_ui._fill_side(app)
-            return True
-        return False
+            return []
+        return evs
     r = _rt(app)
-    for ctl, v, full in evs:
+    editing = bool(getattr(app, "_pads_edit", False))
+    rest = []
+    for ev in evs:
+        ctl, v, full = ev
         if ctl[0] not in ("note", "cc", "pat", "cp"):
+            rest.append(ev)
             continue
         f = max(0.0, min(1.0, float(v) / float(full or 127.0)))
-        # a bank button: the controller's own, or one learned
+        took = False
+        # a bank button: the controller's own, or one learned (its release taken with it)
         for i, b in enumerate(st["banks"]):
-            if v > 0 and ctl[0] in ("note", "cc") and (_same(b.get("midi"), ctl) or
-                                                      (_grid_on(h) and _same(bank_ctl(h["device"], i), ctl))):
-                pads_ui.switch_bank(app, i)
+            if ctl[0] in ("note", "cc") and (_same(b.get("midi"), ctl) or
+                                             (_grid_on(h) and _same(bank_ctl(h["device"], i), ctl))):
+                if v > 0:
+                    pads_ui.switch_bank(app, i)
+                took = True
                 break
         if ctl[0] in ("pat", "cp"):                          # pressed harder: the pressure pads it holds
             for cid, (held, p) in list(r["held"].items()):
@@ -196,8 +207,14 @@ def events(app, evs):
                 if ctl[0] == "cp" or (held[0] == "note" and held[1] == ctl[1] and held[2] == ctl[2]):
                     x, y, _ = pads.where(app, c) or (0.5, 0.5, f)
                     pads.move(app, c, x, y, f)
+                    took = True
+            if not took:
+                rest.append(ev)
             continue
-        for c in _controls_for(st, h, ctl):
+        played = [] if editing else _controls_for(st, h, ctl)
+        if not (took or played):
+            rest.append(ev)
+        for c in played:
             if ctl[0] == "cc" and c["type"] in pads.SLIDERS:
                 pads.drag(app, c, f)
             elif ctl[0] == "cc" and c["type"] in pads.SURFACES:     # a knob on an XY pad: it moves across -
@@ -217,7 +234,7 @@ def events(app, evs):
             elif c["id"] in r["held"]:
                 del r["held"][c["id"]]
                 pads.release(app, c)
-    return False
+    return rest
 
 
 def _words(ctl):
@@ -247,12 +264,16 @@ def poll(app):
                 out.send(_dark(k))
             _rt(app)["lights"] = {}
             out.close()
-        if h["out"] and getattr(app, "_pads_out_tried", None) != h["out"]:
-            app._pads_out_tried = h["out"]
+        # tried as it is picked, then again every RETRY_S while it is not there (said once, not each time)
+        tried, now = getattr(app, "_pads_out_tried", None), time.monotonic()
+        new = tried is None or tried[0] != h["out"]
+        if h["out"] and (new or (now - tried[1] >= RETRY_S and h["out"] in midi.out_ports())):
+            app._pads_out_tried = (h["out"], now)
             try:
                 out.open(h["out"])
             except Exception as e:
-                app.gp.status(f"pads: the controller's lights: {e}", "warn")
+                if new:
+                    app.gp.status(f"pads: the controller's lights: {e}", "warn")
     lights(app, out)
 
 

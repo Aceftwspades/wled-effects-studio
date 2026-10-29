@@ -1161,7 +1161,8 @@ whichever of A and B the fader is furthest from - the one the **cue**
 preview shows - instead of its own deck, and blinks until that deck goes on
 air. A **Cut** or **Fade** pad is the GO.
 
-**Edit** lays the bank out (the pads do nothing meanwhile): click an empty
+**Edit** lays the bank out (the pads do nothing meanwhile - from the
+mouse, the phone or a controller): click an empty
 cell to add a control there, or a control to pick it - drag it to move it,
 drag its corner to make it span more cells. The panel beside the grid sets
 its kind, its label (the action's name if left empty), its colour and
@@ -1198,7 +1199,9 @@ buttons (APC) switch the banks. **lights to** picks the MIDI output its
 lights go to: every pad shows its control's colour, dim, and bright while
 lit (the first APC mini, which cannot dim, blinks instead), and the bank
 buttons show which bank is up. Any other controller lights its learned
-pads by velocity 127 and 0. (The Launchpad's and APC's messages follow
+pads by velocity 127 and 0; a lights port not there yet is found when the
+controller is plugged in. A note or knob that plays a pad is not also
+taken by a Window > MIDI mapping of it. (The Launchpad's and APC's messages follow
 their makers' programming guides; they were checked against a stand-in
 port, not the devices themselves.)
 

@@ -624,6 +624,8 @@ function hex(rgb){return "rgb("+rgb.join(",")+")";}
 function build(p){
  const want=JSON.stringify([p.bank,p.cols,p.rows,p.banks,p.controls.map(c=>[c.id,c.type,c.x,c.y,c.w,c.h,c.label,c.rgb,c.orient])]);
  if(want===layout)return;layout=want;
+ // the pads drawn again: a finger on one is let go (its element, and the release it would have said, go with it)
+ for(const [pid,t] of touches){touches.delete(pid);send({a:"pad",id:t.id,e:"up"});}
  const bk=$("banks");bk.textContent="";
  p.banks.forEach((b,i)=>{const e=document.createElement("button");e.className="bank"+(i===p.bank?" on":"");
   e.textContent=b.name;e.style.background=hex(b.rgb);e.onclick=()=>{send({a:"padbank",v:i});};bk.appendChild(e);});
@@ -709,7 +711,8 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState===
 async function poll(){
  try{const r=await fetch("state?k="+encodeURIComponent(key),{cache:"no-store"});
   if(!r.ok)throw new Error(r.status===403?"this link's key is not the studio's any more - open the new link":"HTTP "+r.status);
-  const s=await r.json();if(s.pads){st=s.pads;build(st);paint();say(s.project||"");}}
+  const s=await r.json();if(s.pads){st=s.pads;build(st);paint();
+   say(st.edit?"being edited in the studio - the pads do nothing till it is done":(s.project||""));}}
  catch(e){say("no studio: "+e.message);}
  setTimeout(poll,200);}
 poll();

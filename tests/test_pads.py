@@ -326,6 +326,29 @@ check(abs(vj.knob_get(app2, 0, "hue") - 0.6) < 1e-3, "an XY pad pressed again fr
 pads.release(app2, sx)
 pads.release(app2, sx)
 check(abs(vj.knob_get(app2, 0, "hue") - h0) < 1e-3, "both let go: it snaps back where it was before the first touch")
+app2._pads_edit = True
+o2["fader"] = 0.2
+pads_ui.remote(app2, {"a": "pad", "id": hv["id"], "e": "down"})
+check(o2["fader"] == 0.2 and not pads._rt(app2)["held"] and pads_ui.remote_state(app2)["edit"],
+      "the pads edited in the studio: the phone's press does nothing, and its page is told")
+app2._pads_edit = False
+
+# --- a label typed: saved once the typing stops, not at each key --------------------------------------------------
+saves = []
+app2.project.save = lambda: saves.append(1)
+app2._pads_sel = hv["id"]
+for k in ("H", "Ho", "Hol", "Hold!"):
+    pads_ui._ctl_set(app2, "label", k, typed=True)
+t_typed = app2._pads_typed[0]
+pads_ui._flush(app2, t_typed + 0.1)
+check(hv["label"] == "Hold!" and not saves, "typing: the label changes at each key, nothing saved yet")
+pads_ui._flush(app2, t_typed + pads_ui.SAVE_AFTER_S + 0.01)
+pads_ui._flush(app2, t_typed + pads_ui.SAVE_AFTER_S + 1.0)
+check(len(saves) == 1, "the typing stopped: saved once")
+pads_ui._ctl_set(app2, "label", "Hold", typed=True)
+pads_ui._flush(app2)
+check(len(saves) == 2, "the window closing: what was typed saved at once")
+app2._pads_sel = None
 pads.press(app2, hv)
 pads.press(app2, hv)
 pads.let_go(app2)

@@ -87,9 +87,10 @@ fader = pads.at(b, 2, 0)
 
 # --- learning ---------------------------------------------------------------------------------------------------
 pads_hw.learn(app, ("control", cut["id"]))
-check(not pads_hw.events(app, [(("note", 0, 40), 0, 127.0)]) and pads_hw.learning(app) is not None,
-      "a learn ignores a note's release")
-check(pads_hw.events(app, [note(40, 100), (("cc", 0, 7), 64, 127.0)]), "a learn takes the first note (the MIDI window's learn does not see it)")
+check(pads_hw.events(app, [(("note", 0, 40), 0, 127.0)]) == [(("note", 0, 40), 0, 127.0)]
+      and pads_hw.learning(app) is not None, "a learn ignores a note's release (it goes on to the MIDI window)")
+check(pads_hw.events(app, [note(40, 100), (("cc", 0, 7), 64, 127.0)]) == [],
+      "a learn takes the first note (none go on: the MIDI window's learn does not see it)")
 check(cut["midi"] == ["note", 0, 40] and pads_hw.learning(app) is None and "learned" in app.gp.said[-1],
       "Cut has learned note 40")
 pads_hw.learn(app, ("control", fader["id"]))
@@ -106,6 +107,15 @@ check(fader["midi"] == ["cc", 0, 21] and flash["midi"] == ["note", 0, 41] and st
 o["fader"] = 0.0
 pads_hw.events(app, [note(40, 100), note(40, 0)])
 check(o["fader"] == 1.0, "the learned note presses Cut")
+o["fader"] = 0.0
+rest = pads_hw.events(app, [note(40, 100), note(40, 0), note(99, 100), (("cc", 0, 7), 10, 127.0)])
+check(o["fader"] == 1.0 and rest == [note(99, 100), (("cc", 0, 7), 10, 127.0)],
+      "what played a pad goes no further; the rest go on to the MIDI window's maps")
+app._pads_edit = True
+o["fader"] = 0.0
+rest = pads_hw.events(app, [note(40, 100), note(40, 0)])
+app._pads_edit = False
+check(o["fader"] == 0.0 and len(rest) == 2, "while the pads are edited a learned note plays nothing (and goes on)")
 pads_hw.events(app, [(("cc", 0, 21), 32, 127.0)])
 check(abs(o["fader"] - 32 / 127) < 1e-3, "the learned CC moves the crossfader")
 o["decks"][2]["level"] = 0.0
@@ -217,6 +227,46 @@ check([0x90, 41, 127] in out.sent, "Flash C held: its learned note at 127")
 pads.release(app, flash)
 pads_hw.forget(app, ("control", flash["id"]))
 check(flash["midi"] is None, "a learned note forgotten")
+
+# --- the lights' port: one not there is looked for again (the controller plugged in after it was picked) ------------
+from native import midi
+
+
+class FakeMidiOut:
+    def __init__(self):
+        self.port, self.sent, self.there = None, [], False
+
+    @property
+    def is_open(self):
+        return self.port is not None
+
+    def open(self, name):
+        if not self.there:
+            raise RuntimeError(f"no MIDI output named {name!r}")
+        self.port = name
+
+    def send(self, m):
+        self.sent.append(list(m))
+
+    def close(self):
+        self.port = None
+
+
+was = (midi.available, midi.out_ports, pads_hw.RETRY_S)
+midi.available = lambda: True
+midi.out_ports = lambda: ["LP lights"] if fake.there else []
+pads_hw.RETRY_S = 0.0
+fake = app._pads_out = FakeMidiOut()
+h["out"] = "LP lights"
+app.gp.said.clear()
+pads_hw.poll(app)
+pads_hw.poll(app)
+check(not fake.is_open and sum("lights" in s for s in app.gp.said) == 1, "a lights port not there: said once")
+fake.there = True
+pads_hw.poll(app)
+check(fake.is_open and fake.sent, "plugged in afterwards: found, opened and lit")
+midi.available, midi.out_ports, pads_hw.RETRY_S = was
+h["out"] = ""
 dpg.destroy_context()
 
 print("pads_hw:", "FAILED" if fails else "ok")

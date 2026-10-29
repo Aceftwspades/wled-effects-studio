@@ -1158,6 +1158,11 @@ STEPS = [
       {"py": "app.midi.inject([0x80, 40, 0])"}], 0.3),
     ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['fader'] == 1.0"},
       {"py": "__import__('native.pads_hw', fromlist=['p']).forget(app, ('control', __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1)['id']))"},
+      {"py": "__import__('native.pads_hw', fromlist=['p']).learn(app, ('bank', 0))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._fill_banks(app)"},
+      {"py": "app.midi.inject([0x90, 45, 100])"}], 0.3),
+    # the bank's button learned: its Learn button says what, not "press it..."
+    ([{"check": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['midi'] == ['note', 0, 45] and dpg.get_item_configuration('pads_blearn')['label'] == 'note 45 ch 1'"},
+      {"py": "__import__('native.pads_hw', fromlist=['p']).forget(app, ('bank', 0))"},
       {"py": "chrome.close_dialog('pads_win')"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
     # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed
     # left where it was set

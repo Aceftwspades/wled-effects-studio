@@ -24,6 +24,7 @@ SIDE_W = 270
 KNOB_PX = 160                  # a knob turned from bottom to top by dragging this far up
 HANDLE = 12                    # the resize corner of a selected control, in pixels at 1x
 REMOTE_GONE_S = 2.5            # a pad held from a phone that has said nothing for this long is let go
+SAVE_AFTER_S = 0.8             # a name or a label typed: saved once it has not changed for this long
 SWELL_FROM = 0.35              # a pressure pad's pressure as it is touched here...
 SWELL_S = 0.8                  # ...swelling to full over this many seconds held
 
@@ -43,7 +44,23 @@ def _st(app):
 
 
 def _save(app):
+    app._pads_typed = None
     app.project.save()
+
+
+def _save_soon(app):
+    """A name or a label as it is typed: saved (one undo) once the typing stops, not at each key."""
+    import time
+    app._pads_typed = (time.monotonic(), app.project)
+
+
+def _flush(app, now=None):
+    """What was typed saved once the typing has stopped - or at once (`now` None: the window closing) - into the
+    project it was typed in (another opened since saves its own)."""
+    typed = getattr(app, "_pads_typed", None)
+    if typed is not None and (now is None or now - typed[0] >= SAVE_AFTER_S):
+        app._pads_typed = None
+        typed[1].save()
 
 
 # --- the window -------------------------------------------------------------------------------------------------
@@ -61,7 +78,7 @@ def build(app):
                   "to resize it; the panel sets what it is and what it drives. Pads do nothing while editing")
         with dpg.group(horizontal=True, tag="pads_bankrow", show=False):
             dpg.add_input_text(tag="pads_bname", width=px(130), hint="bank name", on_enter=False,
-                               callback=lambda s, v: _bank_set(app, "name", v.strip() or "Bank"))
+                               callback=lambda s, v: _bank_set(app, "name", v.strip() or "Bank", typed=True))
             dpg.add_combo([n for n, _ in pads.COLOURS], tag="pads_bcolour", width=px(80),
                           callback=lambda s, v: _bank_set(app, "colour", v))
             c.tip("the bank button's colour")
@@ -116,7 +133,7 @@ def _build_side(app):
         dpg.add_combo([pads.TYPE_WORDS[t] for t in pads.TYPES], tag="pads_s_type", width=-1,
                       callback=lambda s, v: _ctl_set(app, "type", next(t for t in pads.TYPES if pads.TYPE_WORDS[t] == v)))
         dpg.add_input_text(tag="pads_s_label", width=-1, hint="label (the action's name if empty)",
-                           callback=lambda s, v: _ctl_set(app, "label", v))
+                           callback=lambda s, v: _ctl_set(app, "label", v, typed=True))
         dpg.add_combo([n for n, _ in pads.COLOURS], tag="pads_s_colour", width=-1,
                       callback=lambda s, v: _ctl_set(app, "colour", v))
         with dpg.group(tag="pads_s_xyrow", show=False):
@@ -179,6 +196,7 @@ def show(app):
 
 
 def _close(app):
+    _flush(app)
     pads.let_go(app)
     dpg.hide_item(TAG)
 
@@ -253,9 +271,12 @@ def _add_bank(app):
     _save(app)
 
 
-def _bank_set(app, key, v):
+def _bank_set(app, key, v, typed=False):
     pads.current(_st(app))[key] = v
-    _save(app)
+    if typed:
+        _save_soon(app)
+    else:
+        _save(app)
     _fill_banks(app)
 
 
@@ -494,11 +515,14 @@ def _target_set(app, **kw):
         _fill_side(app)
 
 
-def _ctl_set(app, key, v):
+def _ctl_set(app, key, v, typed=False):
     s = _sel(app)
     if not isinstance(s, dict):
         return
     s[key] = v
+    if typed:
+        _save_soon(app)
+        return
     if key == "type":
         for tk in ("target", "target_y", "target_p"):
             if not _fits_type(v, s.get(tk)):
@@ -563,6 +587,7 @@ def remote_state(app):
             d["xy"] = [round(v, 4) for v in at] if at else None
         out.append(d)
     return {"bank": st["bank"], "cols": b["cols"], "rows": b["rows"], "controls": out,
+            "edit": bool(getattr(app, "_pads_edit", False)),
             "banks": [{"name": x["name"], "rgb": _rgb(x.get("colour"))} for x in st["banks"]]}
 
 
@@ -573,6 +598,8 @@ def remote(app, cmd):
     st = _st(app)
     if cmd["a"] == "padbank":
         switch_bank(app, int(cmd["v"]))
+        return
+    if getattr(app, "_pads_edit", False):                          # the pads do nothing while they are edited
         return
     c = next((x for x in pads.current(st)["controls"] if x["id"] == cmd["id"]), None)
     if c is None:                                                   # a bank switched since the page drew it
@@ -801,7 +828,10 @@ def _travel(c, mx, my, x0, y0, cw, ch, gap):
 
 
 def poll(app):
-    """Each frame while the window is shown: the grid drawn, and the pointer on it played (or, editing, laid out)."""
+    """Each frame while the window is shown: the grid drawn, and the pointer on it played (or, editing, laid out);
+    and, shown or not, what was typed into it saved once the typing stops."""
+    import time
+    _flush(app, time.monotonic())
     if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG):
         if getattr(app, "_pads_drag", None) is not None:
             app._pads_drag = None

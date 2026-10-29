@@ -613,7 +613,8 @@ def poll(app):
     evs = [(ctl, v, 127.0) for ctl, v in m.drain()] + [(ctl, v, 1.0) for ctl, v in app.osc.drain()]
     if not evs:
         return
-    if pads_hw.events(app, evs):                          # a pad learning took it: not the window's learn's
+    evs = pads_hw.events(app, evs)                        # a pad's learn or a pad played: not the window's
+    if not evs:
         return
     if app._midi_learn:
         ctl, v, full = evs[0]
