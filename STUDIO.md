@@ -4256,7 +4256,20 @@ notes, its lights mirroring the layout). In four phases:
    Tests: test_pads (each axis through its range, snap and stay, pressure, a switch refused on an axis, staging
    both ways and GO); the smoke adds and plays an XY pad and stages a look then cuts to it. By hand with the real
    mouse: an XY pad dragged (snap, then stay), a pressure pad held, a staged look and GO.
-3. The /pads page on the phone remote's server, multi-touch, in step with the window.
+3. **Done** (2026-10-29): /pads on the phone remote's server (phone.PADS_PAGE, behind the same key): the bank the
+   studio shows, full screen, each finger holding its own control (pointer capture), every press, move and
+   release sent in order and a move at most once a request, a bank switched from either side switching both.
+   Commands {"a": "pad", "id", "e": down/move/up/hold, f/x/y/p held to 0..1} and {"a": "padbank"} checked in
+   phone.check; pads_ui.remote applies them to the bank shown only, remote_state is in the page's state, and
+   remote_poll lets go of a pad a phone has not mentioned for 2.5 s (it says "hold" every 0.5 s while a finger is
+   down) - a phone that drops off the network mid-press. Pressure: the screen's own where it says (a pen, or a value
+   other than the 0.5 a browser gives when it cannot tell), else the window's swell, on a timer rather than
+   animation frames (those stop while the page is not drawn - found by the test). The remote's page links to it.
+   Tests: test_phone (the page behind the key, the commands checked), test_pads (Cut, the crossfader, Flash C held
+   and let go when the phone falls silent, a bank switched with the picture untouched, a control of another bank
+   refused, a pressure pad and its dot); the smoke reads the pads in the state and fetches the page. By hand in a
+   browser at phone sizes against a running studio: Cut, the fader dragged, two fingers at once (Flash C held while
+   the fader moved), a bank switched, a pen's pressure and a finger's swell.
 4. A physical controller: pads learned from its notes, its lights driven over MIDI.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency

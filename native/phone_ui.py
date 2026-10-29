@@ -161,6 +161,8 @@ def poll(app):
         open_saved(app)
     if not r.is_open:
         return
+    from native import pads_ui
+    pads_ui.remote_poll(app)                                # a pad a phone held, the phone gone: let go
     for cmd in r.drain():
         try:
             apply(app, cmd)
@@ -178,6 +180,10 @@ def apply(app, cmd):
     """One checked command from the page (phone.check) onto the studio."""
     from native import midi_ui, sequence_ui
     a = cmd["a"]
+    if a in ("pad", "padbank"):                          # the /pads page (pads_ui.py)
+        from native import pads_ui
+        pads_ui.remote(app, cmd)
+        return
     if a == "fx":
         midi_ui.apply_target(app, {"kind": "fx", "key": cmd["k"]}, cmd["v"], 1.0)
     elif a == "check":
@@ -263,11 +269,24 @@ def state(app):
             "sliders": sliders, "palettes": [n for n, _ in pals], "palette": pal,
             "bri": int(getattr(app, "master_bri", 255)), "blackout": bool(getattr(app, "blackout", False)),
             "vj": _vj_state(app),
+            "pads": _pads_state(app),
             "mixer": {"on": __import__("native.mixer", fromlist=["m"]).on(app),
                       "fader": float(__import__("native.mixer", fromlist=["m"]).options(app)["fader"])},
             "steps": [str(s.get("name") or f"step {i + 1}") for i, s in enumerate(S["steps"])],
             "step": play["i"] if play else getattr(app, "_seq_sel", -1),
             "playing": bool(play) and play.get("paused") is None}
+
+
+def _pads_state(app):
+    """The /pads page's: the bank shown (pads_ui.remote_state); None if it cannot be made (said once)."""
+    from native import pads_ui
+    try:
+        return pads_ui.remote_state(app)
+    except Exception as e:                                  # the rest of the page's state still goes
+        if not getattr(app, "_pads_state_err", None):
+            app._pads_state_err = str(e)
+            app.gp.status(f"phone remote: the pads: {e}", "warn")
+        return None
 
 
 def _vj_state(app):

@@ -519,7 +519,8 @@ certificate - **Advanced**, then go on to the address. The page's **Camera**
 link sends the phone's own camera to the studio (**Start**, then allow the
 camera; **Front / back**, a size and a frame rate) - a source for the Video
 node and a camera for mapping. A browser offers the camera only to a page
-served over HTTPS, so the camera needs the check. Segments (+ in
+served over HTTPS, so the camera needs the check. Its **Pads** link opens
+the VJ's pads full screen (see the VJ frame's **Pads...**). Segments (+ in
 the panel) layer several effects with WLED's blend modes and opacity, and
 carry WLED's segment options - reverse, mirror (and Y, and swap XY on a
 matrix), group, space, offset - which the sim lays out the way the device
@@ -1170,6 +1171,16 @@ which movement the action and range are for. **Remove this control** takes
 it off the grid. The row above the grid names the bank, colours its button, sets its
 grid from 2 x 2 to 8 x 8, moves it left or right, copies or deletes it, and
 **Undo** takes back the last change. The pads are kept with the project.
+
+On a phone or a tablet, the phone remote's page has **The VJ's pads,
+full screen**: the bank the studio shows, its banks along the top, played
+with as many fingers as the screen takes - hold Flash C with one and pull
+the crossfader with another. It follows the studio both ways: a pad pressed
+on the phone lights in the window, a bank switched on either switches both.
+A pressure pad reads the screen's own pressure where it has one (a pen,
+some screens) and swells while held where it does not. If the phone loses
+the network while a pad is held, the studio lets go of it after a few
+seconds. The layout is made in the studio's Pads window.
 
 The looks:
 

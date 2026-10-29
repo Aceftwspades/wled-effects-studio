@@ -48,7 +48,8 @@ MAX_PIXELS = 4096 * 4096             # a frame's size as its header says, checke
 FRAME_W = 640                        # frames kept at most this wide: the video and mapping read far less
 HANDSHAKE_S = 10                     # a connection that does not finish its TLS handshake in this is dropped
 ACTIONS = {"fx", "check", "effect", "palette", "bri", "blackout", "play", "stop", "step", "next", "prev", "fader", "vj", "vjfader",
-           "vjlevel", "vjlook"}
+           "vjlevel", "vjlook", "pad", "padbank"}
+PAD_EVENTS = ("down", "move", "up", "hold")      # the pads page's: a finger on, moved, off; "hold" says it is still on
 VJ_KEYS = ("cut", "fade", "shuffle_a", "shuffle_b", "air", "c_in", "c_out", "c_flash")   # the VJ card's buttons
 
 
@@ -70,11 +71,40 @@ def lan_address():
         s.close()
 
 
+def _unit(v):
+    """A number from the page as 0..1, or None (missing, not a number, NaN)."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return None if v != v else max(0.0, min(1.0, v))
+
+
 def check(cmd):
-    """A command from the page made safe, or None: {"a": action, "k": slider key, "v": number or name}."""
+    """A command from the page made safe, or None: {"a": action, "k": slider key, "v": number or name}; a pad's
+    {"a": "pad", "id": control, "e": event, "f"/"x"/"y"/"p": 0..1 where given}; {"a": "padbank", "v": index}."""
     if not isinstance(cmd, dict) or cmd.get("a") not in ACTIONS:
         return None
     out = {"a": cmd["a"]}
+    if cmd["a"] in ("pad", "padbank"):
+        try:
+            n = int(cmd.get("id" if cmd["a"] == "pad" else "v", -1))
+        except (TypeError, ValueError):
+            return None
+        if not 0 <= n < 1 << 30:
+            return None
+        if cmd["a"] == "padbank":
+            return {"a": "padbank", "v": n}
+        if cmd.get("e") not in PAD_EVENTS:
+            return None
+        out.update(id=n, e=cmd["e"])
+        for k in ("f", "x", "y", "p"):
+            if k in cmd:
+                u = _unit(cmd[k])
+                if u is None:
+                    return None
+                out[k] = u
+        return out
     if cmd["a"] in ("fx", "check"):
         if cmd.get("k") not in ("sx", "ix", "c1", "c2", "c3", "o1", "o2", "o3"):
             return None
@@ -291,6 +321,8 @@ def _handler(remote):
                 self._send(200, PAGE.encode("utf-8"), "text/html; charset=utf-8")
             elif path == "/camera":
                 self._send(200, CAMERA_PAGE.encode("utf-8"), "text/html; charset=utf-8")
+            elif path == "/pads":
+                self._send(200, PADS_PAGE.encode("utf-8"), "text/html; charset=utf-8")
             elif path == "/state":
                 self._send(200, remote._state_bytes())
             else:
@@ -383,6 +415,9 @@ button.on{border-color:var(--acc);color:var(--acc)}button.stop{color:var(--red)}
 <section class="card"><div class="lab">Show</div>
 <div class="btns"><button id="play">&#9654; Play</button><button id="stop" class="stop">&#9632; Stop</button></div>
 <div class="btns steps" id="steps"></div></section>
+<section class="card"><div class="lab">Pads</div>
+<a id="padslink" class="btnlink">The VJ's pads, full screen &#8250;</a>
+<div class="note">the pad banks laid out in the studio's Pads window, played with your fingers</div></section>
 <section class="card"><div class="lab">Camera</div>
 <a id="cam" class="btnlink">Send this phone's camera to the studio &#8250;</a>
 <div class="note">a video source for the Video node, or the camera for mapping</div></section>
@@ -445,6 +480,7 @@ fad.onchange=()=>{send({a:"fader",v:fad.value/1000});touching=null;};
 $("black").onclick=()=>send({a:"blackout",v:$("black").classList.contains("on")?0:1});
 $("play").onclick=()=>send({a:"play"});$("stop").onclick=()=>send({a:"stop"});
 $("cam").href="camera?k="+encodeURIComponent(key);
+$("padslink").href="pads?k="+encodeURIComponent(key);
 poll();
 </script></body></html>"""
 
@@ -516,3 +552,165 @@ $("flip").onclick=()=>{facing=facing==="environment"?"user":"environment";if(str
 $("fps").onchange=()=>{if(timer){clearInterval(timer);timer=setInterval(tick,1000/(+$("fps").value));}};
 </script></body></html>"""
 # AI: end
+
+
+# The pads page: the bank the studio's Pads window shows, full screen, played with several fingers at once. Each
+# finger holds its own control (pointer capture); what it does goes to the studio as it happens, a move at most once
+# a frame, in order; while a finger is down the page says so every half second, so a phone that drops off the network
+# mid-press lets go of its pads (native/pads_ui.py: remote_poll). Pressure is the screen's where it says (a pen, a
+# screen that reports it), otherwise it swells while held as the window's does. The layout is edited in the studio.
+PADS_PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<title>Studio pads</title>
+<style>
+:root{--bg:#0d0f12;--panel:#171a1f;--line:#2a2e36;--text:#e8e6e1;--dim:#8c8f96;--acc:#f5a623}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);overflow:hidden;
+font:15px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body{display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+header{display:flex;gap:8px;align-items:center;padding:8px 10px;overflow-x:auto;flex:none;scrollbar-width:none}
+header::-webkit-scrollbar{display:none}
+header a{color:var(--dim);text-decoration:none;padding:8px 4px;flex:none}
+.bank{font:inherit;color:#e9eaee;border:0;border-radius:9px;padding:9px 14px;flex:none;opacity:.55}
+.bank.on{opacity:1;color:#0c0c0e;font-weight:600}
+#msg{color:var(--dim);font-size:12px;margin-left:auto;flex:none;padding-right:4px}
+#grid{flex:1;display:grid;gap:8px;padding:0 10px 10px;touch-action:none;min-height:0;min-width:0}
+.c{position:relative;border-radius:12px;border:2px solid var(--col);background:color-mix(in srgb,var(--col) 26%,#111);
+overflow:hidden;touch-action:none}
+.c.lit{background-color:var(--col)}.c.lit .t{color:#0c0c0e}
+.t{position:absolute;left:9px;top:7px;right:9px;font-size:13px;line-height:1.2;color:#eceef2;pointer-events:none;
+display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.s{background:#191c22}.s .t{color:#eceef2}
+.fill{position:absolute;left:10px;right:10px;bottom:10px;background:color-mix(in srgb,var(--col) 80%,#000);border-radius:6px;
+border-top:3px solid #f0f0f0;pointer-events:none}
+.h .fill{top:30px;bottom:10px;left:10px;right:auto;border-top:0;border-right:3px solid #f0f0f0}
+svg{position:absolute;inset:26px 6px 6px 6px;width:calc(100% - 12px);height:calc(100% - 32px);pointer-events:none}
+.xy{background:color-mix(in srgb,var(--col) 14%,#0e0f12);
+background-image:linear-gradient(color-mix(in srgb,var(--col) 25%,transparent) 1px,transparent 1px),
+linear-gradient(90deg,color-mix(in srgb,var(--col) 25%,transparent) 1px,transparent 1px);background-size:25% 25%}
+.xy.lit{background-color:color-mix(in srgb,var(--col) 22%,#0e0f12);border-width:3px}.xy.lit .t{color:#eceef2}
+.dot{position:absolute;border-radius:50%;background:var(--col);border:2px solid #fff;transform:translate(-50%,50%);pointer-events:none}
+.empty{display:flex;align-items:center;justify-content:center;color:var(--dim);grid-column:1/-1;grid-row:1/-1;text-align:center;padding:20px}
+</style></head><body>
+<header><a id="back">&#8249;</a><div id="banks" style="display:flex;gap:8px"></div><span id="msg">connecting...</span></header>
+<div id="grid"></div>
+<script>
+"use strict";
+const key=new URLSearchParams(location.search).get("k")||"";
+const $=id=>document.getElementById(id);
+$("back").href="./?k="+encodeURIComponent(key);
+const grid=$("grid");
+let st=null,layout="",els={};
+const touches=new Map();          // pointerId -> {id, type, el, f0, y0, t0, real, x, y, p, f}
+const heldIds=()=>new Set([...touches.values()].map(t=>t.id));
+const SWELL_FROM=0.35,SWELL_MS=800,KNOB_PX=180;
+
+// --- sending: in order, one request at a time; moves of a control merged while one is on its way ------------
+let queue=[],busy=false;
+function send(c){
+ if(c.e==="move"){const i=queue.findIndex(q=>q.e==="move"&&q.id===c.id);if(i>=0){queue[i]=c;return;}}
+ queue.push(c);pump();}
+async function pump(){
+ if(busy||!queue.length)return;busy=true;const out=queue;queue=[];
+ try{const r=await fetch("act?k="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(out)});
+  if(r.status===403)say("this link's key is not the studio's any more - open the new link");}
+ catch(e){say("no studio: "+e.message);}
+ busy=false;if(queue.length)pump();}
+function say(t){$("msg").textContent=t;}
+
+// --- drawing the bank ------------------------------------------------------------------------------------------
+function hex(rgb){return "rgb("+rgb.join(",")+")";}
+function build(p){
+ const want=JSON.stringify([p.bank,p.cols,p.rows,p.banks,p.controls.map(c=>[c.id,c.type,c.x,c.y,c.w,c.h,c.label,c.rgb,c.orient])]);
+ if(want===layout)return;layout=want;
+ const bk=$("banks");bk.textContent="";
+ p.banks.forEach((b,i)=>{const e=document.createElement("button");e.className="bank"+(i===p.bank?" on":"");
+  e.textContent=b.name;e.style.background=hex(b.rgb);e.onclick=()=>{send({a:"padbank",v:i});};bk.appendChild(e);});
+ grid.textContent="";els={};
+ grid.style.gridTemplateColumns="repeat("+p.cols+",minmax(0,1fr))";grid.style.gridTemplateRows="repeat("+p.rows+",minmax(0,1fr))";
+ if(!p.controls.length){const e=document.createElement("div");e.className="empty";
+  e.textContent="This bank has no pads yet: lay it out in the studio's Pads window (Edit).";grid.appendChild(e);}
+ for(const c of p.controls){
+  const e=document.createElement("div");
+  e.className="c"+(c.type==="fader"||c.type==="knob"?" s":"")+(c.type==="xy"||c.type==="pressure"?" xy":"")+(c.orient==="h"?" h":"");
+  e.style.setProperty("--col",hex(c.rgb));
+  e.style.gridColumn=(c.x+1)+" / span "+c.w;e.style.gridRow=(c.y+1)+" / span "+c.h;
+  const t=document.createElement("div");t.className="t";t.textContent=c.label;e.appendChild(t);
+  if(c.type==="fader"){const f=document.createElement("div");f.className="fill";e.appendChild(f);}
+  if(c.type==="knob"){e.insertAdjacentHTML("beforeend",'<svg viewBox="-50 -50 100 100"><circle r="38" fill="none" stroke-width="7" stroke="rgba(255,255,255,.18)"/><path class="arc" fill="none" stroke-width="7" stroke-linecap="round"/><line class="ptr" x1="0" y1="0" stroke="#f0f0f0" stroke-width="5" stroke-linecap="round"/></svg>');
+   e.querySelector(".arc").setAttribute("stroke",hex(c.rgb));}
+  if(c.type==="xy"||c.type==="pressure"){const d=document.createElement("div");d.className="dot";d.hidden=true;e.appendChild(d);}
+  e.dataset.id=c.id;els[c.id]={el:e,c:c};
+  e.addEventListener("pointerdown",down);e.addEventListener("pointermove",move);
+  e.addEventListener("pointerup",up);e.addEventListener("pointercancel",up);e.addEventListener("lostpointercapture",up);
+  e.addEventListener("contextmenu",ev=>ev.preventDefault());
+  grid.appendChild(e);}}
+function knobDraw(e,f){const a0=135*Math.PI/180,a1=a0+f*270*Math.PI/180,r=38;
+ const x0=r*Math.cos(a0),y0=r*Math.sin(a0),x1=r*Math.cos(a1),y1=r*Math.sin(a1);
+ e.querySelector(".arc").setAttribute("d","M"+x0+" "+y0+" A"+r+" "+r+" 0 "+(f*270>180?1:0)+" 1 "+x1+" "+y1);
+ const ptr=e.querySelector(".ptr");ptr.setAttribute("x2",x1);ptr.setAttribute("y2",y1);}
+function paint(){
+ if(!st)return;const held=new Map([...touches.values()].map(t=>[t.id,t]));
+ for(const c of st.controls){const k=els[c.id];if(!k)continue;const e=k.el,t=held.get(c.id);
+  e.classList.toggle("lit",t?true:!!c.lit);
+  if(c.type==="fader"){const f=t&&t.f!=null?t.f:(c.f||0),fl=e.querySelector(".fill");
+   if(c.orient==="h"){fl.style.width="calc("+(f*100)+"% - 20px)";}else{fl.style.height="calc("+(f*100)+"% - 40px)";}}
+  if(c.type==="knob")knobDraw(e,t&&t.f!=null?t.f:(c.f||0));
+  if(c.type==="xy"||c.type==="pressure"){const d=e.querySelector(".dot"),at=t?[t.x,t.y,t.p]:c.xy;
+   d.hidden=!at;if(at){const r=c.type==="pressure"?16+28*at[2]:24;d.style.width=d.style.height=r+"px";
+    d.style.left=(at[0]*100)+"%";d.style.bottom=(at[1]*100)+"%";}}}}
+
+// --- playing ---------------------------------------------------------------------------------------------------
+function where(e,ev){const r=e.getBoundingClientRect();
+ return [Math.min(1,Math.max(0,(ev.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(r.bottom-ev.clientY)/r.height))];}
+function faderAt(c,e,ev){const r=e.getBoundingClientRect();
+ return c.orient==="h"?Math.min(1,Math.max(0,(ev.clientX-r.left-10)/(r.width-20))):Math.min(1,Math.max(0,(r.bottom-10-ev.clientY)/(r.height-40)));}
+function pressure(t,ev){
+ if(ev&&(ev.pointerType==="pen"||(ev.pressure>0&&ev.pressure!==0.5))){t.real=true;return ev.pressure;}
+ if(t.real&&ev)return t.p;
+ return SWELL_FROM+(1-SWELL_FROM)*Math.min(1,(performance.now()-t.t0)/SWELL_MS);}
+function down(ev){
+ const e=ev.currentTarget,k=els[e.dataset.id];if(!k)return;ev.preventDefault();
+ if(heldIds().has(k.c.id))return;                  // one finger a control
+ try{e.setPointerCapture(ev.pointerId);}catch(x){}
+ const c=k.c,t={id:c.id,type:c.type,el:e,t0:performance.now(),y0:ev.clientY,f0:c.f||0,real:false,f:null,x:0,y:0,p:1};
+ touches.set(ev.pointerId,t);
+ const m={a:"pad",id:c.id,e:"down"};
+ if(c.type==="fader"){t.f=faderAt(c,e,ev);m.f=t.f;}
+ else if(c.type==="knob"){t.f=t.f0;m.f=t.f;}
+ else if(c.type==="xy"||c.type==="pressure"){[t.x,t.y]=where(e,ev);t.p=pressure(t,ev);m.x=t.x;m.y=t.y;m.p=t.p;}
+ if(navigator.vibrate&&(c.type==="trigger"||c.type==="toggle"||c.type==="hold"))navigator.vibrate(12);
+ send(m);paint();}
+function move(ev){
+ const t=touches.get(ev.pointerId);if(!t)return;ev.preventDefault();const c=els[t.id]&&els[t.id].c;if(!c)return;
+ if(c.type==="fader"){t.f=faderAt(c,t.el,ev);send({a:"pad",id:c.id,e:"move",f:t.f});}
+ else if(c.type==="knob"){t.f=Math.min(1,Math.max(0,t.f0+(t.y0-ev.clientY)/KNOB_PX));send({a:"pad",id:c.id,e:"move",f:t.f});}
+ else if(c.type==="xy"||c.type==="pressure"){[t.x,t.y]=where(t.el,ev);t.p=pressure(t,ev);send({a:"pad",id:c.id,e:"move",x:t.x,y:t.y,p:t.p});}
+ paint();}
+function up(ev){
+ const t=touches.get(ev.pointerId);if(!t)return;touches.delete(ev.pointerId);
+ send({a:"pad",id:t.id,e:"up"});paint();}
+// a pressure pad's swell while the finger is still (a timer, not animation frames: those stop while the page is not
+// drawn), and "still here" for every held pad
+function tick(){
+ for(const t of touches.values()){const c=els[t.id]&&els[t.id].c;
+  if(c&&c.type==="pressure"&&!t.real&&t.p<1){t.p=pressure(t,null);send({a:"pad",id:t.id,e:"move",x:t.x,y:t.y,p:t.p});}}
+ if(touches.size)paint();}
+setInterval(tick,50);
+setInterval(()=>{for(const id of heldIds())send({a:"pad",id:id,e:"hold"});},500);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="visible"){
+ for(const [pid,t] of touches){touches.delete(pid);send({a:"pad",id:t.id,e:"up"});}}});
+
+// --- the studio's state ------------------------------------------------------------------------------------
+let lock=null;
+async function wake(){try{if(navigator.wakeLock)lock=await navigator.wakeLock.request("screen");}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")wake();});wake();
+async function poll(){
+ try{const r=await fetch("state?k="+encodeURIComponent(key),{cache:"no-store"});
+  if(!r.ok)throw new Error(r.status===403?"this link's key is not the studio's any more - open the new link":"HTTP "+r.status);
+  const s=await r.json();if(s.pads){st=s.pads;build(st);paint();say(s.project||"");}}
+ catch(e){say("no studio: "+e.message);}
+ setTimeout(poll,200);}
+poll();
+</script></body></html>"""

@@ -3,7 +3,8 @@ the state only with the link's key, commands checked before they are queued
 (a slider's key, a number, a name - anything else dropped), a body past its
 size refused, and the queue drained in order; the phone's camera - its page,
 JPEG frames taken, anything else refused - over HTTPS with the certificate
-the studio makes. On the loopback only.
+the studio makes; the pads page and its commands (a control's id, an event, numbers held to
+0..1). On the loopback only.
 Run with  python tests/test_phone.py  (or pytest).
 """
 import json
@@ -162,6 +163,33 @@ def test_the_camera_over_https():
     finally:
         r.close()
         phone_tls._dir = keep
+
+
+def test_the_pads_page_and_its_commands():
+    r, base = _open()
+    try:
+        assert _get(base + "/pads")[0] == 403
+        code, page = _get(base + "/pads?k=testkey1")
+        assert code == 200 and b"pointerdown" in page and b"setPointerCapture" in page
+        code, got = _post(base + "/act?k=testkey1", [
+            {"a": "pad", "id": 4, "e": "down", "x": 1.7, "y": -2, "p": 0.25},     # kept, its numbers held to 0..1
+            {"a": "pad", "id": 4, "e": "move", "f": 0.5},
+            {"a": "pad", "id": 4, "e": "up"},
+            {"a": "pad", "id": 4, "e": "hold"},
+            {"a": "padbank", "v": 1},
+            {"a": "pad", "id": 4, "e": "explode"},                               # no such event
+            {"a": "pad", "id": -1, "e": "down"},                                 # no such control
+            {"a": "pad", "id": "4; drop", "e": "down"},
+            {"a": "pad", "id": 4, "e": "move", "x": "nan"},
+            {"a": "padbank", "v": "two"}])
+        assert code == 200 and got == {"taken": 5}
+        q = r.drain()
+        assert q[0] == {"a": "pad", "id": 4, "e": "down", "x": 1.0, "y": 0.0, "p": 0.25}
+        assert [c["e"] for c in q[:4]] == ["down", "move", "up", "hold"] and q[4] == {"a": "padbank", "v": 1}
+        code, main = _get(base + "/?k=testkey1")
+        assert b"pads?k=" in main                                                  # the remote links to it
+    finally:
+        r.close()
 
 
 def test_a_key_and_an_address():

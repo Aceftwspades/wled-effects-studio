@@ -240,6 +240,72 @@ pads.press(app, pp2); pads.release(app, pp2)
 check(pads.staged(app, pp2) == 0 and abs(o["decks"][0]["hue"] - 0.4) < 1e-6,
       "a staged preset with B on air loads onto A")
 
+# --- the phone's /pads page (phase 3) ------------------------------------------------------------------------
+import dearpygui.dearpygui as dpg                                   # noqa: E402 - pads_ui asks whether its items exist
+from native import pads_ui                                          # noqa: E402
+dpg.create_context()
+
+
+class Gp:
+    def status(self, *a):
+        pass
+
+
+app2 = App(geometry.Geometry("cube", B=16))
+app2.gp = Gp()
+o2 = vj.options(app2)
+st4 = pads_ui._st(app2)
+rs = pads_ui.remote_state(app2)
+check(rs["bank"] == 0 and (rs["cols"], rs["rows"]) == (4, 4) and len(rs["controls"]) == 10
+      and rs["banks"][0]["name"] == "Live" and len(rs["banks"][0]["rgb"]) == 3, "the page's state: the bank, its grid, its banks")
+rf = next(c for c in rs["controls"] if c["label"] == "A - B")
+check(rf["type"] == "fader" and "f" in rf and (rf["w"], rf["h"]) == (1, 4), "a fader in it with its place")
+o2["fader"] = 0.0
+cutc = pads.at(pads.current(st4), 0, 1)
+pads_ui.remote(app2, {"a": "pad", "id": cutc["id"], "e": "down"})
+pads_ui.remote(app2, {"a": "pad", "id": cutc["id"], "e": "up"})
+check(o2["fader"] == 1.0, "Cut pressed on the page cuts")
+fdr = pads.at(pads.current(st4), 2, 0)
+pads_ui.remote(app2, {"a": "pad", "id": fdr["id"], "e": "down", "f": 0.25})
+pads_ui.remote(app2, {"a": "pad", "id": fdr["id"], "e": "move", "f": 0.6})
+check(abs(o2["fader"] - 0.6) < 1e-6, "the crossfader dragged on the page")
+pads_ui.remote(app2, {"a": "pad", "id": fdr["id"], "e": "up"})
+flc = pads.at(pads.current(st4), 0, 2)
+o2["decks"][2]["level"] = 0.0
+pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "down"})
+check(vj.c_level(app2) > 0 and next(c for c in pads_ui.remote_state(app2)["controls"] if c["id"] == flc["id"])["lit"],
+      "Flash C held from the page: deck C in, the pad shown lit")
+app2._pads_remote[flc["id"]] -= pads_ui.REMOTE_GONE_S + 1                 # the phone fell silent
+pads_ui.remote_poll(app2)
+check(vj.c_level(app2) == 0.0 and flc["id"] not in app2._pads_remote, "a phone silent mid-press: its pad let go")
+pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "down"})
+pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "hold"})
+pads_ui.remote_poll(app2)
+check(vj.c_level(app2) > 0, "one that says it still holds keeps holding")
+pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "up"})
+st4["banks"].append(pads.new_bank("Two"))
+before = repr((o2["fader"], o2["decks"]))
+pads_ui.remote(app2, {"a": "padbank", "v": 1})
+check(st4["bank"] == 1 and pads_ui.remote_state(app2)["controls"] == [] and repr((o2["fader"], o2["decks"])) == before,
+      "a bank switched from the page: the pads change, the picture does not")
+f_was = o2["fader"]
+pads_ui.remote(app2, {"a": "pad", "id": cutc["id"], "e": "down"})
+pads_ui.remote(app2, {"a": "pad", "id": cutc["id"], "e": "up"})
+check(o2["fader"] == f_was, "a control of a bank not shown is not played")
+xyc = pads.new_control(st4, "pressure", 0, 0, 2, 2, target={"kind": "vj_knob", "deck": 0, "key": "hue"}, label="XY")
+xyc["target_p"] = {"kind": "vj_knob", "deck": 0, "key": "speed"}
+pads.current(st4)["controls"].append(xyc)
+pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "down", "x": 0.3, "y": 0.5, "p": 0.5})
+pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "move", "x": 0.7, "y": 0.5, "p": 1.0})
+xs = pads_ui.remote_state(app2)["controls"][0]
+check(abs(vj.knob_get(app2, 0, "hue") - 0.7) < 1e-3 and abs(vj.knob_get(app2, 0, "speed") - 1.0) < 1e-3
+      and xs["xy"] == [0.7, 0.5, 1.0], "a pressure pad played from the page: across, pressure, the dot")
+pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "up"})
+check(pads_ui.remote_state(app2)["controls"][0]["xy"] is None, "let go: snapped back, no dot")
+pads_ui.remote(app2, {"a": "pad", "id": 99999, "e": "down"})
+check(not pads._rt(app2)["held"] and 99999 not in app2._pads_remote, "a control that is not there: nothing held")
+dpg.destroy_context()
+
 print("pads:", "FAILED" if fails else "ok")
 sys.exit(1 if fails else 0)
 # AI: end

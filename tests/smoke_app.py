@@ -364,7 +364,8 @@ STEPS = [
       {"py": "__import__('socket').socket(2, 2).sendto(__import__('native.osc', fromlist=['osc']).message('/1/fader1', 0.2), "
              "('127.0.0.1', app.osc.port))"}], 0.8),
     ([{"check": "app.eng.fx['ix'] == 51"}, {"py": "midi_ui.set_osc(app, on=False)"}], 0.3),
-    # the phone remote, on the loopback: its page's state is the studio's, a slider and the master brightness
+    # the phone remote, on the loopback: its page's state is the studio's (the pads' too, and their page served), a
+    # slider and the master brightness
     # moved from it, a blackout darkens the picture every view and the stream read, then off again
     ([{"py": "setattr(app, '_https_was', phone_ui._st(app)['https'])"},
       {"py": "phone_ui._st(app).update(host='127.0.0.1', port=0, https=False)"}, {"py": "phone_ui.set_on(app, True)"}], 0.6),
@@ -372,6 +373,11 @@ STEPS = [
       {"check": "__import__('json').loads(__import__('urllib.request', fromlist=['x']).urlopen("
                 "f'http://127.0.0.1:{app.phone.port}/state?k={app.phone.key}', timeout=5).read())['effect'] "
                 "== app.eng.names[app.eng.idx]"},
+      {"check": "len(__import__('json').loads(__import__('urllib.request', fromlist=['x']).urlopen("
+                "f'http://127.0.0.1:{app.phone.port}/state?k={app.phone.key}', timeout=5).read())['pads']['controls']) "
+                "== len(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'])"},
+      {"check": "b'pointerdown' in __import__('urllib.request', fromlist=['x']).urlopen("
+                "f'http://127.0.0.1:{app.phone.port}/pads?k={app.phone.key}', timeout=5).read()"},
       {"py": "__import__('urllib.request', fromlist=['x']).urlopen(__import__('urllib.request', fromlist=['x']).Request("
              "f'http://127.0.0.1:{app.phone.port}/act?k={app.phone.key}', data=b'[{\"a\":\"fx\",\"k\":\"sx\",\"v\":0.5},"
              "{\"a\":\"bri\",\"v\":128}]', headers={'Content-Type': 'application/json'}), timeout=5).read()"}], 0.5),
