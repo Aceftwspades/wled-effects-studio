@@ -172,7 +172,7 @@ class Project:
 
     # the options with an undo of their own: the sequence's steps, the schedule, the
     # palettes, the segments - every save() that changes one keeps what it was
-    UNDO_KEYS = ("sequence", "schedule", "palettes", "segments", "vj")
+    UNDO_KEYS = ("sequence", "schedule", "palettes", "segments", "vj", "pads")
     UNDO_MAX = 40
 
     def load(self):

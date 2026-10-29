@@ -78,6 +78,9 @@ def build(app):
                     dpg.add_button(label="Packs...", tag="vj_packs", small=True, callback=lambda: _packs(app))
                     c.tip("add-on packs from the gallery - MilkDrop presets and Shadertoy shaders - installed for "
                           "every project, a pack or a look at a time")
+                    dpg.add_button(label="Pads...", tag="vj_pads", small=True, callback=lambda: _pads(app))
+                    c.tip("a pad surface for the show: banks of buttons, faders and knobs, each driving anything MIDI "
+                          "can - a bank switched changes the pads, never the picture")
                 with dpg.group(horizontal=True):
                     typeface.label(dpg.add_text("MAP", color=c.ACCENT))
                     dpg.add_combo([w for _, w in vj.MAPS], tag="vj_map", width=px(190),
@@ -626,6 +629,11 @@ def _build_browser(app):
                   "project, a pack or a look at a time")
         dpg.add_text("", tag="vj_br_words", color=c.DIM)
         dpg.add_group(tag="vj_br_grid")
+
+
+def _pads(app):
+    from native import pads_ui
+    pads_ui.show(app)
 
 
 def _packs(app):

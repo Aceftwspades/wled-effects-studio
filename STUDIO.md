@@ -4224,6 +4224,33 @@ step checks the deck's picture only where shaders run (the CI's Windows and ARM 
 
 Released as 1.22.0 (2026-10-28).
 
+### The VJ's pads (asked for 2026-10-29)
+
+Asked for: a pad surface for the VJ like a MIDI drum controller's - square pads in rows, every one assignable,
+resizable, with X/Y aftertouch; faders and knobs beside them; reaching everything MIDI can; its own local web page;
+banks switched by buttons along the top that change the layout, never the picture, until a pad that changes the
+picture is touched. Agreed (2026-10-29): button pads (fires once, on and off, while held), XY pads and position +
+pressure pads as their own kinds, each XY's release chosen per pad (snap back or stay), pads acting live with an
+optional "stage" onto the deck off air and a GO pad, and a physical pad controller later (pads learned from its
+notes, its lights mirroring the layout). In four phases:
+
+1. **Done** (2026-10-29): native/pads.py - banks of controls on a grid (2 x 2 to 8 x 8, a control spanning cells),
+   kept in the project (its own undo history, "pads"), made whole on load (a control off the grid, on another's
+   cells or of no known kind dropped); a button that fires once, turns on and off, or holds while held (a hold
+   puts back what it changed; deck C's flash in while held, out when let go); a fader and a knob between a range,
+   upside down if asked. Every action through midi_ui.apply_target, so a pad does what MIDI does, plus a look
+   put on a deck and a saved preset loaded onto one. native/pads_ui.py - the Pads window (the VJ frame's
+   **Pads...**): the banks as coloured buttons, the grid drawn and played with the mouse or a touchscreen, lit
+   from the targets themselves (on air, deck C in, a toggle's value), Edit - a cell or a control picked, moved by
+   a drag, resized by its corner, a panel for its kind, label, colour, action (found by typing) and range; a
+   bank renamed, coloured, resized, moved, copied, deleted. Tests: test_pads (the grid, each kind on a knob,
+   deck C, a look and a preset, letting go); the smoke plays Cut, switches a bank with the picture untouched,
+   and adds, plays and undoes a hold. By hand with the real mouse: Cut, the crossfader dragged, a knob turned,
+   Flash C held, a control added in Edit and played.
+2. XY and pressure pads, snap back or stay, staging onto the deck off air and GO.
+3. The /pads page on the phone remote's server, multi-touch, in step with the window.
+4. A physical controller: pads learned from its notes, its lights driven over MIDI.
+
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).
 
