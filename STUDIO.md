@@ -4270,7 +4270,20 @@ notes, its lights mirroring the layout). In four phases:
    refused, a pressure pad and its dot); the smoke reads the pads in the state and fetches the page. By hand in a
    browser at phone sizes against a running studio: Cut, the fader dragged, two fingers at once (Flash C held while
    the fader moved), a bank switched, a pen's pressure and a finger's swell.
-4. A physical controller: pads learned from its notes, its lights driven over MIDI.
+4. **Done** (2026-10-29): native/pads_hw.py - on the project's MIDI port (midi_ui.poll hands its events to
+   pads_hw.events first; a pad learning takes the first note or CC, so the MIDI window's learn never sees it): a
+   control or a bank button learns a note or a CC; a note presses and lets go, its velocity a pressure pad's first
+   pressure and its polyphonic aftertouch (midi.parse now reads "pat" and channel pressure "cp") the rest; a CC
+   moves a fader, a knob or an XY pad across, and presses a button past half. Known controllers lay the bank on
+   their own 8 x 8 from the top left and switch banks from their own buttons: a Launchpad in Programmer mode (pads
+   11..88, top row CC 91..98, the sysex that enters the mode sent for the X, the Mini MK3 and the Pro MK3), an APC
+   mini mk2 (pads 0..63 from the bottom left, the note's channel the brightness, scene buttons 112..119) and the
+   first APC mini (velocity 1 green, 3 red, 5 yellow, one more to blink; scene buttons 82..89). The lights go out
+   on a chosen port (midi.MidiOut), each pad its control's colour dim and bright while lit, at most 20 times a
+   second and only what changed; a light no longer used is put out, a new device or port sends all again. The
+   message formats are from the makers' programming references, checked against a stand-in port - no device was
+   to hand. Tests: test_pads_hw (learning, playing, both grids, the lights per device); the smoke learns Cut from
+   a note injected on the MIDI port and plays it.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

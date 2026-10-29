@@ -15,7 +15,7 @@ holds is let go once the phone has not said "still held" for REMOTE_GONE_S (it d
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
-from native import form, num, pads
+from native import form, num, pads, pads_hw
 
 TAG = "pads_win"
 GRID = "pads_grid"
@@ -81,6 +81,22 @@ def build(app):
             c.tip("this bank and its controls gone (Undo brings it back)")
             dpg.add_button(label="Undo", small=True, callback=lambda: _undo(app))
             c.tip("the pads' last change undone")
+        with dpg.group(horizontal=True, tag="pads_hwrow", show=False):
+            form.inline("controller")
+            dpg.add_combo([w for _, w in pads_hw.DEVICES], tag="pads_hwdev", width=px(190),
+                          callback=lambda s, v: _hw_set(app, "device", next(k for k, w in pads_hw.DEVICES if w == v)))
+            c.tip("the pad controller its notes come in from (the MIDI port of Window > MIDI, OSC and phone): any "
+                  "controller (its learned pads lit by velocity 127 / 0), a Novation Launchpad Mini MK3, X or Pro MK3 "
+                  "(put in Programmer mode), an Akai APC mini mk2 or the first APC mini - one of those lays the pads' "
+                  "grid on its own pads and switches banks from its top row or scene buttons")
+            form.inline("lights to")
+            dpg.add_combo([], tag="pads_hwout", width=px(150), callback=lambda s, v: _hw_set(app, "out", "" if v == "(none)" else v))
+            c.tip("the MIDI output the controller's lights are sent to (usually named like its input)")
+            dpg.add_checkbox(label="its grid", tag="pads_hwgrid", callback=lambda s, v: _hw_set(app, "grid", bool(v)))
+            c.tip("the pads laid on the controller's own 8 x 8 from its top left, lit in their colours - nothing to learn")
+            form.inline("bank button")
+            dpg.add_button(label="Learn", tag="pads_blearn", small=True, callback=lambda: _learn(app, "bank"))
+            c.tip("this bank's button on the controller: press the pad or button that should switch to it")
         with dpg.group(horizontal=True):
             with dpg.child_window(tag="pads_area", border=False, width=-1, height=-1, no_scrollbar=True):
                 dpg.add_drawlist(tag=GRID, width=px(400), height=px(400))
@@ -142,6 +158,12 @@ def _build_side(app):
         dpg.add_combo(["vertical", "horizontal"], tag="pads_s_orient", width=-1,
                       callback=lambda s, v: _ctl_set(app, "orient", "v" if v == "vertical" else "h"))
         c.tip("which way a fader moves")
+        dpg.add_text("CONTROLLER", color=c.ACCENT)
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Learn", tag="pads_s_learn", small=True, callback=lambda: _learn(app, "control"))
+            c.tip("press the controller's pad (or turn its knob) that should play this control")
+            dpg.add_button(label="Forget", tag="pads_s_forget", small=True, callback=lambda: _forget(app))
+            dpg.add_text("", tag="pads_s_midi", color=c.DIM)
         dpg.add_button(label="Remove this control", width=-1, callback=lambda: _remove_control(app))
 
 
@@ -180,6 +202,16 @@ def _fill_banks(app):
     num.set("pads_cols", b["cols"])
     num.set("pads_rows", b["rows"])
     dpg.configure_item("pads_delbank", enabled=len(st["banks"]) > 1)
+    dpg.configure_item("pads_hwrow", show=edit)
+    h = pads_hw.hw(st)
+    dpg.set_value("pads_hwdev", dict(pads_hw.DEVICES)[h["device"]])
+    from native import midi
+    outs = ["(none)"] + midi.out_ports() + ([h["out"]] if h["out"] and h["out"] not in midi.out_ports() else [])
+    dpg.configure_item("pads_hwout", items=outs)
+    dpg.set_value("pads_hwout", h["out"] or "(none)")
+    dpg.set_value("pads_hwgrid", bool(h.get("grid", True)))
+    dpg.configure_item("pads_hwgrid", show=h["device"] in pads_hw.GRIDS)
+    _fill_banks_learn(app)
 
 
 _THEMES = {}
@@ -267,6 +299,32 @@ def _delete_bank(app):
     _fill_side(app)
 
 
+def _hw_set(app, key, v):
+    pads_hw.hw(_st(app))[key] = v
+    _save(app)
+    _fill_banks(app)
+
+
+def _learn(app, what):
+    """Wait for the controller's next note or CC for the selected control or the bank shown (again: stop)."""
+    st = _st(app)
+    s = _sel(app)
+    want = ("control", s["id"]) if what == "control" and isinstance(s, dict) else ("bank", st["bank"]) if what == "bank" else None
+    if want is None:
+        return
+    pads_hw.learn(app, None if pads_hw.learning(app) == want else want)
+    app.gp.status("pads: press the controller's pad or button..." if pads_hw.learning(app) else "pads: learning stopped")
+    _fill_banks(app)
+    _fill_side(app)
+
+
+def _forget(app):
+    s = _sel(app)
+    if isinstance(s, dict):
+        pads_hw.forget(app, ("control", s["id"]))
+        _fill_side(app)
+
+
 def _undo(app):
     pads.let_go(app)
     if not app.project.undo("pads"):
@@ -280,6 +338,7 @@ def _undo(app):
 # --- editing a control ---------------------------------------------------------------------------------------
 def _set_edit(app, on):
     pads.let_go(app)
+    pads_hw.learn(app, None)
     app._pads_edit = bool(on)
     app._pads_sel = None
     dpg.configure_item(SIDE, show=bool(on))
@@ -370,6 +429,12 @@ def _fill_side(app):
     dpg.set_value("pads_s_orient", "vertical" if s.get("orient", "v") == "v" else "horizontal")
     dpg.configure_item("pads_s_orient", show=s["type"] == "fader")
     dpg.configure_item("pads_s_invert", show=ax[0] == "x")
+    w = pads_hw.learning(app)
+    dpg.configure_item("pads_s_learn", label="press it..." if w == ("control", s["id"]) else "Learn")
+    dpg.configure_item("pads_s_forget", show=bool(s.get("midi")))
+    dpg.set_value("pads_s_midi", pads_hw.words(s.get("midi")) or "not learned")
+    if dpg.does_item_exist("pads_blearn"):
+        _fill_banks_learn(app)
     k = pads.kind_of(s.get(ax[1]))
     dpg.configure_item("pads_s_valrow", show=k == "value" or (surface and not (s.get(ax[1]) or {}).get("kind")))
     dpg.configure_item("pads_s_stage", show=k in ("look", "preset"))
@@ -385,6 +450,15 @@ def _fill_side(app):
         dpg.configure_item("pads_s_preset", items=sorted(vj.options(app)["presets"]))
         dpg.set_value("pads_s_preset", s["target"].get("name", ""))
     _fill_actions(app)
+
+
+def _fill_banks_learn(app):
+    """The bank's Learn button's words: waiting, what it learned, or Learn."""
+    st = _st(app)
+    b = pads.current(st)
+    w = pads_hw.learning(app)
+    dpg.configure_item("pads_blearn", label="press it..." if w and w[0] == "bank" else
+                       (pads_hw.words(b["midi"]) if b.get("midi") else "Learn"))
 
 
 def _fits_type(typ, t):

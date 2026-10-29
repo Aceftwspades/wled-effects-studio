@@ -1149,6 +1149,15 @@ STEPS = [
       {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1))"},
       {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1))"}], 0.4),
     ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['fader'] == 1.0 and __import__('native.pads', fromlist=['p']).staged(app, app._pads_stg) is None"},
+      {"py": "setattr(app, '_pads_maps', len(midi_ui._st(app)['maps']))"},
+      {"py": "__import__('native.pads_hw', fromlist=['p']).learn(app, ('control', __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1)['id']))"},
+      {"py": "app.midi.inject([0x90, 40, 100])"}], 0.3),
+    # a pad controller: Cut learns note 40 from the MIDI port (the MIDI window's maps untouched), and the note plays it
+    ([{"check": "__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1)['midi'] == ['note', 0, 40] and __import__('native.pads_hw', fromlist=['p']).learning(app) is None and len(midi_ui._st(app)['maps']) == app._pads_maps"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(fader=0.0)"}, {"py": "app.midi.inject([0x90, 40, 100])"},
+      {"py": "app.midi.inject([0x80, 40, 0])"}], 0.3),
+    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['fader'] == 1.0"},
+      {"py": "__import__('native.pads_hw', fromlist=['p']).forget(app, ('control', __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1)['id']))"},
       {"py": "chrome.close_dialog('pads_win')"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
     # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed
     # left where it was set

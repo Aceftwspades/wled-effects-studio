@@ -1182,6 +1182,26 @@ some screens) and swells while held where it does not. If the phone loses
 the network while a pad is held, the studio lets go of it after a few
 seconds. The layout is made in the studio's Pads window.
 
+A **pad controller** plays them too, on the MIDI port chosen in Window >
+MIDI, OSC and phone. In **Edit**, the panel's **Learn** (under CONTROLLER)
+waits for the controller's pad or knob that should play the selected
+control - press it - and **Forget** takes it off; the **bank button**'s
+**Learn** on the row above the grid does the same for the bank shown. A
+learned pad presses and lets go; its velocity is a pressure pad's first
+pressure and its aftertouch the rest; a knob or fader (a CC) moves a
+fader, a knob or across an XY pad, and presses a button past halfway. The
+**controller** list knows a Novation **Launchpad** (Mini MK3, X, Pro MK3,
+put in Programmer mode) and Akai's **APC mini mk2** and first **APC
+mini**: with **its grid** ticked the bank lies on the controller's own pads
+from the top left - nothing to learn - and its top row (Launchpad) or scene
+buttons (APC) switch the banks. **lights to** picks the MIDI output its
+lights go to: every pad shows its control's colour, dim, and bright while
+lit (the first APC mini, which cannot dim, blinks instead), and the bank
+buttons show which bank is up. Any other controller lights its learned
+pads by velocity 127 and 0. (The Launchpad's and APC's messages follow
+their makers' programming guides; they were checked against a stand-in
+port, not the devices themselves.)
+
 The looks:
 
 - **Video**: the Video Switchboard's ten - Clean, Neon Edges, Mosaic,

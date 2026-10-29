@@ -56,7 +56,7 @@ def _midi():
 
 
 def new_bank(name="Bank 1", cols=4, rows=4, colour="blue"):
-    return {"name": name, "colour": colour, "cols": int(cols), "rows": int(rows), "controls": []}
+    return {"name": name, "colour": colour, "cols": int(cols), "rows": int(rows), "controls": [], "midi": None}
 
 
 def new_control(st, type_, x, y, w=1, h=1, target=None, label="", colour="grey"):
@@ -101,6 +101,7 @@ def state(project):
         st["banks"] = [starter(st)]
     for b in st["banks"]:
         b.setdefault("name", "Bank")
+        b.setdefault("midi", None)
         b.setdefault("colour", "blue")
         b["cols"] = max(GRID_MIN, min(GRID_MAX, int(b.get("cols", 4))))
         b["rows"] = max(GRID_MIN, min(GRID_MAX, int(b.get("rows", 4))))

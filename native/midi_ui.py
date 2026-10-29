@@ -607,9 +607,13 @@ def poll(app):
     if getattr(app, "_osc_for", None) != app.project.path:
         app._osc_for = app.project.path                   # the project's OSC: opened as the studio starts, and as
         open_osc(app, quiet=True)                         # another project is opened - closed when its is off
+    from native import pads_hw
+    pads_hw.poll(app)                                     # the pad controller's lights (the VJ's pads)
     # (control, value, its full scale): a knob's 0..127, an OSC fader's 0..1
     evs = [(ctl, v, 127.0) for ctl, v in m.drain()] + [(ctl, v, 1.0) for ctl, v in app.osc.drain()]
     if not evs:
+        return
+    if pads_hw.events(app, evs):                          # a pad learning took it: not the window's learn's
         return
     if app._midi_learn:
         ctl, v, full = evs[0]

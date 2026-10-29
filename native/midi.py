@@ -69,11 +69,23 @@ def ports():
         return []
 
 
+def out_ports():
+    """The MIDI outputs on this machine, by name (a pad controller's lights); [] without python-rtmidi."""
+    if rtmidi is None:
+        return []
+    try:
+        return list(rtmidi.MidiOut().get_ports())
+    except Exception:
+        return []
+
+
 def parse(msg):
     """A raw message to (control, value 0..127), or None for what is not
     a control: a control change is ("cc", channel, number); a note is
     ("note", channel, number), on at its velocity and off at 0; the pitch
-    bend is ("bend", channel, 0) with its coarse byte."""
+    bend is ("bend", channel, 0) with its coarse byte; a held note's
+    aftertouch ("pat", channel, note) and a channel's pressure ("cp",
+    channel, 0) with how hard."""
     if not msg:
         return None
     st, ch = msg[0] & 0xF0, msg[0] & 0x0F
@@ -87,6 +99,10 @@ def parse(msg):
         return ("bend", ch, 0), int(msg[2])
     if st == 0xC0 and len(msg) >= 2:
         return ("pc", ch, 0), int(msg[1])                 # Program Change: the program number is the value
+    if st == 0xA0 and len(msg) >= 3:
+        return ("pat", ch, int(msg[1])), int(msg[2])      # polyphonic aftertouch: a pad pressed harder
+    if st == 0xD0 and len(msg) >= 2:
+        return ("cp", ch, 0), int(msg[1])                 # channel pressure: the same, for the whole controller
     return None
 
 
@@ -94,7 +110,8 @@ def ctl_label(ctl):
     kind, ch, n = ctl
     if kind == "osc":                                     # osc.py: ("osc", address, the number's place in it)
         return f"OSC {ch}" + (f" #{int(n) + 1}" if n else "")
-    return {"cc": f"CC {n}", "note": f"note {n}", "bend": "pitch bend", "pc": "program change"}.get(kind, kind) + f" ch {int(ch) + 1}"
+    return {"cc": f"CC {n}", "note": f"note {n}", "bend": "pitch bend", "pc": "program change",
+            "pat": f"aftertouch {n}", "cp": "pressure"}.get(kind, kind) + f" ch {int(ch) + 1}"
 
 
 def state(project):
@@ -239,6 +256,41 @@ def step_effect(names, setlist, current, d):
     if current not in live:
         return live[0] if d > 0 else live[-1]
     return live[(live.index(current) + d) % len(live)]
+
+
+class MidiOut:
+    """One output port: messages sent as they are given (a pad controller's lights, native/pads_hw.py)."""
+
+    def __init__(self):
+        self._out = None
+        self.port = None
+
+    def open(self, name):
+        self.close()
+        if rtmidi is None:
+            raise RuntimeError("python-rtmidi is not installed:  pip install python-rtmidi")
+        mo = rtmidi.MidiOut()
+        names = mo.get_ports()
+        if name not in names:
+            raise RuntimeError(f"no MIDI output named {name!r}")
+        mo.open_port(names.index(name))
+        self._out, self.port = mo, name
+
+    def send(self, msg):
+        if self._out is not None:
+            self._out.send_message(list(msg))
+
+    def close(self):
+        out, self._out, self.port = self._out, None, None
+        if out is not None:
+            try:
+                out.close_port()
+            except Exception:
+                pass
+
+    @property
+    def is_open(self):
+        return self._out is not None
 
 
 class MidiIn:
