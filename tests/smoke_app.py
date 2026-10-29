@@ -1086,7 +1086,9 @@ STEPS = [
       {"py": "setattr(app, '_pk_toy', next(n for n in __import__('native.vj_looks', fromlist=['v']).LOOKS if __import__('native.vj_looks', fromlist=['v']).look_source(n) == ('addon', 'smoke-pack') and not n.startswith('Milk')))"},
       {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0].update(look=app._pk_toy, sh_mouse=True, sh_mx=1.0, sh_my=0.5)"},
       {"py": "__import__('native.vj_ui', fromlist=['v']).refresh(app)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, True)"}], 1.0),
-    ([{"check": "dpg.is_item_shown('vj_steerrow0') and dpg.get_value('vj_steer0') and app._vj_out is not None and app._vj_out.any()"},
+    # a picture only where shaders run: the CI's Windows and ARM runners have no OpenGL 3.3 (test_vj skips there too)
+    ([{"check": "dpg.is_item_shown('vj_steerrow0') and dpg.get_value('vj_steer0')"},
+      {"check": "(app._vj_out is not None and app._vj_out.any()) or not __import__('native.vj_glsl', fromlist=['v']).available()[0]"},
       {"check": "'Milk: Smoke spin' not in __import__('native.vj', fromlist=['v']).favourites(app)"},
       {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
       {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0].update(look='Plasma', sh_mouse=False, sh_mx=0.5, sh_my=0.5)"},
