@@ -304,6 +304,55 @@ pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "up"})
 check(pads_ui.remote_state(app2)["controls"][0]["xy"] is None, "let go: snapped back, no dot")
 pads_ui.remote(app2, {"a": "pad", "id": 99999, "e": "down"})
 check(not pads._rt(app2)["held"] and 99999 not in app2._pads_remote, "a control that is not there: nothing held")
+
+# --- one control held from two places: let go when the last lets go, back where it was before the first ----------
+pads_ui.switch_bank(app2, 0)
+b0 = pads.current(st4)
+hv = pads.new_control(st4, "hold", 0, 0, target={"kind": "vj_fader"}, label="Hold")
+b0["controls"] = [x for x in b0["controls"] if not (x["x"] == 0 and x["y"] == 0)] + [hv]
+o2["fader"] = 0.2
+pads.press(app2, hv)                                        # the phone
+pads.press(app2, hv)                                        # and the controller
+pads.release(app2, hv)
+check(o2["fader"] == 1.0 and pads.lit(app2, hv), "held from two places, one let go: still held")
+pads.release(app2, hv)
+check(abs(o2["fader"] - 0.2) < 1e-6 and not pads.lit(app2, hv), "the other let go: back where it was before the first")
+sx = pads.new_control(st4, "xy", 0, 0, target={"kind": "vj_knob", "deck": 0, "key": "hue"}, label="S")
+vj.knob_set(app2, 0, "hue", 0.25)
+h0 = vj.knob_get(app2, 0, "hue")
+pads.press(app2, sx, xy=(0.8, 0.5))
+pads.press(app2, sx, xy=(0.6, 0.5))
+check(abs(vj.knob_get(app2, 0, "hue") - 0.6) < 1e-3, "an XY pad pressed again from elsewhere: it moves there")
+pads.release(app2, sx)
+pads.release(app2, sx)
+check(abs(vj.knob_get(app2, 0, "hue") - h0) < 1e-3, "both let go: it snaps back where it was before the first touch")
+pads.press(app2, hv)
+pads.press(app2, hv)
+pads.let_go(app2)
+check(not pads._rt(app2)["held"] and abs(o2["fader"] - 0.2) < 1e-6, "all let go at once (a bank switched): however many held it")
+
+# --- the bank shown is not an edit: no undo of its own, and an undo leaves it be ----------------------------------
+from native import project as project_mod
+app3 = App(geometry.Geometry("cube", B=16))
+app3.project = project_mod.Project(tempfile.mkdtemp())
+st5 = pads_ui._st(app3)
+st5["banks"].append(pads.new_bank("Two"))
+app3.project.save()
+pads_ui.switch_bank(app3, 1)
+pads_ui.switch_bank(app3, 0)
+pads_ui.switch_bank(app3, 1)
+app3.project.save()
+pads_ui._undo(app3)
+st5 = pads_ui._st(app3)
+check(len(st5["banks"]) == 1 and st5["bank"] == 0, "Undo takes back the added bank, not the bank switches")
+st5["banks"].append(pads.new_bank("Two"))
+app3.project.save()
+pads_ui.switch_bank(app3, 1)
+st5["banks"][1]["name"] = "Renamed"
+app3.project.save()
+pads_ui._undo(app3)
+st5 = pads_ui._st(app3)
+check(st5["banks"][1]["name"] == "Two" and st5["bank"] == 1, "an undo of an edit: the bank shown stays where it is")
 dpg.destroy_context()
 
 print("pads:", "FAILED" if fails else "ok")

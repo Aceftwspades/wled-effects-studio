@@ -174,6 +174,16 @@ class Project:
     # palettes, the segments - every save() that changes one keeps what it was
     UNDO_KEYS = ("sequence", "schedule", "palettes", "segments", "vj", "pads")
     UNDO_MAX = 40
+    # fields of those that are where the user is, not an edit: no undo of their own, and an undo leaves them be
+    # (the pads' bank shown - a show switching banks would push its layout edits out of the undo)
+    UNDO_SKIP = {"pads": ("bank",)}
+
+    def _snap(self, k):
+        v = self.options.get(k)
+        skip = self.UNDO_SKIP.get(k)
+        if skip and isinstance(v, dict):
+            v = {f: x for f, x in v.items() if f not in skip}
+        return json.dumps(v, sort_keys=True)
 
     def load(self):
         self.load_error = None          # what went wrong reading project.json, for the app to say (issue #5)
@@ -238,7 +248,7 @@ class Project:
     def _journal_reset(self):
         self._undo = {k: [] for k in self.UNDO_KEYS}
         self._redo = {k: [] for k in self.UNDO_KEYS}
-        self._last = {k: json.dumps(self.options.get(k), sort_keys=True) for k in self.UNDO_KEYS}
+        self._last = {k: self._snap(k) for k in self.UNDO_KEYS}
         # when each entry was made, by one count across the keys: which of two stacks changed last
         self._undo_t = {k: [] for k in self.UNDO_KEYS}
         self._redo_t = {k: [] for k in self.UNDO_KEYS}
@@ -250,7 +260,7 @@ class Project:
         if not hasattr(self, "_last"):
             self._journal_reset(); return
         for k in self.UNDO_KEYS:
-            cur = json.dumps(self.options.get(k), sort_keys=True)
+            cur = self._snap(k)
             if cur != self._last[k]:
                 if not self._restoring:
                     self._undo[k].append(self._last[k]); del self._undo[k][:-self.UNDO_MAX]
@@ -293,6 +303,11 @@ class Project:
         if take_t is not None:
             give_t[key].append(take_t[key].pop() if take_t[key] else 0)
         val = json.loads(take[key].pop())
+        was = self.options.get(key)
+        if isinstance(val, dict) and isinstance(was, dict):
+            for f in self.UNDO_SKIP.get(key, ()):
+                if f in was:
+                    val[f] = was[f]
         if val is None:
             self.options.pop(key, None)
         else:

@@ -238,9 +238,8 @@ def switch_bank(app, i):
     if not 0 <= i < len(st["banks"]) or i == st["bank"]:
         return
     pads.let_go(app)
-    st["bank"] = i
+    st["bank"] = i                                              # saved with the next change (not an undo of its own)
     app._pads_sel = None
-    _save(app)
     _fill_banks(app)
     _fill_side(app)
 

@@ -259,10 +259,11 @@ def _span(c, f):
 
 def _rt(app):
     """The pads' run state, never saved: held controls, what a hold or a snapping XY pad changed (to put back),
-    toggles' own on/off for targets that cannot be read, triggers' flash times, the staged pad and its deck."""
+    toggles' own on/off for targets that cannot be read, triggers' flash times, the staged pad and its deck, and how
+    many hold each held control (the mouse, a phone, a controller: let go when the last does)."""
     r = getattr(app, "_pads_rt", None)
     if r is None:
-        r = app._pads_rt = {"held": set(), "before": {}, "on": {}, "flash": {}, "staged": None}
+        r = app._pads_rt = {"held": set(), "count": {}, "before": {}, "on": {}, "flash": {}, "staged": None}
     return r
 
 
@@ -330,9 +331,18 @@ def staged(app, c):
 
 def press(app, c, f=None, xy=None, pressure=None):
     """A control pressed (a fader or a knob: where it was touched, as 0..1 - `f`; an XY pad: where, x and y 0..1
-    with y up - `xy` - and how hard on a pressure pad)."""
+    with y up - `xy` - and how hard on a pressure pad). One already held from elsewhere is not pressed again (what
+    it was before stays the first press's, to go back to): only where it is touched moves."""
     r = _rt(app)
     t, typ, kind = c.get("target") or {}, c["type"], kind_of(c.get("target"))
+    if c["id"] in r["held"]:
+        r["count"][c["id"]] = r["count"].get(c["id"], 1) + 1
+        if typ in SURFACES and xy is not None:
+            move(app, c, xy[0], xy[1], pressure)
+        elif typ in SLIDERS and f is not None:
+            drag(app, c, f)
+        return
+    r["count"][c["id"]] = 1
     r["held"].add(c["id"])
     if typ in SURFACES:
         if c.get("release", "snap") == "snap":
@@ -385,6 +395,11 @@ def release(app, c):
     r = _rt(app)
     if c["id"] not in r["held"]:
         return
+    n = r["count"].get(c["id"], 1) - 1
+    if n > 0:                                                       # still held from elsewhere
+        r["count"][c["id"]] = n
+        return
+    r["count"].pop(c["id"], None)
     r["held"].discard(c["id"])
     t, typ, kind = c.get("target") or {}, c["type"], kind_of(c.get("target"))
     if typ in SURFACES:
@@ -453,9 +468,13 @@ def lit(app, c):
 
 
 def let_go(app):
-    """Every held control released (the window closed, the mouse gone off it, a bank switched mid-press)."""
+    """Every held control released (the window closed, the mouse gone off it, a bank switched mid-press) - however
+    many held it - and the controller's pads it held forgotten (pressed again, they press again)."""
+    from native import pads_hw
+    pads_hw.let_go(app)
     st = state(app.project)
     for cid in list(_rt(app)["held"]):
+        _rt(app)["count"].pop(cid, None)
         c = find(st, cid)
         if c is not None:
             release(app, c)

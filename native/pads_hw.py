@@ -108,6 +108,11 @@ def _rt(app):
     return r
 
 
+def let_go(app):
+    """The pads the controller holds forgotten (pads.let_go: they were let go another way)."""
+    _rt(app)["held"].clear()
+
+
 def _same(a, b):
     return a is not None and b is not None and list(a) == list(b)
 
@@ -195,13 +200,9 @@ def events(app, evs):
         for c in _controls_for(st, h, ctl):
             if ctl[0] == "cc" and c["type"] in pads.SLIDERS:
                 pads.drag(app, c, f)
-            elif ctl[0] == "cc" and c["type"] in pads.SURFACES:     # a knob on an XY pad: it moves across
-                at = pads.where(app, c) or (0.5, 0.5, 1.0)
-                if c["id"] in r["held"]:
-                    pads.move(app, c, f, at[1], at[2])
-                else:
-                    pads.press(app, c, xy=(f, at[1]), pressure=at[2])
-                    r["held"][c["id"]] = (tuple(ctl), f)
+            elif ctl[0] == "cc" and c["type"] in pads.SURFACES:     # a knob on an XY pad: it moves across -
+                at = pads.where(app, c) or (0.5, 0.5, 1.0)          # not pressed, as a knob is never let go
+                pads.move(app, c, f, at[1], at[2])
             elif v > (0 if ctl[0] == "note" else 63):
                 if c["id"] in r["held"]:
                     continue

@@ -130,7 +130,24 @@ pads_hw.events(app, [(("pat", 0, 50), 127, 127.0)])
 p2 = vj.knob_get(app, 0, "speed")
 pads_hw.events(app, [note(50, 0)])
 check(abs(p1 - 64 / 127) < 1e-3 and abs(p2 - 1.0) < 1e-3, "a pressure pad: velocity, then aftertouch, its pressure")
+
+# a knob on an XY pad moves it across, never pressing it (a knob is never let go)
+pr["midi"] = ["cc", 0, 22]
+pads_hw.events(app, [(("cc", 0, 22), 127, 127.0)])
+check(abs(vj.knob_get(app, 0, "hue") - 1.0) < 1e-3 and pr["id"] not in pads._rt(app)["held"]
+      and not pads.lit(app, pr), "a learned CC moves an XY pad across without holding it")
+pr["midi"] = ["note", 0, 50]
 pads_ui.switch_bank(app, 0)
+
+# a learned pad held while the bank switches: on the bank again, its next press plays
+o["fader"] = 0.0
+pads_hw.events(app, [note(40, 100)])
+pads_ui.switch_bank(app, 1)
+pads_hw.events(app, [note(40, 0)])
+pads_ui.switch_bank(app, 0)
+o["fader"] = 0.0
+pads_hw.events(app, [note(40, 100), note(40, 0)])
+check(o["fader"] == 1.0, "a pad held over a bank switch: pressed again, it plays")
 
 # --- a Launchpad's grid -----------------------------------------------------------------------------------------
 h = pads_hw.hw(st)
