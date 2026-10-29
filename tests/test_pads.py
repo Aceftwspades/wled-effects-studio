@@ -170,6 +170,76 @@ pads.let_go(app)
 check(not pads._rt(app)["held"] and abs(vj.knob_get(app, 0, "hue")) < 1e-3,
       "let go of everything (the window closed mid-press): nothing held, a hold's value put back")
 
+# --- XY and pressure pads, release, staging (phase 2) ---------------------------------------------------------
+old = {"next_id": 1, "banks": [{"controls": [{"type": "trigger", "x": 0, "y": 0}]}]}
+proj3 = Proj(geometry.Geometry("cube", B=16))
+proj3.options["pads"] = old
+c_old = pads.state(proj3)["banks"][0]["controls"][0]
+check(c_old["release"] == "snap" and c_old["target_y"] == {} and c_old["stage"] is False,
+      "a control saved before XY pads gets their fields")
+
+vj.knob_set(app, 0, "hue", 0.2)
+vj.knob_set(app, 0, "kaleido", 0.0)
+vj.knob_set(app, 0, "speed", 0.25)
+xy = pads.new_control(st3, "xy", 0, 0, 2, 2, target=hue)
+xy["target_y"] = {"kind": "vj_knob", "deck": 0, "key": "kaleido"}
+xy.update(lo_y=0.0, hi_y=0.5)
+check([a for a, _ in pads.surface_targets(xy)] == ["x", "y"], "an XY pad drives across and up and down")
+pads.press(app, xy, xy=(0.75, 1.0))
+check(abs(vj.knob_get(app, 0, "hue") - 0.75) < 1e-3 and vj.options(app)["decks"][0]["kaleido"] == 6,
+      "touched: across sets one target, up and down the other through its range")
+pads.move(app, xy, 0.5, 0.0)
+check(abs(vj.knob_get(app, 0, "hue") - 0.5) < 1e-3 and vj.options(app)["decks"][0]["kaleido"] == 0
+      and pads.where(app, xy)[:2] == (0.5, 0.0) and pads.lit(app, xy), "moved: both follow, the dot where the finger is")
+pads.release(app, xy)
+check(abs(vj.knob_get(app, 0, "hue") - 0.2) < 1e-3 and vj.options(app)["decks"][0]["kaleido"] == 0
+      and pads.where(app, xy) is None, "let go (snap back): both back where they were before the touch")
+xy["release"] = "stay"
+pads.press(app, xy, xy=(0.9, 0.5))
+pads.release(app, xy)
+check(abs(vj.knob_get(app, 0, "hue") - 0.9) < 1e-3 and pads.where(app, xy) is not None,
+      "let go (stay): left where the finger left them, the dot kept there")
+
+pr = pads.new_control(st3, "pressure", 0, 0, 2, 2, target=hue)
+pr["target_p"] = {"kind": "vj_knob", "deck": 0, "key": "speed"}
+pr["hi_p"] = 0.5
+check([a for a, _ in pads.surface_targets(pr)] == ["x", "p"], "a pressure pad drives across and pressure (up and down unset)")
+s0 = vj.knob_get(app, 0, "speed")
+pads.press(app, pr, xy=(0.1, 0.1), pressure=0.8)
+check(abs(vj.knob_get(app, 0, "speed") - 0.4) < 1e-3, "its pressure through the pressure range")
+pads.release(app, pr)
+check(abs(vj.knob_get(app, 0, "speed") - s0) < 1e-3, "and snapped back")
+xy["target"] = {"kind": "vj_cut"}
+check([a for a, _ in pads.surface_targets(xy)] == ["y"], "a switch on an XY axis is not driven")
+
+o["fader"] = 0.0
+o["c_fade"] = 0.0
+look2 = next(n for n in vj_looks.LOOKS if n not in (o["decks"][0]["look"], o["decks"][1]["look"]))
+deck_a = o["decks"][0]["look"]
+sp = pads.new_control(st3, "trigger", 0, 0, target={"kind": "pad_look", "deck": 0, "look": look2})
+sp["stage"] = True
+pads.press(app, sp); pads.release(app, sp)
+check(o["decks"][1]["look"] == look2 and o["decks"][0]["look"] == deck_a and o["fader"] == 0.0,
+      "staged with A on air: the look goes onto B, off the air, its own deck A untouched")
+check(pads.staged(app, sp) == 1, "the pad knows it is staged on B")
+blink = set()
+for _ in range(12):
+    blink.add(pads.lit(app, sp))
+    time.sleep(0.05)
+check(blink == {True, False}, "a staged pad blinks")
+cut = pads.new_control(st3, "trigger", 0, 0, target={"kind": "vj_cut"})
+pads.press(app, cut); pads.release(app, cut)
+check(o["fader"] == 1.0 and pads.staged(app, sp) is None, "GO (a Cut) puts B on air; the pad stops blinking")
+vj.save_preset(app, 1, "cool")
+pp2 = pads.new_control(st3, "trigger", 0, 0, target={"kind": "pad_preset", "deck": 1, "name": "cool"})
+pp2["stage"] = True
+o["decks"][0]["hue"] = 0.0
+o["decks"][1]["hue"] = 0.4
+vj.save_preset(app, 1, "cool")
+pads.press(app, pp2); pads.release(app, pp2)
+check(pads.staged(app, pp2) == 0 and abs(o["decks"][0]["hue"] - 0.4) < 1e-6,
+      "a staged preset with B on air loads onto A")
+
 print("pads:", "FAILED" if fails else "ok")
 sys.exit(1 if fails else 0)
 # AI: end

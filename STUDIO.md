@@ -4247,7 +4247,15 @@ notes, its lights mirroring the layout). In four phases:
    deck C, a look and a preset, letting go); the smoke plays Cut, switches a bank with the picture untouched,
    and adds, plays and undoes a hold. By hand with the real mouse: Cut, the crossfader dragged, a knob turned,
    Flash C held, a control added in Edit and played.
-2. XY and pressure pads, snap back or stay, staging onto the deck off air and GO.
+2. **Done** (2026-10-29): an XY pad (across and up and down, each its own target and range) and an XY + pressure
+   pad (a third target); let go, each snaps back to where its targets were before the touch or stays. Pressure in
+   the window swells over the first 0.8 s held: from the mouse or Windows' touch nothing says how hard, and how
+   fast the pointer came in was tried and read the same for a tap and a slam (a mouse is still when it clicks, a
+   touch jumps there at once) - the phone's page will read a screen's real pressure. A look or preset pad can stage
+   onto the deck off the air (vj.cue_deck), blinking until that deck goes on air by a Cut or a Fade pad (the GO).
+   Tests: test_pads (each axis through its range, snap and stay, pressure, a switch refused on an axis, staging
+   both ways and GO); the smoke adds and plays an XY pad and stages a look then cuts to it. By hand with the real
+   mouse: an XY pad dragged (snap, then stay), a pressure pad held, a staged look and GO.
 3. The /pads page on the phone remote's server, multi-touch, in step with the window.
 4. A physical controller: pads learned from its notes, its lights driven over MIDI.
 

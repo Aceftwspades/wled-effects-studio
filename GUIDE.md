@@ -1146,12 +1146,28 @@ or a **knob** moves its target between **from** and **to** (turned
 the top each hold a layout: clicking one only changes the pads you see,
 never what is on the LEDs - only a pad does that. **+** adds a bank.
 
+An **XY pad** drives two targets from where you touch it and drag:
+**across** one, **up and down** another, each through its own range (a
+dot shows where the finger is). An **XY + pressure pad** drives a third
+from how hard it is pressed: in this window, which a mouse or Windows'
+touch cannot tell, the pressure swells from soft to full over the first
+second held - an aftertouch. **let go** sets what happens after: **snap
+back** puts the targets where they were before the touch, **stay** leaves
+them where the finger left them.
+
+A look or preset pad can **stage on the deck off the air**: it loads onto
+whichever of A and B the fader is furthest from - the one the **cue**
+preview shows - instead of its own deck, and blinks until that deck goes on
+air. A **Cut** or **Fade** pad is the GO.
+
 **Edit** lays the bank out (the pads do nothing meanwhile): click an empty
 cell to add a control there, or a control to pick it - drag it to move it,
 drag its corner to make it span more cells. The panel beside the grid sets
 its kind, its label (the action's name if left empty), its colour and
 what it drives (type in **find an action** to narrow the list), and its
-range; **Remove this control** takes it off the grid. The row above the grid names the bank, colours its button, sets its
+range; on an XY pad, **across**, **up and down** and **pressure** choose
+which movement the action and range are for. **Remove this control** takes
+it off the grid. The row above the grid names the bank, colours its button, sets its
 grid from 2 x 2 to 8 x 8, moves it left or right, copies or deletes it, and
 **Undo** takes back the last change. The pads are kept with the project.
 

@@ -1121,6 +1121,28 @@ STEPS = [
     ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['kaleido'] == 0"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._undo(app)"}], 0.3),
     ([{"check": "__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 0)['hi'] == 1.0"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(app, '_pads_sel', (4, 1))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'xy')"}], 0.3),
+    # an XY pad: across on deck A's hue, up and down on its kaleidoscope (to 0.5); touched and moved, then let go
+    # (snap back); a staged look onto the deck off the air, then GO
+    ([{"check": "isinstance(__import__('native.pads_ui', fromlist=['p'])._sel(app), dict) and __import__('native.pads_ui', fromlist=['p'])._sel(app)['type'] == 'xy' and (__import__('native.pads_ui', fromlist=['p'])._sel(app)['w'], __import__('native.pads_ui', fromlist=['p'])._sel(app)['h']) == (1, 2) and dpg.is_item_shown('pads_s_xyrow')"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 0 and t.get('key') == 'hue'))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_axis(app, 'up and down')"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 0 and t.get('key') == 'kaleido'))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._ctl_set(app, 'hi_y', 0.5)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
+      {"py": "__import__('native.vj', fromlist=['v']).knob_set(app, 0, 'hue', 0.1)"}, {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0].update(kaleido=0)"},
+      {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 1), xy=(0.5, 1.0))"}], 0.3),
+    ([{"check": "abs(__import__('native.vj', fromlist=['v']).knob_get(app, 0, 'hue') - 0.5) < 1e-3 and __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['kaleido'] == 6 and dpg.get_value('pads_s_drives') == 'UP AND DOWN DRIVES'"},
+      {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 1))"}], 0.3),
+    ([{"check": "abs(__import__('native.vj', fromlist=['v']).knob_get(app, 0, 'hue') - 0.1) < 1e-3 and __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['kaleido'] == 0"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(fader=0.0)"},
+      {"py": "setattr(app, '_pads_stg', __import__('native.pads', fromlist=['p']).new_control(__import__('native.pads_ui', fromlist=['p'])._st(app), 'trigger', 0, 0, target={'kind': 'pad_look', 'deck': 0, 'look': 'Plasma'}))"},
+      {"py": "app._pads_stg.update(stage=True)"}, {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1].update(look='Metaballs')"},
+      {"py": "__import__('native.pads', fromlist=['p']).press(app, app._pads_stg)"}, {"py": "__import__('native.pads', fromlist=['p']).release(app, app._pads_stg)"}], 0.3),
+    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['look'] == 'Plasma' and __import__('native.pads', fromlist=['p']).staged(app, app._pads_stg) == 1 and __import__('native.vj', fromlist=['v']).options(app)['fader'] == 0.0"},
+      {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1))"},
+      {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1))"}], 0.4),
+    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['fader'] == 1.0 and __import__('native.pads', fromlist=['p']).staged(app, app._pads_stg) is None"},
       {"py": "chrome.close_dialog('pads_win')"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
     # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed
     # left where it was set

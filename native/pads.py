@@ -9,7 +9,14 @@ deck, a saved VJ preset on a deck. Kept in the project's options under "pads":
                                          "lo": 0.0, "hi": 1.0, "invert": false}, ...]}]}
 
 A bank switched only changes what the grid shows: never the picture. A control acts when it is pressed, let go or
-dragged (press / release / drag here; the window, pads_ui.py, and later the phone's page call them).
+dragged (press / release / drag / move here; the window, pads_ui.py, and later the phone's page call them).
+
+An XY pad drives two targets from where the finger is (across, and up and down); a pressure pad a third from how
+hard it presses (where the screen says - a pen, some phones; in the studio's window, swelling while held). Let go, each puts its
+targets back where they were before the touch ("snap") or leaves them where the finger left them ("stay").
+
+A look or a preset pad can "stage": it loads onto the deck off the air (the one the fader is furthest from - the cue
+preview shows it) instead of its own, and blinks until that deck goes on air - by a Cut or a Fade, the GO.
 
     st = state(project)            # made if missing, every field filled
     bank = current(st)
@@ -24,9 +31,14 @@ import time
 GRID_MIN, GRID_MAX = 2, 8
 BUTTONS = ("trigger", "toggle", "hold")
 SLIDERS = ("fader", "knob")
-TYPES = BUTTONS + SLIDERS
+SURFACES = ("xy", "pressure")
+TYPES = BUTTONS + SLIDERS + SURFACES
 TYPE_WORDS = {"trigger": "button: fires once", "toggle": "button: on and off", "hold": "button: on while held",
-              "fader": "fader", "knob": "knob"}
+              "fader": "fader", "knob": "knob", "xy": "XY pad", "pressure": "XY + pressure pad"}
+AXES = (("x", "target", "lo", "hi", "across"), ("y", "target_y", "lo_y", "hi_y", "up and down"),
+        ("p", "target_p", "lo_p", "hi_p", "pressure"))     # (axis, its target's key, its range's keys, its words)
+RELEASES = (("snap", "snap back"), ("stay", "stay"))
+BLINK_HZ = 3.0                  # a staged pad blinks this fast until its deck is on air
 # a pad's colours: (name, RGB) - the grid draws a control in its colour, brighter lit
 COLOURS = (("grey", (120, 124, 132)), ("red", (226, 64, 64)), ("orange", (240, 140, 40)), ("amber", (240, 190, 40)),
            ("yellow", (230, 226, 60)), ("lime", (150, 220, 60)), ("green", (60, 200, 100)), ("teal", (40, 200, 180)),
@@ -52,7 +64,12 @@ def new_control(st, type_, x, y, w=1, h=1, target=None, label="", colour="grey")
     st["next_id"] = int(st.get("next_id", 1)) + 1
     return {"id": st["next_id"] - 1, "type": type_, "x": int(x), "y": int(y), "w": int(w), "h": int(h),
             "label": label, "colour": colour, "target": dict(target or {}), "lo": 0.0, "hi": 1.0,
-            "invert": False, "orient": "v", "midi": None}
+            "invert": False, "orient": "v", "midi": None, **{k: copy.deepcopy(v) for k, v in EXTRA}}
+
+
+# the fields phase 2 added (XY and pressure pads, release, staging): filled in on a control saved before them
+EXTRA = (("target_y", {}), ("target_p", {}), ("lo_y", 0.0), ("hi_y", 1.0), ("lo_p", 0.0), ("hi_p", 1.0),
+         ("release", "snap"), ("stage", False))
 
 
 def starter(st):
@@ -92,8 +109,8 @@ def state(project):
             if not isinstance(c, dict) or c.get("type") not in TYPES:
                 continue
             for k, v in (("w", 1), ("h", 1), ("label", ""), ("colour", "grey"), ("target", {}), ("lo", 0.0),
-                         ("hi", 1.0), ("invert", False), ("orient", "v"), ("midi", None)):
-                c.setdefault(k, v)
+                         ("hi", 1.0), ("invert", False), ("orient", "v"), ("midi", None)) + EXTRA:
+                c.setdefault(k, copy.deepcopy(v))
             if "id" not in c:
                 c["id"] = st["next_id"]
                 st["next_id"] += 1
@@ -240,11 +257,11 @@ def _span(c, f):
 
 
 def _rt(app):
-    """The pads' run state, never saved: held controls, what a hold changed (to put back), toggles' own on/off for
-    targets that cannot be read, triggers' flash times."""
+    """The pads' run state, never saved: held controls, what a hold or a snapping XY pad changed (to put back),
+    toggles' own on/off for targets that cannot be read, triggers' flash times, the staged pad and its deck."""
     r = getattr(app, "_pads_rt", None)
     if r is None:
-        r = app._pads_rt = {"held": set(), "before": {}, "on": {}, "flash": {}}
+        r = app._pads_rt = {"held": set(), "before": {}, "on": {}, "flash": {}, "staged": None}
     return r
 
 
@@ -272,16 +289,68 @@ def vj_looks_names():
     return list(vj_looks.LOOKS)
 
 
-def press(app, c, f=None):
-    """A control pressed (a fader or a knob: where it was touched, as 0..1 - `f`)."""
+def _range(c, axis, f):
+    """0..1 across an axis of an XY pad as its target's 0..1, through that axis's range (across turned by invert)."""
+    _, _, lo, hi, _ = next(a for a in AXES if a[0] == axis)
+    f = max(0.0, min(1.0, float(f)))
+    if axis == "x" and c.get("invert"):
+        f = 1.0 - f
+    return float(c.get(lo, 0.0)) + (float(c.get(hi, 1.0)) - float(c.get(lo, 0.0))) * f
+
+
+def surface_targets(c):
+    """[(axis, target)] an XY or pressure pad drives (those set)."""
+    out = [(a, c.get(key) or {}) for a, key, _, _, _ in AXES if a != "p" or c["type"] == "pressure"]
+    return [(a, t) for a, t in out if t.get("kind") and kind_of(t) == "value"]
+
+
+def move(app, c, x, y, p=None):
+    """An XY pad's finger at x, y (0..1, y up) - with its pressure, 0..1, on a pressure pad."""
+    if c["type"] not in SURFACES:
+        return
+    p = 1.0 if p is None else max(0.0, min(1.0, float(p)))
+    at = {"x": x, "y": y, "p": p}
+    _rt(app)["on"][("xy", c["id"])] = (max(0.0, min(1.0, x)), max(0.0, min(1.0, y)), p)
+    for axis, t in surface_targets(c):
+        _apply(app, t, _range(c, axis, at[axis]))
+
+
+def staged(app, c):
+    """The deck a staged pad loaded (still off the air), or None."""
+    s = _rt(app)["staged"]
+    if not s or s[0] != c["id"]:
+        return None
+    from native import vj
+    if vj.cue_deck(app) != s[1]:                                    # its deck went on air: the GO
+        _rt(app)["staged"] = None
+        return None
+    return s[1]
+
+
+def press(app, c, f=None, xy=None, pressure=None):
+    """A control pressed (a fader or a knob: where it was touched, as 0..1 - `f`; an XY pad: where, x and y 0..1
+    with y up - `xy` - and how hard on a pressure pad)."""
     r = _rt(app)
     t, typ, kind = c.get("target") or {}, c["type"], kind_of(c.get("target"))
     r["held"].add(c["id"])
+    if typ in SURFACES:
+        if c.get("release", "snap") == "snap":
+            for axis, tt in surface_targets(c):
+                r["before"][(c["id"], axis)] = value(app, tt)
+        if xy is not None:
+            move(app, c, xy[0], xy[1], pressure)
+        return
     if not t.get("kind"):
         return
     if typ in SLIDERS:
         if f is not None:
             drag(app, c, f)
+        return
+    if kind in ("look", "preset") and c.get("stage"):
+        from native import vj
+        deck = vj.cue_deck(app)                                     # onto the deck off the air, there till GO
+        r["staged"] = (c["id"], deck)
+        _apply(app, dict(t, deck=deck), 1.0)
         return
     if kind in ("switch", "look", "preset"):
         r["flash"][c["id"]] = time.monotonic()
@@ -317,6 +386,13 @@ def release(app, c):
         return
     r["held"].discard(c["id"])
     t, typ, kind = c.get("target") or {}, c["type"], kind_of(c.get("target"))
+    if typ in SURFACES:
+        if c.get("release", "snap") == "snap":                      # back where they were before the touch
+            for axis, tt in surface_targets(c):
+                was = r["before"].pop((c["id"], axis), None)
+                _apply(app, tt, _range(c, axis, 0.0) if was is None else was)
+            r["on"].pop(("xy", c["id"]), None)
+        return
     if typ != "hold" or not t.get("kind"):
         return
     if t.get("kind") == "vj_c_flash":
@@ -350,11 +426,19 @@ def position(app, c):
     return 1.0 - f if c.get("invert") else f
 
 
+def where(app, c):
+    """Where an XY pad shows its dot: (x, y, pressure) 0..1, or None when it is not being touched and stays nowhere
+    (snapped back). A pad left where it was let go ("stay") keeps showing there."""
+    return _rt(app)["on"].get(("xy", c["id"]))
+
+
 def lit(app, c):
-    """Shown lit: held, a trigger just pressed, a toggle on, a flip whose target is on."""
+    """Shown lit: held, a trigger just pressed, a toggle on, a flip whose target is on; a staged pad blinks."""
     r = _rt(app)
     if c["id"] in r["held"]:
         return True
+    if staged(app, c) is not None:
+        return int(time.monotonic() * BLINK_HZ * 2) % 2 == 0
     if time.monotonic() - r["flash"].get(c["id"], -1e9) < FLASH_MS:
         return True
     t = c.get("target") or {}

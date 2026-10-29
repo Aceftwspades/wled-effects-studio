@@ -1,6 +1,8 @@
 """The Pads window: the VJ's pad surface (native/pads.py) - the banks along the top, the grid of controls drawn below
 and played with the mouse or a touchscreen, and an Edit mode: a cell clicked picks it, a control dragged moves it, its
-corner resizes it, and the panel beside the grid sets what it is and what it drives.
+corner resizes it, and the panel beside the grid sets what it is and what it drives. An XY pad is played by
+dragging over it; a pressure pad's pressure, from the mouse or a touchscreen here, swells the longer it is held (a
+mouse and Windows' touch say nothing of how hard; the phone's page reads a screen's real pressure).
 
     show(app)          # the window (the VJ frame's Pads... button)
     poll(app)          # each frame: the grid drawn and played (app.py's main loop)
@@ -17,6 +19,8 @@ SIDE = "pads_side"
 SIDE_W = 270
 KNOB_PX = 160                  # a knob turned from bottom to top by dragging this far up
 HANDLE = 12                    # the resize corner of a selected control, in pixels at 1x
+SWELL_FROM = 0.35              # a pressure pad's pressure as it is touched here...
+SWELL_S = 0.8                  # ...swelling to full over this many seconds held
 
 
 def _c():
@@ -94,7 +98,18 @@ def _build_side(app):
                            callback=lambda s, v: _ctl_set(app, "label", v))
         dpg.add_combo([n for n, _ in pads.COLOURS], tag="pads_s_colour", width=-1,
                       callback=lambda s, v: _ctl_set(app, "colour", v))
-        dpg.add_text("DRIVES", color=c.ACCENT)
+        with dpg.group(tag="pads_s_xyrow", show=False):
+            dpg.add_radio_button([w for _, _, _, _, w in pads.AXES], tag="pads_s_axis", horizontal=True,
+                                 default_value="across", callback=lambda s, v: _set_axis(app, v))
+            c.tip("which of the pad's movements the settings below are for: across, up and down, and (a pressure "
+                  "pad) how hard it is pressed - each drives its own target through its own range")
+            with form.row("let go", width=px(50)):
+                dpg.add_combo([w for _, w in pads.RELEASES], tag="pads_s_release", width=-1,
+                              callback=lambda s, v: _ctl_set(app, "release", next(k for k, w in pads.RELEASES
+                                                                                   if w == v)))
+            c.tip("snap back: the targets go back where they were before the touch; stay: they keep where the "
+                  "finger left them")
+        dpg.add_text("DRIVES", tag="pads_s_drives", color=c.ACCENT)
         dpg.add_text("", tag="pads_s_target", wrap=px(SIDE_W - 20))
         dpg.add_input_text(tag="pads_s_find", width=-1, hint="find an action",
                            callback=lambda s, v: _fill_actions(app))
@@ -104,14 +119,18 @@ def _build_side(app):
             dpg.add_combo([], tag="pads_s_look", width=-1, callback=lambda s, v: _target_set(app, look=v))
         with dpg.group(tag="pads_s_presetrow", show=False):
             dpg.add_combo([], tag="pads_s_preset", width=-1, callback=lambda s, v: _target_set(app, name=v))
+        dpg.add_checkbox(label="stage on the deck off the air", tag="pads_s_stage", show=False,
+                         callback=lambda s, v: _ctl_set(app, "stage", bool(v)))
+        c.tip("loaded onto the deck the fader is furthest from (the cue preview shows it), not its own - the pad "
+              "blinks until a Cut or a Fade pad takes that deck on air (the GO)")
         with dpg.group(tag="pads_s_valrow"):
             dpg.add_text("RANGE", color=c.ACCENT)
             with form.row("from", width=px(50)):
                 num.add("pads_s_lo", 0.0, 0.0, 1.0, digits=3, width=-1,
-                        callback=lambda s, v: _ctl_set(app, "lo", round(v, 3)))
+                        callback=lambda s, v: _ctl_set(app, _axis(app)[2], round(v, 3)))
             with form.row("to", width=px(50)):
                 num.add("pads_s_hi", 1.0, 0.0, 1.0, digits=3, width=-1,
-                        callback=lambda s, v: _ctl_set(app, "hi", round(v, 3)))
+                        callback=lambda s, v: _ctl_set(app, _axis(app)[3], round(v, 3)))
             c.tip("a button sets the target to 'to' (and back to 'from' for a toggle or a hold); a fader or a knob "
                   "moves it between the two")
             dpg.add_checkbox(label="upside down", tag="pads_s_invert", callback=lambda s, v: _ctl_set(app, "invert", v))
@@ -297,6 +316,21 @@ def target_label(app, t):
     return k
 
 
+def _axis(app):
+    """The axis the panel's action and range are for: (axis, target key, low key, high key, words) - always across
+    for a control that is not an XY pad."""
+    s = _sel(app)
+    a = getattr(app, "_pads_axis", "x") if isinstance(s, dict) and s["type"] in pads.SURFACES else "x"
+    if a == "p" and isinstance(s, dict) and s["type"] != "pressure":
+        a = "x"
+    return next(x for x in pads.AXES if x[0] == a)
+
+
+def _set_axis(app, words):
+    app._pads_axis = next(a for a, _, _, _, w in pads.AXES if w == words)
+    _fill_side(app)
+
+
 def _fill_side(app):
     if not dpg.does_item_exist(SIDE) or not getattr(app, "_pads_edit", False):
         return
@@ -314,14 +348,25 @@ def _fill_side(app):
     dpg.set_value("pads_s_type", pads.TYPE_WORDS[s["type"]])
     dpg.set_value("pads_s_label", s.get("label", ""))
     dpg.set_value("pads_s_colour", s.get("colour", "grey"))
-    dpg.set_value("pads_s_target", target_label(app, s.get("target")))
-    num.set("pads_s_lo", float(s.get("lo", 0.0)))
-    num.set("pads_s_hi", float(s.get("hi", 1.0)))
+    ax = _axis(app)
+    surface = s["type"] in pads.SURFACES
+    dpg.configure_item("pads_s_xyrow", show=surface)
+    if surface:
+        dpg.configure_item("pads_s_axis", items=[w for a, _, _, _, w in pads.AXES if a != "p" or s["type"] == "pressure"])
+        dpg.set_value("pads_s_axis", ax[4])
+        dpg.set_value("pads_s_release", dict(pads.RELEASES)[s.get("release", "snap")])
+    dpg.set_value("pads_s_drives", f"{ax[4].upper()} DRIVES" if surface else "DRIVES")
+    dpg.set_value("pads_s_target", target_label(app, s.get(ax[1])))
+    num.set("pads_s_lo", float(s.get(ax[2], 0.0)))
+    num.set("pads_s_hi", float(s.get(ax[3], 1.0)))
     dpg.set_value("pads_s_invert", bool(s.get("invert")))
     dpg.set_value("pads_s_orient", "vertical" if s.get("orient", "v") == "v" else "horizontal")
     dpg.configure_item("pads_s_orient", show=s["type"] == "fader")
-    k = pads.kind_of(s.get("target"))
-    dpg.configure_item("pads_s_valrow", show=k == "value")
+    dpg.configure_item("pads_s_invert", show=ax[0] == "x")
+    k = pads.kind_of(s.get(ax[1]))
+    dpg.configure_item("pads_s_valrow", show=k == "value" or (surface and not (s.get(ax[1]) or {}).get("kind")))
+    dpg.configure_item("pads_s_stage", show=k in ("look", "preset"))
+    dpg.set_value("pads_s_stage", bool(s.get("stage")))
     dpg.configure_item("pads_s_lookrow", show=k == "look")
     dpg.configure_item("pads_s_presetrow", show=k == "preset")
     if k == "look":
@@ -336,7 +381,7 @@ def _fill_side(app):
 
 
 def _fits_type(typ, t):
-    """Whether an action suits a control: a fader or a knob only moves a value."""
+    """Whether an action suits a control: a fader, a knob or an XY pad only moves a value."""
     return typ in pads.BUTTONS or pads.kind_of(t) == "value"
 
 
@@ -347,7 +392,7 @@ def _fill_actions(app):
     q = (dpg.get_value("pads_s_find") or "").strip().lower()
     items = [lab for lab, t in labels(app) if _fits_type(s["type"], t) and (not q or q in lab.lower())]
     dpg.configure_item("pads_s_actions", items=items)
-    now = target_label(app, s.get("target"))
+    now = target_label(app, s.get(_axis(app)[1]))
     dpg.set_value("pads_s_actions", now if now in items else "")
 
 
@@ -356,7 +401,7 @@ def _pick_action(app, lab):
     t = next((t for l, t in labels(app) if l == lab), None)
     if not isinstance(s, dict) or t is None:
         return
-    s["target"] = dict(t)
+    s[_axis(app)[1]] = dict(t)
     _save(app)
     _fill_side(app)
 
@@ -364,7 +409,7 @@ def _pick_action(app, lab):
 def _target_set(app, **kw):
     s = _sel(app)
     if isinstance(s, dict):
-        s["target"].update(kw)
+        s[_axis(app)[1]].update(kw)
         _save(app)
         _fill_side(app)
 
@@ -374,8 +419,10 @@ def _ctl_set(app, key, v):
     if not isinstance(s, dict):
         return
     s[key] = v
-    if key == "type" and not _fits_type(v, s.get("target")):
-        s["target"] = {}                       # a fader cannot fire a cut: picked again
+    if key == "type":
+        for tk in ("target", "target_y", "target_p"):
+            if not _fits_type(v, s.get(tk)):
+                s[tk] = {}                     # a fader cannot fire a cut: picked again
     _save(app)
     _fill_side(app)
 
@@ -386,10 +433,13 @@ def _add_control(app, typ):
         return
     st = _st(app)
     b = pads.current(st)
-    w, h = (1, 2) if typ == "fader" and s[1] + 1 < b["rows"] else (1, 1)
+    w, h = (1, 2) if typ == "fader" else (2, 2) if typ in pads.SURFACES else (1, 1)
     c = pads.new_control(st, typ, s[0], s[1], w, h)
-    if not pads.fits(b, c):
-        c["h"] = 1
+    for w, h in ((w, h), (w, 1), (1, h), (1, 1)):             # as big as it may be there
+        c["w"], c["h"] = w, h
+        if pads.fits(b, c):
+            break
+    app._pads_axis = "x"
     b["controls"].append(c)
     app._pads_sel = c["id"]
     _save(app)
@@ -448,7 +498,10 @@ def _draw(app, cw, ch, gap):
         x0, y0, x1, y1 = _rect(c, cw, ch, gap)
         on = (not edit) and pads.lit(app, c)
         lab = c.get("label") or target_label(app, c.get("target"))
-        if c["type"] in pads.BUTTONS:
+        if c["type"] in pads.SURFACES:
+            lab = c.get("label") or _surface_label(app, c)
+            _draw_surface(app, c, rgb, x0, y0, x1, y1, on)
+        elif c["type"] in pads.BUTTONS:
             dpg.draw_rectangle((x0, y0), (x1, y1), fill=_shade(rgb, 1.0 if on else 0.32), color=_shade(rgb, 0.9),
                                rounding=px(8), thickness=px(2), parent=GRID)
         else:
@@ -494,6 +547,53 @@ def _draw(app, cw, ch, gap):
         x, y = sel
         dpg.draw_rectangle((x * cw + gap, y * ch + gap), ((x + 1) * cw, (y + 1) * ch), color=(255, 255, 255, 255),
                            rounding=px(6), thickness=px(2), parent=GRID)
+
+
+def _surface_label(app, c):
+    """An XY pad's words when it has no label of its own: what each movement drives."""
+    parts = [f"{ {'x': 'x', 'y': 'y', 'p': 'press'}[a]}: {target_label(app, c.get(k)).split(': ')[-1]}"
+             for a, k, _, _, _ in pads.AXES if (c.get(k) or {}).get("kind") and (a != "p" or c["type"] == "pressure")]
+    return "  ".join(parts) or "nothing yet - pick an action"
+
+
+def _draw_surface(app, c, rgb, x0, y0, x1, y1, on):
+    """An XY pad: a dark field with a grid, lit at the edge while touched, the dot where the finger is (bigger the
+    harder a pressure pad is pressed)."""
+    dpg.draw_rectangle((x0, y0), (x1, y1), fill=_shade(rgb, 0.16), color=_shade(rgb, 1.0 if on else 0.6),
+                       rounding=px(8), thickness=px(3 if on else 2), parent=GRID)
+    top = y0 + px(22)
+    for k in (1, 2, 3):
+        gx = x0 + (x1 - x0) * k / 4
+        gy = top + (y1 - top) * k / 4
+        dpg.draw_line((gx, top), (gx, y1 - px(4)), color=_shade(rgb, 0.3), parent=GRID)
+        dpg.draw_line((x0 + px(4), gy), (x1 - px(4), gy), color=_shade(rgb, 0.3), parent=GRID)
+    at = pads.where(app, c)
+    if at is None:
+        return
+    x, y, p = at
+    cx, cy = x0 + px(6) + (x1 - x0 - px(12)) * x, y1 - px(6) - (y1 - top - px(12)) * y
+    r = px(8) + (px(14) * p if c["type"] == "pressure" else px(4))
+    dpg.draw_line((cx, top), (cx, y1 - px(4)), color=_shade(rgb, 0.8), parent=GRID)
+    dpg.draw_line((x0 + px(4), cy), (x1 - px(4), cy), color=_shade(rgb, 0.8), parent=GRID)
+    dpg.draw_circle((cx, cy), r, fill=_shade(rgb, 1.0), color=(255, 255, 255, 255), thickness=px(2), parent=GRID)
+
+
+def _surface_at(c, mx, my, x0, y0, cw, ch, gap):
+    """Where on an XY pad the pointer is: (x, y) 0..1, y up."""
+    rx0, ry0, rx1, ry1 = _rect(c, cw, ch, gap)
+    top = y0 + ry0 + px(22)
+    x = (mx - (x0 + rx0 + px(6))) / max(1.0, rx1 - rx0 - px(12))
+    y = ((y0 + ry1 - px(6)) - my) / max(1.0, (y0 + ry1) - top - px(12))
+    return max(0.0, min(1.0, x)), max(0.0, min(1.0, y))
+
+
+def _swell(app):
+    """How hard a pressure pad is pressed from the mouse or a touchscreen, which cannot say: SWELL_FROM as it is
+    touched, rising to full over SWELL_S held - an aftertouch swell. (How fast the pointer came in was tried: a
+    mouse is still when it clicks and a touch jumps there at once, so it read the same for a tap and a slam.)"""
+    import time
+    held = time.monotonic() - getattr(app, "_pads_down_at", time.monotonic())
+    return SWELL_FROM + (1.0 - SWELL_FROM) * max(0.0, min(1.0, held / SWELL_S))
 
 
 def _wrap(text, width, lines):
@@ -588,6 +688,13 @@ def poll(app):
                 _fill_side(app)
             elif c is not None:
                 f = None
+                if c["type"] in pads.SURFACES:
+                    import time
+                    app._pads_down_at = time.monotonic()
+                    pads.press(app, c, xy=_surface_at(c, mx, my, x0, y0, cw, ch, gap), pressure=_swell(app))
+                    app._pads_drag = ("play", c["id"])
+                    _draw(app, cw, ch, gap)
+                    return
                 if c["type"] == "fader":
                     f = _travel(c, mx, my, x0, y0, cw, ch, gap)
                 elif c["type"] == "knob":
@@ -604,7 +711,10 @@ def _dragging(app, drag, mx, my, x0, y0, cw, ch, gap, b):
         app._pads_drag = None
         return
     if drag[0] == "play":
-        if c["type"] == "fader":
+        if c["type"] in pads.SURFACES:
+            x, y = _surface_at(c, mx, my, x0, y0, cw, ch, gap)
+            pads.move(app, c, x, y, _swell(app))                   # each frame held: the pressure swells
+        elif c["type"] == "fader":
             pads.drag(app, c, _travel(c, mx, my, x0, y0, cw, ch, gap))
         elif c["type"] == "knob":
             y_start, f0 = getattr(app, "_pads_knob", (my, 0.0))
