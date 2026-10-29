@@ -4218,6 +4218,12 @@ The packs measured as before (bass against brightness and motion, 8 s each) and 
 check on the built packs and on a stray and a changed file. By hand: the Packs window against the local clone
 (`STUDIO_GALLERY_URL`), the browser's filters and stars, a shader steered.
 
+A second round for the gallery (2026-10-28): eleven more packs, 40 presets and 47 shaders - 19 packs, 142 looks in
+all - each run in the VJ; two shaders left out for sitting dark half the time or holding still. The smoke's steer
+step checks the deck's picture only where shaders run (the CI's Windows and ARM runners have no OpenGL 3.3).
+
+Released as 1.22.0 (2026-10-28).
+
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).
 
