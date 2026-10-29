@@ -30,7 +30,7 @@ DEVICES = (("generic", "any (learned pads)"),       # lit by velocity 127 / 0
            ("apc_mk2", "APC mini mk2"),               # Akai
            ("apc_mk1", "APC mini (first)"))
 GRIDS = ("launchpad", "apc_mk2", "apc_mk1")     # the kinds with an 8 x 8 grid the pads can lie on
-LIGHTS_HZ = 20.0
+LIGHTS_HZ = 60.0                # at most this often (each frame): only what changed is sent
 RETRY_S = 3.0                   # a lights port not there is looked for again this often (the controller plugged in)
 # Launchpad palette indexes (and the APC mini mk2's, which follows it): the pads' colours (bright, dim)
 PALETTE = {"grey": (3, 1), "red": (5, 7), "orange": (9, 11), "amber": (9, 11), "yellow": (13, 15),
@@ -298,8 +298,9 @@ def wanted(app, st):
     dev = h["device"]
     b = pads.current(st)
     out = {}
+    lit = {c["id"]: bool(pads.lit(app, c)) for c in b["controls"]}     # each control's once, for all its pads
     for c in b["controls"]:
-        on = bool(pads.lit(app, c))
+        on = lit[c["id"]]
         ctl = c.get("midi")
         if ctl and ctl[0] == "note":
             m = _pad_msg(dev, int(ctl[2]), c.get("colour"), on, int(ctl[1]))
@@ -307,14 +308,15 @@ def wanted(app, st):
         elif ctl and ctl[0] == "cc" and dev in ("generic", "launchpad"):
             out[("cc", int(ctl[1]), int(ctl[2]))] = (0xB0 | (int(ctl[1]) & 0x0F), int(ctl[2]), 127 if on else 0)
     if _grid_on(h):
+        under = {cell: c for c in b["controls"] for cell in pads.cells(c)}     # the control on each cell
         for x in range(8):
             for y in range(8):
                 n = cell_note(dev, x, y)
-                c = pads.at(b, x, y) if x < b["cols"] and y < b["rows"] else None
+                c = under.get((x, y))
                 key = ("note", 0, n)
                 if key in out and c is None:
                     continue
-                out[key] = _pad_msg(dev, n, c.get("colour"), bool(pads.lit(app, c))) if c else (0x90, n, 0)
+                out[key] = _pad_msg(dev, n, c.get("colour"), lit[c["id"]]) if c else (0x90, n, 0)
         for i in range(8):
             k = bank_ctl(dev, i)
             if k is None:

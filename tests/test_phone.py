@@ -4,7 +4,7 @@ the state only with the link's key, commands checked before they are queued
 size refused, and the queue drained in order; the phone's camera - its page,
 JPEG frames taken, anything else refused - over HTTPS with the certificate
 the studio makes; the pads page and its commands (a control's id, an event, numbers held to
-0..1). On the loopback only.
+0..1); one connection kept for the page's requests, one refused not kept. On the loopback only.
 Run with  python tests/test_phone.py  (or pytest).
 """
 import json
@@ -188,6 +188,33 @@ def test_the_pads_page_and_its_commands():
         assert [c["e"] for c in q[:4]] == ["down", "move", "up", "hold"] and q[4] == {"a": "padbank", "v": 1}
         code, main = _get(base + "/?k=testkey1")
         assert b"pads?k=" in main                                                  # the remote links to it
+    finally:
+        r.close()
+
+
+def test_the_connection_is_kept_between_requests():
+    import http.client
+    r, base = _open()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", r.port, timeout=5)
+        socks = []
+        for _ in range(3):
+            conn.request("POST", "/act?k=testkey1", json.dumps({"a": "pad", "id": 1, "e": "down"}),
+                         {"Content-Type": "application/json"})
+            resp = conn.getresponse()
+            assert resp.status == 200 and json.loads(resp.read()) == {"taken": 1}
+            socks.append(conn.sock)
+        conn.request("GET", "/state?k=testkey1")
+        resp = conn.getresponse()
+        resp.read()
+        socks.append(conn.sock)
+        assert resp.version == 11 and all(s is socks[0] for s in socks), "one connection for all four"
+        conn.request("POST", "/act?k=wrongkey", "x" * 50, {"Content-Type": "application/json"})
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 403 and resp.getheader("Connection") == "close", "a refused one is not kept"
+        conn.close()
+        assert len(r.drain()) == 3
     finally:
         r.close()
 

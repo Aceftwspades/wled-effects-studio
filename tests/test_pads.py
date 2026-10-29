@@ -333,6 +333,30 @@ check(o2["fader"] == 0.2 and not pads._rt(app2)["held"] and pads_ui.remote_state
       "the pads edited in the studio: the phone's press does nothing, and its page is told")
 app2._pads_edit = False
 
+# --- the labels by a table, made again for another effect; the grid drawn only when what it shows changes --------
+app2.eng.meta, app2.eng.idx = [{"labels": ["Speed", "Intensity"]}, {"labels": ["Rate", "Depth"]}], 0
+app2._pads_labels = None
+fxc = {"kind": "fx", "key": "sx"}
+from native import midi_ui
+midi_ui_targets = midi_ui.targets
+midi_ui.targets = lambda app: [(app.eng.meta[app.eng.idx]["labels"][0], {"kind": "fx", "key": "sx"}),
+                               ("VJ: cut to the other deck", {"kind": "vj_cut"}),
+                               ("VJ A: Hue", {"kind": "vj_knob", "deck": 0, "key": "hue"})]
+check(pads_ui.target_label(app2, fxc) == "Speed" and pads_ui.target_label(app2, {"kind": "vj_cut"})
+      == "VJ: cut to the other deck" and pads_ui.target_label(app2, {"kind": "nothing_known"}) == "nothing_known",
+      "a target's label from the table (one not there: its kind)")
+app2.eng.idx = 1
+check(pads_ui.target_label(app2, fxc) == "Rate", "another effect: the list made again, its slider's own name")
+midi_ui.targets = midi_ui_targets
+d1 = pads_ui._drawn(app2, 70.0, 70.0, 6)
+check(d1 == pads_ui._drawn(app2, 70.0, 70.0, 6), "nothing changed: the grid not drawn again")
+o2["fader"] = 0.2
+pads.press(app2, hv)
+d2 = pads_ui._drawn(app2, 70.0, 70.0, 6)
+pads.release(app2, hv)
+check(d2 != d1 and pads_ui._drawn(app2, 70.0, 70.0, 6) == d1, "a press: drawn again lit; let go: as it was")
+check(pads_ui._drawn(app2, 80.0, 70.0, 6) != d1, "the window resized: drawn again")
+
 # --- a label typed: saved once the typing stops, not at each key --------------------------------------------------
 saves = []
 app2.project.save = lambda: saves.append(1)

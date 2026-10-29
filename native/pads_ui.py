@@ -375,16 +375,37 @@ def _sel(app):
     return s
 
 
+def _labels_for(app):
+    """What the action list depends on: the effect shown and its sliders' names (another effect names them its way)."""
+    eng = app.eng
+    idx = getattr(eng, "idx", None)
+    try:
+        return idx, tuple(eng.meta[idx]["labels"])
+    except Exception:
+        return idx, None
+
+
 def labels(app):
-    """{label: target} of every action a control can drive: MIDI learn's, then the pads' own."""
-    if getattr(app, "_pads_labels", None) is None:
+    """[(label, target)] of every action a control can drive: MIDI learn's, then the pads' own - made again when the
+    effect changes. Each target's label is in a table too (target_label: each control's, every frame)."""
+    key = _labels_for(app)
+    if getattr(app, "_pads_labels", None) is None or getattr(app, "_pads_labels_key", None) != key:
         from native import midi_ui, vj
         out = [(lab, t) for lab, t in midi_ui.targets(app) if t.get("kind") != "pin"]
         for i, d in enumerate(vj.LETTERS):
             out.append((f"VJ {d}: this look (pick it below)", {"kind": "pad_look", "deck": i, "look": ""}))
             out.append((f"VJ {d}: a saved preset (pick it below)", {"kind": "pad_preset", "deck": i, "name": ""}))
-        app._pads_labels = out
+        app._pads_labels, app._pads_labels_key, app._pads_label_ix = out, key, None
+    if getattr(app, "_pads_label_ix", None) is None:
+        ix = {}
+        for lab, t in app._pads_labels:
+            ix.setdefault(_label_key(t), lab)                 # two the same: the first, as the list's scan found
+        app._pads_label_ix = ix
     return app._pads_labels
+
+
+def _label_key(t):
+    return tuple(t.get(q) for q in ("kind", "deck", "key"))
 
 
 def target_label(app, t):
@@ -395,11 +416,8 @@ def target_label(app, t):
         return f"VJ {'ABC'[int(t.get('deck', 0))]}: {t.get('look') or '(no look picked)'}"
     if k == "pad_preset":
         return f"VJ {'ABC'[int(t.get('deck', 0))]}: preset {t.get('name') or '(none picked)'}"
-    keys = ("kind", "deck", "key")
-    for lab, x in labels(app):
-        if all(x.get(q) == t.get(q) for q in keys):
-            return lab
-    return k
+    labels(app)
+    return app._pads_label_ix.get(_label_key(t), k)
 
 
 def _axis(app):
@@ -667,6 +685,30 @@ def _shade(rgb, k):
     return (int(rgb[0] * k), int(rgb[1] * k), int(rgb[2] * k), 255)
 
 
+def _drawn(app, cw, ch, gap):
+    """All the grid shows, in brief: drawn again only when it changes (a full bank drawn each frame took 5 ms)."""
+    st = _st(app)
+    b = pads.current(st)
+    edit = bool(getattr(app, "_pads_edit", False))
+    sel = _sel(app)
+    out = [st["bank"], b["cols"], b["rows"], round(cw, 2), round(ch, 2), gap, edit,
+           sel["id"] if isinstance(sel, dict) else sel]
+    for c in b["controls"]:
+        lab = c.get("label") or (_surface_label(app, c) if c["type"] in pads.SURFACES else target_label(app, c.get("target")))
+        out.append((c["id"], c["type"], c["x"], c["y"], c["w"], c["h"], c.get("colour"), c.get("orient"), lab,
+                    (not edit) and bool(pads.lit(app, c)),
+                    round(pads.position(app, c), 4) if c["type"] in pads.SLIDERS else None,
+                    pads.where(app, c) if c["type"] in pads.SURFACES else None))
+    return out
+
+
+def _redraw(app, cw, ch, gap):
+    key = _drawn(app, cw, ch, gap)
+    if key != getattr(app, "_pads_drawn", None) or not dpg.get_item_children(GRID, 2):
+        app._pads_drawn = key
+        _draw(app, cw, ch, gap)
+
+
 def _draw(app, cw, ch, gap):
     from native import chrome
     st = _st(app)
@@ -885,7 +927,7 @@ def poll(app):
                     app._pads_down_at = time.monotonic()
                     pads.press(app, c, xy=_surface_at(c, mx, my, x0, y0, cw, ch, gap), pressure=_swell(app))
                     app._pads_drag = ("play", c["id"])
-                    _draw(app, cw, ch, gap)
+                    _redraw(app, cw, ch, gap)
                     return
                 if c["type"] == "fader":
                     f = _travel(c, mx, my, x0, y0, cw, ch, gap)
@@ -893,7 +935,7 @@ def poll(app):
                     app._pads_knob = (my, pads.position(app, c))
                 pads.press(app, c, f)
                 app._pads_drag = ("play", c["id"])
-    _draw(app, cw, ch, gap)
+    _redraw(app, cw, ch, gap)
 
 
 def _dragging(app, drag, mx, my, x0, y0, cw, ch, gap, b):

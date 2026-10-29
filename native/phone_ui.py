@@ -163,13 +163,15 @@ def poll(app):
         return
     from native import pads_ui
     pads_ui.remote_poll(app)                                # a pad a phone held, the phone gone: let go
+    pad = False
     for cmd in r.drain():
+        pad = pad or (cmd.get("a") in ("pad", "padbank") and cmd.get("e") not in ("move", "hold"))
         try:
             apply(app, cmd)
         except Exception as e:                              # one command the studio could not take: said, not raised
             app.gp.status(f"phone remote: {cmd.get('a')}: {e}", "warn")
     now = time.monotonic()
-    if now - app._phone_at >= PUBLISH_S:
+    if pad or now - app._phone_at >= PUBLISH_S:             # a pad pressed: what it did there for the page at once
         app._phone_at = now
         r.publish(state(app))
         if dpg.does_item_exist("phone_state") and dpg.is_item_visible("phone_state"):

@@ -289,6 +289,9 @@ class PhoneRemote:
 def _handler(remote):
     class Handler(BaseHTTPRequestHandler):
         server_version = "WLEDEffectsStudio"
+        # HTTP/1.1: the page's connection kept between requests - with HTTPS, a new one for each pad press and each
+        # state asked cost a handshake (several round trips on Wi-Fi) before the press was even sent
+        protocol_version = "HTTP/1.1"
         timeout = 30                          # an idle or stalled connection is let go
 
         def log_message(self, *a):            # quiet: the studio's console is not the server's log
@@ -296,6 +299,9 @@ def _handler(remote):
 
         def _send(self, code, body, ctype="application/json"):
             self.send_response(code)
+            if code >= 400:                   # refused: a body not read may still be on the way - not kept
+                self.close_connection = True
+                self.send_header("Connection", "close")
             self.send_header("Content-Type", ctype)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(body)))
@@ -614,7 +620,8 @@ function send(c){
 async function pump(){
  if(busy||!queue.length)return;busy=true;const out=queue;queue=[];
  try{const r=await fetch("act?k="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(out)});
-  if(r.status===403)say("this link's key is not the studio's any more - open the new link");}
+  if(r.status===403)say("this link's key is not the studio's any more - open the new link");
+  if(out.some(c=>c.e!=="move"&&c.e!=="hold"))pollSoon();}   // what it did (a toggle, a bank) shown at once
  catch(e){say("no studio: "+e.message);}
  busy=false;if(queue.length)pump();}
 function say(t){$("msg").textContent=t;}
@@ -705,15 +712,17 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState!==
  for(const [pid,t] of touches){touches.delete(pid);send({a:"pad",id:t.id,e:"up"});}}});
 
 // --- the studio's state ------------------------------------------------------------------------------------
-let lock=null;
+let lock=null,pollTimer=null,polling=false;
+function pollSoon(){if(!polling){clearTimeout(pollTimer);pollTimer=setTimeout(poll,30);}}
 async function wake(){try{if(navigator.wakeLock)lock=await navigator.wakeLock.request("screen");}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")wake();});wake();
 async function poll(){
+ clearTimeout(pollTimer);polling=true;
  try{const r=await fetch("state?k="+encodeURIComponent(key),{cache:"no-store"});
   if(!r.ok)throw new Error(r.status===403?"this link's key is not the studio's any more - open the new link":"HTTP "+r.status);
   const s=await r.json();if(s.pads){st=s.pads;build(st);paint();
    say(st.edit?"being edited in the studio - the pads do nothing till it is done":(s.project||""));}}
  catch(e){say("no studio: "+e.message);}
- setTimeout(poll,200);}
+ polling=false;pollTimer=setTimeout(poll,200);}
 poll();
 </script></body></html>"""

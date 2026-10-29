@@ -192,7 +192,7 @@ check(sent[(0x90, 51)] == pads_hw.PALETTE["green"][1] and sent[(0x90, 11)] == 0 
 check(sent[(0xB0, 91)] == pads_hw.PALETTE["blue"][0] and (0xB0, 92) in sent and sent[(0xB0, 93)] == 0,
       "the banks on its top row: the shown one bright, another dim, none past them dark")
 out.sent.clear()
-check(pads_hw.lights(app, out, now=100.01) == 0, "asked again at once: nothing (twenty times a second at most)")
+check(pads_hw.lights(app, out, now=100.01) == 0, "asked again at once: nothing (sixty times a second at most)")
 check(pads_hw.lights(app, out, now=100.2) == 0 and not out.sent, "nothing changed: nothing sent")
 o["decks"][2]["level"] = 0.0
 pads.press(app, flash)
