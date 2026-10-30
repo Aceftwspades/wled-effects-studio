@@ -1179,6 +1179,14 @@ STEPS = [
       {"py": "__import__('native.midi_ui', fromlist=['m']).apply_target(app, {'kind': 'mod', 'id': __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'key': 'depth'}, 1.0, 1.0)"}], 0.2),
     ([{"check": "__import__('native.modulate', fromlist=['m']).modulators(app)[0]['depth'] == 255 and int(dpg.get_value('mod_depth_0')) == 255"},
       {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
+    # an envelope played from MIDI's play target: its four numbers in the dialog; a wave that runs while held
+    ([{"py": "app.eng.fx.update(ix=40)"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='ix', kind='env', depth=120, attack=0.05)"},
+      {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='c1', kind='lfo', start='held')"}, {"py": "__import__('native.modulate', fromlist=['m']).show(app)"},
+      {"py": "__import__('native.midi_ui', fromlist=['m']).apply_target(app, {'kind': 'mod_gate', 'id': __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']}, 127, 127.0, ('note', 0, 61))"}], 0.4),
+    ([{"check": "dpg.does_item_exist('mod_env_attack_0') and dpg.does_item_exist('mod_env_release_0') and app.eng.fx['ix'] > 40 and __import__('native.modulate', fromlist=['m']).gated(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'])"},
+      {"py": "__import__('native.midi_ui', fromlist=['m']).apply_target(app, {'kind': 'mod_gate', 'id': __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']}, 0, 127.0, ('note', 0, 61))"}], 1.2),
+    ([{"check": "app.eng.fx['ix'] == 40 and not __import__('native.modulate', fromlist=['m']).gated(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']) and __import__('native.modulate', fromlist=['m']).place(app, 'c1') is None"},
+      {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
     # a wave attached from the pad editor: a fader on Speed, + LFO, the band drawn over it; a rate knob; taken off
     ([{"py": "__import__('native.pads_ui', fromlist=['p']).show(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"},
       {"py": "setattr(app, '_pads_sel', __import__('native.pads_ui', fromlist=['p'])._free_cell(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))))"},
@@ -1188,7 +1196,7 @@ STEPS = [
     ([{"check": "dpg.is_item_shown('pads_s_modrow') and len(__import__('native.modulate', fromlist=['m']).on_key(app, 'sx')) == 1 and len(dpg.get_item_children('pads_s_mods', 1)) >= 2 and len(dpg.get_item_children('pads_mods_layer', 2)) >= 2"},
       {"py": "setattr(app, '_sm_cols', __import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['cols'])"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols + 1)"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._rate_knob(app, __import__('native.modulate', fromlist=['m']).on_key(app, 'sx')[0]['id'])"}], 0.3),
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._mod_pad(app, __import__('native.modulate', fromlist=['m']).on_key(app, 'sx')[0]['id'], 'knob', 'mod', 'rate')"}], 0.3),
     ([{"check": "__import__('native.pads_ui', fromlist=['p'])._sel(app)['type'] == 'knob' and __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']['key'] == 'rate' and __import__('native.pads_ui', fromlist=['p']).target_label(app, __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']).endswith(': rate')"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._detach(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'sx')"}], 0.3),
     ([{"check": "not __import__('native.modulate', fromlist=['m']).modulators(app) and not dpg.get_item_children('pads_mods_layer', 2)"},

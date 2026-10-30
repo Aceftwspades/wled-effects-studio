@@ -37,7 +37,9 @@ FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
 # the VJ frame's deck knobs too (vj.py): "vj0.amount" is deck A's amount - 0..255 of the knob's range
 VJ_KEYS = tuple(f"vj{i}.{k}" for i in (0, 1, 2) for k in ("level", "amount", "speed", "hue", "kaleido", "trails", "blur"))
 KEYS = FX_KEYS + VJ_KEYS
-KINDS = (("lfo", "a wave (LFO)"), ("beat", "on the beat"), ("steps", "a step pattern"))
+KINDS = (("lfo", "a wave (LFO)"), ("beat", "on the beat"), ("steps", "a step pattern"), ("env", "an envelope (ADSR)"))
+STARTS = (("free", "always"), ("held", "while held"), ("press", "restart on press"))   # how a wave or steps run
+ENV = (("attack", 0.05, 0.005, 4.0), ("decay", 0.3, 0.005, 4.0), ("sustain", 0.6, 0.0, 1.0), ("release", 0.5, 0.005, 8.0))
 SHAPES = ("sine", "triangle", "saw up", "saw down", "square", "random")
 PERIODS = (0.25, 0.5, 1, 2, 4, 8, 16, 32)          # beats: a synced rate's choices
 HZ_LO, HZ_HI = 0.05, 20.0                          # a free rate's range, turned along a log scale
@@ -46,7 +48,8 @@ STEP_SLEW_S = 0.05
 LOCK_SPEED = 0.25                                  # a synced wave back onto the grid at most this much faster or slower
 SAVE_AFTER_S = 0.8                                 # a setting turned from a control: saved once it is left this long
 DEFAULT = {"keys": ["sx"], "kind": "lfo", "shape": "sine", "sync": True, "period": 4, "hz": 0.5, "depth": 96,
-           "decay": 0.4, "steps": [1.0, 0.0, 0.5, 0.0, 0.75, 0.0, 0.25, 0.0], "on": True}
+           "decay": 0.4, "steps": [1.0, 0.0, 0.5, 0.0, 0.75, 0.0, 0.25, 0.0], "on": True, "start": "free",
+           "attack": 0.05, "env_decay": 0.3, "sustain": 0.6, "release": 0.5}
 PARAMS = (("rate", "rate"), ("depth", "depth"), ("shape", "wave shape"))   # a modulator's settings a control turns
 
 
@@ -156,6 +159,60 @@ def restart(app, m):
     """A modulator back to the start of its wave, and a synced one's grid counted from now."""
     st = app.__dict__.setdefault("_mod_state", {})
     st.setdefault("phase", {})[m["id"]] = [0.0, float(st.get("beats", 0.0))]
+    if m.get("kind") == "env":
+        st.setdefault("env", {})[m["id"]] = [st.get("env", {}).get(m["id"], [0.0])[0], "a"]
+
+
+def _env_param(m, k):
+    """An envelope's attack, decay (kept as env_decay: "decay" is the beat's), sustain or release, in its range."""
+    _, d, lo, hi_ = next(e for e in ENV if e[0] == k)
+    return max(lo, min(hi_, float(m.get("env_decay" if k == "decay" else k, d))))
+
+
+def _env(m, e, dt, gated):
+    """An envelope moved on by dt: e is [level 0..1, stage] - "a"ttack up to 1 over its attack, "d"ecay down to the
+    sustain level while held, "s"ustain there, "r"elease down to 0 over its release once let go, then "off". One
+    let go (or only restarted) during its attack goes from its peak straight to release."""
+    lv, sg = e
+    sus = _env_param(m, "sustain")
+    if sg == "a":
+        need = (1.0 - lv) * _env_param(m, "attack")        # seconds left to the peak
+        if dt < need:
+            lv, dt = lv + dt / _env_param(m, "attack"), 0.0
+        else:                                           # past it this frame: only what is left goes on down
+            lv, dt, sg = 1.0, dt - need, ("d" if gated else "r")
+    if sg in ("d", "s") and not gated:
+        sg = "r"
+    elif sg == "d":
+        lv -= dt * (1.0 - sus) / _env_param(m, "decay")
+        if lv <= sus:
+            lv, sg = sus, "s"
+    elif sg == "s":
+        lv = sus
+    if sg == "r":
+        lv -= dt / _env_param(m, "release")
+        if lv <= 0.0:
+            lv, sg = 0.0, "off"
+    e[0], e[1] = lv, sg
+    return lv
+
+
+def gated(app, mid):
+    """Whether something holds a modulator's play target (a pad, a MIDI note, the phone)."""
+    return bool((getattr(app, "_mod_state", {}) or {}).get("gate", {}).get(mid))
+
+
+def _gate(app, m, src, down):
+    """Modulator m's play target pressed (down) or let go from `src`. Opened: an envelope starts its attack, a wave
+    or steps that run while held or restart on a press start from the top. Its last holder gone: an envelope
+    releases (in apply)."""
+    st = app.__dict__.setdefault("_mod_state", {})
+    holders = st.setdefault("gate", {}).setdefault(m["id"], set())
+    was = bool(holders)
+    (holders.add if down else holders.discard)(src)
+    if holders and not was:
+        if m.get("kind") == "env" or m.get("start", "free") in ("held", "press"):
+            restart(app, m)
 
 
 def apply(app):
@@ -188,18 +245,26 @@ def apply(app):
     for n, m in enumerate(mods):
         if "seed" not in m:                                 # one made before seeds: its own, kept
             m["seed"] = 7 + n * 7919
-        pos = _advance(m, ph, st["beats"], dt, bpm) if m.get("kind", "lfo") != "beat" else 0.0
-        if not m.get("on", True):
+        kind = m.get("kind", "lfo")
+        pos = _advance(m, ph, st["beats"], dt, bpm) if kind not in ("beat", "env") else 0.0
+        held = gated(app, m["id"])
+        if kind == "env":
+            e = st.setdefault("env", {}).setdefault(m["id"], [0.0, "off"])
+            lv = _env(m, e, dt, held)
+            if e[1] == "off":
+                continue                                    # silent: its sliders at their places
+        if not m.get("on", True) or (kind in ("lfo", "steps") and m.get("start") == "held" and not held):
             continue
         off = None
         for k in dict.fromkeys(m.get("keys") or ()):          # one target twice: moved once
             if _get(app, k) is None:
                 continue
             if off is None:
-                off = offset(m, pos, since, cycle_s(m, bpm))
+                off = float(m.get("depth", 0)) * lv if kind == "env" else offset(m, pos, since, cycle_s(m, bpm))
             push[k] = push.get(k, 0.0) + off * hi(k) / 255.0  # depth of 255 of each one's own range
-    for i in [i for i in ph if find(app, i) is None]:         # a modulator gone: its phase too
-        del ph[i]
+    for d in (ph, st.get("env", {}), st.get("gate", {})):        # a modulator gone: its phase, level and holders too
+        for i in [i for i in d if find(app, i) is None]:
+            del d[i]
     changed = False
     places = st.setdefault("places", {})
     live = st.setdefault("live", {})                        # what each modulated one is moved to now (a pad shows it)
@@ -296,7 +361,7 @@ def swing(app, key):
         any_ = True
         d = float(m.get("depth", 0)) * hi(key) / 255.0
         kind = m.get("kind", "lfo")
-        if kind == "beat":
+        if kind in ("beat", "env"):
             up += d
         elif kind == "steps":
             lv = [float(v) for v in (m.get("steps") or [0.5])][:16] or [0.5]
@@ -336,9 +401,12 @@ def brief(m):
     kind = m.get("kind", "lfo")
     if kind == "beat":
         return "on the beat"
+    if kind == "env":
+        return "envelope"
     what = m.get("shape", "sine") if kind == "lfo" else "steps"
     rate = _beats(m.get("period", 4)) if m.get("sync", True) else f"{float(m.get('hz', 0.5)):g} Hz"
-    return f"{what}, {rate}"
+    start = m.get("start", "free")
+    return f"{what}, {rate}" + (f", {dict(STARTS)[start]}" if start in ("held", "press") else "")
 
 
 # --- a modulator's settings as targets: MIDI's, the pads', the phone's -----------------------------------------------
@@ -362,7 +430,8 @@ def targets(app):
         name = title(app, m, labs)
         out += [(f"{name}: {w}", {"kind": "mod", "id": m["id"], "key": k}) for k, w in PARAMS]
         out += [(f"{name}: on or off", {"kind": "mod_on", "id": m["id"]}),
-                (f"{name}: restart its wave", {"kind": "mod_restart", "id": m["id"]})]
+                (f"{name}: restart its wave", {"kind": "mod_restart", "id": m["id"]}),
+                (f"{name}: play (held: an envelope, or a wave set to run while held)", {"kind": "mod_gate", "id": m["id"]})]
     return out
 
 
@@ -403,7 +472,9 @@ def value(app, t):
 
 def is_on(app, t):
     m = find(app, t.get("id"))
-    return None if m is None else bool(m.get("on", True))
+    if m is None:
+        return None
+    return gated(app, m["id"]) if t.get("kind") == "mod_gate" else bool(m.get("on", True))
 
 
 def set_target(app, t, f):
@@ -415,6 +486,9 @@ def set_target(app, t, f):
         return
     f = max(0.0, min(1.0, float(f)))
     kind = t.get("kind")
+    if kind == "mod_gate":                                  # pressed (f at least half) or let go, from t's "src"
+        _gate(app, m, t.get("src"), f >= 0.5)
+        return
     if kind == "mod_on":
         m["on"] = not m.get("on", True)
     elif kind == "mod_restart":
@@ -447,7 +521,7 @@ def _flush(app, now, force=False):
 
 # --- the dialog ------------------------------------------------------------------------------------
 TAG = "modulators_win"
-W, H = 680, 340
+W, H = 860, 360
 RATES = (("sync", "synced"), ("free", "free (Hz)"))
 
 
@@ -475,7 +549,8 @@ def build(app):
         chrome.dialog_header(TAG, "Modulators")
         dpg.add_text("Sliders moved by a wave, the beat or a pattern of steps, around where each is set - in the sim "
                      "and the stream. Whatever sets a slider sets the place it moves around. A pad, MIDI or the phone "
-                     "can turn a modulator's rate, depth and shape, and switch or restart it.", color=chrome.DIM,
+                     "can turn a modulator's rate, depth and shape, switch or restart it, and play it (an envelope, or a "
+                     "wave that runs while held).", color=chrome.DIM,
                      wrap=px(W - 30))
         dpg.add_group(tag="mod_rows")
         with dpg.group(horizontal=True):
@@ -503,7 +578,7 @@ def refresh(app):
                           callback=lambda s, v, i=i: set_key(app, i, 0, by_lab.get(v, "sx")))
             dpg.add_button(label="+", small=True, callback=lambda s, a, i=i: add_key(app, i))
             chrome.tip("one more slider moved by this same wave (each by the depth, of its own range)")
-            dpg.add_combo([w for _, w in KINDS], width=px(110), default_value=dict(KINDS).get(m.get("kind"), "a wave (LFO)"),
+            dpg.add_combo([w for _, w in KINDS], width=px(150), default_value=dict(KINDS).get(m.get("kind"), "a wave (LFO)"),
                           callback=lambda s, v, i=i: edit(app, i, kind=next(k for k, w in KINDS if w == v)))
             kind = m.get("kind", "lfo")
             if kind == "lfo":
@@ -523,6 +598,11 @@ def refresh(app):
                     num.add(f"mod_hz_{i}", float(m.get("hz", 0.5)), HZ_LO, HZ_HI, width=px(80), digits=2, unit="Hz",
                             callback=lambda s, v, i=i: edit(app, i, hz=float(v)))
                     chrome.tip("waves (or steps) a second")
+            if kind in ("lfo", "steps"):
+                dpg.add_combo([w for _, w in STARTS], width=px(110), default_value=dict(STARTS).get(m.get("start", "free")),
+                              callback=lambda s, v, i=i: edit(app, i, start=next(k for k, w in STARTS if w == v)))
+                chrome.tip("always: it runs all the time; while held: only while its play target is held (a pad, a "
+                           "note), from the top of its wave; restart on press: all the time, from the top at each press")
             if kind == "beat":
                 num.add(f"mod_decay_{i}", float(m.get("decay", 0.4)), 0.05, 4.0, width=px(80), digits=2, unit="s",
                         callback=lambda s, v, i=i: edit(app, i, decay=float(v)))
@@ -540,6 +620,18 @@ def refresh(app):
                                   callback=lambda s, v, i=i, j=j: set_key(app, i, j, by_lab.get(v, "sx")))
                     dpg.add_button(label="x", small=True, callback=lambda s, a, i=i, j=j: remove_key(app, i, j))
                     chrome.tip("this slider no longer moved by it: left where it is set")
+        if m.get("kind") == "env":
+            with dpg.group(horizontal=True, parent="mod_rows"):
+                dpg.add_text("   envelope", color=chrome.DIM)
+                for k, d, lo, hi_ in ENV:
+                    dpg.add_text(k[0].upper(), color=chrome.DIM)
+                    num.add(f"mod_env_{k}_{i}", _env_param(m, k), lo, hi_, digits=2, width=px(60),
+                            unit="" if k == "sustain" else "s",
+                            callback=lambda s, v, i=i, k=k: edit(app, i, **{"env_decay" if k == "decay" else k: round(float(v), 3)}))
+                    chrome.tip({"attack": "seconds up to full when its play target is pressed",
+                                "decay": "seconds from full down to the sustain level, held",
+                                "sustain": "the level it stays at while held (of the depth)",
+                                "release": "seconds from full down to nothing once let go"}[k])
         if m.get("kind") == "steps":
             with dpg.group(horizontal=True, parent="mod_rows"):
                 dpg.add_text("   steps", color=chrome.DIM)

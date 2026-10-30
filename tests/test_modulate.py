@@ -163,8 +163,8 @@ try:
 
     # the settings as targets
     labs = [lab for lab, _ in mo.targets(app)]
-    check(any(lab.startswith("Mod 1 (") and lab.endswith(": rate") for lab in labs) and len(labs) == 5,
-          f"a modulator's five targets ({labs[:2]})")
+    check(any(lab.startswith("Mod 1 (") and lab.endswith(": rate") for lab in labs) and len(labs) == 6,
+          f"a modulator's six targets ({labs[:2]})")
     rate = {"kind": "mod", "id": 1, "key": "rate"}
     m["sync"] = True
     mo.set_target(app, rate, 1.0)
@@ -224,6 +224,74 @@ try:
     w2 = mo.on_key(app, "sx")[0]
     w2["on"] = False
     check(mo.swing(app, "sx") is None, "one switched off: no band")
+
+    # how a pad starts one: a wave while held, a wave restarted on a press, an envelope
+    mo.modulators(app).clear()
+    mo.apply(app)
+    app.eng.fx["sx"] = 100
+    gate = lambda m, src, f: mo.set_target(app, {"kind": "mod_gate", "id": m["id"], "src": src}, f)   # noqa: E731
+    w = mo.add(app, key="sx", kind="lfo", shape="square", period=2, depth=60, start="held")
+    for _ in range(3):
+        clock.step(0.3)
+        mo.apply(app)
+    check(app.eng.fx["sx"] == 100 and mo.place(app, "sx") is None, "while held, not held: silent, the slider at its place")
+    gate(w, "a", 1.0)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 130 and app._mod_state["phase"][w["id"]][0] == 0.0, f"pressed: from the top of its wave ({app.eng.fx['sx']})")
+    gate(w, "b", 1.0)
+    gate(w, "a", 0.0)
+    mo.apply(app)
+    check(mo.gated(app, w["id"]) and app.eng.fx["sx"] != 100, "two holding it: one let go, still running")
+    gate(w, "b", 0.0)
+    mo.apply(app)
+    check(not mo.gated(app, w["id"]) and app.eng.fx["sx"] == 100, "the last let go: back at its place")
+    check(mo.brief(w) == "square, 2 beats, while held", f"in a few words ({mo.brief(w)})")
+    w["start"] = "press"
+    for _ in range(4):
+        clock.step(0.25)
+        mo.apply(app)
+    check(app._mod_state["phase"][w["id"]][0] > 0.4, "restart on press: running unpressed")
+    gate(w, "a", 1.0)
+    check(app._mod_state["phase"][w["id"]][0] == 0.0, "pressed: back to the top")
+    gate(w, "a", 0.0)
+    mo.modulators(app).clear()
+    mo.apply(app)
+
+    e = mo.add(app, key="sx", kind="env", depth=100, attack=0.1, env_decay=0.2, sustain=0.5, release=0.4)
+    app.eng.fx["sx"] = 50
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 50 and mo.swing(app, "sx") is None, "an envelope unplayed: silent, no band")
+    gate(e, "n", 1.0)
+    clock.step(0.05)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 100, f"attack: half way up in half its time ({app.eng.fx['sx']})")
+    clock.step(0.05)
+    mo.apply(app)
+    clock.step(0.1)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 125, f"decay: half way down to the sustain ({app.eng.fx['sx']})")
+    for _ in range(5):
+        clock.step(0.1)
+        mo.apply(app)
+    lo, up, _ = mo.swing(app, "sx")
+    check(app.eng.fx["sx"] == 100 and near(lo, 50) and near(up, 150), f"sustain held at half; the band up by its depth ({app.eng.fx['sx']})")
+    gate(e, "n", 0.0)
+    clock.step(0.1)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 75, f"let go: released at 1 a release ({app.eng.fx['sx']})")
+    for _ in range(3):
+        clock.step(0.1)
+        mo.apply(app)
+    check(app.eng.fx["sx"] == 50 and app._mod_state["env"][e["id"]][1] == "off", "released to nothing: at its place")
+    mo.set_target(app, {"kind": "mod_restart", "id": e["id"]}, 1.0)
+    for _ in range(2):
+        clock.step(0.05)
+        mo.apply(app)
+    st_ = app._mod_state["env"][e["id"]][1]
+    clock.step(0.1)
+    mo.apply(app)
+    check(st_ == "r" and app.eng.fx["sx"] == 125, f"a restart unheld: one shot, from its peak straight to release ({st_}, {app.eng.fx['sx']})")
+    check(mo.is_on(app, {"kind": "mod_gate", "id": e["id"]}) is False and mo.brief(e) == "envelope", "not held; in a word")
     mo.modulators(app).clear()
     mo.apply(app)
     check(app._mod_state == {}, "none left: nothing kept")

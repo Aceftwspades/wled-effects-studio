@@ -456,7 +456,7 @@ try:
     check(abs(a_ - 77 / 255) < 1e-6 and abs(b_ - 177 / 255) < 1e-6 and abs(n_ - 77 / 255) < 1e-6, "upside down: the band too")
     sp["invert"] = False
     n = len(b6["controls"])
-    pads_ui._rate_knob(app3, m["id"])
+    pads_ui._mod_pad(app3, m["id"], "knob", "mod", "rate")
     kn = b6["controls"][-1]
     check(len(b6["controls"]) == n + 1 and kn["type"] == "knob" and kn["target"] == {"kind": "mod", "id": m["id"], "key": "rate"}
           and pads.fits(b6, kn) and app3._pads_sel == kn["id"], "rate knob: a knob on its rate in a free cell, selected")
@@ -464,6 +464,35 @@ try:
     modulate.apply(app3)
     check(not modulate.modulators(app3) and app3.eng.fx["sx"] == 128 and pads.swing(app3, sp) is None,
           "x: the wave taken off, the slider back where it was set, no band")
+
+    # a pad that plays it: a hold pad holds the gate, a toggle latches it, MIDI's note-off lets go
+    env = modulate.add(app3, key="sx", kind="env", depth=80, attack=0.01, release=0.01)
+    pp = pads.new_control(st6, "hold", 0, 0, target={"kind": "mod_gate", "id": env["id"]})
+    tg = pads.new_control(st6, "toggle", 1, 0, target={"kind": "mod_gate", "id": env["id"]})
+    check(pads.kind_of(pp["target"]) == "gate" and not pads_ui._fits_type("fader", pp["target"])
+          and pads_ui._fits_type("trigger", pp["target"]), "play: a pad's, not a fader's")
+    pads.press(app3, pp)
+    check(modulate.gated(app3, env["id"]) and pads.lit(app3, pp), "a hold pad down: played, lit")
+    pads.press(app3, tg)
+    pads.release(app3, tg)
+    pads.release(app3, pp)
+    check(modulate.gated(app3, env["id"]) and pads.lit(app3, tg), "a toggle latched it: still played with the hold pad up")
+    pads.press(app3, tg)
+    pads.release(app3, tg)
+    check(not modulate.gated(app3, env["id"]) and not pads.lit(app3, pp), "the toggle again: let go, dark")
+    from native import midi, midi_ui
+    t = {"kind": "mod_gate", "id": env["id"]}
+    check(midi.fires(t, ("note", 0, 60), 0, 100) and midi.fires(t, ("note", 0, 60), 100, 0), "MIDI: a note's press and its note-off both reach it")
+    midi_ui.apply_target(app3, t, 100, 127.0, ("note", 0, 60))
+    check(modulate.gated(app3, env["id"]), "a note down: played")
+    midi_ui.apply_target(app3, t, 0, 127.0, ("note", 0, 60))
+    check(not modulate.gated(app3, env["id"]), "its note-off: let go")
+    check(pads_ui.target_label(app3, t).endswith("play (held: an envelope, or a wave set to run while held)"), "its label")
+    pads_ui._mod_pad(app3, env["id"], "hold", "mod_gate", None)
+    pl = b6["controls"][-1]
+    check(pl["type"] == "hold" and pl["target"] == t and pl["label"] == f"Mod {env['id']} play", "play pad: a hold pad on it, in a free cell")
+    modulate.modulators(app3).clear()
+    modulate.apply(app3)
 finally:
     clock.release()
 dpg.destroy_context()

@@ -52,7 +52,9 @@ CHECK_KEYS = ("o1", "o2", "o3")
 VJ_BUTTONS = ("vj_cut", "vj_fade", "vj_shuffle_a", "vj_shuffle_b", "vj_air", "vj_clip_a", "vj_clip_b", "vj_clip_c",
               "vj_pause_a", "vj_pause_b", "vj_pause_c", "vj_c_in", "vj_c_out", "vj_c_toggle", "vj_c_flash")
 MOD_BUTTONS = ("mod_on", "mod_restart")                       # a modulator switched on or off, its wave restarted (modulate.py)
-SWITCHES = ("effect", "palette", "setlist", "next", "prev") + VJ_BUTTONS + MOD_BUTTONS   # targets that pick, not set: a note-off never fires them
+GATES = ("mod_gate",)                                          # held: every press and every let-go, in order
+MOD_KINDS = ("mod",) + MOD_BUTTONS + GATES                     # all a modulator's targets
+SWITCHES = ("effect", "palette", "setlist", "next", "prev") + VJ_BUTTONS + MOD_BUTTONS + GATES   # targets that pick, not set: a note-off never fires them (a gate's does)
 STEPS = ("next", "prev") + VJ_BUTTONS + MOD_BUTTONS           # fired once as the control rises
 
 
@@ -221,7 +223,7 @@ def fires(target, ctl, v, prev, full=127.0):
     press, a knob or fader crossing its middle from below (`prev` the value
     it had before, None when unknown)."""
     kind = target.get("kind")
-    if kind not in SWITCHES:
+    if kind not in SWITCHES or kind in GATES:
         return True
     if ctl[0] == "note" and v <= 0:
         return False

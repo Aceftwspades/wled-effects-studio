@@ -528,12 +528,19 @@ def _fill_mods(app, c, t):
                     callback=lambda s, v, mid=mid: modulate.set_target(
                         app, {"kind": "mod", "id": mid, "key": "depth"}, int(v) / 255.0))
             col.tip("how far it swings, of 255 of the slider's range (the band drawn on the control)")
-            dpg.add_button(label="rate knob", small=True, enabled=free is not None,
-                           callback=lambda s, a, mid=mid: _rate_knob(app, mid))
-            col.tip("a knob for its rate in the bank's first free cell" if free is not None else
-                    "no free cell on this bank for a rate knob")
             dpg.add_button(label="x", small=True, callback=lambda s, a, mid=mid: _detach(app, mid, key))
             col.tip("no longer moved by it (the modulator itself goes when it moved nothing else)")
+        with dpg.group(horizontal=True, parent="pads_s_mods"):
+            dpg.add_text("  ", color=col.DIM)
+            dpg.add_button(label="rate knob", small=True, enabled=free is not None,
+                           callback=lambda s, a, mid=mid: _mod_pad(app, mid, "knob", "mod", "rate"))
+            col.tip("a knob for its rate in the bank's first free cell" if free is not None else
+                    "no free cell on this bank for a rate knob")
+            dpg.add_button(label="play pad", small=True, enabled=free is not None,
+                           callback=lambda s, a, mid=mid: _mod_pad(app, mid, "hold", "mod_gate", None))
+            col.tip("a pad that plays it while held - an envelope, or a wave set to run while held or restart on a "
+                    "press (Modulators...) - in the bank's first free cell" if free is not None else
+                    "no free cell on this bank for a play pad")
 
 
 def _mods_changed(app):
@@ -577,16 +584,18 @@ def _mod_on(app, mid, v):
         modulate.set_target(app, {"kind": "mod_on", "id": mid}, 1.0)
 
 
-def _rate_knob(app, mid):
-    """A knob for modulator mid's rate in the bank's first free cell, selected."""
+def _mod_pad(app, mid, typ, kind, key):
+    """A control for modulator mid in the bank's first free cell, selected: a knob on its rate, or a hold pad that
+    plays it."""
     st = _st(app)
     b = pads.current(st)
     cell = _free_cell(b)
     if cell is None:
         return
     s = _sel(app)
-    c = pads.new_control(st, "knob", cell[0], cell[1], target={"kind": "mod", "id": mid, "key": "rate"},
-                         label=f"Mod {mid} rate", colour=s.get("colour", "grey") if isinstance(s, dict) else "grey")
+    t = {"kind": kind, "id": mid, **({"key": key} if key else {})}
+    c = pads.new_control(st, typ, cell[0], cell[1], target=t, label=f"Mod {mid} {key or 'play'}",
+                         colour=s.get("colour", "grey") if isinstance(s, dict) else "grey")
     b["controls"].append(c)
     app._pads_sel = c["id"]
     app._pads_axis = "x"

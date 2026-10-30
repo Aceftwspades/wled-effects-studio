@@ -232,7 +232,7 @@ def target_label(app, t):
         return "next effect"
     if kind == "prev":
         return "previous effect"
-    if kind in ("mod",) + midi.MOD_BUTTONS:
+    if kind in midi.MOD_KINDS:
         from native import modulate
         lab = next((lab for lab, x in modulate.targets(app) if x == t), None)
         return lab or f"a modulator no longer there (Mod {t.get('id')})"
@@ -697,9 +697,10 @@ def apply_target(app, t, v, full=127.0, ctl=None):
         elif kind.startswith("vj_c_"):
             vj.c_launch(app, kind[5:])
         return
-    if kind in ("mod",) + midi.MOD_BUTTONS:               # a modulator's setting (modulate.py)
+    if kind in midi.MOD_KINDS:                              # a modulator's setting (modulate.py)
         from native import modulate
-        modulate.set_target(app, t, float(v) / float(full or 127.0))
+        modulate.set_target(app, dict(t, src=t.get("src", ("midi",) + tuple(ctl or ()))) if kind in midi.GATES else t,
+                            float(v) / float(full or 127.0))
         return
     if kind in midi.STEPS:
         switch_effect(app, midi.step_effect(app.eng.names, _st(app)["setlist"], app.eng.names[app.eng.idx],

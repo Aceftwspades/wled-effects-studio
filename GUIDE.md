@@ -1069,6 +1069,18 @@ turned while the wave runs carries on from where it was, never jumping;
 a synced one then eases back onto the beat within a few cycles. What a
 control turns is saved once it is left alone.
 
+A modulator can be **played**, too: its **play** target is held while a
+pad, a MIDI note or the phone holds it (a toggle pad latches it). A wave
+or step pattern **starts** **always** (running all the time), **while
+held** (only while played, from the top of its wave - let go, its
+sliders sit where they are set) or on **restart on press** (all the
+time, back to the top at each press). **An envelope (ADSR)** is a
+modulator of its own: played, it pushes its sliders up by its depth
+over its **A**ttack, falls to its **S**ustain level (of the depth) over
+its **D**ecay and stays there while held; let go, it falls to nothing
+over its **R**elease. Restarting one fires it once: up to full, then
+straight down.
+
 **The mixer** (Playback > Mixer...) runs a second effect beside the one
 the studio has, hearing the same sound, and a fader takes the picture
 from one to the other: **deck A** is the studio's effect, edited and
@@ -1191,8 +1203,9 @@ A control driving one of the effect's sliders or a deck's knob has
 **MOVED BY** in its panel: **+ LFO** puts a wave on what it drives (synced
 to the beat, depth 96), and the control then sets the place the wave
 swings around. Each modulator on it gets a row - ticked while it runs, its
-**depth**, **rate knob** (a knob for its rate in the bank's first free
-cell) and **x** (taken off; the modulator goes if it moved nothing else).
+**depth**, **x** (taken off; the modulator goes if it moved nothing
+else), **rate knob** (a knob for its rate in the bank's first free cell)
+and **play pad** (a hold pad there that plays it).
 **Modulators...** opens the dialog for its shape, its rate and the other
 sliders it moves. A fader or a knob so moved shows the stretch it swings
 over as a pale band (an arc round a knob) and where the wave has it now
@@ -2318,7 +2331,7 @@ Every button, with what its tooltip says.
 
 **Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `play from the top`; `play from the selected step` — play from the selected step (Space while the frame has the keyboard); playing, it pauses and goes on; `stop` — stop: the sim goes back to running on its own; `record automation` — record automation: while the show plays, a slider moved (here or in the side panel) is written into the step playing as a curve ramp - over the stretch it was moved, the rest of the step as it was. Again: stop recording; `+ Add from the sim` — a new step after the selected one: what the sim shows now - effect, sliders, palette, colours, segments; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `-` — zoom out (Ctrl+wheel over the timeline zooms at the pointer); `+` — zoom in (Ctrl+wheel over the timeline zooms at the pointer); `All` — the whole show across the timeline (Shift+Z); `Step` — the selected step across the timeline, a little either side (Z); `Find sections` — the show's audio listened to: its intro, verses, builds, drops, breakdowns and outro, as named sections over the steps - and its tempo, when none is set; `Make a show...` — steps laid on the sections and the bars: calm effects for the quiet parts, the brightest for the drops, the intensity rising over a build - from the effects you choose, then yours to edit; `+ Audio...` — an audio file onto the show, at the playhead (or the selected step's start), on a track with room there: heard while the show plays, and by its effects; copied into the project; `+ Track` — one more track: a lane of its own under the others, for a layer of sound over another; `a copy of this step, after it`; `this step away` — this step away (undo brings it back); `Update from the sim` — the selected step becomes what the sim shows now (its name, length, blend and ramps kept); `Load into the sim` — the sim shows the selected step (double-click it on the timeline does the same); `Duplicate` — a copy of the selected step, after it (Ctrl+D); `Delete` — the selected step away (Delete); undo brings it back; `x` — this ramp off (the others stay); `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap lengths to bars` — every step's length rounded to whole bars, so the sequence changes on the music; `Render GIF` — plays the sequence once from the top and records it as a GIF, into captures/; `Render video...` — the show made into an mp4, frame by frame at the size, rate and quality chosen, with its audio - into captures/; needs ffmpeg on the path; `Export FSEQ...` — the show frame by frame into an FSEQ file for Falcon Player, with its audio beside it - FPP plays it to the controllers, WLED among them; `Send and run it`; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 
-**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `making...`; `not built yet`
+**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `not built yet`; `making...`
 
 **Palettes frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ New`; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy`; `Remove`; `Use in the sim`; `spread evenly`; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all`; `Remove this one there`
 

@@ -194,6 +194,8 @@ def kind_of(t):
     k = (t or {}).get("kind")
     if k in FLIPS:
         return "flip"
+    if k == "mod_gate":
+        return "gate"
     if k in ("pad_look", "pad_preset"):
         return k[4:]
     if k in _midi().SWITCHES:
@@ -250,7 +252,7 @@ def is_on(app, t):
         return bool(vj.c_is_in(app))
     if k and k.startswith("vj_pause_"):
         return _paused(app, "abc".index(k[-1]))
-    if k == "mod_on":
+    if k in ("mod_on", "mod_gate"):
         from native import modulate
         return modulate.is_on(app, t)
     return None
@@ -385,6 +387,14 @@ def press(app, c, f=None, xy=None, pressure=None):
             r["flash"][c["id"]] = time.monotonic()
         _apply(app, t, 1.0)
         return
+    if kind == "gate":                                              # held while pressed; a toggle latches it
+        g = dict(t, src=("pad", c["id"]))
+        if typ == "toggle":
+            r["on"][c["id"]] = not r["on"].get(c["id"])
+            _apply(app, g, 1.0 if r["on"][c["id"]] else 0.0)
+        else:
+            _apply(app, g, 1.0)
+        return
     # a value target
     hi, lo = _span(c, 1.0), _span(c, 0.0)
     if typ == "trigger":
@@ -411,6 +421,9 @@ def release(app, c):
     r["count"].pop(c["id"], None)
     r["held"].discard(c["id"])
     t, typ, kind = c.get("target") or {}, c["type"], kind_of(c.get("target"))
+    if kind == "gate" and typ != "toggle":
+        _apply(app, dict(t, src=("pad", c["id"])), 0.0)
+        return
     if typ in SURFACES:
         if c.get("release", "snap") == "snap":                      # back where they were before the touch
             for axis, tt in surface_targets(c):

@@ -4312,8 +4312,16 @@ notes, its lights mirroring the layout). In four phases:
    wave's value and wobbled with it - pads.value reads the slider's place now. The dialog's refresh no longer runs
    before the dialog is built (it crashed Dear PyGui with no context). Tests: test_modulate (key_of, the bands of
    each kind, brief, detach), test_pads (+ LFO, the handle at the place, the band and upside down, the rate knob,
-   x), the smoke. Next: how a pad starts a modulator (always, while held, restart on press) and an envelope; the
-   controller's lights pulsing.
+   x), the smoke.
+   Step 3 **done** (2026-10-30): each modulator a play target (mod_gate) held by its holders - a pad's, a MIDI
+   note's, the phone's (modulate._gate: a set of sources, so two holding it need both let go); MIDI gives it every
+   press and note-off in order (midi.GATES in SWITCHES, fired on a note-off too). A wave or steps start "always",
+   "while held" (silent unplayed - its sliders back at their places - and from the top when played) or "restart on
+   press". A fourth kind, an envelope (ADSR, "env_decay" kept apart from the beat's "decay"): attack to full, decay
+   to sustain while held, release to nothing; a restart a one-shot; the time past its peak in a frame carried on down,
+   not the frame's whole step. The pad editor's play pad; the dialog's start and the envelope's four numbers. Tests:
+   test_modulate (held, two holders, restart on press, the envelope's stages by the clock, a one-shot), test_pads
+   (hold and toggle pads, MIDI's note-off, the play pad), the smoke. Next: the controller's lights pulsing.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).
