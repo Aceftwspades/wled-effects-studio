@@ -265,6 +265,63 @@ check(not fake.is_open and sum("lights" in s for s in app.gp.said) == 1, "a ligh
 fake.there = True
 pads_hw.poll(app)
 check(fake.is_open and fake.sent, "plugged in afterwards: found, opened and lit")
+# the controller unplugged while open: rtmidi raises on a send - said, the port closed and looked for again (it
+# raised out of every frame, the studio stopped, and the lights stayed dead once plugged back)
+
+
+class Handle:
+    def __init__(self):
+        self.ok, self.sent = False, []
+
+    def send_message(self, m):
+        if not self.ok:
+            raise RuntimeError("MidiOutWinMM::sendMessage: error sending MIDI message")
+        self.sent.append(m)
+
+    def close_port(self):
+        pass
+
+
+real = midi.MidiOut()
+dead = Handle()
+real._out, real.port = dead, "LP lights"
+real.open = lambda name: setattr(real, "_out", dead) or setattr(real, "port", name)
+app._pads_out = real
+pads_hw._rt(app).update(at=0.0, out=None)
+app.gp.said.clear()
+pads_hw.RETRY_S = 60.0                                     # (looked for again only after a while)
+fine = True
+for _ in range(3):
+    try:
+        pads_hw.poll(app)
+    except Exception:
+        fine = False
+check(fine and not real.is_open and sum("stopped" in x for x in app.gp.said) == 1,
+      f"unplugged: no frame fails, said once, the port closed ({app.gp.said})")
+dead.ok = True
+pads_hw.RETRY_S = 0.0
+pads_hw._rt(app).update(at=0.0)
+pads_hw.poll(app)
+check(real.is_open and dead.sent, "plugged back: opened again and lit")
+app._pads_out = fake
+
+# a control over two grid pads: let go by the pad that pressed it, not by the other's lift
+app5 = App()
+vj.options(app5)
+st5 = pads_ui._st(app5)
+b5 = st5["banks"][0]
+b5["controls"] = []
+two = pads.new_control(st5, "hold", 0, 0, 2, 1, target={"kind": "vj_knob", "deck": 0, "key": "hue"})
+b5["controls"].append(two)
+pads_hw.hw(st5).update(device="launchpad", grid=True)
+vj.knob_set(app5, 0, "hue", 0.2)
+nA, nB = pads_hw.cell_note("launchpad", 0, 0), pads_hw.cell_note("launchpad", 1, 0)
+pads_hw.events(app5, [note(nA, 100)])
+pads_hw.events(app5, [note(nB, 100)])
+pads_hw.events(app5, [note(nB, 0)])
+check(vj.knob_get(app5, 0, "hue") == 1.0, "the other pad's lift: still held")
+pads_hw.events(app5, [note(nA, 0)])
+check(abs(vj.knob_get(app5, 0, "hue") - 0.2) < 1e-6, "its own pad's lift: let go")
 midi.available, midi.out_ports, pads_hw.RETRY_S = was
 h["out"] = ""
 

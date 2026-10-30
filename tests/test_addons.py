@@ -10,6 +10,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 from types import SimpleNamespace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -181,6 +182,51 @@ def test_installed_looks_reach_the_vj_and_the_browser():
     finally:
         shutil.rmtree(proj.path, ignore_errors=True)
         vj_looks.load_user(proj, allow_py=False)   # the test's looks gone
+
+
+def test_a_project_look_wins_a_name_a_pack_has():
+    """A project's look named like a pack's: it is the one run, edited and deleted - the browser's x once deleted
+    the pack's file, and a pack's update put its look over the project's. Two of the project's of one NAME: said."""
+    tmp = tempfile.mkdtemp(prefix="studio_shadow_")
+    pk = os.path.join(tmp, "packs", "pk")
+    os.makedirs(pk)
+    was = (addons.root, addons.dirs)
+    addons.root, addons.dirs = (lambda: os.path.join(tmp, "packs")), (lambda: [pk])
+
+    class P:
+        path = os.path.join(tmp, "proj")
+    looks = os.path.join(P.path, "looks")
+    os.makedirs(looks)
+    src = "// NAME: Same\nvoid mainImage(out vec4 f, in vec2 c){f=vec4(%s);}\n"
+    try:
+        with open(os.path.join(pk, "a.glsl"), "w") as f:
+            f.write(src % "1.0")
+        with open(os.path.join(looks, "b.glsl"), "w") as f:
+            f.write(src % "0.5")
+        vj_looks.load_user(P)
+        assert "0.5" in vj_looks.LOOKS["Same"].glsl and vj_looks.look_source("Same") == ("project", None)
+        assert os.path.basename(vj_looks.look_path("Same")) == "b.glsl"
+        p = os.path.join(pk, "a.glsl")
+        with open(p, "w") as f:
+            f.write(src % "0.9")
+        os.utime(p, (time.time() + 5,) * 2)
+        vj_looks.load_user(P)
+        assert "0.5" in vj_looks.LOOKS["Same"].glsl, "a pack's update put its look over the project's"
+        twin = "// NAME: Twin\nvoid mainImage(out vec4 f, in vec2 c){f=vec4(%s);}\n"
+        for name, v in (("c.glsl", "0.1"), ("c_2.glsl", "0.2")):
+            with open(os.path.join(looks, name), "w") as f:
+                f.write(twin % v)
+        errs = dict(vj_looks.load_user(P))
+        assert "0.1" in vj_looks.LOOKS["Twin"].glsl and os.path.basename(vj_looks.look_path("Twin")) == "c.glsl"
+        assert "c_2.glsl" in errs and "NAME" in errs["c_2.glsl"], errs
+        os.remove(os.path.join(looks, "b.glsl"))
+        vj_looks.load_user(P)
+        assert "1.0" not in vj_looks.LOOKS["Same"].glsl and vj_looks.look_source("Same") == ("addon", "pk"),             "the project's gone: the pack's look of the name back"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        vj_looks.load_user(P)
+        addons.root, addons.dirs = was
+        vj_looks.load_user(P)
 
 
 if __name__ == "__main__":

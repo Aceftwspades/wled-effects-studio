@@ -140,6 +140,32 @@ def test_a_file_through_ffmpeg():
         src.close()
 
 
+def test_in_and_out_points_loop():
+    """A clip's In and Out: played between them again and again - -stream_loop with -ss/-t played them once and
+    stopped (the deck froze on "the video ended"), or looped from the file's start."""
+    if not shutil.which("ffmpeg"):
+        print("     (no ffmpeg: the In/Out test is left out)")
+        return
+    from native import scratch
+    path = scratch.path("test_inout.mp4")
+    subprocess.run([shutil.which("ffmpeg"), "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=30:duration=4",
+                    "-pix_fmt", "yuv420p", path], check=True)
+    src = video.FfmpegSource(["-ss", "1.000", "-t", "0.500", "-i", path], "clip", "file", 64, 36, realtime=True,
+                             rerun=True, fps=video.FILE_FPS)
+    try:
+        t0, gaps, last, lt = time.time(), [], 0, time.time()
+        while time.time() - t0 < 2.5:
+            time.sleep(0.005)
+            n = src.latest()[1]
+            if n != last:
+                gaps.append(time.time() - lt)
+                last, lt = n, time.time()
+        assert src.error is None and src.thread.is_alive(), src.error
+        assert last >= 50 and max(gaps[1:]) < 0.25, (last, max(gaps[1:]))      # four passes, no long freeze between
+    finally:
+        src.close()
+
+
 def test_a_stream_address_is_a_network_one():
     for url in ("rtsp://192.168.1.20:8554/live", "http://10.0.0.2:8080/video", "srt://host:9000", "rtmp://h/app/key"):
         args = video.stream_args(url)

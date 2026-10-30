@@ -4405,6 +4405,38 @@ notes, its lights mirroring the layout). In four phases:
    Kept as it was: a learn takes the frame's other MIDI too (so the MIDI window's learn does not see a nudge);
    FfmpegSource.latest reads unlocked (frames are replaced, not changed: at worst a frame late). Tests: test_num,
    test_vj, test_pads, test_pads_hw, test_modulate; a real click on the Modulators dialog.
+   A second review (2026-10-30, four reviewers again, one on the first review's fixes). Fixed:
+   - The first review's own: a beat-fired envelope missed the VJ's grid beats (set earlier in the frame than the
+     modulators run: a beat counted fresh only within one frame's dt - 17 of 41 at a 10 ms gap) - now a beat later
+     than the last seen; a modulator turned while paused never saved (only apply flushed, and apply runs only
+     playing) - the main loop flushes, and quitting saves what waits (app._leave_project); one Undo straight after a
+     drag took back the drag and the change before it, the drag lost - modulate.undo and the pad editor's Undo save
+     what waits first.
+   - The controller unplugged: rtmidi raised out of every frame (the studio stopped) and the lights stayed dead
+     plugged back - MidiOut.send catches it, closes the port, and pads_hw looks for it again every RETRY_S.
+   - A clip's In and Out: -stream_loop with -ss/-t played them once and froze ("the video ended"), or looped from
+     the file's start - FfmpegSource(rerun=True) runs ffmpeg again from In each time, its frames paced by the reader
+     (ffmpeg's -re waited ~0.5 s before each run's first frame).
+   - Shaders: iFrame started at 1 (a buffer filled at iFrame 0 - a simulation's start - stayed black); now the GL
+     thread's count of frames drawn for the run, 0 first. A look stopped 30 s lets its buffers go; a buffer resized
+     lets the old pair go; a picture that will not read is none, not the shader failing every frame.
+   - VJ: modulators on the picture knobs (scale, place, turn, key, drift) moved nothing - the layout read the deck;
+     a Cut waiting for its beat and a Mutate growing survived a show step (the Cut flipped the step's fader; the
+     desk came back with the flame frozen part-way - now kept grown); fit and tile cropped every frame to what is
+     not clear, so a transparent clip's sprite was re-fitted (its motion cancelled) - now the box ffmpeg pads the
+     file in (video.fit_box, from its size); a source that failed or ended is opened again (3 s, doubling to 30 s);
+     options() puts a damaged setting right (a null, a "1.5x", an unknown mode: its default) instead of failing
+     every frame; an Effect deck follows a new shape of one size; a web video closed while it resolved no longer
+     leaves ffmpeg running; a step captured mid-show keeps the step's modulators.
+   - Looks: a project look named like a pack's ran, but Edit, the browser's x (deleting the pack's file!) and a
+     pack's update went to the pack's file - one file now owns a name (the project's before a pack's), and a second
+     of one place is said; thumbnails of looks gone are let go.
+   - Pads: a damaged pads file (a null grid, a position as text, a short learn, hw a list) failed every frame - put
+     right, ids given twice given anew; a bank switched under an Edit drag laid the control on the other grid (lost
+     on reload); a control over two grid pads let go by the other's lift; the phone remote turned off let go what
+     a phone held; buttons are not offered the palette/effect "by index" (always the last); the MIDI port and a
+     waiting learn follow a project switch.
+   Tests: test_modulate, test_pads, test_pads_hw, test_vj, test_vj_shaders, test_video, test_addons.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

@@ -267,6 +267,7 @@ class MidiOut:
     def __init__(self):
         self._out = None
         self.port = None
+        self.error = None                  # why the last send failed (the port then closed), until it is read
 
     def open(self, name):
         self.close()
@@ -280,8 +281,17 @@ class MidiOut:
         self._out, self.port = mo, name
 
     def send(self, msg):
-        if self._out is not None:
+        """False when it could not be sent: the controller unplugged (rtmidi raises a driver error) - the port is
+        closed then, so it is opened again when it is back, not tried every message of every frame."""
+        if self._out is None:
+            return False
+        try:
             self._out.send_message(list(msg))
+            return True
+        except Exception as e:
+            self.error = str(e) or type(e).__name__
+            self.close()
+            return False
 
     def close(self):
         out, self._out, self.port = self._out, None, None

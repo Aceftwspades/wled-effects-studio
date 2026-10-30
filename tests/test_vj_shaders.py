@@ -228,6 +228,19 @@ if ok:
           f"passes run: B adds a tenth a frame (three: 0.3), A's green, the picture's blue ({err} {img[6, 8] if img is not None else None})")
     img, err = vj_glsl.render("multi2", multi, 16, 12, uni, None, None, wait=True, picture=pic, channels=["", "", "", "none"])
     check(img is not None and img[6, 8, 2] < 0.05, "a deck's choice over the file's: iChannel3 nothing")
+    # iFrame 0 the first frame drawn, as on Shadertoy: a buffer filled only then (a simulation's start) is filled
+    seed = ("//@ buffer A\n//@ iChannel0 = A\nvoid mainImage(out vec4 f, in vec2 p){ f = iFrame == 0 ? vec4(1.0) : "
+            "texelFetch(iChannel0, ivec2(p), 0); }\n//@ image\n//@ iChannel0 = A\n"
+            "void mainImage(out vec4 f, in vec2 p){ f = texelFetch(iChannel0, ivec2(p), 0); }\n")
+    for _ in range(3):
+        img, err = vj_glsl.render("seeded", seed, 8, 8, dict(uni), None, None, wait=True)
+    check(not err and img is not None and img.mean() > 0.99, f"iFrame 0 first: a buffer filled then stays filled ({err})")
+    # a picture that is not one on its channel: none (black), not the shader failing
+    bad_pic = os.path.join(tempfile.mkdtemp(), "bad.png")
+    with open(bad_pic, "w") as f:
+        f.write("not a picture")
+    img, err = vj_glsl.render("badpic", multi, 16, 12, uni, None, None, wait=True, picture=bad_pic)
+    check(not err and img is not None, f"a picture that will not read: the shader still draws ({err})")
     MD2 = PRESET.replace("fWaveAlpha=0", "fWaveAlpha=0\nwarp_1=`shader_body\nwarp_2=`{ ret = tex2D(sampler_main, uv).xyz * 0.5; }\n"
                          "comp_1=`shader_body\ncomp_2=`{ ret = float3(0, 1, 0) * (1 - GetPixel(uv).x); }")
     pre2 = milk.parse(MD2, "md2")

@@ -92,33 +92,68 @@ def starter(st):
     return b
 
 
+def _int(v, default):
+    """A whole number from a hand-edited file's value (a float, a numeric string), else `default`."""
+    try:
+        return int(float(v))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _learned(m):
+    """A learned control as it is kept - [kind, channel, number] with the numbers whole - or None for anything else."""
+    if isinstance(m, (list, tuple)) and len(m) >= 3 and isinstance(m[0], str):
+        ch, num = _int(m[1], None), _int(m[2], None)
+        if ch is not None and num is not None:
+            return [m[0], ch, num] + list(m[3:])
+    return None
+
+
 def state(project):
     """The project's pads, made if missing: one starter bank, every field filled and the grid made whole (a
-    control off its bank's grid or on another's cells is dropped - a hand-edited file)."""
-    st = project.options.setdefault("pads", {})
-    st.setdefault("next_id", 1)
-    if not isinstance(st.get("banks"), list) or not st["banks"]:
-        st["banks"] = [starter(st)]
+    control off its bank's grid or on another's cells is dropped - a hand-edited file: a field of the wrong kind
+    put right or defaulted, a bank or control that is not one dropped, an id given twice given anew)."""
+    st = project.options.get("pads")
+    if not isinstance(st, dict):
+        st = project.options["pads"] = {}
+    st["next_id"] = max(1, _int(st.get("next_id"), 1))
+    banks = [b for b in st.get("banks") or () if isinstance(b, dict)] if isinstance(st.get("banks"), list) else []
+    st["banks"] = banks or [starter(st)]
+    ids = {_int(c.get("id"), 0) for b in st["banks"] if isinstance(b.get("controls"), list)
+           for c in b["controls"] if isinstance(c, dict)}
+    st["next_id"] = max([st["next_id"]] + [i + 1 for i in ids])      # a file without it: no id handed out twice
+    used = set()
     for b in st["banks"]:
-        b.setdefault("name", "Bank")
-        b.setdefault("midi", None)
+        if not isinstance(b.get("name"), str):
+            b["name"] = "Bank"
+        b["midi"] = _learned(b.get("midi"))
         b.setdefault("colour", "blue")
-        b["cols"] = max(GRID_MIN, min(GRID_MAX, int(b.get("cols", 4))))
-        b["rows"] = max(GRID_MIN, min(GRID_MAX, int(b.get("rows", 4))))
+        b["cols"] = max(GRID_MIN, min(GRID_MAX, _int(b.get("cols"), 4)))
+        b["rows"] = max(GRID_MIN, min(GRID_MAX, _int(b.get("rows"), 4)))
         kept = []
-        for c in b.get("controls") or []:
+        for c in b["controls"] if isinstance(b.get("controls"), list) else []:
             if not isinstance(c, dict) or c.get("type") not in TYPES:
                 continue
             for k, v in (("w", 1), ("h", 1), ("label", ""), ("colour", "grey"), ("target", {}), ("lo", 0.0),
                          ("hi", 1.0), ("invert", False), ("orient", "v"), ("midi", None)) + EXTRA:
                 c.setdefault(k, copy.deepcopy(v))
-            if "id" not in c:
-                c["id"] = st["next_id"]
+            x, y = _int(c.get("x"), None), _int(c.get("y"), None)
+            if x is None or y is None:
+                continue
+            c["x"], c["y"], c["w"], c["h"] = x, y, _int(c["w"], 1), _int(c["h"], 1)
+            c["midi"] = _learned(c["midi"])
+            if not isinstance(c["target"], dict):
+                c["target"] = {}
+            i = _int(c.get("id"), 0)
+            if i < 1 or i in used:
+                i = st["next_id"]
                 st["next_id"] += 1
+            c["id"] = i
             if fits(b, c, kept):
                 kept.append(c)
+                used.add(i)
         b["controls"] = kept
-    st["bank"] = max(0, min(len(st["banks"]) - 1, int(st.get("bank", 0))))
+    st["bank"] = max(0, min(len(st["banks"]) - 1, _int(st.get("bank"), 0)))
     return st
 
 

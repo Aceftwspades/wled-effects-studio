@@ -1544,7 +1544,10 @@ from an example and opens it in your editor; saved, it reloads in the frame
 at once, listed under Yours (**Edit** opens it again). Its `NAME` must not be
 a built-in look's - one that is is listed under the decks as not loaded, and
 the built-in stays. Two files of one name: the project's wins over an add-on
-pack's, and the other's comes back when it goes. A Python look is a
+pack's (it is the one that runs, **Edit** opens and the browser's **x** removes),
+and the other's comes back when it goes; two of the project's own (a shader
+imported twice) - the second is listed under the decks as not loaded until
+one is given a NAME of its own. A Python look is a
 program and runs as one: a project opened from elsewhere with Python looks
 in it asks first, once, whether to run them (**Run them** allows that
 project on this computer - kept in the studio's own settings, so a project

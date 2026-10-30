@@ -1172,6 +1172,7 @@ def draw(c, st):
 
 _USER = {}                      # path -> (mtime, name)
 _BY_NAME = {}                   # name -> the path of the file it came from (load_user keeps it)
+_OBJ = {}                       # path -> the look read from it (the one of a name in LOOKS: _BY_NAME's file's)
 
 
 def user_dir(project):
@@ -1209,9 +1210,9 @@ def load_user(project, allow_py=True):
     files = []
     for d, own in places:
         if os.path.isdir(d):
-            files += [(d, f) for f in sorted(os.listdir(d))
+            files += [(d, f, own) for f in sorted(os.listdir(d))
                       if f.lower().endswith((".py", ".glsl", ".milk") if own else (".glsl", ".milk"))]
-    for d, f in files:
+    for d, f, own in files:
         path = os.path.join(d, f)
         seen.add(path)
         try:
@@ -1219,49 +1220,45 @@ def load_user(project, allow_py=True):
         except OSError:
             continue
         if f.lower().endswith(".py") and not allow_py:
-            old = _USER.get(path, (None, None, ""))[1]
             _USER[path] = (None, None, NOT_ALLOWED)               # read again once allowed
-            if old:
-                _let_go(old, path)
+            _OBJ.pop(path, None)
             continue
         if _USER.get(path, (None,))[0] == mt:
             continue
-        old = _USER.get(path, (None, None, ""))[1]
         try:
             lk = _load_file(path)
             if lk.name in BUILTIN:                                # it would hide the built-in, and take it with it
                 raise ValueError(f"'{lk.name}' is a built-in look's name: give this one a NAME of its own")
-            LOOKS[lk.name] = lk
+            _OBJ[path] = lk
             _USER[path] = (mt, lk.name, "")
-            if old and old != lk.name:
-                _let_go(old, path)
         except Exception as e:
+            _OBJ.pop(path, None)
             _USER[path] = (mt, None, f"{type(e).__name__}: {e}")
-            if old:
-                _let_go(old, path)
     for path in [p for p in _USER if p not in seen]:
-        name = _USER.pop(path)[1]
-        if name:
-            _let_go(name, path)
-    _BY_NAME.clear()                                          # each name's file, as look_source finds it
-    for path, e in _USER.items():
-        if e[1]:
-            _BY_NAME.setdefault(e[1], path)
-    return [(os.path.basename(p), e[2]) for p, e in _USER.items() if e[2]]
-
-
-def _let_go(name, path):
-    """A look's name let go by the file at `path` (gone, renamed, broken): back to another file's look of that name
-    (an add-on's that a project's look of one name hid), else out of the list."""
-    other = next((p for p, e in _USER.items() if p != path and e[1] == name), None)
-    if other is not None:
-        try:
-            LOOKS[name] = _load_file(other)
-            return
-        except Exception as e:
-            _USER[other] = (_USER[other][0], None, f"{type(e).__name__}: {e}")
-    if name not in BUILTIN:
-        LOOKS.pop(name, None)
+        _USER.pop(path)
+        _OBJ.pop(path, None)
+    # each name's file: the project's before a pack's (it wins a name both have), and of two in one place the first
+    # by name - the other said, not run silently while Edit opens the first
+    before = set(_BY_NAME)
+    _BY_NAME.clear()
+    clash, mine = {}, {os.path.join(d, f): own for d, f, own in files}
+    for d, f, own in sorted(files, key=lambda x: not x[2]):
+        path = os.path.join(d, f)
+        name = _USER.get(path, (None, None))[1]
+        if not name or path not in _OBJ:
+            continue
+        first = _BY_NAME.get(name)
+        if first is None:
+            _BY_NAME[name] = path
+        elif own == mine[first]:
+            clash[path] = f"its NAME '{name}' is {os.path.basename(first)}'s too: give one a NAME of its own"
+    for name, path in _BY_NAME.items():
+        LOOKS[name] = _OBJ[path]
+    for name in before - set(_BY_NAME):                       # a name no file has now: out of the list
+        if name not in BUILTIN:
+            LOOKS.pop(name, None)
+    return ([(os.path.basename(p), e[2]) for p, e in _USER.items() if e[2]]
+            + [(os.path.basename(p), m) for p, m in clash.items()])
 
 
 def look_source(name):
@@ -1277,8 +1274,8 @@ def look_source(name):
 
 
 def look_path(name):
-    """The file a project's or an add-on's look was read from, or None."""
-    return next((p for p, e in _USER.items() if e[1] == name), None)
+    """The file a project's or an add-on's look was read from (the one that runs), or None."""
+    return _BY_NAME.get(name)
 
 
 def _load_file(path):

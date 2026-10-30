@@ -50,10 +50,13 @@ LP_IDS = (0x0C, 0x0D, 0x0E)
 
 
 def hw(st):
-    h = st.setdefault("hw", {})
+    h = st.get("hw")
+    if not isinstance(h, dict):                       # a hand-edited file's: one put right
+        h = st["hw"] = {}
     if h.get("device") not in dict(DEVICES):
         h["device"] = "generic"
-    h.setdefault("out", "")
+    if not isinstance(h.get("out"), str):
+        h["out"] = ""
     h.setdefault("grid", True)
     return h
 
@@ -236,9 +239,9 @@ def events(app, evs):
                     pads.drag(app, c, f)
                 else:
                     pads.press(app, c)
-            elif c["id"] in r["held"]:
-                del r["held"][c["id"]]
-                pads.release(app, c)
+            elif c["id"] in r["held"] and _same(r["held"][c["id"]][0], ctl):   # let go by the pad that pressed it
+                del r["held"][c["id"]]                                        # (a control over two grid pads: not
+                pads.release(app, c)                                          # by the other's lift)
     return rest
 
 
@@ -281,6 +284,10 @@ def poll(app):
                     if new:
                         app.gp.status(f"pads: the controller's lights: {e}", "warn")
     lights(app, out)
+    if getattr(out, "error", None) is not None:            # a send failed (unplugged): the port closed, looked for
+        app.gp.status(f"pads: the controller's lights stopped: {out.error}", "warn")   # again every RETRY_S
+        out.error = None
+        app._pads_out_tried = (h["out"], time.monotonic())
 
 
 

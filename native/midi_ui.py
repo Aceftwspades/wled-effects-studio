@@ -595,10 +595,12 @@ def poll(app):
     if m is None:
         return
     st = _st(app)
-    if not app._midi_opened:
-        # the project's port, opened once when the studio starts (quietly when it is not there)
-        app._midi_opened = True
-        if st.get("port") and midi.available() and st["port"] in midi.ports():
+    if app._midi_opened != app.project.path:
+        # the project's port, opened as the studio starts and as another project is opened (quietly when it is not
+        # there; a project without one keeps the port that is open)
+        app._midi_opened = app.project.path
+        app._midi_learn = None                            # a learn waiting: not bound into the next project's maps
+        if st.get("port") and st["port"] != m.port and midi.available() and st["port"] in midi.ports():
             try:
                 m.open(st["port"])
             except Exception:

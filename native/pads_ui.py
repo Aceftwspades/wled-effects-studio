@@ -369,6 +369,8 @@ def _undo(app):
     here: the pad editor makes those too)."""
     from native import modulate
     pads.let_go(app)
+    _flush(app)                                       # a label still being typed, a depth just dragged: saved first,
+    modulate._flush(app, 0.0, force=True)             # so they are what is undone (and seen by latest)
     if app.project.latest(("pads", "modulators")) == "modulators":
         modulate.undo(app)
         app._pads_labels = None
@@ -644,9 +646,15 @@ def _fill_banks_learn(app):
                        (pads_hw.words(b["midi"]) if b.get("midi") else "Learn"))
 
 
+BY_INDEX = ("palette", "effect", "setlist")   # targets picked along by a value: a button's press (1.0) is the last
+
+
 def _fits_type(typ, t):
-    """Whether an action suits a control: a fader, a knob or an XY pad only moves a value."""
-    return typ in pads.BUTTONS or pads.kind_of(t) == "value"
+    """Whether an action suits a control: a fader, a knob or an XY pad only moves a value; a button does not pick
+    by index (it would always pick the last one - the next and previous ones step instead)."""
+    if typ in pads.BUTTONS:
+        return (t or {}).get("kind") not in BY_INDEX
+    return pads.kind_of(t) == "value"
 
 
 def _fill_actions(app):
@@ -807,15 +815,16 @@ def remote(app, cmd):
             pads.drag(app, c, cmd["f"])
 
 
-def remote_poll(app):
-    """Each frame: a control a phone holds but has not mentioned for REMOTE_GONE_S let go."""
+def remote_poll(app, gone=False):
+    """Each frame: a control a phone holds but has not mentioned for REMOTE_GONE_S let go - every one at once when
+    `gone` (the remote turned off: no phone can lift them)."""
     import time
     seen = getattr(app, "_pads_remote", None)
     if not seen:
         return
     now = time.monotonic()
     for cid, (n, t) in list(seen.items()):
-        if now - t > REMOTE_GONE_S:
+        if gone or now - t > REMOTE_GONE_S:
             del seen[cid]
             c = pads.find(_st(app), cid)
             for _ in range(n if c is not None else 0):             # each phone press it was holding by
@@ -1168,8 +1177,8 @@ def poll(app):
 def _dragging(app, drag, mx, my, x0, y0, cw, ch, gap, b):
     st = _st(app)
     c = pads.find(st, drag[1])
-    if c is None:
-        app._pads_drag = None
+    if c is None or (drag[0] != "play" and not any(o is c for o in b["controls"])):   # (the bank switched under a
+        app._pads_drag = None                                                          # move: not laid on another's grid)
         return
     if drag[0] == "play":
         if c["type"] in pads.SURFACES:

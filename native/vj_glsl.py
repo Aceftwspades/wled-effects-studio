@@ -215,6 +215,7 @@ class _Jobs:
             return self.jobs.pop(next(iter(self.jobs)))
 
 
+FORGET_S = 30.0                     # seconds not asked for: a look taken as stopped (its buffers let go)
 HUNG = 5.0                          # seconds on one job: the graphics card (or a shader) is taken as stuck
 
 
@@ -257,7 +258,9 @@ class _GL:
         self.tex = {}                # name -> texture (video, sound, a caller's own shader's inputs)
         self.static = {}             # name -> texture uploaded once (MilkDrop's noise: the same for every preset)
         self.bufs = {}               # (key, buffer) -> [[texture, framebuffer] x 2, which is the last]
-        self.pics = {}               # path -> (mtime, texture)
+        self.pics = {}               # path -> (mtime, texture, or None: a file that did not read)
+        self.frames = {}             # key -> the frames drawn for it: its iFrame (0 the first, as on Shadertoy)
+        self.seen = {}               # key -> when it was last asked for (a look long stopped: its buffers let go)
         quad = np.array([-1, -1, 3, -1, -1, 3], np.float32)          # one triangle over the whole frame
         self.vbo = self.ctx.buffer(quad.tobytes())
         rng = np.random.default_rng(1234)
@@ -270,6 +273,11 @@ class _GL:
             job = self.q.get()
             key = job[0]
             self.busy_since = time.perf_counter()
+            if not _is_frag(key):                                 # the frames it has had, counted where they are drawn
+                n = self.frames.get(key, 0)                       # (a frame replaced in the queue is not one): a
+                job[4]["iFrame"] = n                              # shader that fills its buffers at 0 sees 0
+                self.frames[key] = n + 1
+                self.seen[key] = self.busy_since
             try:
                 img = self._frag(*job[1:]) if _is_frag(key) else self._draw(*job)
                 err = ""
@@ -284,10 +292,15 @@ class _GL:
                 self.lock.notify_all()
             if _is_frag(key):
                 continue
-            with self.lock:
-                while len(self.results) > 32:                     # looks long since changed: their last frames let go
-                    gone = next(iter(self.results))
-                    self.results.pop(gone)
+            now = time.perf_counter()
+            with self.lock:                                       # looks stopped (not asked for in FORGET_S), or long
+                old = [k for k, at in self.seen.items() if now - at > FORGET_S]   # since changed past 32: their last
+                while len(self.results) - len(old) > 32:          # frames and buffers let go
+                    old.append(next(k for k in self.results if k not in old))
+                for gone in old:
+                    self.results.pop(gone, None)
+                    self.seen.pop(gone, None)
+                    self.frames.pop(gone, None)
                     for bk in [b for b in self.bufs if b[0] == gone]:
                         for t, f in self.bufs.pop(bk)[0]:
                             f.release(); t.release()
@@ -342,10 +355,13 @@ class _GL:
         got = self.pics.get(path)
         if got is None or got[0] != mt:
             from PIL import Image
-            im = Image.open(path).convert("RGBA").transpose(Image.FLIP_TOP_BOTTOM)
-            t = self.ctx.texture(im.size, 4, im.tobytes())
-            t.repeat_x = t.repeat_y = True
-            if got:
+            try:                                                 # a file that is not a picture: none (the caller's
+                im = Image.open(path).convert("RGBA").transpose(Image.FLIP_TOP_BOTTOM)   # black or noise), kept
+                t = self.ctx.texture(im.size, 4, im.tobytes())   # so until it changes - not opened every frame
+                t.repeat_x = t.repeat_y = True
+            except Exception:
+                t = None
+            if got and got[1] is not None:
                 got[1].release()
             got = self.pics[path] = (mt, t)
         return got[1]
@@ -353,6 +369,8 @@ class _GL:
     def _buffer(self, key, name, w, h):
         b = self.bufs.get((key, name))
         if b is None or b[0][0][0].size != (w, h):
+            for t, f in (b[0] if b else ()):                     # the old size's let go
+                f.release(); t.release()
             pair = []
             for _ in range(2):
                 t = self.ctx.texture((w, h), 4, dtype="f2")
@@ -768,7 +786,7 @@ def look_draw(src, name):
 
     def draw(ctx, st):
         from native import clock, vj
-        st["n"] = st.get("n", 0) + 1
+        st["n"] = st.get("n", 0) + 1                                 # (iFrame is the GL thread's count, _run)
         bands = getattr(ctx, "bands", None)
         aud = audio_texture(bands if bands is not None else np.full(16, ctx.bass, np.float32), ctx.wave)
         key = st.get("key")

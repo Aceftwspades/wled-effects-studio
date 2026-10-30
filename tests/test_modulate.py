@@ -452,6 +452,26 @@ try:
     mo.apply(app)
     check(app.eng.fx["sx"] > 40, "the next beat: fired")
     del app.last_hit_at
+    # the VJ's grid beat, set earlier in the frame than the modulators run (vj.update before step_sim): every
+    # beat fires, not only those that fell within a frame of the modulators' run
+    mo.modulators(app).clear()
+    mo.apply(app)
+    app.eng.fx["sx"] = 40
+    e = mo.add(app, key="sx", kind="env", fire="beat", depth=200, attack=0.01, release=0.05)
+    spb, frame, gap = 0.48371, 1 / 60, 0.010
+    t0, fired, up, beats = clock.now(), 0, False, set()
+    for _ in range(int(20 / frame)):
+        clock.step(frame - gap)
+        k = int((clock.now() - t0) // spb)
+        app._vj_at, app._vj_grid_beat_at = clock.now(), t0 + k * spb      # the VJ's frame: its last grid beat
+        beats.add(k)
+        clock.step(gap)
+        mo.apply(app)
+        now_up = app.eng.fx["sx"] > 40
+        fired += now_up and not up
+        up = now_up
+    check(fired == len(beats) - 1, f"the grid's beats, set before the modulators run: each fired ({fired} of {len(beats) - 1})")
+    del app._vj_at, app._vj_grid_beat_at
     mo.modulators(app).clear()
     mo.apply(app)
     # a sound level that is not a number: silence, not full
@@ -476,6 +496,28 @@ try:
     mo.modulators(app).clear()
     mo.apply(app)
     check(app._mod_state == {}, "none left: nothing kept")
+    # Undo straight after a drag in the dialog (its save still waiting): the drag undone, not the change before too
+    import tempfile
+    from native.project import Project
+    keep = app.project
+    app.project = Project(os.path.join(tempfile.mkdtemp(), "p"))
+    mo.add(app)
+    mo.edit(app, 0, shape="square")                          # saved
+    mo.edit(app, 0, depth=200)                               # a drag: its save waiting
+    mo.undo(app)
+    x = mo.modulators(app)[0]
+    check(x["shape"] == "square" and x["depth"] != 200, f"one Undo: the drag taken back, the shape kept ({x['shape']})")
+    app.project.redo("modulators")
+    check(mo.modulators(app)[0]["depth"] == 200, "and Redo brings the drag back")
+    mo.edit(app, 0, depth=7)                                 # paused: nothing runs apply, the main loop's flush saves
+    clock.step(mo.SAVE_AFTER_S)
+    mo._flush(app, clock.now())
+    import json
+    with open(app.project.file, encoding="utf-8") as f:
+        check(json.load(f)["options"]["modulators"][0]["depth"] == 7, "a drag while paused: saved by the loop's flush")
+    app.project = keep
+    mo.modulators(app).clear()
+    mo.apply(app)
 finally:
     clock.release()
 

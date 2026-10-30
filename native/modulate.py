@@ -389,9 +389,15 @@ def apply(app):
     grid = getattr(app, "_vj_grid_beat_at", None)                # the VJ running on its bar grid: its beat
     if grid is not None and now - getattr(app, "_vj_at", -1e9) < 0.25:
         since = now - grid
-    prev = st.get("since")                                   # a beat since the last frame: one that is fresh (not
-    hit = since is not None and since <= dt + 1e-3 and (prev is None or since < prev)   # an old one at the start)
-    st["since"] = since
+    beat_at = None if since is None else now - since         # a beat since the last frame: one later than the last
+    prev = st.get("beat_at")                                 # seen (the VJ's grid beat is set earlier in the frame,
+    if beat_at is None:                                      # so not one within this frame's dt); at the start, only
+        hit = False                                          # one that is fresh, not an old one
+    elif prev is None:
+        hit = since <= dt + 1e-3
+    else:
+        hit = beat_at > prev + 1e-4
+    st["beat_at"] = beat_at
     sound = None
     ph = st.setdefault("phase", {})
     push = {}
@@ -718,8 +724,13 @@ def put_deck_mods(app, i, mods):
 
 
 def scene(app):
-    """What a VJ show step keeps of the modulators: each one's on or off and depth, by id."""
-    return {str(m["id"]): {"on": bool(m.get("on", True)), "depth": int(m.get("depth", 0))} for m in modulators(app)}
+    """What a VJ show step keeps of the modulators: each one's on or off and depth, by id - as the step playing has
+    them while a show plays one (what shows is what is kept, as with its decks)."""
+    out = {}
+    for m in modulators(app):
+        m = _scened(app, m)
+        out[str(m["id"])] = {"on": bool(m.get("on", True)), "depth": int(round(float(m.get("depth", 0))))}
+    return out
 
 
 def play_scene(app, sc):
@@ -1149,7 +1160,9 @@ def show(app):
 
 
 def undo(app):
-    """The modulators' last change taken back (the dialog's Undo; the pads' takes it back too when it was last)."""
+    """The modulators' last change taken back (the dialog's Undo; the pads' takes it back too when it was last). A
+    drag waiting to be saved is saved first: it is the change taken back, not lost with the one before it."""
+    _flush(app, 0.0, force=True)
     if not app.project.undo("modulators"):
         gp = getattr(app, "gp", None)
         if gp is not None:

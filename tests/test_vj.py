@@ -1058,6 +1058,78 @@ d0 = vj.options(app)["decks"][0]
 check(0 not in app._vj_morphs and d0["morph_to"] == "" and d0["look"] == "Plasma", "a preset mid-Mutate: the morph let go")
 
 clock.release()
+
+# --- the second review's ---------------------------------------------------------------------------------------
+g8 = geometry.Geometry("cube", B=8)
+# a Cut waiting for its bar when a show step takes the desk: not fired over the step's fader
+a1 = App(g8)
+o1 = vj.options(a1)
+o1["quant"], o1["fader"] = "bar", 0.0
+vj.update(a1, 1 / 40)
+vj.launch(a1, 0.0)
+vj.apply_step(a1, {"vj": {"decks": vj.json_copy(o1["decks"]), "fader": 0.0}, "trans": 0}, playing=True)
+for _ in range(90):
+    vj.update(a1, 1 / 30)
+    time.sleep(0.01)
+check(a1._vj_pending is None and o1["fader"] == 0.0, f"a Cut waiting when a step lands: let go ({o1['fader']})")
+vj.restore_desk(a1)
+vj.close(a1)
+# a Mutate growing when a step takes the desk: the desk kept with it grown, not frozen part-way
+a2 = App(g8)
+o2 = vj.options(a2)
+o2["decks"][0]["look"] = next(n for n, lk in vj_looks.LOOKS.items() if lk.family == "flame")
+o2["decks"][0]["mutate_bars"] = 1
+vj.update(a2, 1 / 40)
+child = vj.mutate_flame(a2, 0)
+for _ in range(10):
+    vj.update(a2, 1 / 30)
+st2 = {"vj": {"decks": vj.json_copy(o2["decks"])}, "trans": 0}
+st2["vj"]["decks"][0].update(look="Plasma", morph_to="", morph=0.0)
+vj.apply_step(a2, st2, playing=True)
+vj.restore_desk(a2)
+d2 = o2["decks"][0]
+check(d2["look"] == child and d2["morph_to"] == "" and not a2._vj_morphs, f"a Mutate a step cut short: grown ({d2['look']})")
+vj.close(a2)
+# a damaged project's VJ settings: put right, not failing every frame
+for what, bad in (("react null", {"decks": [{"react": None}]}), ("source null", {"decks": [{"source": None}]}),
+                  ("decks a dict", {"decks": {}}), ("auto null", {"auto": None}), ("a null deck", {"decks": [None]}),
+                  ("speed as text", {"decks": [{"speed": "1.5x"}]}), ("fader null", {"fader": None}),
+                  ("an unknown mode", {"mode": "overlay", "quant": "never", "map": "x"}),
+                  ("bars as text", {"auto": {"mix": "bars", "bars": "4 bars"}}),
+                  ("clip as text", {"decks": [{"source": {"kind": "file", "files": ["a.mp4"], "clip": "x"}}]}),
+                  ("vj a list", [])):
+    a3 = App(g8)
+    a3.project.options["vj"] = bad
+    try:
+        vj.options(a3)
+        vj.update(a3, 1 / 30)
+        vj.update(a3, 1 / 30)
+        o3 = vj.options(a3)
+        check(o3["mode"] in vj.MODES and dict(vj.QUANTS).get(o3["quant"]) and isinstance(o3["auto"]["bars"], int),
+              f"{what}: read")
+    except Exception as e:
+        check(False, f"{what}: {type(e).__name__} {e}")
+    vj.close(a3)
+# a modulator on a picture knob moves the picture (the layout read the deck's own value only)
+from PIL import Image
+a4 = App(g8)
+o4 = vj.options(a4)
+pic = os.path.join(a4.project.path, "p.png")
+px_ = np.zeros((40, 40, 3), np.uint8)
+px_[:20] = 255
+Image.fromarray(px_).save(pic)
+o4["decks"][0].update(look="Image", image=pic, pic_drift=0.0)
+vj.update(a4, 1 / 30)
+c0 = vj._runs(a4)[0].canvas.copy()
+a4._vj_mod = {(0, "pic_scale"): 4.0, (0, "pic_rot"): 90.0}
+vj.update(a4, 1 / 30)
+check(not np.allclose(c0, vj._runs(a4)[0].canvas), "a modulator on the picture's scale and turn: it moves")
+vj.close(a4)
+# fit and tile on a file: cropped to the box ffmpeg pads it in (the file's own clear parts kept), not to what is
+# not clear (a transparent clip's sprite re-fitted every frame)
+check(videomod.fit_box((320, 180), 64, 64) == (0, 14, 64, 36) and videomod.fit_box((180, 320), 96, 72) == (27, 0, 41, 72)
+      and videomod.fit_box(None, 64, 64) is None, "the fitted picture's box, as ffmpeg pads it")
+
 vj.close(app)
 
 print("FAILED:", fails if fails else "none")

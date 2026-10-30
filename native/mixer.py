@@ -80,7 +80,8 @@ def deck_b(app):
         eng = app.second_engine("mixer")
     except Exception:
         return None
-    if eng.cols != app.eng.cols or eng.rows != app.eng.rows:
+    if (getattr(eng, "geom", None) is not app.project.geometry          # another shape, not only another size:
+            or eng.cols != app.eng.cols or eng.rows != app.eng.rows):   # six faces, a ledmap's (a pooled engine's)
         eng.set_geometry(app.project.geometry)
         app._mixer_sel = None
     if o["b"] not in eng.names:

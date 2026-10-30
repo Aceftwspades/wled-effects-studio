@@ -101,8 +101,14 @@ class FfmpegSource:
     """A file or a webcam through ffmpeg, frames read on a thread; latest() is the newest decoded."""
 
     def __init__(self, input_args, label, kind, width=WIDTH, height=HEIGHT, realtime=True, loop=False, fit=False,
-                 fps=None, crop=None, alpha=False):
+                 fps=None, crop=None, alpha=False, rerun=False):
         self.kind, self.label = kind, label
+        # run again from its start each time it ends: a clip's In/Out points (-ss/-t), which -stream_loop does not
+        # repeat (its -t ends the whole loop, its -ss is the first pass's only) - rerun instead of loop for those
+        self._rerun = bool(rerun)
+        self._pace = None                                        # a rerun's frames paced here: ffmpeg's -re waits
+        if self._rerun and realtime:                             # ~0.5 s before its first frame, at every rerun
+            realtime, self._pace = False, float(fps or FILE_FPS)
         self.comps = 4 if alpha else 3                            # RGBA: a file with transparency (alpha_of)
         self.w, self.h = int(width), int(height) // 2 * 2
         self.error = None
@@ -132,36 +138,59 @@ class FfmpegSource:
         if fps:
             vf = f"fps={fps}," + vf
         self.cmd = [exe, "-v", "error", "-nostdin"] + pre + list(input_args) + ["-vf", vf, "-an", "-f", "rawvideo", "-pix_fmt", "rgba" if alpha else "rgb24", "-"]
+        self._errs = []
+        self._spawn()
+        self.thread = threading.Thread(target=self._read, daemon=True)
+        self.thread.start()
+
+    def _spawn(self):
         from native import procs
         self.proc = procs.popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # ffmpeg's messages read as they come, the last few kept for the error: read only after the video ended,
         # a webcam's "buffer too full" lines filled the pipe, ffmpeg blocked on it, and the picture froze unsaid
-        self._errs = []
-        threading.Thread(target=self._drain, daemon=True).start()
-        self.thread = threading.Thread(target=self._read, daemon=True)
-        self.thread.start()
+        threading.Thread(target=self._drain, args=(self.proc,), daemon=True).start()
 
     def describe(self):
         return f"{self.label}, {self.w} x {self.h}"
 
     def _read(self):
         size = self.w * self.h * self.comps
-        out = self.proc.stdout
         from native import clock
         try:
-            while not self._stop.is_set():
-                with self._cv:                               # a held clock: no further than the frame it wants
-                    while self.fps and clock.held() and self._reads > self._want and not self._stop.is_set():
-                        self._cv.wait(0.05)
-                buf = out.read(size)
-                if len(buf) < size:
+            while True:
+                out, got, t0 = self.proc.stdout, 0, None
+                while not self._stop.is_set():
+                    with self._cv:                           # a held clock: no further than the frame it wants
+                        while self.fps and clock.held() and self._reads > self._want and not self._stop.is_set():
+                            self._cv.wait(0.05)
+                    buf = out.read(size)
+                    if len(buf) < size:
+                        break
+                    if self._pace and not clock.held():      # a rerun: frame k at its time from the run's first
+                        now = time.monotonic()
+                        t0 = now if t0 is None else t0
+                        wait = t0 + got / self._pace - now
+                        if wait > 0:
+                            self._stop.wait(wait)
+                        elif wait < -0.25:                   # fallen behind (a stall): on from now, not caught up
+                            t0 = now - got / self._pace
+                    got += 1
+                    with self._cv:
+                        if not self._paused:                 # paused: the picture holds (the video runs on)
+                            self._frame = np.frombuffer(buf, np.uint8).reshape(self.h, self.w, self.comps)
+                            self.n += 1
+                        self._reads += 1
+                        self._cv.notify_all()
+                if not self._rerun or got == 0:              # a run that gave nothing: not run again for ever
                     break
+                try:
+                    self.proc.wait(timeout=2)
+                except Exception:
+                    pass
                 with self._cv:
-                    if not self._paused:                     # paused: the picture holds (the video runs on)
-                        self._frame = np.frombuffer(buf, np.uint8).reshape(self.h, self.w, self.comps)
-                        self.n += 1
-                    self._reads += 1
-                    self._cv.notify_all()
+                    if self._stop.is_set():
+                        break
+                    self._spawn()                            # from its In point again (close() kills this one)
         except Exception as e:
             self.error = str(e)
         if not self._stop.is_set() and self.error is None:
@@ -169,9 +198,9 @@ class FfmpegSource:
             err = [l for l in list(self._errs) if l.strip()]
             self.error = (err[-1].strip() if err else "the video ended")
 
-    def _drain(self):
+    def _drain(self, proc):
         try:
-            for line in iter(self.proc.stderr.readline, b""):
+            for line in iter(proc.stderr.readline, b""):
                 self._errs.append(line.decode("utf-8", "replace"))
                 del self._errs[:-20]
         except Exception:
@@ -201,15 +230,17 @@ class FfmpegSource:
 
     def close(self):
         self._stop.set()
-        with self._cv:
-            self._cv.notify_all()
+        with self._cv:                                       # (a rerun's new process is started under it: this
+            self._cv.notify_all()                            # kills that one, not the one before)
+            proc = self.proc
         try:
-            self.proc.kill()
+            proc.kill()
         except Exception:
             pass
 
 
 _ALPHA = {}
+_SIZE = {}
 
 
 def alpha_of(path):
@@ -230,18 +261,48 @@ def alpha_of(path):
         from native import procs
         try:
             out = procs.run([probe, "-v", "error", "-select_streams", "v:0", "-show_entries",
-                             "stream=codec_name,pix_fmt:stream_tags=alpha_mode", "-of", "default=nw=1", path],
+                             "stream=codec_name,pix_fmt,width,height:stream_tags=alpha_mode", "-of", "default=nw=1", path],
                             capture_output=True, text=True, timeout=10).stdout
         except Exception:
             out = ""
         info = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
         codec, fmt = info.get("codec_name", ""), info.get("pix_fmt", "")
+        try:
+            _SIZE[key] = (int(info["width"]), int(info["height"]))
+        except (KeyError, ValueError):
+            pass
         if info.get("TAG:alpha_mode") == "1" and codec in ("vp8", "vp9"):
             got = (["-c:v", "libvpx" if codec == "vp8" else "libvpx-vp9"], True)
         elif fmt.startswith(("yuva", "rgba", "bgra", "argb", "abgr", "gbrap", "ya")) or fmt in ("pal8",):
             got = ([], True)
     _ALPHA[key] = got
     return got
+
+
+def size_of(path):
+    """A video file's (width, height) as ffprobe gave it with alpha_of, or None."""
+    import os
+    try:
+        key = (path, os.path.getmtime(path))
+    except OSError:
+        return None
+    if key not in _ALPHA:
+        alpha_of(path)
+    return _SIZE.get(key)
+
+
+def fit_box(size, w, h):
+    """(x, y, width, height) of a picture of `size` fitted into w x h as FfmpegSource(fit=True) pads it (ffmpeg's
+    scale ... decrease, then pad centred), or None for a size not known."""
+    if not size or size[0] <= 0 or size[1] <= 0:
+        return None
+    iw, ih = size
+    if iw * h > ih * w:                                      # wider: the width filled
+        bw, bh = w, max(1, int(w * ih / iw + 0.5))     # (half up, as ffmpeg rounds)
+    else:
+        bw, bh = max(1, int(h * iw / ih + 0.5)), h
+    bw, bh = min(w, bw), min(h, bh)
+    return (w - bw) // 2, (h - bh) // 2, bw, bh
 
 
 def webcams():
@@ -608,10 +669,10 @@ class WebSource:
                                fit=self.fit)
         except ValueError as e:
             self.error = str(e); return
-        if self._closed:
-            src.close(); return
         src.pause(self._paused)
         self._src = src
+        if self._closed:                                     # closed meanwhile (after the source was kept, so a close
+            src.close()                                      # between the two cannot miss it): ffmpeg not left running
 
     @property
     def n(self):

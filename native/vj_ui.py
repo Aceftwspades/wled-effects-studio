@@ -693,6 +693,11 @@ def _fill_browser(app):
     c = _c()
     dpg.delete_item("vj_br_grid", children_only=True)
     app._vj_thumbs = {}
+    made = app.__dict__.setdefault("_vj_th_made", {})        # a thumbnail's texture, by the look it was made for:
+    for n in [n for n in made if n not in vj_looks.LOOKS]:    # one of a look gone (a pack taken off) let go
+        tag = made.pop(n)
+        if dpg.does_item_exist(tag):
+            dpg.delete_item(tag)
     try:
         packs = addons.installed()
     except OSError:
@@ -714,6 +719,7 @@ def _fill_browser(app):
                 row = dpg.add_group(horizontal=True, parent="vj_br_grid")
             tag = f"vj_th_{abs(hash(n)) % 10 ** 9}"
             _tex(tag, TH_W, TH_H)
+            made[n] = tag
             addon = vj_looks.look_source(n)[0] == "addon"
             with dpg.group(parent=row):
                 dpg.add_image_button(tag, width=px(TH_W * 1.4), height=px(TH_H * 1.4),
@@ -1284,7 +1290,7 @@ def _ask_py(app):
 
 
 def _user_path(name):
-    return next((p for p, e in vj_looks._USER.items() if e[1] == name), None)
+    return vj_looks.look_path(name)
 
 
 def _edit_look(app, i):

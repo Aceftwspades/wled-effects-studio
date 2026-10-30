@@ -159,10 +159,10 @@ def poll(app):
     if not getattr(app, "_phone_started", False):
         app._phone_started = True                          # left on: served again as the studio starts
         open_saved(app)
+    from native import pads_ui
+    pads_ui.remote_poll(app, gone=not r.is_open)           # a pad a phone held, the phone (or the remote) gone: let go
     if not r.is_open:
         return
-    from native import pads_ui
-    pads_ui.remote_poll(app)                                # a pad a phone held, the phone gone: let go
     pad = False
     for cmd in r.drain():
         pad = pad or (cmd.get("a") in ("pad", "padbank") and cmd.get("e") not in ("move", "hold"))

@@ -29,7 +29,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import num
-from native import render_video, render_fseq, modulate, mixer, vj
+from native import render_video, render_fseq, modulate, mixer, vj, clock
 from native import typeface
 from native import form
 from native import dock
@@ -1059,7 +1059,7 @@ class App(Features, Recorder, EditBuild):
         """The project about to be closed left whole: the pads and controls held let go (what a hold changed put
         back), the desk a show's VJ steps took over put back, and what waits to be saved (a VJ knob, a modulator
         turned, a pad's typed label, the mixer's fader) saved into it - not into the next one."""
-        from native import modulate, mixer, pads, pads_ui, vj, vj_ui
+        from native import modulate, pads, pads_ui, vj, vj_ui
         try:
             pads.let_go(self)
         except Exception:
@@ -1676,6 +1676,7 @@ class App(Features, Recorder, EditBuild):
                     self.edit_save()
                 if self.gp.graph is not None:
                     self.gp.save()
+                self._leave_project()            # what waits to be saved (a modulator dragged while paused) kept
                 save_prefs(self.prefs)
             except Exception:
                 import traceback
@@ -4202,6 +4203,7 @@ def main():
                 app.poll_wiring_read()
                 app.poll_stream_wiring()
                 chrome.poll_update(app); chrome.poll_update_download(app)
+                modulate._flush(app, clock.now())    # a modulator turned while paused saved too (apply runs only playing)
                 _t.append(time.perf_counter())
                 app.step_sim()
                 _t.append(time.perf_counter())

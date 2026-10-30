@@ -518,6 +518,45 @@ try:
     modulate.apply(app3)
 finally:
     clock.release()
+
+# a hand-edited pads file: put right, not failing every frame (pads_hw.poll reads it each one)
+class Bare:
+    def __init__(self, pads_):
+        self.options = {"pads": pads_}
+
+
+for what, bad in (("a bank not a dict", {"banks": [3]}), ("a null grid", {"banks": [{"cols": None, "rows": "x"}]}),
+                  ("a null bank", {"bank": None}), ("a position as text", {"banks": [{"controls": [
+                      {"type": "trigger", "x": "1", "y": 0, "w": 1.0, "h": 1}]}]}),
+                  ("controls not a list", {"banks": [{"controls": {"a": 1}}]}), ("hw a list", {"hw": []}),
+                  ("a short learn", {"banks": [{"controls": [{"type": "trigger", "x": 0, "y": 0, "midi": ["note"]}]}]}),
+                  ("pads not a dict", [])):
+    try:
+        st_ = pads.state(Bare(bad))
+        from native import pads_hw as ph
+        ph.hw(st_)
+        ph.wanted(App(geometry.Geometry("cube", B=16)), st_)
+        check(isinstance(st_["banks"][0], dict), f"{what}: read")
+    except Exception as e:
+        check(False, f"{what}: {type(e).__name__} {e}")
+st_ = pads.state(Bare({"banks": [{"controls": [{"type": "trigger", "x": 0, "y": 0, "id": 5},
+                                               {"type": "trigger", "x": 1, "y": 0, "id": 5}]}]}))
+ids = [c["id"] for c in st_["banks"][0]["controls"]]
+check(len(set(ids)) == 2 and st_["next_id"] > max(ids), f"an id given twice, no next_id: each its own ({ids})")
+
+# a bank switched (the phone, the controller) while Edit drags a control: the drag let go, not laid on the other grid
+app4 = App(geometry.Geometry("cube", B=16))
+pads_ui._fill_banks = pads_ui._fill_side = lambda a: None
+st4 = pads_ui._st(app4)
+st4["banks"].append(pads.new_bank("Big", 8, 8))
+b0 = st4["banks"][0]
+c0 = pads.at(b0, 0, 0)
+app4._pads_edit = True
+app4._pads_drag = ("move", c0["id"], (0, 0), (c0["x"], c0["y"]))
+pads_ui.switch_bank(app4, 1)
+pads_ui._dragging(app4, app4._pads_drag, 6 * 50 + 10, 5 * 50 + 10, 0, 0, 50, 50, 6, pads.current(st4))
+check((c0["x"], c0["y"]) == (0, 0) and pads.fits(b0, c0) and app4._pads_drag is None,
+      f"a move across a bank switch: the control left where it was ({c0['x']}, {c0['y']})")
 dpg.destroy_context()
 
 print("pads:", "FAILED" if fails else "ok")
