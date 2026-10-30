@@ -406,7 +406,7 @@ check(showanalysis.boundaries(nov, bar=2.0, first=0.5) == [20.5], "an edge on th
 from native import modulate as mo
 m1 = dict(mo.DEFAULT, shape="random", seed=1)
 m2 = dict(mo.DEFAULT, shape="random", seed=2)
-check(mo.offset(m1, 2.5, None) != mo.offset(m2, 2.5, None), "two random modulators: two waves")
+check(mo.offset(m1, 0.6, None) != mo.offset(m2, 0.6, None), "two random modulators: two waves")
 
 # --- the remaining list (2026-10-23) ----------------------------------------------------------------
 # deck C over the mix, at its level; A and B at theirs

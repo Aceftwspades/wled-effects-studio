@@ -4294,6 +4294,16 @@ notes, its lights mirroring the layout). In four phases:
    state 3.3 -> 0.4 ms, the lights worked out once a control (0.85 -> 0.35 ms) so sent each frame; the phone
    remote kept on one HTTP/1.1 connection (a press over HTTPS on the loopback 11.4 -> 1.0 ms, no handshake each
    time), and its state published as soon as a pad is pressed, the page asking again 30 ms after.
+5. **Modulators on the pads**, step 1 **done** (2026-10-29): native/modulate.py - each modulator an id and a list
+   of sliders (one made before: its "key" a list of one), each moved by depth of 255 of its own range (Custom 3's
+   0..31 was moved in steps of 255 before); its rate synced (beats, the default) or free (0.05..20 Hz); its phase
+   kept and moved on each frame, so a rate turned mid-wave never jumps it (the old beats / period jumped 83 steps
+   in a frame in the test), a synced one eased back onto its beat grid at most a quarter faster or slower than its
+   own speed; its rate, depth, shape, on/off and a restart targets of MIDI, the pads and the phone (midi_ui.targets,
+   midi.MOD_BUTTONS, pads.FLIPS), saved once left 0.8 s; the dialog's widgets kept as a control moves them.
+   Tests: test_modulate (the phase, the grid, free, several sliders, the targets, the save), test_pads (a fader on
+   the rate, a toggle on on/off). Next: an LFO attached from the pad editor and its range drawn on the pad; how a
+   pad starts it (always, while held, restart on press) and an envelope; the controller's lights pulsing.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

@@ -1172,6 +1172,13 @@ STEPS = [
                 "app.eng.fx['sx'] in (max(0, app._mo_sx - 20), min(255, app._mo_sx + 20))"},
       {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
     ([{"check": "app.eng.fx['sx'] == app._mo_sx"}], 0.1),
+    # a modulator on two sliders, at a free rate; its depth turned from a control (as a pad or MIDI does) shown in the dialog
+    ([{"py": "__import__('native.modulate', fromlist=['m']).add(app, key='ix', period=4)"}, {"py": "__import__('native.modulate', fromlist=['m']).show(app)"}, {"py": "__import__('native.modulate', fromlist=['m']).add_key(app, 0)"},
+      {"py": "__import__('native.modulate', fromlist=['m']).edit(app, 0, sync=False)"}], 0.2),
+    ([{"check": "dpg.does_item_exist('mod_hz_0') and len(__import__('native.modulate', fromlist=['m']).modulators(app)[0]['keys']) == 2"},
+      {"py": "__import__('native.midi_ui', fromlist=['m']).apply_target(app, {'kind': 'mod', 'id': __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'key': 'depth'}, 1.0, 1.0)"}], 0.2),
+    ([{"check": "__import__('native.modulate', fromlist=['m']).modulators(app)[0]['depth'] == 255 and int(dpg.get_value('mod_depth_0')) == 255"},
+      {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
     # a number field dragged: its pace from its width as drawn, so a wide one keeps up with the pointer
     ([{"py": "num._on_activated(None, dpg.get_alias_id('inp_sx'))"},
       {"check": "dpg.get_item_rect_size('inp_sx')[0] <= 0 or "

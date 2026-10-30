@@ -1045,15 +1045,29 @@ desk made a frame of its own, with more looks and a source per deck.
 themselves, around where it is set - in the sim and so in the stream.
 **+ Modulator** adds one; each row picks the slider, what moves it and how
 far (the number after it): **a wave (LFO)** - sine, triangle, saw up or
-down, square or random - over a length in beats; **on the beat**, a push
-upward on each beat of the sound, eased in over 140 ms and let go over
-its time; or **a step pattern** of up to 16 levels (the small sliders
-under its row, **+** and **-** for more or fewer), a step every so many
-beats. The beats are the show's tempo (the synth's without one). A
-modulator never takes the slider over: drag the slider, play a step of
-the show, move it from MIDI, and it moves around the new place; untick
-it or take it away (**x**) and the slider is left where it was set.
-The device does not run them: they are for the sim and the stream.
+down, square or random; **on the beat**, a push upward on each beat of
+the sound, eased in over 140 ms and let go over its time; or **a step
+pattern** of up to 16 levels (the small sliders under its row, **+** and
+**-** for more or fewer). A wave's or a step's rate is **synced** - a
+length in beats of the show's tempo (the synth's without one) - or
+**free**, so many a second (0.05 to 20 Hz). The **+** beside the slider
+moves one more slider by the same wave (an **also moves** row under it,
+each with its **x**); the depth is of each slider's own range, so Custom
+3's 0..31 moves as far along as Speed's 0..255. A modulator never takes
+the slider over: drag the slider, play a step of the show, move it from
+MIDI, and it moves around the new place; untick it or take it away
+(**x**) and the slider is left where it was set. The device does not run
+them: they are for the sim and the stream.
+
+Each modulator is **Mod 1**, **Mod 2** ... in every list of things a
+control can drive - a MIDI mapping, a VJ pad, the phone's pads: its
+**rate** (a fader or knob up is faster; synced, it steps along the beat
+lengths), its **depth**, its **wave shape**, **on or off** (a toggle pad
+lights while it runs; a hold pad switches it only while held - one left off runs while the pad is down), and **restart its
+wave** (back to its start, the beat counted from that moment). A rate
+turned while the wave runs carries on from where it was, never jumping;
+a synced one then eases back onto the beat within a few cycles. What a
+control turns is saved once it is left alone.
 
 **The mixer** (Playback > Mixer...) runs a second effect beside the one
 the studio has, hearing the same sound, and a fader takes the picture

@@ -377,12 +377,13 @@ def _sel(app):
 
 def _labels_for(app):
     """What the action list depends on: the effect shown and its sliders' names (another effect names them its way)."""
+    from native import modulate
     eng = app.eng
     idx = getattr(eng, "idx", None)
     try:
-        return idx, tuple(eng.meta[idx]["labels"])
+        return idx, tuple(eng.meta[idx]["labels"]), modulate.signature(app)
     except Exception:
-        return idx, None
+        return idx, None, modulate.signature(app)
 
 
 def labels(app):
@@ -405,7 +406,7 @@ def labels(app):
 
 
 def _label_key(t):
-    return tuple(t.get(q) for q in ("kind", "deck", "key"))
+    return tuple(t.get(q) for q in ("kind", "deck", "key", "id"))         # id: a modulator's
 
 
 def target_label(app, t):

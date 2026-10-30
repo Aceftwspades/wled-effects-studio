@@ -400,6 +400,32 @@ app3.project.save()
 pads_ui._undo(app3)
 st5 = pads_ui._st(app3)
 check(st5["banks"][1]["name"] == "Two" and st5["bank"] == 1, "an undo of an edit: the bank shown stays where it is")
+
+# --- a modulator's settings on the pads: a fader turns its rate, a toggle switches it, a trigger restarts its wave ----
+from native import modulate
+
+
+class Gp:
+    graph, file = None, None
+
+
+app3.eng.meta, app3.eng.idx, app3.gp = [{"labels": ["Speed", "Intensity"]}], 0, Gp()
+mod = modulate.add(app3, key="sx", period=4)
+st6 = pads_ui._st(app3)
+rate_f = pads.new_control(st6, "fader", 0, 0, target={"kind": "mod", "id": mod["id"], "key": "rate"})
+onoff = pads.new_control(st6, "toggle", 1, 0, target={"kind": "mod_on", "id": mod["id"]})
+check(abs(pads.position(app3, rate_f) - 3 / 7) < 1e-6, "the fader shows the rate: 4 beats, along the beats")
+pads.press(app3, rate_f, 1.0)
+pads.release(app3, rate_f)
+check(mod["period"] == 0.25, "the fader to the top: the fastest synced rate")
+check(pads.kind_of(onoff["target"]) == "flip" and pads.lit(app3, onoff), "on or off a flip, lit while it runs")
+pads.press(app3, onoff)
+pads.release(app3, onoff)
+check(mod["on"] is False and not pads.lit(app3, onoff), "the toggle switches it off, and goes dark")
+labs = [lab for lab, _ in pads_ui.labels(app3)]
+check(any(lab.endswith(": restart its wave") for lab in labs), "the modulator's targets in the pads' list")
+modulate.add_key(app3, 0)
+check(pads_ui.target_label(app3, rate_f["target"]).endswith("+ 1): rate"), "a slider added to it: the labels made again")
 dpg.destroy_context()
 
 print("pads:", "FAILED" if fails else "ok")

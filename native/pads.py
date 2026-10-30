@@ -45,7 +45,7 @@ COLOURS = (("grey", (120, 124, 132)), ("red", (226, 64, 64)), ("orange", (240, 1
            ("cyan", (60, 200, 240)), ("blue", (70, 120, 240)), ("violet", (150, 90, 240)), ("pink", (240, 90, 190)))
 COLOUR = dict(COLOURS)
 # switches that flip something on and off: a toggle shows it, a hold flips it back on release
-FLIPS = ("vj_air", "vj_c_toggle", "vj_pause_a", "vj_pause_b", "vj_pause_c")
+FLIPS = ("vj_air", "vj_c_toggle", "vj_pause_a", "vj_pause_b", "vj_pause_c", "mod_on")
 FLASH_MS = 0.15                 # a trigger shown lit this long after its press
 MAX_BANKS = 32
 
@@ -229,6 +229,9 @@ def value(app, t):
             return float(app.eng.fx.get(t.get("key"), 0)) / (31.0 if t.get("key") == "c3" else 255.0)
         if k == "check":
             return 1.0 if app.eng.fx.get(t.get("key")) else 0.0
+        if k == "mod":
+            from native import modulate
+            return modulate.value(app, t)
     except Exception:
         return None
     return None
@@ -244,6 +247,9 @@ def is_on(app, t):
         return bool(vj.c_is_in(app))
     if k and k.startswith("vj_pause_"):
         return _paused(app, "abc".index(k[-1]))
+    if k == "mod_on":
+        from native import modulate
+        return modulate.is_on(app, t)
     return None
 
 

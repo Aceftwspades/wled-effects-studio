@@ -178,6 +178,8 @@ def targets(app):
         out += [(f"VJ {d}: {vj.KNOB_WORDS[k]}", {"kind": "vj_knob", "deck": i, "key": k}) for k, _, _ in vj.KNOBS]
         out += [(f"VJ {d}: next video file", {"kind": f"vj_clip_{d.lower()}"}),
                 (f"VJ {d}: video paused or playing", {"kind": f"vj_pause_{d.lower()}"})]
+    from native import modulate
+    out += modulate.targets(app)                                                  # each modulator's rate, depth, ...
     g = app.gp.graph
     if g and app.gp.file:
         wired = {(b, i) for _, _, b, i in g.links}
@@ -230,6 +232,10 @@ def target_label(app, t):
         return "next effect"
     if kind == "prev":
         return "previous effect"
+    if kind in ("mod",) + midi.MOD_BUTTONS:
+        from native import modulate
+        lab = next((lab for lab, x in modulate.targets(app) if x == t), None)
+        return lab or f"a modulator no longer there (Mod {t.get('id')})"
     if kind == "pin":
         g = app.gp.graph
         n = g.nodes.get(t.get("nid")) if g and app.gp.file == t.get("graph") else None
@@ -690,6 +696,10 @@ def apply_target(app, t, v, full=127.0, ctl=None):
             vj_ui.set_on(app, not vj.on(app))
         elif kind.startswith("vj_c_"):
             vj.c_launch(app, kind[5:])
+        return
+    if kind in ("mod",) + midi.MOD_BUTTONS:               # a modulator's setting (modulate.py)
+        from native import modulate
+        modulate.set_target(app, t, float(v) / float(full or 127.0))
         return
     if kind in midi.STEPS:
         switch_effect(app, midi.step_effect(app.eng.names, _st(app)["setlist"], app.eng.names[app.eng.idx],
