@@ -202,6 +202,7 @@ def apply(app):
         del ph[i]
     changed = False
     places = st.setdefault("places", {})
+    live = st.setdefault("live", {})                        # what each modulated one is moved to now (a pad shows it)
     for k in KEYS:
         cur = _get(app, k)
         if cur is None:
@@ -216,7 +217,9 @@ def apply(app):
             if v != cur:
                 changed |= _set(app, k, v)
             places[k] = (base, _get(app, k))                # as it reads back (a knob of whole steps rounds it)
+            live[k] = v
         elif written is not None:                           # no longer modulated: left at its place
+            live.pop(k, None)
             if k in VJ_KEYS:
                 getattr(app, "_vj_mod", {}).pop(_vj_key(k), None)
             elif cur == written[1] and cur != written[0]:
@@ -262,6 +265,80 @@ def place(app, key):
     """The value a modulated slider moves around (what the slider was set to), or None when it is not."""
     w = (getattr(app, "_mod_state", {}) or {}).get("places", {}).get(key)
     return None if w is None else w[0]
+
+
+def key_of(t):
+    """The modulators' name for a control's target (an effect slider, a VJ deck's knob), or None for one they
+    cannot move."""
+    k = (t or {}).get("kind")
+    if k == "fx" and t.get("key") in FX_KEYS:
+        return t["key"]
+    if k == "vj_knob":
+        key = f"vj{int(t.get('deck', 0))}.{t.get('key')}"
+        return key if key in VJ_KEYS else None
+    return None
+
+
+def on_key(app, key):
+    """The modulators moving `key`, in their order."""
+    return [m for m in modulators(app) if key in (m.get("keys") or ())]
+
+
+def swing(app, key):
+    """How far the modulators on `key` move it now: (lowest, highest, where it is) in its own steps (0..hi(key)),
+    or None when none that is on moves it. A wave swings depth around the place, a step pattern from its lowest
+    level to its highest, the beat up by depth from it."""
+    lo = up = 0.0
+    any_ = False
+    for m in on_key(app, key):
+        if not m.get("on", True):
+            continue
+        any_ = True
+        d = float(m.get("depth", 0)) * hi(key) / 255.0
+        kind = m.get("kind", "lfo")
+        if kind == "beat":
+            up += d
+        elif kind == "steps":
+            lv = [float(v) for v in (m.get("steps") or [0.5])][:16] or [0.5]
+            lo += d * (min(lv) - 0.5)
+            up += d * (max(lv) - 0.5)
+        else:
+            lo -= d / 2.0
+            up += d / 2.0
+    w = (getattr(app, "_mod_state", {}) or {}).get("places", {}).get(key)
+    if not any_ or w is None:
+        return None
+    clamp = lambda v: max(0.0, min(float(hi(key)), v))          # noqa: E731
+    now = (app._mod_state.get("live") or {}).get(key, w[0])
+    return clamp(w[0] + lo), clamp(w[0] + up), float(now)
+
+
+def attach(app, key):
+    """A new wave on `key` (the pad editor's + LFO): synced, its depth the default."""
+    return add(app, key=key)
+
+
+def detach(app, m, key):
+    """`key` no longer moved by modulator m; m taken away when it moved nothing else."""
+    keys = m.get("keys") or []
+    if key in keys:
+        keys.remove(key)
+    if not keys:
+        mods = modulators(app)
+        if m in mods:
+            mods.remove(m)
+    app.project.save()
+    refresh(app)
+
+
+def brief(m):
+    """A modulator in a few words: "sine, 4 beats", "steps, 2 Hz", "on the beat"."""
+    kind = m.get("kind", "lfo")
+    if kind == "beat":
+        return "on the beat"
+    what = m.get("shape", "sine") if kind == "lfo" else "steps"
+    rate = _beats(m.get("period", 4)) if m.get("sync", True) else f"{float(m.get('hz', 0.5)):g} Hz"
+    return f"{what}, {rate}"
 
 
 # --- a modulator's settings as targets: MIDI's, the pads', the phone's -----------------------------------------------
@@ -411,8 +488,8 @@ def refresh(app):
     import dearpygui.dearpygui as dpg
     from native import chrome, num
     from native.typeface import px
-    if not dpg.does_item_exist("mod_rows"):
-        return
+    if not getattr(app, "_mod_dialog_built", False) or not dpg.does_item_exist("mod_rows"):
+        return                                              # never opened (or no window at all: a test)
     dpg.delete_item("mod_rows", children_only=True)
     labs = _labels(app)
     by_lab = {v: k for k, v in labs.items()}

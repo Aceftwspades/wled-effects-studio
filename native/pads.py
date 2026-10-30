@@ -225,8 +225,11 @@ def value(app, t):
         if k == "mixer":
             from native import mixer
             return float(mixer.options(app)["fader"])
-        if k == "fx":
-            return float(app.eng.fx.get(t.get("key"), 0)) / (31.0 if t.get("key") == "c3" else 255.0)
+        if k == "fx":                                   # a modulated one: where it is set, not where the wave has it
+            from native import modulate
+            v = modulate.place(app, t.get("key"))
+            v = app.eng.fx.get(t.get("key"), 0) if v is None else v
+            return float(v) / (31.0 if t.get("key") == "c3" else 255.0)
         if k == "check":
             return 1.0 if app.eng.fx.get(t.get("key")) else 0.0
         if k == "mod":
@@ -442,10 +445,27 @@ def position(app, c):
     r = _rt(app)
     if v is None:
         return float(r["on"].get(("pos", c["id"]), 0.0))
+    return _travel_of(c, v)
+
+
+def _travel_of(c, v):
+    """A target's 0..1 as 0..1 of a control's travel: back through its range and invert, held to the ends."""
     lo, hi = float(c.get("lo", 0.0)), float(c.get("hi", 1.0))
     f = 0.0 if abs(hi - lo) < 1e-9 else (v - lo) / (hi - lo)
     f = max(0.0, min(1.0, f))
     return 1.0 - f if c.get("invert") else f
+
+
+def swing(app, c):
+    """How far the modulators move a fader's or a knob's target, along its travel: (from, to, where now), from
+    below to; or None when none moves it."""
+    from native import modulate
+    key = modulate.key_of(c.get("target"))
+    s = modulate.swing(app, key) if key else None
+    if s is None:
+        return None
+    a, b, now = (_travel_of(c, v / modulate.hi(key)) for v in s)
+    return min(a, b), max(a, b), now
 
 
 def where(app, c):

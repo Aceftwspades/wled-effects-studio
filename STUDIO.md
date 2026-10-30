@@ -4302,8 +4302,18 @@ notes, its lights mirroring the layout). In four phases:
    own speed; its rate, depth, shape, on/off and a restart targets of MIDI, the pads and the phone (midi_ui.targets,
    midi.MOD_BUTTONS, pads.FLIPS), saved once left 0.8 s; the dialog's widgets kept as a control moves them.
    Tests: test_modulate (the phase, the grid, free, several sliders, the targets, the save), test_pads (a fader on
-   the rate, a toggle on on/off). Next: an LFO attached from the pad editor and its range drawn on the pad; how a
-   pad starts it (always, while held, restart on press) and an envelope; the controller's lights pulsing.
+   the rate, a toggle on on/off).
+   Step 2 **done** (2026-10-29): the pad editor's MOVED BY rows for a control on an effect slider or a deck's knob
+   (modulate.key_of) - + LFO (modulate.attach), each modulator's on/off, depth, a rate knob put in the bank's first
+   free cell, x (modulate.detach: the modulator gone with its last slider); made again when a modulator changes
+   elsewhere, not mid-drag. A fader or knob so moved drawn with the band it swings over and a mark where the wave
+   has it (pads.swing from modulate.swing, which keeps each slider's live value), on a draw layer of its own redrawn
+   alone so the grid under it is not drawn each frame. Fixed on the way: a fader on an effect slider showed the
+   wave's value and wobbled with it - pads.value reads the slider's place now. The dialog's refresh no longer runs
+   before the dialog is built (it crashed Dear PyGui with no context). Tests: test_modulate (key_of, the bands of
+   each kind, brief, detach), test_pads (+ LFO, the handle at the place, the band and upside down, the rate knob,
+   x), the smoke. Next: how a pad starts a modulator (always, while held, restart on press) and an envelope; the
+   controller's lights pulsing.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

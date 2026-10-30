@@ -19,6 +19,7 @@ from native import form, num, pads, pads_hw
 
 TAG = "pads_win"
 GRID = "pads_grid"
+MODS = "pads_mods_layer"       # the grid's top layer: how far modulators move each fader and knob, drawn each frame
 SIDE = "pads_side"
 SIDE_W = 270
 KNOB_PX = 160                  # a knob turned from bottom to top by dragging this far up
@@ -27,6 +28,8 @@ REMOTE_GONE_S = 2.5            # a pad held from a phone that has said nothing f
 SAVE_AFTER_S = 0.8             # a name or a label typed: saved once it has not changed for this long
 SWELL_FROM = 0.35              # a pressure pad's pressure as it is touched here...
 SWELL_S = 0.8                  # ...swelling to full over this many seconds held
+SWING_RGBA = (255, 255, 255, 70)   # the band a modulator swings a fader or a knob over...
+LIVE_RGBA = (255, 214, 90, 255)    # ...and where the wave has it now
 
 
 def _c():
@@ -175,6 +178,14 @@ def _build_side(app):
         dpg.add_combo(["vertical", "horizontal"], tag="pads_s_orient", width=-1,
                       callback=lambda s, v: _ctl_set(app, "orient", "v" if v == "vertical" else "h"))
         c.tip("which way a fader moves")
+        with dpg.group(tag="pads_s_modrow", show=False):
+            dpg.add_text("MOVED BY", color=c.ACCENT)
+            dpg.add_group(tag="pads_s_mods")
+            with dpg.group(horizontal=True):
+                dpg.add_button(label="+ LFO", small=True, callback=lambda: _attach(app))
+                c.tip("a wave on what this drives, synced to the beat: the control sets where it swings around")
+                dpg.add_button(label="Modulators...", small=True, callback=lambda: _open_mods(app))
+                c.tip("every modulator, with its shape, rate and the other sliders each moves")
         dpg.add_text("CONTROLLER", color=c.ACCENT)
         with dpg.group(horizontal=True):
             dpg.add_button(label="Learn", tag="pads_s_learn", small=True, callback=lambda: _learn(app, "control"))
@@ -474,6 +485,7 @@ def _fill_side(app):
     dpg.set_value("pads_s_midi", pads_hw.words(s.get("midi")) or "not learned")
     if dpg.does_item_exist("pads_blearn"):
         _fill_banks_learn(app)
+    _fill_mods(app, s, s.get(ax[1]))
     k = pads.kind_of(s.get(ax[1]))
     dpg.configure_item("pads_s_valrow", show=k == "value" or (surface and not (s.get(ax[1]) or {}).get("kind")))
     dpg.configure_item("pads_s_stage", show=k in ("look", "preset"))
@@ -489,6 +501,102 @@ def _fill_side(app):
         dpg.configure_item("pads_s_preset", items=sorted(vj.options(app)["presets"]))
         dpg.set_value("pads_s_preset", s["target"].get("name", ""))
     _fill_actions(app)
+
+
+def _fill_mods(app, c, t):
+    """The MOVED BY rows: each modulator on what the control drives (on or off, its depth, a knob for its rate, x to
+    take it off) - shown only for a target the modulators can move (an effect slider, a VJ deck's knob)."""
+    from native import modulate
+    key = modulate.key_of(t)
+    dpg.configure_item("pads_s_modrow", show=key is not None)
+    dpg.delete_item("pads_s_mods", children_only=True)
+    if key is None:
+        return
+    col = _c()
+    mods = modulate.on_key(app, key)
+    if not mods:
+        dpg.add_text("nothing - it stays where it is set", color=col.DIM, parent="pads_s_mods")
+    free = _free_cell(pads.current(_st(app)))
+    for m in mods:
+        mid = m["id"]
+        dpg.add_checkbox(label=f"Mod {mid}: {modulate.brief(m)}", default_value=bool(m.get("on", True)),
+                         parent="pads_s_mods", callback=lambda s, v, mid=mid: _mod_on(app, mid, v))
+        col.tip("on or off: off, it stays where the control sets it")
+        with dpg.group(horizontal=True, parent="pads_s_mods"):
+            dpg.add_text("  depth", color=col.DIM)
+            num.add(f"pads_s_mdepth_{mid}", int(m.get("depth", 96)), 0, 255, integer=True, width=px(60),
+                    callback=lambda s, v, mid=mid: modulate.set_target(
+                        app, {"kind": "mod", "id": mid, "key": "depth"}, int(v) / 255.0))
+            col.tip("how far it swings, of 255 of the slider's range (the band drawn on the control)")
+            dpg.add_button(label="rate knob", small=True, enabled=free is not None,
+                           callback=lambda s, a, mid=mid: _rate_knob(app, mid))
+            col.tip("a knob for its rate in the bank's first free cell" if free is not None else
+                    "no free cell on this bank for a rate knob")
+            dpg.add_button(label="x", small=True, callback=lambda s, a, mid=mid: _detach(app, mid, key))
+            col.tip("no longer moved by it (the modulator itself goes when it moved nothing else)")
+
+
+def _mods_changed(app):
+    """The panel's MOVED BY rows made again when a modulator changed elsewhere (the Modulators dialog, MIDI, the
+    phone) - not while one of its fields is being dragged."""
+    from native import modulate
+    key = tuple((m.get("id"), tuple(m.get("keys") or ()), bool(m.get("on", True)), int(m.get("depth", 0)),
+                 modulate.brief(m)) for m in modulate.modulators(app))
+    if key != getattr(app, "_pads_mods_key", None) and not num.busy():
+        app._pads_mods_key = key
+        _fill_side(app)
+
+
+def _free_cell(b):
+    return next(((x, y) for y in range(b["rows"]) for x in range(b["cols"]) if pads.at(b, x, y) is None), None)
+
+
+def _attach(app):
+    from native import modulate
+    s = _sel(app)
+    key = modulate.key_of(s.get(_axis(app)[1])) if isinstance(s, dict) else None
+    if key is not None:
+        modulate.attach(app, key)
+        app._pads_labels = None                   # the new modulator's settings in the action list
+        _fill_side(app)
+
+
+def _detach(app, mid, key):
+    from native import modulate
+    m = modulate.find(app, mid)
+    if m is not None:
+        modulate.detach(app, m, key)
+        app._pads_labels = None
+        _fill_side(app)
+
+
+def _mod_on(app, mid, v):
+    from native import modulate
+    m = modulate.find(app, mid)
+    if m is not None and bool(m.get("on", True)) != bool(v):
+        modulate.set_target(app, {"kind": "mod_on", "id": mid}, 1.0)
+
+
+def _rate_knob(app, mid):
+    """A knob for modulator mid's rate in the bank's first free cell, selected."""
+    st = _st(app)
+    b = pads.current(st)
+    cell = _free_cell(b)
+    if cell is None:
+        return
+    s = _sel(app)
+    c = pads.new_control(st, "knob", cell[0], cell[1], target={"kind": "mod", "id": mid, "key": "rate"},
+                         label=f"Mod {mid} rate", colour=s.get("colour", "grey") if isinstance(s, dict) else "grey")
+    b["controls"].append(c)
+    app._pads_sel = c["id"]
+    app._pads_axis = "x"
+    _save(app)
+    _fill_side(app)
+
+
+def _open_mods(app):
+    from native import modulate
+    modulate.show(app)
 
 
 def _fill_banks_learn(app):
@@ -708,6 +816,7 @@ def _redraw(app, cw, ch, gap):
     if key != getattr(app, "_pads_drawn", None) or not dpg.get_item_children(GRID, 2):
         app._pads_drawn = key
         _draw(app, cw, ch, gap)
+    _draw_swings(app, cw, ch, gap)
 
 
 def _draw(app, cw, ch, gap):
@@ -779,6 +888,60 @@ def _draw(app, cw, ch, gap):
         x, y = sel
         dpg.draw_rectangle((x * cw + gap, y * ch + gap), ((x + 1) * cw, (y + 1) * ch), color=(255, 255, 255, 255),
                            rounding=px(6), thickness=px(2), parent=GRID)
+    dpg.add_draw_layer(tag=MODS, parent=GRID)
+    app._pads_swung = None
+
+
+def _swings(app):
+    """[(control, (from, to, now))] of the bank's faders and knobs a modulator moves."""
+    out = []
+    for c in pads.current(_st(app))["controls"]:
+        if c["type"] in pads.SLIDERS:
+            s = pads.swing(app, c)
+            if s is not None:
+                out.append((c, s))
+    return out
+
+
+def _draw_swings(app, cw, ch, gap):
+    """The top layer drawn again when a band or a wave's place has moved (the grid under it left alone): a band over
+    the stretch of a fader's travel, or an arc round a knob, that the modulators swing it over, and a mark where
+    the wave has it now."""
+    sw = _swings(app)
+    key = tuple((c["id"], round(a, 3), round(b, 3), round(n, 3)) for c, (a, b, n) in sw)
+    if key == getattr(app, "_pads_swung", None) or not dpg.does_item_exist(MODS):
+        return
+    app._pads_swung = key
+    dpg.delete_item(MODS, children_only=True)
+    import math
+    for c, (a, b, n) in sw:
+        x0, y0, x1, y1 = _rect(c, cw, ch, gap)
+        pad = px(10)
+        if c["type"] == "fader":
+            if c.get("orient", "v") == "v":
+                yb, yt = y1 - pad, y0 + pad + px(16)
+                at = lambda f: yb - (yb - yt) * f                 # noqa: E731
+                dpg.draw_rectangle((x0 + pad - px(3), at(b)), (x1 - pad + px(3), at(a)), fill=SWING_RGBA,
+                                   color=(0, 0, 0, 0), rounding=px(3), parent=MODS)
+                dpg.draw_line((x0 + pad - px(3), at(n)), (x1 - pad + px(3), at(n)), color=LIVE_RGBA,
+                              thickness=px(2), parent=MODS)
+            else:
+                xl, xr = x0 + pad, x1 - pad
+                at = lambda f: xl + (xr - xl) * f                 # noqa: E731
+                yt, yb = y0 + pad + px(16) - px(3), y1 - pad + px(3)
+                dpg.draw_rectangle((at(a), yt), (at(b), yb), fill=SWING_RGBA, color=(0, 0, 0, 0), rounding=px(3),
+                                   parent=MODS)
+                dpg.draw_line((at(n), yt), (at(n), yb), color=LIVE_RGBA, thickness=px(2), parent=MODS)
+        else:
+            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2 + px(8)
+            r = max(px(8), min(x1 - x0, y1 - y0 - px(16)) / 2 - px(10)) + px(5)
+            ang = lambda f: math.radians(135 + 270 * f)           # noqa: E731
+            steps = max(2, int(24 * (b - a)) + 2)
+            pts = [(cx + r * math.cos(ang(a + (b - a) * k / steps)), cy + r * math.sin(ang(a + (b - a) * k / steps)))
+                   for k in range(steps + 1)]
+            dpg.draw_polyline(pts, color=SWING_RGBA[:3] + (150,), thickness=px(3), parent=MODS)
+            dpg.draw_circle((cx + r * math.cos(ang(n)), cy + r * math.sin(ang(n))), px(4), fill=LIVE_RGBA,
+                            color=(0, 0, 0, 0), parent=MODS)
 
 
 def _surface_label(app, c):
@@ -887,6 +1050,8 @@ def poll(app):
         app._pads_labels = None
         _fill_banks(app)
         _fill_side(app)
+    if getattr(app, "_pads_edit", False):
+        _mods_changed(app)
     x0, y0, cw, ch, gap = _geometry(app)
     st = _st(app)
     b = pads.current(st)

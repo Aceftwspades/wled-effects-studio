@@ -426,6 +426,46 @@ labs = [lab for lab, _ in pads_ui.labels(app3)]
 check(any(lab.endswith(": restart its wave") for lab in labs), "the modulator's targets in the pads' list")
 modulate.add_key(app3, 0)
 check(pads_ui.target_label(app3, rate_f["target"]).endswith("+ 1): rate"), "a slider added to it: the labels made again")
+
+# --- a wave attached from the pad editor: the fader shows where the slider is set, the band it swings over ------------
+from native import clock
+clock.hold()
+try:
+    app3.eng.push = lambda: None
+    modulate.modulators(app3).clear()
+    modulate.apply(app3)
+    b6 = pads.current(st6)
+    cell = pads_ui._free_cell(b6)
+    sp = pads.new_control(st6, "fader", cell[0], cell[1], target={"kind": "fx", "key": "sx"})
+    b6["controls"].append(sp)
+    app3.eng.fx["sx"] = 128
+    app3._pads_sel, app3._pads_axis = sp["id"], "x"
+    pads_ui._attach(app3)
+    on = modulate.on_key(app3, "sx")
+    check(len(on) == 1 and on[0]["keys"] == ["sx"] and on[0].get("sync", True), "+ LFO: a synced wave on what the fader drives")
+    m = on[0]
+    m.update(shape="square", depth=100)
+    modulate.apply(app3)
+    check(app3.eng.fx["sx"] == 178 and abs(pads.position(app3, sp) - 128 / 255) < 1e-6,
+          f"the slider swung, the fader still where it was set ({app3.eng.fx['sx']}, {pads.position(app3, sp):.3f})")
+    a_, b_, n_ = pads.swing(app3, sp)
+    check(abs(a_ - 78 / 255) < 1e-6 and abs(b_ - 178 / 255) < 1e-6 and abs(n_ - 178 / 255) < 1e-6,
+          f"the band 78..178 of 255, the wave at its top ({a_ * 255:.1f}, {b_ * 255:.1f}, {n_ * 255:.1f})")
+    sp["invert"] = True
+    a_, b_, n_ = pads.swing(app3, sp)
+    check(abs(a_ - 77 / 255) < 1e-6 and abs(b_ - 177 / 255) < 1e-6 and abs(n_ - 77 / 255) < 1e-6, "upside down: the band too")
+    sp["invert"] = False
+    n = len(b6["controls"])
+    pads_ui._rate_knob(app3, m["id"])
+    kn = b6["controls"][-1]
+    check(len(b6["controls"]) == n + 1 and kn["type"] == "knob" and kn["target"] == {"kind": "mod", "id": m["id"], "key": "rate"}
+          and pads.fits(b6, kn) and app3._pads_sel == kn["id"], "rate knob: a knob on its rate in a free cell, selected")
+    pads_ui._detach(app3, m["id"], "sx")
+    modulate.apply(app3)
+    check(not modulate.modulators(app3) and app3.eng.fx["sx"] == 128 and pads.swing(app3, sp) is None,
+          "x: the wave taken off, the slider back where it was set, no band")
+finally:
+    clock.release()
 dpg.destroy_context()
 
 print("pads:", "FAILED" if fails else "ok")

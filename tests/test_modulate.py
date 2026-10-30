@@ -197,6 +197,33 @@ try:
     clock.step(mo.SAVE_AFTER_S)
     mo.apply(app)
     check(app.project.saves == saves + 1, "saved once it is left alone")
+
+    # what the pad editor reads: the slider a target is, the band each kind swings over, a few words, taken off
+    check(mo.key_of({"kind": "fx", "key": "c3"}) == "c3" and mo.key_of({"kind": "vj_knob", "deck": 1, "key": "hue"}) == "vj1.hue"
+          and mo.key_of({"kind": "vj_fader"}) is None and mo.key_of({"kind": "fx", "key": "o1"}) is None,
+          "a target's slider: an effect's, a VJ knob's; none for the crossfader or a check")
+    mo.modulators(app).clear()
+    mo.apply(app)
+    app.eng.fx.update(sx=100, c3=10)
+    w = mo.add(app, keys=["sx", "c3"], kind="lfo", shape="sine", depth=60, on=True)
+    mo.add(app, key="sx", kind="beat", depth=40, on=True)
+    mo.apply(app)
+    lo, up, now = mo.swing(app, "sx")
+    check(near(lo, 70) and near(up, 170) and 0 <= now <= 255, f"a wave of 60 and a beat of 40: 70..170 ({lo}, {up})")
+    lo, up, _ = mo.swing(app, "c3")
+    check(near(lo, 10 - 30 * 31 / 255) and near(up, 10 + 30 * 31 / 255), "Custom 3: the band of its own range")
+    w.update(kind="steps", steps=[0.25, 1.0])
+    lo, up, _ = mo.swing(app, "c3")
+    check(near(lo, 10 - 15 * 31 / 255) and near(up, 10 + 30 * 31 / 255), "a step pattern: its lowest level to its highest")
+    check(mo.brief(w) == "steps, 4 beats" and mo.brief(dict(w, kind="lfo", sync=False, hz=2.0)) == "sine, 2 Hz"
+          and mo.brief({"kind": "beat"}) == "on the beat", "in a few words")
+    mo.detach(app, w, "sx")
+    check(w in mo.modulators(app) and w["keys"] == ["c3"], "taken off one slider: still on the other")
+    mo.detach(app, w, "c3")
+    check(w not in mo.modulators(app), "taken off its last: gone")
+    w2 = mo.on_key(app, "sx")[0]
+    w2["on"] = False
+    check(mo.swing(app, "sx") is None, "one switched off: no band")
     mo.modulators(app).clear()
     mo.apply(app)
     check(app._mod_state == {}, "none left: nothing kept")
