@@ -4321,7 +4321,15 @@ notes, its lights mirroring the layout). In four phases:
    to sustain while held, release to nothing; a restart a one-shot; the time past its peak in a frame carried on down,
    not the frame's whole step. The pad editor's play pad; the dialog's start and the envelope's four numbers. Tests:
    test_modulate (held, two holders, restart on press, the envelope's stages by the clock, a one-shot), test_pads
-   (hold and toggle pads, MIDI's note-off, the play pad), the smoke. Next: the controller's lights pulsing.
+   (hold and toggle pads, MIDI's note-off, the play pad), the smoke.
+   Step 4 **done** (2026-10-30): the controller's lights pulse with a modulator. modulate.apply keeps each running
+   one's level 0..1 (a wave's, steps', the beat's push, an envelope's); pads.pulse gives a control's - one on the
+   modulator's own targets, else the first running one on its slider; pads_hw.pulses reads them at PULSE_HZ (20)
+   in each device's steps (Launchpad 3 shades of its colour, APC mk2 4 brightnesses, the first APC on/off, generic
+   8 velocities), so a light is resent only on a whole step. lights() sends MAX_SENDS (96) a frame at most and only
+   PULSE_SENDS (16) pulsing changes a reading - none between readings - what is held back kept as unsent and caught
+   up after. Tests: test_pads_hw (shades by the clock, only the pulsing pads sent, back to dim when off, each
+   device's message, a 64-pad grid capped at 16 a reading and caught up). Not tried on the devices themselves.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

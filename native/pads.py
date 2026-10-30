@@ -481,6 +481,21 @@ def swing(app, c):
     return min(a, b), max(a, b), now
 
 
+def pulse(app, c):
+    """Where the modulator a control belongs to is, 0..1, for its light to pulse with - one it drives (its play, on
+    or off, rate ...), else the first running one on the slider it drives; None when there is none running."""
+    from native import midi, modulate
+    t = c.get("target") or {}
+    if t.get("kind") in midi.MOD_KINDS:
+        return modulate.level(app, t.get("id"))
+    key = modulate.key_of(t)
+    for m in modulate.on_key(app, key) if key else ():
+        v = modulate.level(app, m["id"])
+        if v is not None:
+            return v
+    return None
+
+
 def where(app, c):
     """Where an XY pad shows its dot: (x, y, pressure) 0..1, or None when it is not being touched and stays nowhere
     (snapped back). A pad left where it was let go ("stay") keeps showing there."""

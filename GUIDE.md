@@ -1238,8 +1238,15 @@ lights go to: every pad shows its control's colour, dim, and bright while
 lit (the first APC mini, which cannot dim, blinks instead), and the bank
 buttons show which bank is up. Any other controller lights its learned
 pads by velocity 127 and 0; a lights port not there yet is found when the
-controller is plugged in. A note or knob that plays a pad is not also
-taken by a Window > MIDI mapping of it. (The Launchpad's and APC's messages follow
+controller is plugged in. A pad that belongs to a running modulator - one
+on its play, on or off, rate and so on, or one on a slider it moves -
+pulses with it: brighter as its wave rises, in three shades on a
+Launchpad, four brightnesses on an APC mini mk2, on and off on the first
+APC mini and by velocity on any other. Its light is resent only when it
+moves a whole shade, read 20 times a second, and no more than 16 pulsing
+lights change at once (the rest catch up next time), so the lights never
+crowd out the controller's own notes. A note or knob that plays a pad is
+not also taken by a Window > MIDI mapping of it. (The Launchpad's and APC's messages follow
 their makers' programming guides; they were checked against a stand-in
 port, not the devices themselves.)
 

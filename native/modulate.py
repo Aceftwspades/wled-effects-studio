@@ -197,6 +197,12 @@ def _env(m, e, dt, gated):
     return lv
 
 
+def level(app, mid):
+    """Where a running modulator's wave (or envelope, or push) is now, 0..1; None when it is not running (off, an
+    envelope silent, a wave that runs while held not held)."""
+    return (getattr(app, "_mod_state", {}) or {}).get("level", {}).get(mid)
+
+
 def gated(app, mid):
     """Whether something holds a modulator's play target (a pad, a MIDI note, the phone)."""
     return bool((getattr(app, "_mod_state", {}) or {}).get("gate", {}).get(mid))
@@ -242,6 +248,7 @@ def apply(app):
         since = now - grid
     ph = st.setdefault("phase", {})
     push = {}
+    levels = st["level"] = {}
     for n, m in enumerate(mods):
         if "seed" not in m:                                 # one made before seeds: its own, kept
             m["seed"] = 7 + n * 7919
@@ -255,12 +262,13 @@ def apply(app):
                 continue                                    # silent: its sliders at their places
         if not m.get("on", True) or (kind in ("lfo", "steps") and m.get("start") == "held" and not held):
             continue
-        off = None
+        off = float(m.get("depth", 0)) * lv if kind == "env" else offset(m, pos, since, cycle_s(m, bpm))
+        d = float(m.get("depth", 0))
+        levels[m["id"]] = (lv if kind == "env" else max(0.0, min(1.0, off / d + (0.0 if kind == "beat" else 0.5)))
+                           if d > 0 else 0.5)                  # where its wave is, 0..1 (a pad's light pulses with it)
         for k in dict.fromkeys(m.get("keys") or ()):          # one target twice: moved once
             if _get(app, k) is None:
                 continue
-            if off is None:
-                off = float(m.get("depth", 0)) * lv if kind == "env" else offset(m, pos, since, cycle_s(m, bpm))
             push[k] = push.get(k, 0.0) + off * hi(k) / 255.0  # depth of 255 of each one's own range
     for d in (ph, st.get("env", {}), st.get("gate", {})):        # a modulator gone: its phase, level and holders too
         for i in [i for i in d if find(app, i) is None]:

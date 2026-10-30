@@ -267,6 +267,74 @@ pads_hw.poll(app)
 check(fake.is_open and fake.sent, "plugged in afterwards: found, opened and lit")
 midi.available, midi.out_ports, pads_hw.RETRY_S = was
 h["out"] = ""
+
+# --- pads pulsing with a modulator: each device's steps, only a step's change sent, a cap on how many at once --------
+from native import clock, modulate
+clock.hold()
+try:
+    app.eng.push = lambda: None
+    app.eng.meta, app.eng.idx = [{"labels": ["Speed"]}], 0
+    st = pads_ui._st(app)
+    pads_hw.let_go(app)
+    bk = pads.new_bank("Pulse", 8, 8)
+    st["banks"].append(bk)
+    st["bank"] = len(st["banks"]) - 1
+    w = modulate.add(app, key="sx", kind="lfo", shape="saw up", period=2, depth=100)
+    play = pads.new_control(st, "hold", 0, 0, target={"kind": "mod_gate", "id": w["id"]}, colour="red")
+    spd = pads.new_control(st, "knob", 1, 0, target={"kind": "fx", "key": "sx"}, colour="cyan")
+    other = pads.new_control(st, "trigger", 2, 0, target={"kind": "vj_cut"}, colour="green")
+    bk["controls"] += [play, spd, other]
+    h.update(device="launchpad", grid=True)
+    pads_hw._rt(app).update(at=0.0, pulse_at=-1e9)           # the port test above ran on the real clock
+    out = Out()
+    lv = lambda: modulate.level(app, w["id"])                                    # noqa: E731
+    modulate.apply(app)
+    pads_hw.lights(app, out, now=200.0)
+    cell = lambda x, y: {m[1]: m[2] for m in out.sent if m[0] == 0x90}.get(pads_hw.cell_note("launchpad", x, y))   # noqa: E731
+    check(lv() is not None and lv() < 0.05 and cell(0, 0) == pads_hw.PALETTE["red"][1] and cell(1, 0) == pads_hw.PALETTE["cyan"][1]
+          and cell(2, 0) == pads_hw.PALETTE["green"][1], "a saw at its start: its play pad and the knob on its slider dim, the rest as ever")
+    out.sent.clear()
+    clock.step(0.5)                                                            # half its 2 beats at 120 bpm
+    modulate.apply(app)
+    pads_hw.lights(app, out, now=200.1)
+    red = pads_hw.PALETTE["red"]
+    check(cell(0, 0) == (red[0] + red[1]) // 2 and cell(1, 0) is not None and cell(2, 0) is None,
+          f"half way up: a step brighter, only the pulsing pads sent ({lv():.2f})")
+    out.sent.clear()
+    pads_hw.lights(app, out, now=200.12)
+    check(not out.sent, "the same frame's step again, and too soon to read the levels: nothing")
+    w["on"] = False
+    modulate.apply(app)
+    pads_hw.lights(app, out, now=200.3)
+    check(cell(0, 0) == red[1] and modulate.level(app, w["id"]) is None, "the modulator switched off: the pads back to their own dim")
+    w["on"] = True
+    modulate.apply(app)
+    check(pads_hw._pad_msg("apc_mk2", 5, "red", False, 0, 2) == (pads_hw.APC_STEPS[2], 5, red[0])
+          and pads_hw._pad_msg("apc_mk1", 5, "red", False, 0, 0) == (0x90, 5, 0)
+          and pads_hw._pad_msg("apc_mk1", 5, "red", False, 0, 1) == (0x90, 5, pads_hw.MK1["red"])
+          and pads_hw._pad_msg("generic", 5, "red", False, 0, 7) == (0x90, 5, 127)
+          and pads_hw._pad_msg("launchpad", 5, "red", True, 0, 0) == (0x90, 5, red[0]),
+          "an APC mk2 by its brightness, the first APC on and off, generic by velocity; held: lit, not pulsing")
+    # a full grid pulsing: at most PULSE_SENDS of its steps a reading, none between readings, all caught up after
+    bk["controls"] = [pads.new_control(st, "trigger", x, y, target={"kind": "mod_restart", "id": w["id"]})
+                      for x in range(8) for y in range(8)]
+    pads_hw.lights(app, out, now=201.0)
+    out.sent.clear()
+    clock.step(0.5)
+    modulate.apply(app)
+    counts = []
+    for k in range(6):
+        out.sent.clear()
+        pads_hw.lights(app, out, now=201.1 + k * 0.025)
+        counts.append(len(out.sent))
+    check(counts[0] == pads_hw.PULSE_SENDS and counts[1] == 0 and max(counts) <= pads_hw.PULSE_SENDS,
+          f"64 pads a step brighter: {pads_hw.PULSE_SENDS} a reading, none between ({counts})")
+    for k in range(6):
+        pads_hw.lights(app, out, now=201.4 + k * 0.05)
+    want = pads_hw.wanted(app, st, pads_hw.pulses(app, st))
+    check(all(pads_hw._rt(app)["lights"].get(k) == m for k, m in want.items()), "a few readings on: every light caught up")
+finally:
+    clock.release()
 dpg.destroy_context()
 
 print("pads_hw:", "FAILED" if fails else "ok")

@@ -31,6 +31,11 @@ DEVICES = (("generic", "any (learned pads)"),       # lit by velocity 127 / 0
            ("apc_mk1", "APC mini (first)"))
 GRIDS = ("launchpad", "apc_mk2", "apc_mk1")     # the kinds with an 8 x 8 grid the pads can lie on
 LIGHTS_HZ = 60.0                # at most this often (each frame): only what changed is sent
+MAX_SENDS = 96                  # a frame's messages at most (a whole Launchpad's lights fit): the rest wait a frame
+PULSE_HZ = 20.0                 # a pad pulsing with a modulator: its level read this often...
+PULSE_SENDS = 16                # ...and at most this many pulsing lights changed each time (the rest catch up)
+STEPS = {"launchpad": 3, "apc_mk2": 4, "apc_mk1": 2, "generic": 8}   # a pulse's brightness steps on each device
+APC_STEPS = (0x91, 0x92, 0x94, 0x96)           # an APC mini mk2's 25%, 50%, 75% and 100% (its note-on channels)
 RETRY_S = 3.0                   # a lights port not there is looked for again this often (the controller plugged in)
 # Launchpad palette indexes (and the APC mini mk2's, which follows it): the pads' colours (bright, dim)
 PALETTE = {"grey": (3, 1), "red": (5, 7), "orange": (9, 11), "amber": (9, 11), "yellow": (13, 15),
@@ -278,8 +283,19 @@ def poll(app):
 
 
 
-def _pad_msg(device, note, colour, lit, ch=0):
-    """The message that lights one pad: [status, note, velocity]."""
+def _pad_msg(device, note, colour, lit, ch=0, step=None):
+    """The message that lights one pad: [status, note, velocity] - lit, unlit, or (`step`, 0 up to STEPS[device]
+    - 1) pulsing: as bright as the modulator it goes with is up."""
+    if step is not None and not lit:
+        top = STEPS.get(device, 8) - 1
+        if device == "launchpad":
+            bright, dim = PALETTE.get(colour, PALETTE["grey"])
+            return (0x90, note, (dim, (bright + dim) // 2, bright)[min(step, 2)])
+        if device == "apc_mk2":
+            return (APC_STEPS[min(step, 3)], note, PALETTE.get(colour, PALETTE["grey"])[0])
+        if device == "apc_mk1":
+            return (0x90, note, MK1.get(colour, 5) if step else 0)     # it cannot dim: on and off
+        return (0x90 | (ch & 0x0F), note, int(round(127 * step / top)))
     if device == "launchpad":
         bright, dim = PALETTE.get(colour, PALETTE["grey"])
         return (0x90, note, bright if lit else dim)
@@ -292,21 +308,41 @@ def _pad_msg(device, note, colour, lit, ch=0):
     return (0x90 | (ch & 0x0F), note, 127 if lit else 0)
 
 
-def wanted(app, st):
-    """{(kind, channel, number): message} - what every light the pads use should be now."""
+def pulses(app, st):
+    """{control id: brightness step} of the bank's controls whose lights pulse with a modulator, in the device's
+    steps (so a light is sent again only when it moves a whole step)."""
+    n = STEPS.get(hw(st)["device"], 8)
+    out = {}
+    for c in pads.current(st)["controls"]:
+        v = pads.pulse(app, c)
+        if v is not None:
+            out[c["id"]] = min(n - 1, int(v * n))
+    return out
+
+
+def wanted(app, st, pulse=None, pulsing=None):
+    """{(kind, channel, number): message} - what every light the pads use should be now; `pulse` the steps of those
+    pulsing with a modulator (pulses()), their lights' keys put in the set `pulsing`."""
     h = hw(st)
     dev = h["device"]
     b = pads.current(st)
     out = {}
+    pulse = pulse or {}
     lit = {c["id"]: bool(pads.lit(app, c)) for c in b["controls"]}     # each control's once, for all its pads
     for c in b["controls"]:
         on = lit[c["id"]]
         ctl = c.get("midi")
+        step = pulse.get(c["id"])
         if ctl and ctl[0] == "note":
-            m = _pad_msg(dev, int(ctl[2]), c.get("colour"), on, int(ctl[1]))
+            m = _pad_msg(dev, int(ctl[2]), c.get("colour"), on, int(ctl[1]), step)
             out[("note", int(ctl[1]), int(ctl[2]))] = m
+            if step is not None and pulsing is not None:
+                pulsing.add(("note", int(ctl[1]), int(ctl[2])))
         elif ctl and ctl[0] == "cc" and dev in ("generic", "launchpad"):
-            out[("cc", int(ctl[1]), int(ctl[2]))] = (0xB0 | (int(ctl[1]) & 0x0F), int(ctl[2]), 127 if on else 0)
+            v = 127 if on or (step is not None and step >= STEPS.get(dev, 8) // 2) else 0
+            out[("cc", int(ctl[1]), int(ctl[2]))] = (0xB0 | (int(ctl[1]) & 0x0F), int(ctl[2]), v)
+            if step is not None and pulsing is not None:
+                pulsing.add(("cc", int(ctl[1]), int(ctl[2])))
     if _grid_on(h):
         under = {cell: c for c in b["controls"] for cell in pads.cells(c)}     # the control on each cell
         for x in range(8):
@@ -316,7 +352,9 @@ def wanted(app, st):
                 key = ("note", 0, n)
                 if key in out and c is None:
                     continue
-                out[key] = _pad_msg(dev, n, c.get("colour"), lit[c["id"]]) if c else (0x90, n, 0)
+                out[key] = _pad_msg(dev, n, c.get("colour"), lit[c["id"]], 0, pulse.get(c["id"])) if c else (0x90, n, 0)
+                if c is not None and c["id"] in pulse and pulsing is not None:
+                    pulsing.add(key)
         for i in range(8):
             k = bank_ctl(dev, i)
             if k is None:
@@ -343,7 +381,9 @@ def _dark(k):
 
 def lights(app, out, now=None):
     """The controller's lights set to the pads, at most LIGHTS_HZ a second, sending only what changed (a device
-    switched or the port opened sends its mode and everything again; a light no longer used is put out)."""
+    switched or the port opened sends its mode and everything again; a light no longer used is put out). A frame
+    sends MAX_SENDS at most, pulsing lights PULSE_SENDS of them: what is held back waits for a later frame (its old
+    message kept as what was sent, so it is tried again)."""
     from native import pads_ui
     r = _rt(app)
     now = time.monotonic() if now is None else now
@@ -365,14 +405,29 @@ def lights(app, out, now=None):
             out.send(m)
             sent += 1
         r["out"] = who
-    want = wanted(app, st)
+    fresh = now - r.get("pulse_at", -1e9) >= 1.0 / PULSE_HZ
+    if fresh:
+        r["pulse"], r["pulse_at"] = pulses(app, st), now
+    pulsing = set()
+    want = wanted(app, st, r.get("pulse"), pulsing)
+    lights_now = dict(r["lights"])
+    budget = PULSE_SENDS if fresh else 0                   # pulses changed only as their levels are read
     for k, m in want.items():
-        if r["lights"].get(k) != m:
-            out.send(list(m))
-            sent += 1
-    for k in [k for k in r["lights"] if k not in want]:   # a light no longer used: out
+        if lights_now.get(k) == m or sent >= MAX_SENDS:
+            continue
+        if k in pulsing and k in lights_now:               # a pulse's next step (one newly lit is not held back)
+            if budget <= 0:
+                continue
+            budget -= 1
+        out.send(list(m))
+        sent += 1
+        lights_now[k] = m
+    for k in [k for k in lights_now if k not in want]:     # a light no longer used: out
+        if sent >= MAX_SENDS:
+            break
         out.send(_dark(k))
         sent += 1
-    r["lights"] = want
+        del lights_now[k]
+    r["lights"] = lights_now
     return sent
 # AI: end
