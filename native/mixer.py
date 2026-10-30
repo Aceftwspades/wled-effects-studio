@@ -115,12 +115,15 @@ def step(app, ms):
 def picture(app, a):
     """The frame through the mixer (as it is when the mixer is off or at deck A)."""
     o = options(app)
-    if not on(app) or float(o["fader"]) <= 0.0:
+    from native import modulate
+    f = modulate.over(app, "mix.fader")                       # a modulator moving it: there, never saved
+    f = float(o["fader"]) if f is None else float(f)
+    if not on(app) or f <= 0.0:
         return a
     eng = deck_b(app)
     if eng is None:
         return a
-    return mix(a, eng.rgb(), float(o["fader"]), o["mode"])
+    return mix(a, eng.rgb(), f, o["mode"])
 
 
 def set_fader(app, v, save=True):

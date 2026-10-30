@@ -1043,28 +1043,51 @@ desk made a frame of its own, with more looks and a source per deck.
 
 **Modulators** (Playback > Modulators...) move a slider of the effect by
 themselves, around where it is set - in the sim and so in the stream.
-**+ Modulator** adds one; each row picks the slider, what moves it and how
-far (the number after it): **a wave (LFO)** - sine, triangle, saw up or
-down, square or random; **on the beat**, a push upward on each beat of
-the sound, eased in over 140 ms and let go over its time; or **a step
-pattern** of up to 16 levels (the small sliders under its row, **+** and
-**-** for more or fewer). A wave's or a step's rate is **synced** - a
-length in beats of the show's tempo (the synth's without one) - or
-**free**, so many a second (0.05 to 20 Hz). The **+** beside the slider
-moves one more slider by the same wave (an **also moves** row under it,
-each with its **x**); the depth is of each slider's own range, so Custom
-3's 0..31 moves as far along as Speed's 0..255. A modulator never takes
-the slider over: drag the slider, play a step of the show, move it from
-MIDI, and it moves around the new place; untick it or take it away
-(**x**) and the slider is left where it was set. The device does not run
-them: they are for the sim and the stream.
+Besides the effect's sliders they move a VJ deck's knobs, **the VJ
+crossfader**, **the mixer fader**, and another modulator's **depth** or
+**rate** (a slow wave sweeping a fast one's depth, say). **+ Modulator**
+adds one; each row picks the slider, what moves it and how far (the
+depth, of 255): **a wave (LFO)** - sine, triangle, saw up or down,
+square, random (a new level each wave, eased into) or **s&h** (sample
+and hold: a new level each wave, held); **on the beat**, a push upward on
+each beat of the sound, eased in over 140 ms and let go over its time;
+**a step pattern** of up to 16 levels (the small sliders under its row,
+**+** and **-** for more or fewer); **an envelope** (below); or **the
+sound** - its level, bass, mid or treble, followed up over its
+**attack** and down over its **release**. On **auto level** the loudest
+of the last few seconds counts as full, so a quiet song moves it as far
+as a loud one. A wave's or a step's rate is **synced** - a length in
+beats of the show's tempo (the synth's without one), with a **feel** of
+straight, **triplets** (two thirds as long) or **dotted** (half as long
+again) - or **free**, so many a second (0.05 to 20 Hz). **phase** moves
+the whole wave on by a share of itself, and a square's or a triangle's
+**width** sets how long it is high (where a triangle peaks). The small
+scope at the end of each row draws where it has been these two seconds.
+
+The **+** beside the slider moves one more slider by the same wave (an
+**also moves** row under it, each with its **x**); the depth is of each
+slider's own range, so Custom 3's 0..31 moves as far along as Speed's
+0..255. The number after each slider is its **amount**: how much of the
+depth moves it, 1 all of it, 0.5 half, and below 0 the other way - one
+wave can push Speed up while it pulls Intensity down. With more than one,
+**spread** puts each further slider a share of a wave on from the one
+before (at 1 they are spaced evenly round the wave, so they chase each
+other). A modulator never takes the slider over: drag the slider, play a
+step of the show, move it from MIDI, and it moves around the new place;
+untick it or take it away (**x**) and the slider is left where it was
+set. A VJ knob, a fader or a modulator's setting moved by one keeps its
+own value where it was set, and that is what is saved. **Undo** takes
+back the last change to the modulators. The device does not run them:
+they are for the sim and the stream.
 
 Each modulator is **Mod 1**, **Mod 2** ... in every list of things a
-control can drive - a MIDI mapping, a VJ pad, the phone's pads: its
-**rate** (a fader or knob up is faster; synced, it steps along the beat
-lengths), its **depth**, its **wave shape**, **on or off** (a toggle pad
-lights while it runs; a hold pad switches it only while held - one left off runs while the pad is down), and **restart its
-wave** (back to its start, the beat counted from that moment). A rate
+control can drive - a MIDI mapping, a VJ pad, the phone's pads - with only
+what does something for its kind: its **rate** (a wave's and steps'; a
+fader or knob up is faster; synced, it steps along the beat lengths), its
+**depth**, its **wave shape** (a wave's), **on or off** (a toggle pad
+lights while it runs; a hold pad switches it only while held - one left off runs while the pad is down), **restart its
+wave** (back to its start, the beat counted from that moment; an
+envelope's **fire its envelope**) and **play** (below). A rate
 turned while the wave runs carries on from where it was, never jumping;
 a synced one then eases back onto the beat within a few cycles. What a
 control turns is saved once it is left alone.
@@ -1078,7 +1101,11 @@ time, back to the top at each press). **An envelope (ADSR)** is a
 modulator of its own: played, it pushes its sliders up by its depth
 over its **A**ttack, falls to its **S**ustain level (of the depth) over
 its **D**ecay and stays there while held; let go, it falls to nothing
-over its **R**elease. Restarting one fires it once: up to full, then
+over its **R**elease. Played from a note, **velocity** (ticked) plays it
+as far as the note is hard - a pad plays it all the way. Set to fire **on
+each beat**, it goes up over its attack and down over its release every
+beat of the sound, a play target still able to hold it. Restarting one
+fires it once: up to full, then
 straight down.
 
 **The mixer** (Playback > Mixer...) runs a second effect beside the one
@@ -1203,13 +1230,20 @@ A control driving one of the effect's sliders or a deck's knob has
 **MOVED BY** in its panel: **+ LFO** puts a wave on what it drives (synced
 to the beat, depth 96), and the control then sets the place the wave
 swings around. Each modulator on it gets a row - ticked while it runs, its
-**depth**, **x** (taken off; the modulator goes if it moved nothing
-else), **rate knob** (a knob for its rate in the bank's first free cell)
-and **play pad** (a hold pad there that plays it).
-**Modulators...** opens the dialog for its shape, its rate and the other
-sliders it moves. A fader or a knob so moved shows the stretch it swings
-over as a pale band (an arc round a knob) and where the wave has it now
-as a yellow mark; the fader's own handle stays where it was set.
+**depth**, **here** (this control's amount of that depth, below 0 the
+other way), **x** (taken off; the modulator goes if it moved nothing
+else), **rate knob** (a knob for its rate in the bank's first free cell;
+a **depth knob** for one without a rate - the beat, an envelope, the
+sound) and **play pad** (a hold pad there that plays it - only for one
+that plays: an envelope, or a wave set to run while held or restart on a
+press). A control on a crossfader or on a modulator's depth or rate gets
+the same rows. **Modulators...** opens the dialog for its shape, its rate
+and the other sliders it moves. A fader or a knob so moved shows the
+stretch it swings over as a pale band (an arc round a knob, a stripe
+across an XY pad for each axis moved) and where the wave has it now as a
+yellow mark; the fader's own handle stays where it was set. The pads'
+**Undo** takes back a modulator made or changed here too, when that was
+the last change.
 
 On a phone or a tablet, the phone remote's page has **The VJ's pads,
 full screen**: the bank the studio shows, its banks along the top, played
@@ -2338,7 +2372,7 @@ Every button, with what its tooltip says.
 
 **Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `play from the top`; `play from the selected step` — play from the selected step (Space while the frame has the keyboard); playing, it pauses and goes on; `stop` — stop: the sim goes back to running on its own; `record automation` — record automation: while the show plays, a slider moved (here or in the side panel) is written into the step playing as a curve ramp - over the stretch it was moved, the rest of the step as it was. Again: stop recording; `+ Add from the sim` — a new step after the selected one: what the sim shows now - effect, sliders, palette, colours, segments; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `-` — zoom out (Ctrl+wheel over the timeline zooms at the pointer); `+` — zoom in (Ctrl+wheel over the timeline zooms at the pointer); `All` — the whole show across the timeline (Shift+Z); `Step` — the selected step across the timeline, a little either side (Z); `Find sections` — the show's audio listened to: its intro, verses, builds, drops, breakdowns and outro, as named sections over the steps - and its tempo, when none is set; `Make a show...` — steps laid on the sections and the bars: calm effects for the quiet parts, the brightest for the drops, the intensity rising over a build - from the effects you choose, then yours to edit; `+ Audio...` — an audio file onto the show, at the playhead (or the selected step's start), on a track with room there: heard while the show plays, and by its effects; copied into the project; `+ Track` — one more track: a lane of its own under the others, for a layer of sound over another; `a copy of this step, after it`; `this step away` — this step away (undo brings it back); `Update from the sim` — the selected step becomes what the sim shows now (its name, length, blend and ramps kept); `Load into the sim` — the sim shows the selected step (double-click it on the timeline does the same); `Duplicate` — a copy of the selected step, after it (Ctrl+D); `Delete` — the selected step away (Delete); undo brings it back; `x` — this ramp off (the others stay); `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap lengths to bars` — every step's length rounded to whole bars, so the sequence changes on the music; `Render GIF` — plays the sequence once from the top and records it as a GIF, into captures/; `Render video...` — the show made into an mp4, frame by frame at the size, rate and quality chosen, with its audio - into captures/; needs ffmpeg on the path; `Export FSEQ...` — the show frame by frame into an FSEQ file for Falcon Player, with its audio beside it - FPP plays it to the controllers, WLED among them; `Send and run it`; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at`; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's`; `Send the schedule`; `Run the playlist at...`
 
-**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `not built yet`; `making...`
+**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails`; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel`; `Open the folder`; `making...`; `not built yet`
 
 **Palettes frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ New`; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy`; `Remove`; `Use in the sim`; `spread evenly`; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all`; `Remove this one there`
 

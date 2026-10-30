@@ -357,7 +357,16 @@ def _forget(app):
 
 
 def _undo(app):
+    """The pads' last change undone - or the modulators', when that came after (one made with + LFO, a depth set
+    here: the pad editor makes those too)."""
+    from native import modulate
     pads.let_go(app)
+    if app.project.latest(("pads", "modulators")) == "modulators":
+        modulate.undo(app)
+        app._pads_labels = None
+        app._pads_mods_key = None
+        _fill_side(app)
+        return
     if not app.project.undo("pads"):
         app.gp.status("nothing to undo in the pads"); return
     app._pads_whole = None
@@ -504,8 +513,9 @@ def _fill_side(app):
 
 
 def _fill_mods(app, c, t):
-    """The MOVED BY rows: each modulator on what the control drives (on or off, its depth, a knob for its rate, x to
-    take it off) - shown only for a target the modulators can move (an effect slider, a VJ deck's knob)."""
+    """The MOVED BY rows: each modulator on what the control drives (on or off, its depth, how much of it moves this
+    one, a knob for its rate, x to take it off) - shown only for a target the modulators can move (an effect
+    slider, a VJ deck's knob, a crossfader, a modulator's depth or rate)."""
     from native import modulate
     key = modulate.key_of(t)
     dpg.configure_item("pads_s_modrow", show=key is not None)
@@ -528,19 +538,28 @@ def _fill_mods(app, c, t):
                     callback=lambda s, v, mid=mid: modulate.set_target(
                         app, {"kind": "mod", "id": mid, "key": "depth"}, int(v) / 255.0))
             col.tip("how far it swings, of 255 of the slider's range (the band drawn on the control)")
+            dpg.add_text("here", color=col.DIM)
+            num.add(f"pads_s_mamt_{mid}", modulate.amount(m, key), -1.0, 1.0, digits=2, width=px(55),
+                    callback=lambda s, v, mid=mid: modulate.set_amount(app, mid, key, v))
+            col.tip("how much of that depth moves this one: 1 all of it, below 0 the other way (one wave can push "
+                    "one slider up while it pulls another down)")
             dpg.add_button(label="x", small=True, callback=lambda s, a, mid=mid: _detach(app, mid, key))
             col.tip("no longer moved by it (the modulator itself goes when it moved nothing else)")
         with dpg.group(horizontal=True, parent="pads_s_mods"):
             dpg.add_text("  ", color=col.DIM)
-            dpg.add_button(label="rate knob", small=True, enabled=free is not None,
-                           callback=lambda s, a, mid=mid: _mod_pad(app, mid, "knob", "mod", "rate"))
-            col.tip("a knob for its rate in the bank's first free cell" if free is not None else
-                    "no free cell on this bank for a rate knob")
-            dpg.add_button(label="play pad", small=True, enabled=free is not None,
+            rated = m.get("kind", "lfo") in ("lfo", "steps")
+            what = "rate" if rated else "depth"
+            dpg.add_button(label=f"{what} knob", small=True, enabled=free is not None,
+                           callback=lambda s, a, mid=mid, k=what: _mod_pad(app, mid, "knob", "mod", k))
+            col.tip(f"a knob for its {what} in the bank's first free cell" if free is not None else
+                    "no free cell on this bank for a knob")
+            plays = modulate.plays(m)
+            dpg.add_button(label="play pad", small=True, enabled=free is not None and plays,
                            callback=lambda s, a, mid=mid: _mod_pad(app, mid, "hold", "mod_gate", None))
-            col.tip("a pad that plays it while held - an envelope, or a wave set to run while held or restart on a "
-                    "press (Modulators...) - in the bank's first free cell" if free is not None else
-                    "no free cell on this bank for a play pad")
+            col.tip(("a pad that plays it while held, in the bank's first free cell" if free is not None else
+                     "no free cell on this bank for a play pad") if plays else
+                    "it plays from a pad when it is an envelope, or a wave set to run while held or restart on a "
+                    "press (Modulators...)")
 
 
 def _mods_changed(app):
@@ -548,7 +567,7 @@ def _mods_changed(app):
     phone) - not while one of its fields is being dragged."""
     from native import modulate
     key = tuple((m.get("id"), tuple(m.get("keys") or ()), bool(m.get("on", True)), int(m.get("depth", 0)),
-                 modulate.brief(m)) for m in modulate.modulators(app))
+                 modulate.brief(m), tuple(sorted((m.get("amt") or {}).items()))) for m in modulate.modulators(app))
     if key != getattr(app, "_pads_mods_key", None) and not num.busy():
         app._pads_mods_key = key
         _fill_side(app)
@@ -902,31 +921,43 @@ def _draw(app, cw, ch, gap):
 
 
 def _swings(app):
-    """[(control, (from, to, now))] of the bank's faders and knobs a modulator moves."""
+    """[(control, axis, (from, to, now))] of the bank's faders, knobs and XY pads' axes a modulator moves."""
     out = []
     for c in pads.current(_st(app))["controls"]:
-        if c["type"] in pads.SLIDERS:
-            s = pads.swing(app, c)
+        for axis in ("x", "y") if c["type"] in pads.SURFACES else ("x",) if c["type"] in pads.SLIDERS else ():
+            s = pads.swing(app, c, axis)
             if s is not None:
-                out.append((c, s))
+                out.append((c, axis, s))
     return out
 
 
 def _draw_swings(app, cw, ch, gap):
     """The top layer drawn again when a band or a wave's place has moved (the grid under it left alone): a band over
-    the stretch of a fader's travel, or an arc round a knob, that the modulators swing it over, and a mark where
-    the wave has it now."""
+    the stretch of a fader's travel, an arc round a knob, or a stripe across an XY pad (for each axis moved), that
+    the modulators swing it over, and a mark where the wave has it now."""
     sw = _swings(app)
-    key = tuple((c["id"], round(a, 3), round(b, 3), round(n, 3)) for c, (a, b, n) in sw)
+    key = tuple((c["id"], ax, round(a, 3), round(b, 3), round(n, 3)) for c, ax, (a, b, n) in sw)
     if key == getattr(app, "_pads_swung", None) or not dpg.does_item_exist(MODS):
         return
     app._pads_swung = key
     dpg.delete_item(MODS, children_only=True)
     import math
-    for c, (a, b, n) in sw:
+    for c, ax, (a, b, n) in sw:
         x0, y0, x1, y1 = _rect(c, cw, ch, gap)
         pad = px(10)
-        if c["type"] == "fader":
+        if c["type"] in pads.SURFACES:                            # as the pad maps the pointer (_surface_at)
+            top = y0 + px(22)
+            if ax == "x":
+                at = lambda f: x0 + px(6) + (x1 - x0 - px(12)) * f       # noqa: E731
+                dpg.draw_rectangle((at(a), top), (at(b), y1 - px(4)), fill=SWING_RGBA, color=(0, 0, 0, 0),
+                                   parent=MODS)
+                dpg.draw_line((at(n), top), (at(n), y1 - px(4)), color=LIVE_RGBA, thickness=px(2), parent=MODS)
+            else:
+                at = lambda f: y1 - px(6) - (y1 - top - px(12)) * f      # noqa: E731
+                dpg.draw_rectangle((x0 + px(4), at(b)), (x1 - px(4), at(a)), fill=SWING_RGBA, color=(0, 0, 0, 0),
+                                   parent=MODS)
+                dpg.draw_line((x0 + px(4), at(n)), (x1 - px(4), at(n)), color=LIVE_RGBA, thickness=px(2), parent=MODS)
+        elif c["type"] == "fader":
             if c.get("orient", "v") == "v":
                 yb, yt = y1 - pad, y0 + pad + px(16)
                 at = lambda f: yb - (yb - yt) * f                 # noqa: E731

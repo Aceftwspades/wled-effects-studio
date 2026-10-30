@@ -163,8 +163,8 @@ try:
 
     # the settings as targets
     labs = [lab for lab, _ in mo.targets(app)]
-    check(any(lab.startswith("Mod 1 (") and lab.endswith(": rate") for lab in labs) and len(labs) == 6,
-          f"a modulator's six targets ({labs[:2]})")
+    check(any(lab.startswith("Mod 1 (") and lab.endswith(": rate") for lab in labs) and len(labs) == 5,
+          f"a wave that always runs: five targets, no play ({labs[:2]})")
     rate = {"kind": "mod", "id": 1, "key": "rate"}
     m["sync"] = True
     mo.set_target(app, rate, 1.0)
@@ -178,7 +178,7 @@ try:
     check(near(m["hz"], 1.0, 1e-3) and near(mo.value(app, rate), 0.5, 1e-3), f"free: along a log scale, 1 Hz half way ({m['hz']})")
     mo.set_target(app, {"kind": "mod", "id": 1, "key": "depth"}, 0.5)
     mo.set_target(app, {"kind": "mod", "id": 1, "key": "shape"}, 1.0)
-    check(m["depth"] == 128 and m["shape"] == "random", "depth of 255, the shape along the list")
+    check(m["depth"] == 128 and m["shape"] == "s&h", "depth of 255, the shape along the list")
     mo.set_target(app, {"kind": "mod_on", "id": 1}, 1.0)
     check(m["on"] is False and mo.is_on(app, {"kind": "mod_on", "id": 1}) is False, "on or off: flipped")
     mo.set_target(app, {"kind": "mod_on", "id": 1}, 1.0)
@@ -200,8 +200,8 @@ try:
 
     # what the pad editor reads: the slider a target is, the band each kind swings over, a few words, taken off
     check(mo.key_of({"kind": "fx", "key": "c3"}) == "c3" and mo.key_of({"kind": "vj_knob", "deck": 1, "key": "hue"}) == "vj1.hue"
-          and mo.key_of({"kind": "vj_fader"}) is None and mo.key_of({"kind": "fx", "key": "o1"}) is None,
-          "a target's slider: an effect's, a VJ knob's; none for the crossfader or a check")
+          and mo.key_of({"kind": "fx", "key": "o1"}) is None,
+          "a target's slider: an effect's, a VJ knob's; none for a check")
     mo.modulators(app).clear()
     mo.apply(app)
     app.eng.fx.update(sx=100, c3=10)
@@ -292,6 +292,143 @@ try:
     mo.apply(app)
     check(st_ == "r" and app.eng.fx["sx"] == 125, f"a restart unheld: one shot, from its peak straight to release ({st_}, {app.eng.fx['sx']})")
     check(mo.is_on(app, {"kind": "mod_gate", "id": e["id"]}) is False and mo.brief(e) == "envelope", "not held; in a word")
+
+    mo.modulators(app).clear()
+    mo.apply(app)
+    # a note played softly: still a press (it once read as a let-go below half), the envelope only that far up
+    e = mo.add(app, key="sx", kind="env", depth=100, attack=0.1, env_decay=0.2, sustain=1.0, release=0.4)
+    app.eng.fx["sx"] = 50
+    gate(e, "n", 0.4)
+    for _ in range(3):
+        clock.step(0.05)
+        mo.apply(app)
+    check(mo.gated(app, e["id"]) and app.eng.fx["sx"] == 90, f"velocity 0.4: held, up 40 of 100 ({app.eng.fx['sx']})")
+    e["vel"] = False
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 150, "velocity off: all the way")
+    gate(e, "n", 0.0)
+    mo.modulators(app).clear()
+    mo.apply(app)
+
+    # each slider its own amount: one up while the other goes down
+    app.eng.fx.update(sx=100, ix=100)
+    w = mo.add(app, keys=["sx", "ix"], kind="lfo", shape="square", period=2, depth=60, amt={"ix": -1.0})
+    mo.restart(app, w)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 130 and app.eng.fx["ix"] == 70, f"amount -1: the other way ({app.eng.fx['sx']}, {app.eng.fx['ix']})")
+    lo, up, _ = mo.swing(app, "ix")
+    check(near(lo, 70) and near(up, 130), "its band the same, mirrored")
+    mo.set_amount(app, w["id"], "ix", 0.5)
+    mo.apply(app)
+    check(app.eng.fx["ix"] == 115, f"amount 0.5: half the depth ({app.eng.fx['ix']})")
+    # spread: the second slider half a wave on
+    w.update(amt={}, spread=1.0)
+    mo.restart(app, w)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 130 and app.eng.fx["ix"] == 70, f"spread 1 over two: half a wave apart ({app.eng.fx['ix']})")
+    w.update(spread=0.0, phase=0.5)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 70 and app.eng.fx["ix"] == 70, "phase 0.5: the whole wave half on")
+    mo.modulators(app).clear()
+    mo.apply(app)
+
+    # feel, width, sample and hold
+    check(near(mo.cycle_s({"period": 1, "feel": "triplet"}, 60), 2 / 3) and near(mo.cycle_s({"period": 1, "feel": "dotted"}, 60), 1.5),
+          "triplets two thirds, dotted half as long again")
+    check(mo.wave("square", 0.2, width=0.25) == 1.0 and mo.wave("square", 0.3, width=0.25) == 0.0, "a square's width")
+    check(near(mo.wave("triangle", 0.25, width=0.25), 1.0), "a triangle peaking where its width says")
+    sh = [mo.wave("s&h", p, 3) for p in (0.0, 0.3, 0.99)]
+    check(sh[0] == sh[1] == sh[2] and mo.wave("s&h", 0.0, 4) != sh[0], "sample and hold: one level a wave, held")
+    check(mo.brief({"kind": "lfo", "period": 1, "feel": "triplet"}) == "sine, 1 beat triplets", "a triplet in words")
+
+    # the sound: the bass followed, on auto level against the loudest lately
+    app.eng.fft = [0] * 16
+    app.eng.fx["sx"] = 20
+    a = mo.add(app, key="sx", kind="audio", band="bass", depth=100, attack=0.01, release=0.2)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 20 and mo.level(app, a["id"]) == 0.0, "silence: at its place")
+    app.eng.fft[0:3] = [128, 128, 128]
+    for _ in range(10):
+        clock.step(1 / 60)
+        mo.apply(app)
+    check(app.eng.fx["sx"] == 120, f"the bass up: on auto, full ({app.eng.fx['sx']})")
+    a["auto"] = False
+    mo.apply(app)
+    check(abs(app.eng.fx["sx"] - 70) <= 1, f"auto off: its own level, about half ({app.eng.fx['sx']})")
+    a["auto"] = True
+    app.eng.fft[0:3] = [0, 0, 0]
+    clock.step(0.2)
+    mo.apply(app)
+    check(app.eng.fx["sx"] < 70, f"quiet again: falls back over its release ({app.eng.fx['sx']})")
+    check(mo.brief(a) == "the bass" and [t["kind"] for _, t in mo.targets(app)] == ["mod", "mod_on"],
+          "the sound: its depth and on or off its only targets")
+    mo.modulators(app).clear()
+    mo.apply(app)
+    del app.eng.fft
+
+    # an envelope fired on each beat
+    app.eng.fx["sx"] = 10
+    e = mo.add(app, key="sx", kind="env", depth=100, attack=0.05, release=0.2, fire="beat")
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 10, "no beat yet: silent")
+    app.last_hit_at = clock.now()
+    clock.step(0.05)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 110, f"a beat: up over its attack ({app.eng.fx['sx']})")
+    clock.step(0.1)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 60, f"and down over its release, nothing holding it ({app.eng.fx['sx']})")
+    del app.last_hit_at
+    mo.modulators(app).clear()
+    mo.apply(app)
+
+    # one modulator moving another's depth: the other's own depth (the saved one) left alone
+    app.eng.fx["sx"] = 100
+    w1 = mo.add(app, key="sx", kind="lfo", shape="square", period=2, depth=40)
+    w2 = mo.add(app, keys=[f"m{w1['id']}.depth"], kind="lfo", shape="square", period=2, depth=40)
+    mo.restart(app, w1)
+    mo.restart(app, w2)
+    mo.apply(app)
+    mo.apply(app)                                           # a frame on: the depth it was moved to used
+    check(w1["depth"] == 40 and app.eng.fx["sx"] == 130, f"its depth 40 moved to 60 while it runs ({app.eng.fx['sx']})")
+    check(mo.key_of({"kind": "mod", "id": w1["id"], "key": "depth"}) == f"m{w1['id']}.depth"
+          and mo.swing(app, f"m{w1['id']}.depth") is not None, "a depth knob shows the band it swings over")
+    check(f"m{w1['id']}.depth" in mo.choices(app, w2) and f"m{w2['id']}.depth" not in mo.choices(app, w2),
+          "the others' settings offered, not its own")
+    mo.remove(app, 0)
+    check(w2["keys"] == [], "the one it moved taken away: no longer moved")
+    mo.modulators(app).clear()
+    mo.apply(app)
+
+    # the mixer's fader moved, kept apart from the fader itself
+    from native import mixer
+    mixer.options(app)["fader"] = 0.5
+    f = mo.add(app, key="mix.fader", kind="lfo", shape="square", period=2, depth=51)
+    mo.restart(app, f)
+    mo.apply(app)
+    check(near(mo.over(app, "mix.fader"), 0.6, 1.0 / 255) and mixer.options(app)["fader"] == 0.5,
+          f"the mixer's fader moved, its own left at 0.5 ({mo.over(app, 'mix.fader')})")
+    check(mo.key_of({"kind": "mixer"}) == "mix.fader" and mo.key_of({"kind": "vj_fader"}) == "vj.fader", "the faders' names")
+    mo.modulators(app).clear()
+    mo.apply(app)
+    check(mo.over(app, "mix.fader") is None, "taken away: the fader its own again")
+
+    # another project opened: nothing of the last one's carried over
+    app.eng.fx["sx"] = 100
+    w = mo.add(app, key="sx", kind="lfo", shape="square", period=2, depth=60, start="held")
+    gate(w, ("midi", "note", 0, 60), 1.0)
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 130, "held in the first project")
+    old = app.project
+    app.project = Proj()
+    app.project.options["modulators"] = [dict(w, id=w["id"])]
+    app.eng.fx["sx"] = 130                                  # the new project's Speed: the old one's wave value
+    mo.apply(app)
+    check(app.eng.fx["sx"] == 130 and not mo.gated(app, w["id"]),
+          f"the new one: its own 130 kept, the old one's held note not holding it ({app.eng.fx['sx']})")
+    app.project = old
+    mo.modulators(app).clear()
+    mo.apply(app)
     mo.modulators(app).clear()
     mo.apply(app)
     check(app._mod_state == {}, "none left: nothing kept")

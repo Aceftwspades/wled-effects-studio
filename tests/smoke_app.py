@@ -1201,6 +1201,23 @@ STEPS = [
       {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._detach(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'sx')"}], 0.3),
     ([{"check": "not __import__('native.modulate', fromlist=['m']).modulators(app) and not dpg.get_item_children('pads_mods_layer', 2)"},
       {"py": "setattr(app, '_pads_sel', app._sm_fd)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"}], 0.3),
+    # the sound on Intensity, a wave on Mod 1's depth, two sliders a wave apart: their rows, scopes drawn; undone
+    ([{"py": "__import__('native.modulate', fromlist=['m']).add(app, key='ix', kind='audio', band='bass')"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, keys=['m' + str(__import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']) + '.depth', 'c1', 'c2'], spread=1.0)"},
+      {"py": "__import__('native.modulate', fromlist=['m']).show(app)"}], 0.4),
+    ([{"check": "dpg.does_item_exist('mod_amt_1_2') and dpg.does_item_exist('mod_spread_1') and len(dpg.get_item_children('mod_scope_1', 2) or []) >= 2 and ('m' + str(__import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']) + '.depth') in app._mod_over"},
+      {"py": "__import__('native.modulate', fromlist=['m']).undo(app)"}], 0.2),
+    ([{"check": "len(__import__('native.modulate', fromlist=['m']).modulators(app)) == 1 and not dpg.does_item_exist('mod_amt_1_0')"},
+      {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
+    # an XY pad on Speed across: + LFO, a stripe over it, its amount field in the panel; taken off
+    ([{"py": "__import__('native.pads_ui', fromlist=['p']).show(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"},
+      {"py": "setattr(app, '_sm_cols', __import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['cols'])"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols + 2)"},
+      {"py": "setattr(app, '_pads_sel', (app._sm_cols, 0))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'xy')"}, {"py": "setattr(app, '_sm_xy', app._pads_sel)"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t == {'kind': 'fx', 'key': 'sx'}))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._attach(app)"}], 0.4),
+    ([{"check": "dpg.does_item_exist('pads_s_mamt_' + str(__import__('native.modulate', fromlist=['m']).on_key(app, 'sx')[0]['id'])) and len(dpg.get_item_children('pads_mods_layer', 2)) >= 2"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._detach(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'sx')"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"}], 0.3),
+    ([{"check": "not __import__('native.modulate', fromlist=['m']).modulators(app) and not dpg.get_item_children('pads_mods_layer', 2)"}], 0.1),
     # a number field dragged: its pace from its width as drawn, so a wide one keeps up with the pointer
     ([{"py": "num._on_activated(None, dpg.get_alias_id('inp_sx'))"},
       {"check": "dpg.get_item_rect_size('inp_sx')[0] <= 0 or "

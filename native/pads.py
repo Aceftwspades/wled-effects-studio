@@ -469,15 +469,17 @@ def _travel_of(c, v):
     return 1.0 - f if c.get("invert") else f
 
 
-def swing(app, c):
-    """How far the modulators move a fader's or a knob's target, along its travel: (from, to, where now), from
-    below to; or None when none moves it."""
+def swing(app, c, axis="x"):
+    """How far the modulators move a control's target, along its travel (a fader's, a knob's, an XY pad's `axis`):
+    (from, to, where now), from below to; or None when none moves it."""
     from native import modulate
-    key = modulate.key_of(c.get("target"))
+    _, tk, lo, hi, _ = next(a for a in AXES if a[0] == axis)
+    key = modulate.key_of(c.get(tk))
     s = modulate.swing(app, key) if key else None
     if s is None:
         return None
-    a, b, now = (_travel_of(c, v / modulate.hi(key)) for v in s)
+    rng = {"lo": c.get(lo, 0.0), "hi": c.get(hi, 1.0), "invert": c.get("invert") and axis == "x"}
+    a, b, now = (_travel_of(rng, v / modulate.hi(key)) for v in s)
     return min(a, b), max(a, b), now
 
 

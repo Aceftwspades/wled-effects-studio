@@ -333,6 +333,16 @@ try:
         pads_hw.lights(app, out, now=201.4 + k * 0.05)
     want = pads_hw.wanted(app, st, pads_hw.pulses(app, st))
     check(all(pads_hw._rt(app)["lights"].get(k) == m for k, m in want.items()), "a few readings on: every light caught up")
+    # a wave that never stops: every pad gets its turn (the same 16 once won every reading, the rest froze)
+    w.update(period=0.5)
+    got = set()
+    for k in range(40):
+        clock.step(0.05)
+        modulate.apply(app)
+        out.sent.clear()
+        pads_hw.lights(app, out, now=202.0 + k * 0.05)
+        got |= {m[1] for m in out.sent if m[0] == 0x90}
+    check(len(got) == 64, f"a wave always moving: all 64 pads updated in turn ({len(got)})")
 finally:
     clock.release()
 dpg.destroy_context()

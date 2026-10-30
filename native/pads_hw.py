@@ -412,16 +412,25 @@ def lights(app, out, now=None):
     want = wanted(app, st, r.get("pulse"), pulsing)
     lights_now = dict(r["lights"])
     budget = PULSE_SENDS if fresh else 0                   # pulses changed only as their levels are read
+    waiting = []
     for k, m in want.items():
         if lights_now.get(k) == m or sent >= MAX_SENDS:
             continue
         if k in pulsing and k in lights_now:               # a pulse's next step (one newly lit is not held back)
-            if budget <= 0:
-                continue
-            budget -= 1
+            waiting.append(k)
+            continue
         out.send(list(m))
         sent += 1
         lights_now[k] = m
+    when = r.setdefault("pulse_sent", {})
+    waiting.sort(key=lambda k: when.get(k, -1e9))           # the longest kept waiting first: every pulse gets its turn
+    for k in waiting[:max(0, min(budget, MAX_SENDS - sent))]:
+        out.send(list(want[k]))
+        sent += 1
+        lights_now[k] = want[k]
+        when[k] = now
+    for k in [k for k in when if k not in pulsing]:
+        del when[k]
     for k in [k for k in lights_now if k not in want]:     # a light no longer used: out
         if sent >= MAX_SENDS:
             break

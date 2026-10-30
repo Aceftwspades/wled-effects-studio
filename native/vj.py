@@ -903,7 +903,7 @@ def mix(app, a, b, c=None, c_alpha=None):
     transparency, keyed or its own), not at all."""
     from native import mixer, transition
     o = options(app)
-    f = float(o["fader"])
+    f = fader_now(app)
     a, b = _level(a, knob_value(app, 0, "level")), _level(b, knob_value(app, 1, "level"))
     if o.get("wipe", "blend") != "blend" and 0.0 < f < 1.0:
         out = transition.blend(a, b, f, o["wipe"])
@@ -960,7 +960,7 @@ def update(app, dt=None):
     beat, hit = _beat(app, now, heard)
     app._vj_pulse = beat
     _flames(app)
-    f = float(o["fader"])
+    f = fader_now(app)
     app._vj_tick = getattr(app, "_vj_tick", 0) + 1
     cue = cue_deck(app) if o.get("cue") else -1
     for i in range(len(o["decks"])):
@@ -1179,6 +1179,14 @@ def _launch_due(app):
     if beat_count(app)[0] >= p[0] - 1e-6:
         app._vj_pending = None
         go(app, p[1])
+
+
+def fader_now(app):
+    """The crossfader as it mixes: what a modulator moves it to while one does (modulate.py, never saved), else its
+    own."""
+    from native import modulate
+    m = modulate.over(app, "vj.fader")
+    return float(options(app)["fader"]) if m is None else float(m)
 
 
 def set_fader(app, v, hand=True):

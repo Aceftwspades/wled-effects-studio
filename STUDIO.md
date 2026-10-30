@@ -4330,6 +4330,30 @@ notes, its lights mirroring the layout). In four phases:
    PULSE_SENDS (16) pulsing changes a reading - none between readings - what is held back kept as unsent and caught
    up after. Tests: test_pads_hw (shades by the clock, only the pulsing pads sent, back to dim when off, each
    device's message, a 64-pad grid capped at 16 a reading and caught up). Not tried on the devices themselves.
+   Review and the comparison with other VJ and modulation tools (2026-10-30). Fixed: (1) the pulse cap starved all
+   but 16 lights - lights() went through them in the same order each reading, so with a wave always moving the
+   same 16 won (48 of 64 never changed); now the longest kept waiting go first (pads_hw "pulse_sent"). (2) The
+   modulators' state outlived a project switch - a slider equal to the old project's wave value was put back to the
+   old place, and a note held across the switch held the new project's modulator with nothing holding it;
+   modulate.apply now clears it when app.project changes. (3) A play target read a soft note (velocity below 64)
+   as a let-go; any value above 0 presses now. (4) Each modulator lists only the targets that do something for its
+   kind (no rate or shape on an envelope, no play on the beat or a wave that always runs); the module's docstring
+   brought up to date. (5) "modulators" has its own undo (project.UNDO_KEYS); the dialog's Undo, and the pads'
+   Undo takes it back when the modulators changed last.
+   Added, after Bitwig's, VDMX's, Resolume's and Chromatik's modulation: the sound as a kind of its own ("audio":
+   the level, bass, mid or treble followed over an attack and a release, on auto level against the loudest of the
+   last AUTO_S seconds); an amount per slider (amt, -1..1: one wave up on one slider and down on another); phase,
+   and spread (each further slider a share of a wave on); a feel (triplets, dotted); a width (a square's duty, a
+   triangle's peak); sample and hold; an envelope fired on each beat, and played at a note's velocity; the VJ
+   crossfader and the mixer fader as targets ("vj.fader", "mix.fader", kept apart in app._mod_over and read through
+   vj.fader_now / mixer.picture); other modulators' depth and rate ("m<id>.depth" / ".rate": moved a frame late,
+   a modulated rate running free of the beat grid; taken away with the modulator it belongs to); a scope on each
+   dialog row (its last two seconds); the band on an XY pad's axes; the pad editor's "here" amount, a depth knob for
+   a kind without a rate, and its play pad only for one that plays. Tests: test_modulate (velocity, amounts and
+   their bands, spread and phase, the feels, width, sample and hold, the sound followed and auto level, an envelope
+   on the beat, one modulator on another's depth, the mixer's fader kept apart, a project switch), test_pads_hw (a
+   wave always moving: all 64 pads get their turn), the smoke. Not done: modulators kept in a preset or a show
+   step, palette and graph pins as targets, the device running them.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

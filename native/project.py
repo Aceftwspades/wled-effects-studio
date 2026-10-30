@@ -172,7 +172,7 @@ class Project:
 
     # the options with an undo of their own: the sequence's steps, the schedule, the
     # palettes, the segments - every save() that changes one keeps what it was
-    UNDO_KEYS = ("sequence", "schedule", "palettes", "segments", "vj", "pads")
+    UNDO_KEYS = ("sequence", "schedule", "palettes", "segments", "vj", "pads", "modulators")
     UNDO_MAX = 40
     # fields of those that are where the user is, not an edit: no undo of their own, and an undo leaves them be
     # (the pads' bank shown - a show switching banks would push its layout edits out of the undo)

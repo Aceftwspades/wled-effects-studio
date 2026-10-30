@@ -487,7 +487,7 @@ try:
     check(modulate.gated(app3, env["id"]), "a note down: played")
     midi_ui.apply_target(app3, t, 0, 127.0, ("note", 0, 60))
     check(not modulate.gated(app3, env["id"]), "its note-off: let go")
-    check(pads_ui.target_label(app3, t).endswith("play (held: an envelope, or a wave set to run while held)"), "its label")
+    check(pads_ui.target_label(app3, t).endswith("play (while held)"), "its label")
     pads_ui._mod_pad(app3, env["id"], "hold", "mod_gate", None)
     pl = b6["controls"][-1]
     check(pl["type"] == "hold" and pl["target"] == t and pl["label"] == f"Mod {env['id']} play", "play pad: a hold pad on it, in a free cell")
