@@ -1547,7 +1547,6 @@ def menu_commands(app):
 
 def run_menu_item(item):
     """A menu item run as a click runs it: a check item turned over first."""
-    import inspect
     conf = dpg.get_item_configuration(item)
     cb, ud = conf.get("callback"), conf.get("user_data")
     if cb is None:
@@ -1556,11 +1555,7 @@ def run_menu_item(item):
     if conf.get("check"):
         val = not dpg.get_value(item)
         dpg.set_value(item, val)
-    try:
-        n = len(inspect.signature(cb).parameters)
-    except (TypeError, ValueError):
-        n = 3
-    cb(*[item, val, ud][:n])
+    num.call(cb, item, val, ud)                         # as the studio calls one (defaults kept)
 
 
 def _palette_fill(app, text):

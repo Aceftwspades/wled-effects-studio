@@ -181,6 +181,7 @@ def copy_bank(st, i):
     """Bank i copied after itself, its controls given new ids; the copy's index."""
     b = copy.deepcopy(st["banks"][i])
     b["name"] = f"{b['name']} copy"
+    b["midi"] = None                      # the button that shows bank i stays its own (two banks on one button)
     for c in b["controls"]:
         c["id"] = st["next_id"]
         st["next_id"] += 1
@@ -259,6 +260,13 @@ def is_on(app, t):
 
 
 # --- acting ------------------------------------------------------------------------------------------------------
+def _at(t, v, want):
+    """Whether a target reads back as `want` (0..1): within half a step of what it holds - an effect's slider keeps
+    whole steps of 255 (Custom 3 of 31), so a toggle's 0.5 reads back 128/255 and was never "on" at 1e-3."""
+    step = 1.0 / 31.0 if (t or {}).get("key") == "c3" else 1.0 / 255.0 if (t or {}).get("kind") == "fx" else 2e-3
+    return abs(float(v) - float(want)) <= step / 2.0 + 1e-9
+
+
 def _span(c, f):
     """0..1 along the control (a fader's travel) as the target's 0..1, through the control's range and invert."""
     f = max(0.0, min(1.0, float(f)))
@@ -402,7 +410,7 @@ def press(app, c, f=None, xy=None, pressure=None):
         _apply(app, t, hi)
     elif typ == "toggle":
         now = value(app, t)
-        on = (abs(now - hi) < 1e-3) if now is not None else bool(r["on"].get(c["id"]))
+        on = _at(t, now, hi) if now is not None else bool(r["on"].get(c["id"]))
         r["on"][c["id"]] = not on
         _apply(app, t, lo if on else hi)
     else:                                                           # hold: hi while held, what was there after
@@ -519,15 +527,19 @@ def lit(app, c):
         return on
     if c["type"] == "toggle" and kind_of(t) == "value":
         v = value(app, t)
-        return (abs(v - _span(c, 1.0)) < 1e-3) if v is not None else bool(r["on"].get(c["id"]))
+        return _at(t, v, _span(c, 1.0)) if v is not None else bool(r["on"].get(c["id"]))
     return False
 
 
 def let_go(app):
     """Every held control released (the window closed, the mouse gone off it, a bank switched mid-press) - however
-    many held it - and the controller's pads it held forgotten (pressed again, they press again)."""
+    many held it - and the controller's pads it held forgotten (pressed again, they press again), as are the
+    mouse's drag and the phone's touches: a move or a lift that comes after drives nothing."""
     from native import pads_hw
     pads_hw.let_go(app)
+    app._pads_remote = None
+    if (getattr(app, "_pads_drag", None) or ("",))[0] == "play":
+        app._pads_drag = None
     st = state(app.project)
     for cid in list(_rt(app)["held"]):
         _rt(app)["count"].pop(cid, None)

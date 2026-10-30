@@ -180,8 +180,25 @@ def modulators(app):
         if "keys" not in m:
             m["keys"] = [m.pop("key", "sx")]
         if "id" not in m:
-            m["id"] = 1 + max((int(x.get("id", 0)) for x in mods), default=0)
+            m["id"] = _new_id(app, mods)
     return mods
+
+
+def _new_id(app, mods):
+    """An id no modulator of the project has had: what a step, a MIDI mapping or a pad kept of one taken away does
+    not land on the next one made (and its held notes, phase and history are not inherited)."""
+    o = app.project.options
+    n = max(int(o.get("mod_next_id", 1) or 1), 1 + max((int(x.get("id", 0)) for x in mods), default=0))
+    o["mod_next_id"] = n + 1
+    return n
+
+
+def _forget(app, mid):
+    """What runs of modulator mid let go (it is taken away): its phase, envelope, holders, history, a step's say."""
+    st = getattr(app, "_mod_state", None) or {}
+    for k in ("phase", "env", "gate", "aud", "vel", "hist", "level"):
+        (st.get(k) or {}).pop(mid, None)
+    (getattr(app, "_mod_scene", None) or {}).pop(mid, None)
 
 
 def find(app, mid):
@@ -273,7 +290,8 @@ def _sound(app):
 def _follow(m, a, sound, dt):
     """An audio modulator's level 0..1: its band followed up over its attack and down over its release (a is
     [followed, loudest lately]); on auto level, against the loudest of the last few seconds."""
-    raw = max(0.0, min(1.0, float(sound.get(m.get("band", "bass"), 0.0))))
+    raw = float(sound.get(m.get("band", "bass"), 0.0))
+    raw = max(0.0, min(1.0, raw)) if math.isfinite(raw) else 0.0     # no number (a broken source): silence
     if dt > 0:
         tau = _env_param(m, "attack" if raw > a[0] else "release")
         a[0] += (raw - a[0]) * (1.0 - math.exp(-dt / tau))
@@ -371,7 +389,8 @@ def apply(app):
     grid = getattr(app, "_vj_grid_beat_at", None)                # the VJ running on its bar grid: its beat
     if grid is not None and now - getattr(app, "_vj_at", -1e9) < 0.25:
         since = now - grid
-    hit = since is not None and (st.get("since") is None or since < st["since"])   # a beat since the last frame
+    prev = st.get("since")                                   # a beat since the last frame: one that is fresh (not
+    hit = since is not None and since <= dt + 1e-3 and (prev is None or since < prev)   # an old one at the start)
     st["since"] = since
     sound = None
     ph = st.setdefault("phase", {})
@@ -656,14 +675,25 @@ def deck_mods(app, i):
     return out
 
 
+def _same_mod(a, b):
+    """Two modulators alike but for their ids, seeds and where they came from."""
+    skip = ("id", "seed", "preset_deck")
+    return {k: v for k, v in a.items() if k not in skip} == {k: v for k, v in b.items() if k not in skip}
+
+
 def put_deck_mods(app, i, mods):
     """A preset's modulators onto deck i, in place of the ones the last preset loaded there brought (preset_deck);
-    the ones made by hand are left. A preset without any takes those off too: they went with its look."""
+    the ones made by hand are left - and one made by hand that the preset kept (saved from this deck) is not made a
+    second time beside itself. A preset without any takes the last one's off too: they went with its look. Another
+    modulator moving the depth or rate of one taken off moves the one that takes its place (in their order), or
+    nothing when there is none. One save, one undo step."""
     pre = f"vj{int(i)}."
-    old = [m for m in modulators(app) if m.get("preset_deck") == int(i)]
+    all_ = modulators(app)
+    old = [m for m in all_ if m.get("preset_deck") == int(i)]
     for m in old:
-        _drop(app, m)
-    made = 0
+        all_.remove(m)
+        _forget(app, m["id"])
+    made = []
     for c in mods or ():
         c = json.loads(json.dumps(c))
         keys = [pre + str(k)[4:] for k in c.get("keys") or () if str(k).startswith("vj*.") and pre + str(k)[4:] in VJ_KEYS]
@@ -671,12 +701,20 @@ def put_deck_mods(app, i, mods):
             continue
         c["amt"] = {pre + str(k)[4:]: v for k, v in (c.get("amt") or {}).items() if str(k).startswith("vj*.")}
         c.update(keys=keys, preset_deck=int(i))
-        add(app, **c)
-        made += 1
-    if old and not made:
+        if any(_same_mod(c, m) for m in modulators(app) if m.get("preset_deck") is None):
+            continue                                        # the hand-made one it was saved from: already here
+        made.append(add(app, _quiet=True, **c))
+    moved = {f"m{a['id']}.{p}": (f"m{b['id']}.{p}" if b is not None else None)
+             for k, a in enumerate(old) for b in [made[k] if k < len(made) else None] for p in MOD_PARAMS}
+    for x in modulators(app):
+        if moved.keys() & set(x.get("keys") or ()):
+            amt = x.get("amt") or {}
+            x["keys"] = [moved.get(k, k) for k in x["keys"] if moved.get(k, k) is not None]
+            x["amt"] = {moved.get(k, k): v for k, v in amt.items() if moved.get(k, k) is not None}
+    if old or made:
         app.project.save()
         refresh(app)
-    return made
+    return len(made)
 
 
 def scene(app):
@@ -772,7 +810,7 @@ def value(app, t):
     if k == "rate":
         return _rate_f(m)
     if k == "depth":
-        return float(m.get("depth", 0)) / 255.0
+        return float(_scened(app, m).get("depth", 0)) / 255.0
     if k == "shape":
         s = m.get("shape", "sine")
         return SHAPES.index(s) / (len(SHAPES) - 1) if s in SHAPES else 0.0
@@ -811,8 +849,13 @@ def set_target(app, t, f):
         return
     else:
         k = t.get("key")
+        sc = (getattr(app, "_mod_scene", None) or {}).get(m["id"])
         if k == "rate":
             _rate_set(m, f)
+        elif k == "depth" and sc is not None:               # a show step has it: turned there, for the step
+            sc["depth"] = int(round(f * 255))
+            app._mod_moved = True
+            return
         elif k == "depth":
             m["depth"] = int(round(f * 255))
         elif k == "shape":
@@ -845,7 +888,8 @@ def _labels(app):
     out = {}
     for i, k in enumerate(FX_KEYS):
         lab = (m["labels"][i] if i < len(m["labels"]) else "").strip()
-        out[k] = lab if lab and lab != "!" else generic[k]
+        lab = lab if lab and lab != "!" else generic[k]
+        out[k] = f"{lab} ({generic[k]})" if lab in out.values() else lab   # two of one name: the picker told apart
     from native import vj
     for k in VJ_KEYS:
         i, knob = _vj_key(k)
@@ -1116,9 +1160,9 @@ def undo(app):
     return True
 
 
-def add(app, **kw):
+def add(app, _quiet=False, **kw):
     """One more modulator: on the first slider without one (or `keys`, or `key` for one), a wave unless said
-    otherwise; an id of its own."""
+    otherwise; an id of its own. `_quiet`: not saved nor shown yet (the caller does both, once for many)."""
     mods = modulators(app)
     used = {k for m in mods for k in (m.get("keys") or ())}
     m = dict(DEFAULT, steps=list(DEFAULT["steps"]), amt={}, seed=random.randrange(1 << 20))   # a random wave of its own
@@ -1127,20 +1171,27 @@ def add(app, **kw):
         kw["keys"] = [kw.pop("key")]
     m.update(kw)
     m["keys"] = list(m["keys"])
-    m["id"] = 1 + max((int(x.get("id", 0)) for x in mods), default=0)
+    m["id"] = _new_id(app, mods)
     mods.append(m)
-    app.project.save()
-    refresh(app)
+    if not _quiet:
+        app.project.save()
+        refresh(app)
     return m
 
 
 def edit(app, i, **kw):
+    """Modulator i's settings set from the dialog: a choice (its kind, its rate's sort, its shape, how it starts or
+    fires) saved and the row made again at once; a number - a drag field calls at each step of a drag - saved once
+    it is left alone (_flush), so a drag is one save and one undo step."""
+    from native import clock
     mods = modulators(app)
     if 0 <= i < len(mods):
         mods[i].update(kw)
-        app.project.save()
-        if {"kind", "sync", "shape", "start", "fire"} & set(kw):
+        if {"kind", "sync", "shape", "start", "fire", "on"} & set(kw):
+            app.project.save()
             refresh(app)
+        else:
+            app._mod_save_at = (clock.now(), app.project)
 
 
 def set_key(app, i, j, key):
@@ -1189,6 +1240,7 @@ def _drop(app, m):
     mods = modulators(app)
     if m in mods:
         mods.remove(m)
+    _forget(app, m["id"])
     mine = {f"m{m['id']}.{p}" for p in MOD_PARAMS}
     for x in mods:
         if mine & set(x.get("keys") or ()):
@@ -1208,8 +1260,9 @@ def remove(app, i):
 def _set_step(app, i, j, v):
     mods = modulators(app)
     if 0 <= i < len(mods):
+        from native import clock
         mods[i].setdefault("steps", list(DEFAULT["steps"]))[j] = round(float(v), 3)
-        app.project.save()
+        app._mod_save_at = (clock.now(), app.project)       # a drag: saved once it is left alone
 
 
 def _steps_len(app, i, d):

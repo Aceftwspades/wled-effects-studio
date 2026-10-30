@@ -126,6 +126,9 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
 """
 
 
+_RUNS = [0]                                              # the shader runs made so far (their keys)
+
+
 def name_of(source, fallback):
     """The look's name: a "// NAME: ..." line in the shader, else the file's."""
     for line in source.splitlines()[:40]:
@@ -768,7 +771,10 @@ def look_draw(src, name):
         st["n"] = st.get("n", 0) + 1
         bands = getattr(ctx, "bands", None)
         aud = audio_texture(bands if bands is not None else np.full(16, ctx.bass, np.float32), ctx.wave)
-        key = st.setdefault("key", f"{name}-{id(st)}")
+        key = st.get("key")
+        if key is None:                                     # a number never given twice: id(st) came back for the
+            _RUNS[0] += 1                                   # next state, and with it the last run's buffers
+            key = st["key"] = f"{name}-{_RUNS[0]}"
         deck = getattr(ctx, "deck", None) or {}
         # a video or an FSEQ being rendered (the clock held): this frame's own, not the one before
         chosen = list(vj.deck_channels(deck) or ["", "", "", ""]) if deck else None

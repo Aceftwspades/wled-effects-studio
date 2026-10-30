@@ -1055,6 +1055,37 @@ class App(Features, Recorder, EditBuild):
             messages.post(self, err, "error", key="project:load")
             chrome.confirm(self, "The project's settings did not read", err, [("OK", None)])
 
+    def _leave_project(self):
+        """The project about to be closed left whole: the pads and controls held let go (what a hold changed put
+        back), the desk a show's VJ steps took over put back, and what waits to be saved (a VJ knob, a modulator
+        turned, a pad's typed label, the mixer's fader) saved into it - not into the next one."""
+        from native import modulate, mixer, pads, pads_ui, vj, vj_ui
+        try:
+            pads.let_go(self)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        if getattr(self, "_vj_by_show", False):
+            vj.restore_desk(self)
+            self.project.save()                          # the desk, not the step's decks, is what it keeps
+        vj_ui._flush_save(self, now=True)
+        modulate._flush(self, 0.0, force=True)
+        pads_ui._flush(self)
+        if getattr(self, "_mixer_save_at", None) is not None:
+            self._mixer_save_at = None
+            self.project.save()
+
+    def _enter_project(self):
+        """Nothing of the last project's run state reaching the next: its pads' held controls, the phone's holds, a
+        learn waiting, a drag; the Modulators dialog shows the new project's."""
+        from native import modulate
+        self._pads_rt = None
+        self._pads_remote = None
+        self._pads_learn = None
+        self._pads_drag = None
+        getattr(self, "_pads_hw_rt", {}).get("held", {}).clear()
+        modulate.refresh(self)
+
     def switch_project(self, path, create=False):
         path = project_path(path)
         if not create and not os.path.isdir(path):
@@ -1063,7 +1094,9 @@ class App(Features, Recorder, EditBuild):
             self.edit_save()
         if self.gp.graph:
             self.gp.save()
+        self._leave_project()
         self.project = Project(path)
+        self._enter_project()
         messages.clear(self, "")                         # the last project's problems are not this one's
         shape_ui.forget(self)                            # nor its shape's undo steps and selection
         self._code_undo, self._code_redo = [], []        # nor the code pane's (they reached the next file opened)
@@ -4113,13 +4146,20 @@ def main():
     app.report_project_load()                        # a project.json that did not read: said now the window is up
     try:
         while dpg.is_dearpygui_running():
+            jobs = None
             try:
                 jobs = dpg.get_callback_queue()
-                if jobs:
-                    dpg.run_callbacks(jobs)
             except Exception:
                 import traceback
                 traceback.print_exc()
+            for job in jobs or ():                   # each on its own: one that fails leaves the rest to run
+                if job[0] is None:
+                    continue
+                try:
+                    num.call(job[0], *job[1:4])      # defaulted parameters keep their defaults (num.call)
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
             if app._need_layout:
                 app._need_layout = False
                 app.relayout()

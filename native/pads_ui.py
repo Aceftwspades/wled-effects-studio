@@ -299,7 +299,14 @@ def _grid_size(app, cols=None, rows=None):
     _fill_banks(app)
 
 
+def _no_bank_learn(app):
+    """A learn waiting for a bank's button given up: the banks are moving, its index would be another's."""
+    if (pads_hw.learning(app) or ("",))[0] == "bank":
+        pads_hw.learn(app, None)
+
+
 def _move_bank(app, d):
+    _no_bank_learn(app)
     st = _st(app)
     i, j = st["bank"], st["bank"] + d
     if 0 <= j < len(st["banks"]):
@@ -322,6 +329,7 @@ def _delete_bank(app):
     if len(st["banks"]) <= 1:
         return
     pads.let_go(app)
+    _no_bank_learn(app)
     st["banks"].pop(st["bank"])
     st["bank"] = max(0, st["bank"] - 1)
     app._pads_sel = None
@@ -698,6 +706,10 @@ def _add_control(app, typ):
         c["w"], c["h"] = w, h
         if pads.fits(b, c):
             break
+    else:                                                     # the cell gone (the grid made smaller) or taken
+        app._pads_sel = None
+        _fill_side(app)
+        return
     app._pads_axis = "x"
     b["controls"].append(c)
     app._pads_sel = c["id"]
@@ -763,13 +775,22 @@ def remote(app, cmd):
     if seen is None:
         seen = app._pads_remote = {}
     e = cmd["e"]
-    if e == "up":
-        seen.pop(c["id"], None)
-        pads.release(app, c)
+    mine = seen.get(c["id"])                                        # [how many phone presses hold it, last heard]
+    if e == "up":                                                   # only what a phone pressed: not the mouse's,
+        if mine is not None:                                        # not the controller's, not one let go since
+            mine[0] -= 1
+            if mine[0] <= 0:
+                del seen[c["id"]]
+            pads.release(app, c)
         return
-    seen[c["id"]] = time.monotonic()
-    if e == "hold":
-        return
+    if e in ("hold", "move"):
+        if mine is None:                                            # let go since (Edit, a bank switched): nothing
+            return
+        mine[1] = time.monotonic()
+        if e == "hold":
+            return
+    else:
+        seen[c["id"]] = [(mine or [0])[0] + 1, time.monotonic()]
     if e == "down":
         if c["type"] in pads.SURFACES:
             pads.press(app, c, xy=(cmd.get("x", 0.5), cmd.get("y", 0.5)), pressure=cmd.get("p"))
@@ -793,11 +814,11 @@ def remote_poll(app):
     if not seen:
         return
     now = time.monotonic()
-    for cid, t in list(seen.items()):
+    for cid, (n, t) in list(seen.items()):
         if now - t > REMOTE_GONE_S:
             del seen[cid]
             c = pads.find(_st(app), cid)
-            if c is not None:
+            for _ in range(n if c is not None else 0):             # each phone press it was holding by
                 pads.release(app, c)
 
 

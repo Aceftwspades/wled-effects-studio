@@ -363,10 +363,12 @@ def step(item, notches):
     return dpg.get_value(item)
 
 
-def _call(cb, *args):
-    """A callback called as Dear PyGui calls one: with as many of (sender,
-    app_data, user_data) as it takes - defaulted parameters count, as they
-    do there."""
+def call(cb, *args):
+    """A widget's callback called the way the studio runs them (app.py's loop, the tests, the walk): with as many
+    of (sender, app_data, user_data) as it has parameters WITHOUT a default - a defaulted one keeps its default.
+    Dear PyGui's own run_callbacks counts the defaulted ones too, so `lambda s, v, i=i:` got user_data (None) as
+    i and every such control did nothing from the mouse; a value a callback wants handed in rides in user_data,
+    taken as a third parameter without a default."""
     import inspect
     try:
         ps = list(inspect.signature(cb).parameters.values())
@@ -374,8 +376,11 @@ def _call(cb, *args):
         return cb(*args)
     if any(p.kind == p.VAR_POSITIONAL for p in ps):
         return cb(*args)
-    n = sum(1 for p in ps if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD))
+    n = sum(1 for p in ps if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD) and p.default is p.empty)
     return cb(*args[:min(n, len(args))])
+
+
+_call = call
 
 
 def fire(item):

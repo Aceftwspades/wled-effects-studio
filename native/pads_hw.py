@@ -184,7 +184,7 @@ def events(app, evs):
             app.gp.status(f"pads: learned {_words(ctl)}")
             pads_ui._fill_banks(app)
             pads_ui._fill_side(app)
-            return []
+            return []                                       # none go on: the MIDI window's learn does not see it
         return evs
     r = _rt(app)
     editing = bool(getattr(app, "_pads_edit", False))
@@ -216,7 +216,7 @@ def events(app, evs):
             if not took:
                 rest.append(ev)
             continue
-        played = [] if editing else _controls_for(st, h, ctl)
+        played = [] if editing or took else _controls_for(st, h, ctl)   # a bank button: not the new bank's pad too
         if not (took or played):
             rest.append(ev)
         for c in played:
@@ -272,13 +272,14 @@ def poll(app):
         # tried as it is picked, then again every RETRY_S while it is not there (said once, not each time)
         tried, now = getattr(app, "_pads_out_tried", None), time.monotonic()
         new = tried is None or tried[0] != h["out"]
-        if h["out"] and (new or (now - tried[1] >= RETRY_S and h["out"] in midi.out_ports())):
-            app._pads_out_tried = (h["out"], now)
-            try:
-                out.open(h["out"])
-            except Exception as e:
-                if new:
-                    app.gp.status(f"pads: the controller's lights: {e}", "warn")
+        if h["out"] and (new or now - tried[1] >= RETRY_S):
+            app._pads_out_tried = (h["out"], now)              # looked for again only every RETRY_S (not each frame)
+            if new or h["out"] in midi.out_ports():
+                try:
+                    out.open(h["out"])
+                except Exception as e:
+                    if new:
+                        app.gp.status(f"pads: the controller's lights: {e}", "warn")
     lights(app, out)
 
 
@@ -336,12 +337,12 @@ def wanted(app, st, pulse=None, pulsing=None):
         if ctl and ctl[0] == "note":
             m = _pad_msg(dev, int(ctl[2]), c.get("colour"), on, int(ctl[1]), step)
             out[("note", int(ctl[1]), int(ctl[2]))] = m
-            if step is not None and pulsing is not None:
+            if step is not None and pulsing is not None and not on:     # lit by a press: not a pulse step
                 pulsing.add(("note", int(ctl[1]), int(ctl[2])))
         elif ctl and ctl[0] == "cc" and dev in ("generic", "launchpad"):
             v = 127 if on or (step is not None and step >= STEPS.get(dev, 8) // 2) else 0
             out[("cc", int(ctl[1]), int(ctl[2]))] = (0xB0 | (int(ctl[1]) & 0x0F), int(ctl[2]), v)
-            if step is not None and pulsing is not None:
+            if step is not None and pulsing is not None and not on:
                 pulsing.add(("cc", int(ctl[1]), int(ctl[2])))
     if _grid_on(h):
         under = {cell: c for c in b["controls"] for cell in pads.cells(c)}     # the control on each cell
@@ -353,7 +354,7 @@ def wanted(app, st, pulse=None, pulsing=None):
                 if key in out and c is None:
                     continue
                 out[key] = _pad_msg(dev, n, c.get("colour"), lit[c["id"]], 0, pulse.get(c["id"])) if c else (0x90, n, 0)
-                if c is not None and c["id"] in pulse and pulsing is not None:
+                if c is not None and c["id"] in pulse and pulsing is not None and not lit[c["id"]]:
                     pulsing.add(key)
         for i in range(8):
             k = bank_ctl(dev, i)
@@ -411,12 +412,13 @@ def lights(app, out, now=None):
     pulsing = set()
     want = wanted(app, st, r.get("pulse"), pulsing)
     lights_now = dict(r["lights"])
+    was_pulsing = r.get("pulsing", set())
     budget = PULSE_SENDS if fresh else 0                   # pulses changed only as their levels are read
     waiting = []
     for k, m in want.items():
         if lights_now.get(k) == m or sent >= MAX_SENDS:
             continue
-        if k in pulsing and k in lights_now:               # a pulse's next step (one newly lit is not held back)
+        if k in pulsing and k in was_pulsing and k in lights_now:   # a pulse's next step (pressed, let go: at once)
             waiting.append(k)
             continue
         out.send(list(m))
@@ -437,6 +439,6 @@ def lights(app, out, now=None):
         out.send(_dark(k))
         sent += 1
         del lights_now[k]
-    r["lights"] = lights_now
+    r["lights"], r["pulsing"] = lights_now, pulsing
     return sent
 # AI: end

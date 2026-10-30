@@ -23,7 +23,7 @@ def blend(old, new, prog, style="fade"):
     p = float(max(0.0, min(1.0, prog)))
     h, w = new.shape[:2]
     if style == "fade" or w * h == 1:
-        return (old.astype(np.float32) * (1 - p) + new.astype(np.float32) * p).astype(np.uint8)
+        return (old.astype(np.float32) * (1 - p) + new.astype(np.float32) * p + 0.5).astype(np.uint8)   # rounded, not cut down
     ys, xs = np.mgrid[0:h, 0:w]
     if style == "swipe right":
         m = xs < p * w

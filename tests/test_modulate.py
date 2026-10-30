@@ -417,6 +417,46 @@ try:
     mo.apply(app)
     check(mo.over(app, "mix.fader") is None, "taken away: the fader its own again")
 
+    # ids never given again: one taken away keeps its number, and what was held of it is not inherited
+    e = mo.add(app, key="sx", kind="env")
+    gate(e, "p", 1.0)
+    mo.remove(app, 0)
+    n = mo.add(app, key="sx")
+    check(n["id"] != e["id"] and not mo.gated(app, n["id"]), f"a new one after one taken away: a new id ({e['id']} -> {n['id']})")
+    # a depth dragged in the dialog: saved once left alone, one save (one undo step) not one a tick
+    saves = app.project.saves
+    for d in range(96, 140):
+        mo.edit(app, 0, depth=d)
+    check(app.project.saves == saves, "a drag: no save while it moves")
+    clock.step(mo.SAVE_AFTER_S + 0.1)
+    mo.apply(app)
+    check(app.project.saves == saves + 1 and n["depth"] == 139, "left alone: saved once")
+    # a depth turned from a pad while a show step plays: for the step (as on or off is), the modulator's own kept
+    mo.play_scene(app, {str(n["id"]): {"on": True, "depth": 100}})
+    mo.set_target(app, {"kind": "mod", "id": n["id"], "key": "depth"}, 0.0)
+    check(mo._eff(app, n)["depth"] == 0 and n["depth"] == 139
+          and mo.value(app, {"kind": "mod", "id": n["id"], "key": "depth"}) == 0.0, "a step playing: its depth turned")
+    mo.play_scene(app, None)
+    mo.modulators(app).clear()
+    mo.apply(app)
+    # an envelope fired on the beat, added long after the last beat: it waits for the next
+    app.eng.fx["sx"] = 40
+    app.last_hit_at = clock.now() - 20.0
+    e = mo.add(app, key="sx", kind="env", fire="beat", depth=200)
+    for _ in range(3):
+        clock.step(0.05)
+        mo.apply(app)
+    check(app.eng.fx["sx"] == 40, f"no beat since: silent ({app.eng.fx['sx']})")
+    app.last_hit_at = clock.now()
+    clock.step(0.05)
+    mo.apply(app)
+    check(app.eng.fx["sx"] > 40, "the next beat: fired")
+    del app.last_hit_at
+    mo.modulators(app).clear()
+    mo.apply(app)
+    # a sound level that is not a number: silence, not full
+    check(mo._follow({"band": "bass"}, [0.0, 0.0], {"bass": float("nan")}, 0.02) == 0.0, "no number: silence")
+
     # another project opened: nothing of the last one's carried over
     app.eng.fx["sx"] = 100
     w = mo.add(app, key="sx", kind="lfo", shape="square", period=2, depth=60, start="held")

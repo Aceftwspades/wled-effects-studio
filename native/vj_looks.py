@@ -1052,11 +1052,7 @@ def _text(ctx, st):
     line = float(knob("text_outline"))
     if line > 0.0:                                            # a ring round each letter, in the far end of the colours
         r = max(1, int(round(px * 0.06)))
-        grown = out.copy()
-        for dy in range(-r, r + 1):
-            for dx in range(-r, r + 1):
-                if dx * dx + dy * dy <= r * r and (dx or dy):
-                    grown = np.maximum(grown, _shift(out, dx, dy))
+        grown = _disk_max(out, r)
         edge = np.clip(grown - out, 0, 1) * line
     shadow = float(knob("text_shadow"))
     drop = None
@@ -1080,6 +1076,20 @@ def _text(ctx, st):
         lit = np.maximum(out, edge) if edge is not None else out
         pic = pic + col * (0.35 * drop * (1.0 - lit))[..., None]
     return np.clip(pic, 0, 1)
+
+
+def _disk_max(m, r):
+    """The mask grown by a disk of radius r (each point the most of those within r of it): the rows' maxima over
+    each half-width built once, then each row of the disk one shift of the right one - about 4r array steps, not the
+    pi r^2 shifts one per point of the disk took (some 530 a frame at the largest text, 15 ms)."""
+    rows = [m]                                               # rows[k]: the most within k across
+    for k in range(1, r + 1):
+        rows.append(np.maximum(rows[-1], np.maximum(_shift(m, k, 0), _shift(m, -k, 0))))
+    grown = rows[r].copy()
+    for dy in range(1, r + 1):
+        k = int(math.isqrt(r * r - dy * dy))
+        grown = np.maximum(grown, np.maximum(_shift(rows[k], 0, dy), _shift(rows[k], 0, -dy)))
+    return grown
 
 
 def _shift(m, dx, dy):
@@ -1161,6 +1171,7 @@ def draw(c, st):
 '''
 
 _USER = {}                      # path -> (mtime, name)
+_BY_NAME = {}                   # name -> the path of the file it came from (load_user keeps it)
 
 
 def user_dir(project):
@@ -1209,37 +1220,59 @@ def load_user(project, allow_py=True):
             continue
         if f.lower().endswith(".py") and not allow_py:
             old = _USER.get(path, (None, None, ""))[1]
-            if old:
-                LOOKS.pop(old, None)
             _USER[path] = (None, None, NOT_ALLOWED)               # read again once allowed
+            if old:
+                _let_go(old, path)
             continue
         if _USER.get(path, (None,))[0] == mt:
             continue
         old = _USER.get(path, (None, None, ""))[1]
-        if old:
-            LOOKS.pop(old, None)
         try:
             lk = _load_file(path)
+            if lk.name in BUILTIN:                                # it would hide the built-in, and take it with it
+                raise ValueError(f"'{lk.name}' is a built-in look's name: give this one a NAME of its own")
             LOOKS[lk.name] = lk
             _USER[path] = (mt, lk.name, "")
+            if old and old != lk.name:
+                _let_go(old, path)
         except Exception as e:
             _USER[path] = (mt, None, f"{type(e).__name__}: {e}")
+            if old:
+                _let_go(old, path)
     for path in [p for p in _USER if p not in seen]:
         name = _USER.pop(path)[1]
         if name:
-            LOOKS.pop(name, None)
+            _let_go(name, path)
+    _BY_NAME.clear()                                          # each name's file, as look_source finds it
+    for path, e in _USER.items():
+        if e[1]:
+            _BY_NAME.setdefault(e[1], path)
     return [(os.path.basename(p), e[2]) for p, e in _USER.items() if e[2]]
+
+
+def _let_go(name, path):
+    """A look's name let go by the file at `path` (gone, renamed, broken): back to another file's look of that name
+    (an add-on's that a project's look of one name hid), else out of the list."""
+    other = next((p for p, e in _USER.items() if p != path and e[1] == name), None)
+    if other is not None:
+        try:
+            LOOKS[name] = _load_file(other)
+            return
+        except Exception as e:
+            _USER[other] = (_USER[other][0], None, f"{type(e).__name__}: {e}")
+    if name not in BUILTIN:
+        LOOKS.pop(name, None)
 
 
 def look_source(name):
     """Where a look comes from: ("builtin", None), ("project", None), ("addon", its pack's id) - or (None, None)."""
     if name in BUILTIN:
         return "builtin", None
-    for path, e in _USER.items():
-        if e[1] == name:
-            from native import addons
-            pid = addons.pack_of(path)
-            return ("addon", pid) if pid else ("project", None)
+    path = _BY_NAME.get(name)                                 # one look at a time, not a walk of every file (the
+    if path is not None:                                      # browser asks this of each look at each key typed)
+        from native import addons
+        pid = addons.pack_of(path)
+        return ("addon", pid) if pid else ("project", None)
     return None, None
 
 

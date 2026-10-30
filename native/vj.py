@@ -114,6 +114,7 @@ def options(app):
     o.setdefault("pulse", "grid")       # the decks' beat: "grid" (on the bar grid) or "heard" (every beat heard)
     o.setdefault("quant", "now")        # Cut and Fade by hand: "now", or waiting for the next "beat" or "bar"
     decks = o.setdefault("decks", [])
+    del decks[DECKS:]                                        # a hand-made project with more: only A, B and C run
     while len(decks) < DECKS:
         d = json_copy(DECK)
         d["look"] = ("Plasma", "Drop: Nebula", "Text")[len(decks)]
@@ -298,14 +299,20 @@ def _same_file(a, b):
         return False
 
 
-def source_key(app, s):
+def whole_picture(deck):
+    """Whether a deck lays its video file out itself (fit, tile): then it is read whole - fitted inside the canvas,
+    clear bars round it - not cut to fill the canvas, which left fit and tile nothing to do."""
+    return deck.get("source", {}).get("kind") == "file" and vj_layer._get(deck, "pic_fit") in ("fit", "tile")
+
+
+def source_key(app, s, whole=False):
     kind = s.get("kind", "none")
     if kind == "none":
         return None
     w, h = canvas_size(app)
     if kind == "file":
         return ("file", media(app, clip_path(s)), round(float(s.get("speed", 1.0)), 3), float(s.get("in", 0.0)),
-                float(s.get("out", 0.0)), w, h)
+                float(s.get("out", 0.0)), w, h, bool(whole))
     return (kind, s.get("path"), s.get("name"), s.get("url"), w, h)
 
 
@@ -328,8 +335,9 @@ def _open(app, s, key):
         if b > a:
             args += ["-t", f"{(b - a):.3f}"]
         dec, has_alpha = video.alpha_of(path)                 # a file with transparency: read as RGBA, kept
+        whole = bool(key[-1])                                 # fit or tile: the whole picture, clear bars round it
         return video.FfmpegSource(args + dec + ["-i", path], os.path.basename(path), "file", w, h, realtime=True,
-                                  loop=True, fps=video.FILE_FPS, alpha=has_alpha)
+                                  loop=True, fps=video.FILE_FPS, alpha=has_alpha or whole, fit=whole)
     return video.open_source(kind, path=s.get("url") if kind == "stream" else s.get("path"), name=s.get("name"),
                              width=w, height=h, loop=True)
 
@@ -337,7 +345,7 @@ def _open(app, s, key):
 def _source(app, i, run, deck):
     """The deck's video source - the one open for its key, shared, or opened now - or None."""
     s = deck["source"]
-    key = source_key(app, s)
+    key = source_key(app, s, whole_picture(deck))
     pool = _pool(app)
     if key != run.src_key:
         run.src_key = key
@@ -588,6 +596,38 @@ def beat_count(app):
     return getattr(app, "_vj_beats", 0.0), "the tempo"
 
 
+SHOW_COUNT = "the show's bars"
+
+
+def _rebase(app):
+    """Each frame: when the count changes where it comes from (a show started or stopped - the tempo's count runs
+    on for ever, the show's from its first beat), what waits on it is carried across instead of reading the jump
+    as bars gone by - the bars counted for the auto-mix, deck C and a deck's clips start again from here (no fade
+    fired), a Cut or deck C's press waiting for the next beat or bar waits for the next one of the new count, and
+    a Mutate over bars keeps how far it had grown."""
+    beats, src = beat_count(app)
+    show = src == SHOW_COUNT
+    was, last = getattr(app, "_vj_count", (None, None))
+    app._vj_count = (show, beats)
+    if was is None or was == show:
+        return
+    for k in ("_vj_bar_k", "_vj_cbar_k") + tuple(f"_vj_clipbar{i}" for i in range(DECKS)):
+        app.__dict__.pop(k, None)
+    q = options(app).get("quant", "now")
+    unit = 1 if q == "beat" else _per_bar(app, src)
+    nxt = float((math.floor(beats / unit + 1e-6) + 1) * unit)
+    p = getattr(app, "_vj_pending", None)
+    if p is not None:
+        app._vj_pending = (nxt, p[1])
+    p = getattr(app, "_vj_cpending", None)
+    if p is not None:
+        app._vj_cpending = (nxt, p[1])
+    jump = beats - (last or 0.0)
+    morphs = getattr(app, "_vj_morphs", {})
+    for i, (t0, n) in list(morphs.items()):
+        morphs[i] = (t0 + jump, n)
+
+
 def _keep_count(app, now, hit):
     """The tempo's beat count a frame on, a beat heard near one of its beats pulling it onto the music, and a tap
     tempo's first tap made a bar's first beat (sequence_ui.tap sets _vj_downbeat)."""
@@ -639,7 +679,13 @@ def _take_video(app, i, run, deck):
             run.n = n
             run.video_prev = run.video
             f = np.asarray(frame, np.float32) / 255.0
-            if f.shape[-1] == 4 or not vj_layer.plain(deck):   # transparency, or keyed / moved: as the deck lays it
+            if whole_picture(deck) and f.shape[-1] == 4:       # the picture inside its clear bars, at its own shape,
+                ys, xs = np.nonzero(f[..., 3] > 0.0)           # laid on the canvas as the deck fits or tiles it
+                if len(ys):
+                    f = f[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+                cw, ch = canvas_size(app)
+                f, run.video_alpha = vj_layer.prepare(f, cw, ch, deck, drift=0.0)
+            elif f.shape[-1] == 4 or not vj_layer.plain(deck):   # transparency, or keyed / moved: as the deck lays it
                 h, w = f.shape[:2]
                 f, run.video_alpha = vj_layer.prepare(f, w, h, deck, drift=0.0)
             else:
@@ -810,7 +856,8 @@ def fx_settings(eng, name, d):
 def _effect_frame(app, i, run, deck, speed, amount, dt):
     """An Effect deck: the studio's effect named, on an engine of the deck's, hearing the same sound."""
     name = deck.get("effect") or ""
-    try:
+    run.look = EFFECT                                         # a look again after: it starts afresh (with its cross-
+    try:                                                      # fade), not on the state the effect kept in run.state
         eng = app.second_engine(f"vj{i}")
     except Exception as e:
         run.error = str(e)
@@ -956,6 +1003,7 @@ def update(app, dt=None):
     if heard:
         app._vj_hits = getattr(app, "_vj_hits", 0) + 1
     _keep_count(app, now, heard)
+    _rebase(app)
     app._vj_last_hit = last
     beat, hit = _beat(app, now, heard)
     app._vj_pulse = beat
@@ -1358,6 +1406,7 @@ def apply_step(app, step, playing=True):
             options(app)
             o["on"] = True
             app._vj_sweep = None
+            app._vj_csweep = app._vj_cpending = None
             app._vj_dirty = True
             if v.get("mods"):
                 from native import modulate
@@ -1372,6 +1421,8 @@ def apply_step(app, step, playing=True):
                 o[k] = json_copy(v[k])
         options(app)                                  # anything the snapshot left out, defaulted
         o["on"] = True
+        app.project.save_view = lambda opts, app=app: _desk_saved(app, opts)   # saved meanwhile: the desk, kept
+        app._vj_csweep = app._vj_cpending = None       # deck C as the step has it, not a fade from before
         from native import modulate
         modulate.play_scene(app, v.get("mods"))       # its modulators as it kept them (a step without: as they are)
         app._vj_by_show = True
@@ -1380,6 +1431,16 @@ def apply_step(app, step, playing=True):
     elif by_show:
         _fade_from_here(app, step)
         restore_desk(app)
+
+
+def _desk_saved(app, opts):
+    """The project's options as they are saved while a show's VJ steps hold the desk: the desk they took over (put
+    back when the show lets go), not the step's decks - a save meanwhile, or the studio closing or failing mid-show,
+    kept the step's decks as the desk for good."""
+    desk = getattr(app, "_vj_desk", None)
+    if not getattr(app, "_vj_by_show", False) or not desk or not isinstance(opts.get("vj"), dict):
+        return opts
+    return dict(opts, vj=dict(opts["vj"], **desk))
 
 
 def restore_desk(app):
@@ -1395,7 +1456,9 @@ def restore_desk(app):
         o["on"] = False
     app._vj_by_show = False
     app._vj_desk = None
+    app.project.save_view = None
     app._vj_sweep = None
+    app._vj_csweep = app._vj_cpending = None           # deck C as the desk had it, not the step's fade
     app._vj_dirty = True
     from native import modulate
     modulate.play_scene(app, None)                    # the modulators each as it is set again
@@ -1435,7 +1498,9 @@ def load_preset(app, i, name):
     if p:
         p = json_copy(p)
         mods = p.pop("mods", None)
+        getattr(app, "_vj_morphs", {}).pop(i, None)     # a Mutate growing on the deck: the preset's look wins
         o["decks"][i].update(p)
+        o["decks"][i]["morph_to"], o["decks"][i]["morph"] = "", 0.0
         modulate.put_deck_mods(app, i, mods)
 
 
@@ -1659,6 +1724,9 @@ def project_changed(app):
     app._vj_csweep = app._vj_cpending = None
     app._vj_morphs = {}
     app._vj_mod = {}
+    for k in ("_vj_pending", "_vj_bar_k", "_vj_sec", "_vj_cbar_k", "_vj_csec", "_vj_skip", "_vj_last_pic",
+              "_vj_out", "_vj_count") + tuple(f"_vj_clipbar{i}" for i in range(DECKS)):
+        app.__dict__.pop(k, None)                           # a Cut waiting for the bar, the bars counted, the picture
     close(app)
     app._vj_runs = None
     for n in [n for n, lk in vj_looks.LOOKS.items() if lk.family == "flame" and n not in vj_looks.FLAMES]:

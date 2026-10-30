@@ -275,7 +275,7 @@ o2["decks"][2]["level"] = 0.0
 pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "down"})
 check(vj.c_level(app2) > 0 and next(c for c in pads_ui.remote_state(app2)["controls"] if c["id"] == flc["id"])["lit"],
       "Flash C held from the page: deck C in, the pad shown lit")
-app2._pads_remote[flc["id"]] -= pads_ui.REMOTE_GONE_S + 1                 # the phone fell silent
+app2._pads_remote[flc["id"]][1] -= pads_ui.REMOTE_GONE_S + 1              # the phone fell silent
 pads_ui.remote_poll(app2)
 check(vj.c_level(app2) == 0.0 and flc["id"] not in app2._pads_remote, "a phone silent mid-press: its pad let go")
 pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "down"})
@@ -304,6 +304,29 @@ pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "up"})
 check(pads_ui.remote_state(app2)["controls"][0]["xy"] is None, "let go: snapped back, no dot")
 pads_ui.remote(app2, {"a": "pad", "id": 99999, "e": "down"})
 check(not pads._rt(app2)["held"] and 99999 not in app2._pads_remote, "a control that is not there: nothing held")
+# a phone's lift only lets go of what a phone pressed (a stray or late one let go of the mouse's hold)
+pads.press(app2, flc)                                                  # the mouse holds Flash C
+pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "up"})
+check(flc["id"] in pads._rt(app2)["held"] and vj.c_level(app2) > 0, "a stray lift from the phone: the mouse's hold kept")
+pads.release(app2, flc)
+# a phone still moving an XY pad after everything was let go (Edit ticked, a bank switched) drives nothing
+pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "down", "x": 0.3, "y": 0.5, "p": 0.5})
+pads.let_go(app2)
+hue = vj.knob_get(app2, 0, "hue")
+pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "move", "x": 0.9, "y": 0.9, "p": 1.0})
+pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "up"})
+check(abs(vj.knob_get(app2, 0, "hue") - hue) < 1e-6 and pads_ui.remote_state(app2)["controls"][0]["xy"] is None,
+      "moved after a let-go: nothing moved, no dot left behind")
+# a toggle on an effect slider at a value between its steps: on, then off again (0.5 read back 128/255)
+app2.eng.fx = {"sx": 10, "ix": 0, "c1": 0, "c2": 0, "c3": 0}
+app2.eng.push = lambda: None
+tg = pads.new_control(st4, "toggle", 3, 3, target={"kind": "fx", "key": "sx"}, label="T")
+tg["hi"] = 0.5
+pads.current(st4)["controls"].append(tg)
+pads.press(app2, tg); pads.release(app2, tg)
+lit_on = pads.lit(app2, tg)
+pads.press(app2, tg); pads.release(app2, tg)
+check(lit_on and app2.eng.fx["sx"] == 0 and not pads.lit(app2, tg), f"a toggle at 0.5: on, lit, then off ({app2.eng.fx['sx']})")
 
 # --- one control held from two places: let go when the last lets go, back where it was before the first ----------
 pads_ui.switch_bank(app2, 0)

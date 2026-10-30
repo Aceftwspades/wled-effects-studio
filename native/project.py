@@ -331,8 +331,9 @@ class Project:
         # "dictionary changed size during iteration" failed the save, and a flash that worked was called failed
         with _SAVE_LOCK:
             self._journal()
+            view = getattr(self, "save_view", None)     # what is on screen for now, not to keep (a show's VJ desk)
             d = {"geometry": self.geometry.to_json(), "selected": self.selected,
-                 "options": self.options, "imported": self.imported,
+                 "options": view(self.options) if view else self.options, "imported": self.imported,
                  "saved": time.strftime("%Y-%m-%d %H:%M:%S")}
             for attempt in range(8):
                 try:

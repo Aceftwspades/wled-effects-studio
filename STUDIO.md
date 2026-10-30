@@ -4361,6 +4361,50 @@ notes, its lights mirroring the layout). In four phases:
    a pad's on/off flips it in the overlay), let go by restore_desk; loaded into the sim (not playing), written
    into the modulators (load_scene). Tests: test_vj (a preset's modulators onto the other deck, again, replaced,
    a hand-made one kept; a step played, switched from a pad, let go, loaded).
+   Review of the VJ, pads, MIDI and modulator code (2026-10-30, four reviewers in parallel, every finding re-run
+   before fixing). Fixed:
+   - 56 widget callbacks written `lambda s, v, x=x:` did nothing from the mouse (or raised, with four parameters):
+     dpg.run_callbacks passes one argument per parameter, defaulted ones included, so x became user_data (None) -
+     the whole Modulators dialog, the pad editor's MOVED BY rows, the VJ's video files, picture, font, shader
+     channels, text/steer/picture knobs (which also saved a "null" key), effect-deck sliders, every flame knob and
+     arm, a pack's Remove/Install, the device frame's stream targets. The studio's loop now calls each job through
+     num.call (only parameters without a default are passed; one failing job no longer drops the rest), as do
+     num.fire, the walk and chrome.run_menu_item - so the tests call callbacks as the app does. Found with a real
+     click (tests called the functions directly).
+   - A project switch (app._leave_project / _enter_project): held pads let go before the old project goes (their
+     slider put back), the pads' run state, the phone's holds, a learn and a drag forgotten after (control ids
+     restart at 1 in every project); a show's desk put back and saved; pending VJ, modulator, pad-label and mixer
+     saves written into the project they belong to; the Modulators dialog shown again. vj.project_changed also lets
+     go a waiting quantized Cut, the bar counters and the last picture.
+   - A VJ step and the desk restore let go deck C's fade and its waiting press; a preset loaded mid-Mutate lets the
+     morph go (its end handed the deck to the bred flame). The beat count switching between the tempo's and the
+     show's (vj._rebase) restarts the bar counters, re-aims a waiting Cut or C press at the new count's next beat or
+     bar and carries a Mutate over - it fired a fade, and a Cut waited for beat 1004. While a show holds the desk,
+     a save writes the desk (Project.save_view), not the step's decks. options() drops a fourth deck (crashed every
+     frame). "fit" and "tile" work on video files (read whole, clear bars round it, cropped, laid out by vj_layer).
+     An Effect deck marks its look, so a look after it starts afresh; a shader run's key is a counter, not id().
+     The fade transition rounds.
+   - Pads: a toggle on a slider compares within half a step (0.5 read back 128/255 and never turned off); a phone's
+     lift lets go only what a phone pressed (counted per control), a move or hold for one it does not hold is
+     dropped, and let_go forgets the phone's touches and the mouse's play drag (an XY dot stuck after Edit); Add
+     into a cell the grid lost does nothing; a copied bank does not share the bank button; moving or deleting banks
+     cancels a bank learn; a bank button on a grid pad does not also press the new bank's control; a missing lights
+     port is looked for every RETRY_S, not every frame; a light lit or let go by a press is not held back behind
+     pulse steps.
+   - Modulators: ids never reused (options "mod_next_id"; a removed one's run state forgotten at once); a preset
+     saved from a deck and loaded there again makes no copy beside the hand-made one, and a modulator moving a
+     preset modulator's depth follows the one that replaces it; a preset load is one save; dialog drags save once
+     left alone (104 saves and undo steps for one drag before); a depth turned while a show step plays goes to the
+     step; a beat-fired envelope waits for a fresh beat (it fired on the first frame); two sliders of one label
+     told apart; a sound level that is not a number is silence.
+   - Looks: a user look named like a built-in is refused (it hid it, and deleting it removed the built-in); a name
+     let go by one file goes back to another file's look of that name; look_source is an index, not a walk of
+     every file per look; the browser's thumbnails survive a look returning grey or RGBA; Text's outline grows by a
+     disk in ~4r steps, not pi r^2 shifts (7 ms to 1 ms at the largest size); import reports a file it could not
+     import; the stream address and the preset name follow the project.
+   Kept as it was: a learn takes the frame's other MIDI too (so the MIDI window's learn does not see a nudge);
+   FfmpegSource.latest reads unlocked (frames are replaced, not changed: at worst a frame late). Tests: test_num,
+   test_vj, test_pads, test_pads_hw, test_modulate; a real click on the Modulators dialog.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

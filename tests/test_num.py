@@ -55,6 +55,16 @@ def test_callbacks_take_what_they_ask_for():
     assert got == [0, (1, 2), (1, 2, 3), (1, 2, 3)]
 
 
+def test_defaulted_parameters_keep_their_defaults():
+    # `lambda s, v, i=i:` in a loop: Dear PyGui's run_callbacks handed it user_data (None) as i, and every such
+    # control did nothing from the mouse; the studio's loop calls through num.call, which leaves i alone
+    got = []
+    num.call(lambda s, v, i=7: got.append((s, v, i)), 1, 2, None)
+    num.call(lambda s, a, u, k=5: got.append((u, k)), 1, 2, (9,))
+    num.call(lambda s, a, m=3, k=4: got.append((m, k)), 1, 2, None)
+    assert got == [(1, 2, 7), ((9,), 5), (3, 4)]
+
+
 def _context():
     dpg.create_context()
     typeface._scale = 1.0

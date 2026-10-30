@@ -120,8 +120,10 @@ class FfmpegSource:
         if not exe:
             raise ValueError("video needs ffmpeg on the PATH (ffmpeg.org) - the test pattern works without it")
         pre = (["-re"] if realtime else []) + (["-stream_loop", "-1"] if loop else [])
-        if fit:                                                  # all of the picture, bars where it is narrower (mapping)
+        if fit:                                                  # all of the picture, bars where it is narrower (mapping;
             vf = f"scale={self.w}:{self.h}:force_original_aspect_ratio=decrease,pad={self.w}:{self.h}:(ow-iw)/2:(oh-ih)/2"
+            if alpha:                                            # read with its transparency, the bars clear: the VJ's
+                vf += ":color=black@0"                           # fit and tile find the picture inside them)
         else:                                                    # the frame filled (the LEDs: no black bars)
             vf = f"scale={self.w}:{self.h}:force_original_aspect_ratio=increase,crop={self.w}:{self.h}"
         if crop:                                                 # (x, y, w, h) of the picture first: an area of the screen

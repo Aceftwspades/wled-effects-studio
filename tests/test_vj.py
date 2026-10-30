@@ -165,6 +165,18 @@ check(len([m for m in modulate.modulators(app) if m.get("preset_deck") == 0]) ==
 vj.load_preset(app, 0, "cold coral")
 check(not [m for m in modulate.modulators(app) if m.get("preset_deck") == 0] and hand in modulate.modulators(app),
       "a preset without any: the last one's gone, the one made by hand kept")
+vj.save_preset(app, 0, "own")                                       # the hand-made one on A's amount kept in it
+for _ in range(3):
+    vj.load_preset(app, 0, "own")
+check(len(modulate.on_key(app, "vj0.amount")) == 1, "a preset saved from its own deck, loaded there again: no copies")
+vj.load_preset(app, 0, "hue wave")
+pm = next(m for m in modulate.modulators(app) if m.get("preset_deck") == 0)
+link = modulate.add(app, keys=[f"m{pm['id']}.depth"], kind="lfo")
+vj.load_preset(app, 0, "hue wave")
+pm2 = next(m for m in modulate.modulators(app) if m.get("preset_deck") == 0)
+check(pm2["id"] != pm["id"] and link["keys"] == [f"m{pm2['id']}.depth"],
+      "loaded again: a new id, and the one moving its depth moves the new one")
+modulate.remove(app, modulate.modulators(app).index(link))
 
 # a VJ step keeps which modulators run and how deep: over them while the show plays it, never saved into them
 hand.update(on=True, depth=90)
@@ -174,6 +186,11 @@ snap["mods"][str(hand["id"])] = {"on": False, "depth": 20}
 vj.apply_step(app, {"vj": snap, "trans": 0.0})
 e = modulate._eff(app, hand)
 check(not e["on"] and e["depth"] == 20 and hand["on"] and hand["depth"] == 90, "played: off and 20 deep, its own kept")
+desk_look = app._vj_desk["decks"][0]["look"]
+o["decks"][0]["look"] = "Warp" if desk_look != "Warp" else "Plasma"      # the step's deck A, other than the desk's
+saved = app.project.save_view(app.project.options)
+check(saved["vj"]["decks"][0]["look"] == desk_look and o["decks"][0]["look"] != desk_look,
+      "saved while the step plays: the desk kept, not the step's decks")
 modulate.set_target(app, {"kind": "mod_on", "id": hand["id"]}, 1.0)
 check(modulate._eff(app, hand)["on"] and hand["on"], "switched on from a pad while the step plays: for the step")
 vj.restore_desk(app)
@@ -193,6 +210,21 @@ check(not errs and vj_looks.LOOKS.get("Pull Rings") and vj_looks.LOOKS["Pull Rin
 o["decks"][0]["look"] = "Pull Rings"
 vj.update(app, 1 / 40)
 check(vj._runs(app)[0].canvas is not None and not vj._runs(app)[0].error, "it draws")
+# a look file named like a built-in: refused (it hid Plasma, and took Plasma with it when it went); two files of
+# one name: the other's look back when one goes
+d_looks = os.path.dirname(path)
+for fn, name in (("plasma_too.py", "Plasma"), ("same_a.py", "Same"), ("same_b.py", "Same")):
+    open(os.path.join(d_looks, fn), "w").write(f'NAME = "{name}"\ndef draw(c, st):\n    return c.grad(c.u)\n')
+errs = vj_looks.load_user(app.project)
+check(any(f == "plasma_too.py" and "built-in" in e for f, e in errs) and vj_looks.look_source("Plasma") == ("builtin", None)
+      and vj_looks.LOOKS["Plasma"] is not None and "Same" in vj_looks.LOOKS, "a built-in's name refused")
+for fn in ("plasma_too.py", "same_a.py"):
+    os.remove(os.path.join(d_looks, fn))
+vj_looks.load_user(app.project)
+check("Plasma" in vj_looks.LOOKS and "Same" in vj_looks.LOOKS, "one of two of a name gone: the other's look stays")
+os.remove(os.path.join(d_looks, "same_b.py"))
+vj_looks.load_user(app.project)
+check("Same" not in vj_looks.LOOKS, "the last gone: the name too")
 time.sleep(0.05)
 open(path, "w").write("NAME = 'Pull Rings'\ndef draw(c, st):\n    return 1 / 0\n")
 os.utime(path, (time.time() + 5, time.time() + 5))
@@ -977,6 +1009,53 @@ check(left[0] < mid[0] and right[1] > mid[1] and left[0] <= 6 and right[1] >= 89
 check(_cols(_words(text_outline=1.0))[2] > mid[2] and _cols(_words(text_shadow=1.0))[2] > mid[2], "an outline and a shadow")
 check(_cols(_words(text_font="no such font.ttf"))[2] == mid[2], "a font file that will not load: the built-in")
 check(all(k in vj.PRESET_KEYS for k in ("text_align", "text_font", "text_shadow", "text_outline")), "kept in presets")
+
+# a show starting: the count jumps from the tempo's (on for ever) to the show's (from its first beat) - no fade
+# fired by the jump, a Cut waiting for the bar waits for the show's next bar, deck C's fade and a Mutate carried
+from native import sequence_ui
+keep = (sequence_ui.position, sequence_ui._steps)
+o = vj.options(app)
+o["auto"].update(mix="bars", bars=4)
+o["quant"] = "bar"
+app._vj_beats, app._seq_play, app._vj_sweep = 1000.3, None, None
+vj.update(app, 1 / 40)
+vj.launch(app, 0.0)
+check(app._vj_pending is not None and app._vj_pending[0] == 1004.0, "a Cut waiting for the tempo's next bar")
+try:
+    sequence_ui.position = lambda a: 1.0
+    sequence_ui._steps = lambda a: {"bpm": 120, "first": 0.0, "bar": 4, "steps": []}
+    app._seq_play = 1
+    vj.update(app, 1 / 40)
+    check(app._vj_sweep is None and app._vj_pending is not None and app._vj_pending[0] == 4.0,
+          f"the show started at its beat 2: no fade for the jump, the Cut waits for its bar 4 ({app._vj_pending})")
+finally:
+    sequence_ui.position, sequence_ui._steps = keep
+    app._seq_play = None
+o["auto"]["mix"], o["quant"] = "off", "now"
+app._vj_pending = None
+# a project switched: a Cut waiting in the last one does not go off in the next
+o["quant"] = "bar"
+vj.launch(app, 0.0)
+vj.project_changed(app)
+check(getattr(app, "_vj_pending", None) is None, "another project: the Cut waiting is let go")
+vj.options(app)["quant"] = "now"
+# four decks in a hand-made project: only A, B and C kept (a fourth crashed every frame)
+vj.options(app)["decks"].append(vj.json_copy(vj.options(app)["decks"][0]))
+check(len(vj.options(app)["decks"]) == 3, "a fourth deck dropped")
+# a show step and the desk put back: deck C's fade from before let go (it wrote over the step's level)
+app._vj_csweep, app._vj_cpending = (0.0, 1.0, 0.0, 16.0), (8.0, "in")
+vj.apply_step(app, {"vj": vj.snapshot(app), "trans": 0.0})
+check(app._vj_csweep is None and app._vj_cpending is None, "a VJ step: deck C's fade and waiting press let go")
+app._vj_csweep = (0.0, 1.0, 0.0, 16.0)
+vj.restore_desk(app)
+check(app._vj_csweep is None, "the desk back: the step's deck C fade let go")
+# a preset loaded while a Mutate grows on the deck: the preset's look kept when the morph would have ended
+vj.options(app)["presets"]["plain"] = {"look": "Plasma"}
+vj.options(app)["decks"][0].update(morph_to="Flame: Coral", morph=0.4)
+app._vj_morphs = {0: (0.0, 4.0)}
+vj.load_preset(app, 0, "plain")
+d0 = vj.options(app)["decks"][0]
+check(0 not in app._vj_morphs and d0["morph_to"] == "" and d0["look"] == "Plasma", "a preset mid-Mutate: the morph let go")
 
 clock.release()
 vj.close(app)

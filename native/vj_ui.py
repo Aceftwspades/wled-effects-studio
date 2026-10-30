@@ -815,11 +815,14 @@ def _thumbs(app):
         c.amount, c.speed = 0.5, 1.0
         c.grad = vj_looks.gradient("neon")
         try:
-            img = np.clip(lk.draw(c, e["state"]), 0, 1)
+            img = np.clip(np.asarray(lk.draw(c, e["state"]), np.float32), 0, 1)
+            if img.ndim == 2:                                # a look's grey picture: as a colour one
+                img = np.repeat(img[:, :, None], 3, -1)
+            img = img[:, :, :3]                              # one with its own transparency: its colour
         except Exception:
             img = np.zeros((TH_H, TH_W, 3), np.float32)
-        if img.shape[:2] != (TH_H, TH_W):
-            continue
+        if img.ndim != 3 or img.shape != (TH_H, TH_W, 3):    # a look of the wrong size: not shown (it never
+            continue                                         # takes the frame down with it)
         dpg.set_value(e["tag"], np.concatenate([img, np.ones((TH_H, TH_W, 1), np.float32)], -1).ravel())
     app._vj_th_k = (k0 + 5) % max(1, len(names))
 
@@ -1075,13 +1078,21 @@ def _import(app, a):
     sel = [f for f in (list((a.get("selections") or {}).values()) or [a.get("file_path_name", "")]) if f and os.path.isfile(f)]
     skipped = [f for f in sel if os.path.splitext(f)[1].lower() not in vj_looks.IMPORTS]
     sel = [f for f in sel if f not in skipped]
+    failed = []
     for f in sel:
-        vj_looks.import_file(app.project, f)
+        try:
+            vj_looks.import_file(app.project, f)
+        except Exception as e:                               # a .json that is not Shadertoy's, a file gone: said,
+            failed.append(f"{os.path.basename(f)}: {e}")     # and the rest still imported
+    sel = [f for f in sel if not any(x.startswith(os.path.basename(f) + ":") for x in failed)]
     errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
     app._vj_file_errs = errs
     app._vj_thumbs = None
     refresh(app)
     bad = [e for e in errs if any(os.path.basename(f).lower() in e[0].lower() for f in sel)]
+    if failed:
+        app.gp.status(f"{len(sel)} imported - {len(failed)} could not be: {failed[0]}", "warn")
+        return
     app.gp.status(f"{len(sel)} imported into the project's looks/" + (f" - {len(bad)} could not be read" if bad else "")
                   + (f" - {len(skipped)} left out: only .milk, .glsl and .json files are imported" if skipped else ""))
 
@@ -1411,6 +1422,8 @@ def refresh(app):
             dpg.configure_item(f"vj_srcname{i}", items=[s["name"]])
             dpg.set_value(f"vj_srcname{i}", s["name"])
         dpg.configure_item(f"vj_url{i}", show=kind == "stream")
+        if dpg.get_value(f"vj_url{i}") != s.get("url", ""):   # another project's (or an undo's): not the one before
+            dpg.set_value(f"vj_url{i}", s.get("url", ""))
         files = [f for f in (s.get("files") or []) if f]
         dpg.configure_item(f"vj_cliprows{i}", show=kind == "file")
         dpg.configure_item(f"vj_clips{i}", items=[os.path.basename(f) for f in files])
@@ -1430,7 +1443,9 @@ def refresh(app):
         dpg.configure_item(f"vj_flamerow{i}", show=d["look"] in o["flames"])
         _refresh_flame(app, i, d)
         dpg.configure_item(f"vj_pre{i}", items=sorted(o["presets"]))
-        desc = "an effect of the studio's, on the shape itself (speed and amount are its Speed and Intensity)" if eff \
+        if dpg.get_value(f"vj_pre{i}") not in o["presets"]:   # a name of another project's: Rename and Delete not
+            dpg.set_value(f"vj_pre{i}", "")                   # left aimed at one of this project's by chance
+        desc ="an effect of the studio's, on the shape itself (speed and amount are its Speed and Intensity)" if eff \
             else (lk.desc if lk else "")
         dpg.set_value(f"vj_desc{i}", desc)
     num.set("vj_fader", float(o["fader"]))

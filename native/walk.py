@@ -13,19 +13,14 @@ from native import device_ui
 
 
 def _call(item, label):
-    """A menu item's or row's callback, the way Dear PyGui would call it."""
-    import inspect
+    """A menu item's or row's callback, the way the studio calls one (num.call)."""
+    from native import num
     cfg = dpg.get_item_configuration(item)
     cb, ud = cfg.get("callback"), cfg.get("user_data")
     if cb is None:
         return "no callback"
     try:
-        n = len(inspect.signature(cb).parameters)
-    except (TypeError, ValueError):
-        n = 3
-    args = [item, dpg.get_value(item) if dpg.get_item_type(item).endswith("::mvMenuItem") else None, ud][:n]
-    try:
-        cb(*args)
+        num.call(cb, item, dpg.get_value(item) if dpg.get_item_type(item).endswith("::mvMenuItem") else None, ud)
         return "ok"
     except Exception as e:
         import traceback
