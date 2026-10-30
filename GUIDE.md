@@ -1080,6 +1080,17 @@ own value where it was set, and that is what is saved. **Undo** takes
 back the last change to the modulators. The device does not run them:
 they are for the sim and the stream.
 
+Modulators travel with the VJ, too. A deck's **preset** keeps the
+modulators that move only that deck's knobs, and loading it - onto
+either deck - makes them again on that deck's knobs, in place of the
+ones the deck's last preset brought (a modulator you made yourself is
+left alone; a preset without any takes the last one's off). A **VJ step**
+of the show keeps which modulators run and how deep: while the show
+plays it they run as it kept them, without changing the modulators
+themselves (a pad switching one on or off then does it for the step),
+and when the show lets go each is as it is set again. **Load into the
+sim** puts the step's on/off and depths into the modulators themselves.
+
 Each modulator is **Mod 1**, **Mod 2** ... in every list of things a
 control can drive - a MIDI mapping, a VJ pad, the phone's pads - with only
 what does something for its kind: its **rate** (a wave's and steps'; a

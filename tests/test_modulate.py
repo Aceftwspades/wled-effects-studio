@@ -395,6 +395,10 @@ try:
           and mo.swing(app, f"m{w1['id']}.depth") is not None, "a depth knob shows the band it swings over")
     check(f"m{w1['id']}.depth" in mo.choices(app, w2) and f"m{w2['id']}.depth" not in mo.choices(app, w2),
           "the others' settings offered, not its own")
+    app._mod_over[f"m{w1['id']}.rate"] = 0.5
+    check(near(mo._eff(app, w1)["period"], 2 ** 1.5) and mo._eff(app, w1)["_unlocked"] and w1["period"] == 2,
+          "a synced rate moved: swept smoothly between the beat lengths, off the grid, its own kept")
+    del app._mod_over[f"m{w1['id']}.rate"]
     mo.remove(app, 0)
     check(w2["keys"] == [], "the one it moved taken away: no longer moved")
     mo.modulators(app).clear()

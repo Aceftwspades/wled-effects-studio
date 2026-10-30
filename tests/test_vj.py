@@ -145,6 +145,42 @@ vj.save_preset(app, 1, "cold coral")
 o["decks"][0].update(look="Plasma", colours="fire")
 vj.load_preset(app, 0, "cold coral")
 check(o["decks"][0]["look"] == "Flame: Coral" and o["decks"][0]["colours"] == "ice", "a preset onto the other deck")
+
+# the modulators on a deck's knobs kept with its preset: made again on the deck it is loaded onto, in place of
+# the last preset's (one made by hand left alone); a preset without any takes the last one's off
+from native import modulate
+hand = modulate.add(app, key="vj0.amount", kind="lfo")
+modulate.add(app, keys=["vj1.hue", "vj1.trails"], kind="lfo", shape="triangle", depth=50, amt={"vj1.trails": -0.5})
+modulate.add(app, keys=["vj1.hue", "sx"], kind="beat")              # not only the deck's: not the preset's
+vj.save_preset(app, 1, "hue wave")
+p = o["presets"]["hue wave"]
+check(len(p["mods"]) == 1 and p["mods"][0]["keys"] == ["vj*.hue", "vj*.trails"] and "id" not in p["mods"][0],
+      "a preset keeps the modulators on only its deck's knobs")
+vj.load_preset(app, 0, "hue wave")
+mine = [m for m in modulate.modulators(app) if m.get("preset_deck") == 0]
+check(len(mine) == 1 and mine[0]["keys"] == ["vj0.hue", "vj0.trails"] and mine[0]["amt"] == {"vj0.trails": -0.5}
+      and "mods" not in o["decks"][0], "loaded onto deck A: its wave on A's knobs")
+vj.load_preset(app, 0, "hue wave")
+check(len([m for m in modulate.modulators(app) if m.get("preset_deck") == 0]) == 1, "loaded again: still one")
+vj.load_preset(app, 0, "cold coral")
+check(not [m for m in modulate.modulators(app) if m.get("preset_deck") == 0] and hand in modulate.modulators(app),
+      "a preset without any: the last one's gone, the one made by hand kept")
+
+# a VJ step keeps which modulators run and how deep: over them while the show plays it, never saved into them
+hand.update(on=True, depth=90)
+snap = vj.snapshot(app)
+check(snap["mods"][str(hand["id"])] == {"on": True, "depth": 90}, "a step keeps each modulator's on and depth")
+snap["mods"][str(hand["id"])] = {"on": False, "depth": 20}
+vj.apply_step(app, {"vj": snap, "trans": 0.0})
+e = modulate._eff(app, hand)
+check(not e["on"] and e["depth"] == 20 and hand["on"] and hand["depth"] == 90, "played: off and 20 deep, its own kept")
+modulate.set_target(app, {"kind": "mod_on", "id": hand["id"]}, 1.0)
+check(modulate._eff(app, hand)["on"] and hand["on"], "switched on from a pad while the step plays: for the step")
+vj.restore_desk(app)
+check(modulate._eff(app, hand) is hand, "the show let go: each as it is set")
+vj.apply_step(app, {"vj": snap}, playing=False)
+check(not hand["on"] and hand["depth"] == 20, "loaded into the sim: into the modulators themselves")
+modulate.modulators(app).clear()
 name = vj.mutate_flame(app, 0)
 check(name == "Flame: Coral #2" and name in vj_looks.LOOKS and name in o["flames"], f"a flame bred: {name}")
 vj.update(app, 1 / 40)

@@ -4352,8 +4352,15 @@ notes, its lights mirroring the layout). In four phases:
    a kind without a rate, and its play pad only for one that plays. Tests: test_modulate (velocity, amounts and
    their bands, spread and phase, the feels, width, sample and hold, the sound followed and auto level, an envelope
    on the beat, one modulator on another's depth, the mixer's fader kept apart, a project switch), test_pads_hw (a
-   wave always moving: all 64 pads get their turn), the smoke. Not done: modulators kept in a preset or a show
-   step, palette and graph pins as targets, the device running them.
+   wave always moving: all 64 pads get their turn), the smoke. Not done: palette and graph pins as targets, the device running them.
+   Then (2026-10-30) modulators kept with the VJ: a deck's preset keeps the ones moving only its knobs
+   (modulate.deck_mods: keys "vj*.<knob>", no id) and load_preset makes them again on the deck it is loaded onto
+   (put_deck_mods: tagged preset_deck, in place of the last preset's; hand-made ones left; a preset without any
+   takes the last one's off). A VJ show step keeps each modulator's on and depth (vj.snapshot "mods",
+   modulate.scene): played, an overlay (play_scene -> app._mod_scene, read through _scened/_eff, swing, is_on;
+   a pad's on/off flips it in the overlay), let go by restore_desk; loaded into the sim (not playing), written
+   into the modulators (load_scene). Tests: test_vj (a preset's modulators onto the other deck, again, replaced,
+   a hand-made one kept; a step played, switched from a pad, let go, loaded).
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

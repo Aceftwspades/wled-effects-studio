@@ -1314,9 +1314,14 @@ SNAP_KEYS = ("decks", "fader", "mode", "wipe", "map", "canvas", "c_mode", "c_up"
 
 
 def snapshot(app):
-    """What a step keeps of the VJ: its decks, fader, blend, wipe, map and canvas."""
+    """What a step keeps of the VJ: its decks, fader, blend, wipe, map and canvas - and which modulators run, how
+    deep (modulate.scene)."""
+    from native import modulate
     o = options(app)
-    return json_copy({k: o[k] for k in SNAP_KEYS})
+    snap = json_copy({k: o[k] for k in SNAP_KEYS})
+    if modulate.modulators(app):
+        snap["mods"] = modulate.scene(app)
+    return snap
 
 
 def _fade_from_here(app, step):
@@ -1354,6 +1359,9 @@ def apply_step(app, step, playing=True):
             o["on"] = True
             app._vj_sweep = None
             app._vj_dirty = True
+            if v.get("mods"):
+                from native import modulate
+                modulate.load_scene(app, v["mods"])
         return
     if v:
         if not by_show:
@@ -1364,6 +1372,8 @@ def apply_step(app, step, playing=True):
                 o[k] = json_copy(v[k])
         options(app)                                  # anything the snapshot left out, defaulted
         o["on"] = True
+        from native import modulate
+        modulate.play_scene(app, v.get("mods"))       # its modulators as it kept them (a step without: as they are)
         app._vj_by_show = True
         app._vj_sweep = None
         app._vj_dirty = True
@@ -1387,6 +1397,8 @@ def restore_desk(app):
     app._vj_desk = None
     app._vj_sweep = None
     app._vj_dirty = True
+    from native import modulate
+    modulate.play_scene(app, None)                    # the modulators each as it is set again
 
 
 def step_name(app):
@@ -1405,16 +1417,26 @@ PRESET_KEYS = ("look", "effect", "amount", "speed", "colours", "kaleido", "mirro
 
 
 def save_preset(app, i, name):
+    """Deck i's look and knobs kept as a preset, with the modulators that move only its knobs (modulate.deck_mods)."""
+    from native import modulate
     o = options(app)
     o["presets"][name] = json_copy({k: o["decks"][i][k] for k in PRESET_KEYS})
+    mods = modulate.deck_mods(app, i)
+    if mods:
+        o["presets"][name]["mods"] = mods
     return name
 
 
 def load_preset(app, i, name):
+    """A preset onto deck i: its look and knobs, and its modulators in place of those the deck's last preset brought."""
+    from native import modulate
     o = options(app)
     p = o["presets"].get(name)
     if p:
-        o["decks"][i].update(json_copy(p))
+        p = json_copy(p)
+        mods = p.pop("mods", None)
+        o["decks"][i].update(p)
+        modulate.put_deck_mods(app, i, mods)
 
 
 def delete_preset(app, name):
