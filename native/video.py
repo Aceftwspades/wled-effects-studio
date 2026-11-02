@@ -243,6 +243,7 @@ class FfmpegSource:
 
 _ALPHA = {}
 _SIZE = {}
+_DUR = {}
 
 
 def alpha_of(path):
@@ -264,7 +265,7 @@ def alpha_of(path):
         try:
             out = procs.run([probe, "-v", "error", "-select_streams", "v:0", "-show_entries",
                              "stream=codec_name,pix_fmt,width,height:stream_tags=alpha_mode,rotate:"
-                             "stream_side_data=rotation", "-of", "default=nw=1", path],
+                             "stream_side_data=rotation:format=duration", "-of", "default=nw=1", path],
                             capture_output=True, text=True, timeout=10).stdout
         except Exception:
             out = ""
@@ -278,12 +279,51 @@ def alpha_of(path):
             _SIZE[key] = wh
         except (KeyError, ValueError):
             pass
+        try:
+            _DUR[key] = float(info["duration"])
+        except (KeyError, ValueError):
+            pass
         if info.get("TAG:alpha_mode") == "1" and codec in ("vp8", "vp9"):
             got = (["-c:v", "libvpx" if codec == "vp8" else "libvpx-vp9"], True)
         elif fmt.startswith(("yuva", "rgba", "bgra", "argb", "abgr", "gbrap", "ya")) or fmt in ("pal8",):
             got = ([], True)
     _ALPHA[key] = got
     return got
+
+
+def duration_of(path):
+    """A video file's seconds as ffprobe gave them with alpha_of, or None (no ffprobe, not a video)."""
+    import os
+    try:
+        key = (path, os.path.getmtime(path))
+    except OSError:
+        return None
+    if key not in _ALPHA:
+        alpha_of(path)
+    return _DUR.get(key)
+
+
+def thumbs(path, n=8, w=48, h=27):
+    """A strip of n frames across a video file, evenly from its start to its end, side by side: (h, n * w, 3) uint8
+    - the clip editor's timeline - or None (no ffmpeg, its length not known). One quick seek each (not the whole
+    file decoded); a frame that will not read is left black."""
+    ff = shutil.which("ffmpeg")
+    d = duration_of(path)
+    if not ff or not d:
+        return None
+    from native import procs
+    out = np.zeros((h, n * w, 3), np.uint8)
+    for k in range(n):
+        t = d * (k + 0.5) / n
+        try:
+            raw = procs.run([ff, "-v", "error", "-ss", f"{t:.3f}", "-i", path, "-frames:v", "1", "-vf",
+                             f"scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                            capture_output=True, timeout=10).stdout
+        except Exception:
+            raw = b""
+        if len(raw) >= w * h * 3:
+            out[:, k * w:(k + 1) * w] = np.frombuffer(raw[:w * h * 3], np.uint8).reshape(h, w, 3)
+    return out
 
 
 def size_of(path):

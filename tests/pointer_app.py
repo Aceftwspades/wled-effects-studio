@@ -24,7 +24,8 @@ focus frame drawn where the 3-D view is in every frame while it is moved
 and sized; the live readouts kept off the 3-D view and hidden under a node
 drawn above theirs, back once their node is clicked to the front; the
 readouts away while the canvas is dragged with the middle button, back
-inside their nodes once it is still. It works in a project of its own,
+inside their nodes once it is still; a clip pad's In and Out dragged on its
+strip of frames. It works in a project of its own,
 deleted after.
 """
 import ctypes
@@ -630,6 +631,44 @@ def check_painter(app, bad):
         bad.append(f"a press on the Bitmap painter's cell did not paint it: row {got}, the painter hovered {hov}")
 
 
+def check_clip_strip(app, bad):
+    """A clip pad's In and Out dragged on its strip of frames with the mouse: the left handle to a quarter of the
+    file, the right one to three quarters - each lands there, and is saved with the pad."""
+    clip = os.path.join(app.project, "assets", "vj", "pointer_clip.mp4")
+    os.makedirs(os.path.dirname(clip), exist_ok=True)
+    subprocess.run([shutil.which("ffmpeg"), "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=30:duration=4",
+                    "-pix_fmt", "yuv420p", clip], check=True)
+    P = "__import__('native.pads_ui', fromlist=['p'])"
+    app.send([{"py": f"{P}.show(app)"}], 0.6)                # (its first frame takes the project: a selection after)
+    app.send([{"py": "dpg.set_value('pads_edit', True)"}, {"py": f"{P}._set_edit(app, True)"},
+              {"py": f"{P}._grid_size(app, cols=5)"},                    # (the starter bank is full)
+              {"py": f"setattr(app, '_pads_sel', {P}._free_cell(__import__('native.pads', fromlist=['p']).current({P}._st(app))))"},
+              {"py": f"{P}._add_control(app, 'trigger')"},
+              {"py": f"{P}._pick_action(app, 'VJ C: a video clip (set it below)')"},
+              {"py": "__import__('native.clip_ui', fromlist=['c'])._set_file(app, 'assets/vj/pointer_clip.mp4')"}], 2.5)
+    app.send([{"py": f"dpg.set_y_scroll({P}.SIDE, dpg.get_y_scroll_max({P}.SIDE))"}], 0.6)
+    r = app.rect("pads_clip_strip")
+    if not r:
+        bad.append("the clip's strip is not shown")
+        return
+    for name, frm, to, want in (("in", 2, 1 / 4, 1.0), ("out", -2, 3 / 4, 3.0)):
+        r = app.rect("pads_clip_strip") or r                 # (where it is now: the panel may have moved)
+        x, y, w, h = r
+        frm, to = (x + frm if frm > 0 else x + w + frm), x + int(w * to)
+        app.down(frm, y + h // 2)
+        app.move([(frm + (to - frm) * k // 6, y + h // 2) for k in range(1, 7)], 0.6)
+        app.up()
+        got = app.ask(f"{P}._sel(app)['target'][{name!r}]")
+        if got is None or abs(got - want) > 0.15:
+            bad.append(f"the clip's {name} handle dragged to {want} s: it is at {got} "
+                       f"({app.ask(P + '._sel(app)[' + chr(39) + 'target' + chr(39) + ']')}, strip {r})")
+    saved = app.ask("[c['target'].get('in') for b in __import__('json').load(open(app.project.file))['options']['pads']['banks'] "
+                    "for c in b['controls'] if c['target'].get('kind') == 'pad_clip']")
+    if not saved or abs(saved[-1] - 1.0) > 0.15:
+        bad.append(f"the dragged In not saved with the pad ({saved})")
+    app.send([{"py": f"{P}._set_edit(app, False)"}, {"py": "chrome.close_dialog('pads_win')"}], 0.4)
+
+
 def main():
     if os.name != "nt":
         print("pointer: Windows only (it posts mouse messages to the studio's window)")
@@ -640,7 +679,8 @@ def main():
     app, bad = App(), []
     try:
         app.start()
-        for name, fn in (("frame", lambda: check_frame(app, bad)), ("add menu", lambda: check_add_menu(app, bad)),
+        for name, fn in (("a clip's In and Out dragged", lambda: check_clip_strip(app, bad)),   # (first: nothing over it)
+                         ("frame", lambda: check_frame(app, bad)), ("add menu", lambda: check_add_menu(app, bad)),
                          ("properties, panel open", lambda: check_properties(app, bad, "open_panel")),
                          ("properties, panel folded", lambda: check_properties(app, bad, "fold_panel")),
                          ("3-D view", lambda: check_pip_drag(app, bad)), ("painter", lambda: check_painter(app, bad)),

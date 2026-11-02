@@ -4469,6 +4469,19 @@ notes, its lights mirroring the layout). In four phases:
      let go after 30 s and it came in from black - drawn every other frame like A and B; a deck's shader channels
      of the wrong length and a preset that is not one failed every frame.
    Tests: test_modulate, test_pads, test_pads_hw, test_phone, test_video, test_vj.
+- [x] **Video clips on pads** (2026-11-02): a pad's action "a video clip" (pads target `pad_clip`) plays part of a
+   video file on a deck over what it shows - native/vj_clips.py, run state only. One shot (In to Out once, its
+   release timed to end at Out) or loop; an ADSR envelope on the deck's level (knob_value's "level" is the clip's
+   while it plays); one clip a deck, the next taking over from the level the last had; the deck draws it through
+   its own look when that is a video look, else Clean (vj_clips.deck over the deck's settings, never saved). Each
+   start is a new take in the source's key, so ffmpeg runs again from In; the clip's time starts at its first
+   picture (the file's opening not counted against its length). The pad's type plays it: a trigger restarts a one
+   shot and starts/stops a loop, a toggle starts/stops, a hold plays while held. The editor (native/clip_ui.py, the
+   pad panel's CLIP section): the file (kept ones, Choose...), deck, mode, a strip of eight frames
+   (video.thumbs, on a thread) with In and Out dragged on it or typed, Play to try it, the envelope drawn as it is
+   set. "video clips: a pad each..." (an empty cell's list) makes one trigger pad a file in the bank's free
+   cells, then in new banks named Clips. video.duration_of reads the length
+   with the probe alpha_of already runs. Tests: test_vj_clips; the smoke plays one on deck C.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

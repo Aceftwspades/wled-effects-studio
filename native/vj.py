@@ -28,7 +28,7 @@ import time
 
 import numpy as np
 
-from native import clock, vj_layer, vj_looks
+from native import clock, vj_clips, vj_layer, vj_looks
 
 CANVASES = (("64x48", "64 x 48 (light)"), ("96x72", "96 x 72"), ("128x96", "128 x 96 (fine)"),
             ("64x64", "64 x 64 (square)"), ("128x72", "128 x 72 (16:9, a wide panel)"),
@@ -349,7 +349,7 @@ def source_key(app, s, whole=False):
     w, h = canvas_size(app)
     if kind == "file":
         return ("file", media(app, clip_path(s)), round(float(s.get("speed", 1.0)), 3), float(s.get("in", 0.0)),
-                float(s.get("out", 0.0)), w, h, bool(whole))
+                float(s.get("out", 0.0)), w, h, bool(whole), s.get("take", 0))   # take: a pad's clip, each start anew
     return (kind, s.get("path"), s.get("name"), s.get("url"), w, h)
 
 
@@ -453,6 +453,7 @@ def _release(app):
 
 
 def close(app):
+    vj_clips.let_go(app)
     for r in _runs(app):
         r.src_key = None
         r.video = r.video_prev = None
@@ -769,6 +770,8 @@ def _take_video(app, i, run, deck):
         if frame is not None and n != run.n:
             run.n = n
             run.video_prev = run.video
+            if deck.get("_clip_take"):
+                vj_clips.started(app, i, deck["_clip_take"])   # a pad's clip: its time from its first picture
             f = np.asarray(frame, np.float32) / 255.0
             pd = _picture_deck(app, i, deck)
             if whole_picture(deck) and f.shape[-1] == 4:       # the picture inside its clear bars, at its own shape,
@@ -796,7 +799,7 @@ def _take_video(app, i, run, deck):
 def draw_deck(app, i, dt, snd, beat, hit):
     """Deck i a frame on: its video's newest frame taken, its look drawn on the canvas (or its effect run)."""
     o = options(app)
-    deck = o["decks"][i]
+    deck = vj_clips.deck(app, i, o["decks"][i])               # a pad's clip playing on it: its file and a video look
     run = _runs(app)[i]
     what, rv = _react(deck, snd, beat)
     speed = knob_value(app, i, "speed") * (1.0 + 2.0 * rv if what == "speed" else 1.0)
@@ -1129,6 +1132,7 @@ def update(app, dt=None):
     _flames(app)
     f = fader_now(app)
     app._vj_tick = getattr(app, "_vj_tick", 0) + 1
+    vj_clips.tick(app)                                      # the pads' clips: their envelopes, the one-shots ended
     cue = cue_deck(app) if o.get("cue") else -1
     for i in range(len(o["decks"])):
         _advance_clips(app, i, hit)
@@ -1146,7 +1150,7 @@ def update(app, dt=None):
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
         else:
             _skips(app)[i] += dt
-            d = o["decks"][i]
+            d = vj_clips.deck(app, i, o["decks"][i])
             if d["look"] != EFFECT and d["source"].get("kind", "none") != "none":
                 _take_video(app, i, _runs(app)[i], d)         # its video rolling on off the mix
     _launch_due(app)
@@ -1898,6 +1902,10 @@ KNOB_WORDS.update({f"fl_w{k}": f"flame arm {k}" for k in range(1, vj_looks.ARMS 
 def knob_value(app, i, key):
     """A deck's knob as it draws: a modulator's value over it while one moves it (vj_mod, never saved), else the
     knob's own (what the dialog, MIDI and the project have)."""
+    if key == "level":
+        lv = vj_clips.level(app, i)                         # a pad's clip playing: its level through its envelope
+        if lv is not None:
+            return lv
     m = getattr(app, "_vj_mod", None)
     if m and (i, key) in m:
         return m[(i, key)]

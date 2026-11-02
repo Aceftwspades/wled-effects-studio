@@ -17,7 +17,7 @@ import copy
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
-from native import form, num, pads, pads_hw
+from native import clip_ui, form, num, pads, pads_hw, vj_clips
 
 TAG = "pads_win"
 GRID = "pads_grid"
@@ -124,6 +124,7 @@ def build(app):
                 dpg.add_drawlist(tag=GRID, width=px(400), height=px(400))
             with dpg.child_window(tag=SIDE, width=px(SIDE_W), height=-1, show=False, border=True):
                 _build_side(app)
+    clip_ui.build_dialogs(app)
 
 
 def _build_side(app):
@@ -134,6 +135,10 @@ def _build_side(app):
         for typ in pads.TYPES:
             dpg.add_button(label=pads.TYPE_WORDS[typ], width=-1, user_data=typ,
                            callback=lambda s, a, u: _add_control(app, u))
+        dpg.add_button(label="video clips: a pad each...", width=-1, callback=lambda: dpg.show_item("pads_clips_dialog"))
+        c.tip("video files made into pads: each copied into the project and given a pad, from this bank's free "
+              "cells on (then a new bank named Clips), that plays it once on deck C - each pad's CLIP section "
+              "sets its part, how it plays and its envelope")
     with dpg.group(tag="pads_s_ctl", show=False):
         dpg.add_combo([pads.TYPE_WORDS[t] for t in pads.TYPES], tag="pads_s_type", width=-1,
                       callback=lambda s, v: _ctl_set(app, "type", next(t for t in pads.TYPES if pads.TYPE_WORDS[t] == v)))
@@ -162,6 +167,7 @@ def _build_side(app):
             dpg.add_combo([], tag="pads_s_look", width=-1, callback=lambda s, v: _target_set(app, look=v))
         with dpg.group(tag="pads_s_presetrow", show=False):
             dpg.add_combo([], tag="pads_s_preset", width=-1, callback=lambda s, v: _target_set(app, name=v))
+        clip_ui.build(app)
         dpg.add_checkbox(label="stage on the deck off the air", tag="pads_s_stage", show=False,
                          callback=lambda s, v: _ctl_set(app, "stage", bool(v)))
         c.tip("loaded onto the deck the fader is furthest from (the cue preview shows it), not its own - the pad "
@@ -433,6 +439,7 @@ def labels(app):
         for i, d in enumerate(vj.LETTERS):
             out.append((f"VJ {d}: this look (pick it below)", {"kind": "pad_look", "deck": i, "look": ""}))
             out.append((f"VJ {d}: a saved preset (pick it below)", {"kind": "pad_preset", "deck": i, "name": ""}))
+            out.append((f"VJ {d}: a video clip (set it below)", dict(vj_clips.DEFAULT, deck=i)))
         app._pads_labels, app._pads_labels_key, app._pads_label_ix = out, key, None
     if getattr(app, "_pads_label_ix", None) is None:
         ix = {}
@@ -454,6 +461,8 @@ def target_label(app, t):
         return f"VJ {'ABC'[int(t.get('deck', 0))]}: {t.get('look') or '(no look picked)'}"
     if k == "pad_preset":
         return f"VJ {'ABC'[int(t.get('deck', 0))]}: preset {t.get('name') or '(none picked)'}"
+    if k == "pad_clip":
+        return f"VJ {'ABC'[int(t.get('deck', 0))]}: clip {vj_clips.words(t)}"
     labels(app)
     return app._pads_label_ix.get(_label_key(t), k)
 
@@ -526,6 +535,7 @@ def _fill_side(app):
         from native import vj
         dpg.configure_item("pads_s_preset", items=sorted(vj.options(app)["presets"]))
         dpg.set_value("pads_s_preset", s["target"].get("name", ""))
+    clip_ui.fill(app, s)
     _fill_actions(app)
 
 
@@ -1134,6 +1144,7 @@ def poll(app):
         _fill_side(app)
     if getattr(app, "_pads_edit", False):
         _mods_changed(app)
+        clip_ui.poll(app)
     x0, y0, cw, ch, gap = _geometry(app)
     st = _st(app)
     b = pads.current(st)

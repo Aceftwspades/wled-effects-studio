@@ -116,6 +116,9 @@ def _target(t):
         return {}
     if "deck" in t:
         t["deck"] = max(0, min(2, _int(t["deck"], 0)))
+    if t.get("kind") == "pad_clip":
+        from native import vj_clips
+        vj_clips.fill(t)
     return t
 
 
@@ -263,7 +266,7 @@ def kind_of(t):
         return "flip"
     if k == "mod_gate":
         return "gate"
-    if k in ("pad_look", "pad_preset"):
+    if k in ("pad_look", "pad_preset", "pad_clip"):
         return k[4:]
     if k in _midi().SWITCHES:
         return "switch"
@@ -506,6 +509,16 @@ def press(app, c, f=None, xy=None, pressure=None):
         if f is not None:
             drag(app, c, f)
         return
+    if kind == "clip":                                              # a video clip: started (again, from In) - a
+        from native import vj_clips                                 # loop pressed while it plays, a toggle on:
+        on = vj_clips.playing(app, c["id"])                         # stopped; a hold stops on its release
+        if typ == "trigger":
+            r["flash"][c["id"]] = time.monotonic()
+        if on and (typ == "toggle" or (typ == "trigger" and t.get("mode") == "loop")):
+            vj_clips.stop(app, c["id"])
+        else:
+            vj_clips.play(app, t, c["id"])
+        return
     if kind in ("look", "preset") and c.get("stage"):
         from native import vj
         deck = vj.cue_deck(app)                                     # onto the deck off the air, there till GO
@@ -573,6 +586,10 @@ def release(app, c):
             r["on"].pop(("xy", c["id"]), None)
         return
     if typ != "hold" or not t.get("kind"):
+        return
+    if kind == "clip":
+        from native import vj_clips
+        vj_clips.stop(app, c["id"])
         return
     last, was = _unclaim(r, c["id"], t)
     if not last:                                                    # another hold has it still
@@ -657,6 +674,9 @@ def lit(app, c):
     if time.monotonic() - r["flash"].get(c["id"], -1e9) < FLASH_MS:
         return True
     t = c.get("target") or {}
+    if t.get("kind") == "pad_clip":                                 # lit while its clip plays (its release too)
+        from native import vj_clips
+        return vj_clips.playing(app, c["id"])
     on = is_on(app, t)
     if on is not None and c["type"] != "trigger":
         return on
@@ -677,6 +697,9 @@ def forget(app, c):
     t = c.get("target") or {}
     if c["type"] == "toggle" and kind_of(t) == "gate" and r["on"].get(c["id"]):
         _apply(app, dict(t, src=("pad", c["id"])), 0.0)
+    if t.get("kind") == "pad_clip":
+        from native import vj_clips
+        vj_clips.stop(app, c["id"])
     for k in (c["id"], ("xy", c["id"]), ("pos", c["id"])):
         r["on"].pop(k, None)
     r["flash"].pop(c["id"], None)
