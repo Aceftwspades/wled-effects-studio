@@ -2607,9 +2607,11 @@ def _rec_poll(app, i, t):
     now = clock.now()
     seg = app.eng.seg
     was = _REC.applied
+    from native import modulate
+    own = lambda s: modulate.unmodulated(app, s, app.eng.fx.get(s))     # noqa: E731 - a modulator's push not
     if was is not None and was[:3] == (i, app.eng.idx, seg):   # the same step, effect and layer as last frame
-        for slider in sequence.RAMP_KEYS:
-            if app.eng.fx.get(slider) != was[3].get(slider):
+        for slider in sequence.RAMP_KEYS:                        # the hand's (nor recorded)
+            if own(slider) != was[3].get(slider):
                 _REC.held[_rec_key(seg, slider)] = now      # moved since playback left it: the hand's
     hand = getattr(app, "_vj_hand_at", None)                 # the VJ's crossfader, moved by hand in a VJ step
     if st.get("vj") and hand is not None and now - hand < HOLD_S:
@@ -2628,7 +2630,7 @@ def _rec_poll(app, i, t):
         if s_ != seg:
             continue
         take = _REC.takes.setdefault((id(st), key), [])
-        v = int(app.eng.fx.get(slider, 0))
+        v = int(own(slider) or 0)
         if not take or t > take[-1][0] + 1e-4:
             take.append((t, v))
     if any(sid == id(st) for sid, _ in _REC.takes):

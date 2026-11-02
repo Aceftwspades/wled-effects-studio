@@ -175,8 +175,9 @@ class Project:
     UNDO_KEYS = ("sequence", "schedule", "palettes", "segments", "vj", "pads", "modulators")
     UNDO_MAX = 40
     # fields of those that are where the user is, not an edit: no undo of their own, and an undo leaves them be
-    # (the pads' bank shown - a show switching banks would push its layout edits out of the undo)
-    UNDO_SKIP = {"pads": ("bank",)}
+    # (the pads' bank shown - a show switching banks would push its layout edits out of the undo; their next id -
+    # an undo putting it back handed a removed control's id, and what it left running, to the next one made)
+    UNDO_SKIP = {"pads": ("bank", "next_id")}
 
     def _snap(self, k):
         v = self.options.get(k)
@@ -213,6 +214,9 @@ class Project:
         self.options = opts if isinstance(opts, dict) else {}
         imp = d.get("imported")                           # null or not a list (a hand edit) raised at the start
         self.imported = [f for f in imp if isinstance(f, str)] if isinstance(imp, list) else []
+        if "modulators" in self.options:                  # made whole before the journal's first look (an old
+            from native import modulate                   # file's ids given now, not again by an Undo)
+            modulate.repair(self.options)
         self._journal_reset()
 
     def _set_aside(self, err):

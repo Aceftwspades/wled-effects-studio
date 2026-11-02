@@ -243,6 +243,8 @@ class PhoneRemote:
         return self.port
 
     def close(self):
+        """Stopped: no new phone let in, and one already in (its kept connection) told no on its next request - what
+        it sent before is dropped, not played when the remote is opened again."""
         srv, self._srv, self.port = self._srv, None, None
         if srv is not None:
             try:
@@ -250,6 +252,8 @@ class PhoneRemote:
                 srv.server_close()
             except OSError:
                 pass
+        with self._lock:
+            self._q.clear()
 
     @property
     def is_open(self):
@@ -316,7 +320,18 @@ def _handler(remote):
             q = parse_qs(urlparse(self.path).query)
             return (q.get("k") or [""])[0]
 
+        def _gone(self):
+            """True (and the connection closed) when this phone came in on a server since stopped or moved to
+            another port: a kept connection outlives the server's shutdown, and went on being served."""
+            if self.server is remote._srv:
+                return False
+            self.close_connection = True
+            self._send(503, b"{}")
+            return True
+
         def do_GET(self):
+            if self._gone():
+                return
             path = urlparse(self.path).path
             if not remote._key_ok(self._key()):
                 self._send(403, b"this link needs the key the studio shows (Window > MIDI, OSC and phone)", "text/plain; charset=utf-8")
@@ -335,6 +350,8 @@ def _handler(remote):
                 self._send(404, b"{}")
 
         def do_POST(self):
+            if self._gone():
+                return
             path = urlparse(self.path).path
             if path not in ("/act", "/cam") or not remote._key_ok(self._key()):
                 self._send(403, b"{}")
@@ -612,18 +629,24 @@ const touches=new Map();          // pointerId -> {id, type, el, f0, y0, t0, rea
 const heldIds=()=>new Set([...touches.values()].map(t=>t.id));
 const SWELL_FROM=0.35,SWELL_MS=800,KNOB_PX=180;
 
-// --- sending: in order, one request at a time; moves of a control merged while one is on its way ------------
+// --- sending: in order, one request at a time, at most PER of them in one (the studio takes no more); while one
+// is on its way a control's moves are merged (into its last waiting command only when that is a move - never past
+// its lift or touch) and its "still held" sent once ------------------------------------------------------------
+const PER=16,MAX_WAIT=256,GIVE_UP_MS=4000;
 let queue=[],busy=false;
 function send(c){
- if(c.e==="move"){const i=queue.findIndex(q=>q.e==="move"&&q.id===c.id);if(i>=0){queue[i]=c;return;}}
- queue.push(c);pump();}
+ if(c.e==="move"||c.e==="hold"){let i=-1;for(let j=queue.length-1;j>=0;j--)if(queue[j].id===c.id&&queue[j].a===c.a){i=j;break;}
+  if(i>=0&&queue[i].e===c.e){if(c.e==="move")queue[i]=c;return;}}
+ queue.push(c);if(queue.length>MAX_WAIT)queue.splice(0,queue.length-MAX_WAIT);pump();}
 async function pump(){
- if(busy||!queue.length)return;busy=true;const out=queue;queue=[];
- try{const r=await fetch("act?k="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(out)});
+ if(busy||!queue.length)return;busy=true;const out=queue.splice(0,PER);
+ const ac=typeof AbortController!=="undefined"?new AbortController():null,tm=ac?setTimeout(()=>ac.abort(),GIVE_UP_MS):0;
+ try{const r=await fetch("act?k="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(out),signal:ac?ac.signal:undefined});
   if(r.status===403)say("this link's key is not the studio's any more - open the new link");
+  if(r.status===503)say("the studio's remote is off");
   if(out.some(c=>c.e!=="move"&&c.e!=="hold"))pollSoon();}   // what it did (a toggle, a bank) shown at once
  catch(e){say("no studio: "+e.message);}
- busy=false;if(queue.length)pump();}
+ clearTimeout(tm);busy=false;if(queue.length)pump();}
 function say(t){$("msg").textContent=t;}
 
 // --- drawing the bank ------------------------------------------------------------------------------------------

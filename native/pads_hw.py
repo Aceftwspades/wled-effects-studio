@@ -154,13 +154,39 @@ def _controls_for(st, h, ctl):
     known grid the one on that pad."""
     b = pads.current(st)
     out = [c for c in b["controls"] if _same(c.get("midi"), ctl)]
-    if ctl[0] == "note" and _grid_on(h):
+    if ctl[0] == "note" and int(ctl[1]) == 0 and _grid_on(h):      # the grid's notes, on its channel (another
+        # device's notes on a merged port do not play it)
         cell = note_cell(h["device"], ctl[2])
         if cell is not None:
             c = pads.at(b, *cell)
             if c is not None and c not in out:
                 out.append(c)
     return out
+
+
+def let_go_held(app):
+    """The controls the controller holds released - it is gone (unplugged), so their lifts will not come."""
+    from native import pads_ui
+    st = pads_ui._st(app)
+    held = _rt(app)["held"]
+    for cid in list(held):
+        del held[cid]
+        c = pads.find(st, cid)
+        if c is not None:
+            pads.release(app, c)
+
+
+def _cell_travel(c, cell):
+    """Where along a fader laid over the grid's pads a pad is, 0..1 of its travel - the bottom (or left) pad 0, the
+    top (or right) 1 - or None for one a pad long, or a cell not on it: a grid's pads all send one velocity, so it
+    is the pad pressed that says how far."""
+    if c["type"] != "fader" or cell is None or cell not in pads.cells(c):
+        return None
+    if c.get("orient", "v") == "v":
+        n, k = c["h"], c["y"] + c["h"] - 1 - cell[1]
+    else:
+        n, k = c["w"], cell[0] - c["x"]
+    return k / (n - 1) if n > 1 else None
 
 
 def events(app, evs):
@@ -236,7 +262,9 @@ def events(app, evs):
                     at = pads.where(app, c) or (0.5, 0.5, f)
                     pads.press(app, c, xy=at[:2], pressure=f)    # a pad's velocity: the first pressure
                 elif c["type"] in pads.SLIDERS:
-                    pads.drag(app, c, f)
+                    on = _cell_travel(c, note_cell(h["device"], ctl[2]) if ctl[0] == "note" and _grid_on(h)
+                                      and int(ctl[1]) == 0 and not _same(c.get("midi"), ctl) else None)
+                    pads.drag(app, c, f if on is None else on)
                 else:
                     pads.press(app, c)
             elif c["id"] in r["held"] and _same(r["held"][c["id"]][0], ctl):   # let go by the pad that pressed it
@@ -288,6 +316,7 @@ def poll(app):
         app.gp.status(f"pads: the controller's lights stopped: {out.error}", "warn")   # again every RETRY_S
         out.error = None
         app._pads_out_tried = (h["out"], time.monotonic())
+        let_go_held(app)                                   # its lift will not come: what it holds let go
 
 
 
@@ -346,7 +375,8 @@ def wanted(app, st, pulse=None, pulsing=None):
             out[("note", int(ctl[1]), int(ctl[2]))] = m
             if step is not None and pulsing is not None and not on:     # lit by a press: not a pulse step
                 pulsing.add(("note", int(ctl[1]), int(ctl[2])))
-        elif ctl and ctl[0] == "cc" and dev in ("generic", "launchpad"):
+        elif ctl and ctl[0] == "cc" and dev in ("generic", "launchpad") and c["type"] in pads.BUTTONS:
+            # (a fader's or a knob's CC not: a motorised fader or a ring of lights would be pulled to 0 or 127)
             v = 127 if on or (step is not None and step >= STEPS.get(dev, 8) // 2) else 0
             out[("cc", int(ctl[1]), int(ctl[2]))] = (0xB0 | (int(ctl[1]) & 0x0F), int(ctl[2]), v)
             if step is not None and pulsing is not None and not on:

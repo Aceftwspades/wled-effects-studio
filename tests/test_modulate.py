@@ -518,6 +518,90 @@ try:
     app.project = keep
     mo.modulators(app).clear()
     mo.apply(app)
+
+    # --- the third review's ---------------------------------------------------------------------------------
+    from native import mixer
+    a3 = App()
+    mixer.options(a3)["fader"] = 0.5
+    m3 = mo.add(a3, key="mix.fader", kind="lfo", shape="square", period=2, depth=51)
+    mo.apply(a3)
+    m3["depth"] = 0                                          # its push rounds to nothing: the fader its own again
+    clock.step(0.1)
+    mo.apply(a3)
+    gone = mo.over(a3, "mix.fader")
+    mixer.options(a3)["fader"] = 0.9
+    clock.step(0.1)
+    mo.apply(a3)
+    check(gone is None and mo.over(a3, "mix.fader") is None,
+          f"a fader's modulator turned to depth 0: the fader its own, dragged to 0.9 it is there ({gone})")
+
+    a4 = App()                                               # a project switched while paused: its holds kept
+    mo.add(a4, key="mix.fader", kind="lfo", shape="square", period=2, depth=51)
+    mo.apply(a4)
+    a4.project = Proj()
+    mo.reset(a4)                                             # (app._enter_project)
+    m4 = mo.add(a4, key="sx", kind="lfo", start="held", shape="square", period=2, depth=60)
+    mo.set_target(a4, {"kind": "mod_gate", "id": m4["id"], "src": "pad"}, 1.0)
+    over_ = mo.over(a4, "mix.fader")
+    clock.step(0.05)
+    mo.apply(a4)
+    check(over_ is None and mo.gated(a4, m4["id"]), "switched while paused: the old fader's push gone, the new hold kept")
+
+    a5 = App()                                               # a pause, then an envelope fired: its attack, not past it
+    m5 = mo.add(a5, key="sx", kind="env", attack=0.5, env_decay=0.3, sustain=0.6, release=0.5, depth=100)
+    mo.apply(a5)
+    clock.step(5.0)
+    mo.set_target(a5, {"kind": "mod_gate", "id": m5["id"], "src": "pad"}, 1.0)
+    mo.apply(a5)
+    lv = mo.level(a5, m5["id"])
+    check(lv is not None and 0.0 < lv < 0.9, f"an envelope fired after a 5 s gap: in its attack ({lv})")
+
+    for bad in ([{"keys": ["sx"], "steps": [None], "kind": "steps"}], [{"key": "sx", "period": None, "depth": "x"}],
+                [None, {"keys": "sx", "amt": [], "shape": 5, "id": "q"}], "junk"):
+        a6, what = App(), json.dumps(bad)[:60]
+        a6.project.options["modulators"] = bad
+        try:
+            mo.repair(a6.project.options)
+            mo.apply(a6)
+            clock.step(0.05)
+            mo.apply(a6)
+            check(all(isinstance(m["id"], int) and isinstance(m["keys"], list) for m in mo.modulators(a6)),
+                  f"a damaged modulators list runs ({what})")
+        except Exception as e:
+            check(False, f"a damaged modulators list {what}: {type(e).__name__} {e}")
+
+    import tempfile
+    from native.project import Project
+    d = tempfile.mkdtemp()
+    with open(os.path.join(d, "project.json"), "w", encoding="utf-8") as f:
+        json.dump({"geometry": {"kind": "cube", "B": 16}, "options": {"modulators": [
+            {"key": "sx", "kind": "lfo"}, {"key": "ix", "kind": "lfo"}]}}, f)
+    a7 = App()
+    a7.project = Project(d)
+    ids = [m["id"] for m in mo.modulators(a7)]
+    mo.edit(a7, 0, on=False)
+    mo.undo(a7)
+    check([m["id"] for m in mo.modulators(a7)] == ids and mo.modulators(a7)[0].get("on", True),
+          f"an old file's modulators given ids as it is read: an Undo keeps them ({ids})")
+
+    a8 = App()                                               # a preset on two decks: a random wave of each its own
+    from native import vj
+    vj.options(a8)
+    mo.put_deck_mods(a8, 0, [{"keys": ["vj*.hue"], "shape": "random", "seed": 5, "amt": [1]}])
+    mo.put_deck_mods(a8, 1, [{"keys": ["vj*.hue"], "shape": "random", "seed": 5}])
+    seeds = [m["seed"] for m in mo.modulators(a8)]
+    check(len(seeds) == 2 and seeds[0] != seeds[1], f"one preset on decks A and B: two seeds ({seeds})")
+    check(all(f"vj{i}.{k}" in mo.VJ_KEYS for i in range(3) for k, _, _ in vj.KNOBS) and
+          mo.key_of({"kind": "vj_knob", "deck": 1, "key": "pic_scale"}) == "vj1.pic_scale",
+          "every VJ knob a modulator's target: the text's, the picture's, the flame's too")
+    app.eng.fx["sx"] = 100                                   # a take records the slider, not the wave on it
+    mo.modulators(app).append({"keys": ["sx"], "kind": "lfo", "shape": "square", "period": 2, "depth": 60, "on": True})
+    mo.apply(app)
+    moved = app.eng.fx["sx"]
+    check(moved != 100 and mo.unmodulated(app, "sx", moved) == 100 and mo.unmodulated(app, "sx", 42) == 42,
+          f"the slider without its push: its place ({moved} -> 100), a value set since its own")
+    mo.modulators(app).clear()
+    mo.apply(app)
 finally:
     clock.release()
 

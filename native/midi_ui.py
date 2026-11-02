@@ -492,6 +492,9 @@ def open_port(app, name):
         app.midi.open(name)
     except Exception as e:
         app.gp.status(f"MIDI: {e}"); return
+    from native import pads_hw
+    pads_hw.let_go_held(app)                          # the last port's pads: their lifts come on that one
+    app._midi_gone = False
     st["port"] = name
     app.project.save()
     app.gp.status(f"MIDI: listening on {name}")
@@ -590,6 +593,33 @@ def _clock(app, st):
 
 
 # --- each frame ---------------------------------------------------------------------------
+REPLUG_S = 2.0                                       # the open input port looked for this often (unplugged?)
+
+
+def _replug(app, m, now=None):
+    """The input port that is open looked for every REPLUG_S: gone (the controller unplugged), the pads it holds
+    let go - their lifts will not come - and said once; back, opened again (rtmidi's port does not come back to
+    life by itself, so a controller plugged in again played nothing until its port was picked again)."""
+    import time
+    now = time.monotonic() if now is None else now
+    if not m.port or not midi.available() or now - getattr(app, "_midi_look_at", -1e9) < REPLUG_S:
+        return
+    app._midi_look_at = now
+    there = m.port in midi.ports()
+    if not there and not getattr(app, "_midi_gone", False):
+        app._midi_gone = True
+        from native import pads_hw
+        pads_hw.let_go_held(app)
+        app.gp.status(f"MIDI: {m.port} is gone (unplugged?) - opened again when it is back", "warn")
+    elif there and getattr(app, "_midi_gone", False):
+        app._midi_gone = False
+        try:
+            m.open(m.port)
+            app.gp.status(f"MIDI: {m.port} is back")
+        except Exception:
+            pass
+
+
 def poll(app):
     m = getattr(app, "midi", None)
     if m is None:
@@ -605,6 +635,7 @@ def poll(app):
                 m.open(st["port"])
             except Exception:
                 pass
+    _replug(app, m)
     _clock(app, st)
     for ok, msg in app.devfx.messages():
         app.gp.status(f"MIDI: {msg}", "info" if ok else "warn")

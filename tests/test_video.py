@@ -166,6 +166,49 @@ def test_in_and_out_points_loop():
         src.close()
 
 
+def test_in_and_out_go_on_after_a_render():
+    """A clip with In and Out, a render reading it ahead of real time (the clock held): let go, it plays on at once -
+    the pace counted from the run's start slept off the frames the render took (seconds of a frozen deck)."""
+    if not shutil.which("ffmpeg"):
+        print("     (no ffmpeg: the render test is left out)")
+        return
+    from native import clock, scratch
+    path = scratch.path("test_inout_render.mp4")
+    subprocess.run([shutil.which("ffmpeg"), "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=30:duration=8",
+                    "-pix_fmt", "yuv420p", path], check=True)
+    src = video.FfmpegSource(["-ss", "0.5", "-t", "6", "-i", path], "clip", "file", 64, 36, realtime=True,
+                             rerun=True, fps=30)
+    try:
+        time.sleep(1.0)
+        clock.hold()
+        try:
+            for _ in range(90):                              # 3 s of it taken as fast as it comes
+                clock.step(1 / 30)
+                src.latest()
+        finally:
+            clock.release()
+        n0 = src.n
+        time.sleep(1.0)
+        assert src.n - n0 >= 15, src.n - n0                  # a second after: playing (not still asleep)
+    finally:
+        src.close()
+
+
+def test_a_turned_clip_s_size():
+    """A phone's portrait clip, kept landscape with a turn: its size as ffmpeg shows it (turned), so fit and tile
+    crop the box ffmpeg pads it in."""
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        print("     (no ffmpeg: the turned clip test is left out)")
+        return
+    from native import scratch
+    flat, path = scratch.path("test_turned_flat.mp4"), scratch.path("test_turned.mp4")
+    subprocess.run([shutil.which("ffmpeg"), "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=192x108:rate=10:duration=1",
+                    "-pix_fmt", "yuv420p", flat], check=True)
+    subprocess.run([shutil.which("ffmpeg"), "-y", "-v", "error", "-i", flat, "-c", "copy", "-metadata:s:v:0", "rotate=90",
+                    path], check=True)                       # (the turn kept as a phone keeps it: copied, not encoded)
+    assert video.size_of(path) == (108, 192), video.size_of(path)
+
+
 def test_a_stream_address_is_a_network_one():
     for url in ("rtsp://192.168.1.20:8554/live", "http://10.0.0.2:8080/video", "srt://host:9000", "rtmp://h/app/key"):
         args = video.stream_args(url)

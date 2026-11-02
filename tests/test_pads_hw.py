@@ -217,8 +217,9 @@ h["device"] = "generic"
 out.sent.clear()
 pads_hw.lights(app, out, now=103.0)
 gen = {(m[0], m[1]): m[2] for m in out.sent}
-check(gen.get((0x90, 41)) == 0 and gen.get((0xB0, 21)) == 0 and gen.get((0xB0, 104)) == 0,
+check(gen.get((0x90, 41)) == 0 and gen.get((0xB0, 104)) == 0,
       "a generic controller: its learned notes and CCs, at 0 while not lit")
+check((0xB0, 21) not in gen, "a fader's CC sent no light (a motorised fader, a ring of lights, left where it is)")
 check(gen.get((0x90, 56)) == 0 and gen.get((0x90, 112)) == 0, "the APC's grid and scene lights it no longer uses put out")
 pads.press(app, flash)
 out.sent.clear()
@@ -322,6 +323,46 @@ pads_hw.events(app5, [note(nB, 0)])
 check(vj.knob_get(app5, 0, "hue") == 1.0, "the other pad's lift: still held")
 pads_hw.events(app5, [note(nA, 0)])
 check(abs(vj.knob_get(app5, 0, "hue") - 0.2) < 1e-6, "its own pad's lift: let go")
+pads_hw.events(app5, [(("note", 1, nA), 100, 127.0)])
+check(abs(vj.knob_get(app5, 0, "hue") - 0.2) < 1e-6, "the grid's note on another channel: not its pad")
+
+# a fader laid on the grid: the pad pressed says how far (the grid's pads all send one velocity)
+fd = pads.new_control(st5, "fader", 3, 0, 1, 4, target={"kind": "vj_fader"})
+b5["controls"].append(fd)
+got = []
+for row in (3, 2, 0):
+    n_ = pads_hw.cell_note("launchpad", 3, row)
+    pads_hw.events(app5, [note(n_, 127)])
+    pads_hw.events(app5, [note(n_, 0)])
+    got.append(round(vj.options(app5)["fader"], 3))
+check(got == [0.0, 0.333, 1.0], f"a grid fader's bottom, second and top pads: 0, 1/3, 1 ({got})")
+
+# the controller unplugged while a pad is held: it is let go (its lift will not come), and the input opened again
+from native import midi_ui
+pads_hw.events(app5, [note(nA, 100)])
+held_ = vj.knob_get(app5, 0, "hue")
+
+
+class FakeIn:
+    port, opened = "LP in", []
+
+    def open(self, name):
+        self.opened.append(name)
+        self.port = name
+
+
+app5.gp = app.gp
+fin, there = FakeIn(), [False]
+was_ports = midi.ports
+midi.ports = lambda: ["LP in"] if there[0] else []
+midi.available = lambda: True
+midi_ui._replug(app5, fin, now=1000.0)
+let = vj.knob_get(app5, 0, "hue")
+there[0] = True
+midi_ui._replug(app5, fin, now=1000.0 + midi_ui.REPLUG_S)
+midi.ports = was_ports
+check(held_ == 1.0 and abs(let - 0.2) < 1e-6 and not pads_hw._rt(app5)["held"] and fin.opened == ["LP in"],
+      f"its input port gone: the held pad let go ({let}); back, opened again ({fin.opened})")
 midi.available, midi.out_ports, pads_hw.RETRY_S = was
 h["out"] = ""
 

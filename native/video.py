@@ -163,12 +163,14 @@ class FfmpegSource:
                     with self._cv:                           # a held clock: no further than the frame it wants
                         while self.fps and clock.held() and self._reads > self._want and not self._stop.is_set():
                             self._cv.wait(0.05)
+                    if clock.held():                         # (a render reading ahead of real time: the pace
+                        t0 = None                            # counted again from where it lets go, not slept off)
                     buf = out.read(size)
                     if len(buf) < size:
                         break
                     if self._pace and not clock.held():      # a rerun: frame k at its time from the run's first
                         now = time.monotonic()
-                        t0 = now if t0 is None else t0
+                        t0 = now - got / self._pace if t0 is None else t0
                         wait = t0 + got / self._pace - now
                         if wait > 0:
                             self._stop.wait(wait)
@@ -261,14 +263,19 @@ def alpha_of(path):
         from native import procs
         try:
             out = procs.run([probe, "-v", "error", "-select_streams", "v:0", "-show_entries",
-                             "stream=codec_name,pix_fmt,width,height:stream_tags=alpha_mode", "-of", "default=nw=1", path],
+                             "stream=codec_name,pix_fmt,width,height:stream_tags=alpha_mode,rotate:"
+                             "stream_side_data=rotation", "-of", "default=nw=1", path],
                             capture_output=True, text=True, timeout=10).stdout
         except Exception:
             out = ""
         info = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
         codec, fmt = info.get("codec_name", ""), info.get("pix_fmt", "")
         try:
-            _SIZE[key] = (int(info["width"]), int(info["height"]))
+            wh = (int(info["width"]), int(info["height"]))
+            turn = info.get("rotation", info.get("TAG:rotate", "0"))
+            if round(float(turn)) % 180 == 90:               # a phone's portrait clip: kept landscape with a turn
+                wh = wh[::-1]                                # that ffmpeg makes as it reads (so its box is this)
+            _SIZE[key] = wh
         except (KeyError, ValueError):
             pass
         if info.get("TAG:alpha_mode") == "1" and codec in ("vp8", "vp9"):

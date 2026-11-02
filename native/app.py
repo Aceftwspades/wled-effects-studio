@@ -1084,6 +1084,7 @@ class App(Features, Recorder, EditBuild):
         self._pads_learn = None
         self._pads_drag = None
         getattr(self, "_pads_hw_rt", {}).get("held", {}).clear()
+        modulate.reset(self)
         modulate.refresh(self)
 
     def switch_project(self, path, create=False):

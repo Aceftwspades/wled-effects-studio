@@ -4437,6 +4437,38 @@ notes, its lights mirroring the layout). In four phases:
      a phone held; buttons are not offered the palette/effect "by index" (always the last); the MIDI port and a
      waiting learn follow a project switch.
    Tests: test_modulate, test_pads, test_pads_hw, test_vj, test_vj_shaders, test_video, test_addons.
+   A third review (2026-11-02, four reviewers: modulators, pads, controller and phone, VJ and video). Fixed:
+   - Modulators: a VJ knob, a fader or a modulator's depth or rate kept the last value a modulator moved it to when
+     its push rounded to nothing (depth 0, a beat decayed, silence) - the fader no longer followed the hand; now let
+     go. An old file's modulators were given ids after the undo journal's first look, so one Undo handed out new ids
+     (pads, MIDI and show steps pointing at none) - modulate.repair runs as the project is read, and puts a damaged
+     entry right (a null period or step stopped playback every frame). A project switched while paused kept the
+     last one's pushes and, on Play, cleared the new one's holds - modulate.reset at the switch. An envelope fired
+     after a pause skipped its attack (the gap is held to 0.25 s for envelopes). The text, picture and flame knobs
+     were not targets, though the guide said so - every vj.KNOBS knob is. A preset on two decks gave both one
+     random wave - each its own seed. A show's take recorded a modulator's wave as the hand's (modulate.unmodulated).
+   - Pads: a toggle on a target of whole steps (the blur, the kaleidoscope, a modulator's depth or rate) to a "to"
+     between steps never turned off - pads._step; two holds on one target left it at the first's "to", and two
+     Flash C let C out at the first lift - the first holder keeps what was there (pads._claim); a toggle latching a
+     modulator's play, then removed, re-pointed, made another type or undone, held it for good (pads.forget), and
+     an Undo put next_id back (a removed control's id and run state handed on - next_id is now kept over an undo);
+     a hold or XY snap on a deck's look went to the first look (vj_look now reads back); a damaged file's range,
+     label, colour, release, orientation or target deck failed every frame; a staged pad blinked again after its
+     deck had been on air unseen (vj.go is counted).
+   - Controller and phone: Remote off left a phone on its kept connection served, its presses queued and played
+     all at once when the remote opened again - it is told 503 and the queue dropped; the /pads page sent more than
+     the 16 a request the studio takes (the rest lost on a slow Wi-Fi) and repeated "still held" - at most 16, held
+     once, a move never merged past its lift, a request given up after 4 s. A pad held as the controller was
+     unplugged stayed held, and its input stayed dead plugged back - midi_ui._replug lets go and opens it again
+     (and a port switch lets go). A fader on a grid controller jumped to the top (the grid's pads send one
+     velocity) - the pad pressed says how far. The generic device's lights pulled a fader's or knob's CC to 0 or
+     127 (motorised faders) - buttons only. A grid pad's note on another channel played the grid.
+   - VJ and video: a clip with In/Out froze after a render for as long as the render ran ahead (its pace slept off
+     the frames taken) - counted again from the release; a phone's portrait clip was fitted as landscape (ffprobe's
+     size, not turned) - its rotation read; deck C with a shader of buffers was not drawn off the mix, so they were
+     let go after 30 s and it came in from black - drawn every other frame like A and B; a deck's shader channels
+     of the wrong length and a preset that is not one failed every frame.
+   Tests: test_modulate, test_pads, test_pads_hw, test_phone, test_video, test_vj.
 
 Released as 1.21.0 (2026-10-28): the four sections below - the MilkDrop and Shadertoy importers, transparency
 and PICTURE, and the review's QoL items and faster frame (with array uniforms fixed for macOS on the way).

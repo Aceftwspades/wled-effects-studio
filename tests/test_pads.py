@@ -557,6 +557,96 @@ pads_ui.switch_bank(app4, 1)
 pads_ui._dragging(app4, app4._pads_drag, 6 * 50 + 10, 5 * 50 + 10, 0, 0, 50, 50, 6, pads.current(st4))
 check((c0["x"], c0["y"]) == (0, 0) and pads.fits(b0, c0) and app4._pads_drag is None,
       f"a move across a bank switch: the control left where it was ({c0['x']}, {c0['y']})")
+
+# --- the third review's ---------------------------------------------------------------------------------------
+from native import modulate
+app5 = App(geometry.Geometry("cube", B=16))
+app5.eng.push = lambda: None
+app5.eng.meta, app5.eng.idx, app5.eng.names = [{"labels": [], "name": "Solid"}], 0, ["Solid"]
+vj.options(app5)
+st5 = pads.state(app5.project)
+# a toggle on a knob of whole steps (the blur's 0..3) to 0.5 - set to 2, read back 2/3 - turns off again
+tog = pads.new_control(st5, "toggle", 0, 0, target={"kind": "vj_knob", "deck": 0, "key": "blur"})
+tog["hi"] = 0.5
+seen = []
+for _ in range(3):
+    pads.press(app5, tog)
+    pads.release(app5, tog)
+    seen.append((vj.options(app5)["decks"][0]["blur"], pads.lit(app5, tog)))
+check([s[0] for s in seen] == [2, 0, 2] and seen[0][1] and not seen[1][1],
+      f"a toggle on the blur to 0.5: on, off, on - lit when on ({seen})")
+m5 = modulate.add(app5, _quiet=True, keys=["sx"], start="held")
+dtog = pads.new_control(st5, "toggle", 1, 0, target={"kind": "mod", "id": m5["id"], "key": "depth"})
+dtog["hi"] = 0.5
+deps = []
+for _ in range(2):
+    pads.press(app5, dtog)
+    pads.release(app5, dtog)
+    deps.append(modulate.find(app5, m5["id"])["depth"])
+check(deps[0] == 128 and deps[1] == 0, f"a toggle on a modulator's depth to 0.5: 128, then off ({deps})")
+
+# two holds on one knob: let go of both, it is back where it was (the second did not take the first's "to")
+t5 = {"kind": "vj_knob", "deck": 0, "key": "hue"}
+vj.knob_set(app5, 0, "hue", 0.5)
+ha, hb = (pads.new_control(st5, "hold", x, 1, target=t5) for x in (0, 1))
+hb["hi"] = 0.0
+pads.press(app5, ha)
+pads.press(app5, hb)
+pads.release(app5, ha)
+mid = vj.knob_get(app5, 0, "hue")
+pads.release(app5, hb)
+check(mid == 0.0 and abs(vj.knob_get(app5, 0, "hue") - 0.5) < 1e-3,
+      f"two holds on the hue: the second's while it is held ({mid}), back to 0.5 when both let go")
+fa, fb = (pads.new_control(st5, "hold", x, 2, target={"kind": "vj_c_flash"}) for x in (0, 1))
+pads.press(app5, fa)
+pads.press(app5, fb)
+pads.release(app5, fa)
+held_in = vj.c_is_in(app5)
+pads.release(app5, fb)
+check(held_in and not vj.c_is_in(app5), "two Flash C held: C stays in till the last lets go")
+
+# a toggle latching a modulator's play, then re-pointed or removed: the modulator let go
+gt = pads.new_control(st5, "toggle", 2, 0, target={"kind": "mod_gate", "id": m5["id"]})
+pads.press(app5, gt)
+pads.release(app5, gt)
+latched = modulate.gated(app5, m5["id"])
+pads.forget(app5, gt)
+check(latched and not modulate.gated(app5, m5["id"]), "a latched play toggle forgotten (removed, re-pointed): let go")
+
+# a hold on a deck's look along the list snaps back to the look it was on, not the first
+names = vj.midi_looks()
+vj.options(app5)["decks"][0]["look"] = names[3]
+hl = pads.new_control(st5, "hold", 2, 1, target={"kind": "vj_look", "deck": 0})
+pads.press(app5, hl)
+on_ = vj.options(app5)["decks"][0]["look"]
+pads.release(app5, hl)
+check(on_ == names[-1] and vj.options(app5)["decks"][0]["look"] == names[3],
+      f"a hold on deck A's look: the last while held, back to {names[3]} ({vj.options(app5)['decks'][0]['look']})")
+
+# a staged pad: its deck on air by a Cut, then cut back while it was not looked at - it blinks no more
+vj.options(app5)["fader"] = 0.0
+sp = pads.new_control(st5, "trigger", 3, 0, target={"kind": "pad_look", "look": names[0]})
+sp["stage"] = True
+pads.press(app5, sp)
+first = pads.staged(app5, sp)
+vj.go(app5, 0)
+vj.go(app5, 0)
+check(first == 1 and pads.staged(app5, sp) is None, "a staged pad: after a Cut and back, not staged")
+
+# a damaged file's fields of the wrong kind put right: drawn, not failing every frame
+bad = {"banks": [{"colour": [1], "controls": [
+    {"type": "fader", "x": 0, "y": 0, "lo": None, "hi": "x", "label": 5, "colour": [2], "release": "x",
+     "orient": 3, "target": {"kind": "vj_knob", "deck": "x", "key": "hue"}, "target_y": 7}]}]}
+st6 = pads.state(Bare(bad))
+c6 = st6["banks"][0]["controls"][0]
+try:
+    pos = pads.position(app5, c6)
+    lab = "ABC"[c6["target"]["deck"]]                 # (the label names the deck by its letter)
+    ok6 = (c6["lo"], c6["hi"], c6["label"], c6["colour"], c6["release"], c6["orient"], c6["target"]["deck"],
+           c6["target_y"], st6["banks"][0]["colour"]) == (0.0, 1.0, "", "grey", "snap", "v", 0, {}, "blue")
+    check(ok6 and 0.0 <= pos <= 1.0 and lab, f"a damaged control's fields put right ({c6})")
+except Exception as e:
+    check(False, f"a damaged control: {type(e).__name__} {e}")
 dpg.destroy_context()
 
 print("pads:", "FAILED" if fails else "ok")

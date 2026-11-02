@@ -54,8 +54,13 @@ import random
 from collections import deque
 
 FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
-# the VJ deck knobs a modulator may move: "vj<deck>.<knob>" (vj.KNOBS)
-VJ_KEYS = tuple(f"vj{i}.{k}" for i in (0, 1, 2) for k in ("level", "amount", "speed", "hue", "kaleido", "trails", "blur"))
+# the VJ deck knobs a modulator may move: "vj<deck>.<knob>" - every one of vj.KNOBS (a test keeps the two alike), the
+# text's, the picture's and the flame's with the rest
+VJ_KNOBS = ("level", "amount", "speed", "hue", "kaleido", "trails", "blur", "text_size", "text_x", "text_y",
+            "text_glow", "text_shadow", "text_outline", "pic_scale", "pic_x", "pic_y", "pic_rot", "pic_tol", "pic_soft",
+            "pic_drift", "sh_mx", "sh_my", "morph", "drift", "fl_sym", "fl_trail", "fl_gamma", "fl_colour",
+            "fl_points", "fl_spin", "fl_x", "fl_y") + tuple(f"fl_w{k}" for k in range(1, 9))
+VJ_KEYS = tuple(f"vj{i}.{k}" for i in (0, 1, 2) for k in VJ_KNOBS)
 MIX_KEYS = ("vj.fader", "mix.fader")               # the VJ's crossfader and the mixer's fader
 KEYS = FX_KEYS + VJ_KEYS + MIX_KEYS
 MOD_PARAMS = ("depth", "rate")                     # another modulator's settings one may move: "m<id>.depth"
@@ -175,12 +180,74 @@ def amount(m, key):
 def modulators(app):
     """The project's modulators, each with an id of its own and a list of targets (one made before either: its
     "key" a list of one, the next id)."""
-    mods = app.project.options.setdefault("modulators", [])
+    o = app.project.options
+    mods = o.get("modulators")
+    if not isinstance(mods, list) or any(not isinstance(m, dict) or "keys" not in m or "id" not in m for m in mods):
+        repair(o)
+    return o["modulators"]
+
+
+_NUMS = ("period", "hz", "depth", "decay", "width", "phase", "spread", "attack", "env_decay", "sustain", "release")
+_CHOICES = {"kind": [k for k, _ in KINDS], "shape": list(SHAPES), "feel": [k for k, _, _ in FEELS],
+            "start": [k for k, _ in STARTS], "fire": [k for k, _ in FIRES], "band": [k for k, _ in BANDS]}
+
+
+def _num(v, default):
+    """A finite number from a hand-edited file's value, else `default`."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return f if math.isfinite(f) else default
+
+
+def _fixed(m):
+    """One modulator's fields put right where a hand edit (or an older studio) left them wrong - a number that is
+    not one, a choice not offered, its targets not a list of names (one made before lists: its "key" a list of
+    one), its steps and amounts not numbers: the default in each one's place. Its id is the caller's."""
+    if not isinstance(m.get("keys"), list):
+        m["keys"] = [m.pop("key")] if isinstance(m.get("key"), str) else ["sx"]
+    m["keys"] = [k for k in m["keys"] if isinstance(k, str)]
+    for k in _NUMS:
+        if k in m:
+            m[k] = _num(m[k], DEFAULT[k])
+    for k, ok in _CHOICES.items():
+        if k in m and m[k] not in ok:
+            m[k] = DEFAULT[k]
+    if "steps" in m:
+        lv = [_num(v, None) for v in m["steps"]] if isinstance(m["steps"], list) else []
+        m["steps"] = [v for v in lv if v is not None][:16] or list(DEFAULT["steps"])
+    if "amt" in m:
+        m["amt"] = ({k: _num(v, 1.0) for k, v in m["amt"].items() if isinstance(k, str)}
+                    if isinstance(m["amt"], dict) else {})
+    if "seed" in m:
+        m["seed"] = int(_num(m["seed"], 7))
+    return m
+
+
+def repair(options):
+    """The project's modulators made whole as the project is read, before its undo journal first looks
+    (project.load): a damaged entry put right or dropped, an id given to one made before ids (and to a second of
+    one id), each its seed - so the first Undo does not go back to a list without them and hand out ids anew."""
+    mods = options.get("modulators")
+    mods = [m for m in mods if isinstance(m, dict)] if isinstance(mods, list) else []
+    options["modulators"] = mods
+    used = set()
     for m in mods:
-        if "keys" not in m:
-            m["keys"] = [m.pop("key", "sx")]
-        if "id" not in m:
-            m["id"] = _new_id(app, mods)
+        _fixed(m)
+        i = _num(m.get("id"), 0)
+        i = int(i) if i == int(i) else 0
+        m["id"] = i if i >= 1 and i not in used else None
+        if m["id"] is not None:
+            used.add(i)
+    nxt = max([max(1, int(_num(options.get("mod_next_id"), 1)))] + [i + 1 for i in used])
+    for n, m in enumerate(mods):
+        if m["id"] is None:
+            m["id"], nxt = nxt, nxt + 1
+        if "seed" not in m:                                 # one made before seeds: its own, kept
+            m["seed"] = 7 + n * 7919
+    if mods or "mod_next_id" in options:
+        options["mod_next_id"] = nxt
     return mods
 
 
@@ -360,6 +427,18 @@ def _eff(app, m):
     return e
 
 
+def reset(app):
+    """Nothing of the last project's modulators run on - their places, phases, holders, levels, what they moved the
+    knobs and faders to, a show step's say - from the switch itself (app._enter_project), paused or not: what is
+    held in the next one before Play is that one's."""
+    app._mod_state = {"project": app.project}
+    app._vj_mod, app._mod_over, app._mod_scene = {}, {}, None
+
+
+GAP_MAX_S = 0.25                                   # a pause, a hitch: an envelope (and the sound's follower) goes on
+                                                   # from it, not past its attack (a wave keeps to the clock)
+
+
 def apply(app):
     """Each frame: every modulator's sliders set to their places plus its push. A slider's place is what it finds
     there when that is not what it wrote last (something else set it since)."""
@@ -369,8 +448,8 @@ def apply(app):
     mods = modulators(app)
     st = app.__dict__.setdefault("_mod_state", {})
     if st.get("project", app.project) is not app.project:     # another project opened: nothing of the last one's
-        st.clear()                                          # (its places, phases, held notes) carried into this one
-        app._vj_mod, app._mod_over, app._mod_scene = {}, {}, None
+        reset(app)                                          # (its places, phases, held notes) carried into this one
+        st = app._mod_state
     if getattr(app, "_mod_moved", False):
         app._mod_moved = False
         sync_dialog(app)
@@ -382,6 +461,7 @@ def apply(app):
     if "beats" not in st:
         st["beats"], st["at"] = 0.0, now
     dt = max(0.0, now - st["at"])
+    edt = min(GAP_MAX_S, dt)
     st["beats"] += dt * bpm / 60.0
     st["at"] = now
     last_hit = getattr(app, "last_hit_at", None)
@@ -402,9 +482,7 @@ def apply(app):
     ph = st.setdefault("phase", {})
     push = {}
     levels = st["level"] = {}
-    for n, m0 in enumerate(mods):
-        if "seed" not in m0:                                # one made before seeds: its own, kept
-            m0["seed"] = 7 + n * 7919
+    for m0 in mods:
         m = _eff(app, m0)
         kind = m.get("kind", "lfo")
         pos = _advance(m, ph, st["beats"], dt, bpm) if kind in ("lfo", "steps") else 0.0
@@ -415,7 +493,7 @@ def apply(app):
             if m.get("fire") == "beat" and hit and m.get("on", True):
                 e[1] = "a"                                  # each beat: up over its attack, down over its release
                 st.setdefault("vel", {})[m["id"]] = 1.0
-            lv = _env(m, e, dt, held)
+            lv = _env(m, e, edt, held)
             if e[1] == "off":
                 continue                                    # silent: its sliders at their places
             if m.get("vel", True):
@@ -423,7 +501,7 @@ def apply(app):
         elif kind == "audio":
             if sound is None:
                 sound = _sound(app)
-            lv = _follow(m, st.setdefault("aud", {}).setdefault(m["id"], [0.0, 0.0]), sound, dt)
+            lv = _follow(m, st.setdefault("aud", {}).setdefault(m["id"], [0.0, 0.0]), sound, edt)
         if not m.get("on", True) or (kind in ("lfo", "steps") and m.get("start") == "held" and not held):
             continue
         d = float(m.get("depth", 0))
@@ -464,7 +542,9 @@ def apply(app):
             else:
                 base = written[0]
             v = int(round(min(hi(k), max(0, base + push[k]))))
-            if v != cur:
+            if k not in FX_KEYS and v == cur:
+                _unset(app, k)                              # a push of nothing: the knob its own (a kept-apart
+            elif v != cur:                                  # one held what it was moved to last)
                 changed |= _set(app, k, v)
             places[k] = (base, _get(app, k))                # as it reads back (a knob of whole steps rounds it)
             live[k] = v
@@ -546,6 +626,14 @@ def _unset(app, k):
 def over(app, key):
     """What the modulators move a crossfader ("vj.fader", "mix.fader") to now, 0..1, or None when none does."""
     return (getattr(app, "_mod_over", None) or {}).get(key)
+
+
+def unmodulated(app, key, v):
+    """An effect slider's value `v` (what it holds now) without the modulators' push: its place while it still holds
+    what they wrote last, else v itself (set since - by the hand, by playback). A show's take records this, not the
+    wave (played back with the modulator on top, the wave was there twice)."""
+    w = (getattr(app, "_mod_state", {}) or {}).get("places", {}).get(key)
+    return w[0] if w is not None and v == w[1] else v
 
 
 def place(app, key):
@@ -701,7 +789,10 @@ def put_deck_mods(app, i, mods):
         _forget(app, m["id"])
     made = []
     for c in mods or ():
-        c = json.loads(json.dumps(c))
+        if not isinstance(c, dict):
+            continue                                        # a damaged preset's
+        c = _fixed(json.loads(json.dumps(c)))
+        c.pop("seed", None)                                 # a random wave of its own on each deck it is loaded onto
         keys = [pre + str(k)[4:] for k in c.get("keys") or () if str(k).startswith("vj*.") and pre + str(k)[4:] in VJ_KEYS]
         if not keys:
             continue

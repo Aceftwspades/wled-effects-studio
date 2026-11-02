@@ -1130,6 +1130,29 @@ vj.close(a4)
 check(videomod.fit_box((320, 180), 64, 64) == (0, 14, 64, 36) and videomod.fit_box((180, 320), 96, 72) == (27, 0, 41, 72)
       and videomod.fit_box(None, 64, 64) is None, "the fitted picture's box, as ffmpeg pads it")
 
+# --- the third review's: a hand-edited deck's shader channels, a preset that is not one, deck C's buffers -------------
+o9 = vj.options(app)
+o9["decks"][0]["channels"], o9["decks"][0]["channel_images"] = ["image"], [None, 3, "", "", "x"]
+o9["presets"]["junk"] = 5
+vj._FILLED[0] = None
+o9 = vj.options(app)
+check(o9["decks"][0]["channels"] == ["image", "", "", ""] and o9["decks"][0]["channel_images"] == ["", "", "", ""]
+      and "junk" not in o9["presets"], "a deck's channels made four, a preset that is not one dropped")
+o9["presets"]["bad"] = {"level": None, "channels": [1], "look": "Plasma"}
+vj.load_preset(app, 0, "bad")
+check(o9["decks"][0]["level"] == vj.DECK["level"] and o9["decks"][0]["channels"] == ["", "", "", ""],
+      "a damaged preset loaded: its null and short list put right on the deck")
+buf = "//@ buffer A\nvoid mainImage(out vec4 c, in vec2 f){c=vec4(1.0);}\n//@ image\nvoid mainImage(out vec4 c, in vec2 f){c=vec4(0.5);}\n"
+one = "void mainImage(out vec4 c, in vec2 f){c=vec4(0.5);}\n"
+lk_b, lk_o = vj_looks.Look("T buf", "yours", None, ""), vj_looks.Look("T one", "yours", None, "")
+lk_b.glsl, lk_o.glsl = buf, one
+vj_looks.LOOKS["T buf"], vj_looks.LOOKS["T one"] = lk_b, lk_o
+try:
+    check(vj._builds_up({"look": "T buf"}) and not vj._builds_up({"look": "T one"}) and not vj._builds_up({"look": "Plasma"}),
+          "a shader with buffers builds up (deck C drawn off the mix like A and B), one without and a Python look not")
+finally:
+    vj_looks.LOOKS.pop("T buf", None)
+    vj_looks.LOOKS.pop("T one", None)
 vj.close(app)
 
 print("FAILED:", fails if fails else "none")

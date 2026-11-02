@@ -1277,13 +1277,17 @@ fader, a knob or across an XY pad, and presses a button past halfway. The
 **controller** list knows a Novation **Launchpad** (Mini MK3, X, Pro MK3,
 put in Programmer mode) and Akai's **APC mini mk2** and first **APC
 mini**: with **its grid** ticked the bank lies on the controller's own pads
-from the top left - nothing to learn - and its top row (Launchpad) or scene
+from the top left - nothing to learn; a fader laid over several of them
+goes to where the pad pressed sits along it, the bottom (or left) one
+the bottom - and its top row (Launchpad) or scene
 buttons (APC) switch the banks. **lights to** picks the MIDI output its
 lights go to: every pad shows its control's colour, dim, and bright while
 lit (the first APC mini, which cannot dim, blinks instead), and the bank
 buttons show which bank is up. Any other controller lights its learned
-pads by velocity 127 and 0; a lights port not there yet is found when the
-controller is plugged in. A pad that belongs to a running modulator - one
+pads and buttons by velocity 127 and 0 (never a fader's or a knob's CC,
+which would pull a motorised fader); a lights port not there yet is found
+when the controller is plugged in. Unplugged, the pads it held are let go,
+and its input port is opened again when it is back. A pad that belongs to a running modulator - one
 on its play, on or off, rate and so on, or one on a slider it moves -
 pulses with it: brighter as its wave rises, in three shades on a
 Launchpad, four brightnesses on an APC mini mk2, on and off on the first

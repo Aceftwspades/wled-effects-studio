@@ -219,6 +219,57 @@ def test_the_connection_is_kept_between_requests():
         r.close()
 
 
+def test_a_phone_already_in_is_cut_off_when_the_remote_stops():
+    """Remote off: a phone on its kept connection is told no on its next request, and what it sent before is not
+    played when the remote is opened again (it went on being served, and its presses all came at once)."""
+    import http.client
+    r, base = _open()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", r.port, timeout=5)
+        conn.request("GET", "/state?k=testkey1")
+        conn.getresponse().read()
+        r._queue([{"a": "pad", "id": 3, "e": "down"}])
+        r.close()
+        conn.request("GET", "/state?k=testkey1")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 503, resp.status
+        r.open(0, key="testkey1", host="127.0.0.1")
+        assert r.drain() == []
+    finally:
+        r.close()
+
+
+def test_the_pads_page_sends_no_more_than_the_studio_takes():
+    """The /pads page's sending, run in node: at most 16 commands a request (the studio takes no more - the rest
+    were dropped), every press and lift sent in order, a pad's "still held" once while one is on its way, and a
+    move merged only into a move (never past the lift it comes after)."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        print("     (no node: the page's sending is left out)")
+        return
+    page = phone.PADS_PAGE
+    js = page[page.index("const PER=16"):page.index("function say(")]
+    run = ("let key='k',sent=[];const pollSoon=()=>{},say=()=>{};"
+           "globalThis.fetch=async(u,o)=>{sent.push(JSON.parse(o.body));await new Promise(r=>setTimeout(r,20));"
+           "return {status:200};};" + js +
+           "for(let i=0;i<30;i++){send({a:'pad',id:i,e:'down'});send({a:'pad',id:i,e:'up'});}"
+           "send({a:'pad',id:99,e:'hold'});send({a:'pad',id:99,e:'hold'});"
+           "send({a:'pad',id:7,e:'move',x:1});send({a:'pad',id:7,e:'up'});send({a:'pad',id:7,e:'move',x:2});"
+           "setTimeout(()=>console.log(JSON.stringify(sent)),600);")
+    out = subprocess.run([node, "-e", run], capture_output=True, text=True, timeout=20)
+    batches = json.loads(out.stdout or "null")
+    flat = [c for b in batches for c in b]
+    assert all(len(b) <= 16 for b in batches), [len(b) for b in batches]
+    downs = [c["id"] for c in flat if c["e"] == "down"]
+    assert downs == list(range(30)) and sum(c["e"] == "up" for c in flat) == 31, flat
+    assert sum(c["e"] == "hold" for c in flat) == 1
+    sevens = [(c["e"], c.get("x")) for c in flat[-3:]]
+    assert sevens == [("move", 1), ("up", None), ("move", 2)], sevens
+
+
 def test_a_key_and_an_address():
     a, b = phone.new_key(), phone.new_key()
     assert a != b and len(a) == 8

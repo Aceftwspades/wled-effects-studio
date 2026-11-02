@@ -159,14 +159,26 @@ def options(app):
         else:
             decks.append(d)
     for d in decks:
-        _fix(d, DECK, _DECK_CHOICES)
-        _fix(d["source"], SOURCE, _SOURCE_CHOICES)
-        _fix(d["react"], DECK["react"], _REACT_CHOICES)
+        _fix_deck(d)
+    for name in [n for n, p in o["presets"].items() if not isinstance(p, dict)]:
+        del o["presets"][name]                               # a hand edit's: not a deck's settings
     flames = o["flames"]                 # {name: a flame bred by Mutate}
     vj_looks.sync_flames(flames)
     _fix(o["auto"], AUTO_DEFAULTS, _AUTO_CHOICES)
     _FILLED[0] = _filled_key(o)
     return o
+
+
+def _fix_deck(d):
+    """A deck's settings put right (options; a preset loaded onto it): each of its kind - its shader's four
+    channels and their pictures four names (a list of one raised in the GL thread every frame)."""
+    _fix(d, DECK, _DECK_CHOICES)
+    _fix(d["source"], SOURCE, _SOURCE_CHOICES)
+    _fix(d["react"], DECK["react"], _REACT_CHOICES)
+    for k in ("channels", "channel_images"):
+        v = d[k]
+        if len(v) != 4 or not all(isinstance(x, str) for x in v):
+            d[k] = [x if isinstance(x, str) else "" for x in v[:4]] + [""] * (4 - len(v[:4]))
 
 
 def deck_channels(d):
@@ -1061,6 +1073,27 @@ def mix(app, a, b, c=None, c_alpha=None):
     return out
 
 
+_BUILDS = {}                      # a shader's source: whether it has buffers (passes it keeps from frame to frame)
+
+
+def _builds_up(deck):
+    """Whether a deck's look is a shader with buffers - one that builds its picture up over frames: deck C's,
+    drawn every other frame off the mix like A's and B's (undrawn, the GL thread lets its buffers go after
+    vj_glsl.FORGET_S, and brought in it started from black)."""
+    src = getattr(vj_looks.LOOKS.get(deck.get("look")), "glsl", None)
+    if not src:
+        return False
+    if src not in _BUILDS:
+        from native import vj_glsl
+        try:
+            _BUILDS[src] = any(p[0] in vj_glsl.BUFFERS for p in vj_glsl.passes(src))
+        except ValueError:
+            _BUILDS[src] = False
+        if len(_BUILDS) > 64:
+            _BUILDS.pop(next(iter(_BUILDS)))
+    return _BUILDS[src]
+
+
 def cue_deck(app):
     """The deck the fader is furthest from: the one to set up before fading to it."""
     return 1 if float(options(app)["fader"]) < 0.5 else 0
@@ -1109,7 +1142,7 @@ def update(app, dt=None):
         # from black only then, would land the drop on black)
         if live:
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
-        elif (i in _previewed(app) or i < 2) and (app._vj_tick + i) % 2 == 0:
+        elif (i in _previewed(app) or i < 2 or _builds_up(o["decks"][i])) and (app._vj_tick + i) % 2 == 0:
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
         else:
             _skips(app)[i] += dt
@@ -1248,7 +1281,9 @@ def _section_now(app):
 
 
 def go(app, seconds):
-    """The fader swept to the other end over `seconds` (0: a cut)."""
+    """The fader swept to the other end over `seconds` (0: a cut) - counted, so a staged pad knows its deck went
+    on air though the fader is back by the time it looks (pads.staged)."""
+    app._vj_goes = getattr(app, "_vj_goes", 0) + 1
     o = options(app)
     f0 = float(o["fader"])
     f1 = 0.0 if f0 >= 0.5 else 1.0
@@ -1597,6 +1632,7 @@ def load_preset(app, i, name):
         getattr(app, "_vj_morphs", {}).pop(i, None)     # a Mutate growing on the deck: the preset's look wins
         o["decks"][i].update(p)
         o["decks"][i]["morph_to"], o["decks"][i]["morph"] = "", 0.0
+        _fix_deck(o["decks"][i])                         # a damaged preset's null or list not run every frame
         modulate.put_deck_mods(app, i, mods)
 
 
