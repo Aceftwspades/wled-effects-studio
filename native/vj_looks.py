@@ -367,11 +367,15 @@ def _meta(ctx, st):
     return ctx.grad(np.clip(v * 0.35, 0, 1)) * np.clip(v, 0, 1)[..., None]
 
 
+RINGS_MAX = 24                       # Beat Rings' rings at most (each is a pass over the canvas)
+
+
 @look("Beat Rings", "shader", "a ring thrown out from the middle on every beat")
 def _rings(ctx, st):
     rings = st.setdefault("rings", [])
     if ctx.beat_hit:
         rings.append(0.0)
+        del rings[:-RINGS_MAX]                                    # at speed 0 none moves out: kept to the newest
     rings[:] = [r + ctx.dt * (0.6 + ctx.amount) * ctx.speed for r in rings if r < 2.0]
     out = np.zeros((ctx.h, ctx.w), np.float32)
     col = np.zeros((ctx.h, ctx.w), np.float32)
@@ -1102,6 +1106,21 @@ def _shift(m, dx, dy):
     return out
 
 
+def eight_bit(im):
+    """A PIL picture of 16-bit (or 32-bit, or float) grey made 8-bit by scale - PIL's convert to RGB clipped it
+    at 255, a 16-bit picture all white."""
+    if im.mode not in ("I", "I;16", "I;16B", "I;16L", "I;16N", "F"):
+        return im
+    from PIL import Image
+    a = np.asarray(im, np.float64)
+    if im.mode == "F":
+        top = 1.0 if a.size and np.nanmax(a) <= 1.0 else 65535.0
+    else:
+        top = 65535.0 if not a.size or a.max() > 255 else 255.0
+    a = np.nan_to_num(a, nan=0.0)
+    return Image.fromarray(np.clip(a / top * 255.0 + 0.5, 0, 255).astype(np.uint8), "L")
+
+
 @look("Image", "layer", "a picture file of the deck's - its transparency kept (or a colour or the dark keyed out), "
                        "fitted, scaled, placed, turned and flipped as the deck's PICTURE settings say, drifting slowly "
                        "- amount its swell")
@@ -1113,18 +1132,20 @@ def _image(ctx, st):
         key = (path, os.path.getmtime(path), ctx.w, ctx.h) if path else None
     except OSError:
         key = (path, None, ctx.w, ctx.h)
-    if st.get("key") != key:
-        st["key"], st["img"] = key, None
+    if "img" not in st or st.get("key") != key:
+        st["key"], st["img"], st["err"] = key, None, None
         if path:
             try:
                 from PIL import Image
-                im = Image.open(path)
+                im = eight_bit(Image.open(path))
                 im = im.convert("RGBA" if ("A" in im.getbands() or "transparency" in im.info) else "RGB")
                 big = max(ctx.w, ctx.h) * 4                       # enough to zoom into, small enough to sample
                 im.thumbnail((big, big), Image.LANCZOS)
                 st["img"] = np.asarray(im, np.float32) / 255.0
             except Exception as e:
-                raise ValueError(f"could not read {path}: {e}")
+                st["err"] = f"could not read {path}: {e}"       # said each frame, not only the first
+    if st.get("err"):
+        raise ValueError(st["err"])
     img = st["img"]
     if img is None:
         raise ValueError("no picture chosen (the deck's image ...)")

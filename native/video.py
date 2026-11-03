@@ -291,14 +291,30 @@ def alpha_of(path):
     return got
 
 
-def duration_of(path):
-    """A video file's seconds as ffprobe gave them with alpha_of, or None (no ffprobe, not a video)."""
+_PROBING = set()
+
+
+def duration_of(path, wait=True):
+    """A video file's seconds as ffprobe gave them with alpha_of, or None (no ffprobe, not a video). wait False:
+    not probed here (the main loop: a probe is a tenth of a second or more) - one is started on a worker and None
+    returned until it is in."""
     import os
     try:
         key = (path, os.path.getmtime(path))
     except OSError:
         return None
     if key not in _ALPHA:
+        if not wait:
+            if key not in _PROBING:
+                _PROBING.add(key)
+
+                def work():
+                    try:
+                        alpha_of(path)
+                    finally:
+                        _PROBING.discard(key)
+                threading.Thread(target=work, daemon=True, name="probe").start()
+            return None
         alpha_of(path)
     return _DUR.get(key)
 

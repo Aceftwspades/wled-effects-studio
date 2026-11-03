@@ -252,9 +252,9 @@ try:
     app4._vj_tick = 0
     vj._warm_cams(app4)
     end = time.time() + 5
-    while time.time() < end and len(app4._vj_warmed) < 2:
+    while time.time() < end and app4.__dict__.get("_vj_opening"):
         time.sleep(0.01)
-    vj._warm_cams(app4)
+        vj._collect(app4)
     keys = {vj.source_key(app4, vj_clips.cam_source(n)) for n in ("Test Cam", video.PHONE)}
     check(keys <= set(vj._pool(app4)) and len(FakeCam.opened) == 2,
           "each camera a pad brings up opened on a worker, kept with the open sources")
@@ -300,10 +300,52 @@ try:
     vj._warm_cams(app4)
     vj.close(app4)
     time.sleep(0.6)
-    check(slow and slow[0].closed and not app4.__dict__.get("_vj_warmed"),
+    check(slow and slow[0].closed and not app4.__dict__.get("_vj_opened"),
           "a camera still starting when the VJ closes: closed once it has started")
+    late = []
+    vj._open = lambda app, s, key: (time.sleep(0.2), late.append(FakeCam(key)))[1] or late[-1]
+    pads.current(st4)["controls"].append(phone_pad)
+    app4._vj_tick = 0
+    vj._warm_cams(app4)                                    # starting...
+    pads.current(st4)["controls"].remove(phone_pad)
+    app4._vj_tick = 0
+    vj._warm_cams(app4)                                    # ...its pad gone meanwhile
+    time.sleep(0.4)
+    vj._collect(app4)
+    ph = [c for c in late if c.key[0] == "phone"]
+    check(ph and ph[0].closed and not vj._pool(app4).get(ph[0].key) and all(not c.closed for c in late if c not in ph),
+          "a camera that finishes starting after its pad is gone: closed, not left on")
 finally:
     vj._open = real_open
+
+# a review's fixes: a camera target keeps none of a clip's fields; taking over keeps the level that showed; a clip
+# that would not open is let go at once
+ct2 = vj_clips.fill({"kind": "pad_cam", "name": "C", "mode": "oneshot", "file": "x.mp4", "in": 1, "out": 2})
+check(not {"mode", "file", "in", "out"} & set(ct2), "a camera target: a clip's mode, file, in and out not kept")
+app5 = App(g)
+vj.options(app5)
+clock.hold()
+try:
+    vj_clips.play(app5, dict(vj_clips.DEFAULT, file="x.mp4", attack=0.0, level=1.0), "a")
+    vj_clips.started(app5, 2, vj_clips._rt(app5)[2]["take"])
+    clock.step(0.1)
+    vj_clips.tick(app5)
+    before = vj_clips.level(app5, 2)
+    vj_clips.play(app5, dict(vj_clips.DEFAULT, file="x.mp4", attack=0.5, level=0.5), "b")
+    check(before == 1.0 and abs(vj_clips.level(app5, 2) - 0.5) < 1e-6,
+          f"a clip at level 0.5 taking over one at full: from the most it can show, not half ({vj_clips.level(app5, 2)})")
+    vj_clips.let_go(app5)
+    vj_clips.play(app5, dict(vj_clips.DEFAULT, file="gone.mp4"), "gone")
+    vj.update(app5, 1 / 30)                                # opened on a worker: there is no such file
+    end = time.time() + 3
+    while time.time() < end and vj_clips.level(app5, 2) is not None:
+        time.sleep(0.02)
+        vj.update(app5, 1 / 30)
+    check(vj_clips.level(app5, 2) is None, "a clip whose file will not open: let go (the clock held: not by its "
+          "wait running out), not shown on the last clip's picture")
+finally:
+    clock.release()
+vj.close(app5)
 
 # made from files: the bank's free cells, then a new bank named Clips as big as the rest need
 from native import clip_ui, pads_ui                        # noqa: E402
@@ -356,7 +398,7 @@ if shutil.which("ffmpeg") and shutil.which("ffprobe"):
     check(vj._runs(app2)[2].src_key != own and vj._pool(app2).get(own, [None])[0] is own_src,
           "a clip over a deck's own video: that one kept open under it")
     real_dur = video.duration_of
-    video.duration_of = lambda p: None                     # as with no ffprobe: its length not known
+    video.duration_of = lambda p, wait=True: None          # as with no ffprobe: its length not known
     try:
         vj_clips.let_go(app2)
         vj_clips.play(app2, dict(vj_clips.DEFAULT, file=path, **{"in": 2.0}, attack=0.0, release=0.0), "whole")

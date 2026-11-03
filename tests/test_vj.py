@@ -310,12 +310,23 @@ try:
 finally:
     clock.release()
 
+def opened(app, wait=3.0):
+    """The VJ run until the sources its decks want have opened (on workers) and are in the pool."""
+    end = time.time() + wait
+    vj.update(app, 1 / 40)
+    while time.time() < end and app.__dict__.get("_vj_opening"):
+        time.sleep(0.01)
+        vj.update(app, 1 / 40)
+    vj.update(app, 1 / 40)
+
+
 # two decks on one video share its source
 o["decks"][0].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
 o["decks"][1].update(look="Thermal", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
 o["fader"] = 0.5
-vj.update(app, 1 / 40)
-check(len(vj._pool(app)) == 1, f"one source for two decks ({len(vj._pool(app))})")
+opened(app)
+check(len(vj._pool(app)) == 1 and not app.__dict__.get("_vj_opening"), f"one source for two decks, opened on a "
+      f"worker ({len(vj._pool(app))})")
 o["decks"][1]["source"]["kind"] = "none"
 vj.update(app, 1 / 40)
 check(len(vj._pool(app)) == 1, "one deck let go: still open for the other")
@@ -457,7 +468,7 @@ vj_looks.LOOKS.pop("Flame: Zzz test", None)
 # an Effect deck lets its video source go
 o["decks"][0].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
 o["decks"][1]["source"] = vj.json_copy(vj.SOURCE)
-vj.update(app, 1 / 40)
+opened(app)
 check(len(vj._pool(app)) == 1, "a video deck: its source open")
 o["decks"][0].update(look=vj.EFFECT, effect="Rainbow")
 vj.update(app, 1 / 40)
@@ -1154,6 +1165,190 @@ finally:
     vj_looks.LOOKS.pop("T buf", None)
     vj_looks.LOOKS.pop("T one", None)
 vj.close(app)
+
+# --- a review's fixes ---------------------------------------------------------------------------------------
+from native import vj_clips, vj_glsl                         # noqa: E402
+# a damaged deck: what is inside its lists and dicts put right, its knobs inside their ranges
+ar = App(g)
+ar.project.options["vj"] = {"decks": [{"look": "Clean", "source": {"kind": "file", "files": [5, "a.mp4", {}]},
+                                       "pic_key": "colour", "pic_key_col": ["a", 1, 0], "fx_set": {"c1": None,
+                                       "c2": "x", "c3": 1e999, "ix": 9}, "blur": 100000, "kaleido": 99.7}]}
+try:
+    od = vj.options(ar)["decks"][0]
+    t0_ = time.time()
+    for _ in range(3):
+        vj.update(ar, 1 / 30)
+    check(od["source"]["files"] == ["a.mp4"] and od["pic_key_col"] == list(vj.DECK["pic_key_col"])
+          and od["fx_set"] == {"ix": 9} and od["blur"] == 3 and od["kaleido"] == 12 and time.time() - t0_ < 5,
+          f"a damaged deck put right - its files, key colour, effect settings, blur and kaleido ({od['blur']})")
+except Exception as e:
+    check(False, f"a damaged deck: {type(e).__name__} {e}")
+vj.close(ar)
+# a damaged show step: not the VJ's
+try:
+    for bad in (True, 1, "x", [1]):
+        vj.apply_step(ar, {"vj": bad}, playing=True)
+        vj.apply_step(ar, {"vj": bad}, playing=False)
+    check(True, "a show step whose vj is not a dict: taken as not the VJ's")
+except Exception as e:
+    check(False, f"a show step whose vj is not a dict: {type(e).__name__} {e}")
+# a webcam's key: its name, not a url the deck kept from being a stream
+k1 = vj.source_key(ar, {"kind": "webcam", "name": "Cam", "url": "rtsp://x", "path": "p"})
+k2 = vj.source_key(ar, vj_clips.cam_source("Cam"))
+check(k1 == k2, "a webcam's source key: the same for a deck that was a stream once and a pad's")
+# a deck's Out at another speed: -t in the scaled time
+got = {}
+real_src = videomod.FfmpegSource
+
+
+class _Grab:
+    def __init__(self, args, *a, **k):
+        got["args"] = args
+
+
+videomod.FfmpegSource = _Grab
+try:
+    fp = os.path.join(ar.project.path, "o.mp4")
+    open(fp, "wb").close()
+    real_alpha = videomod.alpha_of
+    videomod.alpha_of = lambda p: ([], False)
+    try:
+        s2 = dict(vj.SOURCE, kind="file", path=fp, speed=2.0, **{"in": 2.0, "out": 4.0})
+        vj._open(ar, s2, vj.source_key(ar, s2))
+    finally:
+        videomod.alpha_of = real_alpha
+finally:
+    videomod.FfmpegSource = real_src
+a_ = got.get("args", [])
+check("-t" in a_ and abs(float(a_[a_.index("-t") + 1]) - 1.0) < 1e-6, f"speed 2, In 2 to Out 4: one second of "
+      f"scaled time ({a_})")
+# the decks' sources opened on a worker - the main loop not held up by a slow one
+real_open = vj._open
+vj._open = lambda app, s, key: (time.sleep(0.5), videomod.TestPattern(8, 8))[1]
+try:
+    ao = App(g)
+    vj.options(ao)["decks"][0].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
+    t0_ = time.time()
+    vj.update(ao, 1 / 30)
+    quick = time.time() - t0_ < 0.3
+    end = time.time() + 3
+    while time.time() < end and not vj._pool(ao):
+        time.sleep(0.02)
+        vj.update(ao, 1 / 30)
+    check(quick and vj._pool(ao), "a slow source opened on a worker: the frame not held up, the pool has it after")
+    vj.options(ao)["decks"][0]["source"] = vj.json_copy(vj.SOURCE)
+    vj.update(ao, 1 / 30)
+    check(not vj._pool(ao) and vj._runs(ao)[0].src_key is None, "its source none: closed at once")
+    vj.options(ao)["decks"][2].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="test")), level=1.0)
+    vj.update(ao, 1 / 30)
+    vj.options(ao)["decks"][2]["source"] = vj.json_copy(vj.SOURCE)
+    vj.options(ao)["decks"][2]["level"] = 0.0
+    time.sleep(0.7)
+    for _ in range(4):
+        vj.update(ao, 1 / 30)
+    check(not vj._pool(ao), "deck C off the mix, its source none while it opened: the late one closed")
+    vj.close(ao)
+finally:
+    vj._open = real_open
+# a clip on an Effect deck: the clip's picture, not the effect's
+ae = App(g)
+oe = vj.options(ae)
+oe["decks"][0]["look"] = vj.EFFECT
+run_e = vj._runs(ae)[0]
+run_e.led = np.full((g.h, g.w, 3), 7, np.uint8)
+run_e.canvas = np.ones((72, 96, 3), np.float32)
+vj_clips.play(ae, dict(vj_clips.DEFAULT, file="x.mp4", deck=0), "e")
+pic = vj.deck_led(ae, 0)
+check(pic is not None and pic.mean() > 100, "a clip on an Effect deck: its picture shows, not the effect's")
+vj_clips.let_go(ae)
+check(vj.deck_led(ae, 0).mean() == 7, "the clip done: the effect again")
+# a project's bred flames listed when it is opened
+af = App(g)
+of = vj.options(af)
+bred_name = "Flame: Review #1"
+of["flames"][bred_name] = vj_looks.new_flame(3)
+af.project.options["vj"] = of
+vj.project_changed(af)
+check(bred_name in vj_looks.LOOKS, "a project opened: its bred flames listed")
+from native import vj_ui                                      # noqa: E402
+secs = dict(vj_ui.browse_sections(af, "the project's own"))
+check(bred_name in secs.get("The project's own", []), "a bred flame in the browser, with the project's own looks")
+vj_looks.LOOKS.pop(bred_name, None)
+# a look that draws grey (h, w), or a NaN: drawn, not the VJ stopped every frame / a dot kept for ever
+ag = App(g)
+og = vj.options(ag)
+vj_looks.LOOKS["Review Grey"] = vj_looks.Look("Review Grey", "shader", lambda c, st: np.full((c.h, c.w), 0.5), "")
+og["decks"][0].update(look="Review Grey", hue=0.3)
+try:
+    vj.update(ag, 1 / 30)
+    cv = vj._runs(ag)[0].canvas
+    check(cv is not None and cv.shape[2] == 3 and not vj._runs(ag)[0].error, "a look drawing grey (h, w): drawn")
+except Exception as e:
+    check(False, f"a look drawing grey (h, w): {type(e).__name__} {e}")
+nan_once = {"n": 0}
+
+
+def _nan(c, st):
+    nan_once["n"] += 1
+    img = np.full((c.h, c.w, 3), 0.2, np.float32)
+    if nan_once["n"] == 1:
+        img[0, 0] = np.nan
+    return img
+
+
+vj_looks.LOOKS["Review NaN"] = vj_looks.Look("Review NaN", "shader", _nan, "")
+og["decks"][0].update(look="Review NaN", hue=0.0, trails=0.9)
+for _ in range(5):
+    vj.update(ag, 1 / 30)
+check(np.isfinite(vj._runs(ag)[0].canvas).all(), "a NaN from a look: not kept on the canvas by the trails")
+# a look saved again under the same name: its state starts again
+calls = []
+vj_looks.LOOKS["Review Re"] = vj_looks.Look("Review Re", "shader", lambda c, st: (
+    calls.append(dict(st)), st.update(v1=1), np.zeros((c.h, c.w, 3)))[2], "")
+og["decks"][0].update(look="Review Re", trails=0.0)
+vj.update(ag, 1 / 30)
+vj_looks.LOOKS["Review Re"] = vj_looks.Look("Review Re", "shader", lambda c, st: (
+    calls.append(dict(st)), np.zeros((c.h, c.w, 3)))[1], "")
+vj.update(ag, 1 / 30)
+check(calls and calls[-1] == {}, f"a look's file saved again: its state starts again ({calls[-1:]})")
+for n in ("Review Grey", "Review NaN", "Review Re"):
+    vj_looks.LOOKS.pop(n, None)
+vj.close(ag)
+# Beat Rings at speed 0: its rings kept to the newest
+from types import SimpleNamespace                             # noqa: E402
+rings_st = {}
+cx = SimpleNamespace(w=16, h=12, r=np.zeros((12, 16), np.float32), dt=0.03, amount=0.5, speed=0.0, beat_hit=True,
+                     grad=lambda a: np.repeat(np.asarray(a, np.float32)[..., None], 3, 2))
+for _ in range(500):
+    vj_looks.LOOKS["Beat Rings"].draw(cx, rings_st)
+check(len(rings_st["rings"]) <= vj_looks.RINGS_MAX, f"Beat Rings at speed 0: {len(rings_st['rings'])} rings, "
+      "not one a beat for ever")
+# a 16-bit picture: scaled to 8 bits, not clipped white
+from PIL import Image                                         # noqa: E402
+ramp = Image.fromarray(np.tile(np.linspace(0, 65535, 64).astype("<u2"), (8, 1)))
+e8 = np.asarray(vj_looks.eight_bit(ramp).convert("RGB"))
+check(30 < e8.mean() < 220 and e8[:, 0].max() < 10 and e8[:, -1].min() > 245, f"a 16-bit picture: a ramp, not all "
+      f"white ({e8.mean():.0f})")
+# the Image look's errors: no picture, and a file that will not read (each frame)
+ist, ictx = {}, SimpleNamespace(w=16, h=12, image_path="", deck={}, t=0.0, amount=0.0, beat=0.0)
+msgs = []
+for path in ("", "", os.path.join(ag.project.path, "bad.png"), None):
+    if path:
+        open(path, "w").write("not a picture")
+    if path is not None:
+        ictx.image_path = path
+    try:
+        vj_looks.LOOKS["Image"].draw(ictx, ist)
+    except Exception as e:
+        msgs.append(str(e))
+check(len(msgs) == 4 and all("no picture chosen" in m for m in msgs[:2]) and all("could not read" in m
+                                                                                  for m in msgs[2:]),
+      f"the Image look says what is wrong, every frame ({msgs})")
+# a shader's code made WebGL's once, not each frame
+n0 = len(vj_glsl._WEBGL)
+code = "#define f(x) x*2.0\nfloat f = 1.0;\nvoid mainImage(out vec4 o, vec2 u){o = vec4(f(1.0));}"
+a1, a2 = vj_glsl._webgl(code), vj_glsl._webgl(code)
+check(a1 is a2 and len(vj_glsl._WEBGL) == n0 + 1 and "vjm_f(" in a1, "a shader's code made WebGL's once, kept")
 
 print("FAILED:", fails if fails else "none")
 sys.exit(1 if fails else 0)

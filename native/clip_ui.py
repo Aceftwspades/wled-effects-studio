@@ -230,7 +230,7 @@ def _draw_strip(app, t):
     dpg.delete_item(STRIP, children_only=True)
     w, h = _w(), px(40)
     p = _path(app, t)
-    dur = video.duration_of(p) if os.path.isfile(p) else None
+    dur = video.duration_of(p, wait=False) if os.path.isfile(p) else None
     img = _strip(app, t) if dur else None
     if img is not None:
         data = np.concatenate([img.astype(np.float32) / 255.0, np.ones((TH, TW, 1), np.float32)], axis=2).ravel()
@@ -333,7 +333,7 @@ def _set_part(app, which, v):
 def _show_out(app, t):
     """Out as a time: the file's end where it is kept as 0 (to the end)."""
     from native import video
-    num.set("pads_clip_out", float(t["out"]) or float(video.duration_of(_path(app, t)) or 0.0))
+    num.set("pads_clip_out", float(t["out"]) or float(video.duration_of(_path(app, t), wait=False) or 0.0))
 
 
 def _set_file(app, f):
@@ -347,8 +347,9 @@ def _chosen(app, a):
     f = a.get("file_path_name", "")
     if not f or not os.path.isfile(f):
         return
+    proj, into = app.project, _into(app)
     tasks.run(app, "pads_clip_copy", f"copying {os.path.basename(f)} into the project",
-              lambda: vj.keep_media(app, f), lambda kept: _set_file(app, kept))
+              lambda: vj.keep_media(into, f), lambda kept: app.project is proj and _set_file(app, kept))
 
 
 def _add_many(app, a):
@@ -360,8 +361,15 @@ def _add_many(app, a):
     if not sel:
         return
 
+    proj, into = app.project, _into(app)
     tasks.run(app, "pads_clips_copy", f"copying {len(sel)} video file(s) into the project",
-              lambda: [vj.keep_media(app, f) for f in sel], lambda kept: _made(app, kept))
+              lambda: [vj.keep_media(into, f) for f in sel], lambda kept: app.project is proj and _made(app, kept))
+
+
+def _into(app):
+    """The project open now, for a worker copying files into it (another opened meanwhile not handed them)."""
+    import types
+    return types.SimpleNamespace(project=app.project)
 
 
 def add_pads(app, kept):
@@ -437,7 +445,7 @@ def poll(app):
         dpg.configure_item("pads_clip_play", label="Stop" if vj_clips.held(app, ("try", s["id"])) else "Play")
         return
     from native import video
-    dur = video.duration_of(_path(app, t)) if t.get("file") else None
+    dur = video.duration_of(_path(app, t), wait=False) if t.get("file") else None
     mx, _ = dpg.get_mouse_pos(local=False)
     x0 = dpg.get_item_rect_min(STRIP)[0]
     w = _w()
@@ -455,11 +463,13 @@ def poll(app):
             _set_part(app, drag, v if drag == "in" or v < dur - dur * 0.01 else dur)
     playing = vj_clips.held(app, ("try", s["id"]))
     dpg.configure_item("pads_clip_play", label="Stop" if playing else "Play")
-    key = (t["file"], t["in"], t["out"], _THUMBS.get(_strip_key(app, t)) is not None, _playhead(app, t) is not None
+    key = (t["file"], t["in"], t["out"], dur is not None, _THUMBS.get(_strip_key(app, t)) is not None, _playhead(app, t) is not None
            and round(_playhead(app, t), 1))
     if key != getattr(app, "_clip_strip_key", None):
         app._clip_strip_key = key
         _draw_strip(app, t)
+        if not float(t["out"]):
+            _show_out(app, t)                       # the file's length, once its probe is in
 
 
 def _strip_key(app, t):

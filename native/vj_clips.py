@@ -68,6 +68,8 @@ def fill(t):
         t[k] = max(lo, min(hi, float(t[k])))
     t["level"] = max(0.0, min(1.0, float(t["level"])))
     if cam:
+        for k in ("file", "in", "out", "mode"):
+            t.pop(k, None)
         return t
     if t["mode"] not in dict(MODES):
         t["mode"] = "oneshot"
@@ -82,7 +84,7 @@ def length(app, t):
     if b > a:
         return b - a
     from native import video, vj
-    d = video.duration_of(vj.media(app, t.get("file", "")))
+    d = video.duration_of(vj.media(app, t.get("file", "")), wait=False)
     return max(0.0, d - a) if d else None
 
 
@@ -94,7 +96,8 @@ def play(app, t, owner):
     rt = _rt(app)
     old = rt.get(t["deck"])
     app._vj_clip_take = getattr(app, "_vj_clip_take", 0) + 1
-    lv = old["lv"] if old else 0.0
+    shown = old["lv"] * float(old["t"]["level"]) if old else 0.0
+    lv = min(1.0, shown / float(t["level"])) if float(t["level"]) > 0 else 0.0
     rt[t["deck"]] = {"owner": owner, "t": t, "take": app._vj_clip_take, "pressed": clock.now(), "t0": None,
                      "at": clock.now(), "gate": True, "stage": "a", "lv": lv, "rate": 0.0,
                      "rise": (1.0 - lv) * float(t["attack"])}     # its attack's seconds, from the level it took over
@@ -159,6 +162,9 @@ def tick(app):
         dt = max(0.0, now - p["at"])
         p["at"] = now
         t = p["t"]
+        if p["t0"] is None and vj.clip_ended(app, i, p["take"]):
+            del rt[i]                                       # it would not open: nothing of it to show
+            continue
         if p["t0"] is None and now - p["pressed"] >= START_WAIT_S:
             p["t0"] = now                                   # no picture yet (a file gone): its time runs anyway
         if p["t0"] is None:

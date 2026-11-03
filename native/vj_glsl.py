@@ -356,7 +356,8 @@ class _GL:
         if got is None or got[0] != mt:
             from PIL import Image
             try:                                                 # a file that is not a picture: none (the caller's
-                im = Image.open(path).convert("RGBA").transpose(Image.FLIP_TOP_BOTTOM)   # black or noise), kept
+                from native import vj_looks
+                im = vj_looks.eight_bit(Image.open(path)).convert("RGBA").transpose(Image.FLIP_TOP_BOTTOM)  # kept
                 t = self.ctx.texture(im.size, 4, im.tobytes())   # so until it changes - not opened every frame
                 t.repeat_x = t.repeat_y = True
             except Exception:
@@ -627,7 +628,19 @@ def from_shadertoy(data):
 _FN_MACRO = re.compile(r"^(\s*#\s*define\s+)([A-Za-z_]\w*)\(", re.M)
 
 
+_WEBGL = {}                         # a pass's code -> made to compile as in WebGL (a scan a macro: once, not a frame)
+
+
 def _webgl(code):
+    got = _WEBGL.get(code)
+    if got is None:
+        if len(_WEBGL) > 64:
+            _WEBGL.clear()
+        got = _WEBGL[code] = _webgl_made(code)
+    return got
+
+
+def _webgl_made(code):
     """A Shadertoy pass made to compile as it does in WebGL, where the desktop's GLSL differs - its lines kept, so
     the compiler's line numbers stay the shader's:
     - noise1..noise4 are desktop GLSL's (long dead) built-ins: a shader's own `noise2` clashed with them;

@@ -100,6 +100,9 @@ def fill(app):
     c = _c()
     packs = getattr(app, "_vj_packs", None) or []
     here = addons.installed()
+    opened = {dpg.get_item_user_data(h) for h in dpg.get_item_children("vj_pk_list", 1) or ()    # the packs open
+              if dpg.get_item_type(h).endswith("CollapsingHeader") and dpg.get_value(h)}       # stay open
+    scroll = dpg.get_y_scroll("vj_pk_list")
     dpg.delete_item("vj_pk_list", children_only=True)
     if not packs:
         dpg.set_value("vj_pk_words", "the gallery has no packs - or it could not be reached" if
@@ -113,7 +116,7 @@ def fill(app):
         n_old = sum(1 for v in st.values() if v == "update")
         label = f"{pk.name}   {n_here}/{len(pk.items)}" + ("   (update)" if n_old else "") + \
                 ("   non-commercial" if pk.noncommercial else "")
-        with dpg.collapsing_header(label=label, parent="vj_pk_list", default_open=False):
+        with dpg.collapsing_header(label=label, parent="vj_pk_list", default_open=pk.id in opened, user_data=pk.id):
             tex = f"vj_pk_pv_tex_{pk.id}"
             dpg.add_image(tex if dpg.does_item_exist(tex) else _blank(), tag=f"vj_pk_pv_{pk.id}",
                           width=px(PV_W), height=px(PV_H), show=dpg.does_item_exist(tex))
@@ -146,6 +149,9 @@ def fill(app):
                                        small=True, width=-1, user_data=(pk.id, it.file),
                                        callback=lambda sd, a, u, s=s: (_remove(app, u[0], u[1]) if s == "installed"
                                                                        else _install(app, u[0], [u[1]])))
+    if scroll:                                                  # where the list was, once it is laid out again
+        dpg.set_frame_callback(dpg.get_frame_count() + 2, lambda: dpg.does_item_exist("vj_pk_list")
+                               and dpg.set_y_scroll("vj_pk_list", scroll))
 
 
 def _blank():
@@ -185,11 +191,13 @@ def _install(app, pid, files):
 def _remove(app, pid, file):
     from native import addons
     try:
-        addons.remove(pid, file)
+        gone = addons.remove(pid, file)
     except (OSError, ValueError) as e:
         app.gp.status(f"could not remove it: {e}", "warn"); return
     reload_looks(app)
     fill(app)
+    if gone is False:
+        app.gp.status(f"{file or pid} was not installed - nothing removed"); return
     app.gp.status(f"{file or pid} removed (the gallery still has it: Packs installs it again)")
 
 

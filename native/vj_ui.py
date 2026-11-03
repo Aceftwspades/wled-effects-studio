@@ -10,6 +10,7 @@ place of the effect - in the sim, so on the stream.
 import math
 import os
 import time
+import types
 
 import dearpygui.dearpygui as dpg
 import numpy as np
@@ -150,7 +151,7 @@ def build(app):
                   "else on the tempo, kept on the beats heard - tap the tempo in to set where a bar starts), or at "
                   "the show's song sections - a cut into a drop, a slow fade into "
                   "the quiet parts")
-            dpg.add_combo([f"{b} bars" for b in (1, 2, 4, 8, 16)], tag="vj_bars", width=px(80),
+            dpg.add_combo([f"{b} bars" for b in vj.BAR_CHOICES], tag="vj_bars", width=px(80),
                           default_value=f"{o['auto']['bars']} bars",
                           callback=lambda s, v: _set_auto(app, "bars", int(v.split()[0])))
             dpg.add_checkbox(label="shuffle looks", tag="vj_shuffle", default_value=bool(o["auto"]["shuffle"]),
@@ -199,7 +200,7 @@ def build(app):
                 c.tip("deck C moved by itself on the bar grid: in for a few bars and out for as many, a flash every few "
                       "bars, or in for the show's drops and choruses (out for the rest) - with shuffle looks on, "
                       "dealt a new look each time it goes out")
-                dpg.add_combo([f"{b} bars" for b in (1, 2, 4, 8, 16)], tag="vj_cbars", width=px(80),
+                dpg.add_combo([f"{b} bars" for b in vj.BAR_CHOICES], tag="vj_cbars", width=px(80),
                               default_value=f"{o['auto']['c_bars']} bars",
                               callback=lambda s, v: _set_auto(app, "c_bars", int(v.split()[0])))
             with dpg.child_window(tag="vj_deck2", width=px(326), height=px(500), border=True):
@@ -653,6 +654,9 @@ def browse_sections(app, flt="all looks", find=""):
     find = (find or "").strip().lower()
     fav = set(vj.favourites(app))
     src = {n: vj_looks.look_source(n) for n in vj_looks.LOOKS}
+    for n, lk in vj_looks.LOOKS.items():                      # a flame bred with Mutate: kept with the project
+        if src[n][0] is None and lk.family == "flame":
+            src[n] = ("project", None)
     try:
         packs = addons.installed()
     except OSError:
@@ -943,12 +947,36 @@ def _set_react(app, i, **kw):
     _save(app)
 
 
+SRC_REST_S = 0.35                  # a clip's speed, from or to dragged: put on the source once it rests this long
+
+
 def _set_src(app, i, **kw):
     s = vj.options(app)["decks"][i]["source"]
-    s.update({k: v for k, v in kw.items() if v is not None})
+    kw = {k: v for k, v in kw.items() if v is not None}
+    timed = {k: kw.pop(k) for k in ("speed", "in", "out") if k in kw}
+    if timed:                                                   # (each value a new ffmpeg: not every frame)
+        held = app.__dict__.setdefault("_vj_src_rest", {})
+        held[i] = (dict(held.get(i, (dict(), 0))[0], **timed), time.monotonic())
+        if not kw:
+            return
+    if kw.get("kind") not in (None, s.get("kind")):
+        s["name"] = ""                                          # a screen's name is no camera's
+    s.update(kw)
     _save(app)
-    if not {"speed", "in", "out"} & set(kw):
-        refresh(app)
+    refresh(app)
+
+
+def _rest_src(app, now=None):
+    """Each frame: a speed, from or to dragged and left alone SRC_REST_S, put on its deck's source."""
+    held = getattr(app, "_vj_src_rest", None)
+    if not held:
+        return
+    now = time.monotonic() if now is None else now
+    for i, (kw, at) in list(held.items()):
+        if now - at >= SRC_REST_S:
+            del held[i]
+            vj.options(app)["decks"][i]["source"].update(kw)
+            _save(app)
 
 
 def _add_files(app, i, a):
@@ -959,10 +987,16 @@ def _add_files(app, i, a):
     if not sel:
         return
 
+    proj = app.project
+    into = types.SimpleNamespace(project=proj)
+
     def work():
-        return [vj.keep_media(app, f) for f in sel]
+        return [vj.keep_media(into, f) for f in sel]
 
     def done(kept):
+        if app.project is not proj:                             # another project opened while they copied
+            app.gp.status("the video files were copied into the project open before - not added here", "warn")
+            return
         s = vj.options(app)["decks"][i]["source"]
         files = [f for f in (s.get("files") or []) if f]
         if not files and s.get("path"):
@@ -1095,6 +1129,8 @@ def _import(app, a):
     app._vj_file_errs = errs
     app._vj_thumbs = None
     refresh(app)
+    if dpg.does_item_exist(BROWSE) and dpg.is_item_shown(BROWSE):
+        _fill_browser(app)
     bad = [e for e in errs if any(os.path.basename(f).lower() in e[0].lower() for f in sel)]
     if failed:
         app.gp.status(f"{len(sel)} imported - {len(failed)} could not be: {failed[0]}", "warn")
@@ -1326,7 +1362,9 @@ def _pick_source(app, i):
             if not names:
                 app.gp.status(f"no {'cameras' if kind == 'webcam' else 'screens'} found"); return
             dpg.configure_item(f"vj_srcname{i}", items=names, show=True)
-            dpg.set_value(f"vj_srcname{i}", vj.options(app)["decks"][i]["source"].get("name") or names[0])
+            if vj.options(app)["decks"][i]["source"].get("name") not in names:
+                _set_src(app, i, name=names[0])                 # (refreshed: the combo shows it)
+            dpg.set_value(f"vj_srcname{i}", vj.options(app)["decks"][i]["source"].get("name"))
         tasks.run(app, f"vj_list{i}", "looking for " + ("cameras" if kind == "webcam" else "screens"), work, done)
     elif kind == "stream":
         dpg.configure_item(f"vj_url{i}", show=True)
@@ -1502,7 +1540,11 @@ def poll(app):
         if getattr(app, "_vj_open", False):
             vj.close(app)                                           # nothing needs the sources: webcams off
             app._vj_open = False
+        if getattr(app, "_vj_clips", None):
+            from native import vj_clips
+            vj_clips.let_go(app)                                    # a pad pressed with the VJ off: nothing plays
         return
+    _rest_src(app)
     app._vj_open = True
     app._vj_preview = {i for i in range(vj.DECKS) if dpg.is_item_visible(f"vj_pv{i}")} if shown else set()
     if time.monotonic() - getattr(app, "_vj_files_at", 0.0) > 1.0:     # the project's own looks, as they are saved
@@ -1513,7 +1555,10 @@ def poll(app):
             _ask_py(app)
         if set(vj_looks.LOOKS) != before:
             app._vj_dirty = True
-            app._vj_thumbs = None if not dpg.is_item_shown(BROWSE) else app._vj_thumbs
+            if dpg.does_item_exist(BROWSE) and dpg.is_item_shown(BROWSE):
+                _fill_browser(app)                              # a look saved or taken away while browsing
+            else:
+                app._vj_thumbs = None
     vj.update(app)
     _thumbs(app)
     if shown:

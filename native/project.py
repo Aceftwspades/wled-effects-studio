@@ -177,7 +177,9 @@ class Project:
     # fields of those that are where the user is, not an edit: no undo of their own, and an undo leaves them be
     # (the pads' bank shown - a show switching banks would push its layout edits out of the undo; their next id -
     # an undo putting it back handed a removed control's id, and what it left running, to the next one made)
-    UNDO_SKIP = {"pads": ("bank", "next_id")}
+    # (the VJ on air and its fader: the live mix, never taken back by an undo of a knob - Ctrl+Z cut the stream
+    # back to an old fader)
+    UNDO_SKIP = {"pads": ("bank", "next_id"), "vj": ("on", "fader")}
 
     def _snap(self, k):
         v = self.options.get(k)

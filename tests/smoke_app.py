@@ -1194,6 +1194,13 @@ STEPS = [
       {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
       {"py": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'].remove(__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},   # (its cell for the steps after)
       {"py": "chrome.close_dialog('pads_win')"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
+    # the VJ's deck source: a clip speed dragged goes on once it rests (not an ffmpeg a frame); another kind does
+    # not keep the last kind's name
+    ([{"py": "device_ui.show(app, 'vj')"}, {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source'].update(kind='screen', name='the whole desktop')"},
+      {"py": "setattr(app, '_sm_sp', __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source']['speed'])"}, {"py": "__import__('native.vj_ui', fromlist=['v'])._set_src(app, 0, speed=2.5)"},
+      {"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source']['speed'] == app._sm_sp"}, {"py": "__import__('native.vj_ui', fromlist=['v'])._set_src(app, 0, kind='webcam')"}], 0.6),
+    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source']['speed'] == 2.5 and __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source']['name'] != 'the whole desktop'"},
+      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source'].update(kind='none', name='', speed=1.0)"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
     # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed
     # left where it was set
     ([{"py": "setattr(app, '_mo_sx', app.eng.fx['sx'])"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='sx', kind='lfo', shape='square', period=0.5, depth=40)"},
