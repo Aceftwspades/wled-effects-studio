@@ -887,7 +887,8 @@ def flame_now(ctx, st, base):
 
 
 def _flame_look(name, flame, desc, bred=False):
-    lk = Look(name, "flame", lambda ctx, st, fl=flame: flame_frame(ctx, st, flame_now(ctx, st, fl)), desc)
+    lk = Look(name, "flame", None, desc)
+    lk.draw = lambda ctx, st: flame_frame(ctx, st, flame_now(ctx, st, lk.flame))   # (lk.flame as it is now)
     lk.flame = flame
     if bred:
         lk.bred = flame
@@ -925,8 +926,9 @@ def sync_flames(flames):
             if lk is not None and getattr(lk, "bred", None) is None:
                 continue                                      # a look of another kind has the name: it stays
             if lk is not None and _same_flame(lk.bred, fl):
-                lk.bred = fl                                  # the same flame in a new dict (an undo's): the look
-                continue                                      # kept - a deck showing it not started again
+                lk.bred = lk.flame = fl                       # the same flame in a new dict (an undo's): the look
+                continue                                      # kept - a deck showing it not started again - and
+                                                              # drawing this dict, which an edit changes
             register_flame(name, fl)
 
 
@@ -1126,12 +1128,16 @@ def eight_bit(im):
     from PIL import Image
     a = np.nan_to_num(np.asarray(im, np.float64), nan=0.0, posinf=0.0, neginf=0.0)
     big = float(a.max()) if a.size else 0.0
-    top = next((t for t in ((1.0,) if im.mode == "F" else ()) + (255.0, 65535.0) if big <= t), max(big, 1.0))
-    out = Image.fromarray(np.clip(a / top * 255.0 + 0.5, 0, 255).astype(np.uint8))
+    if im.mode.startswith("I;16"):
+        top = 65535.0                                     # (a dark 16-bit picture is dark: not scaled up as 8-bit)
+    else:
+        top = next((t for t in ((1.0,) if im.mode == "F" else ()) + (255.0, 65535.0) if big <= t), max(big, 1.0))
+    grey = np.clip(a / top * 255.0 + 0.5, 0, 255).astype(np.uint8)
     tr = im.info.get("transparency")
-    if isinstance(tr, (int, float)) and not isinstance(tr, bool):
-        out.info["transparency"] = int(max(0, min(255, round(tr / top * 255.0))))
-    return out
+    if isinstance(tr, (int, float)) and not isinstance(tr, bool):  # its clear grey exactly (not every grey that
+        alpha = np.where(a == tr, 0, 255).astype(np.uint8)          # rounds to the same 8 bits)
+        return Image.fromarray(np.dstack([grey, alpha]), "LA")
+    return Image.fromarray(grey)
 
 
 @look("Image", "layer", "a picture file of the deck's - its transparency kept (or a colour or the dark keyed out), "

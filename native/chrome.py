@@ -1819,6 +1819,9 @@ def _restore_project(app, text):
         history.keep(app.project, "project", "project", ".json", open(f, encoding="utf-8").read())
     except OSError:
         pass
+    leave = getattr(app, "_leave_project", None)
+    if leave:
+        leave()                                          # what waits to be saved lands first: the restore over it
     write_atomic(f, text)
     dpg.hide_item("history_win")
     app.switch_project(app.project.path)

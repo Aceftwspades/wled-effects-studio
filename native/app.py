@@ -1124,7 +1124,7 @@ class App(Features, Recorder, EditBuild):
         from native import palette_ui
         palette_ui.sync(self); palette_ui.refresh(self)
         from native import vj, vj_ui
-        vj.project_changed(self); vj_ui.refresh(self)
+        vj.project_changed(self); vj_ui.project_changed(self); vj_ui.refresh(self)
         name = os.path.basename(path)
         dpg.set_value("edit_status", f"project {name}"); self.gp.status(f"project {name}")
         # the engine holds the previous project's drafts: build this one's list

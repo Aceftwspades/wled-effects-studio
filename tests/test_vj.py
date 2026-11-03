@@ -1387,6 +1387,98 @@ vj.restore_desk(av)
 av.project.save()
 undone = av.project.undo("vj") and vj.options(av)["decks"][0]["look"] == "Tunnel"
 check(not undone, "a show's VJ step: an undo after it does not put the step's decks on the desk")
+# round 3: a bred flame kept through an undo draws its dict as edited after
+fl3 = vj_looks.new_flame(4)
+vj_looks.register_flame("Flame: Round3", fl3)
+lk3 = vj_looks.LOOKS["Flame: Round3"]
+same = vj.json_copy(fl3)                                     # an undo's: the same flame, a new dict
+vj_looks._FLAMES_SEEN[0] = None
+vj_looks.sync_flames({"Flame: Round3": same})
+check(vj_looks.LOOKS["Flame: Round3"] is lk3 and lk3.flame is same and lk3.bred is same,
+      "a bred flame after an undo: the look kept, drawing the project's dict (an edit to it shows)")
+vj_looks.LOOKS.pop("Flame: Round3", None)
+vj_looks._FLAMES_SEEN[0] = None
+# a .milk loop that would run for ever: cut short within its budget, said
+from native import milk                                      # noqa: E402
+t0_ = time.perf_counter()
+milk._loop(1e9, lambda: 0.0)
+milk._while(lambda: 1.0)
+check(time.perf_counter() - t0_ < 0.2 and milk.CUT[0], "a .milk loop(1e9) / while(1): cut short, not a stall")
+# 16-bit pictures: a dark one stays dark; a transparent grey clears that grey only
+dark = Image.fromarray(np.full((4, 4), 200, "<u2"))
+check(np.asarray(vj_looks.eight_bit(dark)).max() <= 1, "a dark 16-bit picture: dark, not scaled up as 8-bit")
+ramp16 = Image.fromarray(np.arange(16, dtype="<u2").reshape(4, 4))
+ramp16.info["transparency"] = 0
+la = vj_looks.eight_bit(ramp16)
+check(la.mode == "LA" and int((np.asarray(la)[..., 1] == 0).sum()) == 1,
+      "a 16-bit picture's transparent grey: that grey clear, not its neighbours")
+# a clip with clear parts over deck A: the deck shows through them
+at = App(g)
+ot = vj.options(at)
+ot["decks"][0]["look"] = "Clean"
+run_t = vj._runs(at)[0]
+run_t.canvas = np.ones((72, 96, 3), np.float32)
+vj_clips.play(at, dict(vj_clips.DEFAULT, file="x.mp4", deck=0), "t")
+vj_clips._rt(at)[0]["lv"] = 1.0
+cr = vj._clip_runs(at)[0]
+cr.canvas = np.zeros((72, 96, 3), np.float32)
+cr.alpha = np.zeros((72, 96), np.float32)
+cr.alpha[:, 48:] = 1.0                                       # its left half clear
+pv_ = vj.deck_canvas(at, 0)
+check(pv_[:, :40].min() > 250 and pv_[:, 56:].max() < 5, "a clip with clear parts over deck A: the deck shows "
+      "through them (black only where the clip is)")
+vj_clips.let_go(at)
+# an Effect deck's preview under a clip: the effect under it, not black
+ae2 = App(g)
+vj.options(ae2)["decks"][0]["look"] = vj.EFFECT
+vj._runs(ae2)[0].led = np.full((g.h, g.w, 3), 200, np.uint8)
+vj_clips.play(ae2, dict(vj_clips.DEFAULT, file="x.mp4", deck=0), "e2")
+vj_clips._rt(ae2)[0]["lv"] = 0.5
+vj._clip_runs(ae2)[0].canvas = np.zeros((72, 96, 3), np.float32)
+pv2 = vj.deck_canvas(ae2, 0)
+check(pv2 is not None and abs(int(pv2.max()) - 100) <= 1, f"an Effect deck's preview under a clip at half: half "
+      f"the effect ({pv2.max() if pv2 is not None else None})")
+vj_clips.let_go(ae2)
+# a close as a finished open waits to be taken: that source opened again after, not blocked for good
+real_open = vj._open
+try:
+    vj._open = lambda app, s, key: _Src(key)
+    ab = App(g)
+    vj.options(ab)["decks"][0].update(look="Clean", source=_stream("blocked?"))
+    vj.update(ab, 1 / 30)
+    time.sleep(0.2)                                          # it finished, not yet taken
+    vj.close(ab)
+    opened(ab)
+    check(vj._pool(ab) and not ab.__dict__.get("_vj_opening"), "a close as a finished open waited: it opens again")
+    vj.close(ab)
+    # a render as a worker opens the source: waited for, not opened a second time
+    _Src.most = 0
+    vj._open = lambda app, s, key: _Src(key, 0.3)
+    ar2 = App(g)
+    vj.options(ar2)["decks"][0].update(look="Clean", source=_stream("render2"))
+    vj.update(ar2, 1 / 30)                                   # a worker opening it
+    clock.hold()
+    try:
+        vj.update(ar2, 1 / 30)
+        check(_Src.most == 1 and vj._runs(ar2)[0].video is not None, f"a render as a worker opens its source: "
+              f"waited for, one open ({_Src.most})")
+    finally:
+        clock.release()
+    vj.close(ar2)
+finally:
+    vj._open = real_open
+# an undo back to before the VJ: each deck its own look again (B's not A's, C's text)
+aw = App(g)
+aw.project = Project(os.path.join(tempfile.mkdtemp(), "w"))
+aw.project.geometry = g
+vj.options(aw)
+aw.project.save()
+vj.options(aw)["decks"][0]["hue"] = 0.3
+aw.project.save()
+while aw.project.undo("vj"):
+    pass
+check([d["look"] for d in vj.options(aw)["decks"]] == ["Plasma", "Drop: Nebula", "Text"],
+      f"undone back to before the VJ: each deck's own look ({[d['look'] for d in vj.options(aw)['decks']]})")
 # a project's bred flames listed when it is opened
 af = App(g)
 of = vj.options(af)

@@ -159,7 +159,9 @@ def options(app):
             decks[j] = d
         else:
             decks.append(d)
-    for d in decks:
+    for j, d in enumerate(decks):
+        if "look" not in d:
+            d["look"] = ("Plasma", "Drop: Nebula", "Text")[j]
         _fix_deck(d)
     for name in [n for n, p in o["presets"].items() if not isinstance(p, dict)]:
         del o["presets"][name]                               # a hand edit's: not a deck's settings
@@ -447,11 +449,15 @@ def _source(app, i, run, deck):
                 r.n = -1
     if key not in pool:
         if clock.held():                                      # a render: opened here, so no frame it draws is
-            tried[key] = [now, tried.get(key, [0, REOPEN_S])[1]]   # without its picture (the same each render)
-            try:
-                pool[key] = [_open(app, s, key), ""]
-            except Exception as e:
-                pool[key] = [None, str(e)]
+            got = _wait_opening(app, key)                     # without its picture (the same each render) - one
+            if got is not None:                               # a worker is opening waited for, not opened twice
+                pool[key] = got
+            else:
+                tried[key] = [now, tried.get(key, [0, REOPEN_S])[1]]
+                try:
+                    pool[key] = [_open(app, s, key), ""]
+                except Exception as e:
+                    pool[key] = [None, str(e)]
         else:
             _open_soon(app, s, key)
             run.open_error = ""
@@ -509,6 +515,26 @@ def _open_soon(app, s, key):
         if got[0] is not None:
             got[0].close()
     threading.Thread(target=work, daemon=True, name="vj source").start()
+
+
+OPEN_WAIT_S = 15.0                # a render waits this long at most for a source a worker is opening
+
+
+def _wait_opening(app, key):
+    """A source a worker is opening, waited for (a render): its [source, error], or None when none is opening it."""
+    if key not in app.__dict__.get("_vj_opening", {}):
+        return None
+    end = time.monotonic() + OPEN_WAIT_S
+    while time.monotonic() < end:
+        with _OPEN_LOCK:
+            got = app.__dict__.get("_vj_opened", {}).pop(key, None)
+            if got is not None:
+                app.__dict__.get("_vj_opening", {}).pop(key, None)
+                return got
+        if key not in app.__dict__.get("_vj_opening", {}):
+            return None                                     # (its worker's from before a close: closed it)
+        time.sleep(0.005)
+    return None
 
 
 def _collect(app):
@@ -621,6 +647,8 @@ def close(app):
     with _OPEN_LOCK:
         app._vj_gen = getattr(app, "_vj_gen", 0) + 1         # those still opening closed once they have
         done = app.__dict__.pop("_vj_opened", None) or {}
+        for key in done:
+            app.__dict__.get("_vj_opening", {}).pop(key, None)
     for src, _ in done.values():
         if src is not None:
             src.close()
@@ -1206,23 +1234,27 @@ def deck_led(app, i):
         own = run.led
     else:
         own = None if run.canvas is None else to_shape(app, run.canvas)
-    e, clip = _clip_over(app, i)
+    e, clip, ca = _clip_over(app, i)
     if clip is None:
         return own
     clip = to_shape(app, clip)
+    if ca is not None:                                        # where the clip is clear the deck shows through
+        e = e * to_shape(app, np.repeat(ca[..., None], 3, 2)).astype(np.float32) / 255.0
     base = own.astype(np.float32) if own is not None and own.shape == clip.shape else np.zeros(clip.shape, np.float32)
     return np.clip(base * (1.0 - e) + clip.astype(np.float32) * e + 0.5, 0, 255).astype(np.uint8)
 
 
 def _clip_over(app, i):
-    """(how much of it shows, its canvas) of a pad's clip laid over deck A or B, or (0, None)."""
+    """(how much of it shows, its canvas, its alpha or None) of a pad's clip laid over deck A or B, or
+    (0, None, None)."""
     if i >= 2:
-        return 0.0, None
+        return 0.0, None, None
     lv = vj_clips.level(app, i)
-    c = _clip_runs(app)[i].canvas
-    if lv is None or c is None:
-        return 0.0, None
-    return max(0.0, min(1.0, lv)), c
+    crun = _clip_runs(app)[i]
+    if lv is None or crun.canvas is None:
+        return 0.0, None, None
+    a = crun.alpha if crun.alpha is not None and crun.alpha.shape == crun.canvas.shape[:2] else None
+    return max(0.0, min(1.0, lv)), crun.canvas, a
 
 
 def _draw_clip(app, i):
@@ -1239,11 +1271,20 @@ def _draw_clip(app, i):
     if v is None:
         return
     w, h = canvas_size(app)
+    va = crun.video_alpha
+    if va is None and v.shape[-1] == 4:
+        va = v[..., 3]
     v = v[..., :3]
+    if va is not None and va.shape != v.shape[:2]:
+        va = None
     if v.shape[:2] != (h, w):
         from PIL import Image
         v = np.asarray(Image.fromarray((np.clip(v, 0, 1) * 255).astype(np.uint8)).resize((w, h)), np.float32) / 255.0
+        if va is not None:
+            va = np.asarray(Image.fromarray((np.clip(va, 0, 1) * 255).astype(np.uint8)).resize((w, h)),
+                            np.float32) / 255.0
     crun.canvas = np.clip(v, 0, 1).astype(np.float32)
+    crun.alpha = None if va is None else np.clip(va, 0, 1).astype(np.float32)   # (clear parts: the deck under it)
 
 
 def _look_now(app, i):
@@ -1262,12 +1303,15 @@ def deck_alpha(app, i):
 def deck_canvas(app, i):
     """Deck i's picture for its preview: its canvas, or an Effect deck's logical grid."""
     run = _runs(app)[i]
-    own = run.led if _look_now(app, i) == EFFECT else (None if run.canvas is None else
-                                                        (run.canvas * 255).astype(np.uint8))
-    e, clip = _clip_over(app, i)
+    if _look_now(app, i) == EFFECT:                           # (its logical grid: a clip over it laid on that)
+        return deck_led(app, i)
+    own = None if run.canvas is None else (run.canvas * 255).astype(np.uint8)
+    e, clip, ca = _clip_over(app, i)
     if clip is None:
         return own
     clip = clip * 255.0
+    if ca is not None:
+        e = e * ca[..., None]
     base = own.astype(np.float32) if own is not None and own.shape == clip.shape else np.zeros(clip.shape, np.float32)
     return np.clip(base * (1.0 - e) + clip * e + 0.5, 0, 255).astype(np.uint8)
 

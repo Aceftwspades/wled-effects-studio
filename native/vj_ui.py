@@ -1290,20 +1290,35 @@ def _new_look(app):
                 names = ", ".join(others[:4]) + (f" and {len(others) - 4} more" if len(others) > 4 else "")
                 _c().confirm(app, "Python looks", f"Your look is made. This project also has Python looks that are not "
                              f"yours ({names}); allowing Python looks runs them too. Run them only if you trust where the "
-                             "project came from.", [("Run them all", lambda: allow_py(app, True)), ("Not now", None)])
-            else:
-                allow_py(app, True)                                  # the only one is the user's own: allowed
-        vj_looks.load_user(app.project, allow_py=py_allowed(app))
-        o = vj.options(app)
-        cue = vj.cue_deck(app)                                     # the deck off the mix: seen in its preview first
-        lk = next((n for n, l in vj_looks.LOOKS.items() if l.family == "yours" and _user_path(n) == path), None)
-        if lk:
-            o["decks"][cue]["look"] = lk
-        _save(app)
-        refresh(app)
+                             "project came from.", [("Run them all", lambda: (allow_py(app, True), _put_new(app, path))),
+                                                    ("Not now", None)])
+                _open(app, path)
+                app.gp.status(f"{os.path.basename(path)} made in the project's looks/ - it runs once the project's "
+                              "Python looks are allowed")
+                return
+            allow_py(app, True)                                      # the only one is the user's own: allowed
+        _put_new(app, path)
         _open(app, path)
-        app.gp.status(f"{os.path.basename(path)} made in the project's looks/ - on deck {LETTER[cue]}; save it to see it")
     _c().ask(app, "A look of your own", "its name", "My look", made)
+
+
+def _put_new(app, path):
+    """A new look of the user's loaded and put on the deck off the mix (seen in its preview first)."""
+    vj_looks.load_user(app.project, allow_py=py_allowed(app))
+    o = vj.options(app)
+    cue = vj.cue_deck(app)
+    lk = next((n for n, l in vj_looks.LOOKS.items() if l.family == "yours" and _user_path(n) == path), None)
+    if lk:
+        o["decks"][cue]["look"] = lk
+    _save(app)
+    refresh(app)
+    app.gp.status(f"{os.path.basename(path)} made in the project's looks/ - on deck {LETTER[cue]}; save it to see it")
+
+
+def project_changed(app):
+    """Another project open: its own looks listed now (the pads' look lists read them), the VJ shown or not."""
+    app._vj_files_at = 0.0
+    app._vj_file_errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
 
 
 def py_allowed(app):
@@ -1330,6 +1345,8 @@ def _ask_py(app):
     files = vj_looks.py_files(app.project)
     if not files or py_allowed(app) or root in asked:
         return
+    if any(dpg.does_item_exist(t) and dpg.is_item_shown(t) for t in ("confirm_dialog", "name_dialog")):
+        return                                               # another question open: asked once it is answered
     asked.add(root)
     names = ", ".join(files[:4]) + (f" and {len(files) - 4} more" if len(files) > 4 else "")
     _c().confirm(app, "Python looks", f"This project has looks written in Python ({names}). A Python look is a program: "

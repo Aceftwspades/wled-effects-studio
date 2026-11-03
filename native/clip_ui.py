@@ -43,7 +43,7 @@ def build(app):
             dpg.add_combo([], tag="pads_clip_file", width=px(_ui().SIDE_W - 110),
                           callback=lambda s, v: _set_file(app, v))
             c.tip("the video file it plays - the ones kept with the project (its assets/vj)")
-            dpg.add_button(label="Choose...", small=True, callback=lambda: dpg.show_item("pads_clip_dialog"))
+            dpg.add_button(label="Choose...", small=True, callback=lambda: _open_dialog(app, "pads_clip_dialog"))
             c.tip("a video file copied into the project and played by this pad")
         with dpg.group(horizontal=True, tag="pads_clip_camrow", show=False):
             dpg.add_combo([], tag="pads_clip_cam", width=px(_ui().SIDE_W - 110),
@@ -348,8 +348,7 @@ def _chosen(app, a):
     if not f or not os.path.isfile(f):
         return
     proj, into = app.project, _into(app)
-    sel, _ = _clip(app)
-    cid = sel["id"] if sel else None                 # the pad it was chosen for (another may be picked meanwhile)
+    cid = (getattr(app, "_clip_dialog_for", None) or (None, None))[0]   # the pad it was opened for
     tasks.run(app, "pads_clip_copy", f"copying {os.path.basename(f)} into the project",
               lambda: vj.keep_media(into, f), lambda kept: app.project is proj and _file_of(app, cid, kept))
 
@@ -378,10 +377,17 @@ def _add_many(app, a):
         return
 
     proj, into = app.project, _into(app)
-    bank = _ui()._st(app)["bank"]                    # the bank they were added from (another shown meanwhile)
+    bank = (getattr(app, "_clip_dialog_for", None) or (None, _ui()._st(app)["bank"]))[1]   # its bank then
     tasks.run(app, "pads_clips_copy", f"copying {len(sel)} video file(s) into the project",
               lambda: [vj.keep_media(into, f) for f in sel],
               lambda kept: app.project is proj and _made(app, kept, bank))
+
+
+def _open_dialog(app, tag):
+    """A file dialog shown, the pad and the bank it is for kept (another may be picked while it is open)."""
+    s, _ = _clip(app)
+    app._clip_dialog_for = (s["id"] if s else None, _ui()._st(app)["bank"])
+    dpg.show_item(tag)
 
 
 def _into(app):

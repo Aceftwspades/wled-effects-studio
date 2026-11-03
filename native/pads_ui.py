@@ -135,7 +135,8 @@ def _build_side(app):
         for typ in pads.TYPES:
             dpg.add_button(label=pads.TYPE_WORDS[typ], width=-1, user_data=typ,
                            callback=lambda s, a, u: _add_control(app, u))
-        dpg.add_button(label="video clips: a pad each...", width=-1, callback=lambda: dpg.show_item("pads_clips_dialog"))
+        dpg.add_button(label="video clips: a pad each...", width=-1,
+                       callback=lambda: clip_ui._open_dialog(app, "pads_clips_dialog"))
         c.tip("video files made into pads: each copied into the project and given a pad, from this bank's free "
               "cells on (then a new bank named Clips), that plays it once on deck C - each pad's CLIP section "
               "sets its part, how it plays and its envelope")

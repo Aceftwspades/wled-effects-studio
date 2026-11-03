@@ -353,6 +353,8 @@ class _GL:
         except OSError:
             return None
         got = self.pics.get(path)
+        if got is not None and got[0] == mt:
+            self.pics[path] = self.pics.pop(path)              # used: the newest (the oldest are let go first)
         if got is None or got[0] != mt:
             from PIL import Image
             try:                                                 # a file that is not a picture: none (the caller's
@@ -370,8 +372,8 @@ class _GL:
             got = self.pics[path] = (mt, t)                      # the newest last: the oldest let go past PICS_MAX
             while len(self.pics) > PICS_MAX:
                 old = self.pics.pop(next(iter(self.pics)))
-                if old[1] is not None:
-                    old[1].release()
+                if old[1] is not None:                           # let go after this draw (it may be bound in it)
+                    self.__dict__.setdefault("pics_gone", []).append(old[1])
         return got[1]
 
     def _buffer(self, key, name, w, h):
@@ -449,6 +451,8 @@ class _GL:
         return np.frombuffer(data, np.uint8).reshape(h, w, 3).astype(np.float32) / 255.0   # row 0 the bottom of GL's
 
     def _draw(self, key, src, w, h, uni, video, audio, picture, chosen):
+        for t in self.__dict__.pop("pics_gone", ()):              # pictures let go in the last draw: none bound now
+            t.release()
         plan = passes(src)
         if video is not None:
             v = np.ascontiguousarray(np.flipud(video))                # GL's rows run upward
