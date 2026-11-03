@@ -1242,8 +1242,10 @@ class App(Features, Recorder, EditBuild):
 
     def editor_command(self):
         """The command that opens a file at a line, as a list with {file} and
-        {line} holes; from project options, else VS Code, else none."""
-        cmd = self.project.options.get("editor")
+        {line} holes; from the studio's own settings (never the project's: a
+        project from elsewhere chose the program Edit ran), else VS Code, else
+        none."""
+        cmd = (getattr(self, "prefs", None) or {}).get("editor")
         if cmd:
             return cmd if isinstance(cmd, list) else cmd.split()
         code = shutil.which("code") or shutil.which("code.cmd")
@@ -1884,12 +1886,15 @@ class App(Features, Recorder, EditBuild):
         dpg.set_value("edit_status", msg); self.gp.status(msg)
 
     def save_editor_cmd(self, cmd):
+        from native.project import save_prefs
         cmd = (cmd or "").strip()
         if cmd:
-            self.project.options["editor"] = cmd
+            self.prefs["editor"] = cmd                   # this computer's (the studio's settings), not the project's
         else:
-            self.project.options.pop("editor", None)
-        self.project.save()
+            self.prefs.pop("editor", None)
+        save_prefs(self.prefs)
+        if self.project.options.pop("editor", None) is not None:
+            self.project.save()                          # (an older project's own: not used, not kept)
 
     def reset_layout(self):
         """The default sizes; the arrangement stays."""
@@ -4146,6 +4151,12 @@ def main():
         chrome.check_updates(app)                    # once a day, on a thread; the tests set STUDIO_NO_UPDATE_CHECK
     reader_ui.maybe_welcome(app)                     # the first run's panel; the tests set STUDIO_NO_WELCOME
     app.report_project_load()                        # a project.json that did not read: said now the window is up
+    try:
+        from native import vj_ui as _vj_ui
+        _vj_ui.project_changed(app)                  # the project's own looks and the packs' listed from the start
+    except Exception:                                # (the phone, the pads and MIDI read them, the VJ shown or not)
+        import traceback
+        traceback.print_exc()
     try:
         while dpg.is_dearpygui_running():
             jobs = None

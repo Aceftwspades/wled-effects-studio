@@ -916,7 +916,7 @@ def show_device(app):
 
 
 def show_editor(app):
-    cmd = app.project.options.get("editor") or ""
+    cmd = (getattr(app, "prefs", None) or {}).get("editor") or ""
     dpg.set_value("editor_cmd", " ".join(cmd) if isinstance(cmd, list) else cmd)
     _centre("editor_dialog", 460)
     dpg.show_item("editor_dialog")
@@ -1814,14 +1814,14 @@ def _restore_project(app, text):
         app.edit_save()
     if app.gp.graph:
         app.gp.save()
+    leave = getattr(app, "_leave_project", None)
+    if leave:
+        leave()                                          # what waits to be saved lands first: kept, then restored over
     f = app.project.file
     try:
         history.keep(app.project, "project", "project", ".json", open(f, encoding="utf-8").read())
     except OSError:
         pass
-    leave = getattr(app, "_leave_project", None)
-    if leave:
-        leave()                                          # what waits to be saved lands first: the restore over it
     write_atomic(f, text)
     dpg.hide_item("history_win")
     app.switch_project(app.project.path)

@@ -339,29 +339,37 @@ def _count(n):
     return int(max(0, min(_MAX_LOOP, n))) if math.isfinite(n) else 0
 
 
-CUT_WORDS = "a loop() or while() ran too long a frame: cut short"
-LOOP_BUDGET_S = 0.02                # one loop()/while() at most this long (each turn is Python, not ns-eel's
-CUT = [False]                       # native code: loop(1e9) stopped the studio): cut there, said by the look
+CUT_WORDS = "a loop(), while() or memset() ran too long a frame: cut short"
+FRAME_BUDGET_S = 0.03               # a frame's loops, whiles and memsets together at most this long (each turn is
+CUT = [False]                       # Python, not ns-eel's native code: loop(1e9) stopped the studio) - nested,
+DEADLINE = [float("inf")]           # in a shape's 64 instances, a wave's points: one budget a frame (look_draw)
+
+
+def _spent():
+    """Whether the frame's budget is spent (then every loop left stops at once)."""
+    if CUT[0]:
+        return True
+    if time.perf_counter() > DEADLINE[0]:
+        CUT[0] = True
+        return True
+    return False
 
 
 def _loop(n, body):
-    out, end = 0.0, time.perf_counter() + LOOP_BUDGET_S
+    out = 0.0
     for k in range(_count(n)):
-        out = body()
-        if k & 63 == 63 and time.perf_counter() > end:
-            CUT[0] = True
+        if (CUT[0] or k & 15 == 0) and _spent():
             break
+        out = body()
     return out
 
 
 def _while(body):
-    end = time.perf_counter() + LOOP_BUDGET_S
     for k in range(_MAX_LOOP):
+        if (CUT[0] or k & 15 == 0) and _spent():
+            break
         r = body()
         if not np.any(r != 0) if isinstance(r, np.ndarray) else r == 0:
-            break
-        if k & 63 == 63 and time.perf_counter() > end:
-            CUT[0] = True
             break
     return 0.0
 
@@ -398,19 +406,23 @@ def _mbs(mem, i, x):
 
 def _memset(mem, dest, val, n):
     d = _slot(dest)
-    for k in range(d, d + _count(n)) if d >= 0 else ():
-        if k < _MEM_MAX:
-            mem[k] = float(val)
+    for k in range(d, min(_MEM_MAX, d + _count(n))) if d >= 0 else ():
+        if (k - d) & 1023 == 0 and _spent():
+            break
+        mem[k] = float(val)
     return dest
 
 
 def _memcpy(mem, dest, src, n):
     d, s = _slot(dest), _slot(src)
     if d >= 0 and s >= 0:
-        vals = [mem.get(s + k, 0.0) for k in range(_count(n))]
+        vals = []
+        for k in range(min(_count(n), max(0, _MEM_MAX - d))):
+            if k & 1023 == 0 and _spent():
+                break
+            vals.append(mem.get(s + k, 0.0))
         for k, val in enumerate(vals):
-            if d + k < _MEM_MAX:
-                mem[d + k] = val
+            mem[d + k] = val
     return dest
 
 
@@ -606,7 +618,6 @@ def look_draw(preset):
         v.update(st["q"])
         v.update(time=float(ctx.t), fps=1.0 / max(1e-3, ctx.dt), frame=st["frame"],
                  bass=rel[0], mid=rel[1], treb=rel[2], bass_att=att[0], mid_att=att[1], treb_att=att[2])
-        CUT[0] = False
         preset["frame"](v)
         st["frame"] += 1
         # the motion over the mesh: the per-frame values everywhere, the per-pixel equations changing them point by point
@@ -617,10 +628,7 @@ def look_draw(preset):
             pv[k] = np.full_like(x, float(v.get(k, 0.0)))
         if preset["pixel"] is not None:
             preset["pixel"](pv)
-        if CUT[0]:                                               # a loop that ran past its time: cut, said
-            st["warn"] = CUT_WORDS
-        elif st.get("warn") == CUT_WORDS:
-            st.pop("warn")
+
         g = {k: np.broadcast_to(np.asarray(pv[k], np.float64), x.shape) for k in MOTION}
         k30 = ctx.dt * 30.0 * ctx.speed                          # presets run at 30 frames a second
         zoom = np.power(np.maximum(g["zoom"], 1e-3), np.power(np.maximum(g["zoomexp"], 1e-3), rad * 2.0 - 1.0))
@@ -695,13 +703,23 @@ def look_draw(preset):
             out = 1 - out
         st["q"] = {k: v[k] for k in v if re.match(r"q\d+$", k)}
         return out
-    return draw
+
+    def framed(ctx, st):                                         # the frame's loop budget, from its start
+        CUT[0] = False
+        DEADLINE[0] = time.perf_counter() + FRAME_BUDGET_S
+        try:
+            return draw(ctx, st)
+        finally:
+            DEADLINE[0], CUT[0] = float("inf"), False            # (none outside a frame's draw)
+    return framed
 
 
 def _warn(st, preset):
     """What of the preset could not run, said by the deck (vj.draw_deck shows st["warn"])."""
     off = st.get("md2_off") or {}
     notes = list(preset.get("notes") or []) + [f"its {w} shader left out: {e}" for w, e in off.items()]
+    if CUT[0]:
+        notes.append(CUT_WORDS)                                  # (its shapes' and waves' loops counted too)
     st["warn"] = "; ".join(notes)
 
 

@@ -390,6 +390,9 @@ def source_key(app, s, whole=False):
     return (kind, None, None, None, w, h)
 
 
+FILE_KEY_WHOLE = 7                # a file's source key: its fit-or-tile flag's place (a pad clip's take is last)
+
+
 def _open(app, s, key):
     """A source opened for its key (on a worker: _open_soon) - the file's path and the canvas from the key, so
     it reads nothing of the app's that the main loop changes."""
@@ -410,7 +413,7 @@ def _open(app, s, key):
         if b > a:
             args += ["-t", f"{(b - a) / sp:.3f}"]                # -t counts the scaled time: Out where it was set
         dec, has_alpha = video.alpha_of(path)                 # a file with transparency: read as RGBA, kept
-        whole = bool(key[-1])                                 # fit or tile: the whole picture, clear bars round it
+        whole = bool(key[FILE_KEY_WHOLE])                     # fit or tile: the whole picture, clear bars round it
         cut = a > 0 or b > a                                  # In/Out: run again from In each time (not -stream_loop)
         once = bool(s.get("once"))                            # a pad's one shot: played through once, then it ends
         return video.FfmpegSource(args + dec + ["-i", path], os.path.basename(path), "file", w, h, realtime=True,
@@ -1818,6 +1821,7 @@ def apply_step(app, step, playing=True):
             for k in SNAP_KEYS:
                 if k in v:
                     o[k] = json_copy(v[k])
+            _FILLED[0] = None                              # the step's settings checked as a project's are
             options(app)
             o["on"] = True
             app._vj_sweep = app._vj_pending = None
@@ -1843,6 +1847,7 @@ def apply_step(app, step, playing=True):
         for k in SNAP_KEYS:
             if k in v:
                 o[k] = json_copy(v[k])
+        _FILLED[0] = None                             # (a hand-edited step's null fader: put right, not raised)
         options(app)                                  # anything the snapshot left out, defaulted
         o["on"] = True
         app.project.save_view = lambda opts, app=app: _desk_saved(app, opts)   # saved meanwhile: the desk, kept

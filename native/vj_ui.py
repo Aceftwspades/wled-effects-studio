@@ -239,7 +239,8 @@ def _deck(app, i):
         typeface.label(dpg.add_text(f"DECK {LETTER[i]}", color=c.ACCENT))
         dpg.add_button(label="Browse...", tag=f"vj_br{i}", small=True, callback=lambda: browse(app, i))
         c.tip("every look as a moving thumbnail: click one to put it on this deck")
-        dpg.add_button(label="Shuffle", tag=f"vj_shuf{i}", small=True, callback=lambda: (vj.shuffle(app, i), refresh(app)))
+        dpg.add_button(label="Shuffle", tag=f"vj_shuf{i}", small=True,
+                       callback=lambda: (vj.shuffle(app, i), _save(app), refresh(app)))
         c.tip("a look this deck does not have, at random")
         dpg.add_button(label="Mutate", tag=f"vj_mut{i}", small=True, callback=lambda: _mutate(app, i))
         c.tip("a new flame bred from this one (its maps nudged, a variation swapped) - kept with the project")
@@ -1269,7 +1270,13 @@ def _open(app, path):
         if cmd:
             procs.popen([c.replace("{file}", path).replace("{line}", "1") for c in cmd])
         elif hasattr(os, "startfile"):
-            os.startfile(path)
+            if path.lower().endswith(".py"):                # a .py's "open" runs it: edited instead
+                try:
+                    os.startfile(path, "edit")
+                except OSError:
+                    procs.popen(["notepad", path])
+            else:
+                os.startfile(path)
         else:
             opener = shutil.which("xdg-open") or shutil.which("open")
             if opener:
@@ -1319,6 +1326,9 @@ def project_changed(app):
     """Another project open: its own looks listed now (the pads' look lists read them), the VJ shown or not."""
     app._vj_files_at = 0.0
     app._vj_file_errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
+    app._vj_thumbs = None                                    # the browser's tiles: this project's looks
+    if dpg.does_item_exist(BROWSE) and dpg.is_item_shown(BROWSE):
+        _fill_browser(app)
 
 
 def py_allowed(app):

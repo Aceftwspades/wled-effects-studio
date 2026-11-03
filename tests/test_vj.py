@@ -1192,6 +1192,15 @@ try:
     check(True, "a show step whose vj is not a dict: taken as not the VJ's")
 except Exception as e:
     check(False, f"a show step whose vj is not a dict: {type(e).__name__} {e}")
+# a hand-edited step's null fader (no decks): put right, not raised every frame
+try:
+    for playing in (True, False):
+        vj.apply_step(ar, {"vj": {"fader": None, "c_up": None}}, playing=playing)
+        vj.update(ar, 1 / 30)
+    check(isinstance(vj.options(ar)["fader"], float), "a show step's null fader: put right")
+except Exception as e:
+    check(False, f"a show step's null fader: {type(e).__name__} {e}")
+vj.restore_desk(ar)
 # a webcam's key: its name, not a url the deck kept from being a stream
 k1 = vj.source_key(ar, {"kind": "webcam", "name": "Cam", "url": "rtsp://x", "path": "p"})
 k2 = vj.source_key(ar, vj_clips.cam_source("Cam"))
@@ -1222,6 +1231,31 @@ finally:
 a_ = got.get("args", [])
 check("-t" in a_ and abs(float(a_[a_.index("-t") + 1]) - 1.0) < 1e-6, f"speed 2, In 2 to Out 4: one second of "
       f"scaled time ({a_})")
+# a file's fit or tile read from its key's own place (a pad clip's take is last): a fill deck's clip not
+# letterboxed, a fit deck's file not cropped
+fits = {}
+
+
+class _GrabFit:
+    def __init__(self, args, *a, **k):
+        fits["fit"], fits["alpha"] = k.get("fit"), k.get("alpha")
+
+
+videomod.FfmpegSource = _GrabFit
+real_alpha = videomod.alpha_of
+videomod.alpha_of = lambda p: ([], False)
+try:
+    s3 = dict(vj.SOURCE, kind="file", path=fp, take=5)
+    vj._open(ar, s3, vj.source_key(ar, s3, whole=False))
+    clip_fill = dict(fits)
+    s4 = dict(vj.SOURCE, kind="file", path=fp)
+    vj._open(ar, s4, vj.source_key(ar, s4, whole=True))
+    deck_fit = dict(fits)
+finally:
+    videomod.FfmpegSource = real_src
+    videomod.alpha_of = real_alpha
+check(clip_fill == {"fit": False, "alpha": False} and deck_fit["fit"] is True,
+      f"a file's fit read right: a pad clip on a fill deck filled ({clip_fill}), a fit deck's file fitted ({deck_fit})")
 # the decks' sources opened on a worker - the main loop not held up by a slow one
 real_open = vj._open
 vj._open = lambda app, s, key: (time.sleep(0.5), videomod.TestPattern(8, 8))[1]
@@ -1400,10 +1434,23 @@ vj_looks.LOOKS.pop("Flame: Round3", None)
 vj_looks._FLAMES_SEEN[0] = None
 # a .milk loop that would run for ever: cut short within its budget, said
 from native import milk                                      # noqa: E402
+from types import SimpleNamespace                             # noqa: E402
+bad_milk =os.path.join(tempfile.mkdtemp(), "loops.milk")
+with open(bad_milk, "w") as f:
+    f.write(chr(10).join(["[preset00]", "per_frame_1=loop(1000, loop(1e9, b=b+1));", "per_frame_2=memset(0,1,1000000);",
+                          "per_pixel_1=loop(1e9, q1=q1+rad);", "shape00_enabled=1", "shape00_num_inst=64",
+                          "shape00_per_frame1=loop(1e9, c=c+1);", ""]))
+mdraw = milk.look_draw(milk.load(bad_milk))
+mst = {}
+mctx = SimpleNamespace(w=32, h=24, t=0.0, dt=1 / 30, speed=1.0, amount=0.5, bass=0.3, mid=0.3, treb=0.3, level=0.3,
+                       wave=np.zeros(64, np.float32), beat=0.0, beat_hit=False, grad=lambda a: np.repeat(
+                           np.asarray(a, np.float32)[..., None], 3, 2), video=None, video_prev=None, bands=None,
+                       knob=lambda k: 0.0, deck={}, channel_images=["", "", "", ""])
 t0_ = time.perf_counter()
-milk._loop(1e9, lambda: 0.0)
-milk._while(lambda: 1.0)
-check(time.perf_counter() - t0_ < 0.2 and milk.CUT[0], "a .milk loop(1e9) / while(1): cut short, not a stall")
+mdraw(mctx, mst)
+spent = time.perf_counter() - t0_
+check(spent < 0.5 and milk.CUT_WORDS in mst.get("warn", "") and milk.DEADLINE[0] == float("inf"),
+      f"a .milk of nested loops, a big memset and 64 shapes of loop(1e9): one budget a frame ({spent:.2f} s), said")
 # 16-bit pictures: a dark one stays dark; a transparent grey clears that grey only
 dark = Image.fromarray(np.full((4, 4), 200, "<u2"))
 check(np.asarray(vj_looks.eight_bit(dark)).max() <= 1, "a dark 16-bit picture: dark, not scaled up as 8-bit")

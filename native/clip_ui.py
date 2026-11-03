@@ -348,7 +348,7 @@ def _chosen(app, a):
     if not f or not os.path.isfile(f):
         return
     proj, into = app.project, _into(app)
-    cid = (getattr(app, "_clip_dialog_for", None) or (None, None))[0]   # the pad it was opened for
+    cid = _dialog_for(app)[0]                        # the pad it was opened for (none: another project's open)
     tasks.run(app, "pads_clip_copy", f"copying {os.path.basename(f)} into the project",
               lambda: vj.keep_media(into, f), lambda kept: app.project is proj and _file_of(app, cid, kept))
 
@@ -377,7 +377,10 @@ def _add_many(app, a):
         return
 
     proj, into = app.project, _into(app)
-    bank = (getattr(app, "_clip_dialog_for", None) or (None, _ui()._st(app)["bank"]))[1]   # its bank then
+    bank = _dialog_for(app)[1]                       # its bank then (another project's open: not added)
+    if bank is None:
+        app.gp.status("another project was opened while the files were picked - none added", "warn")
+        return
     tasks.run(app, "pads_clips_copy", f"copying {len(sel)} video file(s) into the project",
               lambda: [vj.keep_media(into, f) for f in sel],
               lambda kept: app.project is proj and _made(app, kept, bank))
@@ -386,8 +389,16 @@ def _add_many(app, a):
 def _open_dialog(app, tag):
     """A file dialog shown, the pad and the bank it is for kept (another may be picked while it is open)."""
     s, _ = _clip(app)
-    app._clip_dialog_for = (s["id"] if s else None, _ui()._st(app)["bank"])
+    app._clip_dialog_for = (s["id"] if s else None, _ui()._st(app)["bank"], app.project)
     dpg.show_item(tag)
+
+
+def _dialog_for(app):
+    """(pad id, bank) the open file dialog is for - none once another project is open (its ids are its own)."""
+    got = getattr(app, "_clip_dialog_for", None)
+    if not got or got[2] is not app.project:
+        return None, None
+    return got[0], got[1]
 
 
 def _into(app):

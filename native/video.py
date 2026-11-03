@@ -199,6 +199,8 @@ class FfmpegSource:
             time.sleep(0.1)                                  # the last message, after the picture stopped
             err = [l for l in list(self._errs) if l.strip()]
             self.error = (err[-1].strip() if err else "the video ended")
+        with self._cv:                                       # a held clock's latest() waiting on a frame: told it
+            self._cv.notify_all()                            # ended (it waited its whole 2 s)
 
     def _drain(self, proc):
         try:
