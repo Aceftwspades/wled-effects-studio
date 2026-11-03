@@ -164,6 +164,54 @@ try:
     pads.forget(app, hold)
     check(not vj_clips._rt(app)[2]["gate"], "a pad taken away (or re-pointed): its clip let go")
     vj_clips.let_go(app)
+
+    # a part shorter than its release: up over its attack, then down to 0 at its Out
+    short = dict(vj_clips.DEFAULT, file="x.mp4", **{"in": 1.0, "out": 1.15}, attack=0.05, release=0.2)
+    vj_clips.play(app, short, "s")
+    vj_clips.started(app, 2, vj_clips._rt(app)[2]["take"])
+    lv, at = [], 0.0
+    while vj_clips.level(app, 2) is not None and at < 1.0:
+        clock.step(0.01)
+        at += 0.01
+        vj_clips.tick(app)
+        lv.append(vj_clips.level(app, 2) or 0.0)
+    check(max(lv) > 0.9 and abs(at - 0.15) < 0.015, f"a part shorter than its release shows ({max(lv):.2f} at its "
+          f"top), its release shortened to end at its Out ({at:.2f} s)")
+    # pressed again while it fades: started again, not stopped twice
+    for typ in ("trigger", "toggle"):
+        c = pads.new_control(st, typ, 0, 1, target=dict(clip, mode="loop", release=2.0))
+        pads.press(app, c)
+        pads.release(app, c)
+        vj_clips.started(app, 2, vj_clips._rt(app)[2]["take"])
+        clock.step(0.6)                                      # up over its attack
+        vj_clips.tick(app)
+        pads.press(app, c)
+        pads.release(app, c)
+        clock.step(0.5)
+        vj_clips.tick(app)
+        fading = not vj_clips.held(app, c["id"]) and vj_clips.playing(app, c["id"])
+        pads.press(app, c)
+        pads.release(app, c)
+        check(fading and vj_clips.held(app, c["id"]), f"a {typ} pressed while its loop fades: it starts again")
+        pads.forget(app, c)
+        vj_clips.let_go(app)
+    # the editor's Play: let go when its pad is no longer the one edited, or the pad is taken away
+    tried = pads.new_control(st, "trigger", 1, 1, target=dict(clip, mode="loop"))
+    vj_clips.play(app, tried["target"], ("try", tried["id"]))
+    vj_clips.stop_tries(app, keep=tried["id"])
+    kept = vj_clips.held(app, ("try", tried["id"]))
+    vj_clips.stop_tries(app, keep=None)
+    check(kept and not vj_clips.held(app, ("try", tried["id"])), "a tried clip: kept while its pad is edited, then "
+          "let go")
+    vj_clips.play(app, tried["target"], ("try", tried["id"]))
+    pads.forget(app, tried)
+    check(not vj_clips.held(app, ("try", tried["id"])), "a pad taken away: its tried clip let go too")
+    vj_clips.let_go(app)
+    oneshot_src = vj_clips.deck(app, 2, d)
+    vj_clips.play(app, clip, "o")
+    check(vj_clips.deck(app, 2, d)["source"]["once"] and not vj_clips.deck(app, 2, d) is oneshot_src,
+          "a one shot's file played through once (not round again)")
+    vj_clips.let_go(app)
 finally:
     clock.release()
 
@@ -201,6 +249,38 @@ if shutil.which("ffmpeg") and shutil.which("ffprobe"):
     run = vj._runs(app2)[2]
     check(vj_clips._rt(app2)[2]["t0"] is not None and run.video is not None and run.canvas is not None
           and run.canvas.max() > 0.2, "a real clip on deck C: its first picture started it, the deck draws it")
+    vj.close(app2)
+
+    # the deck's own video kept open under a clip, there again when it ends; a whole-file one shot with no length
+    # known let go at the file's end
+    o2["decks"][2]["source"] = {"kind": "file", "path": path, "files": [], "clip": 0, "speed": 1.0, "in": 0.0,
+                                "out": 0.0, "advance": "off", "name": "", "url": ""}
+    o2["decks"][2]["level"] = 1.0
+    for _ in range(5):
+        vj.update(app2, 1 / 30)
+    own = vj._runs(app2)[2].src_key
+    own_src = vj._pool(app2)[own][0]
+    vj_clips.play(app2, dict(vj_clips.DEFAULT, file=path, **{"in": 2.0}, attack=0.0, release=0.0), "under")
+    for _ in range(5):
+        vj.update(app2, 1 / 30)
+    check(vj._runs(app2)[2].src_key != own and vj._pool(app2).get(own, [None])[0] is own_src,
+          "a clip over a deck's own video: that one kept open under it")
+    real_dur = video.duration_of
+    video.duration_of = lambda p: None                     # as with no ffprobe: its length not known
+    try:
+        vj_clips.let_go(app2)
+        vj_clips.play(app2, dict(vj_clips.DEFAULT, file=path, **{"in": 2.0}, attack=0.0, release=0.0), "whole")
+        end = time.time() + 8
+        while time.time() < end and vj_clips.level(app2, 2) is not None:
+            vj.update(app2, 1 / 30)
+            time.sleep(0.02)
+    finally:
+        video.duration_of = real_dur
+    check(vj_clips.level(app2, 2) is None, "no length known: a one shot let go at the file's end")
+    for _ in range(3):
+        vj.update(app2, 1 / 30)
+    check(vj._runs(app2)[2].src_key == own and vj._pool(app2)[own][0] is own_src,
+          "the clip done: the deck's own video back, the same one still running")
     vj.close(app2)
 else:
     print("     (no ffmpeg: the real file is left out)")

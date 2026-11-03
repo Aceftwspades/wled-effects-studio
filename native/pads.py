@@ -511,8 +511,8 @@ def press(app, c, f=None, xy=None, pressure=None):
         return
     if kind == "clip":                                              # a video clip: started (again, from In) - a
         from native import vj_clips                                 # loop pressed while it plays, a toggle on:
-        on = vj_clips.playing(app, c["id"])                         # stopped; a hold stops on its release
-        if typ == "trigger":
+        on = vj_clips.held(app, c["id"])                            # stopped; a hold stops on its release; one
+        if typ == "trigger":                                        # in its release: started again
             r["flash"][c["id"]] = time.monotonic()
         if on and (typ == "toggle" or (typ == "trigger" and t.get("mode") == "loop")):
             vj_clips.stop(app, c["id"])
@@ -700,6 +700,7 @@ def forget(app, c):
     if t.get("kind") == "pad_clip":
         from native import vj_clips
         vj_clips.stop(app, c["id"])
+        vj_clips.stop(app, ("try", c["id"]))                       # and the editor's Play of it
     for k in (c["id"], ("xy", c["id"]), ("pos", c["id"])):
         r["on"].pop(k, None)
     r["flash"].pop(c["id"], None)

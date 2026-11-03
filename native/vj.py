@@ -374,8 +374,9 @@ def _open(app, s, key):
         dec, has_alpha = video.alpha_of(path)                 # a file with transparency: read as RGBA, kept
         whole = bool(key[-1])                                 # fit or tile: the whole picture, clear bars round it
         cut = a > 0 or b > a                                  # In/Out: run again from In each time (not -stream_loop)
+        once = bool(s.get("once"))                            # a pad's one shot: played through once, then it ends
         return video.FfmpegSource(args + dec + ["-i", path], os.path.basename(path), "file", w, h, realtime=True,
-                                  loop=not cut, rerun=cut, fps=video.FILE_FPS, alpha=has_alpha or whole, fit=whole)
+                                  loop=not cut and not once, rerun=cut and not once, fps=video.FILE_FPS, alpha=has_alpha or whole, fit=whole)
     return video.open_source(kind, path=s.get("url") if kind == "stream" else s.get("path"), name=s.get("name"),
                              width=w, height=h, loop=True)
 
@@ -397,7 +398,8 @@ def _source(app, i, run, deck):
     now = time.monotonic()
     tried = app.__dict__.setdefault("_vj_pool_at", {})       # key -> [when it was opened, the wait before again]
     ent, t = pool.get(key), tried.get(key)
-    if ent is not None and t is not None and now - t[0] >= t[1] and _dead(ent[0]):
+    if ent is not None and t is not None and now - t[0] >= t[1] and _dead(ent[0]) and not s.get("take"):
+        # (a pad's clip that ended or would not open is not opened again: its last picture held till it is let go)
         # failed to open (a file copied in since), or a stream or webcam that dropped: tried again, the last
         # picture held meanwhile - after REOPEN_S, twice as long each time it fails again (up to REOPEN_MAX_S;
         # one that showed pictures before it stopped: REOPEN_S again)
@@ -442,6 +444,9 @@ def _release(app):
     """Sources no deck looks at any more, closed."""
     pool = _pool(app)
     used = {r.src_key for r in _runs(app)}
+    for i, d in enumerate(options(app)["decks"]):            # a deck a pad's clip covers: its own video kept open,
+        if vj_clips.level(app, i) is not None:               # rolling on under the clip, there again when it ends
+            used.add(source_key(app, d["source"], whole_picture(d)))
     for key in [k for k in pool if k not in used]:
         app.__dict__.get("_vj_pool_at", {}).pop(key, None)
         src = pool.pop(key)[0]
@@ -450,6 +455,15 @@ def _release(app):
                 src.close()
             except Exception:
                 pass
+
+
+def clip_ended(app, i, take):
+    """Whether deck i's pad clip of this take has played to its end (or would not open)."""
+    key = _runs(app)[i].src_key
+    if not key or key[0] != "file" or key[-1] != take:
+        return False
+    ent = _pool(app).get(key)
+    return ent is not None and _dead(ent[0])
 
 
 def close(app):

@@ -1239,22 +1239,26 @@ named Clips. Pick a clip pad and its **CLIP** section sets:
   round again until it is let go);
 - **its part of the file**: the strip shows the file's frames end to end -
   drag the left handle (In) and the right one (Out), or type **in** and
-  **out** (out at the file's end: to its end, whatever its length). **Play** tries it as the pad would;
-  a line on the strip shows where it is;
+  **out** (out at the file's end: to its end, whatever its length). **Play** tries it as the pad would
+  (it stops when you pick another pad or leave Edit); a line on the strip
+  shows where it is;
 - **its envelope**, drawn as you set it: up over the **attack**, down to
   the **sustain** over the **decay**, held, and down over the **release**
-  once it is let go - a one shot's release timed to end at its Out - and
-  its **level** at the top.
+  once it is let go - a one shot's release timed to end at its Out (one
+  shorter than its release rises over its attack first, then fades for
+  what is left) - and its **level** at the top.
 
 The pad's kind says how it plays: a **button that fires once** plays a one
 shot from In each press (again from In if pressed while it plays) and
 starts or stops a loop; **on and off** starts and stops it; **while held**
 plays it while held (a one shot stops at Out) and fades it over its
-release when let go. A pad is lit while its clip plays. One clip a deck: a
+release when let go. Pressed while it fades, a pad starts its clip again.
+A pad is lit while its clip plays. One clip a deck: a
 second on the same deck takes the first's place, its attack starting from
 where the first's level was, so nothing jumps. The deck shows a clip
 through its own look when that is a video look (Thermal, Mosaic...), else
-as it is (Clean).
+as it is (Clean). The deck's own video keeps running under a clip, and is
+there again when the clip ends.
 
 **Edit** lays the bank out (the pads do nothing meanwhile - from the
 mouse, the phone or a controller): click an empty

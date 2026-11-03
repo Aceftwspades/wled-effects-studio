@@ -19,6 +19,7 @@ saved: a project switched or the VJ closed lets every clip go.
     play(app, t, owner)            # a pad (owner: its id) starts t
     stop(app, owner)               # its release begins
     playing(app, owner)            # lit
+    held(app, owner)               # started and not let go (a press in its release starts it again)
     tick(app)                      # each frame (vj.update): the envelopes moved on, the one-shots ended
     deck(app, i, d)                # deck i's settings as it draws: the clip's source and look over its own
     level(app, i)                  # deck i's level while a clip plays, or None
@@ -79,8 +80,10 @@ def play(app, t, owner):
     rt = _rt(app)
     old = rt.get(t["deck"])
     app._vj_clip_take = getattr(app, "_vj_clip_take", 0) + 1
+    lv = old["lv"] if old else 0.0
     rt[t["deck"]] = {"owner": owner, "t": t, "take": app._vj_clip_take, "pressed": clock.now(), "t0": None,
-                     "at": clock.now(), "gate": True, "stage": "a", "lv": old["lv"] if old else 0.0, "rate": 0.0}
+                     "at": clock.now(), "gate": True, "stage": "a", "lv": lv, "rate": 0.0,
+                     "rise": (1.0 - lv) * float(t["attack"])}     # its attack's seconds, from the level it took over
 
 
 def stop(app, owner):
@@ -96,16 +99,30 @@ def stop_deck(app, i):
         _gate_off(p)
 
 
-def _gate_off(p):
+def _gate_off(p, left=None):
+    """Into its release: over the release's seconds - or `left`, a one shot's time to its Out."""
     p["gate"] = False
     p["stage"] = "r"
-    rel = float(p["t"]["release"])
+    rel = float(p["t"]["release"]) if left is None else left
     p["rate"] = p["lv"] / rel if rel > 0 else float("inf")
 
 
 def playing(app, owner):
     """Whether a clip `owner` started is playing (its release counts)."""
     return any(p["owner"] == owner for p in _rt(app).values())
+
+
+def held(app, owner):
+    """Whether a clip `owner` started is on and not let go yet (in its release it is not: pressed, it starts again)."""
+    return any(p["owner"] == owner and p["gate"] for p in _rt(app).values())
+
+
+def stop_tries(app, keep=None):
+    """The clips the editor's Play started let go - all but the one for the pad `keep` (its id)."""
+    for p in _rt(app).values():
+        o = p["owner"]
+        if isinstance(o, tuple) and o[0] == "try" and o[1] != keep and p["gate"]:
+            _gate_off(p)
 
 
 def started(app, i, take):
@@ -117,8 +134,10 @@ def started(app, i, take):
 
 
 def tick(app):
-    """Each frame: every clip's envelope moved on; a one-shot let go in time for its release to end at its Out; a
-    clip whose release is done taken off its deck."""
+    """Each frame: every clip's envelope moved on; a one-shot let go in time for its release to end at its Out (not
+    before its attack is up: a release longer than the part is shortened to what is left), or at the file's end when
+    its length is not known; a clip whose release is done taken off its deck."""
+    from native import vj
     now = clock.now()
     rt = _rt(app)
     for i in list(rt):
@@ -132,13 +151,17 @@ def tick(app):
             continue                                        # the last picture held, at the level it had
         if p["gate"] and t["mode"] == "oneshot":
             n = length(app, t)
-            off_at = None if n is None else max(0.0, n - float(t["release"]))
-            past = None if off_at is None else now - p["t0"] - off_at
-            if past is not None and past >= 0:              # let go part-way through this frame: the frame's
-                pre = max(0.0, dt - past)                   # time before it held, the rest released
-                _env(p, pre)
-                _gate_off(p)
-                dt -= pre
+            if n is None:
+                if vj.clip_ended(app, i, p["take"]):        # no length known (no ffprobe): let go at its end
+                    _gate_off(p)
+            else:
+                off_at = min(n, max(n - float(t["release"]), p["rise"]))
+                past = now - p["t0"] - off_at
+                if past >= 0:                               # let go part-way through this frame: the frame's
+                    pre = max(0.0, dt - past)               # time before it held, the rest released
+                    _env(p, pre)
+                    _gate_off(p, n - off_at)
+                    dt -= pre
         _env(p, dt)
         if p["stage"] == "off":
             del rt[i]
@@ -184,7 +207,8 @@ def deck(app, i, d):
     lk = vj_looks.LOOKS.get(d.get("look"))
     look = d.get("look") if lk is not None and lk.family == "video" else "Clean"
     src = {"kind": "file", "path": t["file"], "files": [], "clip": 0, "speed": 1.0, "in": float(t["in"]),
-           "out": float(t["out"]), "advance": "off", "take": p["take"], "name": "", "url": ""}
+           "out": float(t["out"]), "advance": "off", "take": p["take"], "once": t["mode"] == "oneshot", "name": "",
+           "url": ""}                                       # once: a one shot's file not run round again
     return dict(d, source=src, look=look, _clip_take=p["take"])
 
 

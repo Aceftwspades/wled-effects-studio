@@ -1130,7 +1130,9 @@ def poll(app):
     and, shown or not, what was typed into it saved once the typing stops."""
     import time
     _flush(app, time.monotonic())
-    if not dpg.does_item_exist(TAG) or not dpg.is_item_shown(TAG):
+    shown = dpg.does_item_exist(TAG) and dpg.is_item_shown(TAG)
+    clip_ui.keep_try(app, shown and getattr(app, "_pads_edit", False))
+    if not shown:
         if getattr(app, "_pads_drag", None) is not None:
             app._pads_drag = None
             pads.let_go(app)

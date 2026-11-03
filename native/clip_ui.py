@@ -354,7 +354,7 @@ def _try(app):
     if t is None:
         return
     owner = ("try", s["id"])
-    if vj_clips.playing(app, owner):
+    if vj_clips.held(app, owner):
         vj_clips.stop(app, owner)
         return
     vj_clips.play(app, t, owner)
@@ -363,6 +363,13 @@ def _try(app):
 
 
 # --- each frame -----------------------------------------------------------------------------------------------
+def keep_try(app, editing):
+    """Each frame (pads_ui.poll, the window shown or not): a clip the editor's Play started let go once its pad is
+    no longer the one edited - another picked, Edit left, the window closed, the pad gone."""
+    s, t = _clip(app) if editing else (None, None)
+    vj_clips.stop_tries(app, keep=s["id"] if t is not None else None)
+
+
 def poll(app):
     """While the CLIP rows show: the strip drawn when it changes (its frames come in, it plays), In and Out dragged."""
     s, t = _clip(app)
@@ -386,7 +393,7 @@ def poll(app):
         elif dur:
             v = max(0.0, min(dur, (mx - x0) / w * dur))
             _set_part(app, drag, v if drag == "in" or v < dur - dur * 0.01 else dur)
-    playing = vj_clips.playing(app, ("try", s["id"]))
+    playing = vj_clips.held(app, ("try", s["id"]))
     dpg.configure_item("pads_clip_play", label="Stop" if playing else "Play")
     key = (t["file"], t["in"], t["out"], _THUMBS.get(_strip_key(app, t)) is not None, _playhead(app, t) is not None
            and round(_playhead(app, t), 1))
