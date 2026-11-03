@@ -205,7 +205,7 @@ check(vj._runs(app)[0].canvas is not None, "the bred flame draws")
 
 # a look file of the project's
 path = vj_looks.new_user_look(app.project, "Pull Rings")
-errs = vj_looks.load_user(app.project)
+errs = vj_looks.load_user(app.project, allow_py=True)
 check(not errs and vj_looks.LOOKS.get("Pull Rings") and vj_looks.LOOKS["Pull Rings"].family == "yours", "a look file loaded")
 o["decks"][0]["look"] = "Pull Rings"
 vj.update(app, 1 / 40)
@@ -215,28 +215,28 @@ check(vj._runs(app)[0].canvas is not None and not vj._runs(app)[0].error, "it dr
 d_looks = os.path.dirname(path)
 for fn, name in (("plasma_too.py", "Plasma"), ("same_a.py", "Same"), ("same_b.py", "Same")):
     open(os.path.join(d_looks, fn), "w").write(f'NAME = "{name}"\ndef draw(c, st):\n    return c.grad(c.u)\n')
-errs = vj_looks.load_user(app.project)
+errs = vj_looks.load_user(app.project, allow_py=True)
 check(any(f == "plasma_too.py" and "built-in" in e for f, e in errs) and vj_looks.look_source("Plasma") == ("builtin", None)
       and vj_looks.LOOKS["Plasma"] is not None and "Same" in vj_looks.LOOKS, "a built-in's name refused")
 for fn in ("plasma_too.py", "same_a.py"):
     os.remove(os.path.join(d_looks, fn))
-vj_looks.load_user(app.project)
+vj_looks.load_user(app.project, allow_py=True)
 check("Plasma" in vj_looks.LOOKS and "Same" in vj_looks.LOOKS, "one of two of a name gone: the other's look stays")
 os.remove(os.path.join(d_looks, "same_b.py"))
-vj_looks.load_user(app.project)
+vj_looks.load_user(app.project, allow_py=True)
 check("Same" not in vj_looks.LOOKS, "the last gone: the name too")
 time.sleep(0.05)
 open(path, "w").write("NAME = 'Pull Rings'\ndef draw(c, st):\n    return 1 / 0\n")
 os.utime(path, (time.time() + 5, time.time() + 5))
-vj_looks.load_user(app.project)
+vj_looks.load_user(app.project, allow_py=True)
 vj.update(app, 1 / 40)
 check("ZeroDivisionError" in vj._runs(app)[0].error, "saved with a mistake: the deck says so")
 open(path, "w").write("NAME = 'Pull Rings'\nVIDEO = True\n")
 os.utime(path, (time.time() + 10, time.time() + 10))
-errs = vj_looks.load_user(app.project)
+errs = vj_looks.load_user(app.project, allow_py=True)
 check(errs and "draw" in errs[0][1] and "Pull Rings" not in vj_looks.LOOKS, "no draw(): said, not listed")
 os.remove(path)
-vj_looks.load_user(app.project)
+vj_looks.load_user(app.project, allow_py=True)
 check("Pull Rings" not in vj_looks.LOOKS, "deleted: gone")
 vj.close(app)
 
@@ -551,10 +551,10 @@ os.makedirs(d, exist_ok=True)
 open(os.path.join(d, "glow.glsl"), "w").write("// NAME: Glow\nvoid mainImage(out vec4 c, in vec2 p) { c = vec4(p.x / iResolution.x, iBass, 0.5, 1.0); }\n")
 open(os.path.join(d, "bad.glsl"), "w").write("void mainImage(out vec4 c, in vec2 p) { c = vec4(nope, 1.0); }\n")
 open(os.path.join(d, "wavy.milk"), "w").write("[preset00]\nzoom=1.02\nper_frame_1=rot = 0.02;\n")
-errs = vj_looks.load_user(app.project)
+errs = vj_looks.load_user(app.project, allow_py=True)
 check("Glow" in vj_looks.LOOKS and "Milk: wavy" in vj_looks.LOOKS and vj_looks.LOOKS["Milk: wavy"].family == "milkdrop",
       "a .glsl shader and a .milk preset listed")
-again = vj_looks.load_user(app.project)
+again = vj_looks.load_user(app.project, allow_py=True)
 check(again == errs, "a file's load error kept while it stands, not only said once")
 ok, why = vj_glsl.available()
 if ok:
@@ -576,7 +576,7 @@ else:
     print("skip shaders: " + why)
 for f in ("glow.glsl", "bad.glsl", "wavy.milk"):
     os.remove(os.path.join(d, f))
-vj_looks.load_user(app.project)
+vj_looks.load_user(app.project, allow_py=True)
 check("Glow" not in vj_looks.LOOKS and "Milk: wavy" not in vj_looks.LOOKS, "their files gone: unlisted")
 vj.close(app)
 
@@ -1256,12 +1256,137 @@ oe = vj.options(ae)
 oe["decks"][0]["look"] = vj.EFFECT
 run_e = vj._runs(ae)[0]
 run_e.led = np.full((g.h, g.w, 3), 7, np.uint8)
-run_e.canvas = np.ones((72, 96, 3), np.float32)
 vj_clips.play(ae, dict(vj_clips.DEFAULT, file="x.mp4", deck=0), "e")
-pic = vj.deck_led(ae, 0)
-check(pic is not None and pic.mean() > 100, "a clip on an Effect deck: its picture shows, not the effect's")
+vj._clip_runs(ae)[0].canvas = np.ones((72, 96, 3), np.float32)
+vj_clips._rt(ae)[0]["lv"] = 0.5
+pic, full = vj.deck_led(ae, 0), vj.to_shape(ae, np.ones((72, 96, 3), np.float32))
+want = np.clip(7 * 0.5 + full.astype(np.float32) * 0.5 + 0.5, 0, 255).astype(np.uint8)
+check(pic is not None and np.abs(pic.astype(int) - want).max() <= 1 and vj.knob_value(ae, 0, "level") == 1.0,
+      "a clip on deck A (an Effect): laid over the effect by its envelope - half way, half of each - the deck's "
+      "level its own")
 vj_clips.let_go(ae)
 check(vj.deck_led(ae, 0).mean() == 7, "the clip done: the effect again")
+# a clip on deck A over a look: the look goes on under it (not cut to black at the press), A's level its own
+aa = App(g)
+oa = vj.options(aa)
+oa["decks"][0].update(look="Plasma", level=1.0)
+oa["fader"] = 0.0
+vj.update(aa, 1 / 30)
+before = vj.deck_led(aa, 0).astype(int).mean()
+vj_clips.play(aa, dict(vj_clips.DEFAULT, file="x.mp4", deck=0), "a")
+vj.update(aa, 1 / 30)
+check(abs(vj.deck_led(aa, 0).astype(int).mean() - before) < 25 and vj.knob_value(aa, 0, "level") == 1.0,
+      "a clip pressed on deck A: the deck's look still shows (the clip fades up over it)")
+vj.close(aa)
+# round 2: sources let go at the frame's end; a render opens in place; one open at a time across a close
+import threading as _th                                       # noqa: E402
+
+
+class _Src:
+    live, most, lock = 0, 0, _th.Lock()
+
+    def __init__(self, key, wait=0.0):
+        with _Src.lock:
+            _Src.live += 1
+            _Src.most = max(_Src.most, _Src.live)
+        time.sleep(wait)
+        with _Src.lock:
+            _Src.live -= 1
+        self.key, self.closed, self.n, self.error, self.paused = key, False, 1, None, False
+        self.thread = _th.Thread(target=lambda: None)
+
+    def latest(self):
+        return np.full((8, 8, 3), 100, np.uint8), self.n
+
+    def close(self):
+        self.closed = True
+
+
+def _stream(url):
+    return vj.json_copy(dict(vj.SOURCE, kind="stream", url=url))
+
+
+real_open = vj._open
+try:
+    vj._open = lambda app, s, key: _Src(key)
+    ak = App(g)
+    ok_ = vj.options(ak)
+    ok_["decks"][2].update(look="Clean", source=_stream("c-own"), level=1.0)
+    opened(ak)                                               # deck C's own video open
+    vj_clips.play(ak, dict(vj_clips.DEFAULT, file="x.mp4", mode="loop", attack=0.0, release=0.0), "c")
+    opened(ak)                                               # a clip over it
+    own_c = vj._pool(ak).get(vj.source_key(ak, ok_["decks"][2]["source"]))
+    vj_clips.stop(ak, "c")                                   # deck C's clip ends this frame - and deck A changes
+    ok_["decks"][0].update(look="Clean", source=_stream("a-new"))
+    vj.update(ak, 1 / 30)
+    own_c2 = vj._pool(ak).get(vj.source_key(ak, ok_["decks"][2]["source"]))
+    check(own_c is not None and own_c2 is own_c and not own_c[0].closed,
+          "a clip ending as another deck changes its source: the deck's own video under it not closed")
+    vj.close(ak)
+    # a render (the clock held): opened in place, its picture in the first frame drawn
+    vj._open = lambda app, s, key: _Src(key, 0.2)
+    ah = App(g)
+    vj.options(ah)["decks"][0].update(look="Clean", source=_stream("render"))
+    clock.hold()
+    try:
+        vj.update(ah, 1 / 30)
+        check(vj._runs(ah)[0].video is not None, "a render: a deck's video in the first frame (opened in place)")
+    finally:
+        clock.release()
+    vj.close(ah)
+    # closed while a camera opens, then opened again: the camera not opened twice at once
+    _Src.most = 0
+    vj._open = lambda app, s, key: _Src(key, 0.4)
+    ac = App(g)
+    vj.options(ac)["decks"][0].update(look="Clean", source=_stream("cam"))
+    vj.update(ac, 1 / 30)
+    vj.close(ac)
+    for _ in range(10):
+        vj.update(ac, 1 / 30)
+        time.sleep(0.02)
+    time.sleep(0.9)
+    opened(ac)
+    check(_Src.most == 1 and vj._pool(ac), f"closed while it opened, then shown again: one open at a time "
+          f"({_Src.most}), and it opens after")
+    vj.close(ac)
+finally:
+    vj._open = real_open
+# an undo in the VJ keeps the live mix: on air, the fader, deck C's level - the first undo of a new project too
+from native.project import Project                          # noqa: E402
+au = App(g)
+au.project = Project(os.path.join(tempfile.mkdtemp(), "u"))
+au.project.geometry = g
+ou = vj.options(au)
+au.project.save()                                            # (the VJ made: its first entry is "none yet")
+ou["decks"][0]["hue"] = 0.4
+au.project.save()
+ou.update(on=True, fader=1.0)
+ou["decks"][2]["level"] = 1.0                                # (deck C put on by its auto-mix)
+ou["decks"][1]["hue"] = 0.2
+au.project.save()
+n = 0
+while au.project.undo("vj"):
+    n += 1
+ou = vj.options(au)
+check(n >= 2 and ou["on"] is True and ou["fader"] == 1.0 and ou["decks"][2]["level"] == 1.0
+      and ou["decks"][0]["hue"] == 0.0 and ou["decks"][1]["hue"] == 0.0,
+      f"every VJ undo taken, back to before the VJ was made: the knobs back, on air, the fader and deck C's level "
+      f"kept ({n} undos, on {ou['on']}, fader {ou['fader']}, C {ou['decks'][2]['level']})")
+# a show's VJ step: the journal sees the desk it took over, not the step's decks
+av = App(g)
+av.project = Project(os.path.join(tempfile.mkdtemp(), "v"))
+av.project.geometry = g
+ov = vj.options(av)
+ov["decks"][0]["look"] = "Plasma"
+av.project.save()
+step = {"vj": {"decks": vj.json_copy(ov["decks"])}}
+step["vj"]["decks"][0]["look"] = "Tunnel"
+vj.apply_step(av, step, playing=True)
+av.project.save()                                            # something saved while the show has the VJ
+vj.restore_desk(av)
+av.project.save()
+undone = av.project.undo("vj") and vj.options(av)["decks"][0]["look"] == "Tunnel"
+check(not undone, "a show's VJ step: an undo after it does not put the step's decks on the desk")
 # a project's bred flames listed when it is opened
 af = App(g)
 of = vj.options(af)
@@ -1329,6 +1454,28 @@ ramp = Image.fromarray(np.tile(np.linspace(0, 65535, 64).astype("<u2"), (8, 1)))
 e8 = np.asarray(vj_looks.eight_bit(ramp).convert("RGB"))
 check(30 < e8.mean() < 220 and e8[:, 0].max() < 10 and e8[:, -1].min() > 245, f"a 16-bit picture: a ramp, not all "
       f"white ({e8.mean():.0f})")
+flt = np.asarray(vj_looks.eight_bit(Image.fromarray(np.full((4, 4), 200.0, np.float32))).convert("RGB"))
+unit = np.asarray(vj_looks.eight_bit(Image.fromarray(np.full((4, 4), 0.5, np.float32))).convert("RGB"))
+check(abs(int(flt.mean()) - 200) <= 1 and abs(int(unit.mean()) - 128) <= 1,
+      f"a float picture of 0..255 kept as it is, one of 0..1 scaled ({flt.mean():.0f}, {unit.mean():.0f})")
+# the canvas grid shared by the decks: read only (a look's c.x *= 3 grew it for every deck)
+gx = vj._grid(16, 12)[2]
+try:
+    gx *= 3.0
+    check(False, "the shared grid written in place")
+except ValueError:
+    check(float(gx.max()) < 2.0, "the shared grid: read only")
+# a project's Python looks run only when allowed: loading them is off unless said
+pp = App(g)
+os.makedirs(vj_looks.user_dir(pp.project), exist_ok=True)
+with open(os.path.join(vj_looks.user_dir(pp.project), "ran.py"), "w") as f:
+    f.write("import builtins" + chr(10) + "builtins._vj_ran = True" + chr(10) + "def draw(c, st):" + chr(10)
+            + "    return None" + chr(10))
+import builtins                                             # noqa: E402
+builtins._vj_ran = False
+vj_looks.load_user(pp.project)
+check(not builtins._vj_ran, "a project's Python look: not run by load_user unless allowed")
+vj_looks.load_user(pp.project, allow_py=False)
 # the Image look's errors: no picture, and a file that will not read (each frame)
 ist, ictx = {}, SimpleNamespace(w=16, h=12, image_path="", deck={}, t=0.0, amount=0.0, beat=0.0)
 msgs = []

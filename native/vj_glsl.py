@@ -356,15 +356,22 @@ class _GL:
         if got is None or got[0] != mt:
             from PIL import Image
             try:                                                 # a file that is not a picture: none (the caller's
-                from native import vj_looks
-                im = vj_looks.eight_bit(Image.open(path)).convert("RGBA").transpose(Image.FLIP_TOP_BOTTOM)  # kept
-                t = self.ctx.texture(im.size, 4, im.tobytes())   # so until it changes - not opened every frame
+                from native import vj_looks                      # black or noise), kept so until it changes - not
+                im = vj_looks.eight_bit(Image.open(path)).convert("RGBA")       # opened every frame
+                im.thumbnail((PIC_MAX, PIC_MAX), Image.LANCZOS)  # (a phone's photo: not 96 MB of the card's a picture)
+                im = im.transpose(Image.FLIP_TOP_BOTTOM)
+                t = self.ctx.texture(im.size, 4, im.tobytes())
                 t.repeat_x = t.repeat_y = True
             except Exception:
                 t = None
             if got and got[1] is not None:
                 got[1].release()
-            got = self.pics[path] = (mt, t)
+            self.pics.pop(path, None)
+            got = self.pics[path] = (mt, t)                      # the newest last: the oldest let go past PICS_MAX
+            while len(self.pics) > PICS_MAX:
+                old = self.pics.pop(next(iter(self.pics)))
+                if old[1] is not None:
+                    old[1].release()
         return got[1]
 
     def _buffer(self, key, name, w, h):
@@ -628,6 +635,8 @@ def from_shadertoy(data):
 _FN_MACRO = re.compile(r"^(\s*#\s*define\s+)([A-Za-z_]\w*)\(", re.M)
 
 
+PIC_MAX = 1024                      # a shader's picture at most this many pixels a side (the canvas is far smaller)
+PICS_MAX = 16                       # the shader pictures kept on the card (the oldest let go)
 _WEBGL = {}                         # a pass's code -> made to compile as in WebGL (a scan a macro: once, not a frame)
 
 

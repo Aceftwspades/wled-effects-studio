@@ -280,7 +280,7 @@ try:
         check(lv == 1.0 and vj_clips._rt(app4)[2]["stage"] == "r", f"up over its attack, held ({lv}) - "
               "with no Out, it stays until the next press lets it fade")
         pads.press(app4, phone_pad)
-        check(vj_clips.deck(app4, 0, vj.options(app4)["decks"][0])["source"]["kind"] == "phone",
+        check(vj_clips.clip_deck(app4, 0, vj.options(app4)["decks"][0])["source"]["kind"] == "phone",
               "the phone's camera on deck A, while held")
         pads.release(app4, phone_pad)
         check(not vj_clips.held(app4, phone_pad["id"]), "let go: it fades")
@@ -290,6 +290,8 @@ try:
     pads.current(st4)["controls"].remove(phone_pad)
     app4._vj_tick = 0
     vj._warm_cams(app4)
+    check(app4.__dict__.pop("_vj_release_due", False), "a camera no pad brings up: let go at the frame's end")
+    vj._release(app4)
     phone_cam = next(c for c in FakeCam.opened if c.key[0] == "phone")
     check(phone_cam.closed and not FakeCam.opened[0].closed, "a camera no pad brings up any more: closed")
     vj.close(app4)
@@ -382,6 +384,24 @@ if shutil.which("ffmpeg") and shutil.which("ffprobe"):
     check(vj_clips._rt(app2)[2]["t0"] is not None and run.video is not None and run.canvas is not None
           and run.canvas.max() > 0.2, "a real clip on deck C: its first picture started it, the deck draws it")
     vj.close(app2)
+
+    # a real clip on deck A: drawn beside the deck and laid over its look, the look still drawn under it
+    app6 = App(g)
+    o6 = vj.options(app6)
+    o6["on"], o6["fader"] = True, 0.0
+    o6["decks"][0].update(look="Plasma", level=1.0)
+    vj_clips.play(app6, dict(vj_clips.DEFAULT, file=path, mode="loop", attack=0.0, deck=0), "overA")
+    end = time.time() + 8
+    while time.time() < end and (vj_clips._rt(app6)[0]["t0"] is None or vj._clip_runs(app6)[0].canvas is None):
+        vj.update(app6, 1 / 30)
+        time.sleep(0.02)
+    vj.update(app6, 1 / 30)
+    own = vj.to_shape(app6, vj._runs(app6)[0].canvas)
+    shown = vj.deck_led(app6, 0)
+    check(vj._clip_runs(app6)[0].canvas is not None and vj._runs(app6)[0].look == "Plasma"
+          and np.abs(shown.astype(int) - own.astype(int)).mean() > 5,
+          "a real clip on deck A: laid over the deck's look (the look drawn under it)")
+    vj.close(app6)
 
     # the deck's own video kept open under a clip, there again when it ends; a whole-file one shot with no length
     # known let go at the file's end

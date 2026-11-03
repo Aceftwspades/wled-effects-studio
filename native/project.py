@@ -125,6 +125,55 @@ import threading
 _SAVE_LOCK = threading.RLock()
 
 
+def _path_get(d, f):
+    """d's value at f - a key, or a path of keys and list indexes - or _NONE."""
+    for k in (f if isinstance(f, tuple) else (f,)):
+        try:
+            d = d[k]
+        except (KeyError, IndexError, TypeError):
+            return _NONE
+    return d
+
+
+def _path_pop(d, f):
+    *up, last = f if isinstance(f, tuple) else (f,)
+    d = _path_get(d, tuple(up)) if up else d
+    try:
+        if isinstance(d, dict):
+            d.pop(last, None)
+        elif isinstance(d, list) and isinstance(last, int) and -len(d) <= last < len(d):
+            d[last] = None
+    except TypeError:
+        pass
+
+
+def _path_copy(src, dst, f, make=False):
+    """dst given src's value at f, where both have the place for it (make: dst's places made - dicts, and lists
+    of None up to the index, which the option's own reader fills)."""
+    v = _path_get(src, f)
+    *up, last = f if isinstance(f, tuple) else (f,)
+    if make and v is not _NONE:
+        d = dst
+        for k, nxt in zip(up, up[1:] + [last]):
+            if isinstance(d, dict):
+                d = d.setdefault(k, [] if isinstance(nxt, int) else {})
+            elif isinstance(d, list) and isinstance(k, int):
+                d.extend([None] * (k + 1 - len(d)))
+                if not isinstance(d[k], (dict, list)):
+                    d[k] = [] if isinstance(nxt, int) else {}
+                d = d[k]
+    d = _path_get(dst, tuple(up)) if up else dst
+    if v is _NONE or d is _NONE:
+        return
+    if isinstance(d, dict):
+        d[last] = v
+    elif isinstance(d, list) and isinstance(last, int) and -len(d) <= last < len(d):
+        d[last] = v
+
+
+_NONE = object()
+
+
 class Project:
     def __init__(self, path):
         self.path = os.path.abspath(path)
@@ -177,15 +226,21 @@ class Project:
     # fields of those that are where the user is, not an edit: no undo of their own, and an undo leaves them be
     # (the pads' bank shown - a show switching banks would push its layout edits out of the undo; their next id -
     # an undo putting it back handed a removed control's id, and what it left running, to the next one made)
-    # (the VJ on air and its fader: the live mix, never taken back by an undo of a knob - Ctrl+Z cut the stream
-    # back to an old fader)
-    UNDO_SKIP = {"pads": ("bank", "next_id"), "vj": ("on", "fader")}
+    # (the VJ's live mix, never taken back by an undo of a knob - Ctrl+Z cut the stream back to an old fader, took
+    # deck C off the air its auto-mix had put it on, started a Mutate or a breath over: on air, the fader, deck C's
+    # level and each deck's morph; a field is a name, or a path into the dict)
+    UNDO_SKIP = {"pads": ("bank", "next_id"),
+                 "vj": ("on", "fader", ("decks", 2, "level")) + tuple(("decks", i, "morph") for i in range(3))}
 
     def _snap(self, k):
-        v = self.options.get(k)
+        view = getattr(self, "save_view", None)          # what is saved (a show's VJ steps hold the decks: the
+        opts = view(self.options) if view else self.options   # desk they took over), not what is on screen
+        v = opts.get(k)
         skip = self.UNDO_SKIP.get(k)
         if skip and isinstance(v, dict):
-            v = {f: x for f, x in v.items() if f not in skip}
+            v = json.loads(json.dumps(v))
+            for f in skip:
+                _path_pop(v, f)
         return json.dumps(v, sort_keys=True)
 
     def load(self):
@@ -310,10 +365,13 @@ class Project:
             give_t[key].append(take_t[key].pop() if take_t[key] else 0)
         val = json.loads(take[key].pop())
         was = self.options.get(key)
-        if isinstance(val, dict) and isinstance(was, dict):
-            for f in self.UNDO_SKIP.get(key, ()):
-                if f in was:
-                    val[f] = was[f]
+        skip = self.UNDO_SKIP.get(key, ())
+        made = val is None and skip and isinstance(was, dict)
+        if made:                                              # back to before it was made (a new project's first
+            val = {}                                          # entry): what is live kept still, in what it is
+        if isinstance(val, dict) and isinstance(was, dict):   # made again from
+            for f in skip:
+                _path_copy(was, val, f, make=made)
         if val is None:
             self.options.pop(key, None)
         else:

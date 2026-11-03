@@ -348,8 +348,24 @@ def _chosen(app, a):
     if not f or not os.path.isfile(f):
         return
     proj, into = app.project, _into(app)
+    sel, _ = _clip(app)
+    cid = sel["id"] if sel else None                 # the pad it was chosen for (another may be picked meanwhile)
     tasks.run(app, "pads_clip_copy", f"copying {os.path.basename(f)} into the project",
-              lambda: vj.keep_media(into, f), lambda kept: app.project is proj and _set_file(app, kept))
+              lambda: vj.keep_media(into, f), lambda kept: app.project is proj and _file_of(app, cid, kept))
+
+
+def _file_of(app, cid, f):
+    """The pad `cid`'s clip given file f (its part from the start again) - the panel's, when it is the one shown."""
+    from native import pads
+    c = pads.find(_ui()._st(app), cid) if cid is not None else None
+    t = (c or {}).get("target") or {}
+    if t.get("kind") != "pad_clip":
+        return
+    t.update(file=f, **{"in": 0.0, "out": 0.0})
+    vj_clips.fill(t)
+    _ui()._save(app)
+    if _ui()._sel(app) is c:
+        fill(app, c)
 
 
 def _add_many(app, a):
@@ -362,8 +378,10 @@ def _add_many(app, a):
         return
 
     proj, into = app.project, _into(app)
+    bank = _ui()._st(app)["bank"]                    # the bank they were added from (another shown meanwhile)
     tasks.run(app, "pads_clips_copy", f"copying {len(sel)} video file(s) into the project",
-              lambda: [vj.keep_media(into, f) for f in sel], lambda kept: app.project is proj and _made(app, kept))
+              lambda: [vj.keep_media(into, f) for f in sel],
+              lambda kept: app.project is proj and _made(app, kept, bank))
 
 
 def _into(app):
@@ -372,13 +390,15 @@ def _into(app):
     return types.SimpleNamespace(project=app.project)
 
 
-def add_pads(app, kept):
+def add_pads(app, kept, bank=None):
     """One trigger pad a kept file, playing it once on deck C - in the current bank's free cells, then (it full) in
     new banks named Clips, a grid as big as they need (up to 8 x 8). [the banks' indexes used], the pads made."""
     from native import pads
     st = _ui()._st(app)
     colours = [n for n, _ in pads.COLOURS if n != "grey"]
-    b, used, made = pads.current(st), [st["bank"]], 0
+    if bank is None or not 0 <= bank < len(st["banks"]):
+        bank = st["bank"]
+    b, used, made = st["banks"][bank], [bank], 0
     for k, f in enumerate(kept):
         cell = _ui()._free_cell(b)
         if cell is None:
@@ -397,10 +417,10 @@ def add_pads(app, kept):
     return used, made
 
 
-def _made(app, kept):
+def _made(app, kept, bank=None):
     from native import pads
     ui = _ui()
-    used, made = add_pads(app, kept)
+    used, made = add_pads(app, kept, bank)
     if used[-1] != ui._st(app)["bank"]:
         ui.switch_bank(app, used[-1])                    # the new bank shown
     ui._save(app)

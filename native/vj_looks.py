@@ -924,7 +924,18 @@ def sync_flames(flames):
         if lk is None or getattr(lk, "bred", None) is not fl:
             if lk is not None and getattr(lk, "bred", None) is None:
                 continue                                      # a look of another kind has the name: it stays
+            if lk is not None and _same_flame(lk.bred, fl):
+                lk.bred = fl                                  # the same flame in a new dict (an undo's): the look
+                continue                                      # kept - a deck showing it not started again
             register_flame(name, fl)
+
+
+def _same_flame(a, b):
+    import json
+    try:
+        return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+    except (TypeError, ValueError):
+        return False
 
 
 # --- text and image: a deck's words or a picture of the user's ----------------------------------------
@@ -1108,17 +1119,19 @@ def _shift(m, dx, dy):
 
 def eight_bit(im):
     """A PIL picture of 16-bit (or 32-bit, or float) grey made 8-bit by scale - PIL's convert to RGB clipped it
-    at 255, a 16-bit picture all white."""
+    at 255, a 16-bit picture all white. Its scale from its largest value: up to 1 (a float's 0..1), 255, 65535,
+    or its own largest beyond; a 16-bit picture's transparent grey (tRNS) kept, scaled the same."""
     if im.mode not in ("I", "I;16", "I;16B", "I;16L", "I;16N", "F"):
         return im
     from PIL import Image
-    a = np.asarray(im, np.float64)
-    if im.mode == "F":
-        top = 1.0 if a.size and np.nanmax(a) <= 1.0 else 65535.0
-    else:
-        top = 65535.0 if not a.size or a.max() > 255 else 255.0
-    a = np.nan_to_num(a, nan=0.0)
-    return Image.fromarray(np.clip(a / top * 255.0 + 0.5, 0, 255).astype(np.uint8), "L")
+    a = np.nan_to_num(np.asarray(im, np.float64), nan=0.0, posinf=0.0, neginf=0.0)
+    big = float(a.max()) if a.size else 0.0
+    top = next((t for t in ((1.0,) if im.mode == "F" else ()) + (255.0, 65535.0) if big <= t), max(big, 1.0))
+    out = Image.fromarray(np.clip(a / top * 255.0 + 0.5, 0, 255).astype(np.uint8))
+    tr = im.info.get("transparency")
+    if isinstance(tr, (int, float)) and not isinstance(tr, bool):
+        out.info["transparency"] = int(max(0, min(255, round(tr / top * 255.0))))
+    return out
 
 
 @look("Image", "layer", "a picture file of the deck's - its transparency kept (or a colour or the dark keyed out), "
@@ -1211,11 +1224,11 @@ def py_files(project):
     return sorted(f for f in os.listdir(d) if f.lower().endswith(".py")) if os.path.isdir(d) else []
 
 
-def load_user(project, allow_py=True):
+def load_user(project, allow_py=False):
     """The project's own looks registered - Python looks (looks/*.py), Shadertoy shaders (*.glsl) and MilkDrop
     presets (*.milk) - again when a file has changed, gone when it has gone. [(file, error)] for every one that
-    could not be loaded (as long as it cannot). A Python look is code, run as it is: with `allow_py` False (a
-    project from elsewhere, not yet allowed on this machine) it is listed as not run, and nothing of it runs - a
+    could not be loaded (as long as it cannot). A Python look is code, run as it is: with `allow_py` False (the
+    default: a project from elsewhere, not yet allowed on this machine) it is listed as not run, and nothing of it runs - a
     .glsl or a .milk cannot run anything but its own shader or equations."""
     import os
     from native import addons

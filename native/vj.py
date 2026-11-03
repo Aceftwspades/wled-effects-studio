@@ -181,8 +181,8 @@ def _fix_deck(d):
         if len(v) != 4 or not all(isinstance(x, str) for x in v):
             d[k] = [x if isinstance(x, str) else "" for x in v[:4]] + [""] * (4 - len(v[:4]))
     s = d["source"]
-    if not all(isinstance(f, str) for f in s["files"]):     # a file that is not a name raised every frame
-        s["files"] = [f for f in s["files"] if isinstance(f, str)]
+    if not all(isinstance(f, str) and f for f in s["files"]):   # a file that is not a name raised every frame;
+        s["files"] = [f for f in s["files"] if isinstance(f, str) and f]   # an empty one shifted the picks
     col = d.get("pic_key_col")
     if not (isinstance(col, list) and len(col) == 3 and all(_finite(x) for x in col)):
         d["pic_key_col"] = list(DECK["pic_key_col"])
@@ -266,6 +266,18 @@ class DeckRun:
         self.size = None                # the canvas the look's state was made for
         self.error = ""
         self.open_error = ""            # the source's, when it could not be opened (kept until it is changed)
+
+
+def _clip_runs(app):
+    """Decks A and B's pad clips' runs: a clip there is drawn beside the deck, laid over its picture."""
+    r = app.__dict__.get("_vj_clip_runs")
+    if r is None:
+        r = app._vj_clip_runs = [DeckRun() for _ in range(2)]
+    return r
+
+
+def _all_runs(app):
+    return list(_runs(app)) + _clip_runs(app)
 
 
 def _runs(app):
@@ -414,11 +426,9 @@ def _source(app, i, run, deck):
     pool = _pool(app)
     if key != run.src_key:
         run.src_key = key
-        run.video_prev = None                                 # its last frame held until the next source's first -
-        if deck.get("_clip_take"):                            # not a pad's clip's: one that would not open showed
-            run.video = None                                  # the last clip's picture at its level
+        run.video_prev = None                                 # its last frame held until the next source's first
         run.n = -1
-        _release(app)
+        app._vj_release_due = True                            # (closed at the frame's end, every deck's key set)
     if key is None:
         run.video = None
         run.open_error = ""
@@ -432,13 +442,20 @@ def _source(app, i, run, deck):
         # picture held meanwhile - after REOPEN_S, twice as long each time it fails again (up to REOPEN_MAX_S;
         # one that showed pictures before it stopped: REOPEN_S again)
         _drop_dead(app, key)
-        for r in _runs(app):
+        for r in _all_runs(app):
             if r.src_key == key:
                 r.n = -1
     if key not in pool:
-        _open_soon(app, s, key)
-        run.open_error = ""
-        return None
+        if clock.held():                                      # a render: opened here, so no frame it draws is
+            tried[key] = [now, tried.get(key, [0, REOPEN_S])[1]]   # without its picture (the same each render)
+            try:
+                pool[key] = [_open(app, s, key), ""]
+            except Exception as e:
+                pool[key] = [None, str(e)]
+        else:
+            _open_soon(app, s, key)
+            run.open_error = ""
+            return None
     src, err = pool[key]
     run.open_error = err
     return src
@@ -469,14 +486,14 @@ def _open_soon(app, s, key):
     of a second to seconds, never on the main loop (each frame of it was the studio and the stream stopped). The
     result goes in the pool at the next frame's _collect - closed instead if nothing wants it by then, or if the
     VJ closed meanwhile."""
-    opening = app.__dict__.setdefault("_vj_opening", set())
+    opening = app.__dict__.setdefault("_vj_opening", {})    # key -> the generation it was started in
     if key in opening:
-        return
-    opening.add(key)
+        return                                                # (one from before a close too: it ends first)
+    gen = getattr(app, "_vj_gen", 0)
+    opening[key] = gen
     tried = app.__dict__.setdefault("_vj_pool_at", {})
     tried[key] = [time.monotonic(), tried.get(key, [0, REOPEN_S])[1]]
     s = json_copy(s)
-    gen = getattr(app, "_vj_gen", 0)
 
     def work():
         try:
@@ -487,7 +504,9 @@ def _open_soon(app, s, key):
             if getattr(app, "_vj_gen", 0) == gen:
                 app.__dict__.setdefault("_vj_opened", {})[key] = got
                 return
-        if got[0] is not None:                                # the VJ closed while it opened: not kept
+            if opening.get(key) == gen:                       # the VJ closed while it opened: not kept, and
+                del opening[key]                              # opened again only now it is closed
+        if got[0] is not None:
             got[0].close()
     threading.Thread(target=work, daemon=True, name="vj source").start()
 
@@ -499,12 +518,12 @@ def _collect(app):
         done = app.__dict__.pop("_vj_opened", None)
     if not done:
         return
-    pool, opening, used = _pool(app), app.__dict__.setdefault("_vj_opening", set()), _used(app)
+    pool, opening, used = _pool(app), app.__dict__.setdefault("_vj_opening", {}), _used(app)
     for key, got in done.items():
-        opening.discard(key)
+        opening.pop(key, None)
         if key in used and key not in pool:
             pool[key] = got
-            for r in _runs(app):
+            for r in _all_runs(app):
                 if r.src_key == key:
                     r.n = -1
         elif got[0] is not None:
@@ -528,9 +547,9 @@ def _dead(src):
 def _used(app):
     """The source keys something wants: a deck's, the pads' cameras, and a deck's own under a pad's clip (rolling
     on under it, there again when it ends)."""
-    used = {r.src_key for r in _runs(app)} | set(app.__dict__.get("_vj_cam_keys", ()))
+    used = {r.src_key for r in _all_runs(app)} | set(app.__dict__.get("_vj_cam_keys", ()))
     for i, d in enumerate(options(app)["decks"]):
-        if vj_clips.level(app, i) is not None:
+        if i == 2 and vj_clips.level(app, i) is not None:     # (A and B draw their own under theirs)
             used.add(source_key(app, d["source"], whole_picture(d)))
     used.discard(None)
     return used
@@ -558,7 +577,7 @@ def _warm_cams(app):
     is; one no pad uses any more closed."""
     if getattr(app, "_vj_tick", 0) % CAM_CHECK_TICKS:
         return
-    pool, opening = _pool(app), app.__dict__.setdefault("_vj_opening", set())
+    pool = _pool(app)
     tried, now = app.__dict__.setdefault("_vj_pool_at", {}), time.monotonic()
     want = {}
     for name in vj_clips.cam_names(app):
@@ -566,25 +585,30 @@ def _warm_cams(app):
         want[source_key(app, s)] = s
     gone = set(app.__dict__.get("_vj_cam_keys", ())) - set(want)
     app._vj_cam_keys = set(want)
+    if gone:
+        app._vj_release_due = True
     for key, s in want.items():
         t = tried.get(key)
         if key in pool and _dead(pool[key][0]) and (t is None or now - t[0] >= t[1]):
             _drop_dead(app, key)
         if key not in pool:
             _open_soon(app, s, key)
-    if gone:
-        _release(app)
 
 
 def clip_key(app, i):
-    """The source key deck i draws while a pad's clip plays on it."""
-    d = vj_clips.deck(app, i, options(app)["decks"][i])
+    """The source key a pad's clip on deck i draws."""
+    d = vj_clips.clip_deck(app, i, options(app)["decks"][i])
     return source_key(app, d["source"], whole_picture(d))
+
+
+def _clip_run(app, i):
+    """The run a clip on deck i draws in: deck C's own, A's or B's beside theirs."""
+    return _clip_runs(app)[i] if i < 2 else _runs(app)[i]
 
 
 def clip_ended(app, i, take):
     """Whether deck i's pad clip (or camera) has played to its end, or would not open."""
-    key = _runs(app)[i].src_key
+    key = _clip_run(app, i).src_key
     if not key or key != clip_key(app, i):
         return False
     ent = _pool(app).get(key)
@@ -600,10 +624,12 @@ def close(app):
     for src, _ in done.values():
         if src is not None:
             src.close()
-    app.__dict__.pop("_vj_opening", None)
-    for r in _runs(app):
-        r.src_key = None
+    for r in _all_runs(app):                                 # (the opens in flight stay known: _open_soon waits
+        r.src_key = None                                     # for one from before rather than open it twice)
         r.video = r.video_prev = None
+    for r in _clip_runs(app):
+        r.canvas = None
+    app._vj_release_due = False
     _release(app)
 
 
@@ -641,7 +667,10 @@ def _grid(w, h):
         u, v = np.meshgrid(np.linspace(0, 1, w, dtype=np.float32), np.linspace(0, 1, h, dtype=np.float32))
         x = (u - 0.5) * 2.0 * w / h
         y = (v - 0.5) * 2.0
-        g = _GRID[(w, h)] = (u, v, x, y, np.hypot(x, y), np.arctan2(y, x))
+        g = (u, v, x, y, np.hypot(x, y), np.arctan2(y, x))
+        for a in g:                                           # shared by every deck and look: read only (a look's
+            a.setflags(write=False)                           # c.x *= 3 grew every deck's grid for good)
+        g = _GRID[(w, h)] = g
     return g
 
 
@@ -956,7 +985,7 @@ def draw_deck(app, i, dt, snd, beat, hit):
         if run.src_key is not None:                           # an Effect deck has no video: its source let go
             run.src_key = None
             run.video = run.video_prev = None
-            _release(app)
+            app._vj_release_due = True
         run.led = _effect_frame(app, i, run, deck, speed, amount, dt)
         return
     _take_video(app, i, run, deck)
@@ -1174,10 +1203,47 @@ def deck_led(app, i):
     """Deck i's picture on the shape, (rows, cols, 3) uint8, or None before it has drawn."""
     run = _runs(app)[i]
     if _look_now(app, i) == EFFECT:
-        return run.led
-    if run.canvas is None:
-        return None
-    return to_shape(app, run.canvas)
+        own = run.led
+    else:
+        own = None if run.canvas is None else to_shape(app, run.canvas)
+    e, clip = _clip_over(app, i)
+    if clip is None:
+        return own
+    clip = to_shape(app, clip)
+    base = own.astype(np.float32) if own is not None and own.shape == clip.shape else np.zeros(clip.shape, np.float32)
+    return np.clip(base * (1.0 - e) + clip.astype(np.float32) * e + 0.5, 0, 255).astype(np.uint8)
+
+
+def _clip_over(app, i):
+    """(how much of it shows, its canvas) of a pad's clip laid over deck A or B, or (0, None)."""
+    if i >= 2:
+        return 0.0, None
+    lv = vj_clips.level(app, i)
+    c = _clip_runs(app)[i].canvas
+    if lv is None or c is None:
+        return 0.0, None
+    return max(0.0, min(1.0, lv)), c
+
+
+def _draw_clip(app, i):
+    """Deck A or B's pad clip a frame on: its newest picture taken onto its canvas (laid over the deck's own by
+    deck_led); none playing, its source let go."""
+    crun = _clip_runs(app)[i]
+    if vj_clips.level(app, i) is None:
+        if crun.src_key is not None or crun.canvas is not None:
+            crun.src_key, crun.video, crun.video_prev, crun.canvas = None, None, None, None
+            app._vj_release_due = True
+        return
+    _take_video(app, i, crun, vj_clips.clip_deck(app, i, options(app)["decks"][i]))
+    v = crun.video
+    if v is None:
+        return
+    w, h = canvas_size(app)
+    v = v[..., :3]
+    if v.shape[:2] != (h, w):
+        from PIL import Image
+        v = np.asarray(Image.fromarray((np.clip(v, 0, 1) * 255).astype(np.uint8)).resize((w, h)), np.float32) / 255.0
+    crun.canvas = np.clip(v, 0, 1).astype(np.float32)
 
 
 def _look_now(app, i):
@@ -1196,9 +1262,14 @@ def deck_alpha(app, i):
 def deck_canvas(app, i):
     """Deck i's picture for its preview: its canvas, or an Effect deck's logical grid."""
     run = _runs(app)[i]
-    if _look_now(app, i) == EFFECT:
-        return run.led
-    return None if run.canvas is None else (run.canvas * 255).astype(np.uint8)
+    own = run.led if _look_now(app, i) == EFFECT else (None if run.canvas is None else
+                                                        (run.canvas * 255).astype(np.uint8))
+    e, clip = _clip_over(app, i)
+    if clip is None:
+        return own
+    clip = clip * 255.0
+    base = own.astype(np.float32) if own is not None and own.shape == clip.shape else np.zeros(clip.shape, np.float32)
+    return np.clip(base * (1.0 - e) + clip * e + 0.5, 0, 255).astype(np.uint8)
 
 
 def _level(img, lv):
@@ -1304,7 +1375,9 @@ def update(app, dt=None):
         if run_i.src_key is not None and (dn["look"] == EFFECT or dn["source"].get("kind", "none") == "none"):
             run_i.src_key = None                            # no video shown (none, an Effect, a clip let go): its
             run_i.video = run_i.video_prev = None           # source closed, not decoding on unseen (a webcam off)
-            _release(app)
+            app._vj_release_due = True
+        if i < 2:
+            _draw_clip(app, i)                              # a pad's clip over A or B
         if i < 2:
             live = ((i == 0 and f < 1.0) or (i == 1 and f > 0.0)) and knob_value(app, i, "level") > 0.0
             live = live or i == cue
@@ -1322,6 +1395,8 @@ def update(app, dt=None):
             d = vj_clips.deck(app, i, o["decks"][i])
             if d["look"] != EFFECT and d["source"].get("kind", "none") != "none":
                 _take_video(app, i, _runs(app)[i], d)         # its video rolling on off the mix
+    if app.__dict__.pop("_vj_release_due", False):
+        _release(app)                                       # once every deck has its key: none closed under another
     _launch_due(app)
     _auto(app, hit)
     _c_update(app)
@@ -2036,7 +2111,7 @@ def project_changed(app):
               "_vj_out", "_vj_count") + tuple(f"_vj_clipbar{i}" for i in range(DECKS)):
         app.__dict__.pop(k, None)                           # a Cut waiting for the bar, the bars counted, the picture
     close(app)
-    app._vj_runs = None
+    app._vj_runs = app._vj_clip_runs = None
     for n in [n for n, lk in vj_looks.LOOKS.items() if lk.family == "flame" and n not in vj_looks.FLAMES]:
         vj_looks.LOOKS.pop(n, None)
     vj_looks._FLAMES_SEEN[0] = None                         # (listed again below, not taken as listed already)
@@ -2075,8 +2150,8 @@ KNOB_WORDS.update({f"fl_w{k}": f"flame arm {k}" for k in range(1, vj_looks.ARMS 
 def knob_value(app, i, key):
     """A deck's knob as it draws: a modulator's value over it while one moves it (vj_mod, never saved), else the
     knob's own (what the dialog, MIDI and the project have)."""
-    if key == "level":
-        lv = vj_clips.level(app, i)                         # a pad's clip playing: its level through its envelope
+    if key == "level" and i == 2:
+        lv = vj_clips.level(app, i)                         # a pad's clip on C: its level through its envelope
         if lv is not None:
             return lv
     m = getattr(app, "_vj_mod", None)

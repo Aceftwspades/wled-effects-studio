@@ -106,9 +106,9 @@ class FfmpegSource:
         # run again from its start each time it ends: a clip's In/Out points (-ss/-t), which -stream_loop does not
         # repeat (its -t ends the whole loop, its -ss is the first pass's only) - rerun instead of loop for those
         self._rerun = bool(rerun)
-        self._pace = None                                        # a rerun's frames paced here: ffmpeg's -re waits
-        if self._rerun and realtime:                             # ~0.5 s before its first frame, at every rerun
-            realtime, self._pace = False, float(fps or FILE_FPS)
+        self._pace = None                                        # a file's frames paced here: ffmpeg's -re waits
+        if realtime and (self._rerun or fps):                    # ~0.5 s before its first frame (a pad's clip
+            realtime, self._pace = False, float(fps or FILE_FPS)  # pressed showed nothing that long), each rerun
         self.comps = 4 if alpha else 3                            # RGBA: a file with transparency (alpha_of)
         self.w, self.h = int(width), int(height) // 2 * 2
         self.error = None
@@ -168,7 +168,7 @@ class FfmpegSource:
                     buf = out.read(size)
                     if len(buf) < size:
                         break
-                    if self._pace and not clock.held():      # a rerun: frame k at its time from the run's first
+                    if self._pace and not clock.held():      # paced: frame k at its time from the run's first
                         now = time.monotonic()
                         t0 = now - got / self._pace if t0 is None else t0
                         wait = t0 + got / self._pace - now

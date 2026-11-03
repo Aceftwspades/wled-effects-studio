@@ -1227,8 +1227,9 @@ air. A **Cut** or **Fade** pad is the GO.
 
 **Video clips on pads**, like a sampler's: a pad whose action is **a video
 clip** plays part of a video file on a deck, over what the deck shows -
-deck **C**, over the mix, is the usual place (on A or B it shows when the
-fader is on that side). **video clips: a pad each...** (in Edit, under an
+deck **C**, over the mix, is the usual place (on A or B it is laid over
+the deck's own picture by its envelope, and shows when the fader is on
+that side). **video clips: a pad each...** (in Edit, under an
 empty cell's list) is the quick way: pick several files, each is copied
 into the project (its `assets/vj`) and given a pad, labelled with its name,
 that plays it once on deck C - in the bank's free cells, then in a new bank

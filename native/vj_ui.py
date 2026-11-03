@@ -844,6 +844,8 @@ def _save(app, now=False):
 
 
 def _flush_save(app, now=False):
+    if now:
+        _rest_src(app, now=float("inf"))                  # a speed, from or to still resting: on its deck first
     t = getattr(app, "_vj_save_at", None)
     if t is not None and (now or time.perf_counter() >= t):
         app._vj_save_at = None
@@ -853,6 +855,9 @@ def _flush_save(app, now=False):
 def undo(app, redo=False):
     """The VJ as it was before its last change (or again after an undo)."""
     _flush_save(app, now=True)
+    if getattr(app, "_vj_by_show", False):                 # the show's steps have the decks: an undo now would
+        app.gp.status("the show has the VJ: undo once it lets it go")   # be put back over by the desk after
+        return
     p = app.project
     ok = p.redo("vj") if redo else p.undo("vj")
     if not ok:
@@ -1162,15 +1167,16 @@ def _new_shader(app):
 
 def _pick_clip(app, i, label):
     s = vj.options(app)["decks"][i]["source"]
-    names = [os.path.basename(f) for f in s.get("files") or []]
+    files = [f for f in s.get("files") or [] if f]           # (as the combo lists them)
+    names = [os.path.basename(f) for f in files]
     if label in names:
-        s["clip"] = names.index(label)
+        s["files"], s["clip"] = files, names.index(label)
         _save(app)
 
 
 def _drop_clip(app, i):
     s = vj.options(app)["decks"][i]["source"]
-    files = list(s.get("files") or [])
+    files = [f for f in s.get("files") or [] if f]           # (as the combo lists them: the one it shows taken)
     if files:
         del files[int(s.get("clip", 0)) % len(files)]
         s["files"] = files
@@ -1279,8 +1285,15 @@ def _new_look(app):
             return
         path = vj_looks.new_user_look(app.project, name)
         if not py_allowed(app):
-            allow_py(app, True)                                      # the look is the user's own: this project is allowed
-        vj_looks.load_user(app.project)
+            others = [f for f in vj_looks.py_files(app.project) if f != os.path.basename(path)]
+            if others:                                               # Python looks not the user's: asked, as on opening
+                names = ", ".join(others[:4]) + (f" and {len(others) - 4} more" if len(others) > 4 else "")
+                _c().confirm(app, "Python looks", f"Your look is made. This project also has Python looks that are not "
+                             f"yours ({names}); allowing Python looks runs them too. Run them only if you trust where the "
+                             "project came from.", [("Run them all", lambda: allow_py(app, True)), ("Not now", None)])
+            else:
+                allow_py(app, True)                                  # the only one is the user's own: allowed
+        vj_looks.load_user(app.project, allow_py=py_allowed(app))
         o = vj.options(app)
         cue = vj.cue_deck(app)                                     # the deck off the mix: seen in its preview first
         lk = next((n for n, l in vj_looks.LOOKS.items() if l.family == "yours" and _user_path(n) == path), None)
@@ -1358,13 +1371,20 @@ def _pick_source(app, i):
         def work():                                         # ffmpeg asked on a worker: the studio does not stop
             return [n for n, _ in (video.webcams() if kind == "webcam" else video.screens())]
 
+        proj = app.project
+
         def done(names):
+            s = vj.options(app)["decks"][i]["source"]
+            if app.project is not proj or s.get("kind") != kind:   # the deck changed while ffmpeg was asked
+                return
             if not names:
                 app.gp.status(f"no {'cameras' if kind == 'webcam' else 'screens'} found"); return
+            app.__dict__.setdefault("_vj_src_names", {})[i] = (kind, list(names))
+            if s.get("name") not in names:
+                s["name"] = names[0]                            # the first, as the combo shows it
+                _save(app)
             dpg.configure_item(f"vj_srcname{i}", items=names, show=True)
-            if vj.options(app)["decks"][i]["source"].get("name") not in names:
-                _set_src(app, i, name=names[0])                 # (refreshed: the combo shows it)
-            dpg.set_value(f"vj_srcname{i}", vj.options(app)["decks"][i]["source"].get("name"))
+            dpg.set_value(f"vj_srcname{i}", s["name"])
         tasks.run(app, f"vj_list{i}", "looking for " + ("cameras" if kind == "webcam" else "screens"), work, done)
     elif kind == "stream":
         dpg.configure_item(f"vj_url{i}", show=True)
@@ -1463,7 +1483,8 @@ def refresh(app):
         dpg.configure_item(f"vj_pause{i}", show=kind != "none")
         dpg.configure_item(f"vj_srcname{i}", show=kind in ("webcam", "screen") and bool(s.get("name")))
         if s.get("name"):
-            dpg.configure_item(f"vj_srcname{i}", items=[s["name"]])
+            k_, listed = getattr(app, "_vj_src_names", {}).get(i, (None, []))
+            dpg.configure_item(f"vj_srcname{i}", items=listed if k_ == kind and s["name"] in listed else [s["name"]])
             dpg.set_value(f"vj_srcname{i}", s["name"])
         dpg.configure_item(f"vj_url{i}", show=kind == "stream")
         if dpg.get_value(f"vj_url{i}") != s.get("url", ""):   # another project's (or an undo's): not the one before
@@ -1472,8 +1493,9 @@ def refresh(app):
         dpg.configure_item(f"vj_cliprows{i}", show=kind == "file")
         dpg.configure_item(f"vj_clips{i}", items=[os.path.basename(f) for f in files])
         dpg.set_value(f"vj_clips{i}", os.path.basename(vj.clip_path(s)) if files or s.get("path") else "")
+        held = (getattr(app, "_vj_src_rest", None) or {}).get(i, ({}, 0))[0]
         for tag, key in (("vj_csp", "speed"), ("vj_cin", "in"), ("vj_cout", "out")):
-            num.set(f"{tag}{i}", float(s.get(key, 0.0)))
+            num.set(f"{tag}{i}", float(held.get(key, s.get(key, 0.0))))
         dpg.set_value(f"vj_adv{i}", dict(vj.ADVANCE).get(s.get("advance", "off"), "by hand"))
         _sync_knobs(i, d)
         dpg.set_value(f"vj_col{i}", d["colours"])
@@ -1543,6 +1565,7 @@ def poll(app):
         if getattr(app, "_vj_clips", None):
             from native import vj_clips
             vj_clips.let_go(app)                                    # a pad pressed with the VJ off: nothing plays
+        _rest_src(app)
         return
     _rest_src(app)
     app._vj_open = True
