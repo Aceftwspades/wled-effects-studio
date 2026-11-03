@@ -386,6 +386,11 @@ def _source(app, i, run, deck):
     s = deck["source"]
     key = source_key(app, s, whole_picture(deck))
     pool = _pool(app)
+    if key in app.__dict__.get("_vj_warming", ()) and key not in pool:
+        if key != run.src_key:                                # a pad's camera starting on a worker: its picture
+            run.src_key, run.n, run.video_prev = key, -1, None    # soon (not opened twice)
+        run.open_error = ""
+        return None
     if key != run.src_key:
         run.src_key = key
         run.video_prev = None                                 # its last frame held until the next source's first
@@ -443,7 +448,7 @@ def _dead(src):
 def _release(app):
     """Sources no deck looks at any more, closed."""
     pool = _pool(app)
-    used = {r.src_key for r in _runs(app)}
+    used = {r.src_key for r in _runs(app)} | set(app.__dict__.get("_vj_cam_keys", ()))   # (pads' cameras kept)
     for i, d in enumerate(options(app)["decks"]):            # a deck a pad's clip covers: its own video kept open,
         if vj_clips.level(app, i) is not None:               # rolling on under the clip, there again when it ends
             used.add(source_key(app, d["source"], whole_picture(d)))
@@ -457,6 +462,55 @@ def _release(app):
                 pass
 
 
+CAM_CHECK_TICKS = 30              # the pads' cameras looked over this often (frames)
+
+
+def _warm_cams(app):
+    """The cameras the pads bring up kept open while the VJ runs - each opened on a worker (ffmpeg asked for the
+    cameras, the camera started: a second or so), so a press shows its picture at once; one no pad uses any more
+    closed."""
+    import threading
+    warmed = app.__dict__.setdefault("_vj_warmed", {})      # key -> [source, error], from the workers
+    warming = app.__dict__.setdefault("_vj_warming", set())
+    pool = _pool(app)
+    for key in list(warmed):
+        src, err = warmed.pop(key)
+        warming.discard(key)
+        if key in pool and pool[key][0] is not None:          # a deck opened it meanwhile
+            if src is not None:
+                src.close()
+        else:
+            pool[key] = [src, err]
+            app.__dict__.setdefault("_vj_pool_at", {})[key] = [time.monotonic(), REOPEN_S]
+    if getattr(app, "_vj_tick", 0) % CAM_CHECK_TICKS:
+        return
+    want = set()
+    for name in vj_clips.cam_names(app):
+        s = vj_clips.cam_source(name)
+        key = source_key(app, s)
+        want.add(key)
+        if key in pool or key in warming:
+            continue
+        warming.add(key)
+
+        def work(s=s, key=key, gen=getattr(app, "_vj_cam_gen", 0)):
+            try:
+                got = [_open(app, s, key), ""]
+            except Exception as e:
+                got = [None, str(e)]
+            if getattr(app, "_vj_cam_gen", 0) != gen:        # the VJ closed meanwhile: not kept (the webcam off)
+                if got[0] is not None:
+                    got[0].close()
+                warming.discard(key)
+            else:
+                warmed[key] = got
+        threading.Thread(target=work, daemon=True, name="vj camera").start()
+    gone = set(app.__dict__.get("_vj_cam_keys", ())) - want
+    app._vj_cam_keys = want
+    if gone:
+        _release(app)
+
+
 def clip_ended(app, i, take):
     """Whether deck i's pad clip of this take has played to its end (or would not open)."""
     key = _runs(app)[i].src_key
@@ -468,6 +522,12 @@ def clip_ended(app, i, take):
 
 def close(app):
     vj_clips.let_go(app)
+    app._vj_cam_keys = set()                                 # the pads' cameras too (the VJ off: webcams off),
+    app._vj_cam_gen = getattr(app, "_vj_cam_gen", 0) + 1     # those still starting closed once they have
+    for src, _ in app.__dict__.pop("_vj_warmed", {}).values():
+        if src is not None:
+            src.close()
+    app.__dict__.pop("_vj_warming", None)
     for r in _runs(app):
         r.src_key = None
         r.video = r.video_prev = None
@@ -1147,6 +1207,7 @@ def update(app, dt=None):
     f = fader_now(app)
     app._vj_tick = getattr(app, "_vj_tick", 0) + 1
     vj_clips.tick(app)                                      # the pads' clips: their envelopes, the one-shots ended
+    _warm_cams(app)                                         # the cameras pads bring up, open
     cue = cue_deck(app) if o.get("cue") else -1
     for i in range(len(o["decks"])):
         _advance_clips(app, i, hit)

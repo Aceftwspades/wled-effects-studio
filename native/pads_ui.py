@@ -440,6 +440,7 @@ def labels(app):
             out.append((f"VJ {d}: this look (pick it below)", {"kind": "pad_look", "deck": i, "look": ""}))
             out.append((f"VJ {d}: a saved preset (pick it below)", {"kind": "pad_preset", "deck": i, "name": ""}))
             out.append((f"VJ {d}: a video clip (set it below)", dict(vj_clips.DEFAULT, deck=i)))
+            out.append((f"VJ {d}: a live camera (pick it below)", dict(vj_clips.CAM_DEFAULT, deck=i)))
         app._pads_labels, app._pads_labels_key, app._pads_label_ix = out, key, None
     if getattr(app, "_pads_label_ix", None) is None:
         ix = {}
@@ -463,6 +464,8 @@ def target_label(app, t):
         return f"VJ {'ABC'[int(t.get('deck', 0))]}: preset {t.get('name') or '(none picked)'}"
     if k == "pad_clip":
         return f"VJ {'ABC'[int(t.get('deck', 0))]}: clip {vj_clips.words(t)}"
+    if k == "pad_cam":
+        return f"VJ {'ABC'[int(t.get('deck', 0))]}: camera {vj_clips.words(t)}"
     labels(app)
     return app._pads_label_ix.get(_label_key(t), k)
 

@@ -1182,6 +1182,16 @@ STEPS = [
     # pressed: deck C plays it (its first picture started it), the pad lit while it plays
     ([{"check": "__import__('native.vj_clips', fromlist=['c'])._rt(app).get(2, {}).get('t0') is not None and __import__('native.vj', fromlist=['v'])._runs(app)[2].video is not None and __import__('native.pads', fromlist=['p']).lit(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},
       {"py": "__import__('native.vj_clips', fromlist=['c']).let_go(app)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
+      {"py": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'].remove(__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},
+      # a live camera pad on the same cell: its CAMERA section - the camera (a made-up name: no real one opened),
+      # the deck, the envelope - with no file, mode or strip of a clip's
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(app, '_pads_sel', (4, 3))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'trigger')"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ C: a live camera (pick it below)')"},
+      {"py": "__import__('native.clip_ui', fromlist=['c'])._set(app, name='Smoke Cam')"}], 0.3),
+    ([{"check": "dpg.is_item_shown('pads_s_cliprow') and dpg.get_value('pads_clip_head') == 'CAMERA' and dpg.is_item_shown('pads_clip_camrow') and not dpg.is_item_shown('pads_clip_parts') and not dpg.is_item_shown('pads_clip_filerow') and dpg.get_value('pads_clip_cam') == 'Smoke Cam' and dpg.get_value('pads_clip_how').startswith('A press brings')"},
+      {"check": "__import__('native.pads_ui', fromlist=['p'])._sel(app)['target']['kind'] == 'pad_cam' and __import__('native.pads_ui', fromlist=['p']).target_label(app, __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']) == 'VJ C: camera Smoke Cam'"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
       {"py": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'].remove(__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},   # (its cell for the steps after)
       {"py": "chrome.close_dialog('pads_win')"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
     # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed

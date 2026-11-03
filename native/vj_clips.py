@@ -6,6 +6,14 @@ A clip is a pad's target, kept with the pad:
     {"kind": "pad_clip", "deck": 2, "file": "assets/vj/drop.mp4", "in": 1.5, "out": 4.0, "mode": "oneshot",
      "attack": 0.05, "decay": 0.0, "sustain": 1.0, "release": 0.3, "level": 1.0}
 
+A live camera is the same, with a camera in place of a file and no In or Out - it plays until it is let go:
+
+    {"kind": "pad_cam", "deck": 2, "name": "Integrated Camera", "attack": 0.1, "decay": 0.0, "sustain": 1.0,
+     "release": 0.3, "level": 1.0}
+
+"name" is an entry of the camera list (cameras(): a webcam's name, or video.PHONE); the cameras pads bring up are
+kept open while the VJ runs (vj._warm_cams - a camera takes a second or so to start), so a press shows one at once.
+
 "out" 0 is the file's end. A "oneshot" plays from In to Out once (its release timed to end at Out); a "loop" plays
 In to Out round again until it is stopped. What starts and stops it is the pad's type (pads.press / release):
 a trigger starts a one-shot again from In each press, and starts or stops a loop; a toggle starts and stops it;
@@ -32,6 +40,9 @@ from native import clock
 MODES = (("oneshot", "one shot"), ("loop", "loop"))
 DEFAULT = {"kind": "pad_clip", "deck": 2, "file": "", "in": 0.0, "out": 0.0, "mode": "oneshot", "attack": 0.02,
            "decay": 0.0, "sustain": 1.0, "release": 0.2, "level": 1.0}
+CAM_DEFAULT = {"kind": "pad_cam", "deck": 2, "name": "", "attack": 0.1, "decay": 0.0, "sustain": 1.0,
+               "release": 0.3, "level": 1.0}
+KINDS = ("pad_clip", "pad_cam")
 ENV = (("attack", 0.0, 10.0), ("decay", 0.0, 10.0), ("sustain", 0.0, 1.0), ("release", 0.0, 10.0))   # (key, lo, hi)
 START_WAIT_S = 2.0                 # a clip's first frame waited for this long at most before its time starts anyway
 VIDEO_EXT = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".gif", ".m4v")
@@ -42,8 +53,9 @@ def _rt(app):
 
 
 def fill(t):
-    """A clip target with every field there and of its kind (a hand-edited or older pad's put right)."""
-    for k, v in DEFAULT.items():
+    """A clip or camera target with every field there and of its kind (a hand-edited or older pad's put right)."""
+    cam = t.get("kind") == "pad_cam"
+    for k, v in (CAM_DEFAULT if cam else DEFAULT).items():
         cur = t.get(k)
         if isinstance(v, str):
             ok = isinstance(cur, str)
@@ -52,13 +64,15 @@ def fill(t):
         if not ok:
             t[k] = v
     t["deck"] = max(0, min(2, int(t["deck"])))
-    if t["mode"] not in dict(MODES):
-        t["mode"] = "oneshot"
     for k, lo, hi in ENV:
         t[k] = max(lo, min(hi, float(t[k])))
+    t["level"] = max(0.0, min(1.0, float(t["level"])))
+    if cam:
+        return t
+    if t["mode"] not in dict(MODES):
+        t["mode"] = "oneshot"
     t["in"] = max(0.0, float(t["in"]))
     t["out"] = max(0.0, float(t["out"]))
-    t["level"] = max(0.0, min(1.0, float(t["level"])))
     return t
 
 
@@ -75,7 +89,7 @@ def length(app, t):
 def play(app, t, owner):
     """Clip t started on its deck from its In - in place of the one there, from the level it had."""
     t = fill(dict(t))
-    if not t["file"]:
+    if not t.get("name" if t["kind"] == "pad_cam" else "file"):
         return
     rt = _rt(app)
     old = rt.get(t["deck"])
@@ -149,7 +163,7 @@ def tick(app):
             p["t0"] = now                                   # no picture yet (a file gone): its time runs anyway
         if p["t0"] is None:
             continue                                        # the last picture held, at the level it had
-        if p["gate"] and t["mode"] == "oneshot":
+        if p["gate"] and t.get("mode") == "oneshot":
             n = length(app, t)
             if n is None:
                 if vj.clip_ended(app, i, p["take"]):        # no length known (no ffprobe): let go at its end
@@ -206,10 +220,39 @@ def deck(app, i, d):
     t = p["t"]
     lk = vj_looks.LOOKS.get(d.get("look"))
     look = d.get("look") if lk is not None and lk.family == "video" else "Clean"
+    if t["kind"] == "pad_cam":
+        return dict(d, source=cam_source(t["name"]), look=look, _clip_take=p["take"])
     src = {"kind": "file", "path": t["file"], "files": [], "clip": 0, "speed": 1.0, "in": float(t["in"]),
            "out": float(t["out"]), "advance": "off", "take": p["take"], "once": t["mode"] == "oneshot", "name": "",
            "url": ""}                                       # once: a one shot's file not run round again
     return dict(d, source=src, look=look, _clip_take=p["take"])
+
+
+def cam_source(name):
+    """A deck's source for a camera list entry: the phone's camera, or a webcam by its name."""
+    from native import video
+    if name == video.PHONE:
+        return {"kind": "phone", "path": "", "name": "", "url": ""}
+    return {"kind": "webcam", "path": "", "name": name, "url": ""}
+
+
+def cam_names(app):
+    """The cameras the project's pads bring up (their camera list entries), each once."""
+    from native import pads
+    out = []
+    for b in pads.state(app.project).get("banks", []):
+        for c in b.get("controls", []):
+            t = c.get("target") or {}
+            if t.get("kind") == "pad_cam" and t.get("name") and t["name"] not in out:
+                out.append(t["name"])
+    return out
+
+
+def cameras():
+    """The camera list a camera pad picks from: the webcams ffmpeg sees here, then the phone's camera (asks ffmpeg -
+    a second or so: called on a worker)."""
+    from native import video
+    return [n for n, _ in video.webcams()] + [video.PHONE]
 
 
 def let_go(app):
@@ -229,7 +272,10 @@ def files(app):
 
 
 def words(t):
-    """A clip in a few words: its file's name and its part ("drop.mp4 1.5-4.0 s", "drop.mp4" whole)."""
+    """A clip in a few words: its file's name and its part ("drop.mp4 1.5-4.0 s", "drop.mp4" whole); a camera: its
+    name."""
+    if t.get("kind") == "pad_cam":
+        return t.get("name") or "(no camera picked)"
     name = os.path.basename(t.get("file") or "") or "(no file picked)"
     a, b = float(t.get("in", 0.0)), float(t.get("out", 0.0))
     if b > a:

@@ -4491,6 +4491,16 @@ pictures and video with transparency, and control over how they are shown. Found
 RGB (its transparency gone - a clear area showed whatever colour was under it, often white), every video was read as
 RGB (a WebM's or ProRes 4444's alpha gone), and deck C's "over" knew only black as clear. Done 2026-10-28:
 
+- [x] **Live cameras on pads** (2026-11-03): a pad's action "a live camera" (pads target `pad_cam`: deck, camera
+   list entry `name` - a webcam's, or video.PHONE - envelope, level) plays through the clip player
+   (vj_clips: kind_of "clip", no mode, so it plays until let go; a trigger brings it up and fades it like a loop).
+   vj_clips.deck puts a webcam/phone source on the deck; vj._warm_cams opens every camera the project's pads name
+   on a worker (every CAM_CHECK_TICKS frames), keeps their keys out of _release (_vj_cam_keys) and closes one no
+   pad names; _source waits on a camera still starting rather than opening it twice; vj.close turns them all off
+   (a generation count closes one that finishes starting after). The editor's CLIP section shows as CAMERA: the
+   camera list (vj_clips.cameras on a worker, Look again), deck, Play, envelope and level. Tests: test_vj_clips
+   (a stand-in camera: no real one opened), the smoke.
+
 - [x] **A picture a channel of its own** (`image`): a shader's iChannel set to image reads a picture chosen beside it
       (the "..." by the channel, kept with the project as a deck's picture is) - a texture the shader asks for;
       noise until one is chosen. A Shadertoy JSON's texture comes in as image, the file saying which channel was one.

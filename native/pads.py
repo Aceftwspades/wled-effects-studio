@@ -116,7 +116,7 @@ def _target(t):
         return {}
     if "deck" in t:
         t["deck"] = max(0, min(2, _int(t["deck"], 0)))
-    if t.get("kind") == "pad_clip":
+    if t.get("kind") in ("pad_clip", "pad_cam"):
         from native import vj_clips
         vj_clips.fill(t)
     return t
@@ -268,6 +268,8 @@ def kind_of(t):
         return "gate"
     if k in ("pad_look", "pad_preset", "pad_clip"):
         return k[4:]
+    if k == "pad_cam":                                              # a live camera: played as a clip is
+        return "clip"
     if k in _midi().SWITCHES:
         return "switch"
     return "value"
@@ -514,7 +516,7 @@ def press(app, c, f=None, xy=None, pressure=None):
         on = vj_clips.held(app, c["id"])                            # stopped; a hold stops on its release; one
         if typ == "trigger":                                        # in its release: started again
             r["flash"][c["id"]] = time.monotonic()
-        if on and (typ == "toggle" or (typ == "trigger" and t.get("mode") == "loop")):
+        if on and (typ == "toggle" or (typ == "trigger" and t.get("mode", "loop") == "loop")):   # (a camera: as a loop)
             vj_clips.stop(app, c["id"])
         else:
             vj_clips.play(app, t, c["id"])
@@ -674,7 +676,7 @@ def lit(app, c):
     if time.monotonic() - r["flash"].get(c["id"], -1e9) < FLASH_MS:
         return True
     t = c.get("target") or {}
-    if t.get("kind") == "pad_clip":                                 # lit while its clip plays (its release too)
+    if t.get("kind") in ("pad_clip", "pad_cam"):                    # lit while its clip plays (its release too)
         from native import vj_clips
         return vj_clips.playing(app, c["id"])
     on = is_on(app, t)
@@ -697,7 +699,7 @@ def forget(app, c):
     t = c.get("target") or {}
     if c["type"] == "toggle" and kind_of(t) == "gate" and r["on"].get(c["id"]):
         _apply(app, dict(t, src=("pad", c["id"])), 0.0)
-    if t.get("kind") == "pad_clip":
+    if t.get("kind") in ("pad_clip", "pad_cam"):
         from native import vj_clips
         vj_clips.stop(app, c["id"])
         vj_clips.stop(app, ("try", c["id"]))                       # and the editor's Play of it

@@ -215,6 +215,96 @@ try:
 finally:
     clock.release()
 
+# a live camera on a pad: played as a clip is, a webcam (or the phone's camera) its source, kept open while the
+# VJ runs - a stand-in camera here, so no real one is turned on
+class FakeCam:
+    opened = []
+
+    def __init__(self, key):
+        import threading
+        self.key, self.closed, self.n, self.error, self.paused = key, False, 0, None, False
+        self.thread = threading.Thread(target=lambda: None)
+        FakeCam.opened.append(self)
+
+    def latest(self):
+        return None, 0
+
+    def close(self):
+        self.closed = True
+
+
+app4 = App(g)
+vj.options(app4)
+ct = vj_clips.fill({"kind": "pad_cam", "deck": 9, "name": 3, "release": -2, "file": "x.mp4"})
+check(ct["deck"] == 2 and ct["name"] == "" and ct["release"] == 0.0 and "in" not in ct and "mode" not in ct,
+      f"a damaged camera target put right, no In or Out of a clip's added ({ct})")
+st4 = pads.state(app4.project)
+st4["banks"], st4["bank"] = [pads.new_bank("Cams", 4, 4, "blue")], 0      # cells of its own
+cam_pad = pads.new_control(st4, "trigger", 0, 0, target=dict(vj_clips.CAM_DEFAULT, name="Test Cam"))
+pads.current(st4)["controls"].append(cam_pad)
+phone_pad = pads.new_control(st4, "hold", 1, 0, target=dict(vj_clips.CAM_DEFAULT, name=video.PHONE, deck=0))
+pads.current(st4)["controls"].append(phone_pad)
+check(vj_clips.cam_names(app4) == ["Test Cam", video.PHONE] and pads.kind_of(cam_pad["target"]) == "clip",
+      "the cameras the pads bring up, each once")
+real_open = vj._open
+vj._open = lambda app, s, key: FakeCam(key)
+try:
+    app4._vj_tick = 0
+    vj._warm_cams(app4)
+    end = time.time() + 5
+    while time.time() < end and len(app4._vj_warmed) < 2:
+        time.sleep(0.01)
+    vj._warm_cams(app4)
+    keys = {vj.source_key(app4, vj_clips.cam_source(n)) for n in ("Test Cam", video.PHONE)}
+    check(keys <= set(vj._pool(app4)) and len(FakeCam.opened) == 2,
+          "each camera a pad brings up opened on a worker, kept with the open sources")
+    vj._release(app4)
+    check(all(not c.closed for c in FakeCam.opened), "kept open though no deck shows it yet")
+    clock.hold()
+    try:
+        pads.press(app4, cam_pad)
+        pads.release(app4, cam_pad)
+        dd = vj_clips.deck(app4, 2, vj.options(app4)["decks"][2])
+        check(dd["source"] == vj_clips.cam_source("Test Cam") and dd["source"]["kind"] == "webcam"
+              and vj.source_key(app4, dd["source"]) in vj._pool(app4) and pads.lit(app4, cam_pad),
+              "a trigger brings the camera up on deck C: the source already open, the pad lit")
+        vj_clips.started(app4, 2, vj_clips._rt(app4)[2]["take"])
+        for _ in range(4):
+            clock.step(0.1)
+            vj_clips.tick(app4)
+        lv = vj_clips.level(app4, 2)
+        pads.press(app4, cam_pad)
+        pads.release(app4, cam_pad)
+        clock.step(0.1)
+        vj_clips.tick(app4)
+        check(lv == 1.0 and vj_clips._rt(app4)[2]["stage"] == "r", f"up over its attack, held ({lv}) - "
+              "with no Out, it stays until the next press lets it fade")
+        pads.press(app4, phone_pad)
+        check(vj_clips.deck(app4, 0, vj.options(app4)["decks"][0])["source"]["kind"] == "phone",
+              "the phone's camera on deck A, while held")
+        pads.release(app4, phone_pad)
+        check(not vj_clips.held(app4, phone_pad["id"]), "let go: it fades")
+    finally:
+        clock.release()
+    vj_clips.let_go(app4)
+    pads.current(st4)["controls"].remove(phone_pad)
+    app4._vj_tick = 0
+    vj._warm_cams(app4)
+    phone_cam = next(c for c in FakeCam.opened if c.key[0] == "phone")
+    check(phone_cam.closed and not FakeCam.opened[0].closed, "a camera no pad brings up any more: closed")
+    vj.close(app4)
+    check(all(c.closed for c in FakeCam.opened), "the VJ closed: the pads' cameras off")
+    slow = []
+    vj._open = lambda app, s, key: (time.sleep(0.3), slow.append(FakeCam(key)))[1] or slow[-1]
+    app4._vj_tick = 0
+    vj._warm_cams(app4)
+    vj.close(app4)
+    time.sleep(0.6)
+    check(slow and slow[0].closed and not app4.__dict__.get("_vj_warmed"),
+          "a camera still starting when the VJ closes: closed once it has started")
+finally:
+    vj._open = real_open
+
 # made from files: the bank's free cells, then a new bank named Clips as big as the rest need
 from native import clip_ui, pads_ui                        # noqa: E402
 app3 = App(g)
