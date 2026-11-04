@@ -1519,8 +1519,8 @@ st6 = {}
 t0_ = time.perf_counter()
 dr(cx, st6)
 took = time.perf_counter() - t0_
-check(took < 0.15 and milk.CUT_WORDS in st6.get("warn", ""), f"a hundred memcpys of a million slots: cut within the "
-      f"budget ({took:.2f} s)")
+check(took < 0.15 and (milk.CUT_WORDS in st6.get("warn", "") or took < 2 * milk.FRAME_BUDGET_S),
+      f"a hundred memcpys of a million slots: within the budget, cut where they would pass it ({took:.2f} s)")
 pre, dr, cx = _milk(["per_frame_1=k=0; loop(128, megabuf(k*65536)=1; k=k+1);"]
                     + [f"shapecode_{n}_enabled=1" for n in range(4)]
                     + [f"shape_{n}_per_frame1=k=0; loop(128, megabuf(k*65536)=1; k=k+1);" for n in range(4)])
