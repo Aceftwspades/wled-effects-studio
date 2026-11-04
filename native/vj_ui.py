@@ -809,58 +809,70 @@ def _thumbs(app):
     snd = vj.sound(app)
     done = 0
     app._vj_th_frame = getattr(app, "_vj_th_frame", 0) + 1
-    for j in range(5):
+    for j in range(5):                                       # the cheap ones, in turn, within THUMB_BUDGET_S
         if j and time.perf_counter() - now > THUMB_BUDGET_S:
             break                                            # the frame's thumbnail time spent: on from here next
         done = j + 1
         n = names[(k0 + j) % len(names)]
-        e = th[n]
-        lk = vj_looks.LOOKS.get(n)
-        if lk is None:
-            continue
-        if e.get("costly") and app._vj_th_frame - getattr(app, "_vj_th_costly", -10 ** 9) < THUMB_SLOW_EVERY:
-            continue                                         # a costly look: one of them every THUMB_SLOW_EVERY
-        if e.get("costly"):                                  # frames, for the whole browser
-            app._vj_th_costly = app._vj_th_frame
-        t_draw = time.perf_counter()
-        dt = min(0.25, now - e.get("at", now)) if e.get("at") else 1 / 30
-        e["at"] = now
-        e["t"] += dt
-        c = vj.Ctx()
-        c.w, c.h = TH_W, TH_H
-        c.u, c.v, c.x, c.y, c.r, c.a = vj._grid(TH_W, TH_H)
-        c.t, c.dt = e["t"], dt
-        c.bass, c.mid, c.treb, c.level, c.wave = snd
-        # a beat of their own, twice a second: a look that waits for beats is not dark in its thumbnail
-        ph = (e["t"] * 2.0) % 1.0
-        c.beat = math.exp(-ph * 6.0)
-        c.beat_hit = int(e["t"] * 2.0) != int((e["t"] - dt) * 2.0)
-        c.beats = getattr(app, "_vj_beats", 0.0)
-        c.deck = {"text": "WLED", "image": ""}
-        vid = app._vj_th_src.frame_at(e["t"]).astype(np.float32) / 255.0
-        c.video, c.video_prev = vid, e.get("prev")
-        e["prev"] = vid
-        c.amount, c.speed = 0.5, 1.0
-        c.grad = vj_looks.gradient("neon")
-        try:
-            img = np.clip(np.asarray(lk.draw(c, e["state"]), np.float32), 0, 1)
-            if img.ndim == 2:                                # a look's grey picture: as a colour one
-                img = np.repeat(img[:, :, None], 3, -1)
-            img = img[:, :, :3]                              # one with its own transparency: its colour
-        except Exception:
-            img = np.zeros((TH_H, TH_W, 3), np.float32)
-        if time.perf_counter() - t_draw > THUMB_SLOW_S and not e.get("costly"):
-            e["costly"] = True
-            app._vj_th_costly = app._vj_th_frame
-        if img.ndim != 3 or img.shape != (TH_H, TH_W, 3):    # a look of the wrong size: not shown (it never
-            continue                                         # takes the frame down with it)
-        dpg.set_value(e["tag"], np.concatenate([img, np.ones((TH_H, TH_W, 1), np.float32)], -1).ravel())
+        if not th[n].get("costly"):
+            _draw_thumb(app, n, th[n], now, snd)
     app._vj_th_k = (k0 + max(1, done)) % max(1, len(names))
+    costly = [n for n in names if th[n].get("costly")]       # the costly ones (a MilkDrop look's shapes): one every
+    if costly and app._vj_th_frame - getattr(app, "_vj_th_costly", -10 ** 9) >= THUMB_SLOW_EVERY:   # few frames,
+        app._vj_th_costly = app._vj_th_frame                 # in a turn of their own - each animates, none starved
+        ck = getattr(app, "_vj_th_ck", 0) % len(costly)
+        app._vj_th_ck = ck + 1
+        _draw_thumb(app, costly[ck], th[costly[ck]], now, snd)
+
+
+def _draw_thumb(app, n, e, now, snd):
+    """One thumbnail drawn: its look at the thumbnail's size, the test pattern for video. A draw past THUMB_SLOW_S
+    (not its first, which sets the look up) marks it costly; a costly one well inside it is cheap again."""
+    lk = vj_looks.LOOKS.get(n)
+    if lk is None:
+        return
+    t_draw = time.perf_counter()
+    dt = min(0.25, now - e.get("at", now)) if e.get("at") else 1 / 30
+    e["at"] = now
+    e["t"] += dt
+    c = vj.Ctx()
+    c.w, c.h = TH_W, TH_H
+    c.u, c.v, c.x, c.y, c.r, c.a = vj._grid(TH_W, TH_H)
+    c.t, c.dt = e["t"], dt
+    c.bass, c.mid, c.treb, c.level, c.wave = snd
+    # a beat of their own, twice a second: a look that waits for beats is not dark in its thumbnail
+    ph = (e["t"] * 2.0) % 1.0
+    c.beat = math.exp(-ph * 6.0)
+    c.beat_hit = int(e["t"] * 2.0) != int((e["t"] - dt) * 2.0)
+    c.beats = getattr(app, "_vj_beats", 0.0)
+    c.deck = {"text": "WLED", "image": ""}
+    vid = app._vj_th_src.frame_at(e["t"]).astype(np.float32) / 255.0
+    c.video, c.video_prev = vid, e.get("prev")
+    e["prev"] = vid
+    c.amount, c.speed = 0.5, 1.0
+    c.grad = vj_looks.gradient("neon")
+    try:
+        img = np.clip(np.asarray(lk.draw(c, e["state"]), np.float32), 0, 1)
+        if img.ndim == 2:                                    # a look's grey picture: as a colour one
+            img = np.repeat(img[:, :, None], 3, -1)
+        img = img[:, :, :3]                                  # one with its own transparency: its colour
+    except Exception:
+        img = np.zeros((TH_H, TH_W, 3), np.float32)
+    took = time.perf_counter() - t_draw
+    e["n"] = e.get("n", 0) + 1
+    if e["n"] > 1:
+        if took > THUMB_SLOW_S:
+            e["costly"] = True
+        elif took < THUMB_SLOW_S / 2:
+            e["costly"] = False
+    if img.ndim != 3 or img.shape != (TH_H, TH_W, 3):        # a look of the wrong size: not shown (it never
+        return                                               # takes the frame down with it)
+    dpg.set_value(e["tag"], np.concatenate([img, np.ones((TH_H, TH_W, 1), np.float32)], -1).ravel())
 
 
 THUMB_BUDGET_S = 0.008             # the browser's thumbnails at most this long a frame (then on from there next)
 THUMB_SLOW_S = 0.02                # a thumbnail slower than this (a MilkDrop look's shapes)...
-THUMB_SLOW_EVERY = 6               # ...and one such drawn every this many frames, for the whole browser
+THUMB_SLOW_EVERY = 6               # ...and one such drawn every this many frames, in turn, for the whole browser
 
 
 # --- changes -------------------------------------------------------------------------------------
@@ -1621,6 +1633,7 @@ def poll(app):
         if getattr(app, "_vj_clips", None):
             from native import vj_clips
             vj_clips.let_go(app)                                    # a pad pressed with the VJ off: nothing plays
+        vj.clock_seen(app)                                          # (a render's jump meanwhile: none of it ran)
         _rest_src(app)
         return
     _rest_src(app)

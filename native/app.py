@@ -1251,6 +1251,8 @@ class App(Features, Recorder, EditBuild):
                 return cmd
             import shlex
             try:                                         # a quoted program's path kept whole (C:\Program Files\...)
+                if os.name != "nt":
+                    return shlex.split(cmd)                  # POSIX: its own quotes ('{file}:{line}') taken out
                 return [c.replace('"', "") for c in shlex.split(cmd, posix=False)]   # (--file="{file}" too)
             except ValueError:
                 return cmd.split()

@@ -639,7 +639,19 @@ def _follow_clock(app):
     csw = getattr(app, "_vj_csweep", None)
     if csw is not None:
         app._vj_csweep = (csw[0] + d,) + tuple(csw[1:])
+    fade = getattr(app, "_vj_fade", None)
+    if isinstance(fade, dict) and "t0" in fade:              # a show step's blend into the VJ
+        fade["t0"] += d
+    hit = getattr(app, "last_hit_at", None)
+    if hit is not None:                                      # the last beat heard (in the render: on its clock)
+        app.last_hit_at = min(clock.now(), hit + d)
     vj_clips.shift(app, d)
+
+
+def clock_seen(app):
+    """The clock's jumps so far taken as seen (the VJ not running: nothing of it ran across them, so none moves
+    later - a sweep long done moved minutes ahead swung the fader A-B-A when the VJ came back)."""
+    app._vj_clock_seen = clock.shifted()
 
 
 def clip_key(app, i):
@@ -1552,7 +1564,7 @@ def _auto(app, hit):
     now = clock.now()
     if sweep is not None:
         t0, dur, f0, f1 = sweep
-        k = 1.0 if dur <= 0 else min(1.0, (now - t0) / dur)
+        k = 1.0 if dur <= 0 else max(0.0, min(1.0, (now - t0) / dur))   # (a start ahead of now: held there)
         e = 0.5 - 0.5 * math.cos(math.pi * k)
         o["fader"] = f0 + (f1 - f0) * e
         if k >= 1.0:

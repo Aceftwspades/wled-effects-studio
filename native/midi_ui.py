@@ -662,7 +662,7 @@ def poll(app):
         app.project.save()
         app._midi_learn = None
         app.gp.status(f"MIDI: {midi.ctl_label(ctl)} -> {target_label(app, target)}")
-        apply_target(app, target, v, full, tuple(ctl))
+        apply_target(app, target, v, full, tuple(ctl), keep=True)
         if dpg.is_item_shown(TAG):
             refresh(app)
         return
@@ -674,7 +674,7 @@ def poll(app):
     for mp in st["maps"]:
         got = last.get(tuple(mp["ctl"]))
         if got is not None and mp["target"].get("kind") not in midi.SWITCHES:
-            apply_target(app, mp["target"], *got)
+            apply_target(app, mp["target"], *got, keep=True)
     seen = getattr(app, "_midi_prev", None)
     if seen is None:
         seen = app._midi_prev = {}
@@ -687,7 +687,7 @@ def poll(app):
                 continue
             mapped = True
             if midi.fires(mp["target"], key, v, before, full):
-                apply_target(app, mp["target"], v, full, key)
+                apply_target(app, mp["target"], v, full, key, keep=True)
         if key[0] == "pc" and not mapped and st.get("pc", True) and st["setlist"]:
             switch_effect(app, midi.setlist_pick(app.eng.names, st["setlist"], key, v))
         seen[key] = v
@@ -695,7 +695,7 @@ def poll(app):
         _last(app)
 
 
-def apply_target(app, t, v, full=127.0, ctl=None):
+def apply_target(app, t, v, full=127.0, ctl=None, keep=False):
     """A control's value (0..127; 0..`full`, an OSC fader's 0..1) onto its
     target: the engine, and the widget that shows it. `ctl` the control it
     came from (a Program Change picks the setlist by number)."""
@@ -711,12 +711,14 @@ def apply_target(app, t, v, full=127.0, ctl=None):
         elif kind == "vj_knob":
             vj.knob_set(app, int(t.get("deck", 0)), t.get("key", "amount"), f)
             app._vj_dirty = True
-            vj_ui._save(app)                                 # kept, as the phone's are (once it settles)
+            if keep:                                         # MIDI's: kept, as the phone's are (once it settles) - a
+                vj_ui._save(app)                             # pad's hold goes back on release, never saved
         elif kind == "vj_look":
             names = vj.midi_looks()
             vj.options(app)["decks"][int(t.get("deck", 0))]["look"] = names[int(round(f * (len(names) - 1)))]
             app._vj_dirty = True
-            vj_ui._save(app)
+            if keep:
+                vj_ui._save(app)
         elif kind.startswith("vj_clip_"):
             vj.next_clip(app, "abc".index(kind[-1]))
         elif kind.startswith("vj_pause_"):

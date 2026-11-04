@@ -812,7 +812,7 @@ def look_draw(preset):
         fb = _wave(ctx, v, fb)
         from native import clock
         DRAW_END[0] = float("inf") if clock.held() else time.perf_counter() + DRAW_BUDGET_S   # (a render: all)
-        st["_drawn"] = 0
+        st["_drawn"], st["_fit"] = 0, None
         TIME_CUT[0] = False
         t_draw = time.perf_counter()
         fb = _custom_waves(ctx, st, preset, v, fb)
@@ -872,8 +872,11 @@ def look_draw(preset):
 
 def _cut_here(st):
     """Whether the waves and shapes stop here this frame: its drawing time spent, or the kept cap reached."""
+    now = time.perf_counter()
+    if st.get("_fit") is None and now > DRAW_END[0]:
+        st["_fit"] = st.get("_drawn", 0)                     # how many fitted in the drawing time itself
     over = DRAW_BUDGET_S if "_draw_cap" in st else 0.0      # under a kept cap, the cap rules (time only twice over):
-    if time.perf_counter() > DRAW_END[0] + over:             # the same instances each frame, not one in, one out
+    if now > DRAW_END[0] + over:                             # the same instances each frame, not one in, one out
         TIME_CUT[0] = DRAW_CUT[0] = True
         return True
     if st.get("_drawn", 0) >= _cap(st):
@@ -886,10 +889,12 @@ def _keep_cap(st, took):
     """After a frame's waves and shapes: cut by time DRAW_SLOW_N frames in a row, as many as fitted are kept as
     the cap (the same each frame, not popping); a frame well inside its time lets the cap grow, and go once all
     fit - one slow frame (a GC pause, a disk stall) does not cap a light preset for good."""
-    if TIME_CUT[0]:
+    if TIME_CUT[0] or took > DRAW_BUDGET_S:                  # cut by time, or under a cap but over its time
         st["_cuts"] = st.get("_cuts", 0) + 1
-        if st["_cuts"] >= DRAW_SLOW_N:
-            st["_draw_cap"] = max(1, min(st.get("_draw_cap", 1 << 30), st["_drawn"]))
+        if st["_cuts"] >= DRAW_SLOW_N:                       # what fitted in the time itself kept (not in the
+            fit = st["_fit"] if st.get("_fit") is not None else st["_drawn"]   # cap's doubled room: 160 ms a frame)
+            st["_draw_cap"] = max(1, min(st.get("_draw_cap", 1 << 30), fit))
+            st["_cuts"] = 0
         return
     st["_cuts"] = 0
     cap = st.get("_draw_cap")

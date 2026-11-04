@@ -1537,11 +1537,25 @@ for n in range(4):
 pre, dr, cx = _milk(many, 256, 256)
 st6 = {}
 counts = []
-for _ in range(9):
+for _ in range(14):
     dr(cx, st6)
     counts.append(st6.get("_drawn"))
-check(len(set(counts[-5:])) == 1 and counts[-1] < 256, f"a cut drawing kept after a few slow frames: the same "
+check(len(set(counts[-4:])) == 1 and counts[-1] < 256, f"a cut drawing kept after a few slow frames: the same "
       f"instances each frame ({counts})")
+# a kept cap's shapes growing heavier: the cap tightened to what fits in the drawing time, not left at twice it
+grow = []
+for n in range(4):
+    grow += [f"shapecode_{n}_enabled=1", f"shapecode_{n}_num_inst=64", f"shapecode_{n}_textured=1",
+             f"shape_{n}_per_frame1=rad = if(above(frame, 6), 0.6, 0.12);"]
+pre, dr, cx = _milk(grow, 256, 256)
+st8, took8 = {}, []
+for _ in range(24):
+    t0_ = time.perf_counter()
+    dr(cx, st8)
+    took8.append(time.perf_counter() - t0_)
+late = sorted(took8[-6:])[3]
+check(late < 2 * milk.DRAW_BUDGET_S, f"a capped preset's shapes grown: its frames back near the drawing time "
+      f"({late * 1000:.0f} ms, cap {st8.get('_draw_cap')})")
 # one slow frame (a GC pause, a disk stall): a light preset not capped for good
 light = []
 for n in range(4):
@@ -1619,6 +1633,49 @@ vj.update(aj, 1 / 30)
 moved = vj_clips._rt(aj)[2]["t0"] - t0_was
 check(0.3 < moved < 0.6, f"after a render that ran behind: a clip's time moved with the clock ({moved:.2f} s)")
 vj.close(aj)
+# round 8: a browser of costly looks - each animates in its own turn, none frozen
+from native import vj_ui                                      # noqa: E402
+real_dpg = (vj_ui.dpg.is_item_shown, vj_ui.dpg.set_value)
+drawn_n = {}
+vj_ui.dpg.is_item_shown = lambda tag: True
+vj_ui.dpg.set_value = lambda tag, v: drawn_n.__setitem__(tag, drawn_n.get(tag, 0) + 1)
+try:
+    for k in range(13):
+        vj_looks.LOOKS[f"Slow {k}"] = vj_looks.Look(f"Slow {k}", "shader", lambda c, st: (
+            time.sleep(0.025), np.zeros((c.h, c.w, 3), np.float32))[1], "")
+    ab = App(g)
+    vj.options(ab)
+    ab._vj_thumbs = {f"Slow {k}": {"tag": f"t{k}", "state": {}, "t": 0.0} for k in range(13)}
+    for _ in range(13 * 2 + 13 * vj_ui.THUMB_SLOW_EVERY * 2):
+        vj_ui._thumbs(ab)
+    again = sum(1 for k in range(13) if drawn_n.get(f"t{k}", 0) > 2)
+    check(again == 13, f"a browser of 13 costly looks: each drawn again in its turn ({again} of 13)")
+finally:
+    vj_ui.dpg.is_item_shown, vj_ui.dpg.set_value = real_dpg
+    for k in range(13):
+        vj_looks.LOOKS.pop(f"Slow {k}", None)
+# a render's jump while the VJ was not running: a sweep left from before not moved by it (it swung A-B-A)
+aq = App(g)
+oq = vj.options(aq)
+vj.update(aq, 1 / 30)
+aq._vj_sweep = (clock.now() - 10.0, 1.0, 0.0, 1.0)          # a fade long done, its sweep left behind
+clock.hold()
+clock.step(-300.0)                                           # a render far behind real time (+300 s at release)
+clock.release()
+vj.clock_seen(aq)                                            # (the VJ off and hidden: what poll does)
+vj.update(aq, 1 / 30)
+check(oq["fader"] == 1.0 and aq.__dict__.get("_vj_sweep") is None,
+      f"a render's jump with the VJ not running: an old sweep not moved by it (fader {oq['fader']})")
+# a pad's hold on a VJ knob: not saved (it goes back on release; an undo brought the held value back)
+from native import midi_ui                                    # noqa: E402
+ah = App(g)
+vj.options(ah)
+ah._vj_save_at = None
+midi_ui.apply_target(ah, {"kind": "vj_knob", "deck": 0, "key": "blur"}, 1.0, 1.0)
+held_saved = ah.__dict__.get("_vj_save_at") is not None
+midi_ui.apply_target(ah, {"kind": "vj_knob", "deck": 0, "key": "blur"}, 1.0, 1.0, keep=True)
+check(not held_saved and ah.__dict__.get("_vj_save_at") is not None,
+      "a VJ knob from a pad's hold: not saved; from MIDI: saved")
 # 16-bit pictures: a dark one stays dark; a transparent grey clears that grey only
 dark = Image.fromarray(np.full((4, 4), 200, "<u2"))
 check(np.asarray(vj_looks.eight_bit(dark)).max() <= 1, "a dark 16-bit picture: dark, not scaled up as 8-bit")
