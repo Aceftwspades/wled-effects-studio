@@ -711,10 +711,12 @@ def apply_target(app, t, v, full=127.0, ctl=None):
         elif kind == "vj_knob":
             vj.knob_set(app, int(t.get("deck", 0)), t.get("key", "amount"), f)
             app._vj_dirty = True
+            vj_ui._save(app)                                 # kept, as the phone's are (once it settles)
         elif kind == "vj_look":
             names = vj.midi_looks()
             vj.options(app)["decks"][int(t.get("deck", 0))]["look"] = names[int(round(f * (len(names) - 1)))]
             app._vj_dirty = True
+            vj_ui._save(app)
         elif kind.startswith("vj_clip_"):
             vj.next_clip(app, "abc".index(kind[-1]))
         elif kind.startswith("vj_pause_"):

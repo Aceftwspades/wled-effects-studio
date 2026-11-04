@@ -7,6 +7,7 @@ the video is one the show really had, and its sound is where it should be.
 
     clock.now()                  # seconds, as time.perf_counter
     clock.hold(); clock.step(1 / 30); clock.release()
+    clock.shifted()              # how far now() has jumped at the releases so far (a render ran ahead or behind)
 
 What is not played - a save's delay, a tooltip's, a device's answer, the
 frame rate - keeps the real clock.
@@ -15,6 +16,7 @@ frame rate - keeps the real clock.
 import time
 
 _held = None
+_shift = [0.0]                   # the jumps at every release together: what timed on the clock moves its own by them
 
 
 def now():
@@ -41,5 +43,14 @@ def release():
     """The real clock again. What was timed on the held one (a step's end) is moved by the difference, by its
     owner: the render stops the show it played."""
     global _held
+    if _held is not None:
+        _shift[0] += time.perf_counter() - _held                 # (back when the render ran ahead of real time)
     _held = None
+
+
+def shifted():
+    """The clock's jumps at its releases so far, together: a timer kept on now() moves its times by the change
+    since it last looked (the VJ's fader sweep swung A-B-A after a render that ran ahead; a clip ended early after
+    one that ran behind)."""
+    return _shift[0]
 # AI: end

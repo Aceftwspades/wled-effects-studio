@@ -1251,7 +1251,7 @@ class App(Features, Recorder, EditBuild):
                 return cmd
             import shlex
             try:                                         # a quoted program's path kept whole (C:\Program Files\...)
-                return [c[1:-1] if len(c) > 1 and c[0] == c[-1] == '"' else c for c in shlex.split(cmd, posix=False)]
+                return [c.replace('"', "") for c in shlex.split(cmd, posix=False)]   # (--file="{file}" too)
             except ValueError:
                 return cmd.split()
         code = shutil.which("code") or shutil.which("code.cmd")

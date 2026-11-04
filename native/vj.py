@@ -624,6 +624,24 @@ def _warm_cams(app):
             _open_soon(app, s, key)
 
 
+def _follow_clock(app):
+    """The fader's and deck C's sweeps and the pads' clips moved by the clock's jump since the last frame (a
+    render that ran ahead of real time let go: the sweep swung A-B-A, deck C froze; one that ran behind: a one
+    shot let go before its picture reached Out)."""
+    seen = getattr(app, "_vj_clock_seen", None)
+    app._vj_clock_seen = got = clock.shifted()
+    d = 0.0 if seen is None else got - seen
+    if not d:
+        return
+    sw = getattr(app, "_vj_sweep", None)
+    if sw is not None:
+        app._vj_sweep = (sw[0] + d,) + tuple(sw[1:])
+    csw = getattr(app, "_vj_csweep", None)
+    if csw is not None:
+        app._vj_csweep = (csw[0] + d,) + tuple(csw[1:])
+    vj_clips.shift(app, d)
+
+
 def clip_key(app, i):
     """The source key a pad's clip on deck i draws."""
     d = vj_clips.clip_deck(app, i, options(app)["decks"][i])
@@ -1415,6 +1433,7 @@ def update(app, dt=None):
     _flames(app)
     f = fader_now(app)
     app._vj_tick = getattr(app, "_vj_tick", 0) + 1
+    _follow_clock(app)                                      # a render let the clock go: the times on it moved
     vj_clips.tick(app)                                      # the pads' clips: their envelopes, the one-shots ended
     _collect(app)                                           # sources opened on workers, into the pool
     _warm_cams(app)                                         # the cameras pads bring up, open

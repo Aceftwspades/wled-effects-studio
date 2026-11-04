@@ -808,6 +808,7 @@ def _thumbs(app):
     now = time.perf_counter()
     snd = vj.sound(app)
     done = 0
+    app._vj_th_frame = getattr(app, "_vj_th_frame", 0) + 1
     for j in range(5):
         if j and time.perf_counter() - now > THUMB_BUDGET_S:
             break                                            # the frame's thumbnail time spent: on from here next
@@ -817,9 +818,10 @@ def _thumbs(app):
         lk = vj_looks.LOOKS.get(n)
         if lk is None:
             continue
-        if e.get("skip", 0) > 0:                             # a costly look: drawn one turn in THUMB_SLOW_EVERY
-            e["skip"] -= 1
-            continue
+        if e.get("costly") and app._vj_th_frame - getattr(app, "_vj_th_costly", -10 ** 9) < THUMB_SLOW_EVERY:
+            continue                                         # a costly look: one of them every THUMB_SLOW_EVERY
+        if e.get("costly"):                                  # frames, for the whole browser
+            app._vj_th_costly = app._vj_th_frame
         t_draw = time.perf_counter()
         dt = min(0.25, now - e.get("at", now)) if e.get("at") else 1 / 30
         e["at"] = now
@@ -847,8 +849,9 @@ def _thumbs(app):
             img = img[:, :, :3]                              # one with its own transparency: its colour
         except Exception:
             img = np.zeros((TH_H, TH_W, 3), np.float32)
-        if time.perf_counter() - t_draw > THUMB_SLOW_S:
-            e["skip"] = THUMB_SLOW_EVERY - 1
+        if time.perf_counter() - t_draw > THUMB_SLOW_S and not e.get("costly"):
+            e["costly"] = True
+            app._vj_th_costly = app._vj_th_frame
         if img.ndim != 3 or img.shape != (TH_H, TH_W, 3):    # a look of the wrong size: not shown (it never
             continue                                         # takes the frame down with it)
         dpg.set_value(e["tag"], np.concatenate([img, np.ones((TH_H, TH_W, 1), np.float32)], -1).ravel())
@@ -857,7 +860,7 @@ def _thumbs(app):
 
 THUMB_BUDGET_S = 0.008             # the browser's thumbnails at most this long a frame (then on from there next)
 THUMB_SLOW_S = 0.02                # a thumbnail slower than this (a MilkDrop look's shapes)...
-THUMB_SLOW_EVERY = 6               # ...drawn one turn in this many
+THUMB_SLOW_EVERY = 6               # ...and one such drawn every this many frames, for the whole browser
 
 
 # --- changes -------------------------------------------------------------------------------------

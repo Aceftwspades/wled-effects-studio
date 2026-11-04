@@ -433,6 +433,8 @@ MAX_SHAPES = MAX_WAVES = 4         # MilkDrop's own: four custom shapes and four
 DRAW_BUDGET_S = 0.08               # a frame's shapes and waves drawn within this (then the rest left out, said)
 DRAW_END = [float("inf")]
 DRAW_CUT = [False]
+TIME_CUT = [False]                 # this frame's waves and shapes cut by their time (not by the kept cap)
+DRAW_SLOW_N = 3                    # cut by time this many frames in a row: as many as fitted kept as the cap
 MD2_SLOW_S = 0.08                  # an MD2 shader pass slower than this...
 MD2_SLOW_N = 3                     # ...this many frames in a row: left out (said), not the studio held every frame
 FRAME_BUDGET_S = 0.03               # a frame's loops, whiles and memsets together at most this long (each turn is
@@ -811,10 +813,12 @@ def look_draw(preset):
         from native import clock
         DRAW_END[0] = float("inf") if clock.held() else time.perf_counter() + DRAW_BUDGET_S   # (a render: all)
         st["_drawn"] = 0
+        TIME_CUT[0] = False
+        t_draw = time.perf_counter()
         fb = _custom_waves(ctx, st, preset, v, fb)
         fb = _shapes(ctx, st, preset, v, fb)
-        if DRAW_CUT[0] and not clock.held():
-            st["_draw_cap"] = max(1, min(st.get("_draw_cap", 1 << 30), st["_drawn"]))   # the cut kept from now on
+        if not clock.held():
+            _keep_cap(st, time.perf_counter() - t_draw)
         fb = _borders(v, fb)
         if ctx.video is not None:                                # a deck's video seeds it, as the built-in presets' does
             fb = np.maximum(fb, ctx.video * 0.06 * (0.5 + ctx.amount))
@@ -864,6 +868,36 @@ def look_draw(preset):
         finally:
             DEADLINE[0], DRAW_END[0], CUT[0], DRAW_CUT[0] = float("inf"), float("inf"), False, False
     return framed
+
+
+def _cut_here(st):
+    """Whether the waves and shapes stop here this frame: its drawing time spent, or the kept cap reached."""
+    over = DRAW_BUDGET_S if "_draw_cap" in st else 0.0      # under a kept cap, the cap rules (time only twice over):
+    if time.perf_counter() > DRAW_END[0] + over:             # the same instances each frame, not one in, one out
+        TIME_CUT[0] = DRAW_CUT[0] = True
+        return True
+    if st.get("_drawn", 0) >= _cap(st):
+        DRAW_CUT[0] = True
+        return True
+    return False
+
+
+def _keep_cap(st, took):
+    """After a frame's waves and shapes: cut by time DRAW_SLOW_N frames in a row, as many as fitted are kept as
+    the cap (the same each frame, not popping); a frame well inside its time lets the cap grow, and go once all
+    fit - one slow frame (a GC pause, a disk stall) does not cap a light preset for good."""
+    if TIME_CUT[0]:
+        st["_cuts"] = st.get("_cuts", 0) + 1
+        if st["_cuts"] >= DRAW_SLOW_N:
+            st["_draw_cap"] = max(1, min(st.get("_draw_cap", 1 << 30), st["_drawn"]))
+        return
+    st["_cuts"] = 0
+    cap = st.get("_draw_cap")
+    if cap is not None and took < DRAW_BUDGET_S / 2:
+        if st["_drawn"] < cap:
+            del st["_draw_cap"]                                  # all of them fitted under it
+        else:
+            st["_draw_cap"] = cap + max(1, cap // 4)
 
 
 def _cap(st):
@@ -920,8 +954,7 @@ def _shapes(ctx, st, preset, v, fb):
             sh["init"](iv)
             tinit[n] = {k: iv[k] for k in iv if re.match(r"t\d$", k)}
         for inst in range(max(1, min(64, int(_fn(sh["p"].get("num_inst", 1), 1))))):
-            if time.perf_counter() > DRAW_END[0] or st.get("_drawn", 0) >= _cap(st):
-                DRAW_CUT[0] = True                               # the frame's drawing time spent: the rest left out
+            if _cut_here(st):                                    # the frame's drawing time spent: the rest left out
                 break
             st["_drawn"] = st.get("_drawn", 0) + 1
             s = _carry(sh["p"], v)
@@ -1039,8 +1072,7 @@ def _custom_waves(ctx, st, preset, v, fb):
     h, w = fb.shape[:2]
     tinit = st.setdefault("wave_t", {})
     for n, wv in enumerate(preset["waves"]):
-        if time.perf_counter() > DRAW_END[0] or st.get("_drawn", 0) >= _cap(st):
-            DRAW_CUT[0] = True
+        if _cut_here(st):
             break
         st["_drawn"] = st.get("_drawn", 0) + 1
         if n not in tinit:

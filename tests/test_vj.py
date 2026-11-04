@@ -1537,10 +1537,30 @@ for n in range(4):
 pre, dr, cx = _milk(many, 256, 256)
 st6 = {}
 counts = []
-for _ in range(6):
+for _ in range(9):
     dr(cx, st6)
     counts.append(st6.get("_drawn"))
-check(len(set(counts[1:])) == 1 and counts[-1] < 256, f"a cut drawing kept: the same instances each frame ({counts})")
+check(len(set(counts[-5:])) == 1 and counts[-1] < 256, f"a cut drawing kept after a few slow frames: the same "
+      f"instances each frame ({counts})")
+# one slow frame (a GC pause, a disk stall): a light preset not capped for good
+light = []
+for n in range(4):
+    light += [f"wavecode_{n}_enabled=1", f"shapecode_{n}_enabled=1", f"shapecode_{n}_num_inst=4"]
+pre, dr, cx = _milk(light, 64, 48)
+st7 = {}
+dr(cx, st7)
+full = st7["_drawn"]
+keep = milk.DRAW_BUDGET_S
+milk.DRAW_BUDGET_S = 0.0                                     # its drawing time spent at once, three frames running
+try:
+    for _ in range(3):
+        dr(cx, st7)
+finally:
+    milk.DRAW_BUDGET_S = keep
+for _ in range(40):
+    dr(cx, st7)
+check(st7["_drawn"] == full and "_draw_cap" not in st7 and milk.DRAW_WORDS not in st7.get("warn", ""),
+      f"slow frames, then fast ones: the cap grown back and gone ({st7['_drawn']} of {full})")
 pre, dr, cx = _milk(["per_frame_1=decay = q1 / 0; q1 = 1;", "per_frame_2=wave_mystery = 1e999 * 1e999;"])
 st6 = {}
 for _ in range(3):
@@ -1568,6 +1588,37 @@ run_x.canvas = np.ones((72, 96, 3), np.float32)
 run_x.drawn_at = clock.now()
 vj.draw_deck(ax, 2, 1 / 30, vj.sound(ax), 0.0, False)
 check(getattr(run_x, "xfade", None) is None, "a clip ending on deck C: no crossfade back from its last frame")
+# round 7: a render that ran ahead of real time lets the clock go - the fader's sweep goes on from where it was
+# (it swung A-B-A); one that ran behind - a clip's times move with it
+aj = App(g)
+oj = vj.options(aj)
+oj.update(on=True, fader=0.0)
+vj.update(aj, 1 / 30)
+clock.hold()
+clock.step(6.0)                                              # the render six seconds ahead of real time
+aj._vj_sweep = (clock.now(), 1.0, 0.0, 1.0)
+clock.step(0.3)
+vj.update(aj, 1 / 30)
+mid = oj["fader"]
+clock.release()                                              # now() back six seconds
+seen = []
+for _ in range(14):
+    time.sleep(0.1)
+    vj.update(aj, 1 / 30)
+    seen.append(round(oj["fader"], 2))
+check(all(b >= a for a, b in zip([mid] + seen, seen)) and seen[-1] == 1.0,
+      f"after a render that ran ahead: the fader's sweep goes on, not back and forth ({mid:.2f} then {seen})")
+vj_clips.play(aj, dict(vj_clips.DEFAULT, file="x.mp4", **{"out": 2.0}), "j")
+vj_clips.started(aj, 2, vj_clips._rt(aj)[2]["take"])
+t0_was = vj_clips._rt(aj)[2]["t0"]
+vj.update(aj, 1 / 30)
+clock.hold()
+time.sleep(0.4)                                              # a render running behind real time
+clock.release()
+vj.update(aj, 1 / 30)
+moved = vj_clips._rt(aj)[2]["t0"] - t0_was
+check(0.3 < moved < 0.6, f"after a render that ran behind: a clip's time moved with the clock ({moved:.2f} s)")
+vj.close(aj)
 # 16-bit pictures: a dark one stays dark; a transparent grey clears that grey only
 dark = Image.fromarray(np.full((4, 4), 200, "<u2"))
 check(np.asarray(vj_looks.eight_bit(dark)).max() <= 1, "a dark 16-bit picture: dark, not scaled up as 8-bit")
