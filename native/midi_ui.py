@@ -178,6 +178,8 @@ def targets(app):
         out += [(f"VJ {d}: {vj.KNOB_WORDS[k]}", {"kind": "vj_knob", "deck": i, "key": k}) for k, _, _ in vj.KNOBS]
         out += [(f"VJ {d}: next video file", {"kind": f"vj_clip_{d.lower()}"}),
                 (f"VJ {d}: video paused or playing", {"kind": f"vj_pause_{d.lower()}"})]
+        out += [(f"VJ {d}: effect {vj.fx_words(app, i, k)}", {"kind": "vj_fx", "deck": i, "key": k})
+                for k in vj.FX_SET]                                               # an Effect deck's sliders, checks
     out += [(f"VJ: select deck {d}", {"kind": f"vj_sel_{d.lower()}"}) for d in vj.LETTERS]
     out.append(("VJ: select the next deck", {"kind": "vj_sel_next"}))
     s = "selected deck"                                                           # whichever deck is selected
@@ -185,6 +187,7 @@ def targets(app):
     out += [(f"VJ {s}: {vj.KNOB_WORDS[k]}", {"kind": "vj_knob", "deck": vj.SEL, "key": k}) for k, _, _ in vj.KNOBS]
     out += [(f"VJ {s}: next video file", {"kind": "vj_clip_s"}),
             (f"VJ {s}: video paused or playing", {"kind": "vj_pause_s"})]
+    out += [(f"VJ {s}: effect {vj.FX_SET_WORDS[k]}", {"kind": "vj_fx", "deck": vj.SEL, "key": k}) for k in vj.FX_SET]
     from native import modulate
     out += modulate.targets(app)                                                  # each modulator's rate, depth, ...
     g = app.gp.graph
@@ -710,7 +713,7 @@ def apply_target(app, t, v, full=127.0, ctl=None, keep=False):
     if kind == "setlist":
         switch_effect(app, midi.setlist_pick(app.eng.names, _st(app)["setlist"], ctl or ("cc", 0, 0), v, full))
         return
-    if kind in ("vj_fader", "vj_knob", "vj_look") or kind in midi.VJ_BUTTONS:     # the VJ frame's (vj.py)
+    if kind in ("vj_fader", "vj_knob", "vj_look", "vj_fx") or kind in midi.VJ_BUTTONS:     # the VJ frame's (vj.py)
         from native import vj, vj_ui
         t = vj.resolve(app, t)                              # on "the selected deck": the deck selected now
         kind = t.get("kind")
@@ -722,6 +725,10 @@ def apply_target(app, t, v, full=127.0, ctl=None, keep=False):
             app._vj_dirty = True
             if keep:                                         # MIDI's: kept, as the phone's are (once it settles) - a
                 vj_ui._save(app)                             # pad's hold goes back on release, never saved
+        elif kind == "vj_fx":                               # an Effect deck's Custom slider or check
+            vj.fx_set(app, int(t.get("deck", 0)), t.get("key", "c1"), f)
+            if keep:
+                vj_ui._save(app)
         elif kind == "vj_look":
             names = vj.midi_looks()
             vj.options(app)["decks"][int(t.get("deck", 0))]["look"] = names[int(round(f * (len(names) - 1)))]

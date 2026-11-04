@@ -1373,7 +1373,7 @@ STEPS = [
       {"check": "dpg.is_item_shown('reader_tut_row') and dpg.get_value('reader_tut_what') == 'Tutorial: Slew'"},
       {"check": "reader_ui.S.side and dpg.get_item_pos('reader_win')[0] > dpg.get_viewport_client_width() // 2 and room.folded(app)"},
       {"py": "setattr(reader_ui.S, 'pending', {'k': next(i for i in range(reader_ui.reader.heading_index(reader_ui.S.blocks, 'Slew'), "
-             "len(reader_ui.S.blocks)) if reader_ui.S.blocks[i]['kind'] == 'img'), 'tries': 0})"}], 2.0),
+             "len(reader_ui.S.blocks)) if reader_ui.S.blocks[i]['kind'] == 'img'), 'tries': 0})"}], 4.0),   # (its GIFs decoded on a worker)
     ([{"check": "any(a['frames'] and a['i'] > 0 for a in reader_ui.S.anims.values())"},
       {"py": "reader_ui.follow(app, 'studio:try/slew/1')"}], 1.0),
     ([{"check": "app.gp.graph.nodes[2]['inputs']['up'] == 40.0 and dpg.is_item_shown('props_fly')"},

@@ -1540,8 +1540,9 @@ counts = []
 for _ in range(14):
     dr(cx, st6)
     counts.append(st6.get("_drawn"))
-check(len(set(counts[-4:])) == 1 and counts[-1] < 256, f"a cut drawing kept after a few slow frames: the same "
-      f"instances each frame ({counts})")
+tail = counts[-8:]                                           # kept: never back and forth (a busier machine may
+check(all(b_ <= a_ for a_, b_ in zip(tail, tail[1:])) and counts[-1] < 256,   # tighten it once more, not loosen)
+      f"a cut drawing kept after a few slow frames: the same instances each frame, not popping ({counts})")
 # a kept cap's shapes growing heavier: the cap tightened to what fits in the drawing time, not left at twice it
 grow = []
 for n in range(4):

@@ -427,10 +427,12 @@ def _labels_for(app):
     from native import modulate
     eng = app.eng
     idx = getattr(eng, "idx", None)
+    from native import vj
+    decks = tuple((d.get("look") == vj.EFFECT, d.get("effect")) for d in vj.options(app)["decks"])   # (their names)
     try:
-        return idx, tuple(eng.meta[idx]["labels"]), modulate.signature(app)
+        return idx, tuple(eng.meta[idx]["labels"]), modulate.signature(app), decks
     except Exception:
-        return idx, None, modulate.signature(app)
+        return idx, None, modulate.signature(app), decks
 
 
 def labels(app):

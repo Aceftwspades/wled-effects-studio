@@ -704,6 +704,37 @@ check(switched == ["My Fire"] and d2["look"] == vj.EFFECT and d2["effect"] == "M
 check(pads.kind_of(fxp["target"]) == "pick" and pads.state(a8.project)["banks"][0]["controls"][-1]["target"]["deck"]
       == vj.SEL, "an effect pad's kind; a target on the selected deck kept as it is (not put to deck C)")
 
+# an Effect deck's Custom sliders and checks: a fader and a toggle on the selected deck's, MIDI's, named by its
+# effect in the action lists
+a8.eng.names = ["Solid", "My Fire"]
+a8.eng.meta = [{"labels": [], "name": "Solid"},
+               {"labels": ["Speed", "Intensity", "Ripple size", "", "Fade", "Mirror", "", ""], "name": "My Fire",
+                "defs": {"c1": 40, "o1": 0}}]
+o8["decks"][2].update(look=vj.EFFECT, effect="My Fire", fx_set={})
+vj.select_deck(a8, 2)
+c1f = pads.new_control(st8, "fader", 1, 1, target={"kind": "vj_fx", "deck": vj.SEL, "key": "c1"})
+o1t = pads.new_control(st8, "toggle", 2, 1, target={"kind": "vj_fx", "deck": vj.SEL, "key": "o1"})
+for c in (c1f, o1t):
+    pads.current(st8)["controls"].append(c)
+start = pads.position(a8, c1f)
+pads.press(a8, c1f, f=0.5)
+pads.release(a8, c1f)
+pads.press(a8, o1t)
+pads.release(a8, o1t)
+on1 = o8["decks"][2]["fx_set"].get("o1")
+pads.press(a8, o1t)
+pads.release(a8, o1t)
+check(abs(start - 40 / 255) < 1e-3 and o8["decks"][2]["fx_set"].get("c1") == 128 and on1 == 1
+      and o8["decks"][2]["fx_set"].get("o1") == 0,
+      f"a pad on the selected deck's effect: Custom 1 from its effect's {40} to the fader's half (128), check 1 "
+      f"on and off by a toggle ({o8['decks'][2]['fx_set']})")
+midi_ui.apply_target(a8, {"kind": "vj_fx", "deck": 2, "key": "c3"}, 127, 127.0)
+check(o8["decks"][2]["fx_set"].get("c3") == 31, "MIDI on deck C's effect Custom 3: to its top (31)")
+names8 = [l for l, t in midi_ui.targets(a8) if t.get("kind") == "vj_fx"]
+check("VJ C: effect Custom 1 (Ripple size)" in names8 and "VJ C: effect check 1 (Mirror)" in names8
+      and "VJ selected deck: effect Custom 2" in names8 and "VJ A: effect Custom 1" in names8,
+      f"the deck effect actions named by the effect a deck runs ({[n for n in names8 if n.startswith('VJ C')][:3]})")
+
 dpg.destroy_context()
 
 print("pads:", "FAILED" if fails else "ok")

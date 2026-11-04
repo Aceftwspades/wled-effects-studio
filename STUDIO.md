@@ -4500,7 +4500,10 @@ RGB (a WebM's or ProRes 4444's alpha gone), and deck C's "over" knew only black 
    puts back what it changed on the deck it began on. A deck select pad is lit while its deck is selected; the VJ
    frame's deck title says "selected". New pad actions: "the effect: this one" (pad_effect: midi_ui.switch_effect)
    and "VJ ...: this effect" (pad_deck_fx: the deck's look Effect, its effect the one picked, its settings reset
-   for another), kind_of "pick", picked in the pads_s_fxrow combo. Tests: test_pads.
+   for another), kind_of "pick", picked in the pads_s_fxrow combo. An Effect deck's Custom 1-3 and checks 1-3 are
+   targets too (vj_fx: deck, key; vj.fx_value / fx_set / fx_words, the deck's fx_set), each deck's and the selected
+   deck's, named by the effect the deck runs; the pads' action list made again when a deck's effect changes.
+   Tests: test_pads.
 
 - [x] **Live cameras on pads** (2026-11-03): a pad's action "a live camera" (pads target `pad_cam`: deck, camera
    list entry `name` - a webcam's, or video.PHONE - envelope, level) plays through the clip player

@@ -1218,6 +1218,47 @@ FX_STEP = 23                       # ms an engine frame, as the main engine's (a
 FX_SET = ("c1", "c2", "c3", "o1", "o2", "o3")   # an Effect deck's own settings: the effect's three sliders and checks
 
 
+FX_SET_WORDS = {"c1": "Custom 1", "c2": "Custom 2", "c3": "Custom 3", "o1": "check 1", "o2": "check 2", "o3": "check 3"}
+
+
+def fx_most(k):
+    """The most an Effect deck's setting takes: a check 1, Custom 3 31, the others 255."""
+    return 1 if k[0] == "o" else (31 if k == "c3" else 255)
+
+
+def fx_value(app, i, k):
+    """Deck i's Effect setting k as 0..1 of its range: the deck's own, else its effect's (0 with no effect)."""
+    d = options(app)["decks"][i]
+    own = d.get("fx_set") or {}
+    if k in own:
+        return max(0.0, min(1.0, float(own[k]) / fx_most(k)))
+    got = {kk: v for kk, _, v, _ in fx_settings(app.eng, d.get("effect", ""), d)}
+    return max(0.0, min(1.0, float(got.get(k, 0)) / fx_most(k)))
+
+
+def fx_set(app, i, k, f):
+    """Deck i's Effect setting k set from f (0..1): a slider to its step, a check on from the half up."""
+    if k not in FX_SET:
+        return
+    d = options(app)["decks"][i]
+    v = (1 if f >= 0.5 else 0) if k[0] == "o" else int(round(max(0.0, min(1.0, float(f))) * fx_most(k)))
+    d.setdefault("fx_set", {})[k] = v
+    app._vj_dirty = True
+
+
+def fx_words(app, i, k):
+    """An Effect deck setting's name for the action lists: "Custom 1", with its effect's own name for it when deck i
+    runs an effect that names it ("Custom 1 (Ripple size)")."""
+    w = FX_SET_WORDS[k]
+    if i >= DECKS:
+        return w
+    d = options(app)["decks"][i]
+    if d.get("look") != EFFECT:
+        return w
+    lab = {kk: l for kk, l, _, _ in fx_settings(app.eng, d.get("effect", ""), d)}.get(k)
+    return f"{w} ({lab.strip()})" if lab and lab.strip() and lab.strip() != "!" else w
+
+
 def fx_settings(eng, name, d):
     """An Effect deck's effect's own settings: [(key, its label, the value it has now, the most it takes)] - the
     sliders and checks the effect names (the others it does not use), each the deck's or else the effect's own."""

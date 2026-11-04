@@ -299,6 +299,9 @@ def value(app, t):
         if k == "vj_knob":
             from native import vj
             return float(vj.knob_get(app, int(t.get("deck", 0)), t.get("key", "amount")))
+        if k == "vj_fx":                                # an Effect deck's Custom slider or check
+            from native import vj
+            return vj.fx_value(app, int(t.get("deck", 0)), t.get("key", "c1"))
         if k == "vj_look":                              # along the list, as MIDI's control sets it
             from native import vj
             names = vj.midi_looks()
@@ -353,6 +356,9 @@ def _step(app, t):
     try:
         if k == "fx":
             return 1.0 / 31.0 if key == "c3" else 1.0 / 255.0
+        if k == "vj_fx":
+            from native import vj
+            return 1.0 / vj.fx_most(key)
         if k == "vj_knob":
             from native import vj
             lo, hi = next((a, b) for kk, a, b in vj.KNOBS if kk == key)

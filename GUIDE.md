@@ -1238,7 +1238,13 @@ go, whatever is selected meanwhile.
 **An effect on a pad**: **the effect: this one** switches the studio's
 effect to the one picked (the project's own effects too), crossfading as
 a MIDI effect change does; **VJ A, B, C or selected deck: this effect**
-puts that deck on the Effect look, running the effect picked.
+puts that deck on the Effect look, running the effect picked. A deck on
+an effect also has **VJ A, B, C or selected deck: effect Custom 1, 2, 3**
+and **check 1, 2, 3** for a fader, a knob or a pad (and MIDI) - named in the
+list by the effect the deck runs, "Custom 1 (Ripple size)" - its Speed and
+Intensity being the deck's **speed** and **amount** knobs. They set the
+deck's own copy of the effect (the one on the LEDs while the VJ is on air),
+not the studio's.
 
 **Video clips on pads**, like a sampler's: a pad whose action is **a video
 clip** plays part of a video file on a deck, over what the deck shows -
