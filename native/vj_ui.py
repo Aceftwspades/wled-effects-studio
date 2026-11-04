@@ -1329,6 +1329,7 @@ def project_changed(app):
     app._vj_thumbs = None                                    # the browser's tiles: this project's looks
     if dpg.does_item_exist(BROWSE) and dpg.is_item_shown(BROWSE):
         _fill_browser(app)
+    app._vj_dirty = True                                     # the decks' look lists too (a frame shown at startup)
 
 
 def py_allowed(app):

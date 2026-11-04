@@ -143,7 +143,7 @@ class _Parser:
             if self.peek()[1] in _ASSIGN:
                 op = self.take()[1]
                 rhs = self.assign()
-                mem = "_mem" if val == "megabuf" else "_GMEM"
+                mem = "_mem.cur" if val == "megabuf" else "_GMEM"
                 return self._store(f"_mbs({mem}, {idx}, {{}})", f"_mb({mem}, {idx})", op, rhs)
             self.k = save
         return self.ternary()
@@ -206,7 +206,8 @@ class _Parser:
     def primary(self):
         kind, val = self.take()
         if kind == "num":
-            return f"{float(val)!r}"
+            f = float(val)
+            return f"{f!r}" if math.isfinite(f) else ("1e308" if f > 0 else "-1e308")
         if val == "(":
             e = self.sequence((")",))
             self.take(")")
@@ -224,9 +225,9 @@ class _Parser:
                 if val in ("exec2", "exec3"):
                     return f"_seq({', '.join(a)})" if a else "0.0"
                 if val in _BUFS and len(a) == 1:
-                    return f"_mb({'_mem' if val == 'megabuf' else '_GMEM'}, {a[0]})"
+                    return f"_mb({'_mem.cur' if val == 'megabuf' else '_GMEM'}, {a[0]})"
                 if val in ("memset", "memcpy", "freembuf"):
-                    return f"_{val}(_mem, {', '.join(a)})"
+                    return f"_{val}(_mem.cur, {', '.join(a)})"
                 if val == "assign" and len(a) == 2 and re.fullmatch(r"_g\(v, '(\w+)'\)", a[0]):
                     return f"_s(v, {a[0][7:-1]}, {a[1]})"
                 return f"_f_{val}({', '.join(a)})" if val in _FUNCS else f"_unknown({val!r}, {', '.join(a)})"
@@ -304,7 +305,78 @@ for _n, _impl in {
     _FUNCS[_n] = _impl
 
 _REG = {}                                                # reg00..reg99: ns-eel2's globals, shared by every preset
-_GMEM = {}                                               # gmegabuf: one memory shared by every preset
+class MegaBuf:
+    """A megabuf: up to _MEM_MAX values, 0 where nothing was put - kept in pages of numpy floats made as they are
+    written (a dict of Python floats grew a preset's memset of a million slots a frame to 600 MB)."""
+    PAGE = 1 << 16
+
+    def __init__(self):
+        self.pages = {}
+
+    def get(self, k):
+        pg = self.pages.get(k >> 16)
+        return 0.0 if pg is None else float(pg[k & 0xFFFF])
+
+    def set(self, k, x):
+        pg = self.pages.get(k >> 16)
+        if pg is None:
+            pg = self.pages[k >> 16] = np.zeros(self.PAGE, np.float64)
+        pg[k & 0xFFFF] = x
+
+    def fill(self, d, x, n):
+        """n values from d set to x, a page at a time."""
+        end = min(_MEM_MAX, d + n)
+        while d < end:
+            p, o = d >> 16, d & 0xFFFF
+            m = min(self.PAGE - o, end - d)
+            pg = self.pages.get(p)
+            if pg is None:
+                if x == 0.0:
+                    d += m
+                    continue
+                pg = self.pages[p] = np.zeros(self.PAGE, np.float64)
+            pg[o:o + m] = x
+            d += m
+
+    def read(self, s, n):
+        out = np.zeros(max(0, n), np.float64)
+        k = 0
+        while k < n:
+            p, o = (s + k) >> 16, (s + k) & 0xFFFF
+            m = min(self.PAGE - o, n - k)
+            pg = self.pages.get(p)
+            if pg is not None:
+                out[k:k + m] = pg[o:o + m]
+            k += m
+        return out
+
+    def write(self, d, vals):
+        k, n = 0, len(vals)
+        while k < n:
+            p, o = (d + k) >> 16, (d + k) & 0xFFFF
+            m = min(self.PAGE - o, n - k)
+            pg = self.pages.get(p)
+            if pg is None:
+                pg = self.pages[p] = np.zeros(self.PAGE, np.float64)
+            pg[o:o + m] = vals[k:k + m]
+            k += m
+
+    def free(self, at):
+        """Every value from `at` on let go (freembuf)."""
+        for p in [p for p in self.pages if p > at >> 16]:
+            del self.pages[p]
+        pg = self.pages.get(at >> 16)
+        if pg is not None:
+            pg[at & 0xFFFF:] = 0.0
+
+
+class MemRef:
+    """A compiled block's megabuf: the one its draw points it at (each deck's, each thumbnail's own)."""
+    def __init__(self):
+        self.cur = MegaBuf()
+
+
+_GMEM = MegaBuf()                                        # gmegabuf: one memory shared by every preset
 _MEM_MAX = 1 << 23                                       # ns-eel2's megabuf holds 8M values
 
 
@@ -340,38 +412,80 @@ def _count(n):
 
 
 CUT_WORDS = "a loop(), while() or memset() ran too long a frame: cut short"
+DRAW_WORDS = "its shapes and waves took too long a frame: some left out"
+MAX_SHAPES = MAX_WAVES = 4         # MilkDrop's own: four custom shapes and four custom waves
+DRAW_BUDGET_S = 0.08               # a frame's shapes and waves drawn within this (then the rest left out, said)
+DRAW_END = [float("inf")]
+DRAW_CUT = [False]
+MD2_SLOW_S = 0.08                  # an MD2 shader pass slower than this...
+MD2_SLOW_N = 3                     # ...this many frames in a row: left out (said), not the studio held every frame
 FRAME_BUDGET_S = 0.03               # a frame's loops, whiles and memsets together at most this long (each turn is
 CUT = [False]                       # Python, not ns-eel's native code: loop(1e9) stopped the studio) - nested,
 DEADLINE = [float("inf")]           # in a shape's 64 instances, a wave's points: one budget a frame (look_draw)
 
 
+_IN = [0, 0.0, 0.0]                 # loops entered (depth), when the outermost was, the frame's loop time so far
+
+
 def _spent():
-    """Whether the frame's budget is spent (then every loop left stops at once)."""
+    """Whether the frame's loop time is spent (then every loop left stops at once) - the time inside its loops
+    only, not the frame's other drawing."""
     if CUT[0]:
         return True
-    if time.perf_counter() > DEADLINE[0]:
+    used = _IN[2] + (time.perf_counter() - _IN[1] if _IN[0] else 0.0)
+    if used > FRAME_BUDGET_S and DEADLINE[0] != float("inf"):    # (not in a frame's draw: never cut)
         CUT[0] = True
         return True
     return False
 
 
+def _enter():
+    if _IN[0] == 0:
+        _IN[1] = time.perf_counter()
+    _IN[0] += 1
+
+
+def _leave():
+    _IN[0] -= 1
+    if _IN[0] == 0:
+        _IN[2] += time.perf_counter() - _IN[1]
+
+
 def _loop(n, body):
     out = 0.0
-    for k in range(_count(n)):
-        if (CUT[0] or k & 15 == 0) and _spent():
-            break
-        out = body()
+    _enter()
+    try:
+        for k in range(_count(n)):
+            if (CUT[0] or k & 15 == 0) and _spent():
+                break
+            out = body()
+    finally:
+        _leave()
     return out
 
 
 def _while(body):
-    for k in range(_MAX_LOOP):
-        if (CUT[0] or k & 15 == 0) and _spent():
-            break
-        r = body()
-        if not np.any(r != 0) if isinstance(r, np.ndarray) else r == 0:
-            break
+    _enter()
+    try:
+        for k in range(_MAX_LOOP):
+            if (CUT[0] or k & 15 == 0) and _spent():
+                break
+            r = body()
+            if not np.any(r != 0) if isinstance(r, np.ndarray) else r == 0:
+                break
+    finally:
+        _leave()
     return 0.0
+
+
+def _fn(x, default=0.0):
+    """A preset's value as a finite float - default for inf or NaN (an accumulating q fed into a count, a size, a
+    place: int(inf) raised every frame from then on, the deck dark for good)."""
+    try:
+        f = float(np.asarray(x, np.float64).reshape(-1)[0]) if isinstance(x, np.ndarray) else float(x)
+    except (TypeError, ValueError, IndexError):
+        return default
+    return f if math.isfinite(f) else default
 
 
 def _slot(i):
@@ -385,8 +499,9 @@ def _slot(i):
 def _mb(mem, i):
     """megabuf(i) / gmegabuf(i): a value of the memory (0 where nothing was put)."""
     if isinstance(i, np.ndarray):
-        return np.vectorize(lambda j: mem.get(_slot(j), 0.0), otypes=[np.float64])(i)
-    return mem.get(_slot(i), 0.0)
+        return np.vectorize(lambda j: mem.get(_slot(j)) if _slot(j) >= 0 else 0.0, otypes=[np.float64])(i)
+    k = _slot(i)
+    return mem.get(k) if k >= 0 else 0.0
 
 
 def _mbs(mem, i, x):
@@ -396,39 +511,33 @@ def _mbs(mem, i, x):
         for j, val in zip(ii, xx):
             k = _slot(j)
             if k >= 0:
-                mem[k] = float(val)
+                mem.set(k, float(val))
         return x
     k = _slot(i)
     if k >= 0:
-        mem[k] = x
+        mem.set(k, float(x))
     return x
 
 
 def _memset(mem, dest, val, n):
     d = _slot(dest)
-    for k in range(d, min(_MEM_MAX, d + _count(n))) if d >= 0 else ():
-        if (k - d) & 1023 == 0 and _spent():
-            break
-        mem[k] = float(val)
+    if d >= 0:
+        mem.fill(d, float(np.nan_to_num(float(val))), _count(n))   # (a page at a time: no loop to budget)
     return dest
 
 
 def _memcpy(mem, dest, src, n):
     d, s = _slot(dest), _slot(src)
     if d >= 0 and s >= 0:
-        vals = []
-        for k in range(min(_count(n), max(0, _MEM_MAX - d))):
-            if k & 1023 == 0 and _spent():
-                break
-            vals.append(mem.get(s + k, 0.0))
-        for k, val in enumerate(vals):
-            mem[d + k] = val
+        n = min(_count(n), _MEM_MAX - d, _MEM_MAX - s)
+        mem.write(d, mem.read(s, n))
     return dest
 
 
 def _freembuf(mem, at):
-    for k in [k for k in mem if k >= _slot(at)]:
-        del mem[k]
+    k = _slot(at)
+    if k >= 0:
+        mem.free(k)
     return at
 
 
@@ -446,14 +555,14 @@ _ENV.update({f"_f_{k}": f for k, f in _FUNCS.items()})
 
 def compile_code(src, what="equations", mem=None):
     """ns-eel statements as a Python function run(v) on a dict of the variables; SyntaxError said with `what`.
-    `mem`: the block's megabuf (a dict, kept by the caller for as long as the preset runs)."""
+    `mem`: the block's megabuf (a MemRef the draw points at its own state's MegaBuf)."""
     try:
         body = _Parser(_tokens(src)).statements()
     except SyntaxError as e:
         raise SyntaxError(f"the preset's {what}: {e}")
     code = "def run(v):\n" + ("".join(f"    {s}\n" for s in body) or "    pass\n")
     ns = dict(_ENV)
-    ns["_mem"] = {} if mem is None else mem
+    ns["_mem"] = MemRef() if mem is None else mem
     with np.errstate(all="ignore"):
         exec(compile(code, f"<{what}>", "exec"), ns)
     run = ns["run"]
@@ -544,16 +653,17 @@ def parse(text, name="preset"):
         p = dict(defaults)
         p.update(d["p"])
         src = {w: "\n".join(d["eq"].get(w, {})[n] for n in sorted(d["eq"].get(w, {}))) for w in ("init", "per_frame", "per_point")}
-        mem = {}
-        return {"p": p, "init": compile_code(src["init"], f"{what} init equations", mem),
+        mem = MemRef()
+        return {"p": p, "mem": mem, "init": compile_code(src["init"], f"{what} init equations", mem),
                 "frame": compile_code(src["per_frame"], f"{what} per-frame equations", mem),
                 "point": compile_code(src["per_point"], f"{what} per-point equations", mem) if src["per_point"].strip() else None,
                 "carried": _carried(src["per_point"])}
-    out_shapes = [compiled(shapes[n], SHAPE, f"shape {n}") for n in sorted(shapes) if shapes[n]["p"].get("enabled")]
-    out_waves = [compiled(waves[n], WAVE, f"wave {n}") for n in sorted(waves) if waves[n]["p"].get("enabled")]
+    out_shapes = [compiled(shapes[n], SHAPE, f"shape {n}") for n in sorted(shapes)
+                  if shapes[n]["p"].get("enabled")][:MAX_SHAPES]      # (MilkDrop's 4 each: 300 took minutes a frame)
+    out_waves = [compiled(waves[n], WAVE, f"wave {n}") for n in sorted(waves) if waves[n]["p"].get("enabled")][:MAX_WAVES]
     md2 = {}
     notes = []
-    mem = {}                                                  # the preset's own megabuf
+    mem = MemRef()                                            # the preset's own megabuf
     for which in ("warp", "comp"):
         hlsl = "\n".join(shaders[which][n] for n in sorted(shaders[which]))
         if hlsl.strip():
@@ -563,6 +673,7 @@ def parse(text, name="preset"):
             except ValueError as e:
                 notes.append(f"its {which} shader left out: {e}")
     return {"name": name, "base": base, "src": code, "shapes": out_shapes, "waves": out_waves, "md2": md2, "notes": notes,
+            "mems": [mem] + [x["mem"] for x in out_shapes + out_waves],
             "init": compile_code(code["init"], "per-frame-init equations", mem),
             "frame": compile_code(code["frame"], "per-frame equations", mem),
             "pixel": compile_code(code["pixel"], "per-pixel equations", mem) if code["pixel"].strip() else None}
@@ -657,10 +768,13 @@ def look_draw(preset):
             from native import milk_md2
             uni = milk_md2.uniforms(v, w, h, ctx.t, st["frame"])
             uvmap = np.dstack([U, 1.0 - V]).astype(np.float32)
+            t_ = time.perf_counter()
             warped, err = milk_md2.run(preset["md2"]["warp"], w, h, uni, st["fb"],
                                        milk_md2.blurs(st["fb"], preset["md2"]["warp"]), uvmap)
             if warped is None:
                 st["md2_off"]["warp"] = err
+            else:
+                _md2_slow(st, "warp", time.perf_counter() - t_)
         if warped is not None:                                   # the preset's warp shader made the next frame (its decay its own)
             fb = warped
         else:
@@ -681,10 +795,13 @@ def look_draw(preset):
         out = _echo(v, st["fb"])
         if "comp" in preset["md2"] and "comp" not in st.setdefault("md2_off", {}):
             from native import milk_md2
+            t_ = time.perf_counter()
             shown, err = milk_md2.run(preset["md2"]["comp"], w, h, milk_md2.uniforms(v, w, h, ctx.t, st["frame"]),
                                       out, milk_md2.blurs(out, preset["md2"]["comp"]), None)
             if shown is None:
                 st["md2_off"]["comp"] = err
+            elif _md2_slow(st, "comp", time.perf_counter() - t_):
+                shown = None
             else:
                 st["q"] = {k: v[k] for k in v if re.match(r"q\d+$", k)}
                 _warn(st, preset)
@@ -705,13 +822,29 @@ def look_draw(preset):
         return out
 
     def framed(ctx, st):                                         # the frame's loop budget, from its start
-        CUT[0] = False
+        bufs = st.setdefault("_mem", {})                         # this deck's (or thumbnail's) own megabufs: two
+        for k, ref in enumerate(preset.get("mems", ())):         # decks on one preset kept apart
+            ref.cur = bufs.setdefault(k, MegaBuf())
+        CUT[0] = DRAW_CUT[0] = False
+        _IN[:] = [0, 0.0, 0.0]
         DEADLINE[0] = time.perf_counter() + FRAME_BUDGET_S
+        DRAW_END[0] = time.perf_counter() + DRAW_BUDGET_S
         try:
             return draw(ctx, st)
         finally:
-            DEADLINE[0], CUT[0] = float("inf"), False            # (none outside a frame's draw)
+            DEADLINE[0], DRAW_END[0], CUT[0], DRAW_CUT[0] = float("inf"), float("inf"), False, False
     return framed
+
+
+def _md2_slow(st, which, took):
+    """An MD2 pass's time this frame counted: slower than MD2_SLOW_S MD2_SLOW_N frames in a row, it is left out
+    (said) - the studio waits on it every frame. Whether it was left out now."""
+    slow = st.setdefault("md2_slow", {})
+    slow[which] = slow.get(which, 0) + 1 if took > MD2_SLOW_S else 0
+    if slow[which] >= MD2_SLOW_N:
+        st.setdefault("md2_off", {})[which] = f"too slow for a frame ({took * 1000:.0f} ms)"
+        return True
+    return False
 
 
 def _warn(st, preset):
@@ -720,6 +853,8 @@ def _warn(st, preset):
     notes = list(preset.get("notes") or []) + [f"its {w} shader left out: {e}" for w, e in off.items()]
     if CUT[0]:
         notes.append(CUT_WORDS)                                  # (its shapes' and waves' loops counted too)
+    if DRAW_CUT[0]:
+        notes.append(DRAW_WORDS)
     st["warn"] = "; ".join(notes)
 
 
@@ -745,17 +880,20 @@ def _shapes(ctx, st, preset, v, fb):
             iv = _carry(sh["p"], v)
             sh["init"](iv)
             tinit[n] = {k: iv[k] for k in iv if re.match(r"t\d$", k)}
-        for inst in range(max(1, min(64, int(sh["p"].get("num_inst", 1))))):
+        for inst in range(max(1, min(64, int(_fn(sh["p"].get("num_inst", 1), 1))))):
+            if time.perf_counter() > DRAW_END[0]:
+                DRAW_CUT[0] = True                               # the frame's drawing time spent: the rest left out
+                break
             s = _carry(sh["p"], v)
             s.update(tinit[n])
-            s.update(instance=float(inst), num_inst=float(sh["p"].get("num_inst", 1)))
+            s.update(instance=float(inst), num_inst=_fn(sh["p"].get("num_inst", 1), 1))
             sh["frame"](s)
-            sides = max(3, min(100, int(round(float(s.get("sides", 4))))))
-            cx, cy = float(s.get("x", 0.5)) * (w - 1), (1.0 - float(s.get("y", 0.5))) * (h - 1)
-            rad = max(0.0, float(s.get("rad", 0.1))) * min(w, h)
+            sides = max(3, min(100, int(round(_fn(s.get("sides", 4), 4)))))
+            cx, cy = _fn(s.get("x", 0.5), 0.5) * (w - 1), (1.0 - _fn(s.get("y", 0.5), 0.5)) * (h - 1)
+            rad = min(4.0, max(0.0, _fn(s.get("rad", 0.1), 0.1))) * min(w, h)
             if rad < 0.5:
                 continue
-            ang = float(s.get("ang", 0.0))
+            ang = _fn(s.get("ang", 0.0))
             pad = 2.0
             x0, x1 = max(0, int(cx - rad - pad)), min(w, int(cx + rad + pad) + 1)
             y0, y1 = max(0, int(cy - rad - pad)), min(h, int(cy + rad + pad) + 1)
@@ -861,6 +999,9 @@ def _custom_waves(ctx, st, preset, v, fb):
     h, w = fb.shape[:2]
     tinit = st.setdefault("wave_t", {})
     for n, wv in enumerate(preset["waves"]):
+        if time.perf_counter() > DRAW_END[0]:
+            DRAW_CUT[0] = True
+            break
         if n not in tinit:
             iv = _carry(wv["p"], v)
             wv["init"](iv)
@@ -868,7 +1009,7 @@ def _custom_waves(ctx, st, preset, v, fb):
         s = _carry(wv["p"], v)
         s.update(tinit[n])
         wv["frame"](s)
-        count = max(2, min(256, int(s.get("samples", 512)) // 2))     # the canvas is small: half MilkDrop's points
+        count = max(2, min(256, int(_fn(s.get("samples", 512), 512)) // 2))   # the canvas is small: half MilkDrop's
         if wv.get("carried"):
             count = min(count, 64)                                # point by point is slow: a quarter of those
         k = np.linspace(0, 1, count)
@@ -879,7 +1020,7 @@ def _custom_waves(ctx, st, preset, v, fb):
         else:
             val = np.interp(k * (len(ctx.wave) - 1), np.arange(len(ctx.wave)), ctx.wave)
         val = val * float(wv["p"].get("scaling", 1.0))
-        sep = int(float(wv["p"].get("sep", 0)))
+        sep = int(max(-4096, min(4096, _fn(wv["p"].get("sep", 0)))))
         pv = dict(s)
         pv.update(sample=k, value1=val, value2=np.roll(val, sep), x=k, y=0.5 + val * 0.25,
                   r=np.full(count, float(s.get("r", 1))), g=np.full(count, float(s.get("g", 1))),
@@ -955,7 +1096,7 @@ def _echo(v, fb):
     z = max(0.05, float(np.nan_to_num(v.get("echo_zoom", 1.0))))
     u, vv = np.meshgrid(np.linspace(0, 1, w, dtype=np.float32), np.linspace(0, 1, h, dtype=np.float32))
     u, vv = (u - 0.5) / z + 0.5, (vv - 0.5) / z + 0.5
-    o = int(v.get("echo_orient", 0)) % 4
+    o = int(_fn(v.get("echo_orient", 0))) % 4
     if o in (1, 3):
         u = 1.0 - u
     if o in (2, 3):
@@ -976,7 +1117,7 @@ def _wave(ctx, v, fb):
         col = col / col.max()
     s = np.interp(np.linspace(0, len(ctx.wave) - 1, 256), np.arange(len(ctx.wave)), ctx.wave)
     s = s * float(v.get("wave_scale", 1.0)) * (0.6 + ctx.level)
-    mode = int(v.get("wave_mode", 0)) % 8
+    mode = int(_fn(v.get("wave_mode", 0))) % 8
     cx, cy = float(v.get("wave_x", 0.5)), 1.0 - float(v.get("wave_y", 0.5))
     t = np.linspace(0, 1, len(s))
     if mode in (0, 1):                                            # a circle, the sound its radius

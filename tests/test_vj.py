@@ -1438,8 +1438,8 @@ from types import SimpleNamespace                             # noqa: E402
 bad_milk =os.path.join(tempfile.mkdtemp(), "loops.milk")
 with open(bad_milk, "w") as f:
     f.write(chr(10).join(["[preset00]", "per_frame_1=loop(1000, loop(1e9, b=b+1));", "per_frame_2=memset(0,1,1000000);",
-                          "per_pixel_1=loop(1e9, q1=q1+rad);", "shape00_enabled=1", "shape00_num_inst=64",
-                          "shape00_per_frame1=loop(1e9, c=c+1);", ""]))
+                          "per_pixel_1=loop(1e9, q1=q1+rad);", "shapecode_0_enabled=1", "shapecode_0_num_inst=64",
+                          "shape_0_per_frame1=loop(1e9, c=c+1);", ""]))
 mdraw = milk.look_draw(milk.load(bad_milk))
 mst = {}
 mctx = SimpleNamespace(w=32, h=24, t=0.0, dt=1 / 30, speed=1.0, amount=0.5, bass=0.3, mid=0.3, treb=0.3, level=0.3,
@@ -1451,6 +1451,64 @@ mdraw(mctx, mst)
 spent = time.perf_counter() - t0_
 check(spent < 0.5 and milk.CUT_WORDS in mst.get("warn", "") and milk.DEADLINE[0] == float("inf"),
       f"a .milk of nested loops, a big memset and 64 shapes of loop(1e9): one budget a frame ({spent:.2f} s), said")
+
+
+def _milk(lines, w=32, h=24):
+    """A .milk of these lines: its draw and a canvas of w x h to draw it on."""
+    path = os.path.join(tempfile.mkdtemp(), "t.milk")
+    with open(path, "w") as f:
+        f.write(chr(10).join(["[preset00]"] + lines + [""]))
+    pre = milk.load(path)
+    cx = SimpleNamespace(**dict(vars(mctx), w=w, h=h))
+    return pre, milk.look_draw(pre), cx
+
+
+# round 5: MilkDrop's four shapes and four waves; their drawing within a time of the frame's
+many = []
+for n in range(12):
+    many += [f"shapecode_{n}_enabled=1", f"shapecode_{n}_num_inst=64", f"shapecode_{n}_rad=0.3",
+             f"shapecode_{n}_textured=1"]
+pre, dr, cx = _milk(many, 256, 256)
+st5 = {}
+t0_ = time.perf_counter()
+dr(cx, st5)
+took = time.perf_counter() - t0_
+check(len(pre["shapes"]) == milk.MAX_SHAPES and took < 0.6, f"12 shapes of 64 big instances on a 256 x 256 canvas: "
+      f"four kept, drawn within the frame's time ({took:.2f} s, {st5.get('warn', '')!r})")
+# a legit preset's little loop not cut by the frame's other drawing
+pre, dr, cx = _milk(["shapecode_0_enabled=1", "shapecode_0_num_inst=8", "shapecode_0_rad=0.4", "shapecode_0_textured=1",
+                     "shapecode_1_enabled=1", "shape_1_per_frame1=n=0; loop(3, n=n+1); rad=n*0.05;"], 256, 256)
+st5 = {}
+dr(cx, st5)
+check(milk.CUT_WORDS not in st5.get("warn", ""), f"a 3-turn loop after heavy drawing: not cut ({st5.get('warn')!r})")
+# megabuf: paged numpy, a deck's own (two decks on one preset kept apart)
+pre, dr, cx = _milk(["per_frame_1=megabuf(0)=megabuf(0)+1; q1=megabuf(0);",
+                     "per_frame_2=memset(100000, 1, 1048576); x = megabuf(500000);"])
+sa, sb = {}, {}
+for _ in range(3):
+    dr(cx, sa)
+    dr(cx, sb)
+pages = len(sa["_mem"][0].pages)
+check(sa["q"].get("q1") == 3.0 and sb["q"].get("q1") == 3.0 and pages <= 18,
+      f"megabuf a deck's own (A {sa['q'].get('q1')}, B {sb['q'].get('q1')}), a memset of a million slots in "
+      f"{pages} pages (not 600 MB of floats)")
+mb = milk.MegaBuf()
+mb.fill(10, 2.0, 200000)
+mb.write(5, mb.read(10, 3))
+mb.free(100)
+check(mb.get(5) == 2.0 and mb.get(99) == 2.0 and mb.get(100) == 0.0 and mb.get(150000) == 0.0,
+      "megabuf: fill, copy and freembuf by pages")
+# a number past a float, an accumulating q: drawn on, not dark for good
+pre, dr, cx = _milk(["per_frame_1=q1 = q1*1e200 + 1; wave_mode = q1; echo_orient = q1; x = 1e999;",
+                     "shapecode_0_enabled=1", "shape_0_per_frame1=rad = q1; x = q1 / 0;"])
+st5 = {}
+errs = []
+for _ in range(4):
+    try:
+        dr(cx, st5)
+    except Exception as e:
+        errs.append(f"{type(e).__name__}: {e}")
+check(not errs, f"a preset's numbers past a float: drawn on ({errs[:1]})")
 # 16-bit pictures: a dark one stays dark; a transparent grey clears that grey only
 dark = Image.fromarray(np.full((4, 4), 200, "<u2"))
 check(np.asarray(vj_looks.eight_bit(dark)).max() <= 1, "a dark 16-bit picture: dark, not scaled up as 8-bit")

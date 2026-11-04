@@ -347,8 +347,12 @@ def _chosen(app, a):
     f = a.get("file_path_name", "")
     if not f or not os.path.isfile(f):
         return
+    opened = getattr(app, "_clip_dialog_for", None)
+    if opened and opened[2] is not app.project:      # another project opened while the file was picked: not
+        app.gp.status("another project was opened while the file was picked - not copied", "warn")   # copied in
+        return
     proj, into = app.project, _into(app)
-    cid = _dialog_for(app)[0]                        # the pad it was opened for (none: another project's open)
+    cid = _dialog_for(app)[0]                        # the pad it was opened for
     tasks.run(app, "pads_clip_copy", f"copying {os.path.basename(f)} into the project",
               lambda: vj.keep_media(into, f), lambda kept: app.project is proj and _file_of(app, cid, kept))
 
