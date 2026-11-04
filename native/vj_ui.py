@@ -790,8 +790,15 @@ def _browse_pick(app, name):
 def _thumbs(app):
     """A few thumbnails a frame drawn, in turn: each its look at the thumbnail's size, the test pattern for video."""
     th = getattr(app, "_vj_thumbs", None)
-    if not th or not dpg.is_item_shown(BROWSE):
+    if th and not dpg.is_item_shown(BROWSE):
+        if not getattr(app, "_vj_th_freed", False):          # the browser closed: its looks' states let go (a
+            for e in th.values():                            # MilkDrop look's megabufs, buffers), started again
+                e["state"] = {}                              # when it opens
+            app._vj_th_freed = True
         return
+    if not th:
+        return
+    app._vj_th_freed = False
     from native import video
     if getattr(app, "_vj_th_src", None) is None:
         app._vj_th_src = video.TestPattern(TH_W, TH_H)
@@ -800,12 +807,20 @@ def _thumbs(app):
     k0 = getattr(app, "_vj_th_k", 0)
     now = time.perf_counter()
     snd = vj.sound(app)
+    done = 0
     for j in range(5):
+        if j and time.perf_counter() - now > THUMB_BUDGET_S:
+            break                                            # the frame's thumbnail time spent: on from here next
+        done = j + 1
         n = names[(k0 + j) % len(names)]
         e = th[n]
         lk = vj_looks.LOOKS.get(n)
         if lk is None:
             continue
+        if e.get("skip", 0) > 0:                             # a costly look: drawn one turn in THUMB_SLOW_EVERY
+            e["skip"] -= 1
+            continue
+        t_draw = time.perf_counter()
         dt = min(0.25, now - e.get("at", now)) if e.get("at") else 1 / 30
         e["at"] = now
         e["t"] += dt
@@ -832,10 +847,17 @@ def _thumbs(app):
             img = img[:, :, :3]                              # one with its own transparency: its colour
         except Exception:
             img = np.zeros((TH_H, TH_W, 3), np.float32)
+        if time.perf_counter() - t_draw > THUMB_SLOW_S:
+            e["skip"] = THUMB_SLOW_EVERY - 1
         if img.ndim != 3 or img.shape != (TH_H, TH_W, 3):    # a look of the wrong size: not shown (it never
             continue                                         # takes the frame down with it)
         dpg.set_value(e["tag"], np.concatenate([img, np.ones((TH_H, TH_W, 1), np.float32)], -1).ravel())
-    app._vj_th_k = (k0 + 5) % max(1, len(names))
+    app._vj_th_k = (k0 + max(1, done)) % max(1, len(names))
+
+
+THUMB_BUDGET_S = 0.008             # the browser's thumbnails at most this long a frame (then on from there next)
+THUMB_SLOW_S = 0.02                # a thumbnail slower than this (a MilkDrop look's shapes)...
+THUMB_SLOW_EVERY = 6               # ...drawn one turn in this many
 
 
 # --- changes -------------------------------------------------------------------------------------
@@ -913,6 +935,9 @@ def _set_deck(app, i, key, v):
     vj.options(app)["decks"][i][key] = v
     if i == 2 and key == "level":
         vj.c_hand(app)                                             # deck C's level by hand: its In or Out let go
+        for tag in ("vj_clvl", "vj_lvl2"):                         # its two knobs (the C row's, its panel's) as one
+            if dpg.does_item_exist(tag):
+                num.set(tag, float(v))
     if key == "morph":
         vj.morph_hand(app, i)                                      # the morph by hand: a Mutate over bars let go
     _save(app)

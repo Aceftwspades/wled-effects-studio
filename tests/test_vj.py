@@ -1509,6 +1509,65 @@ for _ in range(4):
     except Exception as e:
         errs.append(f"{type(e).__name__}: {e}")
 check(not errs, f"a preset's numbers past a float: drawn on ({errs[:1]})")
+# round 6: assign() compiles; memcpy's time counted; a deck's megabufs on a page budget; the drawing cut kept;
+# a NaN decay not dark for good
+vv = {}
+milk.compile_code("assign(x, 3);")(vv)
+check(vv.get("x") == 3.0, f"assign(x, 3): x is 3 ({vv})")
+pre, dr, cx = _milk(["per_frame_1=" + " ".join(["memcpy(1, 0, 1e6);"] * 100)])
+st6 = {}
+t0_ = time.perf_counter()
+dr(cx, st6)
+took = time.perf_counter() - t0_
+check(took < 0.15 and milk.CUT_WORDS in st6.get("warn", ""), f"a hundred memcpys of a million slots: cut within the "
+      f"budget ({took:.2f} s)")
+pre, dr, cx = _milk(["per_frame_1=k=0; loop(128, megabuf(k*65536)=1; k=k+1);"]
+                    + [f"shapecode_{n}_enabled=1" for n in range(4)]
+                    + [f"shape_{n}_per_frame1=k=0; loop(128, megabuf(k*65536)=1; k=k+1);" for n in range(4)])
+st6 = {}
+for _ in range(3):
+    dr(cx, st6)
+pages = sum(len(b.pages) for b in st6["_mem"].values())
+check(pages <= milk.MEM_PAGES and milk.MEM_WORDS in st6.get("warn", ""), f"a deck's megabufs: {pages} pages at most "
+      f"{milk.MEM_PAGES}, the rest said")
+many = []
+for n in range(4):
+    many += [f"shapecode_{n}_enabled=1", f"shapecode_{n}_num_inst=64", f"shapecode_{n}_rad=0.3",
+             f"shapecode_{n}_textured=1"]
+pre, dr, cx = _milk(many, 256, 256)
+st6 = {}
+counts = []
+for _ in range(6):
+    dr(cx, st6)
+    counts.append(st6.get("_drawn"))
+check(len(set(counts[1:])) == 1 and counts[-1] < 256, f"a cut drawing kept: the same instances each frame ({counts})")
+pre, dr, cx = _milk(["per_frame_1=decay = q1 / 0; q1 = 1;", "per_frame_2=wave_mystery = 1e999 * 1e999;"])
+st6 = {}
+for _ in range(3):
+    dr(cx, st6)
+check(np.isfinite(st6["fb"]).all(), "a NaN decay, an infinite wave mystery: the picture not dark for good")
+# a second "My shader": a name of its own (the first's clashed and was never listed)
+an = App(g)
+vj_looks.load_user(an.project, allow_py=False)
+p1 = vj_looks.new_shader(an.project, "My shader")
+vj_looks.load_user(an.project, allow_py=False)
+p2 = vj_looks.new_shader(an.project, "My shader")
+errs = vj_looks.load_user(an.project, allow_py=False)
+named = [n for n, lk in vj_looks.LOOKS.items() if n.startswith("My shader")]
+check(len(named) == 2 and not errs, f"two new shaders of one name: both listed ({named}, {errs})")
+for n in named:
+    vj_looks.LOOKS.pop(n, None)
+# a clip ending on deck C: no crossfade from its last frame back over the deck's own look
+ax = App(g)
+ox = vj.options(ax)
+ox["decks"][2].update(look="Plasma", level=1.0)
+vj.update(ax, 1 / 30)
+run_x = vj._runs(ax)[2]
+run_x.clip_take, run_x.look = 7, "Clean"                    # as if a clip (take 7) had just been drawn on it
+run_x.canvas = np.ones((72, 96, 3), np.float32)
+run_x.drawn_at = clock.now()
+vj.draw_deck(ax, 2, 1 / 30, vj.sound(ax), 0.0, False)
+check(getattr(run_x, "xfade", None) is None, "a clip ending on deck C: no crossfade back from its last frame")
 # 16-bit pictures: a dark one stays dark; a transparent grey clears that grey only
 dark = Image.fromarray(np.full((4, 4), 200, "<u2"))
 check(np.asarray(vj_looks.eight_bit(dark)).max() <= 1, "a dark 16-bit picture: dark, not scaled up as 8-bit")

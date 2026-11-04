@@ -160,7 +160,12 @@ def tick(app):
     rt = _rt(app)
     for i in list(rt):
         p = rt[i]
-        dt = max(0.0, now - p["at"])
+        back = now - p["at"]
+        if back < 0:                                        # the clock went back (a render that ran ahead let go):
+            for k in ("pressed", "t0"):                     # its times moved with it, not frozen that long
+                if p[k] is not None:
+                    p[k] += back
+        dt = max(0.0, back)
         p["at"] = now
         t = p["t"]
         if p["t0"] is None and vj.clip_ended(app, i, p["take"]):
@@ -175,6 +180,8 @@ def tick(app):
             if n is None:
                 if vj.clip_ended(app, i, p["take"]):        # no length known (no ffprobe): let go at its end
                     _gate_off(p)
+            elif vj.clip_ended(app, i, p["take"]):          # its file ended before its Out (a shorter file, an Out
+                _gate_off(p)                                # typed past the end): let go there, not held frozen
             else:
                 off_at = min(n, max(n - float(t["release"]), p["rise"]))
                 past = now - p["t0"] - off_at

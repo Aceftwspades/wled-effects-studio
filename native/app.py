@@ -1247,7 +1247,13 @@ class App(Features, Recorder, EditBuild):
         none."""
         cmd = (getattr(self, "prefs", None) or {}).get("editor")
         if cmd:
-            return cmd if isinstance(cmd, list) else cmd.split()
+            if isinstance(cmd, list):
+                return cmd
+            import shlex
+            try:                                         # a quoted program's path kept whole (C:\Program Files\...)
+                return [c[1:-1] if len(c) > 1 and c[0] == c[-1] == '"' else c for c in shlex.split(cmd, posix=False)]
+            except ValueError:
+                return cmd.split()
         code = shutil.which("code") or shutil.which("code.cmd")
         if code:
             return [code, "-g", "{file}:{line}"]

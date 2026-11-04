@@ -1420,8 +1420,16 @@ def new_shader(project, name):
         path = os.path.join(d, f"{base}_{k}.glsl")
         k += 1
     with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(vj_glsl.TEMPLATE.replace("{name}", name.strip() or "My shader"))
+        f.write(vj_glsl.TEMPLATE.replace("{name}", _free_name(name.strip() or "My shader")))
     return path
+
+
+def _free_name(name):
+    """A new look's name no look has (a second "My shader" clashed and was never listed): name, name 2, ..."""
+    out, k = name, 2
+    while out in LOOKS:
+        out, k = f"{name} {k}", k + 1
+    return out
 
 
 def new_user_look(project, name):
@@ -1435,7 +1443,7 @@ def new_user_look(project, name):
     while os.path.exists(path):
         path = os.path.join(d, f"{base}_{k}.py"); k += 1
     with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(TEMPLATE.replace("{name}", name.strip().replace('"', "'") or "My look"))
+        f.write(TEMPLATE.replace("{name}", _free_name(name.strip().replace('"', "'") or "My look")))
     return path
 
 

@@ -278,11 +278,23 @@ class _GL:
                 job[4]["iFrame"] = n                              # shader that fills its buffers at 0 sees 0
                 self.frames[key] = n + 1
                 self.seen[key] = self.busy_since
+            slow = self.__dict__.setdefault("slow", {})       # key -> its frames in a row slower than GL_SLOW_S
             try:
-                img = self._frag(*job[1:]) if _is_frag(key) else self._draw(*job)
-                err = ""
+                if not _is_frag(key) and slow.get(key, 0) >= GL_SLOW_N:
+                    img, err = None, (f"too slow for this graphics card at this canvas (about "
+                                      f"{self.__dict__.get('slow_ms', {}).get(key, 0):.0f} ms a frame, the studio "
+                                      "held meanwhile) - a smaller canvas or another look")
+                else:
+                    img = self._frag(*job[1:]) if _is_frag(key) else self._draw(*job)
+                    err = ""
             except Exception as e:
                 img, err = None, str(e)
+            from native import clock
+            if not _is_frag(key) and not err and not clock.held():   # moderngl holds the GIL while the card draws:
+                took = time.perf_counter() - self.busy_since  # a look this slow stopped the studio every frame (a
+                                                              # render's wait is its own: not counted)
+                slow[key] = slow.get(key, 0) + 1 if took > GL_SLOW_S else 0
+                self.__dict__.setdefault("slow_ms", {})[key] = took * 1000.0
             self.busy_since = None
             with self.lock:
                 if _is_frag(key) and key not in self.waiting:    # its caller gave up on it
@@ -639,6 +651,8 @@ def from_shadertoy(data):
 _FN_MACRO = re.compile(r"^(\s*#\s*define\s+)([A-Za-z_]\w*)\(", re.M)
 
 
+GL_SLOW_S = 0.1                     # a shader look slower than this a frame (the studio waits on the card)...
+GL_SLOW_N = 5                       # ...this many frames in a row: stopped, said (it starts again when picked again)
 PIC_MAX = 1024                      # a shader's picture at most this many pixels a side (the canvas is far smaller)
 PICS_MAX = 16                       # the shader pictures kept on the card (the oldest let go)
 _WEBGL = {}                         # a pass's code -> made to compile as in WebGL (a scan a macro: once, not a frame)

@@ -1026,12 +1026,15 @@ def draw_deck(app, i, dt, snd, beat, hit):
         run.look = lk.name                                  # a flame handed over: the picture goes on from where it was
         run.look_obj = lk
     run.handoff = None
+    clip_moved = deck.get("_clip_take") != getattr(run, "clip_take", None)   # a clip on or off the deck: its
+    run.clip_take = deck.get("_clip_take")                                  # envelope fades it, not a crossfade
     if run.look != lk.name or run.size != (w, h) or getattr(run, "look_obj", lk) is not lk:
         # another look, the canvas resized, or the look's file saved again (the same name, a new look: the old
         # version's state - a shader's frame count, its buffers - not handed to it): it starts again
         last = getattr(run, "canvas", None)
         recent = clock.now() - getattr(run, "drawn_at", -1e9) < 0.2           # it was being drawn, not long put away
-        if run.look is not None and run.size == (w, h) and recent and last is not None and last.shape[:2] == (h, w):
+        if (run.look is not None and run.size == (w, h) and recent and last is not None and last.shape[:2] == (h, w)
+                and not clip_moved):
             # another look on a deck that was showing: the last picture blended into the new over a beat
             run.xfade = [last.copy(), 0.0, max(0.25, min(0.6, 60.0 / _tempo(app)))]
         run.look = lk.name

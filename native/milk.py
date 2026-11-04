@@ -229,7 +229,7 @@ class _Parser:
                 if val in ("memset", "memcpy", "freembuf"):
                     return f"_{val}(_mem.cur, {', '.join(a)})"
                 if val == "assign" and len(a) == 2 and re.fullmatch(r"_g\(v, '(\w+)'\)", a[0]):
-                    return f"_s(v, {a[0][7:-1]}, {a[1]})"
+                    return f"_s(v, {a[0][6:-1]}, {a[1]})"
                 return f"_f_{val}({', '.join(a)})" if val in _FUNCS else f"_unknown({val!r}, {', '.join(a)})"
             return f"_g(v, {val!r})"
         raise SyntaxError(f"unexpected {val!r}")
@@ -310,18 +310,30 @@ class MegaBuf:
     written (a dict of Python floats grew a preset's memset of a million slots a frame to 600 MB)."""
     PAGE = 1 << 16
 
-    def __init__(self):
+    def __init__(self, left=None):
         self.pages = {}
+        self.left = [MEM_PAGES] if left is None else left   # pages it may still make (shared with its state's others)
+
+    def _page(self, p):
+        """Page p, made if the budget has room - else None (the write dropped, said: a page is 512 KB, and one
+        write a page across a deck's nine memories grew to gigabytes)."""
+        pg = self.pages.get(p)
+        if pg is None:
+            if self.left[0] <= 0:
+                MEM_FULL[0] = True
+                return None
+            self.left[0] -= 1
+            pg = self.pages[p] = np.zeros(self.PAGE, np.float64)
+        return pg
 
     def get(self, k):
         pg = self.pages.get(k >> 16)
         return 0.0 if pg is None else float(pg[k & 0xFFFF])
 
     def set(self, k, x):
-        pg = self.pages.get(k >> 16)
-        if pg is None:
-            pg = self.pages[k >> 16] = np.zeros(self.PAGE, np.float64)
-        pg[k & 0xFFFF] = x
+        pg = self._page(k >> 16)
+        if pg is not None:
+            pg[k & 0xFFFF] = x
 
     def fill(self, d, x, n):
         """n values from d set to x, a page at a time."""
@@ -334,8 +346,9 @@ class MegaBuf:
                 if x == 0.0:
                     d += m
                     continue
-                pg = self.pages[p] = np.zeros(self.PAGE, np.float64)
-            pg[o:o + m] = x
+                pg = self._page(p)
+            if pg is not None:
+                pg[o:o + m] = x
             d += m
 
     def read(self, s, n):
@@ -355,16 +368,16 @@ class MegaBuf:
         while k < n:
             p, o = (d + k) >> 16, (d + k) & 0xFFFF
             m = min(self.PAGE - o, n - k)
-            pg = self.pages.get(p)
-            if pg is None:
-                pg = self.pages[p] = np.zeros(self.PAGE, np.float64)
-            pg[o:o + m] = vals[k:k + m]
+            pg = self.pages.get(p) if not np.any(vals[k:k + m]) else self._page(p)
+            if pg is not None:
+                pg[o:o + m] = vals[k:k + m]
             k += m
 
     def free(self, at):
         """Every value from `at` on let go (freembuf)."""
         for p in [p for p in self.pages if p > at >> 16]:
             del self.pages[p]
+            self.left[0] += 1
         pg = self.pages.get(at >> 16)
         if pg is not None:
             pg[at & 0xFFFF:] = 0.0
@@ -376,7 +389,9 @@ class MemRef:
         self.cur = MegaBuf()
 
 
-_GMEM = MegaBuf()                                        # gmegabuf: one memory shared by every preset
+MEM_PAGES = 32                     # a deck's megabufs together at most this many pages of 64K values (16 MB)
+MEM_FULL = [False]
+_GMEM = MegaBuf([128])                                   # gmegabuf: one memory shared by every preset (64 MB)
 _MEM_MAX = 1 << 23                                       # ns-eel2's megabuf holds 8M values
 
 
@@ -413,6 +428,7 @@ def _count(n):
 
 CUT_WORDS = "a loop(), while() or memset() ran too long a frame: cut short"
 DRAW_WORDS = "its shapes and waves took too long a frame: some left out"
+MEM_WORDS = "its megabuf grew past 16 MB: writes beyond left out"
 MAX_SHAPES = MAX_WAVES = 4         # MilkDrop's own: four custom shapes and four custom waves
 DRAW_BUDGET_S = 0.08               # a frame's shapes and waves drawn within this (then the rest left out, said)
 DRAW_END = [float("inf")]
@@ -521,16 +537,24 @@ def _mbs(mem, i, x):
 
 def _memset(mem, dest, val, n):
     d = _slot(dest)
-    if d >= 0:
-        mem.fill(d, float(np.nan_to_num(float(val))), _count(n))   # (a page at a time: no loop to budget)
+    if d >= 0 and not _spent():
+        _enter()
+        try:
+            mem.fill(d, float(np.nan_to_num(float(val))), _count(n))   # (a page at a time; its time the loops')
+        finally:
+            _leave()
     return dest
 
 
 def _memcpy(mem, dest, src, n):
     d, s = _slot(dest), _slot(src)
-    if d >= 0 and s >= 0:
-        n = min(_count(n), _MEM_MAX - d, _MEM_MAX - s)
-        mem.write(d, mem.read(s, n))
+    if d >= 0 and s >= 0 and not _spent():
+        _enter()
+        try:
+            n = min(_count(n), _MEM_MAX - d, _MEM_MAX - s)
+            mem.write(d, mem.read(s, n))
+        finally:
+            _leave()
     return dest
 
 
@@ -779,18 +803,23 @@ def look_draw(preset):
             fb = warped
         else:
             fb = vj_looks.sample(st["fb"], U, 1.0 - V, wrap=True)
-            decay = float(v.get("decay", 0.98))
+            decay = _fn(v.get("decay", 0.98), 0.98)
             fb = fb * (decay ** k30)
         if v.get("darken_center"):
             fb = fb * np.clip(ctx.r / 0.25, 0.6, 1.0)[..., None]
         fb = _wave(ctx, v, fb)
+        from native import clock
+        DRAW_END[0] = float("inf") if clock.held() else time.perf_counter() + DRAW_BUDGET_S   # (a render: all)
+        st["_drawn"] = 0
         fb = _custom_waves(ctx, st, preset, v, fb)
         fb = _shapes(ctx, st, preset, v, fb)
+        if DRAW_CUT[0] and not clock.held():
+            st["_draw_cap"] = max(1, min(st.get("_draw_cap", 1 << 30), st["_drawn"]))   # the cut kept from now on
         fb = _borders(v, fb)
         if ctx.video is not None:                                # a deck's video seeds it, as the built-in presets' does
             fb = np.maximum(fb, ctx.video * 0.06 * (0.5 + ctx.amount))
         # MilkDrop's frame is 8 bits a channel: kept so, a preset's slow fade stops where its steps do, as it does there
-        st["fb"] = np.round(np.clip(fb, 0, 1) * 255.0) / 255.0
+        st["fb"] = np.round(np.clip(np.nan_to_num(fb, nan=0.0, posinf=1.0, neginf=0.0), 0, 1) * 255.0) / 255.0
         st["fb"] = st["fb"].astype(np.float32)
         out = _echo(v, st["fb"])
         if "comp" in preset["md2"] and "comp" not in st.setdefault("md2_off", {}):
@@ -823,17 +852,25 @@ def look_draw(preset):
 
     def framed(ctx, st):                                         # the frame's loop budget, from its start
         bufs = st.setdefault("_mem", {})                         # this deck's (or thumbnail's) own megabufs: two
-        for k, ref in enumerate(preset.get("mems", ())):         # decks on one preset kept apart
-            ref.cur = bufs.setdefault(k, MegaBuf())
-        CUT[0] = DRAW_CUT[0] = False
+        left = st.setdefault("_mem_left", [MEM_PAGES])           # decks on one preset kept apart, on one budget
+        for k, ref in enumerate(preset.get("mems", ())):
+            ref.cur = bufs.setdefault(k, MegaBuf(left))
+        CUT[0] = DRAW_CUT[0] = MEM_FULL[0] = False
         _IN[:] = [0, 0.0, 0.0]
         DEADLINE[0] = time.perf_counter() + FRAME_BUDGET_S
-        DRAW_END[0] = time.perf_counter() + DRAW_BUDGET_S
+        DRAW_END[0] = float("inf")                               # (from where the waves and shapes start)
         try:
             return draw(ctx, st)
         finally:
             DEADLINE[0], DRAW_END[0], CUT[0], DRAW_CUT[0] = float("inf"), float("inf"), False, False
     return framed
+
+
+def _cap(st):
+    """The waves and shape instances a frame may draw: as many as fitted when the drawing was last cut (none
+    while a render holds the clock)."""
+    from native import clock
+    return 1 << 30 if clock.held() else st.get("_draw_cap", 1 << 30)
 
 
 def _md2_slow(st, which, took):
@@ -855,6 +892,8 @@ def _warn(st, preset):
         notes.append(CUT_WORDS)                                  # (its shapes' and waves' loops counted too)
     if DRAW_CUT[0]:
         notes.append(DRAW_WORDS)
+    if MEM_FULL[0]:
+        notes.append(MEM_WORDS)
     st["warn"] = "; ".join(notes)
 
 
@@ -881,9 +920,10 @@ def _shapes(ctx, st, preset, v, fb):
             sh["init"](iv)
             tinit[n] = {k: iv[k] for k in iv if re.match(r"t\d$", k)}
         for inst in range(max(1, min(64, int(_fn(sh["p"].get("num_inst", 1), 1))))):
-            if time.perf_counter() > DRAW_END[0]:
+            if time.perf_counter() > DRAW_END[0] or st.get("_drawn", 0) >= _cap(st):
                 DRAW_CUT[0] = True                               # the frame's drawing time spent: the rest left out
                 break
+            st["_drawn"] = st.get("_drawn", 0) + 1
             s = _carry(sh["p"], v)
             s.update(tinit[n])
             s.update(instance=float(inst), num_inst=_fn(sh["p"].get("num_inst", 1), 1))
@@ -916,7 +956,7 @@ def _shapes(ctx, st, preset, v, fb):
             if s.get("textured"):
                 from native import vj_looks
                 tz = max(1e-3, float(s.get("tex_zoom", 1.0)))
-                ta = float(s.get("tex_ang", 0.0))
+                ta = _fn(s.get("tex_ang", 0.0))
                 ux, uy = dx / (rad * 2 * tz), dy / (rad * 2 * tz)
                 cs, sn = math.cos(ta), math.sin(ta)
                 tu, tv = ux * cs - uy * sn + 0.5, -(ux * sn + uy * cs) + 0.5
@@ -927,7 +967,7 @@ def _shapes(ctx, st, preset, v, fb):
                 fb = np.where(m, np.minimum(1.0, fb + col * a), fb)
             else:
                 fb = np.where(m, fb * (1 - a) + col * a, fb)
-            ba = float(s.get("border_a", 0.0))
+            ba = max(0.0, min(1.0, _fn(s.get("border_a", 0.0))))
             if ba > 0.01:
                 width = 1.5 if s.get("thick") else 0.8
                 rim = (np.abs(r - edge) < width) & (r <= edge + width)
@@ -999,9 +1039,10 @@ def _custom_waves(ctx, st, preset, v, fb):
     h, w = fb.shape[:2]
     tinit = st.setdefault("wave_t", {})
     for n, wv in enumerate(preset["waves"]):
-        if time.perf_counter() > DRAW_END[0]:
+        if time.perf_counter() > DRAW_END[0] or st.get("_drawn", 0) >= _cap(st):
             DRAW_CUT[0] = True
             break
+        st["_drawn"] = st.get("_drawn", 0) + 1
         if n not in tinit:
             iv = _carry(wv["p"], v)
             wv["init"](iv)
@@ -1133,7 +1174,7 @@ def _wave(ctx, v, fb):
     elif mode in (4, 5):                                          # a line across, the sound its height
         px, py = t, cy + s * 0.25
     else:                                                         # a line, tilted
-        ang = float(v.get("wave_mystery", 0.0)) * math.pi
+        ang = _fn(v.get("wave_mystery", 0.0)) * math.pi
         px = cx + (t - 0.5) * math.cos(ang) - s * 0.2 * math.sin(ang)
         py = cy + (t - 0.5) * math.sin(ang) + s * 0.2 * math.cos(ang)
     ix = np.clip((px * (w - 1)).astype(int), 0, w - 1)

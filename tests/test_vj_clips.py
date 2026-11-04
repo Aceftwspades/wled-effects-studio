@@ -349,6 +349,40 @@ finally:
     clock.release()
 vj.close(app5)
 
+# round 6: a one shot whose file ends before its Out let go there; the clock going back (a render that ran
+# ahead) moves its times with it
+app7 = App(g)
+vj.options(app7)
+clock.hold()
+try:
+    vj_clips.play(app7, dict(vj_clips.DEFAULT, file="x.mp4", **{"in": 0.0, "out": 4.0}, attack=0.0, release=0.0), "s")
+    vj_clips.started(app7, 2, vj_clips._rt(app7)[2]["take"])
+    clock.step(0.5)
+    vj_clips.tick(app7)
+    real_ended = vj.clip_ended
+    vj.clip_ended = lambda app, i, take: True                # its file ended at 0.5 s, Out 4
+    try:
+        vj_clips.tick(app7)
+        clock.step(0.05)
+        vj_clips.tick(app7)
+    finally:
+        vj.clip_ended = real_ended
+    check(vj_clips.level(app7, 2) is None, "a one shot whose file ends before its Out: let go there, not held frozen")
+    vj_clips.play(app7, dict(vj_clips.DEFAULT, file="x.mp4", **{"in": 0.0, "out": 2.0}, attack=0.0, release=0.0), "r")
+    vj_clips.started(app7, 2, vj_clips._rt(app7)[2]["take"])
+    clock.step(0.5)
+    vj_clips.tick(app7)
+    clock.step(-20.0)                                        # the render let go: real time 20 s behind it
+    vj_clips.tick(app7)
+    clock.step(1.6)
+    vj_clips.tick(app7)
+    clock.step(0.05)
+    vj_clips.tick(app7)
+    check(vj_clips.level(app7, 2) is None, "the clock going back: a one shot still ends on time")
+finally:
+    clock.release()
+vj.close(app7)
+
 # made from files: the bank's free cells, then a new bank named Clips as big as the rest need
 from native import clip_ui, pads_ui                        # noqa: E402
 app3 = App(g)
