@@ -77,6 +77,8 @@ HZ_LO, HZ_HI = 0.05, 20.0                          # a free rate's range, turned
 ATTACK_S = 0.14                                    # a beat's push eased in over this
 STEP_SLEW_S = 0.05
 LOCK_SPEED = 0.25                                  # a synced wave back onto the grid at most this much faster or slower
+TIME_EPS = 1e-6                                    # times this close taken as equal (a long-running machine's clock
+                                                   # is large: a step of exactly a stage's time rounded short of it)
 SAVE_AFTER_S = 0.8                                 # a setting turned from a control: saved once it is left this long
 AUTO_S = 4.0                                       # auto level: the loudest falls away over this (seconds)...
 AUTO_FLOOR = 0.05                                  # ...but never counts below this (silence stays silent)
@@ -324,10 +326,10 @@ def _env(m, e, dt, gated):
     sus = _env_param(m, "sustain")
     if sg == "a":
         need = (1.0 - lv) * _env_param(m, "attack")        # seconds left to the peak
-        if dt < need:
+        if dt < need - TIME_EPS:                        # (a held clock far from 0: its steps round a hair short)
             lv, dt = lv + dt / _env_param(m, "attack"), 0.0
         else:                                           # past it this frame: only what is left goes on down
-            lv, dt, sg = 1.0, dt - need, ("d" if gated else "r")
+            lv, dt, sg = 1.0, max(0.0, dt - need), ("d" if gated else "r")
     if sg in ("d", "s") and not gated:
         sg = "r"
     elif sg == "d":
@@ -971,7 +973,7 @@ def set_target(app, t, f):
 def _flush(app, now, force=False):
     """A setting turned from a control saved once it has been left SAVE_AFTER_S (into the project it was turned in)."""
     s = getattr(app, "_mod_save_at", None)
-    if s is not None and (force or now - s[0] >= SAVE_AFTER_S):
+    if s is not None and (force or now - s[0] >= SAVE_AFTER_S - TIME_EPS):
         app._mod_save_at = None
         s[1].save()
 

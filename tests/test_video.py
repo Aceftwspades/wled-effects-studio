@@ -204,9 +204,25 @@ def test_a_turned_clip_s_size():
     flat, path = scratch.path("test_turned_flat.mp4"), scratch.path("test_turned.mp4")
     subprocess.run([shutil.which("ffmpeg"), "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=192x108:rate=10:duration=1",
                     "-pix_fmt", "yuv420p", flat], check=True)
-    subprocess.run([shutil.which("ffmpeg"), "-y", "-v", "error", "-i", flat, "-c", "copy", "-metadata:s:v:0", "rotate=90",
-                    path], check=True)                       # (the turn kept as a phone keeps it: copied, not encoded)
+    ff = shutil.which("ffmpeg")
+    for args in ([ff, "-y", "-v", "error", "-display_rotation", "90", "-i", flat, "-c", "copy", path],   # ffmpeg 6.1+
+                 [ff, "-y", "-v", "error", "-i", flat, "-c", "copy", "-metadata:s:v:0", "rotate=90", path]):   # older
+        if os.path.exists(path):                             # (the turn kept as a phone keeps it: copied, not encoded)
+            os.remove(path)
+        if subprocess.run(args, capture_output=True).returncode == 0 and _turned(path):
+            break
+    else:
+        print("     (this ffmpeg writes no turn: the turned clip test is left out)")
+        return
     assert video.size_of(path) == (108, 192), video.size_of(path)
+
+
+def _turned(path):
+    """Whether ffprobe sees a quarter turn on a file's picture (its rotate tag or its display matrix)."""
+    out = subprocess.run([shutil.which("ffprobe"), "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream_tags=rotate:stream_side_data=rotation", "-of", "default=nw=1", path],
+                         capture_output=True, text=True).stdout
+    return any(line.split("=", 1)[-1].strip().lstrip("-") in ("90", "270") for line in out.splitlines())
 
 
 def test_a_stream_address_is_a_network_one():

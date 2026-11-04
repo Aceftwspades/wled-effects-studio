@@ -213,13 +213,13 @@ def _env(p, dt):
     a, d, s = float(t["attack"]), float(t["decay"]), float(t["sustain"])
     if p["stage"] == "a":                                   # (what is left of the frame goes on to the next stage)
         need = (1.0 - p["lv"]) * a
-        if dt >= need:
-            p["lv"], p["stage"], dt = 1.0, "d", dt - need
+        if dt >= need - 1e-6:                               # (a held clock far from 0 rounds a step a hair short)
+            p["lv"], p["stage"], dt = 1.0, "d", max(0.0, dt - need)
         else:
             p["lv"], dt = p["lv"] + dt / a, 0.0
     if p["stage"] == "d":
         need = (p["lv"] - s) * d / (1.0 - s) if s < 1.0 else 0.0
-        if dt >= need:
+        if dt >= need - 1e-6:
             p["lv"], p["stage"] = s, "s"
         else:
             p["lv"] -= dt * (1.0 - s) / d
