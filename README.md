@@ -5,10 +5,66 @@ effects, previewed on a simulated cube, sphere, matrix, strip or any shape
 you build, with synthetic or live audio - then sent to the device as a
 script, as its settings, or flashed into the firmware.
 
+![An effect built as a node graph, previewed on a simulated cube](docs/screenshots/graph.png)
+
 - **[GUIDE.md](GUIDE.md)** - how to use it, from the first run to a show on the device
 - **[TUTORIAL.md](TUTORIAL.md)** - a first effect, node by node
 - **[NODES.md](NODES.md)** - every node
 - **[STUDIO.md](STUDIO.md)** - the design, the history and the roadmap
+
+## What it does
+
+**Make effects.** Wire nodes - noise, waves, fields, the sound, maths,
+geometry - or write C++, and the studio compiles it into a WLED effect as
+you go. It runs on a simulated cube, sphere, matrix, strip or any shape you
+build in the shape editor, beside WLED's own stock effects and palettes, and
+hears synthetic beats, an audio file or live input.
+
+**Put it on the lights.** Send an effect to a device as a script, as its
+settings and presets, or flash it into the firmware. Lay out a show on the
+sequence's timeline - steps, blends, automation, song sections found in the
+audio - then send it as presets and a playlist, export an FSEQ for Falcon
+Player, or render it to video.
+
+**Play it live: the VJ.** Three decks - A and B across a crossfader, C over
+the mix - with cuts, fades and an auto-mix on the bar grid. Each deck shows
+a look: shaders, MilkDrop presets, fractal flames you breed with Mutate,
+text, a picture, a WLED effect, or video from a file, a webcam, the screen,
+a stream or your phone's camera. **Packs...** installs themed packs of
+MilkDrop presets and Shadertoy shaders from the gallery.
+
+![The VJ's decks, on air on the cube](docs/screenshots/vj.png)
+
+**Pads, MIDI and the phone.** Banks of buttons, faders, knobs, XY and
+pressure pads drive anything: cuts and fades, looks and presets, a deck's
+knobs, the effect's sliders, on air. Play them with the mouse, from a pad
+controller (its pads and lights learned), or from the phone's /pads page
+with several fingers at once. MIDI learn reaches the same targets.
+
+<p>
+<img src="docs/screenshots/pads.png" alt="A bank of pads" width="49%">
+<img src="docs/screenshots/pad_clip.png" alt="A pad playing a video clip, its part of the file and its envelope" width="49%">
+</p>
+
+- **Video clips on pads**, like a sampler's: a pad plays part of a video
+  file - drag its In and Out on a strip of its frames - once or looped, its
+  level shaped by an attack, decay, sustain and release, over deck C's mix
+  or laid over deck A or B.
+- **Live cameras on pads**: a webcam or the phone's camera brought up on a
+  deck at a press, kept warm so it shows at once.
+- **The selected deck**: pads that select deck A, B or C, and every deck
+  action also as "the selected deck" - one row of pads or knobs works on
+  each deck in turn.
+- **Effects on pads**: a pad switches the studio's effect, or puts a deck on
+  an effect - and a deck's effect has its Custom sliders and checks as
+  targets for faders, knobs, pads and MIDI.
+
+**Modulators.** LFOs, the beat, step patterns, envelopes and the sound
+itself, moving the effect's sliders, the VJ's knobs and faders, and other
+modulators' depth and rate - synced to the tempo or free, each with a depth
+that a pad or a knob can turn.
+
+![Modulators on the effect's sliders](docs/screenshots/modulators.png)
 
 ## Try it in the browser
 
