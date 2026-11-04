@@ -647,6 +647,63 @@ try:
     check(ok6 and 0.0 <= pos <= 1.0 and lab, f"a damaged control's fields put right ({c6})")
 except Exception as e:
     check(False, f"a damaged control: {type(e).__name__} {e}")
+# the selected deck: a pad selects one (lit while it is), the "selected deck" actions drive whichever it is - a
+# hold keeps the deck it began on till it is let go
+from native import midi_ui                                     # noqa: E402
+a8 = App(geometry.Geometry("cube", B=16))
+o8 = vj.options(a8)
+st8 = pads.state(a8.project)
+st8["banks"], st8["bank"] = [pads.new_bank("Sel", 4, 4, "blue")], 0
+sel_b = pads.new_control(st8, "trigger", 0, 0, target={"kind": "vj_sel_b"})
+nxt = pads.new_control(st8, "trigger", 1, 0, target={"kind": "vj_sel_next"})
+hue = pads.new_control(st8, "hold", 2, 0, target={"kind": "vj_knob", "deck": vj.SEL, "key": "hue"})
+hue["hi"] = 0.5
+for c in (sel_b, nxt, hue):
+    pads.current(st8)["controls"].append(c)
+check(vj.selected(a8) == 0 and not pads.lit(a8, sel_b), "deck A selected at first; deck B's select pad not lit")
+pads.press(a8, sel_b)
+pads.release(a8, sel_b)
+check(vj.selected(a8) == 1 and pads.lit(a8, sel_b), "deck B's select pad: B selected, the pad lit while it is")
+pads.press(a8, hue)                                          # a hold on the selected deck's hue: on B
+held_b = o8["decks"][1]["hue"]
+pads.press(a8, nxt)                                          # C selected while it is held
+pads.release(a8, nxt)
+pads.release(a8, hue)
+check(abs(held_b - 0.5) < 1e-6 and vj.selected(a8) == 2 and abs(o8["decks"][1]["hue"]) < 1e-6 and abs(o8["decks"][2]["hue"]) < 1e-6,
+      f"a hold on the selected deck: B's hue while held and put back on B at release, C selected meanwhile "
+      f"(B {o8['decks'][1]['hue']}, C {o8['decks'][2]['hue']})")
+midi_ui.apply_target(a8, {"kind": "vj_knob", "deck": vj.SEL, "key": "amount"}, 127, 127.0)
+check(o8["decks"][2]["amount"] == 1.0 and o8["decks"][0]["amount"] != 1.0, "MIDI on the selected deck: deck C's")
+import types                                                   # noqa: E402
+a8.eng.meta, a8.eng.idx, a8.eng.names = [{"labels": [], "name": "Solid"}], 0, ["Solid"]
+a8.gp = types.SimpleNamespace(graph=None, file=None)
+lab = dict((t["kind"] + str(t.get("deck")) + str(t.get("key")), l) for l, t in midi_ui.targets(a8)
+           if t.get("deck") == vj.SEL or str(t.get("kind")).startswith("vj_sel"))
+check(any("selected deck" in l for l in lab.values()) and "vj_sel_aNoneNone" in lab,
+      "the selected deck's actions and the deck selects listed for MIDI and the pads")
+# an effect picked: the studio's (switched as MIDI's effect change is), or one on a deck (its look Effect)
+switched = []
+real_switch = midi_ui.switch_effect
+midi_ui.switch_effect = lambda app, name: switched.append(name)
+try:
+    a8.eng.names = ["Solid", "My Fire"]
+    fxp = pads.new_control(st8, "trigger", 3, 0, target={"kind": "pad_effect", "name": "My Fire"})
+    pads.press(a8, fxp)
+    pads.release(a8, fxp)
+    dfx = pads.new_control(st8, "trigger", 0, 1, target={"kind": "pad_deck_fx", "deck": vj.SEL, "name": "My Fire"})
+    o8["decks"][2]["fx_set"] = {"sx": 9}
+    pads.current(st8)["controls"].append(dfx)
+    pads.press(a8, dfx)
+    pads.release(a8, dfx)
+finally:
+    midi_ui.switch_effect = real_switch
+d2 = o8["decks"][2]
+check(switched == ["My Fire"] and d2["look"] == vj.EFFECT and d2["effect"] == "My Fire" and d2["fx_set"] == {},
+      f"an effect pad: the studio's switched {switched}; the selected deck (C) on Effect running it ({d2['look']}, "
+      f"{d2['effect']})")
+check(pads.kind_of(fxp["target"]) == "pick" and pads.state(a8.project)["banks"][0]["controls"][-1]["target"]["deck"]
+      == vj.SEL, "an effect pad's kind; a target on the selected deck kept as it is (not put to deck C)")
+
 dpg.destroy_context()
 
 print("pads:", "FAILED" if fails else "ok")

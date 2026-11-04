@@ -236,7 +236,7 @@ class FakeCam:
 app4 = App(g)
 vj.options(app4)
 ct = vj_clips.fill({"kind": "pad_cam", "deck": 9, "name": 3, "release": -2, "file": "x.mp4"})
-check(ct["deck"] == 2 and ct["name"] == "" and ct["release"] == 0.0 and "in" not in ct and "mode" not in ct,
+check(ct["deck"] == 3 and ct["name"] == "" and ct["release"] == 0.0 and "in" not in ct and "mode" not in ct,
       f"a damaged camera target put right, no In or Out of a clip's added ({ct})")
 st4 = pads.state(app4.project)
 st4["banks"], st4["bank"] = [pads.new_bank("Cams", 4, 4, "blue")], 0      # cells of its own

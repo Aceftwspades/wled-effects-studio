@@ -178,6 +178,13 @@ def targets(app):
         out += [(f"VJ {d}: {vj.KNOB_WORDS[k]}", {"kind": "vj_knob", "deck": i, "key": k}) for k, _, _ in vj.KNOBS]
         out += [(f"VJ {d}: next video file", {"kind": f"vj_clip_{d.lower()}"}),
                 (f"VJ {d}: video paused or playing", {"kind": f"vj_pause_{d.lower()}"})]
+    out += [(f"VJ: select deck {d}", {"kind": f"vj_sel_{d.lower()}"}) for d in vj.LETTERS]
+    out.append(("VJ: select the next deck", {"kind": "vj_sel_next"}))
+    s = "selected deck"                                                           # whichever deck is selected
+    out.append((f"VJ {s}: the look, along the list", {"kind": "vj_look", "deck": vj.SEL}))
+    out += [(f"VJ {s}: {vj.KNOB_WORDS[k]}", {"kind": "vj_knob", "deck": vj.SEL, "key": k}) for k, _, _ in vj.KNOBS]
+    out += [(f"VJ {s}: next video file", {"kind": "vj_clip_s"}),
+            (f"VJ {s}: video paused or playing", {"kind": "vj_pause_s"})]
     from native import modulate
     out += modulate.targets(app)                                                  # each modulator's rate, depth, ...
     g = app.gp.graph
@@ -705,6 +712,8 @@ def apply_target(app, t, v, full=127.0, ctl=None, keep=False):
         return
     if kind in ("vj_fader", "vj_knob", "vj_look") or kind in midi.VJ_BUTTONS:     # the VJ frame's (vj.py)
         from native import vj, vj_ui
+        t = vj.resolve(app, t)                              # on "the selected deck": the deck selected now
+        kind = t.get("kind")
         f = max(0.0, min(1.0, float(v) / float(full or 127.0)))
         if kind == "vj_fader":
             vj.set_fader(app, f)
@@ -719,6 +728,8 @@ def apply_target(app, t, v, full=127.0, ctl=None, keep=False):
             app._vj_dirty = True
             if keep:
                 vj_ui._save(app)
+        elif kind.startswith("vj_sel_"):
+            vj.select_deck(app, "next" if kind == "vj_sel_next" else "abc".index(kind[-1]))
         elif kind.startswith("vj_clip_"):
             vj.next_clip(app, "abc".index(kind[-1]))
         elif kind.startswith("vj_pause_"):

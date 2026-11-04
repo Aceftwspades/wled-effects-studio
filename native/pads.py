@@ -46,7 +46,7 @@ COLOURS = (("grey", (120, 124, 132)), ("red", (226, 64, 64)), ("orange", (240, 1
            ("cyan", (60, 200, 240)), ("blue", (70, 120, 240)), ("violet", (150, 90, 240)), ("pink", (240, 90, 190)))
 COLOUR = dict(COLOURS)
 # switches that flip something on and off: a toggle shows it, a hold flips it back on release
-FLIPS = ("vj_air", "vj_c_toggle", "vj_pause_a", "vj_pause_b", "vj_pause_c", "mod_on")
+FLIPS = ("vj_air", "vj_c_toggle", "vj_pause_a", "vj_pause_b", "vj_pause_c", "vj_pause_s", "mod_on")
 FLASH_MS = 0.15                 # a trigger shown lit this long after its press
 MAX_BANKS = 32
 
@@ -115,7 +115,7 @@ def _target(t):
     if not isinstance(t, dict):
         return {}
     if "deck" in t:
-        t["deck"] = max(0, min(2, _int(t["deck"], 0)))
+        t["deck"] = max(0, min(3, _int(t["deck"], 0)))           # (3: the selected deck - vj.SEL)
     if t.get("kind") in ("pad_clip", "pad_cam"):
         from native import vj_clips
         vj_clips.fill(t)
@@ -270,6 +270,8 @@ def kind_of(t):
         return k[4:]
     if k == "pad_cam":                                              # a live camera: played as a clip is
         return "clip"
+    if k in ("pad_effect", "pad_deck_fx"):                          # an effect picked: the studio's, or a deck's
+        return "pick"
     if k in _midi().SWITCHES:
         return "switch"
     return "value"
@@ -288,6 +290,7 @@ def _paused(app, i):
 
 def value(app, t):
     """A value target's position as 0..1, or None where it cannot be read (a pin, the palette by index)."""
+    t = _resolve(app, t)
     k = (t or {}).get("kind")
     try:
         if k == "vj_fader":
@@ -322,9 +325,12 @@ def value(app, t):
 
 
 def is_on(app, t):
-    """A flip's state (on air, deck C in, a deck's video paused), or None for other targets."""
+    """A flip's state (on air, deck C in, a deck's video paused, a deck selected), or None for other targets."""
+    t = _resolve(app, t)
     k = (t or {}).get("kind")
     from native import vj
+    if k and k.startswith("vj_sel_") and k != "vj_sel_next":
+        return vj.selected(app) == "abc".index(k[-1])
     if k == "vj_air":
         return bool(vj.on(app))
     if k in ("vj_c_toggle", "vj_c_in"):
@@ -424,7 +430,21 @@ def _rt(app):
 def _apply(app, t, f):
     """The target set to f (0..1) - or fired, for a switch - the way MIDI's control would."""
     from native import midi_ui, vj
+    t = _resolve(app, t)
     k = t.get("kind")
+    if k == "pad_effect":                                           # the studio's effect (the project's own too)
+        if t.get("name"):
+            midi_ui.switch_effect(app, t["name"])
+        return
+    if k == "pad_deck_fx":                                          # a deck on Effect, running the one picked
+        name = t.get("name") or ""
+        if name in getattr(app.eng, "names", ()):
+            d = vj.options(app)["decks"][int(t.get("deck", 0))]
+            if d.get("effect") != name:
+                d["fx_set"] = {}                                    # another effect: its own settings
+            d["look"], d["effect"] = vj.EFFECT, name
+            app._vj_dirty = True
+        return
     if k == "pad_look":
         names = set(vj_looks_names())
         if t.get("look") in names:
@@ -438,6 +458,22 @@ def _apply(app, t, f):
             app._vj_knobs_moved = True
         return
     midi_ui.apply_target(app, t, f, 1.0)
+
+
+def _resolve(app, t):
+    """A target on "the selected deck" as the one on the deck selected now (vj.resolve); any other as it is."""
+    if not isinstance(t, dict) or (t.get("deck") != 3 and t.get("kind") not in ("vj_clip_s", "vj_pause_s")):
+        return t
+    from native import vj
+    return vj.resolve(app, t)
+
+
+def held_target(app, c, key="target"):
+    """The target control c drives: the one it was pressed with while it is held (a pad on "the selected deck"
+    keeps the deck it began on, another selected meanwhile - its release puts back what it changed there), else
+    as it is now."""
+    got = _rt(app).setdefault("pressed_t", {}).get((c["id"], key))
+    return got if got is not None else _resolve(app, c.get(key) or {})
 
 
 def vj_looks_names():
@@ -454,9 +490,10 @@ def _range(c, axis, f):
     return float(c.get(lo, 0.0)) + (float(c.get(hi, 1.0)) - float(c.get(lo, 0.0))) * f
 
 
-def surface_targets(c):
-    """[(axis, target)] an XY or pressure pad drives (those set)."""
-    out = [(a, c.get(key) or {}) for a, key, _, _, _ in AXES if a != "p" or c["type"] == "pressure"]
+def surface_targets(c, app=None):
+    """[(axis, target)] an XY or pressure pad drives (those set) - with the app, as it drives them (held_target)."""
+    out = [(a, held_target(app, c, key) if app is not None else c.get(key) or {})
+           for a, key, _, _, _ in AXES if a != "p" or c["type"] == "pressure"]
     return [(a, t) for a, t in out if t.get("kind") and kind_of(t) == "value"]
 
 
@@ -467,7 +504,7 @@ def move(app, c, x, y, p=None):
     p = 1.0 if p is None else max(0.0, min(1.0, float(p)))
     at = {"x": x, "y": y, "p": p}
     _rt(app)["on"][("xy", c["id"])] = (max(0.0, min(1.0, x)), max(0.0, min(1.0, y)), p)
-    for axis, t in surface_targets(c):
+    for axis, t in surface_targets(c, app):
         _apply(app, t, _range(c, axis, at[axis]))
 
 
@@ -498,9 +535,13 @@ def press(app, c, f=None, xy=None, pressure=None):
         return
     r["count"][c["id"]] = 1
     r["held"].add(c["id"])
+    pt = r.setdefault("pressed_t", {})
+    for _, key, _, _, _ in AXES:                                    # the deck selected now, kept till it is let go
+        pt[(c["id"], key)] = _resolve(app, c.get(key) or {})
+    t = pt[(c["id"], "target")]
     if typ in SURFACES:
         if c.get("release", "snap") == "snap":
-            for axis, tt in surface_targets(c):
+            for axis, tt in surface_targets(c, app):
                 _claim(app, r, c["id"], tt)
         if xy is not None:
             move(app, c, xy[0], xy[1], pressure)
@@ -527,7 +568,7 @@ def press(app, c, f=None, xy=None, pressure=None):
         r["staged"] = (c["id"], deck, getattr(app, "_vj_goes", 0))
         _apply(app, dict(t, deck=deck), 1.0)
         return
-    if kind in ("switch", "look", "preset"):
+    if kind in ("switch", "look", "preset", "pick"):
         r["flash"][c["id"]] = time.monotonic()
         if typ == "hold" and t.get("kind") == "vj_c_flash":         # a flash held: deck C in at once, out on release
             from native import vj
@@ -575,13 +616,16 @@ def release(app, c):
         return
     r["count"].pop(c["id"], None)
     r["held"].discard(c["id"])
-    t, typ, kind = c.get("target") or {}, c["type"], kind_of(c.get("target"))
+    t, typ, kind = held_target(app, c), c["type"], kind_of(c.get("target"))
+    axes = surface_targets(c, app)
+    for _, key, _, _, _ in AXES:
+        r.setdefault("pressed_t", {}).pop((c["id"], key), None)
     if kind == "gate" and typ != "toggle":
         _apply(app, dict(t, src=("pad", c["id"])), 0.0)
         return
     if typ in SURFACES:
         if c.get("release", "snap") == "snap":                      # back where they were before the touch
-            for axis, tt in surface_targets(c):
+            for axis, tt in axes:
                 last, was = _unclaim(r, c["id"], tt)
                 if last:
                     _apply(app, tt, _range(c, axis, 0.0) if was is None else was)
@@ -607,7 +651,7 @@ def release(app, c):
 
 def drag(app, c, f):
     """A fader or a knob moved to f (0..1 of its travel)."""
-    t = c.get("target") or {}
+    t = held_target(app, c)
     if c["type"] not in SLIDERS or kind_of(t) != "value" or not t.get("kind"):
         return
     _rt(app)["on"][("pos", c["id"])] = max(0.0, min(1.0, float(f)))    # where it shows, for a target not read back
@@ -676,6 +720,9 @@ def lit(app, c):
     if time.monotonic() - r["flash"].get(c["id"], -1e9) < FLASH_MS:
         return True
     t = c.get("target") or {}
+    k = t.get("kind") or ""
+    if k.startswith("vj_sel_") and k != "vj_sel_next":              # lit while its deck is the selected one
+        return bool(is_on(app, t))
     if t.get("kind") in ("pad_clip", "pad_cam"):                    # lit while its clip plays (its release too)
         from native import vj_clips
         return vj_clips.playing(app, c["id"])

@@ -4491,6 +4491,17 @@ pictures and video with transparency, and control over how they are shown. Found
 RGB (its transparency gone - a clear area showed whatever colour was under it, often white), every video was read as
 RGB (a WebM's or ProRes 4444's alpha gone), and deck C's "over" knew only black as clear. Done 2026-10-28:
 
+- [x] **The selected deck, and effects on pads** (2026-11-04): vj options' "sel" (0..2, kept out of undo like the
+   fader) is the selected deck; a target's deck vj.SEL (3), or the kinds vj_clip_s / vj_pause_s, is resolved to it
+   where it is used (vj.resolve: midi_ui.apply_target, pads._apply / value / is_on, vj_clips.play). MIDI's
+   targets gained "VJ: select deck A/B/C", "the next deck" (vj_sel_*) and a "VJ selected deck: ..." set (the look
+   along the list, every knob, next file, pause); the pads' own per-deck actions a selected-deck row. A pad keeps
+   the targets it was pressed with while held (pads.held_target, r["pressed_t"]): a hold on the selected deck
+   puts back what it changed on the deck it began on. A deck select pad is lit while its deck is selected; the VJ
+   frame's deck title says "selected". New pad actions: "the effect: this one" (pad_effect: midi_ui.switch_effect)
+   and "VJ ...: this effect" (pad_deck_fx: the deck's look Effect, its effect the one picked, its settings reset
+   for another), kind_of "pick", picked in the pads_s_fxrow combo. Tests: test_pads.
+
 - [x] **Live cameras on pads** (2026-11-03): a pad's action "a live camera" (pads target `pad_cam`: deck, camera
    list entry `name` - a webcam's, or video.PHONE - envelope, level) plays through the clip player
    (vj_clips: kind_of "clip", no mode, so it plays until let go; a trigger brings it up and fades it like a loop).

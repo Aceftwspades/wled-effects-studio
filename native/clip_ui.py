@@ -16,6 +16,7 @@ from native.typeface import px
 from native import form, num, vj_clips
 
 ROW = "pads_s_cliprow"
+DECK_WORDS = ("A", "B", "C", "selected")   # a clip's deck: one of the three, or the one selected when it is pressed
 STRIP, STRIP_TEX = "pads_clip_strip", "pads_clip_tex"
 ENV_DRAW = "pads_clip_env"
 TW, TH = 384, 27                   # the strip's texture: eight frames of 48 x 27
@@ -54,10 +55,10 @@ def build(app):
             c.tip("the cameras looked for again (one plugged in since)")
         with dpg.group(horizontal=True):
             form.inline("deck")
-            dpg.add_radio_button(["A", "B", "C"], tag="pads_clip_deck", horizontal=True,
-                                 callback=lambda s, v: _set(app, deck="ABC".index(v)))
+            dpg.add_radio_button(list(DECK_WORDS), tag="pads_clip_deck", horizontal=True,
+                                 callback=lambda s, v: _set(app, deck=DECK_WORDS.index(v)))
             c.tip("the deck it plays on, over what the deck shows: C lays it over the mix (the usual); A or B shows "
-                  "when the fader is on that side")
+                  "when the fader is on that side; selected: whichever deck is selected when it is pressed")
         dpg.add_radio_button([w for _, w in vj_clips.MODES], tag="pads_clip_mode", horizontal=True,
                              callback=lambda s, v: _set(app, mode=next(k for k, w in vj_clips.MODES if w == v)))
         c.tip("one shot: from In to Out once; loop: In to Out round again until it is let go")
@@ -145,7 +146,7 @@ def fill(app, s):
     for tag in ("pads_clip_filerow", "pads_clip_mode", "pads_clip_parts"):
         dpg.configure_item(tag, show=not cam)
     dpg.configure_item("pads_clip_camrow", show=cam)
-    dpg.set_value("pads_clip_deck", "ABC"[t["deck"]])
+    dpg.set_value("pads_clip_deck", DECK_WORDS[t["deck"]])
     for k in ("attack", "decay", "sustain", "release", "level"):
         num.set(f"pads_clip_{k}", float(t[k]))
     _draw_env(t)
@@ -159,7 +160,7 @@ def fill(app, s):
         items = [t["file"]] + items
     dpg.configure_item("pads_clip_file", items=items)
     dpg.set_value("pads_clip_file", t["file"])
-    dpg.set_value("pads_clip_deck", "ABC"[t["deck"]])
+    dpg.set_value("pads_clip_deck", DECK_WORDS[t["deck"]])
     dpg.set_value("pads_clip_mode", dict(vj_clips.MODES)[t["mode"]])
     dpg.set_value("pads_clip_how", how(s["type"], t["mode"]))
     for k in ("in", "attack", "decay", "sustain", "release", "level"):

@@ -64,7 +64,7 @@ def fill(t):
             ok = isinstance(cur, (int, float)) and not isinstance(cur, bool) and math.isfinite(cur)   # (an Infinity Out)
         if not ok:
             t[k] = v
-    t["deck"] = max(0, min(2, int(t["deck"])))
+    t["deck"] = max(0, min(3, int(t["deck"])))                    # (3: the selected deck - resolved as it plays)
     for k, lo, hi in ENV:
         t[k] = max(lo, min(hi, float(t[k])))
     t["level"] = max(0.0, min(1.0, float(t["level"])))
@@ -92,6 +92,9 @@ def length(app, t):
 def play(app, t, owner):
     """Clip t started on its deck from its In - in place of the one there, from the level it had."""
     t = fill(dict(t))
+    if t["deck"] == 3:                                          # on the selected deck: the one selected now
+        from native import vj
+        t["deck"] = vj.selected(app)
     if not t.get("name" if t["kind"] == "pad_cam" else "file"):
         return
     rt = _rt(app)

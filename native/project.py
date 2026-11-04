@@ -230,7 +230,7 @@ class Project:
     # deck C off the air its auto-mix had put it on, started a Mutate or a breath over: on air, the fader, deck C's
     # level and each deck's morph; a field is a name, or a path into the dict)
     UNDO_SKIP = {"pads": ("bank", "next_id"),
-                 "vj": ("on", "fader", ("decks", 2, "level")) + tuple(("decks", i, "morph") for i in range(3))}
+                 "vj": ("on", "fader", "sel", ("decks", 2, "level")) + tuple(("decks", i, "morph") for i in range(3))}
 
     def _snap(self, k):
         view = getattr(self, "save_view", None)          # what is saved (a show's VJ steps hold the decks: the

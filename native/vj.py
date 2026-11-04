@@ -100,6 +100,7 @@ TOP = {"on": False, "fader": 0.0, "mode": "crossfade", "wipe": "blend", "map": "
        "c_mode": "screen", "c_up": 1.0,   # the level deck C's In (and Flash) brings it to
        "c_fade": 2.0,                     # deck C's In and Out, in beats (0: a cut)
        "cue": False,
+       "sel": 0,                          # the selected deck (0 A, 1 B, 2 C): what "the selected deck"'s actions drive
        "pulse": "grid",                   # the decks' beat: "grid" (on the bar grid) or "heard" (every beat heard)
        "quant": "now",                    # Cut and Fade by hand: "now", or waiting for the next "beat" or "bar"
        "decks": [], "presets": {},        # {name: a deck's look and knobs, saved}
@@ -652,6 +653,34 @@ def clock_seen(app):
     """The clock's jumps so far taken as seen (the VJ not running: nothing of it ran across them, so none moves
     later - a sweep long done moved minutes ahead swung the fader A-B-A when the VJ came back)."""
     app._vj_clock_seen = clock.shifted()
+
+
+SEL = 3                            # a target's deck that is "the selected deck" (resolve: the one selected now)
+
+
+def selected(app):
+    """The deck selected (0 A, 1 B, 2 C) - the one a pad or a control on "the selected deck" drives."""
+    return int(options(app).get("sel", 0)) % DECKS
+
+
+def select_deck(app, i):
+    """Deck i selected (or "next": the one after the selected)."""
+    o = options(app)
+    o["sel"] = (selected(app) + 1) % DECKS if i == "next" else max(0, min(DECKS - 1, int(i)))
+    app._vj_dirty = True
+
+
+def resolve(app, t):
+    """A target on "the selected deck" made the one on the deck selected now (its deck SEL; or a kind ending
+    "_s", the next video file's or the pause's): any other as it is."""
+    if not isinstance(t, dict):
+        return t
+    if t.get("deck") == SEL:
+        t = dict(t, deck=selected(app))
+    k = t.get("kind") or ""
+    if k in ("vj_clip_s", "vj_pause_s"):
+        t = dict(t, kind=k[:-1] + "abc"[selected(app)])
+    return t
 
 
 def clip_key(app, i):
@@ -2266,7 +2295,7 @@ def knob_set(app, i, key, f):
 
 
 # the settings with choices, as options() holds them to them (here: the tables they come from are above)
-_TOP_CHOICES = {"mode": MODES, "wipe": WIPES, "map": dict(MAPS), "c_mode": C_MODES, "pulse": dict(PULSES),
+_TOP_CHOICES = {"sel": (0, 1, 2), "mode": MODES, "wipe": WIPES, "map": dict(MAPS), "c_mode": C_MODES, "pulse": dict(PULSES),
                 "quant": dict(QUANTS)}
 _AUTO_CHOICES = {"mix": ("off", "bars", "sections"), "c": dict(C_AUTO), "shuffle_from": dict(SHUFFLE_FROM)}
 _DECK_CHOICES = {"pic_key": dict(vj_layer.KEYS), "pic_fit": dict(vj_layer.FITS), "pic_flip": dict(vj_layer.FLIPS),

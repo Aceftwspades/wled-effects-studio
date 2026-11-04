@@ -168,6 +168,9 @@ def _build_side(app):
             dpg.add_combo([], tag="pads_s_look", width=-1, callback=lambda s, v: _target_set(app, look=v))
         with dpg.group(tag="pads_s_presetrow", show=False):
             dpg.add_combo([], tag="pads_s_preset", width=-1, callback=lambda s, v: _target_set(app, name=v))
+        with dpg.group(tag="pads_s_fxrow", show=False):
+            dpg.add_combo([], tag="pads_s_fx", width=-1, callback=lambda s, v: _target_set(app, name=v))
+            c.tip("the effect it loads - the studio's own, the project's among them")
         clip_ui.build(app)
         dpg.add_checkbox(label="stage on the deck off the air", tag="pads_s_stage", show=False,
                          callback=lambda s, v: _ctl_set(app, "stage", bool(v)))
@@ -437,8 +440,10 @@ def labels(app):
     if getattr(app, "_pads_labels", None) is None or getattr(app, "_pads_labels_key", None) != key:
         from native import midi_ui, vj
         out = [(lab, t) for lab, t in midi_ui.targets(app) if t.get("kind") != "pin"]
-        for i, d in enumerate(vj.LETTERS):
+        out.append(("the effect: this one (pick it below)", {"kind": "pad_effect", "name": ""}))
+        for i, d in enumerate(tuple(vj.LETTERS) + ("selected deck",)):
             out.append((f"VJ {d}: this look (pick it below)", {"kind": "pad_look", "deck": i, "look": ""}))
+            out.append((f"VJ {d}: this effect (pick it below)", {"kind": "pad_deck_fx", "deck": i, "name": ""}))
             out.append((f"VJ {d}: a saved preset (pick it below)", {"kind": "pad_preset", "deck": i, "name": ""}))
             out.append((f"VJ {d}: a video clip (set it below)", dict(vj_clips.DEFAULT, deck=i)))
             out.append((f"VJ {d}: a live camera (pick it below)", dict(vj_clips.CAM_DEFAULT, deck=i)))
@@ -455,18 +460,32 @@ def _label_key(t):
     return tuple(t.get(q) for q in ("kind", "deck", "key", "id"))         # id: a modulator's
 
 
+def _deck_words(t):
+    """A target's deck in a word: A, B, C, or "selected deck" (whichever is selected when it is used)."""
+    try:
+        i = int(t.get("deck", 0))
+    except (TypeError, ValueError):
+        i = 0
+    return ("A", "B", "C", "selected deck")[max(0, min(3, i))]
+
+
 def target_label(app, t):
     if not t or not t.get("kind"):
         return "nothing yet - pick an action"
     k = t.get("kind")
+    d = _deck_words(t)
+    if k == "pad_effect":
+        return f"the effect: {t.get('name') or '(none picked)'}"
+    if k == "pad_deck_fx":
+        return f"VJ {d}: effect {t.get('name') or '(none picked)'}"
     if k == "pad_look":
-        return f"VJ {'ABC'[int(t.get('deck', 0))]}: {t.get('look') or '(no look picked)'}"
+        return f"VJ {d}: {t.get('look') or '(no look picked)'}"
     if k == "pad_preset":
-        return f"VJ {'ABC'[int(t.get('deck', 0))]}: preset {t.get('name') or '(none picked)'}"
+        return f"VJ {d}: preset {t.get('name') or '(none picked)'}"
     if k == "pad_clip":
-        return f"VJ {'ABC'[int(t.get('deck', 0))]}: clip {vj_clips.words(t)}"
+        return f"VJ {d}: clip {vj_clips.words(t)}"
     if k == "pad_cam":
-        return f"VJ {'ABC'[int(t.get('deck', 0))]}: camera {vj_clips.words(t)}"
+        return f"VJ {d}: camera {vj_clips.words(t)}"
     labels(app)
     return app._pads_label_ix.get(_label_key(t), k)
 
@@ -531,6 +550,10 @@ def _fill_side(app):
     dpg.set_value("pads_s_stage", bool(s.get("stage")))
     dpg.configure_item("pads_s_lookrow", show=k == "look")
     dpg.configure_item("pads_s_presetrow", show=k == "preset")
+    dpg.configure_item("pads_s_fxrow", show=k == "pick")
+    if k == "pick":
+        dpg.configure_item("pads_s_fx", items=list(getattr(app.eng, "names", ())))
+        dpg.set_value("pads_s_fx", s["target"].get("name", ""))
     if k == "look":
         from native import vj_looks
         dpg.configure_item("pads_s_look", items=sorted(vj_looks.LOOKS))

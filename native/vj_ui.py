@@ -236,7 +236,9 @@ def _deck(app, i):
     c = _c()
     d = vj.options(app)["decks"][i]
     with dpg.group(horizontal=True):
-        typeface.label(dpg.add_text(f"DECK {LETTER[i]}", color=c.ACCENT))
+        typeface.label(dpg.add_text(f"DECK {LETTER[i]}", tag=f"vj_dtitle{i}", color=c.ACCENT))
+        c.tip("the deck - \"selected\" when it is the one the pads' and MIDI's \"selected deck\" actions drive "
+              "(a pad or a control picks it)")
         dpg.add_button(label="Browse...", tag=f"vj_br{i}", small=True, callback=lambda: browse(app, i))
         c.tip("every look as a moving thumbnail: click one to put it on this deck")
         dpg.add_button(label="Shuffle", tag=f"vj_shuf{i}", small=True,
@@ -1462,6 +1464,9 @@ def refresh(app):
     if not dpg.does_item_exist(TAG):
         return
     o = vj.options(app)
+    for i in range(vj.DECKS):                                # the deck the "selected deck" actions drive, said
+        if dpg.does_item_exist(f"vj_dtitle{i}"):
+            dpg.set_value(f"vj_dtitle{i}", f"DECK {LETTER[i]}" + ("  - selected" if vj.selected(app) == i else ""))
     dpg.set_value("vj_on", bool(o["on"]))
     dpg.set_value("vj_map", dict(vj.MAPS)[o["map"]])
     dpg.set_value("vj_canvas", dict(vj.CANVASES).get(o["canvas"], o["canvas"]))
