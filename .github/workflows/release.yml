@@ -201,7 +201,7 @@ jobs:
           done
 
       - name: the app
-        timeout-minutes: 20
+        timeout-minutes: 30   # (the smoke and its one retry: ~12 min each on macOS)
         env:
           STUDIO_NO_UPDATE_CHECK: "1"
           STUDIO_NO_WELCOME: "1"
@@ -216,7 +216,7 @@ jobs:
           python package.py --zip
 
       - name: the app, packaged
-        timeout-minutes: 20
+        timeout-minutes: 30   # (the smoke and its one retry: ~12 min each on macOS)
         env:
           STUDIO_NO_UPDATE_CHECK: "1"
           STUDIO_NO_WELCOME: "1"
