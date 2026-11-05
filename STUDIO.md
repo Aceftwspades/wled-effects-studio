@@ -4619,6 +4619,12 @@ back into itself), skylight starts white (its warp shader's `frac(ret - 0.005)` 
 Geiss's Kaleidoscope 1 is near black - whether MilkDrop shows them so is not known. One shader of the 479 uses
 float2x3 (non-square matrices are not translated).
 
+Released as 1.23.1 (2026-11-05): the pads, the modulators, video clips and live cameras on pads, the selected deck
+and effects on pads, an Effect deck's Custom sliders and checks, and eight rounds of review fixes across the VJ.
+1.23.0 was tagged first, but its CI failed (a held clock far from 0 on the Windows runner, newer ffmpeg on Linux and
+macOS, no ffmpeg on the packaged Windows runner, macOS's step limits) before a release was made; the release is
+1.23.1, and the v1.23.0 tag is left without one.
+
 ### From the second feature review (October 2026)
 
 The studio set again beside the software it shares ground with (2026-10-22),
