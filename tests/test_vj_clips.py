@@ -81,7 +81,7 @@ try:
     mid = vj_clips.level(app, 2)
     clock.step(0.25)
     vj_clips.tick(app)
-    check(mid == 0.25 and not vj_clips.playing(app, "p1") and vj_clips.level(app, 2) is None,
+    check(abs(mid - 0.25) < 1e-6 and not vj_clips.playing(app, "p1") and vj_clips.level(app, 2) is None,
           f"a one shot: let go so its release ends at its Out ({mid} at 1.75 s), then off its deck")
 
     loop = dict(clip, mode="loop", attack=0.0, decay=0.0, sustain=1.0, release=1.0)
@@ -96,7 +96,7 @@ try:
     vj_clips.tick(app)
     half = vj_clips.level(app, 2)
     vj_clips.play(app, clip, "p3")                            # another on the deck: from the level the last had
-    check(half == 0.5 and vj_clips.level(app, 2) == 0.5 and not vj_clips.playing(app, "p2"),
+    check(abs(half - 0.5) < 1e-6 and abs(vj_clips.level(app, 2) - 0.5) < 1e-6 and not vj_clips.playing(app, "p2"),
           f"stopped: down its release ({half}); another takes its place from there")
     vj_clips.let_go(app)
 
