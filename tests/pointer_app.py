@@ -634,6 +634,9 @@ def check_painter(app, bad):
 def check_clip_strip(app, bad):
     """A clip pad's In and Out dragged on its strip of frames with the mouse: the left handle to a quarter of the
     file, the right one to three quarters - each lands there, and is saved with the pad."""
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        print("     (no ffmpeg: the clip strip is left out - its frames and length come from it)")
+        return
     clip = os.path.join(app.project, "assets", "vj", "pointer_clip.mp4")
     os.makedirs(os.path.dirname(clip), exist_ok=True)
     subprocess.run([shutil.which("ffmpeg"), "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=30:duration=4",
