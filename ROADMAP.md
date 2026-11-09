@@ -46,8 +46,17 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       The footer's stats popover lists where the time goes (`native/frametime.py`): the frame's polls, sim step,
       views and interface, each with what was measured inside it - the engine, each VJ deck (marked MilkDrop or
       shader), the VJ's thumbnails - and the library's thumbnail worker beside them.
-- [ ] **Shaders read back a frame late**, without blocking, so a heavy shader no longer stalls the studio.
-- [ ] **MilkDrop's per-pixel equations on the GPU**, through the path MD2 shaders already use.
+- [-] **Shaders read back a frame late**, without blocking, so a heavy shader no longer stalls the studio.
+      Measured, not done: deck shaders already run a frame behind on their own thread. A pixel-buffer readback
+      a frame later saved nothing on an Intel UHD 630 - the driver runs queued work only once something waits
+      on it, even after a glFlush (render 0.01 ms, the wait the GPU's whole 11-27 ms either way). MilkDrop 2's
+      warp shader is feedback and must be waited for; its composite could be a frame late, but on this driver
+      that moves the wait, it does not remove it.
+- [-] **MilkDrop's per-pixel equations on the GPU**, through the path MD2 shaders already use.
+      Measured, not done: over the 23 bundled presets at 320 x 180 the per-pixel equations (a 32 x 24 mesh in
+      numpy) do not show among the costs. A MilkDrop frame's time goes to custom shapes drawn on the CPU (36%),
+      the MD2 shaders (23%), the feedback's bilinear resample (18%), blurs, waves and echo (8% each). The
+      targets worth it instead: the shapes, and the feedback warp on the GPU for presets without a warp shader.
 
 ## 5. Easier to use (UI)
 - [ ] **The pad action list grouped** (Deck A/B/C/Selected, Mix, Effect, Modulators), recent picks on top.
