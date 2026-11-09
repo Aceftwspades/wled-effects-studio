@@ -42,7 +42,10 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       `__main__` (a second copy), so its shared sizes moved to `app_layout`.
 
 ## 4. Measure, then speed up (speed)
-- [ ] **A frame-time overlay**: milliseconds per frame for the engine, each VJ deck, MilkDrop, thumbnails, the UI.
+- [x] **A frame-time overlay**: milliseconds per frame for the engine, each VJ deck, MilkDrop, thumbnails, the UI.
+      The footer's stats popover lists where the time goes (`native/frametime.py`): the frame's polls, sim step,
+      views and interface, each with what was measured inside it - the engine, each VJ deck (marked MilkDrop or
+      shader), the VJ's thumbnails - and the library's thumbnail worker beside them.
 - [ ] **Shaders read back a frame late**, without blocking, so a heavy shader no longer stalls the studio.
 - [ ] **MilkDrop's per-pixel equations on the GPU**, through the path MD2 shaders already use.
 

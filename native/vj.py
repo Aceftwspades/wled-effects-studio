@@ -32,6 +32,7 @@ import numpy as np
 from native import clock, vj_clips, vj_layer, vj_looks, seq_state
 from native import vj_state
 from native import oops
+from native import frametime
 
 CANVASES = (("64x48", "64 x 48 (light)"), ("96x72", "96 x 72"), ("128x96", "128 x 96 (fine)"),
             ("64x64", "64 x 64 (square)"), ("128x72", "128 x 72 (16:9, a wide panel)"),
@@ -1510,10 +1511,9 @@ def update(app, dt=None):
         # a deck fully off the mix is drawn every other frame (its time kept whole) for its preview - and always
         # when it is A or B, the next one up: its look already running when it is cut to (a feedback look, built up
         # from black only then, would land the drop on black)
-        if live:
-            draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
-        elif (i in _previewed(app) or i < 2 or _builds_up(o["decks"][i])) and (vj_state.of(app).tick + i) % 2 == 0:
-            draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
+        if live or ((i in _previewed(app) or i < 2 or _builds_up(o["decks"][i])) and (vj_state.of(app).tick + i) % 2 == 0):
+            with frametime.part(_deck_words(app, i), "polls"):        # the VJ draws its decks in the frame's polls
+                draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
         else:
             _skips(app)[i] += dt
             d = vj_clips.deck(app, i, o["decks"][i])
@@ -1531,6 +1531,14 @@ def update(app, dt=None):
         pics.append(p if p is not None and p.shape == shape else np.zeros(shape, np.uint8))
     vj_state.of(app).out = mix(app, pics[0], pics[1], pics[2] if len(pics) > 2 else None,
                       deck_alpha(app, 2) if len(pics) > 2 else None)
+
+
+def _deck_words(app, i):
+    """Deck i in the stats popover's list: its letter, and MilkDrop or a shader when its look is one."""
+    d = vj_clips.deck(app, i, options(app)["decks"][i])
+    lk = None if d["look"] == EFFECT else vj_looks.LOOKS.get(d["look"])
+    fam = {"milkdrop": " (MilkDrop)", "shader": " (shader)"}.get(getattr(lk, "family", ""), "")
+    return f"VJ deck {'ABC'[i] if i < 3 else i + 1}" + (" (an effect)" if d["look"] == EFFECT else fam)
 
 
 def _advance_clips(app, i, hit):

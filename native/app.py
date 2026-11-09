@@ -60,6 +60,7 @@ from native import scratch
 from native.remote import SHOT_DIR, SHOT_REQ, SHOT_PNG, CMD_FILE, REMOTE, service_capture, service_command
 import sys
 from native import oops
+from native import frametime
 from native.app_layout import AppLayout
 from native.app_input import AppInput
 from native.app_code import AppCode
@@ -530,6 +531,7 @@ class App(AppProjects, AppCode, AppInput, AppLayout, Features, Recorder, EditBui
         for k, v in vals.items():
             if dpg.does_item_exist(f"stat_{k}"):
                 dpg.set_value(f"stat_{k}", v)
+        chrome.fill_frametime()
 
     # the View menu's switches and what they are until changed: unlit LEDs black (an effect's own dark
     # stays dark), the shape on its floor
@@ -1419,6 +1421,7 @@ class App(AppProjects, AppCode, AppInput, AppLayout, Features, Recorder, EditBui
             mixer.step(self, STEP)                   # the mixer's deck B a frame on beside it (native/mixer.py)
             ms = (time.perf_counter() - t0) * 1000.0
             self.frame_ms = ms if self.frame_ms == 0.0 else self.frame_ms * 0.95 + ms * 0.05
+            frametime.add("the effect (engine)", ms, "sim")
             if self.ab:
                 try:
                     if self.ab_before:
@@ -2067,6 +2070,8 @@ def main():
             _now = time.perf_counter()
             if getattr(app, "_prof", None) is not None:
                 app._prof.append((_now - _r0) * 1000.0)
+                for _n, _ms in zip(frametime.TOP, app._prof):
+                    frametime.add(_n, _ms)               # the stats popover's "where the time goes"
                 pf = getattr(app, "_prof_avg", None)
                 app._prof_avg = app._prof if pf is None else [x * 0.95 + y * 0.05 for x, y in zip(pf, app._prof)]
             if app._loop_t:

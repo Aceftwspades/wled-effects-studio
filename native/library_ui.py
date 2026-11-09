@@ -33,6 +33,7 @@ import numpy as np
 
 from native import graph as G, render, paths
 from native import oops
+from native import frametime
 
 TAG = "library_win"
 FRAMES = 24
@@ -283,6 +284,7 @@ def _thumb_worker(app):
             else:
                 k = eng.names.index(key) if key in eng.names else None
             if k is not None:
+                t0 = time.perf_counter()
                 try:
                     frames = clean_frames(eng, k, FRAMES, syn=syn, params=params)
                     if max(int(f.max()) for f in frames) < 12:
@@ -291,6 +293,7 @@ def _thumb_worker(app):
                 except Exception:
                     oops.swallowed()
                     frames = None
+                frametime.add("library thumbnails, each (a worker, beside the frame)", (time.perf_counter() - t0) * 1000.0, "worker")
             app._lib_tq.put((src, key, frames or []))
             time.sleep(0.002)                        # the GIL back to the frame now and then
         app._lib_tprog = None

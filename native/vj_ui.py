@@ -19,6 +19,7 @@ from native import form, num, typeface, vj, vj_looks, weight
 from native.typeface import px
 from native import vj_state
 from native import oops
+from native import frametime
 
 TAG = "vj_win"
 BROWSE = "vj_browse_win"
@@ -1659,7 +1660,8 @@ def poll(app):
             else:
                 vj_state.of(app).thumbs = None
     vj.update(app)
-    _thumbs(app)
+    with frametime.part("VJ look thumbnails", "polls"):
+        _thumbs(app)
     if shown:
         for i in range(vj.DECKS):
             _preview(app, i)

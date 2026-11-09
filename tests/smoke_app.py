@@ -684,6 +684,9 @@ STEPS = [
     ([{"check": "'device ~' in dpg.get_value('stat_txt') and 'brightness' not in dpg.get_value('stat_txt')"},
       {"py": "chrome.toggle_stats(app)"}], 0.8),
     ([{"check": "dpg.is_item_shown('stats_pop') and dpg.get_value('stat_mean') != '-' and 'ms a frame' in dpg.get_value('stat_app')"},
+      # where the time goes (native/frametime.py): the frame's parts, the engine's under the sim's step
+      {"check": "dpg.get_value('stat_ft_0').startswith('polls') and dpg.is_item_shown('stat_ft_0') and "
+                "any(dpg.get_value(f'stat_ft_{k}').startswith('   the effect (engine)') for k in range(chrome.FT_ROWS))"},
       {"check": "dpg.get_item_pos('stats_pop')[1] + dpg.get_item_rect_size('stats_pop')[1] <= dpg.get_item_rect_min('stat_more')[1]"},
       {"key": "Escape"}], 0.4),
     ([{"check": "not dpg.is_item_shown('stats_pop')"}], 0.2),

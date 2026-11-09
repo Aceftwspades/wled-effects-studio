@@ -1027,6 +1027,29 @@ def build_stats_popover(app):
             for key, words, why in rows:
                 with form.row(words, tip=why):
                     dpg.add_text("-", tag=f"stat_{key}")
+        typeface.label(dpg.add_text("WHERE THE TIME GOES", color=ACCENT))      # native/frametime.py: ms a frame, smoothed
+        for k in range(FT_ROWS):
+            typeface.mono(dpg.add_text("", tag=f"stat_ft_{k}", show=False))
+
+
+FT_ROWS = 12                     # the most parts the stats popover lists
+
+
+def fill_frametime():
+    """The popover's "where the time goes": each part of the frame and what was measured inside it, in ms."""
+    from native import frametime
+    rows = frametime.rows(FT_ROWS)
+    w = max((len(n) + 3 * d for n, _, d in rows), default=0)
+    for k in range(FT_ROWS):
+        tag = f"stat_ft_{k}"
+        if not dpg.does_item_exist(tag):
+            return
+        if k < len(rows):
+            n, ms, d = rows[k]
+            dpg.set_value(tag, f"{'   ' * d}{n:<{w - 3 * d}}  {ms:6.1f} ms")
+            dpg.show_item(tag)
+        else:
+            dpg.hide_item(tag)
 
 
 def toggle_stats(app):
