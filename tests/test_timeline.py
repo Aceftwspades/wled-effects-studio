@@ -16,6 +16,8 @@ import numpy as np                                             # noqa: E402
 
 from native import sequence, seq_state, sequence_ui as S                 # noqa: E402
 
+from native import seq_record                                            # noqa: E402
+
 dpg.create_context()                                           # the frame's items are asked after: none exist
 
 
@@ -117,57 +119,57 @@ def test_a_slider_moved_by_hand_is_recorded_and_playback_is_not():
     app = _app()
     st = S._steps(app)["steps"][0]
     st["ramps"] = {"ix": {"end": 250, "shape": "linear"}}          # playback moves Intensity
-    S._REC.armed, S._REC.takes, S._REC.held, S._REC.steps, S._REC.applied = True, {}, {}, {}, None
+    seq_record._REC.armed, seq_record._REC.takes, seq_record._REC.held, seq_record._REC.steps, seq_record._REC.applied = True, {}, {}, {}, None
     try:
         for f in range(1, 41):
             t = f / 40.0
             if 10 <= f <= 20:
                 app.eng.fx["sx"] = 100 + 10 * (f - 10)            # the hand: Speed 100 -> 200 over a quarter of it
-            S._rec_poll(app, 0, t)
+            seq_record._rec_poll(app, 0, t)
             S._apply_ramps(app, 0, t)
-            S._REC.applied = (0, app.eng.idx, app.eng.seg, dict(app.eng.fx))
+            seq_record._REC.applied = (0, app.eng.idx, app.eng.seg, dict(app.eng.fx))
             if f == 15:
-                assert "sx" in S._REC.held and "ix" not in S._REC.held
-        keys = {k for (_, k) in S._REC.takes}
+                assert "sx" in seq_record._REC.held and "ix" not in seq_record._REC.held
+        keys = {k for (_, k) in seq_record._REC.takes}
         assert keys == {"sx"}, keys                                 # Intensity moved, but by its ramp
-        take = S._REC.takes[(id(st), "sx")]
+        take = seq_record._REC.takes[(id(st), "sx")]
         assert take[0][0] == 0.25 and take[0][1] == 100            # from the first move
-        S._rec_flush(app)
+        seq_record._rec_flush(app)
         assert st["ramps"]["sx"]["shape"] == "curve" and st["segments"][0]["params"]["sx"] == 100
         assert abs(sequence.ramp_value(st, "sx", 0.5) - 200) <= 2  # held at 200 to the end of the take
         assert sequence.ramp_value(st, "sx", 0.1) == 100            # before it, the step's own value
         assert st["ramps"]["ix"] == {"end": 250, "shape": "linear"}  # the ramp it did not touch, as it was
     finally:
-        S._REC.armed, S._REC.takes, S._REC.held, S._REC.steps, S._REC.applied = False, {}, {}, {}, None
+        seq_record._REC.armed, seq_record._REC.takes, seq_record._REC.held, seq_record._REC.steps, seq_record._REC.applied = False, {}, {}, {}, None
 
 
 def test_a_ramp_gives_way_to_the_hand():
     app = _app()
     st = S._steps(app)["steps"][0]
     st["ramps"] = {"sx": {"end": 250, "shape": "linear"}}
-    S._REC.held = {"sx": time.perf_counter()}                       # the hand has Speed
+    seq_record._REC.held = {"sx": time.perf_counter()}                       # the hand has Speed
     try:
         app.eng.fx["sx"] = 30
         S._apply_ramps(app, 0, 0.5)
         assert app.eng.fx["sx"] == 30                               # left where the hand put it
-        S._REC.held = {}
+        seq_record._REC.held = {}
         S._apply_ramps(app, 0, 0.5)
         assert app.eng.fx["sx"] == sequence.ramp_value(st, "sx", 0.5)   # let go: the ramp's again
     finally:
-        S._REC.held = {}
+        seq_record._REC.held = {}
 
 
 def test_a_change_of_effect_is_not_a_hand():
     app = _app()
-    S._REC.armed, S._REC.takes, S._REC.held, S._REC.steps = True, {}, {}, {}
+    seq_record._REC.armed, seq_record._REC.takes, seq_record._REC.held, seq_record._REC.steps = True, {}, {}, {}
     try:
-        S._REC.applied = (0, app.eng.idx, 0, dict(app.eng.fx))
+        seq_record._REC.applied = (0, app.eng.idx, 0, dict(app.eng.fx))
         app.eng.idx = 7                                             # another effect: its sliders all new
         app.eng.fx = {k: 10 for k in sequence.RAMP_KEYS}
-        S._rec_poll(app, 0, 0.5)
-        assert not S._REC.held and not S._REC.takes
+        seq_record._rec_poll(app, 0, 0.5)
+        assert not seq_record._REC.held and not seq_record._REC.takes
     finally:
-        S._REC.armed, S._REC.takes, S._REC.held, S._REC.steps, S._REC.applied = False, {}, {}, {}, None
+        seq_record._REC.armed, seq_record._REC.takes, seq_record._REC.held, seq_record._REC.steps, seq_record._REC.applied = False, {}, {}, {}, None
 
 
 def test_a_number_field_s_pace_follows_its_width():

@@ -128,8 +128,8 @@ MULTI_STEPS = [
 MULTI_SEND_STEPS = [
     ([{"py": "app.add_device('127.0.0.2:8771')"}, {"py": f"app.stream_config().update(multi=True, targets={_HALVES})"},
       {"py": "sequence_ui._steps(app).__setitem__('to_all', True)"},
-      {"check": "sequence_ui.send_hosts(app) == ['127.0.0.1:8770', '127.0.0.2:8771']"},
-      {"py": "sequence_ui.send(app, run=True)"}], 22.0),
+      {"check": "seq_send.send_hosts(app) == ['127.0.0.1:8770', '127.0.0.2:8771']"},
+      {"py": "seq_send.send(app, run=True)"}], 22.0),
     ([{"expect": ["seq_log", "sent to 2 of 2 devices"]}, {"expect": ["seq_log", "started together on 2"]},
       {"py": "sequence_ui._steps(app).__setitem__('to_all', False)"}, {"py": "device_ui._set_multi(app, False)"},
       {"py": "app.remove_device('127.0.0.2:8771')"}], 0.5),
@@ -966,7 +966,7 @@ STEPS = [
       {"check": "sequence.curve_points(app.project.options['sequence']['steps'][0], 'ix')[0] == [0.3, 10]"},
       {"check": "sequence_ui.curve_remove(app, 'ix', 1) and "
                 "len(sequence.curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 4"},
-      {"py": "sequence_ui.send(app, run=True)"}], 22.0),
+      {"py": "seq_send.send(app, run=True)"}], 22.0),
     ([{"expect": ["seq_log", "saved on the device"]}, {"expect": ["seq_sent", "as it is here"]},
       {"seq": ["select", 0]}, {"seq": ["field", "trans", 1.5]}, {"expect": ["seq_sent", "changed since"]},
       {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
@@ -980,21 +980,21 @@ STEPS = [
              "f.writeframes((np.sin(np.arange(44100) * 0.06) * 3000).astype(np.int16).tobytes()), f.close()))(w.open(p, 'wb')))"
              "(__import__('wave'), __import__('numpy'), __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"},
       {"py": "sequence_ui.select(app, 0)"},
-      {"py": "sequence_ui.add_audio(app, __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"}], 3.0),
+      {"py": "seq_audio.add_audio(app, __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"}], 3.0),
     ([{"check": "len(app.project.options['sequence']['tracks']) == 1 and app.project.options['sequence']['tracks'][0]['clips'][0]['file'] == 'assets/audio/smoke_tone.wav'"},
       {"check": "abs(app.project.options['sequence']['tracks'][0]['clips'][0]['len'] - 2.0) < 0.05"},
       {"py": "setattr(seq_state.of(app).player, 'volume', 0.0) if seq_state.of(app).player else None"},
       {"py": "sequence_ui.play(app, 0)"}], 1.2),
-    ([{"check": "type(sequence_ui.show_source(app)).__name__ == 'ShowAudio'"},
+    ([{"check": "type(seq_audio.show_source(app)).__name__ == 'ShowAudio'"},
       {"check": "abs(seq_state.of(app).player.position - sequence_ui.position(app)) < 0.15"},
       {"seq": ["stop"]},
       {"py": "app.project.options['sequence']['tracks'][0]['clips'][0].update(at=1.0, fade_in=0.5)"},
-      {"py": "sequence_ui._audio_changed(app)"}], 0.4),
+      {"py": "seq_audio._audio_changed(app)"}], 0.4),
     ([{"check": "__import__('native.showaudio', fromlist=['x']).fades(app.project.options['sequence']['tracks'][0])[0] == (0.5, 0.0)"},
-      {"check": "sequence_ui.show_source(app) is None"},
-      {"py": "setattr(app, '_clip_sel', (0, 0))"}, {"check": "sequence_ui.delete_clip(app)"},
+      {"check": "seq_audio.show_source(app) is None"},
+      {"py": "setattr(app, '_clip_sel', (0, 0))"}, {"check": "seq_audio.delete_clip(app)"},
       {"check": "app.project.options['sequence']['tracks'][0]['clips'] == []"},
-      {"py": "app.project.options['sequence']['tracks'].clear()"}, {"py": "sequence_ui._audio_changed(app)"}], 0.4),
+      {"py": "app.project.options['sequence']['tracks'].clear()"}, {"py": "seq_audio._audio_changed(app)"}], 0.4),
     # song sections and a show made from them: two sections laid by hand at 120 bpm, a show made from three
     # effects of a setlist (measured on the spare engine) - a step a 4 bars over the 16 s verse and the 8 s drop -
     # then undone to the steps before; the sections, the tempo and the setlist put back
@@ -1014,11 +1014,11 @@ STEPS = [
     # timecode in: MTC on the MIDI port (a stand-in port), a full frame locating 00:00:00:15 at 30 - the show held
     # half a second in; the timecode off again
     ([{"py": "setattr(app, '_tc_port', app.midi.port) or setattr(app.midi, 'port', app.midi.port or 'smoke')"},
-      {"py": "sequence_ui.tc_set(app, source='mtc', start='00:00:00:00')"},
+      {"py": "seq_timecode.tc_set(app, source='mtc', start='00:00:00:00')"},
       {"py": "app.midi.inject([0xF0, 0x7F, 0x7F, 0x01, 0x01, 0x60, 0, 0, 15, 0xF7])"}], 0.5),
     ([{"check": "abs(sequence_ui.position(app) - 0.5) < 0.05 and seq_state.of(app).play.get('paused') is not None"},
       {"check": "dpg.get_value('seq_tc_words').startswith('00:00:00:15')"},
-      {"py": "sequence_ui.tc_set(app, source='off')"}, {"py": "sequence_ui.stop(app)"},
+      {"py": "seq_timecode.tc_set(app, source='off')"}, {"py": "sequence_ui.stop(app)"},
       {"py": "setattr(app.midi, 'port', app._tc_port)"}], 0.4),
     # the show rendered to a video, frame by frame on the held clock: the second step (1 s) at 720p and 24 frames a
     # second, 24 frames in an mp4 in captures/ (taken away again), the clock the real one after - without ffmpeg on the
@@ -1294,12 +1294,12 @@ STEPS = [
     ([{"check": "app.project.options['sequence']['steps'][0]['segments'][0]['effect'] == 'Ace 3-D Maelstrom'"}, {"py": "sequence_ui.select(app, 1)"}], 0.4),
     ([{"check": "sequence_ui._play_i(app) == 1 and seq_state.of(app).sel == 1"}, {"seq": ["stop"]}, {"py": "sequence_ui.toggle_edit(app, False)"}], 0.4),
     # automation recorded: Custom 1 moved by hand while the first step plays becomes a curve on it
-    ([{"py": "sequence_ui.select(app, 0)"}, {"py": "sequence_ui.toggle_rec(app, True)"}], 1.4),
+    ([{"py": "sequence_ui.select(app, 0)"}, {"py": "seq_record.toggle_rec(app, True)"}], 1.4),
     ([{"py": "(app.eng.fx.__setitem__('c1', 40), app.eng.push())"}], 0.15),
     ([{"py": "(app.eng.fx.__setitem__('c1', 120), app.eng.push())"}], 0.15),
     ([{"py": "(app.eng.fx.__setitem__('c1', 220), app.eng.push())"}], 0.15),
-    ([{"check": "sequence_ui._REC.armed and any(k == 'c1' for _, k in sequence_ui._REC.takes)"}, {"seq": ["stop"]}], 0.4),
-    ([{"check": "not sequence_ui._REC.armed and (app.project.options['sequence']['steps'][0].get('ramps') or {}).get('c1', {}).get('shape') == 'curve'"},
+    ([{"check": "seq_record._REC.armed and any(k == 'c1' for _, k in seq_record._REC.takes)"}, {"seq": ["stop"]}], 0.4),
+    ([{"check": "not seq_record._REC.armed and (app.project.options['sequence']['steps'][0].get('ramps') or {}).get('c1', {}).get('shape') == 'curve'"},
       {"expect": ["messages", "automation recorded"]}], 0.2),
     ([{"expect": ["seq_tlog", "read from the device"]}, {"seq": ["del", 1]}, {"seq": ["del", 0]}, {"seq": ["timer_del", 1]}, {"seq": ["timer_del", 0]},
       {"seq": ["tap"]}, {"seq": ["snap", 120.0, 4]}, {"camera": "front"}, {"camera": ["save", 1]}, {"camera": "isometric"}], 1.5),

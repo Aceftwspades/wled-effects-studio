@@ -76,8 +76,8 @@ def size(app):
 
 
 def has_audio(app):
-    from native import sequence_ui
-    return any(tr.get("clips") for tr in sequence_ui._tracks(app))
+    from native import seq_audio
+    return any(tr.get("clips") for tr in seq_audio._tracks(app))
 
 
 # --- the dialog ----------------------------------------------------------------------------------

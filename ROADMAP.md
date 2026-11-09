@@ -32,6 +32,8 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 
 ## 3. Split the largest files (maintainability)
 - [ ] `graph_ui.py` (5,300 lines), `app.py` (4,300), `sequence_ui.py` (3,800): one responsibility per module.
+      Done: `sequence_ui.py` to 2,580, its sending (`seq_send`), audio tracks (`seq_audio`), sections
+      (`seq_sections`), timecode (`seq_timecode`) and automation recording (`seq_record`) in modules of their own.
 
 ## 4. Measure, then speed up (speed)
 - [ ] **A frame-time overlay**: milliseconds per frame for the engine, each VJ deck, MilkDrop, thumbnails, the UI.

@@ -566,8 +566,8 @@ class App(Features, Recorder, EditBuild):
 
     # --- audio ---------------------------------------------------------------
     def audio_push(self):
-        from native import sequence_ui
-        src = sequence_ui.show_source(self) or self.live or self.syn     # the show's audio while it plays, if it has any
+        from native import seq_audio
+        src = seq_audio.show_source(self) or self.live or self.syn     # the show's audio while it plays, if it has any
         video_ui.push(self)                              # the newest video frame into the engine (the Video node)
         try:
             hit = src.push(self.eng)

@@ -4669,7 +4669,7 @@ What they have that the studio lacks, in the order they would pay back:
       *Done, narrower than listed:* the stream to several devices, each a
       range of the wiring, was already there (the review missed it); added
       a show's presets sent to every device of the stream at once and
-      started together (sequence_ui._send_all). Each device then runs its
+      started together (seq_send._send_all). Each device then runs its
       own clock; a continuous picture across them is the stream's or FSEQ's.
 - [x] **FSEQ export for Falcon Player** (the xLights and FPP world of
       holiday and event shows): the show rendered frame by frame on the

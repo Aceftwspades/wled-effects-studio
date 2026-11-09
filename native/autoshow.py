@@ -161,11 +161,11 @@ def _set(app, key, v):
 
 def refresh(app):
     import dearpygui.dearpygui as dpg
-    from native import sequence_ui
+    from native import sequence_ui, seq_sections
     if not dpg.does_item_exist("as_words"):
         return
     o = options(app)
-    secs = sequence_ui._sections(app)
+    secs = seq_sections._sections(app)
     n = len(pool_names(app, o["pool"]))
     dpg.set_value("as_words", f"{n} effects to choose from; " + (f"{len(secs)} sections" if secs else
                   "the sections found first") + ("" if sequence_ui._barlen(app) else ", the tempo found first"))
@@ -184,12 +184,12 @@ def show(app):
 def make(app, again=False):
     """The show made: the sections found first when there are none (and the tempo), the pool's effects measured on
     a spare engine on a worker, then the steps built there and put in place of the show's."""
-    from native import sequence, sequence_ui, tasks
+    from native import sequence, sequence_ui, seq_sections, tasks
     o = options(app)
     if again:
         o["seed"] = int(o.get("seed", 1)) + 1
-    if not sequence_ui._sections(app):
-        if not sequence_ui.find_sections(app):
+    if not seq_sections._sections(app):
+        if not seq_sections.find_sections(app):
             return False
         seq_state.of(app).autoshow_after = True                                    # made once the sections are in (poll)
         return True
@@ -200,7 +200,7 @@ def make(app, again=False):
     if (getattr(eng, "geom", None) is not app.project.geometry          # another shape, not only another size:
             or eng.cols != app.eng.cols or eng.rows != app.eng.rows):   # six faces, a ledmap's (a pooled engine's)
         eng.set_geometry(app.project.geometry)
-    secs = json.loads(json.dumps(sequence_ui._sections(app)))
+    secs = json.loads(json.dumps(seq_sections._sections(app)))
     bar = sequence_ui._barlen(app) or 2.0
     colours = [int(c) for c in app.seg_cols]
     cache = app.__dict__.setdefault("_autoshow_scores", {})
@@ -235,8 +235,8 @@ def make(app, again=False):
 
 def poll(app):
     """A show asked for before its sections were found: made once they are."""
-    from native import sequence_ui
-    if seq_state.of(app).autoshow_after and sequence_ui._sections(app):
+    from native import seq_sections
+    if seq_state.of(app).autoshow_after and seq_sections._sections(app):
         seq_state.of(app).autoshow_after = False
         make(app)
 # AI: end

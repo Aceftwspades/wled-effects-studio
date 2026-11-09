@@ -1640,11 +1640,11 @@ def _auto(app, hit):
 def _section_now(app):
     """(index, kind) of the show's section the playhead is in, or None (not playing, or no sections)."""
     try:
-        from native import sequence_ui
+        from native import sequence_ui, seq_sections
         pos = sequence_ui.position(app)
         if pos is None:
             return None
-        for k, s in enumerate(sequence_ui._sections(app)):
+        for k, s in enumerate(seq_sections._sections(app)):
             if float(s["at"]) <= pos < float(s["at"]) + float(s["len"]):
                 return (k, s.get("kind", "verse"))
     except Exception:
