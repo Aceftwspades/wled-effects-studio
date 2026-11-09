@@ -57,6 +57,13 @@ def luma(img):
     return img[..., 0] * 0.3 + img[..., 1] * 0.59 + img[..., 2] * 0.11
 
 
+def _wrap(x, n):
+    """np.mod(x, n) for float32 x, the same values at half the time: fmod, then n added to what is below 0."""
+    r = np.fmod(x, n)
+    r += (r < 0) * np.float32(n)
+    return r
+
+
 def sample(img, u, v, wrap=False):
     """img (h, w, c) read at u, v (0..1, arrays), bilinear; clamped at the edges (or wrapped). Float32 in, float32
     out: the four corners gathered from the image as rows of a flat (h * w, c) array, which is twice as quick as
@@ -72,21 +79,28 @@ def sample(img, u, v, wrap=False):
     x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
     y = np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
     if wrap:
-        x = np.mod(x, w); y = np.mod(y, h)
+        x = _wrap(x, w); y = _wrap(y, h)
     else:
         x = np.clip(x, 0, w - 1); y = np.clip(y, 0, h - 1)
     x0 = x.astype(np.int32); y0 = y.astype(np.int32)              # a floor: x and y are not below 0 here
-    fx = (x - x0)[..., None]; fy = (y - y0)[..., None]
-    x1 = (x0 + 1) % w if wrap else np.minimum(x0 + 1, w - 1)
-    y1 = (y0 + 1) % h if wrap else np.minimum(y0 + 1, h - 1)
+    fx = x - x0; fy = y - y0
     if wrap:
-        x0 %= w; y0 %= h
+        x0[x0 == w] = 0; y0[y0 == h] = 0                          # (a coordinate rounded up to the width: the first)
+        x1 = x0 + 1; y1 = y0 + 1
+        x1[x1 == w] = 0; y1[y1 == h] = 0
+    else:
+        x1 = np.minimum(x0 + 1, w - 1); y1 = np.minimum(y0 + 1, h - 1)
     r0, r1 = y0 * w, y1 * w
-    a = flat.take(r0 + x0, 0)
-    a += (flat.take(r0 + x1, 0) - a) * fx
-    b = flat.take(r1 + x0, 0)
-    b += (flat.take(r1 + x1, 0) - b) * fx
-    a += (b - a) * fy
+    a = flat.take((r0 + x0).ravel(), 0)
+    b = flat.take((r0 + x1).ravel(), 0)
+    c = flat.take((r1 + x0).ravel(), 0)
+    d = flat.take((r1 + x1).ravel(), 0)
+    fx, fy = fx.ravel(), fy.ravel()
+    for k in range(a.shape[1]):                     # a channel at a time: numpy is slow across a 3-wide last axis
+        ak, ck = a[:, k], c[:, k]
+        ak += (b[:, k] - ak) * fx
+        ck += (d[:, k] - ck) * fx
+        ak += (ck - ak) * fy
     return a.reshape(np.shape(x) + img.shape[2:])
 
 

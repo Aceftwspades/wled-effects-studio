@@ -936,35 +936,71 @@ def _warn(st, preset):
     st["warn"] = "; ".join(notes)
 
 
+_Q_KEY = re.compile(r"q\d+$")                                    # a preset's q1..q32, handed to its shapes and waves
+_T_KEY = re.compile(r"t\d$")                                     # a shape's or wave's t1..t8, kept from its init
+_CARRIED = ("time", "fps", "frame", "progress", "bass", "mid", "treb", "bass_att", "mid_att", "treb_att")
+SIDES_BY_NORMALS = 16        # up to this many sides, a polygon's edge found from its sides' normals (no arctan2)
+
+
 def _carry(base, v):
     """A shape's or wave's variables for this frame: its settings, the preset's q's, its t's from its init."""
     out = dict(base)
-    out.update({k: v[k] for k in v if re.match(r"q\d+$", k)})
-    for k in ("time", "fps", "frame", "progress", "bass", "mid", "treb", "bass_att", "mid_att", "treb_att"):
+    out.update({k: v[k] for k in v if _Q_KEY.match(k)})
+    for k in _CARRIED:
         out[k] = v.get(k, 0.0)
     return out
 
 
+def _num(x, default=0.0):
+    """A shape's setting as a finite float (NaN 0, an infinity the largest float), as nan_to_num made it."""
+    x = _fn(x, default)
+    return 0.0 if x != x else max(-3.4e38, min(3.4e38, x))
+
+
+def _reach(dx, dy, sides, ang, rad):
+    """How far out each pixel is in a regular polygon (`sides`, turned by `ang`, its corners `rad` out): 1 on its rim,
+    below 1 inside. Up to SIDES_BY_NORMALS sides it is the largest of the pixel's projections on the sides' normals
+    over the polygon's inner radius - the same as r / edge from its angle, with no arctan2 or cos over the frame."""
+    seg = 2 * math.pi / sides
+    inner = rad * math.cos(math.pi / sides)
+    if sides <= SIDES_BY_NORMALS:
+        q = None
+        for k in range(sides):
+            phi = ang + seg * (k + 0.5)
+            p = dx * np.float32(math.cos(phi) / inner) + dy * np.float32(math.sin(phi) / inner)
+            q = p if q is None else np.maximum(q, p, out=q)
+        return q
+    th = np.arctan2(dy, dx) - np.float32(ang)
+    edge = inner / np.maximum(np.cos(np.mod(th, np.float32(seg)) - np.float32(seg / 2)), np.float32(1e-3))
+    return np.hypot(dx, dy) / np.maximum(edge, np.float32(1e-3))
+
+
 def _shapes(ctx, st, preset, v, fb):
     """The preset's custom shapes: each a regular polygon of `sides`, its middle one colour and its rim another,
-    a border round it, alpha-blended or added, its inside the last frame when textured - once an instance."""
+    a border round it, alpha-blended or added, its inside the last frame when textured - once an instance.
+    Each instance works on the pixels inside it only (gathered from the frame, blended, put back): a shape over the
+    whole frame costs its pixels once, a small one only its own."""
     if not preset["shapes"]:
         return fb
     h, w = fb.shape[:2]
+    fb = np.ascontiguousarray(fb)
+    flat = fb.reshape(h * w, -1)
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
     tinit = st.setdefault("shape_t", {})
     for n, sh in enumerate(preset["shapes"]):
         if n not in tinit:                                       # its init: run once, its t1..t8 kept for every frame
             iv = _carry(sh["p"], v)
             sh["init"](iv)
-            tinit[n] = {k: iv[k] for k in iv if re.match(r"t\d$", k)}
-        for inst in range(max(1, min(64, int(_fn(sh["p"].get("num_inst", 1), 1))))):
+            tinit[n] = {k: iv[k] for k in iv if _T_KEY.match(k)}
+        base = _carry(sh["p"], v)                                # the same for every instance of this frame
+        base.update(tinit[n])
+        num_inst = _fn(sh["p"].get("num_inst", 1), 1)
+        for inst in range(max(1, min(64, int(num_inst)))):
             if _cut_here(st):                                    # the frame's drawing time spent: the rest left out
                 break
             st["_drawn"] = st.get("_drawn", 0) + 1
-            s = _carry(sh["p"], v)
-            s.update(tinit[n])
-            s.update(instance=float(inst), num_inst=_fn(sh["p"].get("num_inst", 1), 1))
+            s = dict(base)
+            s.update(instance=float(inst), num_inst=num_inst)
             sh["frame"](s)
             sides = max(3, min(100, int(round(_fn(s.get("sides", 4), 4)))))
             cx, cy = _fn(s.get("x", 0.5), 0.5) * (w - 1), (1.0 - _fn(s.get("y", 0.5), 0.5)) * (h - 1)
@@ -977,42 +1013,54 @@ def _shapes(ctx, st, preset, v, fb):
             y0, y1 = max(0, int(cy - rad - pad)), min(h, int(cy + rad + pad) + 1)
             if x0 >= x1 or y0 >= y1:
                 continue
-            box = (slice(y0, y1), slice(x0, x1))
-            full = fb
-            fb = fb[box].copy()
-            dx, dy = xs[box] - cx, -(ys[box] - cy)
-            r = np.hypot(dx, dy)
-            th = np.arctan2(dy, dx) - ang
-            seg = 2 * math.pi / sides
-            edge = rad * math.cos(math.pi / sides) / np.maximum(np.cos(np.mod(th, seg) - seg / 2), 1e-3)
-            inside = r <= edge
-            f = np.clip(r / np.maximum(edge, 1e-3), 0, 1)[..., None]
-            c1 = np.array([s.get("r", 1), s.get("g", 0), s.get("b", 0)], np.float32)
-            c2 = np.array([s.get("r2", 0), s.get("g2", 1), s.get("b2", 0)], np.float32)
-            col = np.clip(np.nan_to_num(c1 * (1 - f) + c2 * f), 0, 1)
-            al = np.clip(np.nan_to_num(float(s.get("a", 1)) * (1 - f[..., 0]) + float(s.get("a2", 0)) * f[..., 0]), 0, 1)
+            dx = xs[y0:y1, x0:x1] - np.float32(cx)
+            dy = np.float32(cy) - ys[y0:y1, x0:x1]
+            q = _reach(dx, dy, sides, ang, rad)
+            bw = x1 - x0
+            li = np.flatnonzero(q <= 1.0)                        # the inside pixels, in the box...
+            at = li + (li // bw) * (w - bw) + (y0 * w + x0)      # ...and in the frame
+            f = q.ravel()[li]
+            np.clip(f, 0, 1, out=f)
+            c1 = (_num(s.get("r", 1)), _num(s.get("g", 0)), _num(s.get("b", 0)))
+            c2 = (_num(s.get("r2", 0)), _num(s.get("g2", 1)), _num(s.get("b2", 0)))
+            a1, a2 = _num(s.get("a", 1)), _num(s.get("a2", 0))
+            al = np.clip(np.float32(a1) + np.float32(a2 - a1) * f, 0, 1)
+            tex = None
             if s.get("textured"):
                 from native import vj_looks
                 tz = max(1e-3, float(s.get("tex_zoom", 1.0)))
                 ta = _fn(s.get("tex_ang", 0.0))
-                ux, uy = dx / (rad * 2 * tz), dy / (rad * 2 * tz)
+                ux, uy = dx.ravel()[li] / (rad * 2 * tz), dy.ravel()[li] / (rad * 2 * tz)
                 cs, sn = math.cos(ta), math.sin(ta)
                 tu, tv = ux * cs - uy * sn + 0.5, -(ux * sn + uy * cs) + 0.5
-                col = col * vj_looks.sample(full, tu, tv, wrap=True)
-            m = inside[..., None]
-            a = (al * inside)[..., None]
-            if s.get("additive"):
-                fb = np.where(m, np.minimum(1.0, fb + col * a), fb)
-            else:
-                fb = np.where(m, fb * (1 - a) + col * a, fb)
+                tex = vj_looks.sample(fb, tu, tv, wrap=True)
+            px = flat.take(at, 0)
+            for k in range(3):                                   # a channel at a time: numpy is slow across a 3-wide axis
+                col = np.float32(c1[k]) + np.float32(c2[k] - c1[k]) * f
+                np.clip(col, 0, 1, out=col)
+                if tex is not None:
+                    col *= tex[:, k]
+                if s.get("additive"):
+                    col *= al
+                    col += px[:, k]
+                    np.minimum(col, 1.0, out=col)
+                else:
+                    col -= px[:, k]
+                    col *= al
+                    col += px[:, k]
+                flat[:, k][at] = col
             ba = max(0.0, min(1.0, _fn(s.get("border_a", 0.0))))
             if ba > 0.01:
                 width = 1.5 if s.get("thick") else 0.8
-                rim = (np.abs(r - edge) < width) & (r <= edge + width)
-                bc = np.clip(np.array([s.get("border_r", 1), s.get("border_g", 1), s.get("border_b", 1)], np.float32), 0, 1)
-                fb = np.where(rim[..., None], fb * (1 - ba) + bc * ba, fb)
-            full[box] = fb
-            fb = full
+                r = np.hypot(dx, dy)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    edge = r / q                                 # (the middle pixel: no edge there, and no rim)
+                li = np.flatnonzero((np.abs(r - edge) < width) & (r <= edge + width))
+                at = li + (li // bw) * (w - bw) + (y0 * w + x0)
+                bc = (_num(s.get("border_r", 1)), _num(s.get("border_g", 1)), _num(s.get("border_b", 1)))
+                for k in range(3):
+                    p = flat[:, k][at]
+                    flat[:, k][at] = p + (np.float32(max(0.0, min(1.0, bc[k]))) - p) * np.float32(ba)
     return fb
 
 
@@ -1083,7 +1131,7 @@ def _custom_waves(ctx, st, preset, v, fb):
         if n not in tinit:
             iv = _carry(wv["p"], v)
             wv["init"](iv)
-            tinit[n] = {k: iv[k] for k in iv if re.match(r"t\d$", k)}
+            tinit[n] = {k: iv[k] for k in iv if _T_KEY.match(k)}
         s = _carry(wv["p"], v)
         s.update(tinit[n])
         wv["frame"](s)

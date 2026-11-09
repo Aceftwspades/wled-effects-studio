@@ -119,6 +119,20 @@ check(frames[-1].shape == (48, 64, 3) and frames[-1].max() > 0.3, "a preset draw
 check(np.abs(frames[-1] - frames[-10]).mean() > 0.001, "and moves")
 check(st["q"].get("q1") == 60.0, f"its q variables kept from frame to frame ({st['q'].get('q1')})")
 
+# a shape's reach (r / its edge) from its sides' normals, as from its angle: the same polygon
+ys, xs = np.mgrid[0:61, 0:81].astype(np.float32)
+dx, dy = xs - np.float32(40.3), np.float32(30.1) - ys
+r = np.hypot(dx, dy)
+worst = 0.0
+for sides in (3, 4, 5, 6, 8, milk.SIDES_BY_NORMALS):
+    for ang in (0.0, 0.7, -2.1):
+        seg = 2 * math.pi / sides
+        edge = 25 * math.cos(math.pi / sides) / np.cos(np.mod(np.arctan2(dy, dx) - ang, seg) - seg / 2)
+        worst = max(worst, float(np.max(np.abs(milk._reach(dx, dy, sides, ang, 25) - r / edge))))
+check(worst < 1e-4, f"a polygon's reach from its sides' normals as from its angle (off by {worst:.1e} at most)")
+far = milk._reach(dx, dy, milk.SIDES_BY_NORMALS + 4, 0.3, 25)
+check(far.shape == dx.shape and abs(float(far[30, 40]) - 0.0) < 0.05 and float(far[0, 0]) > 1, "more sides: from the angle")
+
 d = tempfile.mkdtemp()
 path = os.path.join(d, "swirl.milk")
 open(path, "w").write(PRESET)
