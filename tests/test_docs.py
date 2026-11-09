@@ -31,8 +31,9 @@ def _source(name):
 
 
 def _graph_and_show():
-    """graph_ui.py and the mixins its GraphPanel is made of (graph_*.py), and the modules split from sequence_ui.py (seq_*.py)."""
-    return sorted(f for f in os.listdir(os.path.join(ROOT, "native")) if f.endswith(".py") and f.startswith(("graph_", "seq_")))
+    """The mixins app.py's App and graph_ui.py's GraphPanel are made of (app_*.py, graph_*.py) with graph_ui.py, and the
+    modules split from sequence_ui.py (seq_*.py)."""
+    return sorted(f for f in os.listdir(os.path.join(ROOT, "native")) if f.endswith(".py") and f.startswith(("app_", "graph_", "seq_")))
 
 
 def test_guide_has_the_reference_section():

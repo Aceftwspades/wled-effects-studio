@@ -97,7 +97,8 @@ def test_the_tutorial_pictures_exist():
 def test_the_tree_tutorial_opens_at_its_chapter():
     """Help > Tutorial: a tree in 3-D, the Welcome's button and the shape's
     start open the tutorial at the tree chapter by its heading."""
-    src = open(os.path.join(ROOT, "native", "app.py"), encoding="utf-8").read()
+    src = "".join(open(os.path.join(ROOT, "native", f), encoding="utf-8").read()          # app.py and its mixins (app_*.py)
+                  for f in os.listdir(os.path.join(ROOT, "native")) if f == "app.py" or f.startswith("app_"))
     m = re.search(r'"tutorial_tree": lambda: reader_ui.open_doc\(self, "TUTORIAL.md", "([^"]+)"\)', src)
     assert m, "the tutorial_tree action is not where the test looks"
     assert reader.heading_index(DOCS["TUTORIAL.md"], m.group(1)) is not None, m.group(1)

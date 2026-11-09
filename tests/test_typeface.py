@@ -109,7 +109,8 @@ def test_sizes_in_the_prefs_are_kept_at_100():
     """The 3-D view's side and the panel's width go into the prefs at 100%
     (room.py, app.py): read back at another size they keep their share."""
     src_room = open(os.path.join(ROOT, "native", "room.py"), encoding="utf-8").read()
-    src_app = open(os.path.join(ROOT, "native", "app.py"), encoding="utf-8").read()
+    src_app = "".join(open(os.path.join(ROOT, "native", f), encoding="utf-8").read()      # app.py and its mixins (app_*.py)
+                      for f in os.listdir(os.path.join(ROOT, "native")) if f == "app.py" or f.startswith("app_"))
     assert "px(pip(app)[\"size\"])" in src_room and "def _set_side(" in src_room
     assert 'self.prefs["side_w"] = int(round(self.side_w / typeface.scale()))' in src_app
 

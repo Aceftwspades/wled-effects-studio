@@ -1,0 +1,963 @@
+"""Where the panes sit - a mixin of app.py's App: the arrangement of the main, 3-D and side panes, the ghost a dragged pane leaves, pop-outs, the side panel's sections folded and in any order, and the holes and glow of the gradient frames drawn round them."""
+import os
+import numpy as np
+import dearpygui.dearpygui as dpg
+from native.typeface import px
+from native import dock
+from native.project import PROJECTS, save_prefs
+from native import chrome, glow, device_ui, procs, room, view3d
+from native.gpucube import CubeQuads
+from native.textures import registry as tex_registry
+from native.theme import theme_colors
+import sys
+from native import oops
+
+
+CUBE_MAX = 620          # cube render cost is quadratic in this, so it is capped
+                        # and the image is scaled up if the pane is larger
+# laid out at 100% and at the interface size (typeface.py) from here on
+VIEW_MIN = px(180)
+CAP_H = px(48)          # a view pane above its picture: padding, the grip and caption row, spacing; and the padding below
+
+
+class AppLayout:
+    # --- the arrangement: which pane sits where ---------------------------------
+    # Three slots - "main" (the net, the code or the graph, whichever the
+    # layout mode shows), "cube" (the 3-D view) and "side" (the panel) - in
+    # columns of rows, left to right, top to bottom. A pane moves by its grip
+    # (the ::: at its top right) dragged onto another pane: near an edge it
+    # goes beside or above that pane, in the middle the two swap.
+    # The fourth slot, "props", is the graph's properties pane: a node's
+    # settings too long for the node. It shows in the graph layout only,
+    # and it is a pane of its own so selecting a node never moves the
+    # editor - the panel it used to grow above the editor did.
+    # Then the device frames - "devices", "flash", "send" - which
+    # are windows of their own floating over the panes until docked: in
+    # the arrangement they are placed like any pane (dock_slot puts one
+    # under the main pane; the grip dragged onto a pane, beside it) and
+    # out of it they float. OPTIONAL: an arrangement holds any subset.
+    PRESETS = (("Classic: main pane, 3-D, panel", [["main"], ["cube", "props"], ["side"]]),
+               ("Panel on the left", [["side"], ["main"], ["cube", "props"]]),
+               ("3-D on the left", [["cube", "props"], ["main"], ["side"]]),
+               ("3-D under the main pane", [["main", "cube"], ["side", "props"]]),
+               ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
+               ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
+    CORE = ("main", "cube", "side", "props")
+    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes", "outputs", "audioin", "vj")
+    SLOTS = CORE + OPTIONAL
+
+    @classmethod
+    def _valid_arrangement(cls, arr):
+        if not isinstance(arr, (list, tuple)):           # none saved
+            return None
+        try:
+            cols = [[str(s) for s in c] for c in arr]
+        except Exception:
+            oops.swallowed()
+            return None
+        flat = sorted(s for c in cols for s in c)
+        if flat == sorted(s for s in cls.CORE if s != "props") and all(cols):
+            # saved before the properties pane existed: it goes under the 3-D view
+            for c in cols:
+                if "cube" in c:
+                    c.insert(c.index("cube") + 1, "props")
+                    break
+            return cols
+        core = sorted(s for s in flat if s in cls.CORE)
+        extra = [s for s in flat if s not in cls.CORE]
+        if core != sorted(cls.CORE) or not all(cols):
+            return None
+        if any(s not in cls.OPTIONAL for s in extra) or len(set(extra)) != len(extra):
+            return None
+        return cols
+
+    def docked(self, slot):
+        """Whether a frame is part of the layout - a tab in the dock beside
+        the side panel's (native/dock.py), or a pane among the panes - rather
+        than floating."""
+        return dock.in_dock(self, slot) or dock.paned(self, slot)
+
+    def unplace(self, slot):
+        """A frame out from among the panes (to be closed, floated or docked by the caller)."""
+        if dock.paned(self, slot):
+            self.set_arrangement([[s for s in c if s != slot] for c in self.arrangement], to_dock=False)
+
+    def dock_slot(self, slot):
+        """A frame into the dock, its tab in front."""
+        if slot not in self.OPTIONAL:
+            return
+        dock.dock_frame(self, slot)
+        self.gp.status(f"{dock.NAMES.get(slot, slot)} in the dock; float takes it out over the panes")
+
+    def undock_slot(self, slot):
+        """A docked frame out into a window of its own, over the panes."""
+        if slot not in self.OPTIONAL:
+            return
+        dock.float_frame(self, slot)
+
+    def set_arrangement(self, arr, to_dock=True):
+        """The panes' places. A frame the arrangement had and this one has not (a preset chosen) goes into the
+        dock - unless `to_dock` is off (its caller closes, floats or docks it)."""
+        cols = self._valid_arrangement([[s for s in c] for c in arr if c])
+        if cols is None:
+            raise ValueError(f"not an arrangement: {arr!r}")
+        before = [s for c in self.arrangement for s in c if s in self.OPTIONAL] if to_dock else ()
+        dock.settle(self, cols, before)
+        self.arrangement = cols
+        self.prefs["arrangement"] = cols
+        save_prefs(self.prefs)
+        self.request_layout()
+
+    def move_slot(self, slot, target, zone):
+        """`slot` dropped on `target`: beside it (left, right), above or below
+        it (top, bottom), or in its place (centre - the two swap)."""
+        if slot in self.OPTIONAL and target == "side" and zone == "centre":
+            dock.dock_frame(self, slot)              # a frame's grip dropped on the panel: into the dock, its tab in front
+            return
+        if slot == target or slot not in self.SLOTS or target not in self.SLOTS or zone is None:
+            return
+        if zone == "centre" and slot in self.OPTIONAL and target in self.CORE:
+            return                                   # a frame does not swap with the panes it sits among (drop_zone offers none)
+        if slot in self.OPTIONAL:
+            dock.take(self, slot)                    # among the panes, where it was dropped: not a tab or a window too
+        arr = [list(c) for c in self.arrangement]
+        if zone == "centre":
+            arr = [[target if s == slot else slot if s == target else s for s in c] for c in arr]
+        else:
+            arr = [[s for s in c if s != slot] for c in arr]
+            arr = [c for c in arr if c]
+            ci = next(i for i, c in enumerate(arr) if target in c)
+            rj = arr[ci].index(target)
+            if zone == "left":
+                arr.insert(ci, [slot])
+            elif zone == "right":
+                arr.insert(ci + 1, [slot])
+            elif zone == "top":
+                arr[ci].insert(rj, slot)
+            else:
+                arr[ci].insert(rj + 1, slot)
+        self.set_arrangement(arr)
+
+    def pane_of(self, slot):
+        """The window a slot shows right now."""
+        if slot == "cube":
+            return "cube_win"
+        if slot == "side":
+            return "rail_win" if room.folded(self) else "side_win"
+        if slot == "props":
+            return "props_win"
+        if slot in self.OPTIONAL:
+            return f"{slot}_win"
+        return {"edit": "edit_win", "graph": "graph_win"}.get(self.layout, "net_win")
+
+    def _place_frame(self, slot, rect):
+        """A frame among the panes: its window held at the pane's place and size, with its own header - the title,
+        and at the right float, the grip (to move it again) and close - since no tab strip names it."""
+        tag = device_ui.FRAMES[slot][0]
+        if not dpg.does_item_exist(tag):
+            return
+        x, y, w, h = rect
+        dpg.configure_item(tag, show=True, no_move=True, no_resize=True, no_focus_on_appearing=True, width=w, height=h)
+        dpg.set_item_pos(tag, [x, y])
+        device_ui.chrome_for(self, slot, docked=False)
+        device_ui.place_header(tag, w, False)
+
+    def slot_of(self, pane):
+        return next((s for s in self.SLOTS if self.pane_of(s) == pane), None)
+
+    def net_on(self):
+        """The logical view drawn in the window (not popped out, not hidden)."""
+        return self.layout in ("both", "net") and not self.popouts.is_out("net")
+
+    def cube_on(self):
+        return self.layout in ("both", "cube", "edit", "graph") and not self.popouts.is_out("cube") and not room.tucked(self)
+
+    def slot_shown(self, slot):
+        if not self.ui:
+            return False
+        if slot in self.OPTIONAL:
+            return True                              # a frame placed among the panes (one in the dock or floating is not in the arrangement)
+        if slot == "props":
+            return self.layout == "graph" and self.props and not room.active(self)     # canvas first: over the canvas
+        if slot == "side":
+            return self.side
+        if slot == "cube":
+            return self.cube_on() and not room.active(self)
+        if self.layout == "cube":
+            return False
+        return self.net_on() if self.layout in ("both", "net") else True
+
+    @staticmethod
+    def _col_key(cols):
+        return "|".join("+".join(c) for c in cols)
+
+    def _col_fracs(self, cols):
+        """Each free column's share of the width the panel column leaves,
+        {column index: share}. Per layout mode: the graph wants more room
+        than the net does."""
+        free = [i for i, c in enumerate(cols) if c != ["side"]]
+        if not free:
+            return {}
+        stored = (self.colw.get(self.layout) or {}).get(self._col_key(cols))
+        if stored and len(stored) == len(free):
+            fr = [float(v) for v in stored]
+        elif len(free) == 1:
+            fr = [1.0]
+        else:
+            share = {"graph": 0.7, "edit": 0.55}.get(self.layout, 0.5)
+            fr = [share if "main" in cols[i] else (1.0 - share) / (len(free) - 1) for i in free]
+        tot = sum(fr) or 1.0
+        return {i: f / tot for i, f in zip(free, fr)}
+
+    def _row_fracs(self, col):
+        stored = self.rowh.get("+".join(col))
+        if stored and len(stored) == len(col):
+            fr = [float(v) for v in stored]
+        elif len(col) == 2 and "main" in col:
+            fr = [0.58, 0.42] if col[0] == "main" else [0.42, 0.58]
+        elif len(col) == 2 and "props" in col:
+            fr = [0.62, 0.38] if col[1] == "props" else [0.38, 0.62]
+        else:
+            fr = [1.0 / len(col)] * len(col)
+        tot = sum(fr) or 1.0
+        return [f / tot for f in fr]
+
+    SPLIT = px(8)                # a splitter's thickness
+
+    def pane_rects(self, x0, y0, W, H):
+        """Where each shown slot goes, {slot: (x, y, w, h)}, and the splitters
+        between them, [(kind, col, row, x, y, w, h)]: "v" between column
+        `col` and the next, "h" between row `row` of `col` and the next. A
+        column of the panel alone keeps its pixel width; the others share
+        the rest."""
+        cols = [[s for s in col if self.slot_shown(s)] for col in self.arrangement]
+        cols = [c for c in cols if c]
+        self._cols = cols
+        if not cols:
+            return {}, []
+        G = self.SPLIT
+        n = len(cols)
+        fr = self._col_fracs(cols)
+        folded = room.folded(self)
+        side_px = room.side_px(self)
+        free_w = W - G * (n - 1) - sum(side_px for c in cols if c == ["side"])
+        free_w = max(VIEW_MIN * max(1, len(fr)), free_w)
+        self._free_w = free_w
+        widths = [side_px if c == ["side"] else max(VIEW_MIN, int(free_w * fr[i])) for i, c in enumerate(cols)]
+        rects, splits = {}, []
+        self._rows_h = []
+        x = x0
+        for i, c in enumerate(cols):
+            w = widths[i]
+            rf = self._row_fracs(c)
+            hs = H - G * (len(c) - 1)
+            self._rows_h.append(hs)
+            y = y0
+            for j, s in enumerate(c):
+                h = max(VIEW_MIN // 2, int(hs * rf[j])) if j < len(c) - 1 else max(VIEW_MIN // 2, y0 + H - y)
+                rects[s] = (x, y, w, h)
+                if j < len(c) - 1:
+                    splits.append(("h", i, j, x, y + h, w, G))
+                    y += h + G
+            if i < n - 1 and not (folded and ["side"] in (c, cols[i + 1])):
+                splits.append(("v", i, 0, x + w, y0, G, H))
+            x += w + G
+        return rects, splits
+
+    # --- the ghost: what is being dragged, following the pointer ------------------------
+    def _ghost_start(self, x, y, w, h, label):
+        mx, my = dpg.get_mouse_pos(local=False)
+        self._ghost = (w, h, mx - x, my - y, label)
+        self._ghost_move()
+
+    def _ghost_move(self):
+        if not self._ghost or not dpg.does_item_exist("ghost_rect"):
+            return
+        w, h, dx, dy, label = self._ghost
+        mx, my = dpg.get_mouse_pos(local=False)
+        x0, y0 = mx - dx, my - dy
+        dpg.configure_item("ghost_rect", pmin=(x0, y0), pmax=(x0 + w, y0 + h), show=True)
+        dpg.configure_item("ghost_text", pos=(x0 + 10, y0 + 8), text=label, show=True)
+
+    def _ghost_end(self):
+        self._ghost = None
+        for t in ("ghost_rect", "ghost_text"):
+            if dpg.does_item_exist(t):
+                dpg.configure_item(t, show=False)
+
+    def drop_zone(self, mx, my, frame=False):
+        """What a dragged pane would do if let go here: (slot, zone) for the
+        pane under the pointer - the edge it is nearest, or the centre. A
+        frame (`frame`) has a centre only on the panel - into the dock - or
+        on another frame (the two swap): on the others, the nearest edge."""
+        for slot, (x, y, w, h) in self._rects.items():
+            if not (x <= mx < x + w and y <= my < y + h):
+                continue
+            rx, ry = (mx - x) / max(1, w), (my - y) / max(1, h)
+            d = min(rx, 1 - rx, ry, 1 - ry)
+            if d > 0.3 and not (frame and slot in self.CORE and slot != "side"):
+                return slot, "centre"
+            if d == rx:
+                return slot, "left"
+            if d == 1 - rx:
+                return slot, "right"
+            return slot, "top" if d == ry else "bottom"
+        return None
+
+    def _zone_rect(self, slot, zone):
+        x, y, w, h = self._rects[slot]
+        if zone == "left":
+            return x, y, x + w // 2, y + h
+        if zone == "right":
+            return x + w // 2, y, x + w, y + h
+        if zone == "top":
+            return x, y, x + w, y + h // 2
+        if zone == "bottom":
+            return x, y + h // 2, x + w, y + h
+        return x + 6, y + 6, x + w - 6, y + h - 6
+
+    # --- pop-outs: a view in a window of its own ----------------------------------
+    def set_popout(self, view, on):
+        """The net or the 3-D view in its own window (a second monitor's),
+        its pane given to the others; off, or the window closed, brings the
+        pane back."""
+        if view not in ("net", "cube"):
+            return
+        if on and not self.popouts.is_out(view):
+            self.popouts.open(view, self.eng, (self.yaw, self.pitch, self.dist))
+        elif not on and self.popouts.is_out(view):
+            self.popouts.close(view)
+        self.request_layout()
+
+    def poll_menus_fit(self):
+        """A popup menu that grew past the window's edge - a fold opened
+        near the bottom - is moved back inside, so every row can be reached."""
+        vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+        for tag in ("graph_ctx", "graph_menu", "compare_menu", "open_menu", "midi_ctx", "expr_win") + tuple(self.pane_menus.values()):
+            if not (dpg.does_item_exist(tag) and dpg.is_item_shown(tag)):
+                continue
+            w, h = dpg.get_item_rect_size(tag)
+            if w <= 0 or h <= 0:
+                continue
+            x, y = dpg.get_item_pos(tag)
+            nx = max(0, min(x, vw - w - 4)) if w < vw else 0
+            ny = max(0, min(y, vh - h - 4)) if h < vh else 0
+            if (nx, ny) != (x, y):
+                dpg.set_item_pos(tag, [nx, ny])
+
+    def poll_popouts(self):
+        if self.popouts.jobs and self.popouts.poll():
+            self.request_layout()
+
+    # --- the side panel's sections: folded, and in any order -----------------------
+    SECTIONS = ("effect", "segments", "geometry", "colours", "parameters", "audio", "live", "video")
+
+    def sec_save(self):
+        self.prefs["sections"] = {"order": list(self.sec_order), "closed": sorted(self.sec_closed)}
+        save_prefs(self.prefs)
+
+    def sec_toggle(self, key):
+        self.sec_set(key, key in self.sec_closed)
+
+    def sec_set(self, key, open_):
+        if open_:
+            self.sec_closed.discard(key)
+        else:
+            self.sec_closed.add(key)
+        if dpg.does_item_exist(f"sec_{key}_body"):
+            dpg.configure_item(f"sec_{key}_body", show=open_)
+            dpg.configure_item(f"sec_{key}_arrow", direction=dpg.mvDir_Down if open_ else dpg.mvDir_Right)
+        self.sec_save()
+
+    def sec_all(self, open_):
+        for key in self.SECTIONS:
+            self.sec_set(key, open_)
+
+    def sec_apply_order(self):
+        """The sections into self.sec_order: each moved to the end in turn."""
+        for key in self.sec_order:
+            if dpg.does_item_exist(f"sec_{key}"):
+                dpg.move_item(f"sec_{key}", parent="side_win")
+        self.sec_save()
+
+    def sec_move(self, key, target, zone):
+        """`key` dropped above or below `target`."""
+        if key == target or key not in self.SECTIONS or target not in self.SECTIONS:
+            return
+        order = [k for k in self.sec_order if k != key]
+        i = order.index(target) + (1 if zone == "below" else 0)
+        order.insert(i, key)
+        self.sec_order = order
+        self.sec_apply_order()
+
+    def sec_reset(self):
+        self.sec_order = list(self.SECTIONS)
+        self.sec_closed = set()
+        self.sec_all(True)
+        self.sec_apply_order()
+
+    def sec_zone(self, mx, my):
+        """The section under the pointer and which half of it: (key, "above" | "below")."""
+        # the panel's rectangle, not its hover: while the grip (a button)
+        # is held, ImGui reports nothing under it as hovered
+        pane = self._screen_rect("side_win")
+        if not pane or not (pane[0] <= mx <= pane[2] and pane[1] <= my <= pane[3]):
+            return None
+        for key in self.sec_order:
+            st = dpg.get_item_state(f"sec_{key}")
+            (x, y), (w, h) = st.get("rect_min", (0, 0)), st.get("rect_size", (0, 0))
+            if w > 0 and h > 0 and x <= mx < x + w and y <= my < y + h:
+                return key, ("above" if my < y + h / 2 else "below")
+        return None
+
+    def _sec_zone_rect(self, key, zone):
+        st = dpg.get_item_state(f"sec_{key}")
+        (x, y), (w, h) = st["rect_min"], st["rect_size"]
+        yy = y if zone == "above" else y + h - 4
+        return x, yy - 2, x + w, yy + 4
+
+    @staticmethod
+    def build_dir():
+        return os.path.join(os.path.dirname(PROJECTS), "build", "latest")
+
+    @staticmethod
+    def doc_path(name):
+        from native import paths
+        return os.path.join(paths.RES, name)
+
+    def open_url(self, url):
+        import webbrowser
+        if url:
+            webbrowser.open(url)
+
+    def reveal(self, path):
+        """Open a file or folder with whatever the system uses for it."""
+        try:
+            if os.name == "nt":
+                os.startfile(path)
+            elif sys.platform == "darwin":
+                procs.popen(["open", path])
+            else:
+                procs.popen(["xdg-open", path])
+        except Exception as e:
+            self.gp.status(f"could not open {path}: {e}")
+
+    def relayout(self):
+        """Size and place the panes for whatever the window currently is.
+
+        The panes were fixed pixel sizes, so maximising the window left two
+        small pictures in the corner of a large expanse of panel. Both views
+        are square, so each gets the largest square that fits its pane. The
+        panes' places come from the arrangement (pane_rects); presenting (H)
+        shows the pictures only, centred by hand.
+        """
+        vw = max(640, dpg.get_viewport_client_width())
+        vh = max(420, dpg.get_viewport_client_height())
+        room.prepare(self)                   # the 3-D view and the properties: over the canvas, or among the panes
+
+        # What is on screen decides what there is room for. A popped-out view
+        # is on another window; hidden here. Presenting shows pictures only:
+        # the code and graph panes are chrome too, so in those layouts the
+        # 3-D view stands alone.
+        show_net = self.net_on()
+        show_cube = self.cube_on()
+        show_edit = self.layout == "edit" and self.ui
+        show_graph = self.layout == "graph" and self.ui
+        nview = (show_net + show_cube + show_edit + show_graph) if self.ui else (show_net + show_cube)
+        rects, splits = {}, []
+        if self.ui:
+            # The panes stop where the footer (record, stats, key hints)
+            # starts, so the root window never has anything to scroll to.
+            # The footer is measured rather than assumed; before the first
+            # frame it has no size yet and 48 px is what it comes to.
+            fh = dpg.get_item_rect_size("footer")[1] if dpg.does_item_exist("footer") else 0
+            fh = fh if fh > 0 else px(48)
+            # The menu bar and the toolbar sit above the panes; where the
+            # toolbar ends is measured, since the menu bar's height is the
+            # font's business. Before the first frame it has no size: 59 px
+            # is what it comes to.
+            tb_y = dpg.get_item_rect_min("toolbar")[1] if dpg.does_item_exist("toolbar") else 0
+            tb_h = dpg.get_item_rect_size("toolbar")[1] if dpg.does_item_exist("toolbar") else 0
+            top = (tb_y + tb_h + px(6)) if tb_h > 0 else px(59)
+            pane_h = max(VIEW_MIN, vh - top - fh - px(18))
+            rects, splits = self.pane_rects(px(8), top, vw - px(16), pane_h)
+            main, cube = rects.get("main"), rects.get("cube")
+            if cube is None and main and room.pip_on(self):
+                cube = room.pip_geometry(self, main)          # the 3-D view in its corner of the graph
+                dpg.configure_item("cube_win", width=cube[2], height=cube[3])   # its size before the picture is centred in it
+            self._cube_rect = cube
+            # the 3-D view is a square, the largest its pane's inside allows; the logical view has the
+            # pane's inside as it is (a 40 x 12 net drawn in a square was a strip in a tall pane)
+            net_box = (main[2] - px(22), main[3] - CAP_H) if (main and show_net) else (VIEW_MIN, VIEW_MIN)
+            side = max(VIEW_MIN, min(cube[2] - px(22), cube[3] - CAP_H)) if cube else VIEW_MIN
+        else:
+            # Presenting: no control column, no captions, no borders and no
+            # padding, so none of it gets an allowance. The picture takes the
+            # whole frame less the gap between two of them.
+            pane_h = max(VIEW_MIN, vh)
+            self._cube_rect = None
+            avail = vw - (16 if nview == 2 else 0)
+            left_w = max(VIEW_MIN, avail // max(1, nview))
+            side = max(VIEW_MIN, min(left_w, pane_h))
+            net_box = (left_w, pane_h)
+        self._rects = rects
+
+        dpg.configure_item("net_win",  show=show_net)
+        dpg.configure_item("cube_win", show=show_cube)
+        dpg.configure_item("edit_win", show=show_edit)
+        dpg.configure_item("graph_win", show=show_graph)
+        dpg.configure_item("side_win", show=self.ui and self.side and not room.folded(self))
+        dpg.configure_item("rail_win", show=room.rail(self))
+        dpg.configure_item("props_win", show=self.slot_shown("props") or room.active(self))   # over the canvas: its window decides
+        if not (self.ui and self.side and not room.folded(self)) or "side" not in rects:
+            dock.hide(self)                          # the dock's column is away: its strip and frames with it
+        for slot in self.OPTIONAL:
+            if dock.paned(self, slot) and slot not in rects and dpg.does_item_exist(self.pane_of(slot)):
+                dpg.configure_item(self.pane_of(slot), show=False)     # a frame among the panes, while they are away
+        # The menu bar is the window's: a hidden mvMenuBar still draws its
+        # strip, the window flag takes it away.
+        dpg.configure_item("root", menubar=self.ui)
+        if dpg.does_item_exist("toolbar"):
+            dpg.configure_item("toolbar", show=self.ui)
+        for tag in self._splitters:
+            dpg.configure_item(tag, show=False)
+
+        th = self._themes.get("present" if not self.ui else "normal")
+        if th:
+            dpg.bind_theme(th)
+        dpg.set_viewport_clear_color([0, 0, 0, 255] if not self.ui else list(theme_colors(self.prefs)["bg"]) + [255])
+        for tag in ("net_win", "cube_win", "side_win"):
+            dpg.configure_item(tag, border=self.ui)
+        # The captions, the grips, the readout and the key hints are UI too -
+        # a clean picture means nothing left over the top of it.
+        for tag in ("net_cap", "cube_cap", "cube_cap_tip", "stat_row", "msg_row", "grip_net_win", "grip_cube_win"):
+            if dpg.does_item_exist(tag):
+                dpg.configure_item(tag, show=self.ui)
+        if not self.ui and dpg.does_item_exist("stats_pop"):
+            dpg.hide_item("stats_pop")                   # the footer's figures go with the footer
+        chrome.refresh(self)
+
+        # The net is upscaled by a WHOLE number so the LED grid stays hard;
+        # bilinear scaling of a 48-pixel image looks like a photograph of a cube
+        # rather than a cube.
+        self.net_scale = max(1, min(max(VIEW_MIN, net_box[0]) // max(1, self.eng.cols),
+                                    max(VIEW_MIN, net_box[1]) // max(1, self.net_image().shape[0])))
+        # The cube render is capped whatever the pane size, and the image is
+        # scaled up to fill. Measured, the renderer costs 28 ms a frame at 620
+        # and 64 ms at 900 - it is quadratic in the size, and it is already the
+        # single most expensive thing the app does. Rendering a fullscreen cube
+        # at its true size would take the whole app from 35 fps to 15, so
+        # fullscreen makes the picture BIGGER, not sharper. Raising this is not
+        # a free win; measure before touching it.
+        self.cube_px = min(CUBE_MAX, side // 2 if self.ab else side)
+        self.view_side = side
+
+        if self.ui:
+            # A pane once placed no longer flows in its row; every one is
+            # placed here, from the arrangement.
+            for tag in ("net_win", "cube_win", "edit_win", "graph_win", "side_win", "props_win", "rail_win"):
+                dpg.reset_pos(tag)
+            for slot, (x, y, w, h) in rects.items():
+                if slot == "side" and room.rail(self):
+                    room.place_side(self, (x, y, w, h))        # the rail at the edge, the dock beside it
+                    continue
+                if slot == "side":
+                    dock.place(self, (x, y, w, h))             # the panel, or the frame whose tab is in front
+                    continue
+                if slot in self.OPTIONAL:
+                    self._place_frame(slot, (x, y, w, h))      # a frame among the panes
+                    continue
+                tag = self.pane_of(slot)
+                dpg.configure_item(tag, width=w, height=h)
+                dpg.set_item_pos(tag, [x, y])
+                # the grip at the pane's top right, clear of the scrollbar
+                if dpg.does_item_exist(f"grip_{tag}"):
+                    dpg.set_item_pos(f"grip_{tag}", [w - px(46), px(8)])     # inside the padding: past it, the pane scrolled
+            app_ed = getattr(self, "code_ed", None)
+            if app_ed and show_edit and "main" in rects:
+                x, y, w, h = rects["main"]
+                app_ed.resize(w - px(18), h - px(192))     # the rows above and below it: find and replace are two lines
+            for kind, i, j, x, y, w, h in splits:
+                tag = f"{kind}split_{i}_{j}"
+                if dpg.does_item_exist(tag):
+                    dpg.configure_item(tag, width=w, height=h, show=True)
+                    dpg.set_item_pos(tag, [x, y])
+        # Centre what is left, rather than letting it sit against the corner.
+        # In presentation mode the panes are exactly the size of their pictures
+        # and are positioned by hand; the black around them is the viewport
+        # showing through, which is why the clear colour matters as much as the
+        # theme does.
+        if not self.ui:
+            gap = 16 if nview == 2 else 0
+            total = side * nview + gap
+            x0 = max(0, (vw - total) // 2)
+            y0 = max(0, (vh - side) // 2)
+            if show_net:
+                dpg.configure_item("net_win", width=side, height=side)
+                dpg.set_item_pos("net_win", [x0, y0])
+                x0 += side + gap
+            if show_cube:
+                dpg.configure_item("cube_win", width=side, height=side)
+                dpg.set_item_pos("cube_win", [x0, y0])
+
+        # Only the visible views get textures. A hidden one would otherwise
+        # allocate at full pane size and never be written to - 7.7 MB of
+        # float32 for a net nobody is looking at. Switching back runs this
+        # again, so the texture is there by the time anything draws into it.
+        if show_net:
+            self.remake_net_texture()
+        if show_cube:
+            self.remake_cube_texture()
+        # a narrow pane's caption would run under the grip: the short form
+        if self.ui:
+            if "main" in rects and show_net:
+                dpg.set_value("net_cap", "Logical view - what the effect draws" if rects["main"][2] >= 340 else "Logical view")
+            if "cube" in rects and not self.ab and rects["cube"][2] < 340:
+                dpg.set_value("cube_cap", "3-D view")
+        self.centre_views()
+        room.place(self, rects)              # the windows over the canvas, the help band, the rail's buttons
+
+    def centre_views(self):
+        """A view sits in the middle of its pane, not in its top-left corner:
+        the panes are as tall as the window, the pictures are square."""
+        for win, img in (("net_win", "net_img"), ("cube_win", "cube_img")):
+            if not (dpg.does_item_exist(win) and dpg.does_item_exist(img)):
+                continue
+            if img == "cube_img" and (self.cube_quads is not None or self.point_quads is not None):
+                continue                                  # the drawlist fills the pane and centres itself
+            cw = dpg.get_item_configuration(win).get("width") or 0
+            ch = dpg.get_item_configuration(win).get("height") or 0
+            iw = dpg.get_item_configuration(img).get("width") or 0
+            ih = dpg.get_item_configuration(img).get("height") or 0
+            if not (cw and ch and iw and ih):
+                continue
+            top = CAP_H - px(10) if self.ui else 0        # the caption row (the pane pads 10 below the picture)
+            dpg.set_item_pos(img, [max(0, (cw - iw) // 2), top + max(0, (ch - top - ih - px(10)) // 2)])
+
+    NET_SRC_SCALE = 4            # the net's upscale for the GPU-scaled view
+
+    def remake_net_texture(self):
+        """The net view's texture. Crisp: the net repeated by a whole number
+        on the CPU (6 ms a frame, hard-edged LEDs). GPU: the net at 4x, the
+        image widget scaling it up - a fifth of the work, edges a little
+        soft (the bilinear step is a quarter of an LED)."""
+        img = self.net_image()
+        w = img.shape[1] * self.net_scale
+        h = img.shape[0] * self.net_scale
+        if dpg.does_item_exist("net_img"):
+            dpg.delete_item("net_img")
+        if dpg.does_item_exist("net_tex"):
+            dpg.delete_item("net_tex")
+        if self.gpu_net:
+            k = self.NET_SRC_SCALE
+            tw, th = img.shape[1] * k, img.shape[0] * k
+        else:
+            tw, th = w, h
+        dpg.add_raw_texture(tw, th, np.zeros(tw * th * 4, np.float32),
+                            format=dpg.mvFormat_Float_rgba, tag="net_tex", parent=tex_registry())
+        dpg.add_image("net_tex", tag="net_img", parent="net_win", width=w, height=h)
+        self._bufs.pop("net", None)
+
+    def gpu_cube_active(self):
+        """The GPU view draws a cube as its faces: five flat faces, one
+        segment, in flat mode too (the LEDs are where they were). Two
+        effects side by side keep the software renderer."""
+        g = self.eng.geom
+        return bool(self.gpu_cube and g is not None and g.kind == "cube" and not self.ab)
+
+    def gpu_points_active(self):
+        """The GPU view draws every other geometry as a cloud of squares - or, one whose LEDs lie on a surface
+        (a matrix, a cylinder, a sphere, a torus: surface_geom), as that surface."""
+        g = self.eng.geom
+        return bool(self.gpu_cube and g is not None and g.kind != "cube" and not self.ab)
+
+    def surface_geom(self):
+        """The engine's geometry when the 3-D view draws it as a surface (gpucube.SurfaceQuads), else None."""
+        g = self.eng.geom
+        return g if g is not None and g.is_surface() and len(self.view_positions()) == len(g.pos) else None
+
+    def view_positions(self):
+        """The LEDs' positions the 3-D view draws: the project's geometry
+        when it is the engine's shape moved (a part being dragged), else
+        the engine's own."""
+        g, p = self.eng.geom, self.project.geometry
+        if g is not None and p is not None and p.kind == g.kind and len(p.pos) == len(g.pos):
+            return p.pos
+        return g.pos if g is not None else np.zeros((1, 3), np.float32)
+
+    def remake_cube_texture(self):
+        p = self.cube_px
+        w, h = (2 * p + 8, p) if self.ab else (p, p)
+        if dpg.does_item_exist("cube_img"):
+            dpg.delete_item("cube_img")
+        self.cube_quads = None
+        if self.point_quads is not None and dpg.does_item_exist(self.point_quads.tex):
+            dpg.delete_item(self.point_quads.tex)
+        self.point_quads = None
+        if dpg.does_item_exist("cube_tex"):
+            dpg.delete_item("cube_tex")
+        if self.gpu_points_active():
+            from native.gpucube import PointQuads, SurfaceQuads
+            sg = self.surface_geom()
+            self.point_quads = (SurfaceQuads("cube_win", "cube_img", sg, self.view_positions()) if sg is not None
+                                else PointQuads("cube_win", "cube_img", self.view_positions()))
+            self.point_quads.set_frame(view3d.frame(self))
+            r = getattr(self, "_cube_rect", None)
+            if r and self.ui:
+                self.point_quads.resize(self.view_side, r[2] - px(22), r[3] - CAP_H)
+            else:
+                self.point_quads.resize(self.view_side)
+            if dpg.does_item_exist("cube_cap"):
+                dpg.set_value("cube_cap", "3-D - drag to rotate, wheel to zoom")
+            return
+        if self.gpu_cube_active():
+            # the net, a few times its size so bilinear sampling keeps the
+            # LEDs square, is the one texture the quads draw from
+            n = 3 * self.eng.B * self.CUBE_SRC_SCALE
+            if dpg.does_item_exist("cube_src_tex"):
+                dpg.delete_item("cube_src_tex")
+            dpg.add_raw_texture(n, n, np.zeros(n * n * 4, np.float32), format=dpg.mvFormat_Float_rgba, tag="cube_src_tex", parent=tex_registry())
+            self._bufs.pop("cube_src", None)
+            self.cube_quads = CubeQuads("cube_win", "cube_img", "cube_src_tex")
+            r = getattr(self, "_cube_rect", None)
+            if r and self.ui:
+                self.cube_quads.resize(self.view_side, r[2] - px(22), r[3] - CAP_H)
+            else:
+                self.cube_quads.resize(self.view_side)
+            if dpg.does_item_exist("cube_cap"):
+                dpg.set_value("cube_cap", "3-D - drag to rotate, wheel to zoom")
+            return
+        dpg.add_raw_texture(w, h, np.zeros(w * h * 4, np.float32),
+                            format=dpg.mvFormat_Float_rgba, tag="cube_tex", parent=tex_registry())
+        # Drawn at view_side even when rendered smaller, so capping the render
+        # cost does not also shrink the picture.
+        dpg.add_image("cube_tex", tag="cube_img", parent="cube_win",
+                      width=self.view_side, height=int(self.view_side * h / w))
+        if dpg.does_item_exist("cube_cap"):
+            dpg.set_value("cube_cap", self.ab_caption() if self.ab else "3-D - drag to rotate, wheel to zoom")
+        self._bufs.pop("cube", None)
+
+    @staticmethod
+    def _merge_boxes(boxes):
+        """Rectangles that overlap, merged until none do."""
+        out = [tuple(b) for b in boxes]
+        merged = True
+        while merged and len(out) > 1:
+            merged = False
+            for i in range(len(out)):
+                for j in range(i + 1, len(out)):
+                    a, b = out[i], out[j]
+                    if not (b[2] <= a[0] or b[0] >= a[2] or b[3] <= a[1] or b[1] >= a[3]):
+                        out[i] = (min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]))
+                        del out[j]
+                        merged = True
+                        break
+                if merged:
+                    break
+        return out
+
+    @staticmethod
+    def _screen_rect(tag):
+        """(x0, y0, x1, y1) on screen, or None. A child window reports no
+        rect_min; its pos is in the window it sits in - the root, which is
+        the screen, or a window over the panes (the 3-D view in the graph's
+        corner sits at 0, 0 of its own), whose place is added: the frame of
+        the pane last clicked in was drawn at the screen's corner."""
+        if not dpg.does_item_exist(tag):
+            return None
+        placed = room.placed(tag)
+        if placed:                           # the 3-D view over the graph: where the room puts it this frame
+            x, y, w, h = placed
+            return (x, y, x + w, y + h)
+        st = dpg.get_item_state(tag)
+        w, h = st.get("rect_size", (0, 0))
+        if w <= 0 or h <= 0:
+            return None
+        if st.get("rect_min"):
+            x, y = st["rect_min"]
+        else:
+            x, y = dpg.get_item_pos(tag)
+            parent = dpg.get_item_parent(tag)
+            if parent is not None and dpg.get_item_type(parent).endswith("mvWindowAppItem") and dpg.get_item_alias(parent) != "root":
+                ox, oy = dpg.get_item_pos(parent)
+                x, y = x + ox, y + oy
+        return (x, y, x + w, y + h)
+
+    FLOATING = ("keys_win", "flash_win", "where_win", "history_win", "history_diff_win", "palette_win", "undo_win", "confirm_dialog", "usermods_win", "um_dialog", "compare_menu", "sweep_win", "wav_dialog", "appearance_win", "name_dialog", "editor_dialog", "about_win", "update_win", "wled_dialog", "report_win", "snap_win", "midi_win", "midi_ctx", "bank_win", "expr_win", "reader_win", "welcome_win", "reader_pic",
+                "open_menu", "graph_menu", "graph_ctx", "project_dialog", "graph_import_dialog", "xyz_dialog")
+
+
+    def poll_view_mode(self):
+        """The 3-D view is remade when what it should draw changes: A/B
+        started or stopped, the GPU view switched, a surface's kind or grid."""
+        sg = self.surface_geom() if self.gpu_points_active() else None
+        want = (self.gpu_cube_active(), self.gpu_points_active(), (sg.kind, sg.w, sg.h) if sg is not None else None)
+        if want != getattr(self, "_gpu_was", None):
+            self._gpu_was = want
+            self.request_layout()
+
+    def compute_holes(self):
+        """The screen rectangles of everything drawn over the panes - every
+        window but the root, the file dialogs, the FLOATING list, the open
+        menus - for the gradient frames and every viewport overlay."""
+        # Every window that floats over the panes is a hole in the frames:
+        # every Dear PyGui window but the root (asked for each time, so a
+        # dialog added later is covered), the file dialogs (found once),
+        # and the FLOATING list for anything else.
+        holes = []
+        if self._file_dialogs is None:
+            self._file_dialogs = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("mvFileDialog")]
+        tags = self._hole_tags()
+        # An open menu is an ImGui popup, not a window: it is found by its
+        # items being visible, and its box is theirs plus the padding.
+        if self._menus is None or any(not dpg.does_item_exist(m) for m in self._menus):
+            self._menus = [i for i in dpg.get_all_items() if dpg.get_item_type(i).endswith("::mvMenu")]
+        # An open menu reports its popup's size (closed, zero) and its own
+        # label's position: a top menu's popup hangs under the menu bar at
+        # that x, a submenu's opens to the right of its parent's popup at
+        # the item's height. Menus come parents first, so a parent's box is
+        # known by the time its child is looked at.
+        bar_bottom = (dpg.get_item_rect_min("toolbar")[1] - 8) if dpg.does_item_exist("toolbar") else 24
+        vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+        boxes = {}
+        for m in self._menus:
+            st = dpg.get_item_state(m)
+            w, h = st.get("rect_size") or (0, 0)
+            if w <= 0 or h <= 0:
+                continue
+            px, py = st.get("pos") or (0, 0)
+            parent = boxes.get(dpg.get_item_parent(m))
+            if parent is None:
+                x0, y0 = px - 2, bar_bottom
+            else:
+                x0, y0 = parent[2] - 8, parent[1] + py - 6
+                if x0 + w > vw - glow.POPUP_PAD:         # no room to the right: ImGui opens it to the left
+                    x0 = parent[0] - w + 8
+            # ImGui keeps a popup inside the window, so one taller than the room under it is moved up (a long list,
+            # File > Open graph's, rose over the item it hangs from and the frames ran through its top)
+            x0, y0 = glow.clamp_popup(x0, y0, w, h, vw, vh)
+            boxes[m] = (x0, y0, x0 + w, y0 + h)
+            holes.append((x0 - 2, y0 - 2, x0 + w + 2, y0 + h + 2))
+        for tag in tags:
+            if dpg.does_item_exist(tag) and dpg.is_item_shown(tag):
+                hole = self._window_hole(tag)
+                if hole:
+                    holes.append(hole)
+        return holes
+
+    def _hole_tags(self):
+        """The windows that can float over the panes, once each: get_windows() also lists every theme, font
+        and handler registry and drawlist (160 items for 53 windows), and the file dialogs and FLOATING named
+        some again - a visibility check each, every frame, was 2 ms of it. Kept until the item count changes."""
+        wins = dpg.get_windows()
+        key = (len(wins), len(self._file_dialogs or []), len(self.FLOATING))
+        if getattr(self, "_hole_key", None) != key:
+            seen, out = set(), []
+            real = [w for w in wins if dpg.get_item_type(w).endswith(("::mvWindowAppItem", "::mvFileDialog"))]
+            for t in real + list(self._file_dialogs or []) + list(self.FLOATING):
+                i = dpg.get_alias_id(t) if isinstance(t, str) and dpg.does_alias_exist(t) else t
+                if i in seen or not dpg.does_item_exist(i) or dpg.get_item_alias(i) == "root":
+                    continue
+                seen.add(i); out.append(dpg.get_item_alias(i) or i)   # by tag where it has one: one made again keeps it
+            self._hole_key, self._hole_list = key, out
+        return self._hole_list
+
+    @staticmethod
+    def _window_hole(tag):
+        """A shown window's rectangle as a hole, with a frame's border and
+        rounding round it - or None before it has a size."""
+        placed = room.placed(tag)
+        if placed:
+            x, y, w, h = placed
+            return (x - 2, y - 2, x + w + 3, y + h + 3)
+        st = dpg.get_item_state(tag)
+        w, h = st.get("rect_size") or (0, 0)
+        if w <= 0 or h <= 0:
+            cfg = dpg.get_item_configuration(tag)      # a window not yet measured: its set size
+            w, h = cfg.get("width") or 0, cfg.get("height") or 0
+        if w <= 0 or h <= 0:
+            return None
+        x, y = dpg.get_item_pos(tag)
+        return (x - 2, y - 2, x + w + 3, y + h + 3)
+
+    def _host_hole(self, tag):
+        """The hole of the window a pane floats in (the 3-D view over the
+        graph is in pip_win), or None for a pane among the panes. Every
+        frame keeps off that window but the pane's own, which is drawn round
+        the window itself: cut by it, only scraps of the glow were left. A
+        pane that is a window of its own (a frame in the dock: the library,
+        the sequence...) is its own host - from its parent on, its frame was
+        cut by itself, 4 of its 48 pieces left and a sliver at its left."""
+        item = tag if dpg.does_item_exist(tag) else None
+        while item is not None:
+            if dpg.get_item_type(item).endswith("::mvWindowAppItem"):
+                return None if dpg.get_item_alias(item) == "root" else self._window_hole(item)
+            item = dpg.get_item_parent(item)
+        return None
+
+    def poll_glow(self):
+        """The frames (an accent outline, or a gradient): the pane in focus,
+        and the selected nodes (clipped to the editor). None while
+        presenting, or while a menu is up over the graph - the frame would
+        draw over it."""
+        if self.frames is None:
+            return
+        rects = []
+        if self._picker is not None and not dpg.does_item_exist(self._picker):
+            self._picker = None
+        if self.ui and self._picker is None:
+            shown = [t for t in ("graph_win", "edit_win", "net_win", "cube_win", "side_win") + self.docked_tags()
+                     if dpg.does_item_exist(t) and dpg.is_item_shown(t)]
+            if self.focus not in shown:                  # a docked frame clicked in keeps it (it was taken back each frame)
+                self.focus = shown[0] if shown else None
+            if self.focus:
+                r = self._screen_rect(self.focus)
+                if r:
+                    rects.append(r + (None, 0.55, "focus", glow.RADIUS, self._host_hole(self.focus)))
+            pane = self._screen_rect("graph_win")
+            if self.layout == "graph" and self.gp.graph and pane and dpg.does_item_exist("node_editor") \
+                    and not (dpg.is_item_shown("graph_menu") or dpg.is_item_shown("graph_ctx")):
+                # The editor reports no position of its own; it is the
+                # bottom of its pane, its height from its size.
+                eh = dpg.get_item_rect_size("node_editor")[1]
+                clip = (pane[0] + 9, pane[3] - 9 - eh, pane[2] - 9, pane[3] - 9)
+                pad = self.gp.px(8)
+                sel = self.gp._selected()
+                boxes, ids = [], []                  # ids beside the boxes: a node skipped (scrolled out, folded)
+                for nid in sel:                      # shifted every pairing after it, and the frames jumped
+                    tag = f"gnode_{nid}"
+                    if not dpg.does_item_exist(tag):
+                        continue
+                    st = dpg.get_item_state(tag)
+                    (x0, y0), (x1, y1) = st.get("rect_min", (0, 0)), st.get("rect_max", (0, 0))
+                    if x1 > x0 and y1 > y0:          # the content rect; the node is a padding wider
+                        boxes.append((x0 - pad, y0 - pad, x1 + pad, y1 + pad)); ids.append(nid)
+                # A node's rectangle is last frame's; while it is being
+                # dragged the frame would trail it by a frame, so the mouse's
+                # movement since then is added - imnodes moves the selection
+                # by exactly that. Selected nodes are drawn on top, so
+                # nothing but a window ever covers their frames.
+                mx, my = dpg.get_mouse_pos(local=False)
+                now = {n: b for n, b in zip(ids, boxes)}
+                moved = any(self._glow_rects.get(n) not in (None, b) for n, b in now.items())
+                if moved and (self.gp.dragging_nodes() or self.gp.panning()) and self._glow_mouse is not None:
+                    # only once the nodes really are moving: a press on a
+                    # node's slider, or a middle click that pans nothing,
+                    # moves the pointer and not the graph
+                    dx, dy = mx - self._glow_mouse[0], my - self._glow_mouse[1]
+                    boxes = [(x0 + dx, y0 + dy, x1 + dx, y1 + dy) for x0, y0, x1, y1 in boxes]
+                self._glow_rects = now
+                self._glow_mouse = (mx, my)
+                # boxes that overlap merge into one frame round the group
+                boxes = self._merge_boxes(boxes)
+                if len(boxes) > 3:
+                    boxes = [(min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))]
+                for x0, y0, x1, y1 in boxes:
+                    # the node's corners are rounded 4 at this zoom; the frame's hug them
+                    rects.append((x0, y0, x1, y1, clip, 1.0, "sel", self.gp.px(4) if len(boxes) == 1 and len(sel) == 1 else glow.RADIUS))
+        holes = self.compute_holes()
+        self.frames.update(rects, holes)
+        # Every overlay drawn on the viewport (the wiring on the net, the shape
+        # editor's rings, the reference wireframes) keeps off the same holes:
+        # anything floating over the panes is not to be drawn on.
+        self._holes = holes

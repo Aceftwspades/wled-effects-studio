@@ -31,12 +31,15 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       a graph that is not scriptable) catch exactly that and stay quiet.
 
 ## 3. Split the largest files (maintainability)
-- [ ] `graph_ui.py` (5,300 lines), `app.py` (4,300), `sequence_ui.py` (3,800): one responsibility per module.
+- [x] `graph_ui.py` (5,300 lines), `app.py` (4,300), `sequence_ui.py` (3,800): one responsibility per module.
       Done: `sequence_ui.py` to 2,580, its sending (`seq_send`), audio tracks (`seq_audio`), sections
       (`seq_sections`), timecode (`seq_timecode`) and automation recording (`seq_record`) in modules of their own.
       `graph_ui.py` to 2,490: its add menu, node actions, field widgets (modulation ranges, XY pads, colour ramps),
       overlays, problems and sub-graphs as mixins of `GraphPanel` (`graph_addmenu`, `graph_actions`, `graph_fieldkit`,
       `graph_overlays`, `graph_problems`, `graph_subs`), beside the five it already had.
+      `app.py` to 2,100: where the panes sit (`app_layout`), the mouse and keys (`app_input`), the code pane's tools
+      (`app_code`) and projects (`app_projects`) as mixins of `App`; they never import `native.app`, which runs as
+      `__main__` (a second copy), so its shared sizes moved to `app_layout`.
 
 ## 4. Measure, then speed up (speed)
 - [ ] **A frame-time overlay**: milliseconds per frame for the engine, each VJ deck, MilkDrop, thumbnails, the UI.
