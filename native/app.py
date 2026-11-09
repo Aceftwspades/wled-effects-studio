@@ -64,6 +64,7 @@ from native import scratch
 from native.remote import SHOT_DIR, SHOT_REQ, SHOT_PNG, CMD_FILE, REMOTE, service_capture, service_command
 import shutil
 import sys
+from native import vj_state
 
 STEP = 23
 CUBE_MAX = 620          # cube render cost is quadratic in this, so it is capped
@@ -1065,7 +1066,7 @@ class App(Features, Recorder, EditBuild):
         except Exception:
             import traceback
             traceback.print_exc()
-        if getattr(self, "_vj_by_show", False):
+        if vj_state.of(self).by_show:
             vj.restore_desk(self)
             self.project.save()                          # the desk, not the step's decks, is what it keeps
         vj_ui._flush_save(self, now=True)

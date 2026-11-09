@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from native import clock, modulate as mo
+from native import clock, modulate as mo, vj_state
 
 fails = []
 
@@ -463,7 +463,7 @@ try:
     for _ in range(int(20 / frame)):
         clock.step(frame - gap)
         k = int((clock.now() - t0) // spb)
-        app._vj_at, app._vj_grid_beat_at = clock.now(), t0 + k * spb      # the VJ's frame: its last grid beat
+        vj_state.of(app).at, vj_state.of(app).grid_beat_at = clock.now(), t0 + k * spb      # the VJ's frame: its last grid beat
         beats.add(k)
         clock.step(gap)
         mo.apply(app)
@@ -471,7 +471,7 @@ try:
         fired += now_up and not up
         up = now_up
     check(fired == len(beats) - 1, f"the grid's beats, set before the modulators run: each fired ({fired} of {len(beats) - 1})")
-    del app._vj_at, app._vj_grid_beat_at
+    del vj_state.of(app).at, vj_state.of(app).grid_beat_at
     mo.modulators(app).clear()
     mo.apply(app)
     # a sound level that is not a number: silence, not full

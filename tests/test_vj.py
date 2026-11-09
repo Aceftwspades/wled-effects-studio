@@ -12,7 +12,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 
-from native import clock, geometry, vj, vj_looks
+from native import clock, geometry, vj, vj_looks, vj_state
 
 fails = []
 
@@ -92,15 +92,15 @@ o["decks"][1].update(look="Thermal")
 o["fader"] = 0.0
 vj.update(app, 1 / 40)
 a = vj.deck_led(app, 0)
-check(np.array_equal(app._vj_out, a), "fader at 0: deck A alone")
+check(np.array_equal(vj_state.of(app).out, a), "fader at 0: deck A alone")
 o["fader"] = 1.0
 vj.update(app, 1 / 40)
-check(np.array_equal(app._vj_out, vj.deck_led(app, 1)), "fader at 1: deck B alone")
+check(np.array_equal(vj_state.of(app).out, vj.deck_led(app, 1)), "fader at 1: deck B alone")
 eff = np.full((g.h, g.w, 3), 9, np.uint8)
 o["on"] = False
 check(vj.picture(app, eff) is eff, "off air: the effect's picture")
 o["on"] = True
-check(vj.picture(app, eff) is app._vj_out, "on air: the VJ's")
+check(vj.picture(app, eff) is vj_state.of(app).out, "on air: the VJ's")
 
 # auto-mix on the bars, held clock
 clock.hold()
@@ -108,11 +108,11 @@ try:
     o["auto"].update(mix="bars", bars=1, shuffle=True)
     o["fader"] = 0.0
     look_b = o["decks"][1]["look"]
-    app._vj_beats = 0.0
+    vj_state.of(app).beats = 0.0
     for _ in range(int(3.4 * 40)):                                 # 3.4 s at 120 bpm: the first bar (2 s) and its sweep (1 s)
         clock.step(1 / 40)
         vj.update(app, 1 / 40)
-    check(o["fader"] == 1.0 and app._vj_sweep is None, f"a bar on: swept to deck B ({o['fader']})")
+    check(o["fader"] == 1.0 and vj_state.of(app).sweep is None, f"a bar on: swept to deck B ({o['fader']})")
     check(o["decks"][0]["look"] != "Plasma", "shuffled: the deck the mix left dealt a new look")
     o["auto"].update(mix="off", shuffle=False)
     vj.go(app, 0.0)
@@ -186,7 +186,7 @@ snap["mods"][str(hand["id"])] = {"on": False, "depth": 20}
 vj.apply_step(app, {"vj": snap, "trans": 0.0})
 e = modulate._eff(app, hand)
 check(not e["on"] and e["depth"] == 20 and hand["on"] and hand["depth"] == 90, "played: off and 20 deep, its own kept")
-desk_look = app._vj_desk["decks"][0]["look"]
+desk_look = vj_state.of(app).desk["decks"][0]["look"]
 o["decks"][0]["look"] = "Warp" if desk_look != "Warp" else "Plasma"      # the step's deck A, other than the desk's
 saved = app.project.save_view(app.project.options)
 check(saved["vj"]["decks"][0]["look"] == desk_look and o["decks"][0]["look"] != desk_look,
@@ -287,7 +287,7 @@ o["decks"][0].update(look="Plasma", speed=1.0, amount=0.5)
 # the desk put back when the show lets the VJ go
 o["decks"][0]["look"] = "Warp"
 o["on"] = False
-app._vj_by_show = False
+vj_state.of(app).by_show = False
 vj.apply_step(app, {"vj": {"decks": vj.json_copy(o["decks"]), "fader": 1.0}, "trans": 0.0})
 o["decks"][0]["look"] = "Tunnel"                                   # the show's VJ steps change it
 vj.restore_desk(app)
@@ -296,16 +296,16 @@ check(o["decks"][0]["look"] == "Warp" and not o["on"] and o["fader"] == 0.0, "th
 # a step's blend into the VJ: the picture before blended into the VJ's
 clock.hold()
 try:
-    app._vj_last_pic = np.full((g.h, g.w, 3), 200, np.uint8)
+    vj_state.of(app).last_pic = np.full((g.h, g.w, 3), 200, np.uint8)
     vj.update(app, 1 / 40)
     vj.apply_step(app, {"vj": vj.snapshot(app), "trans": 1.0})
     vj.update(app, 1 / 40)
     clock.step(0.5)
     half = vj.picture(app, np.zeros((g.h, g.w, 3), np.uint8)).astype(int)
-    want = (200 + app._vj_out.astype(int)) / 2
+    want = (200 + vj_state.of(app).out.astype(int)) / 2
     check(np.abs(half - want).max() <= 2, "half way through a step's blend: half the picture before")
     clock.step(0.6)
-    check(np.array_equal(vj.picture(app, np.zeros((g.h, g.w, 3), np.uint8)), app._vj_out), "the blend done: the VJ's")
+    check(np.array_equal(vj.picture(app, np.zeros((g.h, g.w, 3), np.uint8)), vj_state.of(app).out), "the blend done: the VJ's")
     vj.restore_desk(app)
 finally:
     clock.release()
@@ -314,7 +314,7 @@ def opened(app, wait=3.0):
     """The VJ run until the sources its decks want have opened (on workers) and are in the pool."""
     end = time.time() + wait
     vj.update(app, 1 / 40)
-    while time.time() < end and app.__dict__.get("_vj_opening"):
+    while time.time() < end and vj_state.of(app).opening:
         time.sleep(0.01)
         vj.update(app, 1 / 40)
     vj.update(app, 1 / 40)
@@ -325,7 +325,7 @@ o["decks"][0].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="tes
 o["decks"][1].update(look="Thermal", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
 o["fader"] = 0.5
 opened(app)
-check(len(vj._pool(app)) == 1 and not app.__dict__.get("_vj_opening"), f"one source for two decks, opened on a "
+check(len(vj._pool(app)) == 1 and not vj_state.of(app).opening, f"one source for two decks, opened on a "
       f"worker ({len(vj._pool(app))})")
 o["decks"][1]["source"]["kind"] = "none"
 vj.update(app, 1 / 40)
@@ -337,7 +337,7 @@ check(len(vj._pool(app)) == 0, "neither: closed")
 # bars counted on the tempo, kept on the beats heard
 clock.hold()
 try:
-    app._vj_hits = 0
+    vj_state.of(app).hits = 0
     b0 = vj.bar_count(app)[0]
     for k in range(9):
         app.last_hit_at = clock.now()
@@ -355,7 +355,7 @@ o["fader"] = 0.5
 vj.update(app, 1 / 40)
 a, b = vj.deck_led(app, 0), vj.deck_led(app, 1)
 from native import transition
-check(np.array_equal(app._vj_out, transition.blend(a, b, 0.5, "swipe right")), "a wipe in place of the blend")
+check(np.array_equal(vj_state.of(app).out, transition.blend(a, b, 0.5, "swipe right")), "a wipe in place of the blend")
 o["wipe"] = "blend"
 d = o["decks"][0]
 d.update(look="Plasma", react={"to": "bass", "what": "amount", "depth": 1.0})
@@ -392,7 +392,7 @@ was = o["decks"][1]["amount"]
 modulate._set(app, "vj1.amount", 51)
 check(abs(vj.knob_value(app, 1, "amount") - 0.2) < 1e-3 and o["decks"][1]["amount"] == was,
       "and moves it - over the knob, the knob (what is saved) left where it was set")
-app._vj_mod = {}
+vj_state.of(app).mod = {}
 
 # a list of video files: the next one, its key with speed and in and out
 s = o["decks"][0]["source"]
@@ -437,22 +437,22 @@ check(not vj._runs(app)[0].error and vj._runs(app)[0].canvas.shape == (48, 64, 3
 o["canvas"] = "96x72"
 
 # a VJ step shown in the sim (not played): its decks are the desk's, nothing kept to go back to
-app._vj_by_show, app._vj_desk = False, None
+vj_state.of(app).by_show, vj_state.of(app).desk = False, None
 o["decks"][0]["look"] = "Warp"
 snap = vj.snapshot(app)
 snap["decks"][0]["look"] = "Voronoi"
 o["on"] = False
 vj.apply_step(app, {"vj": snap}, playing=False)
-check(o["on"] and o["decks"][0]["look"] == "Voronoi" and not app._vj_by_show, "a VJ step loaded: the desk's now")
+check(o["on"] and o["decks"][0]["look"] == "Voronoi" and not vj_state.of(app).by_show, "a VJ step loaded: the desk's now")
 vj.apply_step(app, {"segments": []}, playing=False)
 check(o["on"] and o["decks"][0]["look"] == "Voronoi", "a plain step loaded after it: the desk left alone")
 
 # another project: the show's desk and the bred flames let go
 o["decks"][0]["look"] = "Flame: Coral"
 bred = vj.mutate_flame(app, 0)
-app._vj_by_show, app._vj_desk = True, {"on": False}
+vj_state.of(app).by_show, vj_state.of(app).desk = True, {"on": False}
 vj.project_changed(app)
-check(not app._vj_by_show and app._vj_desk is None, "another project: the show's desk let go")
+check(not vj_state.of(app).by_show and vj_state.of(app).desk is None, "another project: the show's desk let go")
 app.project.options["vj"]["flames"] = {}
 vj.project_changed(app)
 check(bred not in vj_looks.LOOKS, "another project: the last one's bred flames unlisted")
@@ -494,17 +494,17 @@ o["decks"][1].update(look="Thermal", level=1.0, source=vj.json_copy(vj.SOURCE))
 o["decks"][2].update(look="Metaballs", level=0.0, source=vj.json_copy(vj.SOURCE))
 o.update(fader=0.0, wipe="blend", c_mode="screen")
 vj.update(app, 1 / 40)
-a_only = app._vj_out.copy()
+a_only = vj_state.of(app).out.copy()
 check(np.array_equal(a_only, vj.deck_led(app, 0)), "deck C at 0: the mix as it was")
 o["decks"][2]["level"] = 1.0
 vj.update(app, 1 / 40)
 c_led = vj.deck_led(app, 2)
 want = np.clip(255 - (255 - vj.deck_led(app, 0).astype(np.float32)) * (255 - c_led.astype(np.float32)) / 255 + 0.5, 0, 255)
-check(np.abs(app._vj_out.astype(int) - want.astype(int)).max() <= 2, "deck C screened over the mix at its level")
+check(np.abs(vj_state.of(app).out.astype(int) - want.astype(int)).max() <= 2, "deck C screened over the mix at its level")
 o["decks"][2]["level"] = 0.0
 o["decks"][0]["level"] = 0.5
 vj.update(app, 1 / 40)
-check(np.abs(app._vj_out.astype(int) - vj.deck_led(app, 0).astype(int) // 2).max() <= 1, "deck A at half its level")
+check(np.abs(vj_state.of(app).out.astype(int) - vj.deck_led(app, 0).astype(int) // 2).max() <= 1, "deck A at half its level")
 o["decks"][0]["level"] = 1.0
 
 # the cue: the deck off the mix
@@ -632,23 +632,23 @@ o["auto"]["shuffle_from"] = "any"
 # the auto-mix's bars outside a show: the tempo's count, kept on the beats heard, an off-beat not counted
 app.project.options["sequence"]["bpm"] = 120.0                     # a beat every 0.5 s
 clock.hold()
-app._vj_beats, app.last_hit_at = 0.1, None                          # a tenth of a beat out to start with
-app.__dict__.pop("_vj_downbeat", None)
+vj_state.of(app).beats, app.last_hit_at = 0.1, None                          # a tenth of a beat out to start with
+vj_state.of(app).take("downbeat")
 e = 1.0
 for f in range(1200):                                              # 20 s at 60 frames a second
     now = clock.now()
-    app._vj_beats += (1 / 60) * 2.0
+    vj_state.of(app).beats += (1 / 60) * 2.0
     hit = (f % 30 == 0) or (f % 30 == 15 and f % 60 == 15)          # every beat, and every other off-beat
     if hit:
         app.last_hit_at = now
     vj._keep_count(app, now, hit)
     if f % 30 == 0:
-        e = app._vj_beats - round(app._vj_beats)                   # where the count is on a beat of the music
+        e = vj_state.of(app).beats - round(vj_state.of(app).beats)                   # where the count is on a beat of the music
     clock.step(1 / 60)
 check(abs(e) < 0.03, f"the count pulled onto the beats heard, the off-beats left out (a beat out by {e:+.3f})")
-app._vj_downbeat = clock.now()                                     # a tap: a bar's first beat here
+vj_state.of(app).downbeat = clock.now()                                     # a tap: a bar's first beat here
 vj._keep_count(app, clock.now(), False)
-check(abs(app._vj_beats / 4 - round(app._vj_beats / 4)) < 1e-6, "a tap's first tap: a bar's first beat")
+check(abs(vj_state.of(app).beats / 4 - round(vj_state.of(app).beats / 4)) < 1e-6, "a tap's first tap: a bar's first beat")
 clock.release()
 
 # a video file while the clock is held (a render): a frame of the file for each frame of the clock
@@ -680,13 +680,13 @@ o["pulse"] = "grid"
 clock.hold()
 now = clock.now()
 app.last_hit_at = now                                              # music heard
-app._vj_beats = 9.0
+vj_state.of(app).beats = 9.0
 mid, _ = vj._beat(app, now, False)
-app._vj_beats = 9.0 + 0.07 / 0.5                                   # 70 ms after it (at 120 bpm)
+vj_state.of(app).beats = 9.0 + 0.07 / 0.5                                   # 70 ms after it (at 120 bpm)
 top, _ = vj._beat(app, now, False)
-app._vj_beats = 9.6
+vj_state.of(app).beats = 9.6
 _, hit_off = vj._beat(app, now, True)                              # a heard off-beat: no beat lands
-app._vj_beats = 10.01
+vj_state.of(app).beats = 10.01
 _, hit_on = vj._beat(app, now, False)
 check(abs(mid - 0.5) < 0.02 and top > 0.99 and not hit_off and hit_on,
       f"the pulse on the grid: half-way up on the beat ({mid:.2f}), at the top just after ({top:.2f}), a beat on "
@@ -701,12 +701,12 @@ o["pulse"] = "grid"
 # Cut and Fade on the next bar
 o["quant"], o["fader"] = "bar", 0.0
 app.last_hit_at = clock.now()
-app._vj_beats = 10.5
+vj_state.of(app).beats = 10.5
 waits = vj.launch(app, 0.0)
-app._vj_beats = 11.9
+vj_state.of(app).beats = 11.9
 vj._launch_due(app)
 early = o["fader"]
-app._vj_beats = 12.0
+vj_state.of(app).beats = 12.0
 vj._launch_due(app)
 check(waits == "the next bar" and early == 0.0 and o["fader"] == 1.0, "a Cut on the next bar: waits, then goes on it")
 o["quant"] = "now"
@@ -739,7 +739,7 @@ check("fx_set" in vj.PRESET_KEYS, "kept with a preset")
 # a deck off the mix with video: its source rolls on, so it has a picture the moment it is cut to
 o["fader"] = 0.0
 o["decks"][1].update(look="Clean", source=vj.json_copy(dict(vj.SOURCE, kind="test")))
-app._vj_preview = ()
+vj_state.of(app).preview = ()
 vj._runs(app)[1].video = None
 for _ in range(3):
     vj.update(app, 1 / 30)
@@ -750,19 +750,19 @@ vj.update(app, 1 / 30)
 # the next deck up keeps running off the mix: a cut to a feedback look lands on its picture, not on black
 o["fader"] = 0.0
 o["decks"][1].update(look="Drop: Nebula", level=1.0, source=vj.json_copy(vj.SOURCE))
-app._vj_preview = ()
+vj_state.of(app).preview = ()
 vj._runs(app)[1].state = {}
 for _ in range(40):
     vj.update(app, 1 / 30)
 vj.cut(app)
 vj.update(app, 1 / 30)
-warm = float(app._vj_out.mean())
+warm = float(vj_state.of(app).out.mean())
 o["fader"] = 0.0
 vj._runs(app)[1].state = {}                                        # the same cut to a look started from nothing
 vj._runs(app)[1].look = None
 vj.cut(app)
 vj.update(app, 1 / 30)
-cold = float(app._vj_out.mean())
+cold = float(vj_state.of(app).out.mean())
 check(warm > 2.0 * cold, f"a cut to a MilkDrop look kept running: its picture at once ({warm:.1f} against {cold:.1f} cold)")
 vj.close(app)
 
@@ -799,23 +799,23 @@ clock.step(2 * beat)
 vj._c_update(app)
 check(abs(o["decks"][2]["level"] - 0.3) < 1e-6, "deck C's level by hand: its In let go")
 o["decks"][2]["level"], o["quant"] = 0.0, "bar"
-app._vj_beats = 20.5
+vj_state.of(app).beats = 20.5
 waits = vj.c_launch(app, "in")
 vj._c_update(app)
 early = o["decks"][2]["level"]
 o["c_fade"] = 0.0
-app._vj_beats = 24.0
+vj_state.of(app).beats = 24.0
 vj._c_update(app)
 check(waits == "the next bar" and early == 0.0 and o["decks"][2]["level"] == 0.8, "deck C's In waits for the next bar")
 o["quant"] = "now"
 o["auto"].update(c="bars", c_bars=1)
 o["decks"][2]["level"] = 0.0
-app._vj_beats = 28.5
+vj_state.of(app).beats = 28.5
 vj._c_update(app)
-app._vj_beats = 32.1
+vj_state.of(app).beats = 32.1
 vj._c_update(app)
 inn = o["decks"][2]["level"]
-app._vj_beats = 36.1
+vj_state.of(app).beats = 36.1
 vj._c_update(app)
 check(inn == 0.8 and o["decks"][2]["level"] == 0.0, "deck C by itself: in for a bar, out for a bar")
 o["auto"]["c"] = "off"
@@ -922,17 +922,17 @@ clock.hold()
 o["quant"] = "now"
 o["fader"] = 0.0
 o["decks"][0].update(look="Flame: Sierpinski", mutate_bars=1, breathe=0, morph=0.0, morph_to="", level=1.0)
-app._vj_preview = ()
+vj_state.of(app).preview = ()
 vj.update(app, 1 / 30)
-app._vj_beats = 40.0
+vj_state.of(app).beats = 40.0
 child = vj.mutate_flame(app, 0)
 check(child and o["decks"][0]["morph_to"] == child and o["decks"][0]["look"] == "Flame: Sierpinski",
       f"Mutate over a bar: the deck becoming {child}")
-app._vj_beats = 42.0
+vj_state.of(app).beats = 42.0
 vj.update(app, 1 / 30)
 half = o["decks"][0]["morph"]
 state = vj._runs(app)[0].state
-app._vj_beats = 44.01
+vj_state.of(app).beats = 44.01
 vj.update(app, 1 / 30)
 vj.update(app, 1 / 30)
 check(0.4 < half < 0.6 and o["decks"][0]["look"] == child and o["decks"][0]["morph_to"] == "" and
@@ -940,14 +940,14 @@ check(0.4 < half < 0.6 and o["decks"][0]["look"] == child and o["decks"][0]["mor
       f"halfway at half a bar ({half}), then handed over: the same picture going on, no blend")
 # breathing: there and back
 to = vj.set_breathe(app, 0, 1)
-app._vj_beats = 48.0
+vj_state.of(app).beats = 48.0
 vj.update(app, 1 / 30)
 m0 = o["decks"][0]["morph"]
-app._vj_beats = 50.0
+vj_state.of(app).beats = 50.0
 vj.update(app, 1 / 30)
 m1 = o["decks"][0]["morph"]
 check(to and m0 < 0.01 and m1 > 0.99, f"breathing every bar: itself on the bar, the child halfway ({m0}, {m1})")
-app._vj_beats = 49.0
+vj_state.of(app).beats = 49.0
 vj.update(app, 1 / 30)
 kept = vj.keep_morph(app, 0)
 check(kept and o["decks"][0]["look"] == kept and kept in o["flames"] and not o["decks"][0]["morph_to"] and
@@ -1028,45 +1028,45 @@ keep = (sequence_ui.position, sequence_ui._steps)
 o = vj.options(app)
 o["auto"].update(mix="bars", bars=4)
 o["quant"] = "bar"
-app._vj_beats, app._seq_play, app._vj_sweep = 1000.3, None, None
+vj_state.of(app).beats, app._seq_play, vj_state.of(app).sweep = 1000.3, None, None
 vj.update(app, 1 / 40)
 vj.launch(app, 0.0)
-check(app._vj_pending is not None and app._vj_pending[0] == 1004.0, "a Cut waiting for the tempo's next bar")
+check(vj_state.of(app).pending is not None and vj_state.of(app).pending[0] == 1004.0, "a Cut waiting for the tempo's next bar")
 try:
     sequence_ui.position = lambda a: 1.0
     sequence_ui._steps = lambda a: {"bpm": 120, "first": 0.0, "bar": 4, "steps": []}
     app._seq_play = 1
     vj.update(app, 1 / 40)
-    check(app._vj_sweep is None and app._vj_pending is not None and app._vj_pending[0] == 4.0,
-          f"the show started at its beat 2: no fade for the jump, the Cut waits for its bar 4 ({app._vj_pending})")
+    check(vj_state.of(app).sweep is None and vj_state.of(app).pending is not None and vj_state.of(app).pending[0] == 4.0,
+          f"the show started at its beat 2: no fade for the jump, the Cut waits for its bar 4 ({vj_state.of(app).pending})")
 finally:
     sequence_ui.position, sequence_ui._steps = keep
     app._seq_play = None
 o["auto"]["mix"], o["quant"] = "off", "now"
-app._vj_pending = None
+vj_state.of(app).pending = None
 # a project switched: a Cut waiting in the last one does not go off in the next
 o["quant"] = "bar"
 vj.launch(app, 0.0)
 vj.project_changed(app)
-check(getattr(app, "_vj_pending", None) is None, "another project: the Cut waiting is let go")
+check(vj_state.of(app).pending is None, "another project: the Cut waiting is let go")
 vj.options(app)["quant"] = "now"
 # four decks in a hand-made project: only A, B and C kept (a fourth crashed every frame)
 vj.options(app)["decks"].append(vj.json_copy(vj.options(app)["decks"][0]))
 check(len(vj.options(app)["decks"]) == 3, "a fourth deck dropped")
 # a show step and the desk put back: deck C's fade from before let go (it wrote over the step's level)
-app._vj_csweep, app._vj_cpending = (0.0, 1.0, 0.0, 16.0), (8.0, "in")
+vj_state.of(app).csweep, vj_state.of(app).cpending = (0.0, 1.0, 0.0, 16.0), (8.0, "in")
 vj.apply_step(app, {"vj": vj.snapshot(app), "trans": 0.0})
-check(app._vj_csweep is None and app._vj_cpending is None, "a VJ step: deck C's fade and waiting press let go")
-app._vj_csweep = (0.0, 1.0, 0.0, 16.0)
+check(vj_state.of(app).csweep is None and vj_state.of(app).cpending is None, "a VJ step: deck C's fade and waiting press let go")
+vj_state.of(app).csweep = (0.0, 1.0, 0.0, 16.0)
 vj.restore_desk(app)
-check(app._vj_csweep is None, "the desk back: the step's deck C fade let go")
+check(vj_state.of(app).csweep is None, "the desk back: the step's deck C fade let go")
 # a preset loaded while a Mutate grows on the deck: the preset's look kept when the morph would have ended
 vj.options(app)["presets"]["plain"] = {"look": "Plasma"}
 vj.options(app)["decks"][0].update(morph_to="Flame: Coral", morph=0.4)
-app._vj_morphs = {0: (0.0, 4.0)}
+vj_state.of(app).morphs = {0: (0.0, 4.0)}
 vj.load_preset(app, 0, "plain")
 d0 = vj.options(app)["decks"][0]
-check(0 not in app._vj_morphs and d0["morph_to"] == "" and d0["look"] == "Plasma", "a preset mid-Mutate: the morph let go")
+check(0 not in vj_state.of(app).morphs and d0["morph_to"] == "" and d0["look"] == "Plasma", "a preset mid-Mutate: the morph let go")
 
 clock.release()
 
@@ -1082,7 +1082,7 @@ vj.apply_step(a1, {"vj": {"decks": vj.json_copy(o1["decks"]), "fader": 0.0}, "tr
 for _ in range(90):
     vj.update(a1, 1 / 30)
     time.sleep(0.01)
-check(a1._vj_pending is None and o1["fader"] == 0.0, f"a Cut waiting when a step lands: let go ({o1['fader']})")
+check(vj_state.of(a1).pending is None and o1["fader"] == 0.0, f"a Cut waiting when a step lands: let go ({o1['fader']})")
 vj.restore_desk(a1)
 vj.close(a1)
 # a Mutate growing when a step takes the desk: the desk kept with it grown, not frozen part-way
@@ -1099,7 +1099,7 @@ st2["vj"]["decks"][0].update(look="Plasma", morph_to="", morph=0.0)
 vj.apply_step(a2, st2, playing=True)
 vj.restore_desk(a2)
 d2 = o2["decks"][0]
-check(d2["look"] == child and d2["morph_to"] == "" and not a2._vj_morphs, f"a Mutate a step cut short: grown ({d2['look']})")
+check(d2["look"] == child and d2["morph_to"] == "" and not vj_state.of(a2).morphs, f"a Mutate a step cut short: grown ({d2['look']})")
 vj.close(a2)
 # a damaged project's VJ settings: put right, not failing every frame
 for what, bad in (("react null", {"decks": [{"react": None}]}), ("source null", {"decks": [{"source": None}]}),
@@ -1132,7 +1132,7 @@ Image.fromarray(px_).save(pic)
 o4["decks"][0].update(look="Image", image=pic, pic_drift=0.0)
 vj.update(a4, 1 / 30)
 c0 = vj._runs(a4)[0].canvas.copy()
-a4._vj_mod = {(0, "pic_scale"): 4.0, (0, "pic_rot"): 90.0}
+vj_state.of(a4).mod = {(0, "pic_scale"): 4.0, (0, "pic_rot"): 90.0}
 vj.update(a4, 1 / 30)
 check(not np.allclose(c0, vj._runs(a4)[0].canvas), "a modulator on the picture's scale and turn: it moves")
 vj.close(a4)
@@ -1611,7 +1611,7 @@ oj.update(on=True, fader=0.0)
 vj.update(aj, 1 / 30)
 clock.hold()
 clock.step(6.0)                                              # the render six seconds ahead of real time
-aj._vj_sweep = (clock.now(), 1.0, 0.0, 1.0)
+vj_state.of(aj).sweep = (clock.now(), 1.0, 0.0, 1.0)
 clock.step(0.3)
 vj.update(aj, 1 / 30)
 mid = oj["fader"]
@@ -1646,7 +1646,7 @@ try:
             time.sleep(0.025), np.zeros((c.h, c.w, 3), np.float32))[1], "")
     ab = App(g)
     vj.options(ab)
-    ab._vj_thumbs = {f"Slow {k}": {"tag": f"t{k}", "state": {}, "t": 0.0} for k in range(13)}
+    vj_state.of(ab).thumbs = {f"Slow {k}": {"tag": f"t{k}", "state": {}, "t": 0.0} for k in range(13)}
     for _ in range(13 * 2 + 13 * vj_ui.THUMB_SLOW_EVERY * 2):
         vj_ui._thumbs(ab)
     again = sum(1 for k in range(13) if drawn_n.get(f"t{k}", 0) > 2)
@@ -1659,23 +1659,23 @@ finally:
 aq = App(g)
 oq = vj.options(aq)
 vj.update(aq, 1 / 30)
-aq._vj_sweep = (clock.now() - 10.0, 1.0, 0.0, 1.0)          # a fade long done, its sweep left behind
+vj_state.of(aq).sweep = (clock.now() - 10.0, 1.0, 0.0, 1.0)          # a fade long done, its sweep left behind
 clock.hold()
 clock.step(-300.0)                                           # a render far behind real time (+300 s at release)
 clock.release()
 vj.clock_seen(aq)                                            # (the VJ off and hidden: what poll does)
 vj.update(aq, 1 / 30)
-check(oq["fader"] == 1.0 and aq.__dict__.get("_vj_sweep") is None,
+check(oq["fader"] == 1.0 and vj_state.of(aq).sweep is None,
       f"a render's jump with the VJ not running: an old sweep not moved by it (fader {oq['fader']})")
 # a pad's hold on a VJ knob: not saved (it goes back on release; an undo brought the held value back)
 from native import midi_ui                                    # noqa: E402
 ah = App(g)
 vj.options(ah)
-ah._vj_save_at = None
+vj_state.of(ah).save_at = None
 midi_ui.apply_target(ah, {"kind": "vj_knob", "deck": 0, "key": "blur"}, 1.0, 1.0)
-held_saved = ah.__dict__.get("_vj_save_at") is not None
+held_saved = vj_state.of(ah).save_at is not None
 midi_ui.apply_target(ah, {"kind": "vj_knob", "deck": 0, "key": "blur"}, 1.0, 1.0, keep=True)
-check(not held_saved and ah.__dict__.get("_vj_save_at") is not None,
+check(not held_saved and vj_state.of(ah).save_at is not None,
       "a VJ knob from a pad's hold: not saved; from MIDI: saved")
 # 16-bit pictures: a dark one stays dark; a transparent grey clears that grey only
 dark = Image.fromarray(np.full((4, 4), 200, "<u2"))
@@ -1722,7 +1722,7 @@ try:
     time.sleep(0.2)                                          # it finished, not yet taken
     vj.close(ab)
     opened(ab)
-    check(vj._pool(ab) and not ab.__dict__.get("_vj_opening"), "a close as a finished open waited: it opens again")
+    check(vj._pool(ab) and not vj_state.of(ab).opening, "a close as a finished open waited: it opens again")
     vj.close(ab)
     # a render as a worker opens the source: waited for, not opened a second time
     _Src.most = 0

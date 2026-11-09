@@ -12,6 +12,7 @@ import numpy as np
 
 from native.typeface import px
 from native import gallery, typeface
+from native import vj_state
 
 TAG = "vj_packs_win"
 PV_W, PV_H = 360, 60                     # a pack's picture, as the window shows it
@@ -41,7 +42,7 @@ def show(app):
         build(app)
     chrome._centre(TAG, 620, 600)
     dpg.show_item(TAG)
-    if getattr(app, "_vj_packs", None) is None:
+    if vj_state.of(app).packs is None:
         fetch(app)
     else:
         fill(app)
@@ -63,7 +64,7 @@ def fetch(app):
             if dpg.does_item_exist("vj_pk_words"):
                 dpg.set_value("vj_pk_words", err)
             return
-        app._vj_packs = packs
+        vj_state.of(app).packs = packs
         fill(app)
         for pk in packs:                                          # the pictures, a pack at a time, as they come
             _fetch_preview(app, pk)
@@ -98,7 +99,7 @@ def fill(app):
     if not dpg.does_item_exist("vj_pk_list"):
         return
     c = _c()
-    packs = getattr(app, "_vj_packs", None) or []
+    packs = vj_state.of(app).packs or []
     here = addons.installed()
     opened = {dpg.get_item_user_data(h) for h in dpg.get_item_children("vj_pk_list", 1) or ()    # the packs open
               if dpg.get_item_type(h).endswith("CollapsingHeader") and dpg.get_value(h)}       # stay open
@@ -106,7 +107,7 @@ def fill(app):
     dpg.delete_item("vj_pk_list", children_only=True)
     if not packs:
         dpg.set_value("vj_pk_words", "the gallery has no packs - or it could not be reached" if
-                      getattr(app, "_vj_packs", None) is not None else "")
+                      vj_state.of(app).packs is not None else "")
     else:
         n_in = sum(len(p.items) for p in here.values())
         dpg.set_value("vj_pk_words", f"{len(packs)} packs; {n_in} looks installed")
@@ -162,7 +163,7 @@ def _blank():
 
 
 def _find(app, pid):
-    return next((p for p in (getattr(app, "_vj_packs", None) or []) if p.id == pid), None)
+    return next((p for p in (vj_state.of(app).packs or []) if p.id == pid), None)
 
 
 def _install(app, pid, files):
@@ -217,8 +218,8 @@ def reload_looks(app):
     """The looks read again - the project's and the packs' - and the VJ frame shown them."""
     from native import vj_looks, vj_ui
     errs = vj_looks.load_user(app.project, allow_py=vj_ui.py_allowed(app))
-    app._vj_file_errs = errs
-    app._vj_thumbs = None
+    vj_state.of(app).file_errs = errs
+    vj_state.of(app).thumbs = None
     vj_ui.refresh(app)
     if dpg.does_item_exist(vj_ui.BROWSE) and dpg.is_item_shown(vj_ui.BROWSE):
         vj_ui._fill_browser(app)

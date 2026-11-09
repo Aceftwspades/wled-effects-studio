@@ -52,6 +52,7 @@ import json
 import math
 import random
 from collections import deque
+from native import vj_state
 
 FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
 # the VJ deck knobs a modulator may move: "vj<deck>.<knob>" - every one of vj.KNOBS (a test keeps the two alike), the
@@ -434,7 +435,7 @@ def reset(app):
     knobs and faders to, a show step's say - from the switch itself (app._enter_project), paused or not: what is
     held in the next one before Play is that one's."""
     app._mod_state = {"project": app.project}
-    app._vj_mod, app._mod_over, app._mod_scene = {}, {}, None
+    vj_state.of(app).mod, app._mod_over, app._mod_scene = {}, {}, None
 
 
 GAP_MAX_S = 0.25                                   # a pause, a hitch: an envelope (and the sound's follower) goes on
@@ -468,8 +469,8 @@ def apply(app):
     st["at"] = now
     last_hit = getattr(app, "last_hit_at", None)
     since = None if last_hit is None else now - last_hit
-    grid = getattr(app, "_vj_grid_beat_at", None)                # the VJ running on its bar grid: its beat
-    if grid is not None and now - getattr(app, "_vj_at", -1e9) < 0.25:
+    grid = vj_state.of(app).grid_beat_at                # the VJ running on its bar grid: its beat
+    if grid is not None and vj_state.of(app).at is not None and now - vj_state.of(app).at < 0.25:
         since = now - grid
     beat_at = None if since is None else now - since         # a beat since the last frame: one later than the last
     prev = st.get("beat_at")                                 # seen (the VJ's grid beat is set earlier in the frame,
@@ -566,7 +567,7 @@ def apply(app):
         _draw_scopes(app)
     if not mods:
         app._mod_state = {}
-        app._vj_mod, app._mod_over = {}, {}
+        vj_state.of(app).mod, app._mod_over = {}, {}
     if changed:
         eng.push()
 
@@ -611,7 +612,7 @@ def _set(app, k, v):
         from native import vj
         i, knob = _vj_key(k)
         lo, hi_ = next((a, b) for kk, a, b in vj.KNOBS if kk == knob)
-        app.__dict__.setdefault("_vj_mod", {})[(i, knob)] = lo + (hi_ - lo) * max(0.0, min(1.0, v / 255.0))
+        vj_state.of(app).mod[(i, knob)] = lo + (hi_ - lo) * max(0.0, min(1.0, v / 255.0))
         return False
     app.__dict__.setdefault("_mod_over", {})[k] = max(0.0, min(1.0, v / 255.0))   # a fader's, a modulator's
     return False
@@ -620,7 +621,7 @@ def _set(app, k, v):
 def _unset(app, k):
     """What a modulator moved a kept-apart target to let go: it is its own again."""
     if k in VJ_KEYS:
-        getattr(app, "_vj_mod", {}).pop(_vj_key(k), None)
+        vj_state.of(app).mod.pop(_vj_key(k), None)
     else:
         getattr(app, "_mod_over", {}).pop(k, None)
 

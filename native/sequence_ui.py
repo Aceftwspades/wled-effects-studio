@@ -20,6 +20,7 @@ from native import weight
 import numpy as np
 
 from native import clock, sequence, transition
+from native import vj_state
 
 TAG = "sequence_win"
 ROW_H = 30               # a step's row in the list, at the interface size
@@ -1412,7 +1413,7 @@ def tap(app):
     if taps and now - taps[-1] > 2.0:
         taps = []
     if not taps:
-        app._vj_downbeat = __import__("native.clock", fromlist=["c"]).now()   # the VJ's bars start on the first tap
+        vj_state.of(app).downbeat = __import__("native.clock", fromlist=["c"]).now()   # the VJ's bars start on the first tap
     taps.append(now); taps = taps[-8:]; app._taps = taps
     if len(taps) >= 2:
         bpm = 60.0 * (len(taps) - 1) / (taps[-1] - taps[0])
@@ -2613,7 +2614,7 @@ def _rec_poll(app, i, t):
         for slider in sequence.RAMP_KEYS:                        # the hand's (nor recorded)
             if own(slider) != was[3].get(slider):
                 _REC.held[_rec_key(seg, slider)] = now      # moved since playback left it: the hand's
-    hand = getattr(app, "_vj_hand_at", None)                 # the VJ's crossfader, moved by hand in a VJ step
+    hand = vj_state.of(app).hand_at                 # the VJ's crossfader, moved by hand in a VJ step
     if st.get("vj") and hand is not None and now - hand < HOLD_S:
         _REC.held[sequence.VJF] = hand
     for key, at in list(_REC.held.items()):

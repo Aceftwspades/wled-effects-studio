@@ -15,7 +15,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 
-from native import clock, geometry, pads, video, vj, vj_clips
+from native import clock, geometry, pads, video, vj, vj_clips, vj_state
 
 fails = []
 
@@ -249,10 +249,10 @@ check(vj_clips.cam_names(app4) == ["Test Cam", video.PHONE] and pads.kind_of(cam
 real_open = vj._open
 vj._open = lambda app, s, key: FakeCam(key)
 try:
-    app4._vj_tick = 0
+    vj_state.of(app4).tick = 0
     vj._warm_cams(app4)
     end = time.time() + 5
-    while time.time() < end and app4.__dict__.get("_vj_opening"):
+    while time.time() < end and vj_state.of(app4).opening:
         time.sleep(0.01)
         vj._collect(app4)
     keys = {vj.source_key(app4, vj_clips.cam_source(n)) for n in ("Test Cam", video.PHONE)}
@@ -288,9 +288,9 @@ try:
         clock.release()
     vj_clips.let_go(app4)
     pads.current(st4)["controls"].remove(phone_pad)
-    app4._vj_tick = 0
+    vj_state.of(app4).tick = 0
     vj._warm_cams(app4)
-    check(app4.__dict__.pop("_vj_release_due", False), "a camera no pad brings up: let go at the frame's end")
+    check(vj_state.of(app4).take("release_due"), "a camera no pad brings up: let go at the frame's end")
     vj._release(app4)
     phone_cam = next(c for c in FakeCam.opened if c.key[0] == "phone")
     check(phone_cam.closed and not FakeCam.opened[0].closed, "a camera no pad brings up any more: closed")
@@ -298,19 +298,19 @@ try:
     check(all(c.closed for c in FakeCam.opened), "the VJ closed: the pads' cameras off")
     slow = []
     vj._open = lambda app, s, key: (time.sleep(0.3), slow.append(FakeCam(key)))[1] or slow[-1]
-    app4._vj_tick = 0
+    vj_state.of(app4).tick = 0
     vj._warm_cams(app4)
     vj.close(app4)
     time.sleep(0.6)
-    check(slow and slow[0].closed and not app4.__dict__.get("_vj_opened"),
+    check(slow and slow[0].closed and not vj_state.of(app4).opened,
           "a camera still starting when the VJ closes: closed once it has started")
     late = []
     vj._open = lambda app, s, key: (time.sleep(0.2), late.append(FakeCam(key)))[1] or late[-1]
     pads.current(st4)["controls"].append(phone_pad)
-    app4._vj_tick = 0
+    vj_state.of(app4).tick = 0
     vj._warm_cams(app4)                                    # starting...
     pads.current(st4)["controls"].remove(phone_pad)
-    app4._vj_tick = 0
+    vj_state.of(app4).tick = 0
     vj._warm_cams(app4)                                    # ...its pad gone meanwhile
     time.sleep(0.4)
     vj._collect(app4)

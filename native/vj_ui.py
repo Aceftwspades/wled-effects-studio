@@ -17,6 +17,7 @@ import numpy as np
 
 from native import form, num, typeface, vj, vj_looks, weight
 from native.typeface import px
+from native import vj_state
 
 TAG = "vj_win"
 BROWSE = "vj_browse_win"
@@ -646,7 +647,7 @@ def _packs(app):
 
 
 def _set_browse_filter(app, v):
-    app._vj_br_filter = v
+    vj_state.of(app).br_filter = v
     _fill_browser(app)
 
 
@@ -699,8 +700,8 @@ def _fill_browser(app):
     from native import addons
     c = _c()
     dpg.delete_item("vj_br_grid", children_only=True)
-    app._vj_thumbs = {}
-    made = app.__dict__.setdefault("_vj_th_made", {})        # a thumbnail's texture, by the look it was made for:
+    vj_state.of(app).thumbs = {}
+    made = vj_state.of(app).th_made        # a thumbnail's texture, by the look it was made for:
     for n in [n for n in made if n not in vj_looks.LOOKS]:    # one of a look gone (a pack taken off) let go
         tag = made.pop(n)
         if dpg.does_item_exist(tag):
@@ -710,9 +711,9 @@ def _fill_browser(app):
     except OSError:
         packs = {}
     items = [w for _, w in BR_FILTERS] + [f"pack: {pk.name}" for pk in packs.values()]
-    flt = getattr(app, "_vj_br_filter", "all looks")
+    flt = vj_state.of(app).br_filter
     if flt not in items:
-        flt = app._vj_br_filter = "all looks"
+        flt = vj_state.of(app).br_filter = "all looks"
     dpg.configure_item("vj_br_filter", items=items)
     dpg.set_value("vj_br_filter", flt)
     fav = set(vj.favourites(app))
@@ -742,7 +743,7 @@ def _fill_browser(app):
                         dpg.add_button(label="x", small=True, user_data=n, callback=lambda s, a, u: _unpack(app, u))
                         c.tip("take this add-on look off this computer (Packs installs it again)")
                     dpg.add_text(_short(n)[:9 if addon else 11], color=c.DIM)
-            app._vj_thumbs[n] = {"tag": tag, "state": {}, "t": 0.0}
+            vj_state.of(app).thumbs[n] = {"tag": tag, "state": {}, "t": 0.0}
             shown += 1
     if not shown:
         dpg.add_text("No looks here" + (" - star one with its . to make it a favourite" if flt == "favourites" else "")
@@ -763,7 +764,7 @@ def _star(app, sender, name):
     on = vj.toggle_favourite(app, name)
     dpg.configure_item(sender, label="*" if on else ".")
     app.gp.status(f"{name}: {'a favourite' if on else 'not a favourite'}")
-    if getattr(app, "_vj_br_filter", "") == "favourites":
+    if vj_state.of(app).br_filter == "favourites":
         _fill_browser(app)
 
 
@@ -776,7 +777,7 @@ def _unpack(app, name):
 def browse(app, i):
     """The looks as moving thumbnails; a click puts one on deck i."""
     from native import chrome
-    app._vj_browse_deck = i
+    vj_state.of(app).browse_deck = i
     _fill_browser(app)
     dpg.set_value("vj_br_words", f"a click puts the look on deck {LETTER[i]}")
     chrome._centre(BROWSE, 560, 520)
@@ -784,33 +785,33 @@ def browse(app, i):
 
 
 def _browse_pick(app, name):
-    i = getattr(app, "_vj_browse_deck", 0)
+    i = vj_state.of(app).browse_deck
     _set_deck(app, i, "look", name)
     app.gp.status(f"deck {LETTER[i]}: {name}")
 
 
 def _thumbs(app):
     """A few thumbnails a frame drawn, in turn: each its look at the thumbnail's size, the test pattern for video."""
-    th = getattr(app, "_vj_thumbs", None)
+    th = vj_state.of(app).thumbs
     if th and not dpg.is_item_shown(BROWSE):
-        if not getattr(app, "_vj_th_freed", False):          # the browser closed: its looks' states let go (a
+        if not vj_state.of(app).th_freed:          # the browser closed: its looks' states let go (a
             for e in th.values():                            # MilkDrop look's megabufs, buffers), started again
                 e["state"] = {}                              # when it opens
-            app._vj_th_freed = True
+            vj_state.of(app).th_freed = True
         return
     if not th:
         return
-    app._vj_th_freed = False
+    vj_state.of(app).th_freed = False
     from native import video
-    if getattr(app, "_vj_th_src", None) is None:
-        app._vj_th_src = video.TestPattern(TH_W, TH_H)
-        app._vj_th_ctx = None
+    if vj_state.of(app).th_src is None:
+        vj_state.of(app).th_src = video.TestPattern(TH_W, TH_H)
+        vj_state.of(app).th_ctx = None
     names = list(th)
-    k0 = getattr(app, "_vj_th_k", 0)
+    k0 = vj_state.of(app).th_k
     now = time.perf_counter()
     snd = vj.sound(app)
     done = 0
-    app._vj_th_frame = getattr(app, "_vj_th_frame", 0) + 1
+    vj_state.of(app).th_frame = vj_state.of(app).th_frame + 1
     for j in range(5):                                       # the cheap ones, in turn, within THUMB_BUDGET_S
         if j and time.perf_counter() - now > THUMB_BUDGET_S:
             break                                            # the frame's thumbnail time spent: on from here next
@@ -818,12 +819,12 @@ def _thumbs(app):
         n = names[(k0 + j) % len(names)]
         if not th[n].get("costly"):
             _draw_thumb(app, n, th[n], now, snd)
-    app._vj_th_k = (k0 + max(1, done)) % max(1, len(names))
+    vj_state.of(app).th_k = (k0 + max(1, done)) % max(1, len(names))
     costly = [n for n in names if th[n].get("costly")]       # the costly ones (a MilkDrop look's shapes): one every
-    if costly and app._vj_th_frame - getattr(app, "_vj_th_costly", -10 ** 9) >= THUMB_SLOW_EVERY:   # few frames,
-        app._vj_th_costly = app._vj_th_frame                 # in a turn of their own - each animates, none starved
-        ck = getattr(app, "_vj_th_ck", 0) % len(costly)
-        app._vj_th_ck = ck + 1
+    if costly and vj_state.of(app).th_frame - vj_state.of(app).th_costly >= THUMB_SLOW_EVERY:   # few frames,
+        vj_state.of(app).th_costly = vj_state.of(app).th_frame                 # in a turn of their own - each animates, none starved
+        ck = vj_state.of(app).th_ck % len(costly)
+        vj_state.of(app).th_ck = ck + 1
         _draw_thumb(app, costly[ck], th[costly[ck]], now, snd)
 
 
@@ -846,9 +847,9 @@ def _draw_thumb(app, n, e, now, snd):
     ph = (e["t"] * 2.0) % 1.0
     c.beat = math.exp(-ph * 6.0)
     c.beat_hit = int(e["t"] * 2.0) != int((e["t"] - dt) * 2.0)
-    c.beats = getattr(app, "_vj_beats", 0.0)
+    c.beats = vj_state.of(app).beats
     c.deck = {"text": "WLED", "image": ""}
-    vid = app._vj_th_src.frame_at(e["t"]).astype(np.float32) / 255.0
+    vid = vj_state.of(app).th_src.frame_at(e["t"]).astype(np.float32) / 255.0
     c.video, c.video_prev = vid, e.get("prev")
     e["prev"] = vid
     c.amount, c.speed = 0.5, 1.0
@@ -880,22 +881,22 @@ THUMB_SLOW_EVERY = 6               # ...and one such drawn every this many frame
 # --- changes -------------------------------------------------------------------------------------
 def _save(app, now=False):
     """Saved once the change settles: a drag is one undo step."""
-    app._vj_save_at = time.perf_counter() + (0.0 if now else SAVE_AFTER)
+    vj_state.of(app).save_at = time.perf_counter() + (0.0 if now else SAVE_AFTER)
 
 
 def _flush_save(app, now=False):
     if now:
         _rest_src(app, now=float("inf"))                  # a speed, from or to still resting: on its deck first
-    t = getattr(app, "_vj_save_at", None)
+    t = vj_state.of(app).save_at
     if t is not None and (now or time.perf_counter() >= t):
-        app._vj_save_at = None
+        vj_state.of(app).save_at = None
         app.project.save()
 
 
 def undo(app, redo=False):
     """The VJ as it was before its last change (or again after an undo)."""
     _flush_save(app, now=True)
-    if getattr(app, "_vj_by_show", False):                 # the show's steps have the decks: an undo now would
+    if vj_state.of(app).by_show:                 # the show's steps have the decks: an undo now would
         app.gp.status("the show has the VJ: undo once it lets it go")   # be put back over by the desk after
         return
     p = app.project
@@ -1003,7 +1004,7 @@ def _set_src(app, i, **kw):
     kw = {k: v for k, v in kw.items() if v is not None}
     timed = {k: kw.pop(k) for k in ("speed", "in", "out") if k in kw}
     if timed:                                                   # (each value a new ffmpeg: not every frame)
-        held = app.__dict__.setdefault("_vj_src_rest", {})
+        held = vj_state.of(app).src_rest
         held[i] = (dict(held.get(i, (dict(), 0))[0], **timed), time.monotonic())
         if not kw:
             return
@@ -1016,7 +1017,7 @@ def _set_src(app, i, **kw):
 
 def _rest_src(app, now=None):
     """Each frame: a speed, from or to dragged and left alone SRC_REST_S, put on its deck's source."""
-    held = getattr(app, "_vj_src_rest", None)
+    held = vj_state.of(app).src_rest
     if not held:
         return
     now = time.monotonic() if now is None else now
@@ -1122,13 +1123,13 @@ def _picture_panel(app, i, d):
 
 
 def _pick_channel_image(app, i, k):
-    app._vj_ch_target = (i, k)
+    vj_state.of(app).ch_target = (i, k)
     dpg.show_item("vj_chimgfile")
 
 
 def _set_channel_image(app, path):
     """The picture a shader channel reads, kept with the project (as a deck's picture is)."""
-    i, k = getattr(app, "_vj_ch_target", (0, 0))
+    i, k = vj_state.of(app).ch_target
     if not path or not os.path.isfile(path):
         return
     try:
@@ -1174,8 +1175,8 @@ def _import(app, a):
             failed.append(f"{os.path.basename(f)}: {e}")     # and the rest still imported
     sel = [f for f in sel if not any(x.startswith(os.path.basename(f) + ":") for x in failed)]
     errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
-    app._vj_file_errs = errs
-    app._vj_thumbs = None
+    vj_state.of(app).file_errs = errs
+    vj_state.of(app).thumbs = None
     refresh(app)
     if dpg.does_item_exist(BROWSE) and dpg.is_item_shown(BROWSE):
         _fill_browser(app)
@@ -1366,12 +1367,12 @@ def _put_new(app, path):
 
 def project_changed(app):
     """Another project open: its own looks listed now (the pads' look lists read them), the VJ shown or not."""
-    app._vj_files_at = 0.0
-    app._vj_file_errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
-    app._vj_thumbs = None                                    # the browser's tiles: this project's looks
+    vj_state.of(app).files_at = 0.0
+    vj_state.of(app).file_errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
+    vj_state.of(app).thumbs = None                                    # the browser's tiles: this project's looks
     if dpg.does_item_exist(BROWSE) and dpg.is_item_shown(BROWSE):
         _fill_browser(app)
-    app._vj_dirty = True                                     # the decks' look lists too (a frame shown at startup)
+    vj_state.of(app).dirty = True                                     # the decks' look lists too (a frame shown at startup)
 
 
 def py_allowed(app):
@@ -1387,13 +1388,13 @@ def allow_py(app, on=True):
     have = [p for p in app.prefs.get("vj_py_projects", []) if os.path.normcase(p) != root]
     app.prefs["vj_py_projects"] = have + ([os.path.abspath(app.project.path)] if on else [])
     save_prefs(app.prefs)
-    app._vj_files_at = 0.0                                           # read again now
-    app._vj_dirty = True
+    vj_state.of(app).files_at = 0.0                                           # read again now
+    vj_state.of(app).dirty = True
 
 
 def _ask_py(app):
     """A project with Python looks not yet allowed here: asked once a session whether to run them."""
-    asked = app.__dict__.setdefault("_vj_py_asked", set())
+    asked = vj_state.of(app).py_asked
     root = os.path.abspath(app.project.path)
     files = vj_looks.py_files(app.project)
     if not files or py_allowed(app) or root in asked:
@@ -1449,7 +1450,7 @@ def _pick_source(app, i):
                 return
             if not names:
                 app.gp.status(f"no {'cameras' if kind == 'webcam' else 'screens'} found"); return
-            app.__dict__.setdefault("_vj_src_names", {})[i] = (kind, list(names))
+            vj_state.of(app).src_names[i] = (kind, list(names))
             if s.get("name") not in names:
                 s["name"] = names[0]                            # the first, as the combo shows it
                 _save(app)
@@ -1556,7 +1557,7 @@ def refresh(app):
         dpg.configure_item(f"vj_pause{i}", show=kind != "none")
         dpg.configure_item(f"vj_srcname{i}", show=kind in ("webcam", "screen") and bool(s.get("name")))
         if s.get("name"):
-            k_, listed = getattr(app, "_vj_src_names", {}).get(i, (None, []))
+            k_, listed = vj_state.of(app).src_names.get(i, (None, []))
             dpg.configure_item(f"vj_srcname{i}", items=listed if k_ == kind and s["name"] in listed else [s["name"]])
             dpg.set_value(f"vj_srcname{i}", s["name"])
         dpg.configure_item(f"vj_url{i}", show=kind == "stream")
@@ -1566,7 +1567,7 @@ def refresh(app):
         dpg.configure_item(f"vj_cliprows{i}", show=kind == "file")
         dpg.configure_item(f"vj_clips{i}", items=[os.path.basename(f) for f in files])
         dpg.set_value(f"vj_clips{i}", os.path.basename(vj.clip_path(s)) if files or s.get("path") else "")
-        held = (getattr(app, "_vj_src_rest", None) or {}).get(i, ({}, 0))[0]
+        held = (vj_state.of(app).src_rest or {}).get(i, ({}, 0))[0]
         for tag, key in (("vj_csp", "speed"), ("vj_cin", "in"), ("vj_cout", "out")):
             num.set(f"{tag}{i}", float(held.get(key, s.get(key, 0.0))))
         dpg.set_value(f"vj_adv{i}", dict(vj.ADVANCE).get(s.get("advance", "off"), "by hand"))
@@ -1615,7 +1616,7 @@ def _preview(app, i):
 
 
 def _out_preview(app):
-    out = getattr(app, "_vj_out", None)
+    out = vj_state.of(app).out
     if out is None or not dpg.is_item_visible("vj_out"):
         return
     img = _fit(out, OUT_N, OUT_N).astype(np.float32) / 255.0
@@ -1632,57 +1633,57 @@ def poll(app):
         return
     shown = dpg.is_item_shown(TAG)
     if not (vj.on(app) or shown):
-        if getattr(app, "_vj_open", False):
+        if vj_state.of(app).open:
             vj.close(app)                                           # nothing needs the sources: webcams off
-            app._vj_open = False
-        if getattr(app, "_vj_clips", None):
+            vj_state.of(app).open = False
+        if vj_state.of(app).clips:
             from native import vj_clips
             vj_clips.let_go(app)                                    # a pad pressed with the VJ off: nothing plays
         vj.clock_seen(app)                                          # (a render's jump meanwhile: none of it ran)
         _rest_src(app)
         return
     _rest_src(app)
-    app._vj_open = True
-    app._vj_preview = {i for i in range(vj.DECKS) if dpg.is_item_visible(f"vj_pv{i}")} if shown else set()
-    if time.monotonic() - getattr(app, "_vj_files_at", 0.0) > 1.0:     # the project's own looks, as they are saved
-        app._vj_files_at = time.monotonic()
+    vj_state.of(app).open = True
+    vj_state.of(app).preview = {i for i in range(vj.DECKS) if dpg.is_item_visible(f"vj_pv{i}")} if shown else set()
+    if time.monotonic() - vj_state.of(app).files_at > 1.0:     # the project's own looks, as they are saved
+        vj_state.of(app).files_at = time.monotonic()
         before = set(vj_looks.LOOKS)
-        app._vj_file_errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
-        if any(e == vj_looks.NOT_ALLOWED for _, e in app._vj_file_errs) and shown:
+        vj_state.of(app).file_errs = vj_looks.load_user(app.project, allow_py=py_allowed(app))
+        if any(e == vj_looks.NOT_ALLOWED for _, e in vj_state.of(app).file_errs) and shown:
             _ask_py(app)
         if set(vj_looks.LOOKS) != before:
-            app._vj_dirty = True
+            vj_state.of(app).dirty = True
             if dpg.does_item_exist(BROWSE) and dpg.is_item_shown(BROWSE):
                 _fill_browser(app)                              # a look saved or taken away while browsing
             else:
-                app._vj_thumbs = None
+                vj_state.of(app).thumbs = None
     vj.update(app)
     _thumbs(app)
     if shown:
         for i in range(vj.DECKS):
             _preview(app, i)
         _out_preview(app)
-        p = float(getattr(app, "_vj_pulse", 0.0))
+        p = float(vj_state.of(app).pulse)
         g = int(60 + 195 * p)
         dpg.configure_item("vj_beat", fill=(g, int(60 + 120 * p), 60, 255))
         o = vj.options(app)
         if abs(float(dpg.get_value("vj_fader")) - float(o["fader"])) > 1e-3 and not num.busy():
             num.set("vj_fader", float(o["fader"]))
-        if getattr(app, "_vj_knobs_moved", False) and not num.busy():       # MIDI or a modulator moved a knob
-            app._vj_knobs_moved = False
+        if vj_state.of(app).knobs_moved and not num.busy():       # MIDI or a modulator moved a knob
+            vj_state.of(app).knobs_moved = False
             num.set("vj_clvl", o["decks"][2]["level"])
             for i in range(vj.DECKS):
                 d = o["decks"][i]
                 _sync_knobs(i, d)
-        if getattr(app, "_vj_dirty", False):
-            app._vj_dirty = False
+        if vj_state.of(app).dirty:
+            vj_state.of(app).dirty = False
             refresh(app)
         bars, where = vj.bar_count(app)
         tempo = f"{vj._tempo(app):g} bpm, bar {int(bars) + 1} ({where})"
         if dpg.get_value("vj_tempo") != tempo:
             dpg.set_value("vj_tempo", tempo)
         errs = [f"deck {LETTER[i]}: {r.error}" for i, r in enumerate(vj._runs(app)) if r.error]
-        errs += [f"looks/{f}: {e}" for f, e in getattr(app, "_vj_file_errs", [])]
+        errs += [f"looks/{f}: {e}" for f, e in vj_state.of(app).file_errs]
         words = "; ".join(errs) if errs else ("on air" if vj.on(app) else "off air - the effect shows")
         if dpg.get_value("vj_words") != words:
             dpg.set_value("vj_words", words)

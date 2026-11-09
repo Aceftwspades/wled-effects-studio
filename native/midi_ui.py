@@ -17,6 +17,7 @@ from native import num
 from native import typeface
 
 from native import midi, osc, weight, transition, bank
+from native import vj_state
 
 TAG = "midi_win"
 
@@ -722,7 +723,7 @@ def apply_target(app, t, v, full=127.0, ctl=None, keep=False):
             vj.set_fader(app, f)
         elif kind == "vj_knob":
             vj.knob_set(app, int(t.get("deck", 0)), t.get("key", "amount"), f)
-            app._vj_dirty = True
+            vj_state.of(app).dirty = True
             if keep:                                         # MIDI's: kept, as the phone's are (once it settles) - a
                 vj_ui._save(app)                             # pad's hold goes back on release, never saved
         elif kind == "vj_fx":                               # an Effect deck's Custom slider or check
@@ -732,7 +733,7 @@ def apply_target(app, t, v, full=127.0, ctl=None, keep=False):
         elif kind == "vj_look":
             names = vj.midi_looks()
             vj.options(app)["decks"][int(t.get("deck", 0))]["look"] = names[int(round(f * (len(names) - 1)))]
-            app._vj_dirty = True
+            vj_state.of(app).dirty = True
             if keep:
                 vj_ui._save(app)
         elif kind.startswith("vj_sel_"):

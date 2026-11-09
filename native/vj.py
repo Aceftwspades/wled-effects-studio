@@ -30,6 +30,7 @@ import time
 import numpy as np
 
 from native import clock, vj_clips, vj_layer, vj_looks
+from native import vj_state
 
 CANVASES = (("64x48", "64 x 48 (light)"), ("96x72", "96 x 72"), ("128x96", "128 x 96 (fine)"),
             ("64x64", "64 x 64 (square)"), ("128x72", "128 x 72 (16:9, a wide panel)"),
@@ -273,9 +274,9 @@ class DeckRun:
 
 def _clip_runs(app):
     """Decks A and B's pad clips' runs: a clip there is drawn beside the deck, laid over its picture."""
-    r = app.__dict__.get("_vj_clip_runs")
+    r = vj_state.of(app).clip_runs
     if r is None:
-        r = app._vj_clip_runs = [DeckRun() for _ in range(2)]
+        r = vj_state.of(app).clip_runs = [DeckRun() for _ in range(2)]
     return r
 
 
@@ -284,19 +285,19 @@ def _all_runs(app):
 
 
 def _runs(app):
-    r = app.__dict__.get("_vj_runs")
+    r = vj_state.of(app).runs
     if r is None:
-        r = app._vj_runs = [DeckRun() for _ in range(DECKS)]
+        r = vj_state.of(app).runs = [DeckRun() for _ in range(DECKS)]
     return r
 
 
 def _pool(app):
     """{source key: [source, error]}: the video sources open, shared by the decks that look at the same one (those
     still open when the studio quits, closed then)."""
-    pool = app.__dict__.get("_vj_pool")
+    pool = vj_state.of(app).pool
     if pool is None:
         import atexit
-        pool = app._vj_pool = {}
+        pool = vj_state.of(app).pool = {}
         atexit.register(_close_all, pool)
     return pool
 
@@ -434,13 +435,13 @@ def _source(app, i, run, deck):
         run.src_key = key
         run.video_prev = None                                 # its last frame held until the next source's first
         run.n = -1
-        app._vj_release_due = True                            # (closed at the frame's end, every deck's key set)
+        vj_state.of(app).release_due = True                            # (closed at the frame's end, every deck's key set)
     if key is None:
         run.video = None
         run.open_error = ""
         return None
     now = time.monotonic()
-    tried = app.__dict__.setdefault("_vj_pool_at", {})       # key -> [when it was opened, the wait before again]
+    tried = vj_state.of(app).pool_at       # key -> [when it was opened, the wait before again]
     ent, t = pool.get(key), tried.get(key)
     if ent is not None and t is not None and now - t[0] >= t[1] and _dead(ent[0]) and not s.get("take"):
         # (a pad's clip that ended or would not open is not opened again: its last picture held till it is let go)
@@ -479,7 +480,7 @@ _OPEN_LOCK = threading.Lock()     # a worker's finished source handed over / the
 def _drop_dead(app, key):
     """A dead source out of the pool, to be opened again - its next wait twice as long (REOPEN_S again for one
     that had shown pictures)."""
-    pool, tried = _pool(app), app.__dict__.setdefault("_vj_pool_at", {})
+    pool, tried = _pool(app), vj_state.of(app).pool_at
     ent = pool.pop(key, None)
     t = tried.get(key)
     if t is not None:
@@ -496,12 +497,12 @@ def _open_soon(app, s, key):
     of a second to seconds, never on the main loop (each frame of it was the studio and the stream stopped). The
     result goes in the pool at the next frame's _collect - closed instead if nothing wants it by then, or if the
     VJ closed meanwhile."""
-    opening = app.__dict__.setdefault("_vj_opening", {})    # key -> the generation it was started in
+    opening = vj_state.of(app).opening    # key -> the generation it was started in
     if key in opening:
         return                                                # (one from before a close too: it ends first)
-    gen = getattr(app, "_vj_gen", 0)
+    gen = vj_state.of(app).gen
     opening[key] = gen
-    tried = app.__dict__.setdefault("_vj_pool_at", {})
+    tried = vj_state.of(app).pool_at
     tried[key] = [time.monotonic(), tried.get(key, [0, REOPEN_S])[1]]
     s = json_copy(s)
 
@@ -511,8 +512,8 @@ def _open_soon(app, s, key):
         except Exception as e:
             got = [None, str(e)]
         with _OPEN_LOCK:
-            if getattr(app, "_vj_gen", 0) == gen:
-                app.__dict__.setdefault("_vj_opened", {})[key] = got
+            if vj_state.of(app).gen == gen:
+                vj_state.of(app).opened[key] = got
                 return
             if opening.get(key) == gen:                       # the VJ closed while it opened: not kept, and
                 del opening[key]                              # opened again only now it is closed
@@ -526,16 +527,16 @@ OPEN_WAIT_S = 15.0                # a render waits this long at most for a sourc
 
 def _wait_opening(app, key):
     """A source a worker is opening, waited for (a render): its [source, error], or None when none is opening it."""
-    if key not in app.__dict__.get("_vj_opening", {}):
+    if key not in vj_state.of(app).opening:
         return None
     end = time.monotonic() + OPEN_WAIT_S
     while time.monotonic() < end:
         with _OPEN_LOCK:
-            got = app.__dict__.get("_vj_opened", {}).pop(key, None)
+            got = vj_state.of(app).opened.pop(key, None)
             if got is not None:
-                app.__dict__.get("_vj_opening", {}).pop(key, None)
+                vj_state.of(app).opening.pop(key, None)
                 return got
-        if key not in app.__dict__.get("_vj_opening", {}):
+        if key not in vj_state.of(app).opening:
             return None                                     # (its worker's from before a close: closed it)
         time.sleep(0.005)
     return None
@@ -545,10 +546,10 @@ def _collect(app):
     """Each frame: the sources the workers opened, put in the pool - one nothing wants any more (its deck moved
     on, its pad re-pointed) closed, not left running with its webcam on."""
     with _OPEN_LOCK:
-        done = app.__dict__.pop("_vj_opened", None)
+        done = vj_state.of(app).take("opened")
     if not done:
         return
-    pool, opening, used = _pool(app), app.__dict__.setdefault("_vj_opening", {}), _used(app)
+    pool, opening, used = _pool(app), vj_state.of(app).opening, _used(app)
     for key, got in done.items():
         opening.pop(key, None)
         if key in used and key not in pool:
@@ -577,7 +578,7 @@ def _dead(src):
 def _used(app):
     """The source keys something wants: a deck's, the pads' cameras, and a deck's own under a pad's clip (rolling
     on under it, there again when it ends)."""
-    used = {r.src_key for r in _all_runs(app)} | set(app.__dict__.get("_vj_cam_keys", ()))
+    used = {r.src_key for r in _all_runs(app)} | set(vj_state.of(app).cam_keys)
     for i, d in enumerate(options(app)["decks"]):
         if i == 2 and vj_clips.level(app, i) is not None:     # (A and B draw their own under theirs)
             used.add(source_key(app, d["source"], whole_picture(d)))
@@ -589,7 +590,7 @@ def _release(app):
     """Sources nothing looks at any more, closed."""
     pool, used = _pool(app), _used(app)
     for key in [k for k in pool if k not in used]:
-        app.__dict__.get("_vj_pool_at", {}).pop(key, None)
+        vj_state.of(app).pool_at.pop(key, None)
         src = pool.pop(key)[0]
         if src is not None:
             try:
@@ -605,18 +606,18 @@ def _warm_cams(app):
     """The cameras the pads bring up kept open while the VJ runs (opened on a worker - a camera takes a second
     or so to start - so a press shows its picture at once); one that failed or dropped tried again, as a deck's
     is; one no pad uses any more closed."""
-    if getattr(app, "_vj_tick", 0) % CAM_CHECK_TICKS:
+    if vj_state.of(app).tick % CAM_CHECK_TICKS:
         return
     pool = _pool(app)
-    tried, now = app.__dict__.setdefault("_vj_pool_at", {}), time.monotonic()
+    tried, now = vj_state.of(app).pool_at, time.monotonic()
     want = {}
     for name in vj_clips.cam_names(app):
         s = vj_clips.cam_source(name)
         want[source_key(app, s)] = s
-    gone = set(app.__dict__.get("_vj_cam_keys", ())) - set(want)
-    app._vj_cam_keys = set(want)
+    gone = set(vj_state.of(app).cam_keys) - set(want)
+    vj_state.of(app).cam_keys = set(want)
     if gone:
-        app._vj_release_due = True
+        vj_state.of(app).release_due = True
     for key, s in want.items():
         t = tried.get(key)
         if key in pool and _dead(pool[key][0]) and (t is None or now - t[0] >= t[1]):
@@ -629,18 +630,18 @@ def _follow_clock(app):
     """The fader's and deck C's sweeps and the pads' clips moved by the clock's jump since the last frame (a
     render that ran ahead of real time let go: the sweep swung A-B-A, deck C froze; one that ran behind: a one
     shot let go before its picture reached Out)."""
-    seen = getattr(app, "_vj_clock_seen", None)
-    app._vj_clock_seen = got = clock.shifted()
+    seen = vj_state.of(app).clock_seen
+    vj_state.of(app).clock_seen = got = clock.shifted()
     d = 0.0 if seen is None else got - seen
     if not d:
         return
-    sw = getattr(app, "_vj_sweep", None)
+    sw = vj_state.of(app).sweep
     if sw is not None:
-        app._vj_sweep = (sw[0] + d,) + tuple(sw[1:])
-    csw = getattr(app, "_vj_csweep", None)
+        vj_state.of(app).sweep = (sw[0] + d,) + tuple(sw[1:])
+    csw = vj_state.of(app).csweep
     if csw is not None:
-        app._vj_csweep = (csw[0] + d,) + tuple(csw[1:])
-    fade = getattr(app, "_vj_fade", None)
+        vj_state.of(app).csweep = (csw[0] + d,) + tuple(csw[1:])
+    fade = vj_state.of(app).fade
     if isinstance(fade, dict) and "t0" in fade:              # a show step's blend into the VJ
         fade["t0"] += d
     hit = getattr(app, "last_hit_at", None)
@@ -652,7 +653,7 @@ def _follow_clock(app):
 def clock_seen(app):
     """The clock's jumps so far taken as seen (the VJ not running: nothing of it ran across them, so none moves
     later - a sweep long done moved minutes ahead swung the fader A-B-A when the VJ came back)."""
-    app._vj_clock_seen = clock.shifted()
+    vj_state.of(app).clock_seen = clock.shifted()
 
 
 SEL = 3                            # a target's deck that is "the selected deck" (resolve: the one selected now)
@@ -667,7 +668,7 @@ def select_deck(app, i):
     """Deck i selected (or "next": the one after the selected)."""
     o = options(app)
     o["sel"] = (selected(app) + 1) % DECKS if i == "next" else max(0, min(DECKS - 1, int(i)))
-    app._vj_dirty = True
+    vj_state.of(app).dirty = True
 
 
 def resolve(app, t):
@@ -705,12 +706,12 @@ def clip_ended(app, i, take):
 
 def close(app):
     vj_clips.let_go(app)
-    app._vj_cam_keys = set()                                 # the pads' cameras too (the VJ off: webcams off)
+    vj_state.of(app).cam_keys = set()                                 # the pads' cameras too (the VJ off: webcams off)
     with _OPEN_LOCK:
-        app._vj_gen = getattr(app, "_vj_gen", 0) + 1         # those still opening closed once they have
-        done = app.__dict__.pop("_vj_opened", None) or {}
+        vj_state.of(app).gen = vj_state.of(app).gen + 1         # those still opening closed once they have
+        done = vj_state.of(app).take("opened") or {}
         for key in done:
-            app.__dict__.get("_vj_opening", {}).pop(key, None)
+            vj_state.of(app).opening.pop(key, None)
     for src, _ in done.values():
         if src is not None:
             src.close()
@@ -719,7 +720,7 @@ def close(app):
         r.video = r.video_prev = None
     for r in _clip_runs(app):
         r.canvas = None
-    app._vj_release_due = False
+    vj_state.of(app).release_due = False
     _release(app)
 
 
@@ -740,7 +741,7 @@ def next_clip(app, i, step=1):
     files = [f for f in (s.get("files") or []) if f]
     if len(files) > 1:
         s["clip"] = (int(s.get("clip", 0)) + step) % len(files)
-        app._vj_dirty = True
+        vj_state.of(app).dirty = True
 
 
 # --- the canvas, the sound -----------------------------------------------------------------------
@@ -867,19 +868,19 @@ def _beat(app, now, heard):
         beats, src = beat_count(app)
         last = getattr(app, "last_hit_at", None)
         playing = src == "the show's bars" or (last is not None and now - last < HEARD_FOR)
-        prev = getattr(app, "_vj_pulse_beats", None)
-        app._vj_pulse_beats = beats
+        prev = vj_state.of(app).pulse_beats
+        vj_state.of(app).pulse_beats = beats
         if not playing:
-            app._vj_grid_beat_at = None
+            vj_state.of(app).grid_beat_at = None
             return 0.0, False
         spb = 60.0 / _tempo(app)
         lead = ATTACK * 0.5 / spb                                    # in beats: the ease's first half before the beat
         k = math.floor(beats + lead)
         since = (beats + lead - k) * spb
-        app._vj_grid_beat_at = now - since                           # the modulators' beat (modulate.py) the same
+        vj_state.of(app).grid_beat_at = now - since                           # the modulators' beat (modulate.py) the same
         hit = prev is not None and math.floor(prev) != math.floor(beats) and beats > prev
         return _pulse(since), hit
-    app._vj_grid_beat_at = None
+    vj_state.of(app).grid_beat_at = None
     last = getattr(app, "last_hit_at", None)
     if last is None:
         return 0.0, False
@@ -931,8 +932,8 @@ def beat_count(app):
         pass
     last = getattr(app, "last_hit_at", None)
     if last is not None and clock.now() - last < HEARD_FOR:
-        return getattr(app, "_vj_beats", 0.0), "the tempo, kept on the beats heard"
-    return getattr(app, "_vj_beats", 0.0), "the tempo"
+        return vj_state.of(app).beats, "the tempo, kept on the beats heard"
+    return vj_state.of(app).beats, "the tempo"
 
 
 SHOW_COUNT = "the show's bars"
@@ -946,43 +947,42 @@ def _rebase(app):
     a Mutate over bars keeps how far it had grown."""
     beats, src = beat_count(app)
     show = src == SHOW_COUNT
-    was, last = getattr(app, "_vj_count", (None, None))
-    app._vj_count = (show, beats)
+    was, last = vj_state.of(app).count
+    vj_state.of(app).count = (show, beats)
     if was is None or was == show:
         return
-    for k in ("_vj_bar_k", "_vj_cbar_k") + tuple(f"_vj_clipbar{i}" for i in range(DECKS)):
-        app.__dict__.pop(k, None)
+    vj_state.of(app).forget("bar_k", "cbar_k", "clipbar")
     q = options(app).get("quant", "now")
     unit = 1 if q == "beat" else _per_bar(app, src)
     nxt = float((math.floor(beats / unit + 1e-6) + 1) * unit)
-    p = getattr(app, "_vj_pending", None)
+    p = vj_state.of(app).pending
     if p is not None:
-        app._vj_pending = (nxt, p[1])
-    p = getattr(app, "_vj_cpending", None)
+        vj_state.of(app).pending = (nxt, p[1])
+    p = vj_state.of(app).cpending
     if p is not None:
-        app._vj_cpending = (nxt, p[1])
+        vj_state.of(app).cpending = (nxt, p[1])
     jump = beats - (last or 0.0)
-    morphs = getattr(app, "_vj_morphs", {})
+    morphs = vj_state.of(app).morphs
     for i, (t0, n) in list(morphs.items()):
         morphs[i] = (t0 + jump, n)
 
 
 def _keep_count(app, now, hit):
     """The tempo's beat count a frame on, a beat heard near one of its beats pulling it onto the music, and a tap
-    tempo's first tap made a bar's first beat (sequence_ui.tap sets _vj_downbeat)."""
+    tempo's first tap made a bar's first beat (sequence_ui.tap sets vj_state.downbeat)."""
     bpm = _tempo(app)
-    db = getattr(app, "_vj_downbeat", None)
+    db = vj_state.of(app).downbeat
     if db is not None:
-        app._vj_downbeat = None
-        n = getattr(app, "_vj_beats", 0.0)
-        app._vj_beats = 4.0 * math.floor(n / 4.0 + 0.5) + max(0.0, now - db) * bpm / 60.0
+        vj_state.of(app).downbeat = None
+        n = vj_state.of(app).beats
+        vj_state.of(app).beats = 4.0 * math.floor(n / 4.0 + 0.5) + max(0.0, now - db) * bpm / 60.0
         return
     if hit:
         at = getattr(app, "last_hit_at", now)
-        b = app._vj_beats - max(0.0, now - at) * bpm / 60.0       # the count when the beat was heard
+        b = vj_state.of(app).beats - max(0.0, now - at) * bpm / 60.0       # the count when the beat was heard
         e = b - round(b)
         if abs(e) < LOCK_WINDOW:
-            app._vj_beats -= e * LOCK_PULL
+            vj_state.of(app).beats -= e * LOCK_PULL
 
 
 # --- drawing -------------------------------------------------------------------------------------
@@ -1019,7 +1019,7 @@ def _bars(app, deck, w, h):
 
 def _picture_deck(app, i, deck):
     """The deck as its picture or video is laid out: a modulator's value over a picture knob while one moves it."""
-    m = getattr(app, "_vj_mod", None)
+    m = vj_state.of(app).mod
     if not m:
         return deck
     over = {k: v for (j, k), v in m.items() if j == i and k in vj_layer.DEFAULTS}
@@ -1075,7 +1075,7 @@ def draw_deck(app, i, dt, snd, beat, hit):
         if run.src_key is not None:                           # an Effect deck has no video: its source let go
             run.src_key = None
             run.video = run.video_prev = None
-            app._vj_release_due = True
+            vj_state.of(app).release_due = True
         run.led = _effect_frame(app, i, run, deck, speed, amount, dt)
         return
     _take_video(app, i, run, deck)
@@ -1107,7 +1107,7 @@ def draw_deck(app, i, dt, snd, beat, hit):
     c.t, c.dt = run.t, dt * speed
     c.bass, c.mid, c.treb, c.level, c.wave = snd
     c.beat, c.beat_hit = beat, hit
-    c.beats = getattr(app, "_vj_beats", 0.0)
+    c.beats = vj_state.of(app).beats
     c.deck = _picture_deck(app, i, deck)                    # (the picture knobs as a modulator moves them)
     c.image_path = media(app, deck.get("image") or "")
     c.font_path = media(app, deck.get("text_font") or "")
@@ -1243,7 +1243,7 @@ def fx_set(app, i, k, f):
     d = options(app)["decks"][i]
     v = (1 if f >= 0.5 else 0) if k[0] == "o" else int(round(max(0.0, min(1.0, float(f))) * fx_most(k)))
     d.setdefault("fx_set", {})[k] = v
-    app._vj_dirty = True
+    vj_state.of(app).dirty = True
 
 
 def fx_words(app, i, k):
@@ -1370,7 +1370,7 @@ def _draw_clip(app, i):
     if vj_clips.level(app, i) is None:
         if crun.src_key is not None or crun.canvas is not None:
             crun.src_key, crun.video, crun.video_prev, crun.canvas = None, None, None, None
-            app._vj_release_due = True
+            vj_state.of(app).release_due = True
         return
     _take_video(app, i, crun, vj_clips.clip_deck(app, i, options(app)["decks"][i]))
     v = crun.video
@@ -1498,23 +1498,23 @@ def update(app, dt=None):
     o = options(app)
     now = clock.now()
     if dt is None:
-        last = getattr(app, "_vj_at", None)
+        last = vj_state.of(app).at
         dt = 0.0 if last is None else min(0.1, max(0.0, now - last))
-    app._vj_at = now
-    app._vj_beats = getattr(app, "_vj_beats", 0.0) + dt * _tempo(app) / 60.0
+    vj_state.of(app).at = now
+    vj_state.of(app).beats = vj_state.of(app).beats + dt * _tempo(app) / 60.0
     snd = sound(app)
     last = getattr(app, "last_hit_at", None)
-    heard = last is not None and last != getattr(app, "_vj_last_hit", None)
+    heard = last is not None and last != vj_state.of(app).last_hit
     if heard:
-        app._vj_hits = getattr(app, "_vj_hits", 0) + 1
+        vj_state.of(app).hits = vj_state.of(app).hits + 1
     _keep_count(app, now, heard)
     _rebase(app)
-    app._vj_last_hit = last
+    vj_state.of(app).last_hit = last
     beat, hit = _beat(app, now, heard)
-    app._vj_pulse = beat
+    vj_state.of(app).pulse = beat
     _flames(app)
     f = fader_now(app)
-    app._vj_tick = getattr(app, "_vj_tick", 0) + 1
+    vj_state.of(app).tick = vj_state.of(app).tick + 1
     _follow_clock(app)                                      # a render let the clock go: the times on it moved
     vj_clips.tick(app)                                      # the pads' clips: their envelopes, the one-shots ended
     _collect(app)                                           # sources opened on workers, into the pool
@@ -1526,7 +1526,7 @@ def update(app, dt=None):
         if run_i.src_key is not None and (dn["look"] == EFFECT or dn["source"].get("kind", "none") == "none"):
             run_i.src_key = None                            # no video shown (none, an Effect, a clip let go): its
             run_i.video = run_i.video_prev = None           # source closed, not decoding on unseen (a webcam off)
-            app._vj_release_due = True
+            vj_state.of(app).release_due = True
         if i < 2:
             _draw_clip(app, i)                              # a pad's clip over A or B
         if i < 2:
@@ -1539,14 +1539,14 @@ def update(app, dt=None):
         # from black only then, would land the drop on black)
         if live:
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
-        elif (i in _previewed(app) or i < 2 or _builds_up(o["decks"][i])) and (app._vj_tick + i) % 2 == 0:
+        elif (i in _previewed(app) or i < 2 or _builds_up(o["decks"][i])) and (vj_state.of(app).tick + i) % 2 == 0:
             draw_deck(app, i, dt + _skipped(app, i), snd, beat, hit)
         else:
             _skips(app)[i] += dt
             d = vj_clips.deck(app, i, o["decks"][i])
             if d["look"] != EFFECT and d["source"].get("kind", "none") != "none":
                 _take_video(app, i, _runs(app)[i], d)         # its video rolling on off the mix
-    if app.__dict__.pop("_vj_release_due", False):
+    if vj_state.of(app).take("release_due"):
         _release(app)                                       # once every deck has its key: none closed under another
     _launch_due(app)
     _auto(app, hit)
@@ -1556,7 +1556,7 @@ def update(app, dt=None):
     for i in range(len(o["decks"])):
         p = deck_led(app, i)
         pics.append(p if p is not None and p.shape == shape else np.zeros(shape, np.uint8))
-    app._vj_out = mix(app, pics[0], pics[1], pics[2] if len(pics) > 2 else None,
+    vj_state.of(app).out = mix(app, pics[0], pics[1], pics[2] if len(pics) > 2 else None,
                       deck_alpha(app, 2) if len(pics) > 2 else None)
 
 
@@ -1571,24 +1571,24 @@ def _advance_clips(app, i, hit):
     elif adv == "bars":
         per = max(1, int(options(app)["auto"].get("bars", 4)))
         k = int(bar_count(app)[0] // per)
-        key = f"_vj_clipbar{i}"
-        if k != getattr(app, key, k):
+        bars = vj_state.of(app).clipbar
+        if k != bars.get(i, k):
             next_clip(app, i)
-        setattr(app, key, k)
+        bars[i] = k
 
 
 def _previewed(app):
     """The decks whose previews are on screen (vj_ui says): only those are drawn while off the mix."""
-    p = getattr(app, "_vj_preview", False)
+    p = vj_state.of(app).preview
     if p is True:
         return range(DECKS)
     return p or ()
 
 
 def _skips(app):
-    sk = app.__dict__.get("_vj_skip")
+    sk = vj_state.of(app).skip
     if sk is None or len(sk) < DECKS:
-        sk = app._vj_skip = [0.0] * DECKS
+        sk = vj_state.of(app).skip = [0.0] * DECKS
     return sk
 
 
@@ -1605,19 +1605,19 @@ def picture(app, rgb):
     rgb = np.asarray(rgb)
     out = rgb
     if on(app):
-        v = getattr(app, "_vj_out", None)
+        v = vj_state.of(app).out
         if v is not None and v.shape == rgb.shape:
             out = v
-    fade = getattr(app, "_vj_fade", None)
+    fade = vj_state.of(app).fade
     if fade is not None:
         k = (clock.now() - fade["t0"]) / max(0.05, fade["dur"])
         src = fade["from"]
         if k >= 1.0 or src is None or src.shape != out.shape:
-            app._vj_fade = None
+            vj_state.of(app).fade = None
         else:
             from native import transition
             out = transition.blend(src, out, k, fade["style"])
-    app._vj_last_pic = out
+    vj_state.of(app).last_pic = out
     return out
 
 
@@ -1630,7 +1630,7 @@ def _auto(app, hit):
     a slow fade into the quiet parts); a deck dealt a new look as the mix leaves it, when shuffling."""
     o = options(app)
     a = o["auto"]
-    sweep = getattr(app, "_vj_sweep", None)
+    sweep = vj_state.of(app).sweep
     now = clock.now()
     if sweep is not None:
         t0, dur, f0, f1 = sweep
@@ -1638,7 +1638,7 @@ def _auto(app, hit):
         e = 0.5 - 0.5 * math.cos(math.pi * k)
         o["fader"] = f0 + (f1 - f0) * e
         if k >= 1.0:
-            app._vj_sweep = None
+            vj_state.of(app).sweep = None
             if a.get("shuffle"):
                 shuffle(app, 0 if f1 >= 0.5 else 1)         # the deck the mix just left
         return
@@ -1646,13 +1646,13 @@ def _auto(app, hit):
     if mode == "bars":
         per = max(1, int(a.get("bars", 4)))
         k = int(bar_count(app)[0] // per)
-        if k != getattr(app, "_vj_bar_k", k):
+        if vj_state.of(app).bar_k is not None and k != vj_state.of(app).bar_k:
             go(app, FADE_BEATS * 60.0 / _tempo(app))
-        app._vj_bar_k = k
+        vj_state.of(app).bar_k = k
     elif mode == "sections":
         sec = _section_now(app)
-        was = getattr(app, "_vj_sec", sec)
-        app._vj_sec = sec
+        was = sec if vj_state.of(app).sec == vj_state.UNSET else vj_state.of(app).sec
+        vj_state.of(app).sec = sec
         if sec is not None and sec != was:
             kind = sec[1]
             if kind == "drop":
@@ -1682,17 +1682,17 @@ def _section_now(app):
 def go(app, seconds):
     """The fader swept to the other end over `seconds` (0: a cut) - counted, so a staged pad knows its deck went
     on air though the fader is back by the time it looks (pads.staged)."""
-    app._vj_goes = getattr(app, "_vj_goes", 0) + 1
+    vj_state.of(app).goes = vj_state.of(app).goes + 1
     o = options(app)
     f0 = float(o["fader"])
     f1 = 0.0 if f0 >= 0.5 else 1.0
     if seconds <= 0:
         o["fader"] = f1
-        app._vj_sweep = None
+        vj_state.of(app).sweep = None
         if o["auto"].get("shuffle"):
             shuffle(app, 0 if f1 >= 0.5 else 1)
         return
-    app._vj_sweep = (clock.now(), float(seconds), f0, f1)
+    vj_state.of(app).sweep = (clock.now(), float(seconds), f0, f1)
 
 
 def shuffle(app, i):
@@ -1713,7 +1713,7 @@ def shuffle(app, i):
         pool = kin or pool                                  # a family of one: any look rather than none
     if pool:
         d["look"] = random.choice(pool)
-        app._vj_dirty = True
+        vj_state.of(app).dirty = True
 
 
 def cut(app):
@@ -1729,23 +1729,23 @@ def launch(app, seconds):
     What it waits for, in words, or "" when it went at once."""
     q = options(app).get("quant", "now")
     if q not in ("beat", "bar"):
-        app._vj_pending = None
+        vj_state.of(app).pending = None
         go(app, seconds)
         return ""
     beats, src = beat_count(app)
     unit = 1 if q == "beat" else _per_bar(app, src)
     target = (math.floor(beats / unit + 1e-6) + 1) * unit
-    app._vj_pending = (float(target), float(seconds))
+    vj_state.of(app).pending = (float(target), float(seconds))
     return "the next beat" if q == "beat" else "the next bar"
 
 
 def _launch_due(app):
     """A Cut or Fade waiting for its beat or bar, gone once the count reaches it."""
-    p = getattr(app, "_vj_pending", None)
+    p = vj_state.of(app).pending
     if p is None:
         return
     if beat_count(app)[0] >= p[0] - 1e-6:
-        app._vj_pending = None
+        vj_state.of(app).pending = None
         go(app, p[1])
 
 
@@ -1760,9 +1760,9 @@ def fader_now(app):
 def set_fader(app, v, hand=True):
     """The crossfader set (by hand: the dialog's, MIDI's, the phone's - a show's recording takes it)."""
     options(app)["fader"] = float(max(0.0, min(1.0, v)))
-    app._vj_sweep = None
+    vj_state.of(app).sweep = None
     if hand:
-        app._vj_hand_at = clock.now()
+        vj_state.of(app).hand_at = clock.now()
 
 
 # --- deck C: brought in and taken out over the mix ----------------------------------------------------
@@ -1780,7 +1780,7 @@ def c_level(app):
 
 def c_is_in(app):
     """Deck C in, or on its way in: where a sweep is headed (a flash counts as out), else whether its level is up."""
-    sw = getattr(app, "_vj_csweep", None)
+    sw = vj_state.of(app).csweep
     if sw is not None:
         return sw[3] > 0.0
     return c_level(app) > 0.0
@@ -1795,18 +1795,18 @@ def c_go(app, up, beats=None, flash=False):
     if flash:
         up_to = float(o["c_up"])
         o["decks"][2]["level"] = up_to
-        app._vj_csweep = (clock.now(), beat, up_to, 0.0, FLASH_HOLD * beat)
-        app._vj_knobs_moved = True
+        vj_state.of(app).csweep = (clock.now(), beat, up_to, 0.0, FLASH_HOLD * beat)
+        vj_state.of(app).knobs_moved = True
         return
     l1 = float(o["c_up"]) if up else 0.0
     dur = (float(o["c_fade"]) if beats is None else float(beats)) * beat
     if dur <= 0.0:
         o["decks"][2]["level"] = l1
-        app._vj_csweep = None
-        app._vj_knobs_moved = True
+        vj_state.of(app).csweep = None
+        vj_state.of(app).knobs_moved = True
         _c_left(app, l0, l1)
         return
-    app._vj_csweep = (clock.now(), dur, l0, l1, 0.0)
+    vj_state.of(app).csweep = (clock.now(), dur, l0, l1, 0.0)
 
 
 C_PRESSES = ("in", "out", "toggle", "flash")
@@ -1819,19 +1819,19 @@ def c_launch(app, what):
         what = "out" if c_is_in(app) else "in"
     q = options(app).get("quant", "now")
     if q not in ("beat", "bar"):
-        app._vj_cpending = None
+        vj_state.of(app).cpending = None
         c_go(app, what == "in", flash=what == "flash")
         return ""
     beats, src = beat_count(app)
     unit = 1 if q == "beat" else _per_bar(app, src)
-    app._vj_cpending = (float((math.floor(beats / unit + 1e-6) + 1) * unit), what)
+    vj_state.of(app).cpending = (float((math.floor(beats / unit + 1e-6) + 1) * unit), what)
     return "the next beat" if q == "beat" else "the next bar"
 
 
 def c_hand(app):
     """Deck C's level set by hand (the knob, MIDI, the phone): a sweep under way, and a press waiting, let go."""
-    app._vj_csweep = None
-    app._vj_cpending = None
+    vj_state.of(app).csweep = None
+    vj_state.of(app).cpending = None
 
 
 def _c_left(app, l0, l1):
@@ -1844,32 +1844,32 @@ def _c_left(app, l0, l1):
 def _c_update(app):
     """Each frame: a press waiting for its beat gone, deck C's sweep moved on, and its own auto-mix."""
     o = options(app)
-    p = getattr(app, "_vj_cpending", None)
+    p = vj_state.of(app).cpending
     if p is not None and beat_count(app)[0] >= p[0] - 1e-6:
-        app._vj_cpending = None
+        vj_state.of(app).cpending = None
         c_go(app, p[1] == "in", flash=p[1] == "flash")
-    sw = getattr(app, "_vj_csweep", None)
+    sw = vj_state.of(app).csweep
     if sw is not None:
         t0, dur, l0, l1, hold = sw
         t = clock.now() - t0 - hold
         k = 1.0 if t >= dur else max(0.0, t / dur)
         o["decks"][2]["level"] = round(l0 + (l1 - l0) * (0.5 - 0.5 * math.cos(math.pi * k)), 4)
-        app._vj_knobs_moved = True
+        vj_state.of(app).knobs_moved = True
         if k >= 1.0:
-            app._vj_csweep = None
+            vj_state.of(app).csweep = None
             _c_left(app, l0, l1)
     a = o["auto"]
     mode = a.get("c", "off")
     if mode in ("bars", "flash"):
         per = max(1, int(a.get("c_bars", 4)))
         k = int(bar_count(app)[0] // per)
-        if k != getattr(app, "_vj_cbar_k", k):
+        if vj_state.of(app).cbar_k is not None and k != vj_state.of(app).cbar_k:
             c_go(app, not c_is_in(app), flash=mode == "flash")
-        app._vj_cbar_k = k
+        vj_state.of(app).cbar_k = k
     elif mode == "sections":
         sec = _section_now(app)
-        was = getattr(app, "_vj_csec", sec)
-        app._vj_csec = sec
+        was = sec if vj_state.of(app).csec == vj_state.UNSET else vj_state.of(app).csec
+        vj_state.of(app).csec = sec
         if sec is not None and sec != was:
             loud = sec[1] in C_LOUD
             if loud != c_is_in(app):
@@ -1895,16 +1895,16 @@ def snapshot(app):
 def _fade_from_here(app, step):
     """A show's step blending in: what showed until now blended into what shows next, over the step's blend."""
     dur = float(step.get("trans", 0.0) or 0.0) if isinstance(step, dict) else 0.0
-    last = getattr(app, "_vj_last_pic", None)
+    last = vj_state.of(app).last_pic
     if dur <= 0.0 or last is None:
-        app._vj_fade = None
+        vj_state.of(app).fade = None
         return
     try:
         from native import sequence_ui
         style = str(sequence_ui._steps(app).get("style") or "fade")
     except Exception:
         style = "fade"
-    app._vj_fade = {"t0": clock.now(), "dur": dur, "from": np.array(last, copy=True), "style": style}
+    vj_state.of(app).fade = {"t0": clock.now(), "dur": dur, "from": np.array(last, copy=True), "style": style}
 
 
 def apply_step(app, step, playing=True):
@@ -1917,36 +1917,36 @@ def apply_step(app, step, playing=True):
     if not isinstance(v, dict):                             # a damaged show's (true, a number, a list): not the VJ's
         v = None
     o = options(app)
-    by_show = getattr(app, "_vj_by_show", False)
+    by_show = vj_state.of(app).by_show
     if not playing:
         if v:
             if by_show:                                    # a show's desk let go: what is loaded now is the desk
-                app._vj_by_show, app._vj_desk = False, None
+                vj_state.of(app).by_show, vj_state.of(app).desk = False, None
             for k in SNAP_KEYS:
                 if k in v:
                     o[k] = json_copy(v[k])
             _FILLED[0] = None                              # the step's settings checked as a project's are
             options(app)
             o["on"] = True
-            app._vj_sweep = app._vj_pending = None
-            app._vj_csweep = app._vj_cpending = None
-            app._vj_morphs = {}
-            app._vj_dirty = True
+            vj_state.of(app).sweep = vj_state.of(app).pending = None
+            vj_state.of(app).csweep = vj_state.of(app).cpending = None
+            vj_state.of(app).morphs = {}
+            vj_state.of(app).dirty = True
             if v.get("mods"):
                 from native import modulate
                 modulate.load_scene(app, v["mods"])
         return
     if v:
         if not by_show:
-            app._vj_desk = json_copy({k: o[k] for k in SNAP_KEYS + ("on",)})
-            for d in app._vj_desk.get("decks") or ():        # a Mutate growing: the desk kept with it grown (no
+            vj_state.of(app).desk = json_copy({k: o[k] for k in SNAP_KEYS + ("on",)})
+            for d in vj_state.of(app).desk.get("decks") or ():        # a Mutate growing: the desk kept with it grown (no
                 to = d.get("morph_to") or ""                 # one is left to grow it), not frozen part-way
                 if to:
                     if to in vj_looks.LOOKS:
                         d["look"] = to
                     d["morph_to"], d["morph"] = "", 0.0
-        app._vj_morphs = {}
-        app._vj_pending = None                             # a Cut waiting for its beat: not over the step's fader
+        vj_state.of(app).morphs = {}
+        vj_state.of(app).pending = None                             # a Cut waiting for its beat: not over the step's fader
         _fade_from_here(app, step)
         for k in SNAP_KEYS:
             if k in v:
@@ -1955,12 +1955,12 @@ def apply_step(app, step, playing=True):
         options(app)                                  # anything the snapshot left out, defaulted
         o["on"] = True
         app.project.save_view = lambda opts, app=app: _desk_saved(app, opts)   # saved meanwhile: the desk, kept
-        app._vj_csweep = app._vj_cpending = None       # deck C as the step has it, not a fade from before
+        vj_state.of(app).csweep = vj_state.of(app).cpending = None       # deck C as the step has it, not a fade from before
         from native import modulate
         modulate.play_scene(app, v.get("mods"))       # its modulators as it kept them (a step without: as they are)
-        app._vj_by_show = True
-        app._vj_sweep = None
-        app._vj_dirty = True
+        vj_state.of(app).by_show = True
+        vj_state.of(app).sweep = None
+        vj_state.of(app).dirty = True
     elif by_show:
         _fade_from_here(app, step)
         restore_desk(app)
@@ -1970,30 +1970,30 @@ def _desk_saved(app, opts):
     """The project's options as they are saved while a show's VJ steps hold the desk: the desk they took over (put
     back when the show lets go), not the step's decks - a save meanwhile, or the studio closing or failing mid-show,
     kept the step's decks as the desk for good."""
-    desk = getattr(app, "_vj_desk", None)
-    if not getattr(app, "_vj_by_show", False) or not desk or not isinstance(opts.get("vj"), dict):
+    desk = vj_state.of(app).desk
+    if not vj_state.of(app).by_show or not desk or not isinstance(opts.get("vj"), dict):
         return opts
     return dict(opts, vj=dict(opts["vj"], **desk))
 
 
 def restore_desk(app):
     """The desk as it was before a show's VJ steps took it over (the show stopped, or a step not the VJ's)."""
-    if not getattr(app, "_vj_by_show", False):
+    if not vj_state.of(app).by_show:
         return
-    desk = getattr(app, "_vj_desk", None)
+    desk = vj_state.of(app).desk
     o = options(app)
     if desk:
         for k, val in desk.items():
             o[k] = json_copy(val)
     else:
         o["on"] = False
-    app._vj_by_show = False
-    app._vj_desk = None
+    vj_state.of(app).by_show = False
+    vj_state.of(app).desk = None
     app.project.save_view = None
-    app._vj_sweep = app._vj_pending = None              # (a Cut a step waited on: not over the desk's fader)
-    app._vj_morphs = {}                                 # the step's Mutate: not grown on the desk's decks
-    app._vj_csweep = app._vj_cpending = None           # deck C as the desk had it, not the step's fade
-    app._vj_dirty = True
+    vj_state.of(app).sweep = vj_state.of(app).pending = None              # (a Cut a step waited on: not over the desk's fader)
+    vj_state.of(app).morphs = {}                                 # the step's Mutate: not grown on the desk's decks
+    vj_state.of(app).csweep = vj_state.of(app).cpending = None           # deck C as the desk had it, not the step's fade
+    vj_state.of(app).dirty = True
     from native import modulate
     modulate.play_scene(app, None)                    # the modulators each as it is set again
 
@@ -2032,7 +2032,7 @@ def load_preset(app, i, name):
     if p:
         p = json_copy(p)
         mods = p.pop("mods", None)
-        getattr(app, "_vj_morphs", {}).pop(i, None)     # a Mutate growing on the deck: the preset's look wins
+        vj_state.of(app).morphs.pop(i, None)     # a Mutate growing on the deck: the preset's look wins
         o["decks"][i].update(p)
         o["decks"][i]["morph_to"], o["decks"][i]["morph"] = "", 0.0
         _fix_deck(o["decks"][i])                         # a damaged preset's null or list not run every frame
@@ -2088,7 +2088,7 @@ def _hand_over(app, i, name):
 
 def _morph_done(app, i):
     d = options(app)["decks"][i]
-    getattr(app, "_vj_morphs", {}).pop(i, None)
+    vj_state.of(app).morphs.pop(i, None)
     to = d.get("morph_to") or ""
     d["morph_to"], d["morph"] = "", 0.0
     if to in vj_looks.LOOKS:
@@ -2097,7 +2097,7 @@ def _morph_done(app, i):
 
 def morph_hand(app, i):
     """Deck i's morph moved by hand (the knob, MIDI, a modulator): a Mutate growing over bars let go."""
-    getattr(app, "_vj_morphs", {}).pop(i, None)
+    vj_state.of(app).morphs.pop(i, None)
 
 
 def mutate_flame(app, i):
@@ -2121,8 +2121,8 @@ def mutate_flame(app, i):
     else:
         d["morph_to"], d["morph"] = name, 0.0
         beats, src = beat_count(app)
-        app._vj_morphs = getattr(app, "_vj_morphs", {})
-        app._vj_morphs[i] = (beats, float(bars * _per_bar(app, src)))
+        vj_state.of(app).morphs = vj_state.of(app).morphs
+        vj_state.of(app).morphs[i] = (beats, float(bars * _per_bar(app, src)))
     return name
 
 
@@ -2130,7 +2130,7 @@ def set_breathe(app, i, bars):
     """Deck i breathing between its flame and a child over `bars` (0: still) - a child bred if it has none."""
     d = options(app)["decks"][i]
     d["breathe"] = int(bars)
-    getattr(app, "_vj_morphs", {}).pop(i, None)
+    vj_state.of(app).morphs.pop(i, None)
     if bars and not d.get("morph_to") and _flame_of(d["look"]) is not None:
         import random
         d["morph_to"] = _keep_flame(app, d["look"], vj_looks.mutate(_flame_of(d["look"]), random.randrange(1 << 30)))
@@ -2150,7 +2150,7 @@ def keep_morph(app, i):
     if "sym_to" in fl:
         fl["sym"] = int(fl.pop("sym_to")[0]) if m >= 0.5 else fl["sym"]
     name = _keep_flame(app, d["look"], fl)
-    getattr(app, "_vj_morphs", {}).pop(i, None)
+    vj_state.of(app).morphs.pop(i, None)
     d["morph_to"], d["morph"], d["breathe"] = "", 0.0, 0
     _hand_over(app, i, name)
     return name
@@ -2159,7 +2159,7 @@ def keep_morph(app, i):
 def _flames(app):
     """Each frame: a Mutate growing over bars moved on (and handed over at its end), a breathing flame breathed."""
     o = options(app)
-    morphs = getattr(app, "_vj_morphs", {})
+    morphs = vj_state.of(app).morphs
     beats, src = beat_count(app)
     for i, d in enumerate(o["decks"]):
         to = d.get("morph_to") or ""
@@ -2171,13 +2171,13 @@ def _flames(app):
             t0, n = morphs[i]
             k = 1.0 if n <= 0 else max(0.0, (beats - t0) / n)
             d["morph"] = round(min(1.0, k), 4)
-            app._vj_knobs_moved = True
+            vj_state.of(app).knobs_moved = True
             if k >= 1.0:
                 _morph_done(app, i)
         elif to and int(d.get("breathe", 0) or 0) > 0:
             n = int(d["breathe"]) * _per_bar(app, src)
             d["morph"] = round(0.5 - 0.5 * math.cos(2 * math.pi * beats / n), 4)
-            app._vj_knobs_moved = True
+            vj_state.of(app).knobs_moved = True
 
 
 FLAME_EDITS = ("var1", "var2", "mix", "final")
@@ -2256,15 +2256,11 @@ def rename_flame(app, old, new):
 
 def project_changed(app):
     """Another project opened: the last one's show desk, sources, decks' state and bred flames let go."""
-    app._vj_by_show, app._vj_desk, app._vj_fade, app._vj_sweep = False, None, None, None
-    app._vj_csweep = app._vj_cpending = None
-    app._vj_morphs = {}
-    app._vj_mod = {}
-    for k in ("_vj_pending", "_vj_bar_k", "_vj_sec", "_vj_cbar_k", "_vj_csec", "_vj_skip", "_vj_last_pic",
-              "_vj_out", "_vj_count") + tuple(f"_vj_clipbar{i}" for i in range(DECKS)):
-        app.__dict__.pop(k, None)                           # a Cut waiting for the bar, the bars counted, the picture
-    close(app)
-    app._vj_runs = app._vj_clip_runs = None
+    S = vj_state.of(app)
+    S.forget("by_show", "desk", "fade", "sweep", "csweep", "cpending", "morphs", "mod",
+             "pending", "bar_k", "sec", "cbar_k", "csec", "clipbar", "skip", "last_pic", "out", "count")
+    close(app)                                              # (a Cut waiting for the bar, the bars counted, the picture)
+    S.forget("runs", "clip_runs")
     for n in [n for n, lk in vj_looks.LOOKS.items() if lk.family == "flame" and n not in vj_looks.FLAMES]:
         vj_looks.LOOKS.pop(n, None)
     vj_looks._FLAMES_SEEN[0] = None                         # (listed again below, not taken as listed already)
@@ -2307,7 +2303,7 @@ def knob_value(app, i, key):
         lv = vj_clips.level(app, i)                         # a pad's clip on C: its level through its envelope
         if lv is not None:
             return lv
-    m = getattr(app, "_vj_mod", None)
+    m = vj_state.of(app).mod
     if m and (i, key) in m:
         return m[(i, key)]
     lo = next(a for k, a, _ in KNOBS if k == key)
@@ -2327,7 +2323,7 @@ def knob_set(app, i, key, f):
     f = max(0.0, min(1.0, float(f)))
     v = lo + (hi - lo) * f
     options(app)["decks"][i][key] = int(round(v)) if isinstance(hi, int) else round(v, 4)
-    app._vj_knobs_moved = True
+    vj_state.of(app).knobs_moved = True
     if i == 2 and key == "level":
         c_hand(app)
     if key == "morph":

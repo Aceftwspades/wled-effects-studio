@@ -14,6 +14,7 @@ import numpy as np
 
 from native.typeface import px
 from native import form, num, vj_clips
+from native import vj_state
 
 ROW = "pads_s_cliprow"
 DECK_WORDS = ("A", "B", "C", "selected")   # a clip's deck: one of the three, or the one selected when it is pressed
@@ -465,7 +466,7 @@ def _try(app):
         vj_clips.stop(app, owner)
         return
     vj_clips.play(app, t, owner)
-    if not vj.on(app) and not getattr(app, "_vj_open", False):
+    if not vj.on(app) and not vj_state.of(app).open:
         app.gp.status("the clip plays on the VJ: turn it on (On air) to see it", "info")
 
 

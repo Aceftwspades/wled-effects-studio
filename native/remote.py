@@ -9,7 +9,7 @@ import time
 import numpy as np
 import dearpygui.dearpygui as dpg
 
-from native import num, typeface, form, messages, scratch
+from native import num, typeface, form, messages, scratch, vj_state
 from native import chrome, device_ui, shape_ui, midi_ui, bank_ui, reader_ui, room, weight, view3d, shape_tools, video_ui
 from native.geometry import Geometry
 from native.walk import _call, process_stats, walk_actions, walk_ctx, walk_frame, walk_menus, write_uiref
@@ -39,7 +39,7 @@ def _hook_names(app):
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
             "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,
-            "shape_checks": shape_checks, "shape_start": shape_start, "camera_map": camera_map, "camera_map_ui": camera_map_ui}
+            "shape_checks": shape_checks, "shape_start": shape_start, "camera_map": camera_map, "camera_map_ui": camera_map_ui, "vj_state": vj_state}
 
 
 UNTIL_S = 20.0                                   # how long an "until" batch waits for its condition by default

@@ -25,6 +25,7 @@ import dearpygui.dearpygui as dpg
 from native import phone, phone_tls, midi
 from native.typeface import px
 from native import typeface
+from native import vj_state
 
 PUBLISH_S = 0.25                 # the state the page reads, made again at most this often
 
@@ -211,7 +212,7 @@ def apply(app, cmd):
         elif a == "vjlook":
             if cmd["v"] in vj_ui.look_names():
                 vj.options(app)["decks"][cmd["d"]]["look"] = cmd["v"]
-                app._vj_dirty = True
+                vj_state.of(app).dirty = True
                 vj_ui._save(app)
         elif cmd["k"] == "cut":
             vj.launch(app, 0.0)
@@ -295,7 +296,7 @@ def _vj_state(app):
     """The VJ card's: whether the frame is open, on air, the fader, each deck's look and level, the looks to pick."""
     from native import vj, vj_ui
     o = vj.options(app)
-    return {"open": bool(getattr(app, "_vj_open", False)), "on": vj.on(app), "fader": float(o["fader"]),
+    return {"open": bool(vj_state.of(app).open), "on": vj.on(app), "fader": float(o["fader"]),
             "decks": [{"look": d["look"], "level": float(d.get("level", 1.0))} for d in o["decks"]],
             "looks": vj_ui.look_names()}
 # AI: end

@@ -28,6 +28,7 @@ preview shows it) instead of its own, and blinks until that deck goes on air - b
 import copy
 import json
 import time
+from native import vj_state
 
 GRID_MIN, GRID_MAX = 2, 8
 BUTTONS = ("trigger", "toggle", "hold")
@@ -449,19 +450,19 @@ def _apply(app, t, f):
             if d.get("effect") != name:
                 d["fx_set"] = {}                                    # another effect: its own settings
             d["look"], d["effect"] = vj.EFFECT, name
-            app._vj_dirty = True
+            vj_state.of(app).dirty = True
         return
     if k == "pad_look":
         names = set(vj_looks_names())
         if t.get("look") in names:
             vj.options(app)["decks"][int(t.get("deck", 0))]["look"] = t["look"]
-            app._vj_dirty = True
+            vj_state.of(app).dirty = True
         return
     if k == "pad_preset":
         if t.get("name") in vj.options(app)["presets"]:
             vj.load_preset(app, int(t.get("deck", 0)), t["name"])
-            app._vj_dirty = True
-            app._vj_knobs_moved = True
+            vj_state.of(app).dirty = True
+            vj_state.of(app).knobs_moved = True
         return
     midi_ui.apply_target(app, t, f, 1.0)
 
@@ -520,7 +521,7 @@ def staged(app, c):
     if not s or s[0] != c["id"]:
         return None
     from native import vj
-    if vj.cue_deck(app) != s[1] or getattr(app, "_vj_goes", 0) != s[2]:    # its deck went on air: the GO (a Cut
+    if vj.cue_deck(app) != s[1] or vj_state.of(app).goes != s[2]:    # its deck went on air: the GO (a Cut
         _rt(app)["staged"] = None                                   # or Fade since, though cut back while unseen)
         return None
     return s[1]
@@ -571,7 +572,7 @@ def press(app, c, f=None, xy=None, pressure=None):
     if kind in ("look", "preset") and c.get("stage"):
         from native import vj
         deck = vj.cue_deck(app)                                     # onto the deck off the air, there till GO
-        r["staged"] = (c["id"], deck, getattr(app, "_vj_goes", 0))
+        r["staged"] = (c["id"], deck, vj_state.of(app).goes)
         _apply(app, dict(t, deck=deck), 1.0)
         return
     if kind in ("switch", "look", "preset", "pick"):

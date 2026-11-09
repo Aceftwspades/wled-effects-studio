@@ -21,7 +21,7 @@ a hold plays it while held (a one-shot ends at Out even if held longer).
 
 One clip a deck: another on the same deck takes its place, its attack from the level the last had (no jump). While
 one plays the deck shows it through the deck's own look when that is a video look (else "Clean"), at the clip's
-level times its envelope - deck C, over the mix, is where clips usually go. Run state only (app._vj_clips), never
+level times its envelope - deck C, over the mix, is where clips usually go. Run state only (vj_state.of(app).clips), never
 saved: a project switched or the VJ closed lets every clip go.
 
     play(app, t, owner)            # a pad (owner: its id) starts t
@@ -37,6 +37,7 @@ import math
 import os
 
 from native import clock
+from native import vj_state
 
 MODES = (("oneshot", "one shot"), ("loop", "loop"))
 DEFAULT = {"kind": "pad_clip", "deck": 2, "file": "", "in": 0.0, "out": 0.0, "mode": "oneshot", "attack": 0.02,
@@ -50,7 +51,7 @@ VIDEO_EXT = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".gif", ".m4v")
 
 
 def _rt(app):
-    return app.__dict__.setdefault("_vj_clips", {})
+    return vj_state.of(app).clips
 
 
 def fill(t):
@@ -99,10 +100,10 @@ def play(app, t, owner):
         return
     rt = _rt(app)
     old = rt.get(t["deck"])
-    app._vj_clip_take = getattr(app, "_vj_clip_take", 0) + 1
+    vj_state.of(app).clip_take = vj_state.of(app).clip_take + 1
     shown = old["lv"] * float(old["t"]["level"]) if old else 0.0
     lv = min(1.0, shown / float(t["level"])) if float(t["level"]) > 0 else 0.0
-    rt[t["deck"]] = {"owner": owner, "t": t, "take": app._vj_clip_take, "pressed": clock.now(), "t0": None,
+    rt[t["deck"]] = {"owner": owner, "t": t, "take": vj_state.of(app).clip_take, "pressed": clock.now(), "t0": None,
                      "at": clock.now(), "gate": True, "stage": "a", "lv": lv, "rate": 0.0,
                      "rise": (1.0 - lv) * float(t["attack"])}     # its attack's seconds, from the level it took over
 
