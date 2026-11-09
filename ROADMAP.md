@@ -107,3 +107,26 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       timecode into `seq_state`, 13 of the shape view's tools, preview and gallery into `shape_state`. The show's
       section drag was `app._sec_drag`, the name the side panel's section grips use: dragging a section's edge on
       the timeline was taken by the panel's mouse handlers as a grip's drag (by reading the code, not reproduced).
+
+## 8. From a look at every part: what the frame costs, what a new project says, what does not fit
+- [x] **The gradient frames' holes** asked each of 214 windows "are you shown?" every frame - 2.4 ms of a 9 ms idle
+      frame, none of them shown. Asked now: the windows a show or hide went to through Dear PyGui since the last
+      frame, the ones last found shown, and eight of the rest in turn (`app_layout._shown_holes`): 0.26 ms. A window
+      shown is a hole the same frame, as before.
+- [x] **"device ~N fps"** fell from ~200 to 67 while the Library made thumbnails: the engine step timed from
+      Python, where the call's return waits for Python's lock whenever another thread holds it - most steps, a
+      little. The engine times its own frame now (`simFrameMs`, `Engine.frame_ms`): 238 idle, 210-214 beside the
+      thumbnails. An engine without it is timed as before, without the slowest tenth of its last 96 steps
+      (`frametime.without_waits`).
+- [x] **The Library's thumbnails** were made for all three banks from the first opening on, the frame open or not,
+      the frame's polls three times as slow beside them. The bank in front only, and only while the frame shows.
+- [x] **LED outputs in a new project** opened in red: "22.84 A of a 0.85 A supply - the device would dim it to 0%"
+      and "0 output(s) cover 0 of 1280 - short by 1280". WLED's own 850 mA default says it is the default and asks
+      for the supply's, in amber; no outputs says how to make some.
+- [x] **Dialogs taller than the studio** (camera mapping, 755 in a 761 window) are as tall as fits and
+      scroll (`chrome._fit_height`).
+- [ ] **Pads, Modulators, Mixer and MIDI as frames** that dock, with a toolbar button, as the other ten.
+- [ ] **A tooltip on every button** (132 of 354 have none), and a check that fails for a new one without.
+- [ ] **Clipped words** (the Library's tags, the VJ decks' descriptions), **areas with no title** (the logs of
+      Devices and Send), **controls shown before they can do anything** (Sequence, Palettes, Send).
+- [ ] **Startup**: ~8,600 items and 180 windows are built before the first frame; what that costs is not measured.

@@ -158,7 +158,7 @@ def show(app):
     dpg.set_value("map_ff_words", "ffmpeg is not on the PATH, so neither a video nor a webcam can be read: install it "
                   "(ffmpeg.org) and restart the studio")
     dpg.configure_item("map_ff_words", show=not cm.ffmpeg())
-    chrome._centre(TAG, 620, 720)
+    chrome._centre(TAG, 620, 760)
     dpg.show_item(TAG)
 
 

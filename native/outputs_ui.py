@@ -104,8 +104,11 @@ def refresh(app):
     g = app.project.geometry
     outs = S["outs"]
     covered = sum(o["len"] for o in outs)
-    dpg.set_value("out_desc", f"{g.describe()}; {len(outs)} output(s) cover {covered} of {g.count}"
-                  + ("" if covered == g.count else f" - {'short by' if covered < g.count else 'over by'} {abs(g.count - covered)}"))
+    if not outs:        # a new project: "0 output(s) cover 0 of 1280 - short by 1280" read as a fault
+        dpg.set_value("out_desc", f"{g.describe()}; no outputs yet - split its {g.count} LEDs with a button below")
+    else:
+        dpg.set_value("out_desc", f"{g.describe()}; {len(outs)} output(s) cover {covered} of {g.count}"
+                      + ("" if covered == g.count else f" - {'short by' if covered < g.count else 'over by'} {abs(g.count - covered)}"))
     dpg.set_value("out_ledma", int(S.get("ma_per_led", 55))); dpg.set_value("out_maxma", int(S.get("max_ma", 850)))
     dpg.set_value("out_abl", bool(S.get("abl_preview")))
     dpg.set_value("out_devview", bool(S.get("dev_view")))
@@ -285,10 +288,17 @@ def poll(app):
         return
     ma, scale, limit = pw
     a = ma / 1000.0
-    line = f"this frame: {a:.2f} A" + (f" of a {limit / 1000.0:.2f} A supply" if limit else " (no limit set)")
-    if limit and scale < 1.0:
-        line += f" - the device would dim it to {int(scale * 100)}%"
-    elif limit:
-        line += " - within the limit"
+    unset = limit == outputs.MAX_MA_DEFAULT and scale < 1.0
+    if unset:
+        # the supply never set: a new project's 1,280 LEDs against WLED's own 850 mA opened the frame in red,
+        # "22.84 A of a 0.85 A supply - the device would dim it to 0%", before anything had been asked of it
+        line = (f"this frame: {a:.2f} A - at WLED's default supply ({limit / 1000.0:.2f} A) the device would dim it to "
+                f"{int(scale * 100)}%: set what yours gives")
+    else:
+        line = f"this frame: {a:.2f} A" + (f" of a {limit / 1000.0:.2f} A supply" if limit else " (no limit set)")
+        if limit and scale < 1.0:
+            line += f" - the device would dim it to {int(scale * 100)}%"
+        elif limit:
+            line += " - within the limit"
     dpg.set_value("out_power", line)
-    dpg.configure_item("out_power", color=_c().RED if (limit and scale < 0.6) else (_c().AMBER if (limit and scale < 1.0) else _c().TEXT))
+    dpg.configure_item("out_power", color=_c().AMBER if (unset or (limit and 0.6 <= scale < 1.0)) else (_c().RED if (limit and scale < 0.6) else _c().TEXT))
