@@ -162,10 +162,15 @@ def _build_side(app):
                   "finger left them")
         dpg.add_text("DRIVES", tag="pads_s_drives", color=c.ACCENT)
         dpg.add_text("", tag="pads_s_target", wrap=px(SIDE_W - 20))
-        dpg.add_input_text(tag="pads_s_find", width=-1, hint="find an action",
-                           callback=lambda s, v: _fill_actions(app))
-        dpg.add_listbox([], tag="pads_s_actions", width=-1, num_items=8,
-                        callback=lambda s, v: _pick_action(app, v))
+        dpg.add_button(label="Change what it drives", tag="pads_s_change", small=True,
+                       callback=lambda: _open_list(app, not _list_open(app)))
+        c.tip("the list of actions: folded once the control drives something, so what that action needs (its "
+              "look, its clip, its camera, its range) is right here")
+        with dpg.group(tag="pads_s_listrow"):
+            dpg.add_input_text(tag="pads_s_find", width=-1, hint="find an action",
+                               callback=lambda s, v: _fill_actions(app))
+            dpg.add_listbox([], tag="pads_s_actions", width=-1, num_items=8,
+                            callback=lambda s, v: _pick_action(app, v))
         with dpg.group(tag="pads_s_lookrow", show=False):
             dpg.add_combo([], tag="pads_s_look", width=-1, callback=lambda s, v: _target_set(app, look=v))
         with dpg.group(tag="pads_s_presetrow", show=False):
@@ -536,6 +541,9 @@ def _fill_side(app):
         dpg.set_value("pads_s_release", dict(pads.RELEASES)[s.get("release", "snap")])
     dpg.set_value("pads_s_drives", f"{ax[4].upper()} DRIVES" if surface else "DRIVES")
     dpg.set_value("pads_s_target", target_label(app, s.get(ax[1])))
+    has = bool((s.get(ax[1]) or {}).get("kind"))
+    dpg.configure_item("pads_s_listrow", show=_list_open(app) or not has)    # nothing picked yet: the list, open
+    dpg.configure_item("pads_s_change", show=has, label="Fold the list" if _list_open(app) else "Change what it drives")
     num.set("pads_s_lo", float(s.get(ax[2], 0.0)))
     num.set("pads_s_hi", float(s.get(ax[3], 1.0)))
     dpg.set_value("pads_s_invert", bool(s.get("invert")))
@@ -789,7 +797,19 @@ def _pick_action(app, lab):
     pads.forget(app, s)                              # a toggle latching what it drove lets it go
     s[_axis(app)[1]] = dict(t)
     _remember(app, lab)
+    pads_state.of(app).list_for = None               # picked: the list folds, what the action needs comes up
     _save(app)
+    _fill_side(app)
+
+
+def _list_open(app):
+    """The action list opened by hand for the control and axis selected now (another control: folded again)."""
+    P = pads_state.of(app)
+    return P.list_for is not None and P.list_for == (id(_sel(app)), _axis(app)[0])
+
+
+def _open_list(app, on):
+    pads_state.of(app).list_for = (id(_sel(app)), _axis(app)[0]) if on else None
     _fill_side(app)
 # AI: end
 

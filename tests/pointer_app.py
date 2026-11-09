@@ -649,6 +649,23 @@ def check_clip_strip(app, bad):
               {"py": f"{P}._add_control(app, 'trigger')"},
               {"py": f"{P}._pick_action(app, 'VJ C: a video clip (set it below)')"},
               {"py": "__import__('native.clip_ui', fromlist=['c'])._set_file(app, 'assets/vj/pointer_clip.mp4')"}], 2.5)
+    # picked, the action list folds: the clip's strip is in the panel without scrolling it; Change what it drives,
+    # clicked, opens the list, and clicked again folds it
+    app.send([{"py": f"dpg.set_y_scroll({P}.SIDE, 0)"}], 0.6)
+    r, side, top = app.rect("pads_clip_strip"), app.rect("pads_side"), app.rect("pads_s_title")
+    if not r or not side or not top or r[1] + r[3] > top[1] + side[3]:      # (a child window's own place is not
+        bad.append(f"the clip's strip is not in the pad panel without scrolling it "   # told: from its first row)
+                   f"(strip {r}, panel {side}, its first row {top})")
+    for want in (True, False):
+        b = app.rect("pads_s_change")
+        if not b:
+            bad.append("no Change what it drives button")
+            break
+        app.click(b[0] + b[2] // 2, b[1] + b[3] // 2)
+        time.sleep(0.4)
+        if app.ask("dpg.is_item_shown('pads_s_listrow')") is not want:
+            bad.append(f"Change what it drives, clicked: the list {'not opened' if want else 'not folded'}")
+            break
     app.send([{"py": f"dpg.set_y_scroll({P}.SIDE, dpg.get_y_scroll_max({P}.SIDE))"}], 0.6)
     r = app.rect("pads_clip_strip")
     if not r:

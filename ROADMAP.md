@@ -61,6 +61,8 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 ## 5. Easier to use (UI)
 - [x] **The pad action list grouped** (Deck A/B/C/Selected, Mix, Effect, Modulators), recent picks on top.
       Each group under a header row (`pads_ui.group_of`), the last six picks first (prefs `pad_recent`).
-- [ ] **The pad panel's settings in reach**: CLIP and CAMERA without scrolling past the action list.
+- [x] **The pad panel's settings in reach**: CLIP and CAMERA without scrolling past the action list.
+      The list folds once a control drives something - what the action needs (look, clip, camera, range) right
+      under it - and **Change what it drives** opens it again; a pick folds it.
 - [ ] **The selected deck at a glance**: a coloured border on it and on the pads that act on it.
 - [ ] **A starter "live show" project** with pads, a clip pad and a camera pad already set up.

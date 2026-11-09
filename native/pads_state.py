@@ -40,6 +40,7 @@ class PadsState:
     labels_key: object = None       # what the action list was made for (another key: made again)
     label_ix: object = None         # target -> its label, from the action list
     state_err: object = None        # the phone's /pads state failed with this (said once)
+    list_for: object = None         # (the control, its axis) whose action list was opened by hand (else folded)
 
     # --- a clip pad's editor ------------------------------------------------------------------------------
     clip_cams: object = None        # the cameras listed for a camera pad (None: not listed yet)

@@ -1299,7 +1299,9 @@ drag its corner to make it span more cells. The panel beside the grid sets
 its kind, its label (the action's name if left empty), its colour and
 what it drives - the actions grouped (the effect, the mix, each deck, the
 selected deck, the modulators), the last few you picked on top; type in
-**find an action** to narrow the list - and its
+**find an action** to narrow the list. Once it drives something the list folds
+away, so what that action needs (its look, its clip, its camera) sits right
+under it; **Change what it drives** opens the list again - and its
 range; on an XY pad, **across**, **up and down** and **pressure** choose
 which movement the action and range are for. **Remove this control** takes
 it off the grid. The row above the grid names the bank, colours its button, sets its

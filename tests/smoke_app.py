@@ -1141,6 +1141,10 @@ STEPS = [
       {"py": "pads_ui._pick_action(app, pads_ui.header('Mix'))"},          # a header: nothing picked
       {"check": "pads_ui._sel(app)['target'].get('key') == 'kaleido' and "
                 "dpg.get_item_configuration('pads_s_actions')['items'][:2] == [pads_ui.header('Recent'), 'VJ B: kaleidoscope']"},
+      # picked, the list folds (what the action needs comes up); Change what it drives opens it, a pick folds it
+      {"check": "not dpg.is_item_shown('pads_s_listrow') and dpg.is_item_shown('pads_s_change')"},
+      {"py": "pads_ui._open_list(app, True)"}, {"check": "dpg.is_item_shown('pads_s_listrow')"},
+      {"py": "pads_ui._pick_action(app, 'VJ B: kaleidoscope')"}, {"check": "not dpg.is_item_shown('pads_s_listrow')"},
       {"py": "pads_ui._ctl_set(app, 'hi', 0.5)"}, {"py": "pads_ui._set_edit(app, False)"},
       {"py": "vj.options(app)['decks'][1].update(kaleido=0)"},
       {"py": "pads.press(app, pads.at(pads.current(pads_ui._st(app)), 4, 0))"}], 0.3),
