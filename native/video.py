@@ -32,6 +32,7 @@ import threading
 import time
 
 import numpy as np
+from native import oops
 
 WIDTH, HEIGHT = 96, 54          # the decoded frame: enough for any LED shape, small enough to copy every frame
 FILE_FPS = 30                   # a file's frames, made this rate by ffmpeg: what a held clock counts them by
@@ -188,7 +189,7 @@ class FfmpegSource:
                 try:
                     self.proc.wait(timeout=2)
                 except Exception:
-                    pass
+                    oops.swallowed()
                 with self._cv:
                     if self._stop.is_set():
                         break
@@ -208,7 +209,7 @@ class FfmpegSource:
                 self._errs.append(line.decode("utf-8", "replace"))
                 del self._errs[:-20]
         except Exception:
-            pass
+            oops.swallowed()
 
     def latest(self):
         from native import clock
@@ -240,7 +241,7 @@ class FfmpegSource:
         try:
             proc.kill()
         except Exception:
-            pass
+            oops.swallowed()
 
 
 _ALPHA = {}
@@ -270,6 +271,7 @@ def alpha_of(path):
                              "stream_side_data=rotation:format=duration", "-of", "default=nw=1", path],
                             capture_output=True, text=True, timeout=10).stdout
         except Exception:
+            oops.swallowed()
             out = ""
         info = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
         codec, fmt = info.get("codec_name", ""), info.get("pix_fmt", "")
@@ -338,6 +340,7 @@ def thumbs(path, n=8, w=48, h=27):
                              f"scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                             capture_output=True, timeout=10).stdout
         except Exception:
+            oops.swallowed()
             raw = b""
         if len(raw) >= w * h * 3:
             out[:, k * w:(k + 1) * w] = np.frombuffer(raw[:w * h * 3], np.uint8).reshape(h, w, 3)
@@ -395,7 +398,7 @@ def webcams():
             for dev in sorted(glob.glob("/dev/video*")):
                 out.append((dev, ["-f", "v4l2", "-i", dev]))
     except Exception:
-        pass
+        oops.swallowed()
     return out
 
 
@@ -429,7 +432,7 @@ def desktop_origin():
             m = ctypes.windll.user32.GetSystemMetrics
             return int(m(76)), int(m(77))                    # SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN
         except Exception:
-            pass
+            oops.swallowed()
     return 0, 0
 
 
@@ -509,6 +512,7 @@ def _xrandr_monitors(text=None):
             from native import procs
             text = procs.run(["xrandr", "--listmonitors"], capture_output=True, text=True, timeout=5).stdout
         except Exception:
+            oops.swallowed()
             return []
     out = []
     for m in re.finditer(r"^\s*\d+:\s+\S+\s+(\d+)/\d+x(\d+)/\d+\+(-?\d+)\+(-?\d+)\s+(\S+)", text or "", re.M):
@@ -557,7 +561,7 @@ def screens(windows=True):
                     for name, w, h, x, y in mons:
                         out.append((f"{name}, {w} x {h}", grab + ["-video_size", f"{w}x{h}", "-i", f"{disp}+{x},{y}"]))
     except Exception:
-        pass
+        oops.swallowed()
     return out
 
 

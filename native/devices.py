@@ -33,6 +33,7 @@ import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from native import oops
 
 MDNS_ADDR, MDNS_PORT = "224.0.0.251", 5353
 SERVICE = "_wled._tcp.local"
@@ -68,7 +69,10 @@ def probe(host, timeout=3.0, effects=True):
     host = clean_host(host)
     try:
         i = _get(host, "/json/info", timeout)
+    except (OSError, ValueError):                         # not there, or not a WLED (the network's answer)
+        return None
     except Exception:
+        oops.swallowed()
         return None
     d = {"host": host, "name": i.get("name") or host, "arch": i.get("arch", ""), "ver": i.get("ver", ""),
          "vid": i.get("vid", ""), "release": i.get("release", ""), "fx": i.get("fxcount", 0),
@@ -82,6 +86,7 @@ def probe(host, timeout=3.0, effects=True):
             names = _get(host, "/json/effects", timeout)
             d["script"] = any("Studio Script" in str(n) for n in names)
         except Exception:
+            oops.swallowed()
             d["script"] = None
     return d
 
@@ -94,7 +99,10 @@ def state(host, timeout=3.0):
         s = _get(host, "/json/state", timeout)
         i = _get(host, "/json/info", timeout)
         names = _get(host, "/json/effects", timeout)
+    except (OSError, ValueError):                         # not there, or not a WLED
+        return None
     except Exception:
+        oops.swallowed()
         return None
     seg = next((g for g in s.get("seg", []) if g.get("id") == s.get("mainseg", 0)), (s.get("seg") or [{}])[0])
     fx = seg.get("fx", 0)
@@ -177,7 +185,7 @@ def _dns_records(data):
             out.append((name, typ, pos, data[pos:pos + rdlen]))
             pos += rdlen
     except Exception:
-        pass
+        oops.swallowed()
     return out
 
 
@@ -206,6 +214,7 @@ def mdns_scan(seconds=2.5, log=lambda m: None):
             except socket.timeout:
                 continue
             except Exception:
+                oops.swallowed()
                 break
             try:
                 _answer(data, addr, found)
@@ -237,6 +246,7 @@ def nodes_of(host, timeout=3.0):
     try:
         d = _get(clean_host(host), "/json/nodes", timeout)
     except Exception:
+        oops.swallowed()
         return []
     out = []
     for n in d.get("nodes", []):
@@ -255,6 +265,7 @@ def local_prefix():
         s.close()
         return ip.rsplit(".", 1)[0] + "."
     except Exception:
+        oops.swallowed()
         return None
 
 
@@ -273,7 +284,10 @@ def sweep(prefix=None, timeout=0.8, log=lambda m: None, stop=lambda: False):
         try:
             i = _get(h, "/json/info", timeout)
             return (h, i.get("name") or h) if "ver" in i else None
+        except (OSError, ValueError):                     # nothing there (most of a scan)
+            return None
         except Exception:
+            oops.swallowed()
             return None
     with ThreadPoolExecutor(max_workers=60) as ex:
         for r in ex.map(one, hosts):

@@ -6,6 +6,7 @@ views. Nothing here is called from outside the app.
 """
 import json
 import os
+import queue
 import shutil
 import threading
 import time
@@ -23,6 +24,7 @@ from native.project import save_prefs
 from native.engine import Engine
 from native.geometry import Geometry
 from native.dropfiles import classify
+from native import oops
 
 
 def _same_file(a, b):
@@ -289,6 +291,7 @@ class Features:
             mx, my = dpg.get_mouse_pos(local=False)
             hit = self.led_at(mx, my)
         except Exception:
+            oops.swallowed()
             return ""
         if hit is None:
             return ""
@@ -573,6 +576,7 @@ class Features:
             try:
                 holes = self.compute_holes()
             except Exception:
+                oops.swallowed()
                 holes = []
         if over == "cube":
             from native import room
@@ -690,6 +694,7 @@ class Features:
         try:
             return self._limited(transition.blend(tr["old"].rgb(), eng.rgb(), prog, tr["style"]))
         except Exception:
+            oops.swallowed()
             self._transition = None
             return eng.rgb()
 
@@ -732,6 +737,7 @@ class Features:
                                       int(S.get("max_ma", outputs.MAX_MA_DEFAULT)), int(getattr(self, "bri", 255)))
             self._power = (ma, scale, int(S.get("max_ma", outputs.MAX_MA_DEFAULT)))
         except Exception:
+            oops.swallowed()
             self._power = None
 
     def transition_start(self, old_state, dur, style="fade"):
@@ -759,6 +765,7 @@ class Features:
             tr["old"].audio(*getattr(self.eng, "last_audio", (0.0, 0)))
             tr["old"].frame(23)
         except Exception:
+            oops.swallowed()
             self._transition = None
 
     # --- live output: the sim's frames to the device, and the wiring test ------------
@@ -866,6 +873,7 @@ class Features:
                 try:
                     st = devices.state(t.host, timeout=2.0)
                 except Exception:
+                    oops.swallowed()
                     st = None
                 if t not in self.streams:
                     break
@@ -1178,7 +1186,7 @@ class Features:
             while n < 20:
                 try:
                     kind, v = scan.q.get_nowait()
-                except Exception:
+                except queue.Empty:
                     break
                 n += 1
                 if kind == "log":
@@ -1197,7 +1205,7 @@ class Features:
             while True:
                 try:
                     kind, v = p.q.get_nowait()
-                except Exception:
+                except queue.Empty:
                     break
                 if kind == "device":
                     if v:
@@ -1349,7 +1357,7 @@ class Features:
             if dpg.does_item_exist("map1d2d"):
                 self.ab.set_map1d2d(["strip", "bars", "arcs", "corner"].index(dpg.get_value("map1d2d")))
         except Exception:
-            pass
+            oops.swallowed()
     def _ab_reloaded(self, library):
         """The library was rebuilt: B takes a fresh copy and its effect back -
         or, keeping the build from before, stays on it and restarts with A."""

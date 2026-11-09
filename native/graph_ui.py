@@ -29,6 +29,7 @@ from native.graph_costs import GraphCosts
 from native.graph_menu import GraphMenu
 from native.graph_props import GraphProps
 from native.nodedefs import library, IMPLICIT_SOURCES
+from native import oops
 
 DIM = (139, 147, 163)
 PIN_COL = {"vector": (190, 120, 235),"float": (110, 190, 250), "color": (250, 170, 90), "bool": (170, 230, 120)}
@@ -1536,14 +1537,17 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu, GraphProps):
         si = eng.script_effect()
         if si is None:
             return False
-        from native.script import compile_script, settings_of
+        from native.script import compile_script, settings_of, GraphError
         try:
             if self._engine_has(fname, g.compile()):
                 if self.standin_on():
                     self._standin_back()             # an edit undone before its build: the build is the graph again
                 return False                         # the engine runs this code already (a zoom, a label, an open)
             prog = compile_script(g)
-        except Exception:                            # a node the script does not have: the build alone shows it
+        except GraphError:                           # a node the script does not have, or a graph that does not check: the build alone shows it
+            return False
+        except Exception:
+            oops.swallowed()
             return False
         title = app.project.effect_title(fname)
         on = eng.idx == si and self._standin_for == fname
@@ -1801,7 +1805,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu, GraphProps):
             try:
                 extra["palette"] = self.app.palette_name_for(self.app.eng.pal)
             except Exception:
-                pass
+                oops.swallowed()
         return nodeface.summary(n, d, wired, extra)
 
     def _refresh_summary(self, nid):
@@ -2779,7 +2783,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu, GraphProps):
             else:
                 dpg.set_value(w, val)
         except Exception:
-            pass
+            oops.swallowed()
 
     def _input_widget(self, nid, n, i, tag, show, width=None):
         """The editable stand-in for an unconnected input pin: after its
@@ -3344,6 +3348,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu, GraphProps):
         try:
             return self.app.eng.palette_list()
         except Exception:
+            oops.swallowed()
             return [("Default", 0)]
 
     # --- the XY pads: two typed inputs as one point on a small square -----------------------
@@ -3737,6 +3742,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu, GraphProps):
         try:
             _, _, scope, _, _, _ = self.graph.plan()
         except Exception:
+            oops.swallowed()
             scope = {}
         if scope and self.graph.has_sends():
             # the plan joins the pairs away: a Send takes what feeds it, a Receive its Send
@@ -4333,6 +4339,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu, GraphProps):
                 try:
                     nodes = json.load(open(os.path.join(d, f), encoding="utf-8")).get("nodes", [])
                 except Exception:
+                    oops.swallowed()
                     continue
                 n = sum(1 for x in nodes if x.get("type") == type_)
                 if n:
@@ -4616,6 +4623,7 @@ class GraphPanel(Glyphs, GraphFiles, GraphCosts, GraphMenu, GraphProps):
         try:
             at = dpg.get_mouse_pos(local=False)
         except Exception:
+            oops.swallowed()
             at = (200, 200)
         self.show_add_menu(at)
 

@@ -22,6 +22,7 @@ import math
 
 import json
 import numpy as np
+from native import oops
 
 # each kind: the parameters it takes, with their defaults, and a line for the editor
 KINDS = {
@@ -189,7 +190,7 @@ def formula_error(part):
     try:
         part_points(part)                           # every LED worked out (kept: the view wants them anyway)
     except Exception:
-        pass
+        oops.swallowed()
     for axis in ("x", "y", "z"):
         text = str(p.get(axis, "0"))
         try:

@@ -24,6 +24,7 @@ import dearpygui.dearpygui as dpg
 from native.graph_ui import _font_file
 
 from native.typeface import px
+from native import oops
 
 FONT_PX = px(13)
 LINE_H = px(17)
@@ -93,6 +94,7 @@ class CodeEditor:
                 with dpg.font_registry():
                     self.font = dpg.add_font(ff, FONT_PX)
             except Exception:
+                oops.swallowed()
                 self.font = None
         with dpg.child_window(tag="code_ed_win", parent=parent, width=400, height=300, border=True,
                               no_scrollbar=True, no_scroll_with_mouse=True):
@@ -507,7 +509,7 @@ class CodeEditor:
                     self.char_w = w[0] / 10.0
                     self._dirty = True
             except Exception:
-                pass
+                oops.swallowed()
         hovered = dpg.is_item_hovered(self.dl)
         if dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
             if hovered and not self._drag and dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):

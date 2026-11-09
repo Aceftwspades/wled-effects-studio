@@ -22,6 +22,7 @@ import sys
 import numpy as np
 import time
 import os
+from native import oops
 
 try:
     import pyaudiowpatch as pyaudio
@@ -30,6 +31,7 @@ except ImportError:                                    # pragma: no cover
 try:
     import sounddevice as sd
 except Exception:                                      # pragma: no cover - not installed, or no sound system to start
+    oops.swallowed()
     sd = None                                          # (PortAudio fails its start where no audio server runs)
 
 
@@ -330,7 +332,7 @@ class LiveInput:
         try:
             self.stream.stop(); self.stream.close()
         except Exception:
-            pass
+            oops.swallowed()
 
 
 AUDIO_EXTS = (".wav", ".mp3", ".flac", ".ogg", ".oga", ".opus", ".m4a", ".aac", ".wma", ".aiff", ".aif")
@@ -385,7 +387,7 @@ def load(path, ffmpeg=None):
         try:
             return read_wav(path)
         except Exception:
-            pass                                       # a float or extensible WAV: ffmpeg reads those
+            oops.swallowed()                                       # a float or extensible WAV: ffmpeg reads those
     return decode(path, ffmpeg)
 
 
@@ -537,5 +539,5 @@ def open_live(gain=3.0, device=None):
         try:
             return LiveAudio(gain=gain)
         except Exception:
-            pass                     # fall through to an input device
+            oops.swallowed()                     # fall through to an input device
     return LiveInput(gain=gain, device=device)

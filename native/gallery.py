@@ -28,6 +28,7 @@ import re
 import urllib.request
 
 from native import paths, version
+from native import oops
 
 INDEX_MAX = 1 << 20              # the index: a megabyte is thousands of entries
 BUNDLE_MAX = 2 << 20             # a bundle: the biggest graph here is under 100 KB
@@ -174,6 +175,7 @@ def read_gif(path, size=96, max_frames=48):
                 break
         return frames or None
     except Exception:
+        oops.swallowed()
         return None
 
 

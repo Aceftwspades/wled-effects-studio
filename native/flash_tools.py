@@ -39,6 +39,7 @@ import time
 import urllib.request
 
 from native import procs
+from native import oops
 
 # USB vendor ids of the serial chips on ESP32 boards (and Espressif's own USB)
 ESP_VIDS = {"10C4": "Silicon Labs CP210x", "1A86": "WCH CH340 / CH9102", "0403": "FTDI", "303A": "Espressif USB"}
@@ -61,6 +62,7 @@ def serial_ports(pio=None):
                         timeout=30, env=dict(os.environ, **flash.PIO_ENV)).stdout
         rows = json.loads(out or "[]")
     except Exception:
+        oops.swallowed()
         return []
     return sort_ports(rows)
 
@@ -131,6 +133,7 @@ def device_files(host):
         rows = json.loads(_get(host, "/edit?list=/").decode("utf-8", "replace"))
         return ["/" + str(r.get("name", "")).lstrip("/") for r in rows if r.get("type", "file") == "file"]
     except Exception:
+        oops.swallowed()
         return None
 
 
@@ -169,6 +172,7 @@ def backups(project, key):
         try:
             meta = json.load(open(os.path.join(root, d, "device.json"), encoding="utf-8"))
         except Exception:
+            oops.swallowed()
             meta = {"when": d, "files": []}
         out.append((os.path.join(root, d), meta))
     return out
@@ -203,7 +207,7 @@ def restore(host, folder, log=lambda m: None, reboot=True):
                                          headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=5).read()
         except Exception:
-            pass                                                          # it may drop the connection as it goes down
+            oops.swallowed()                                                          # it may drop the connection as it goes down
     return True, f"{len(done)} file(s) restored ({', '.join(done)}); the device is rebooting to read them"
 
 
@@ -244,6 +248,7 @@ def kept(project, key):
         try:
             info = json.load(open(os.path.join(root, f + ".json"), encoding="utf-8"))
         except Exception:
+            oops.swallowed()
             info = {"what": f, "when": f[:15]}
         out.append((os.path.join(root, f), info))
     return out
@@ -317,6 +322,7 @@ def system_python():
             if r.stdout.strip() == "True":
                 return [p, *name[1:]]
         except Exception:
+            oops.swallowed()
             continue
     return None
 

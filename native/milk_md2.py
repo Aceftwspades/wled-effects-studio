@@ -23,6 +23,7 @@ import math
 import re
 
 import numpy as np
+from native import oops
 
 SAMPLERS_2D = ("sampler_main", "sampler_fw_main", "sampler_fc_main", "sampler_pw_main", "sampler_pc_main",
                "sampler_blur1", "sampler_blur2", "sampler_blur3", "sampler_noise_lq", "sampler_noise_lq_lite",
@@ -190,6 +191,7 @@ def translate(hlsl, which):
     try:
         return _translate_typed(text[:m.start()], text[m.end():k - 1])
     except Exception:                                            # whatever stops the typed one: the older rewrite
+        oops.swallowed()
         return _translate_rewrite(hlsl, which)
 
 

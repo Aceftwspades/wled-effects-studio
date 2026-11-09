@@ -14,6 +14,7 @@ from native import typeface
 from native import form
 
 from native import outputs, weight
+from native import oops
 
 TAG = "outputs_win"
 
@@ -221,6 +222,7 @@ def read_device(app):
             try:
                 bri = (devices._get(host, "/json/state", 6) or {}).get("bri")
             except Exception:
+                oops.swallowed()
                 bri = None
             return True, (cfg, bri)
         except Exception as e:

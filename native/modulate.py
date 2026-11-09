@@ -53,6 +53,7 @@ import math
 import random
 from collections import deque
 from native import vj_state
+from native import oops
 
 FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
 # the VJ deck knobs a modulator may move: "vj<deck>.<knob>" - every one of vj.KNOBS (a test keeps the two alike), the
@@ -281,6 +282,7 @@ def tempo(app):
         from native import sequence_ui
         bpm = float(sequence_ui._steps(app).get("bpm") or 0)
     except Exception:
+        oops.swallowed()
         bpm = 0.0
     if bpm <= 0:
         bpm = float(getattr(getattr(app, "syn", None), "bpm", 120) or 120)
@@ -354,6 +356,7 @@ def _sound(app):
         b, m, t, lv, _ = vj.sound(app)
         return {"level": float(lv), "bass": float(b), "mid": float(m), "treb": float(t)}
     except Exception:
+        oops.swallowed()
         return {}
 
 
@@ -593,6 +596,7 @@ def _get(app, k):
             o = vj.options(app) if k == "vj.fader" else mixer.options(app)
             return int(round(float(o.get("fader", 0.0)) * 255))
         except Exception:
+            oops.swallowed()
             return None
     mk = _mkey(k)
     if mk is not None:
@@ -863,6 +867,7 @@ def targets(app):
     try:
         labs = _labels(app)
     except Exception:
+        oops.swallowed()
         labs = {}
     for m in modulators(app):
         name = title(app, m, labs)
@@ -883,6 +888,7 @@ def signature(app):
     try:
         return tuple((m.get("id"), tuple(m.get("keys") or ()), m.get("kind"), m.get("start")) for m in modulators(app))
     except Exception:
+        oops.swallowed()
         return ()
 
 

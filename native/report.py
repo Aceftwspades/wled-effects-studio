@@ -19,6 +19,7 @@ import time
 import zipfile
 
 from native import paths, procs, version
+from native import oops
 
 
 def _what_build():
@@ -34,7 +35,7 @@ def _what_build():
     try:
         commit = procs.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=paths.RES, timeout=5).stdout.strip()
     except Exception:
-        pass
+        oops.swallowed()
     return json.dumps({"version": version.__version__, "commit": commit, "built": "a checkout"}, indent=1)
 
 
@@ -56,7 +57,7 @@ def _machine(app):
             d["dearpygui"] = dpg.get_dearpygui_version()
             d["viewport"] = [dpg.get_viewport_client_width(), dpg.get_viewport_client_height()]
         except Exception:
-            pass
+            oops.swallowed()
         try:
             d["engine"] = os.path.basename(app.eng.library or "")
             d["effects"] = len(app.eng.names)
@@ -64,7 +65,7 @@ def _machine(app):
             d["layout"] = app.layout
             d["gpu"] = bool(getattr(app, "cube_quads", None) or getattr(app, "point_quads", None))
         except Exception:
-            pass
+            oops.swallowed()
     return json.dumps(d, indent=1)
 
 
@@ -105,9 +106,11 @@ def bundle(app=None, log_lines=()):
             z.writestr("log.txt", "\n".join(log_lines))
         from native import messages
         z.writestr("messages.txt", messages.dump() or "(none)")        # the studio's message log, the problems first
+        from native import oops
+        z.writestr("carried_on.txt", "\n".join(oops.counts()) or "(none)")   # errors carried on past, by place
         z.writestr("README.txt", f"A problem report from WLED Effects Studio {version.__version__}.\n"
                                  f"Attach this zip to an issue at https://github.com/{version.REPO}/issues and say what you did, "
                                  "what you expected and what happened.\nIt holds: what this build is, the doctor's findings, "
                                  "the machine, the project's settings (device addresses blanked), the prefs, the last crash "
-                                 "tracebacks, the studio's last fifty messages - nothing of your effects, graphs or captures.\n")
+                                 "tracebacks, the studio's last fifty messages, the errors it carried on past - nothing of your effects, graphs or captures.\n")
     return path

@@ -20,6 +20,7 @@ from its own file:
 """
 import os
 import sys
+from native import oops
 
 FROZEN = bool(getattr(sys, "frozen", False))
 APP_NAME = "WLED Effects Studio"
@@ -80,7 +81,7 @@ def _tree():
         if p and os.path.isdir(os.path.join(p, "wled00")):
             return os.path.abspath(p)
     except Exception:
-        pass
+        oops.swallowed()
     return None
 
 

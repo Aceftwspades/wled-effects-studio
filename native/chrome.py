@@ -24,6 +24,7 @@ from native.icons import texture
 from native.project import save_prefs
 from native.keys import ACTIONS, FIXED
 from native import glow, flash, device_ui, room, weight
+from native import oops
 
 TEXT   = (215, 219, 227, 255)
 DIM    = (139, 147, 163, 255)
@@ -1504,7 +1505,7 @@ def show_history(app, which=None):
                         words = f"{len(d.get('nodes', []))} nodes"
                     typeface.small(dpg.add_text(words, color=DIM))
                 except Exception:
-                    pass
+                    oops.swallowed()
     if not vs:
         dpg.add_text("no earlier versions yet", parent="history_rows", color=DIM)
     _centre("history_win", 520, 420)
@@ -1610,6 +1611,7 @@ def _fit_text(text, width):
         if dpg.get_text_size(text)[0] <= width:
             return text
     except Exception:
+        oops.swallowed()
         return text                                     # before the first frame there is no font to measure with
     lo, hi = 0, len(text)
     while lo < hi:                                      # the longest start that fits with the dots
@@ -1725,6 +1727,7 @@ def _current_text(app, kind, stem, ext):
         try:
             return app.project.read_effect(stem + ext)
         except Exception:
+            oops.swallowed()
             return ""
     if kind == "project":
         try:
@@ -1892,6 +1895,7 @@ def recolour_texts(old, new):
                 continue
             col = dpg.get_item_configuration(it).get("color")
         except Exception:
+            oops.swallowed()
             continue
         if not col or col[0] < 0:
             continue                                     # the theme's own: it follows by itself
@@ -1995,6 +1999,7 @@ def scrollbar_w(tag):
         if dpg.get_item_configuration(tag).get("no_scrollbar") or dpg.get_y_scroll_max(tag) <= 0:
             return 0
     except Exception:
+        oops.swallowed()
         return 0
     return px(10)
 
@@ -2013,7 +2018,7 @@ def pin_sideways():
                     and not dpg.get_item_configuration(tag).get("horizontal_scrollbar")):
                 dpg.set_x_scroll(tag, 0)
         except Exception:
-            pass                                   # not made yet, or gone
+            oops.swallowed()                                   # not made yet, or gone
 
 
 def poll_dialogs():
@@ -2070,6 +2075,7 @@ def placed_words(item):
         me = dpg.get_alias_id(item) if isinstance(item, str) else item
         j = kids.index(me)
     except Exception:
+        oops.swallowed()
         return ""
     if j + 1 < len(kids) and dpg.get_item_type(kids[j + 1]).endswith("::mvTooltip"):
         for t in dpg.get_item_children(kids[j + 1], 1) or []:
@@ -2115,6 +2121,7 @@ def poll_placed_tips():
             try:
                 st = dpg.get_item_state(item)
             except Exception:
+                oops.swallowed()
                 PLACED.discard(item)                   # made again under another tag, or gone
                 continue
             if st.get("hovered") and st.get("visible", True):

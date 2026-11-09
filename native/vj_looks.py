@@ -768,7 +768,7 @@ def _kn(ctx, key, default):
     if f is not None:
         try:
             return float(f(key))
-        except Exception:
+        except Exception:                                 # a knob the VJ's decks do not have (a look's own): below
             pass
     v = (getattr(ctx, "deck", None) or {}).get(key)
     return default if v is None else float(v)

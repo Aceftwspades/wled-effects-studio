@@ -34,6 +34,7 @@ import queue
 import threading
 import time
 import urllib.request
+from native import oops
 
 SLOTS = 36                       # CFX_BANK_SLOTS: the firmware's default; a device's block says its own
 
@@ -146,7 +147,7 @@ def write(host, names, reboot=True, timeout=6.0):
     try:
         _post(host, "/json/state", {"rb": True}, timeout)
     except Exception:
-        pass                                              # it may drop the connection as it goes down
+        oops.swallowed()                                              # it may drop the connection as it goes down
     return True, f"{used} slots written; the device is rebooting to apply them"
 
 

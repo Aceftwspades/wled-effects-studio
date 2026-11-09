@@ -25,6 +25,7 @@ import time
 from native.geometry import Geometry
 
 from native import paths
+from native import oops
 HERE = paths.RES                         # what ships: examples/, the docs
 ROOT = paths.TREE                        # the WLED checkout, or None (native/paths.py)
 PROJECTS = paths.PROJECTS
@@ -548,7 +549,10 @@ class Project:
         try:
             m = re.search(r'PROGMEM\s*=\s*"([^@"]+)', self.read_effect(fname))
             title = m.group(1) if m else fname
+        except OSError:                                   # the file gone: its name
+            title = fname
         except Exception:
+            oops.swallowed()
             title = fname
         cache[fname] = (mt, title, now)
         return title
@@ -738,6 +742,7 @@ def _studio():
     except FileNotFoundError:
         return {}
     except Exception:
+        oops.swallowed()
         try:
             os.replace(STUDIO_FILE, f"{STUDIO_FILE}.bad-{time.strftime('%Y%m%d-%H%M%S')}")
         except OSError:

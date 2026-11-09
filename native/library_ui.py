@@ -32,6 +32,7 @@ from native import weight
 import numpy as np
 
 from native import graph as G, render, paths
+from native import oops
 
 TAG = "library_win"
 FRAMES = 24
@@ -161,6 +162,7 @@ def _graph_name(app, fn):
     try:
         g = G.load(path, lib=app.gp.lib, resolver=app.gp.resolve_sub)
     except Exception:
+        oops.swallowed()
         return None
     cache[fn] = (mt, g.name)
     app.__dict__.setdefault("_lib_tags", {})[fn] = tags_of(app, g)
@@ -188,11 +190,13 @@ def tags_of(app, g):
             dim = n.get("params", {}).get("dimensions")
             if dim:
                 tags.add(str(dim))
+    from native.script import compile_script, GraphError
     try:
-        from native.script import compile_script
         compile_script(g); tags.add("script")
-    except Exception:
+    except GraphError:                                    # not scriptable, or not a whole graph: no "script" tag
         pass
+    except Exception:
+        oops.swallowed()
     return sorted(tags)
 
 
@@ -235,7 +239,7 @@ def _thumb_worker(app):
     try:
         eng.set_geometry(app.project.geometry)
     except Exception:
-        pass
+        oops.swallowed()
     from native.synth import Synth
     syn = Synth()
     src = app.eng.library
@@ -285,6 +289,7 @@ def _thumb_worker(app):
                         # dark at every third frame: a flash too short to be sampled (Strobe) - every frame, longer
                         frames = clean_frames(eng, k, FRAMES * 3, every=1, syn=syn, params=params)
                 except Exception:
+                    oops.swallowed()
                     frames = None
             app._lib_tq.put((src, key, frames or []))
             time.sleep(0.002)                        # the GIL back to the frame now and then
@@ -299,12 +304,15 @@ def _script_key(fn):
 
 def _script_of(app, fn):
     """(bytecode, the Script effect's settings) of a graph, or None when the script cannot run it."""
-    from native.script import compile_script, settings_of
+    from native.script import compile_script, settings_of, GraphError
     try:
         g = G.load(os.path.join(app.gp.dir, fn), lib=app.gp.lib, resolver=app.gp.resolve_sub)
         g.project_dir = app.project.path
         prog = compile_script(g)
+    except GraphError:                                    # not scriptable, or not a whole graph: no script preview
+        return None
     except Exception:
+        oops.swallowed()
         return None
     st = settings_of(g)
     pal = st.pop("pal")
@@ -329,7 +337,7 @@ def _poll_thumbs(app):
     while q is not None and got < 8:
         try:
             src, key, frames = q.get_nowait()
-        except Exception:
+        except queue.Empty:
             break
         if src == app.eng.library and key not in getattr(app, "_lib_turns", ()):
             app._lib_thumbs[key] = frames            # a preview's turn is not replaced by the plain thumbnail
@@ -522,6 +530,7 @@ def _shrink(frame, size):
         from PIL import Image
         return np.asarray(Image.fromarray(frame).resize((size, size), Image.BILINEAR))
     except Exception:
+        oops.swallowed()
         h, w = frame.shape[:2]
         k = max(1, min(h, w) // size)
         return frame[::k, ::k][:size, :size]
@@ -534,7 +543,7 @@ def _poll_previews(app):
     for _ in range(4):
         try:
             item = q.get_nowait()
-        except Exception:
+        except queue.Empty:
             break
         if item[0] == "made":
             _, key, small, gpath = item

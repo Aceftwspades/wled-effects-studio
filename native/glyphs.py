@@ -20,6 +20,7 @@ import dearpygui.dearpygui as dpg
 from native import nodeface
 from native import typeface
 from native.textures import registry
+from native import oops
 
 HIST_N = 600            # samples kept per probe: ten seconds at 60 frames
 HIST_MAX = 256          # probes a build can plant (graph.py)
@@ -201,6 +202,7 @@ class Glyphs:
         try:
             d = self.graph.node_def(n)
         except Exception:
+            oops.swallowed()
             return
         self._glyph_draw(nid, n, d)
 
@@ -240,6 +242,7 @@ class Glyphs:
             try:
                 cols = self.app.eng.palette_swatch(self.app.eng.pal, 24)
             except Exception:
+                oops.swallowed()
                 return
         else:
             cols = nodeface.ramp_strip(n, d, 24)
@@ -337,6 +340,7 @@ class Glyphs:
             a = np.asarray(canvas, np.float32) / 255.0
             self._patch_set(nid, a)
         except Exception:
+            oops.swallowed()
             self._patch_set(nid, np.zeros((PATCH[1], PATCH[0]), np.float32))
 
     def _draw_path(self, nid, n, d):
@@ -405,6 +409,7 @@ class Glyphs:
         try:
             bands = [float(v) / 255.0 for v in eng.fft]
         except Exception:
+            oops.swallowed()
             bands = None
         frame = (self._hist_i - 1) % HIST_N
         for nid, kind in list(self._live_glyphs.items()):

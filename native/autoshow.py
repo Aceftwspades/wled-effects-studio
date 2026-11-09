@@ -19,6 +19,7 @@ import json
 import random
 
 import numpy as np
+from native import oops
 
 TAG = "autoshow_win"
 TARGET = {"intro": 0.25, "verse": 0.5, "build": 0.6, "drop": 0.95, "breakdown": 0.3, "outro": 0.2}
@@ -122,7 +123,7 @@ def pool_names(app, key):
         plain |= {e["name"].strip().lower() for e in flash.builtin_catalog()
                   if "imu" in e["needs"] or flash.missing_features(app.project, e["needs"] & {"audio", "pcm"})}
     except Exception:
-        pass
+        oops.swallowed()
     return [n for n in names if n.strip().lower() not in plain and "gyro" not in n.lower()]
 
 

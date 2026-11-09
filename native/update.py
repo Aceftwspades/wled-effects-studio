@@ -24,6 +24,7 @@ import urllib.parse
 import urllib.request
 
 from native import paths, version
+from native import oops
 
 TIMEOUT = 8
 
@@ -39,6 +40,7 @@ def check():
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
             d = json.loads(r.read().decode("utf-8", "replace"))
     except Exception:
+        oops.swallowed()
         return None
     tag = d.get("tag_name") or ""
     return {"tag": tag, "notes": (d.get("body") or "").strip(), "url": d.get("html_url") or "",

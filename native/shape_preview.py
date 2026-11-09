@@ -17,6 +17,7 @@ import os
 import numpy as np
 
 from native import render, gif, live_out
+from native import oops
 
 
 def _colour_of_part(k, n):
@@ -104,5 +105,6 @@ def save(app, frames, fps=15, name="shape_preview"):
         from PIL import Image
         Image.fromarray(frames[0]).save(ppath)
     except Exception:
+        oops.swallowed()
         ppath = None
     return gpath, ppath

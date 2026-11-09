@@ -37,6 +37,7 @@ outgoing effect into the incoming one; 0 cuts.
 import threading
 import time
 from collections import deque
+from native import oops
 
 CLOCK_PPQN = 24                  # MIDI clock ticks a beat (a quarter note)
 CLOCK_GONE_S = 0.5               # no tick for this long: the clock has stopped, stop message or not
@@ -44,6 +45,7 @@ CLOCK_GONE_S = 0.5               # no tick for this long: the clock has stopped,
 try:
     import rtmidi
 except Exception:                       # not installed, or no MIDI API on this OS
+    oops.swallowed()
     rtmidi = None
 
 FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
@@ -71,6 +73,7 @@ def ports():
     try:
         return list(rtmidi.MidiIn().get_ports())
     except Exception:
+        oops.swallowed()
         return []
 
 
@@ -81,6 +84,7 @@ def out_ports():
     try:
         return list(rtmidi.MidiOut().get_ports())
     except Exception:
+        oops.swallowed()
         return []
 
 
@@ -301,7 +305,7 @@ class MidiOut:
             try:
                 out.close_port()
             except Exception:
-                pass
+                oops.swallowed()
 
     @property
     def is_open(self):
@@ -375,5 +379,5 @@ class MidiIn:
             try:
                 self._in.close_port()
             except Exception:
-                pass
+                oops.swallowed()
         self._in, self.port = None, None

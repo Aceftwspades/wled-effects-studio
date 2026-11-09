@@ -18,6 +18,7 @@ import json
 import math
 import time
 import urllib.request
+from native import oops
 
 
 def capture(eng, colours, bri=255, name="", dur=10.0, trans=0.7, rgb=None):
@@ -448,7 +449,7 @@ def psave(host, k, body, timeout=6.0, gap=1.1):
                 time.sleep(max(0.0, gap - (time.time() - sent)))     # into the next second before the next save
                 return
         except Exception:
-            pass
+            oops.swallowed()
     # pmt is whole seconds: a write in the same second as one just before it
     # leaves it as it was. By now the device has long written or dropped it,
     # so one read of the file is safe - it is the polling during the write
@@ -458,7 +459,7 @@ def psave(host, k, body, timeout=6.0, gap=1.1):
             if str(int(k)) in json.loads(r.read()):
                 return
     except Exception:
-        pass
+        oops.swallowed()
     raise TimeoutError(f"preset {k} was accepted but never written")
 
 

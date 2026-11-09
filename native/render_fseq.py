@@ -33,6 +33,7 @@ import wave
 import numpy as np
 
 from native import clock, procs
+from native import oops
 
 TAG = "render_fseq_win"
 RATES = (20, 25, 40)             # FPP's usual: 50, 40 and 25 ms a frame
@@ -275,7 +276,7 @@ def _end(app, words, ok=False):
         try:
             job["f"].close()
         except Exception:
-            pass
+            oops.swallowed()
         for p in (job["path"], job["stem"] + ".wav", job["stem"] + ".mp3"):
             try:
                 if os.path.exists(p):

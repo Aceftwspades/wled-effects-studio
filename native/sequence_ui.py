@@ -21,6 +21,7 @@ import numpy as np
 
 from native import clock, sequence, transition
 from native import vj_state
+from native import oops
 
 TAG = "sequence_win"
 ROW_H = 30               # a step's row in the list, at the interface size
@@ -858,6 +859,7 @@ def _undimmed(app):
     try:
         return app._frame_rgb_inner(app.eng)
     except Exception:
+        oops.swallowed()
         return app.frame_rgb()
 
 
@@ -1058,6 +1060,7 @@ def _fx_sig(app):
     try:
         x0, y0, x1, y1, op, fx, bm = e.seg_get(e.seg)
     except Exception:
+        oops.swallowed()
         y0 = y1 = 0
     return (e.idx, e.seg, e.seg_count(), y1 - y0 > 1, len(e.names))
 

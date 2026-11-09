@@ -20,6 +20,7 @@ import os
 import re
 
 from native import paths
+from native import oops
 HERE = paths.RES
 ROOT = paths.TREE
 GEN = os.path.join(HERE, "gen")
@@ -248,7 +249,7 @@ def extract(log=print):
                 log(f"  stock 1-D: {len(reg)} effects ({len(skip) - len(ALWAYS_SKIP)} skipped, cached)")
                 return out
         except Exception:
-            pass
+            oops.swallowed()
 
     try:
         compiler, env = find_compiler()

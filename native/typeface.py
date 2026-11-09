@@ -29,6 +29,7 @@ import os
 import sys
 
 import dearpygui.dearpygui as dpg
+from native import oops
 
 # role: (face, size at 100% - a Dear ImGui size, the line's height)
 ROLES = {
@@ -70,7 +71,7 @@ def monitor_scale():
             if pct and pct > 0:
                 return pct / 100.0
         except Exception:
-            pass
+            oops.swallowed()
     return 1.0
 
 
@@ -88,7 +89,7 @@ def scale():
             from native.project import load_prefs
             pct = load_prefs().get("ui_scale")
         except Exception:
-            pass
+            oops.swallowed()
         _scale = _clamp((pct / 100.0) if isinstance(pct, (int, float)) and pct > 0 else monitor_scale())
     return _scale
 
@@ -114,8 +115,10 @@ def dpi_aware():
         try:
             return ctypes.windll.shcore.SetProcessDpiAwareness(2) == 0      # per monitor
         except Exception:
+            oops.swallowed()
             return bool(ctypes.windll.user32.SetProcessDPIAware())
     except Exception:
+        oops.swallowed()
         return False
 
 
@@ -155,6 +158,7 @@ def at(face, size):
                 with dpg.font_registry():
                     f = dpg.add_font(path, size)
             except Exception:
+                oops.swallowed()
                 f = None
         _at[key] = f
     return _at[key]
@@ -178,6 +182,7 @@ def _measurer(face, size):
                 line = _metrics[(face, "line")] = float(a + d) / 1000.0
             f = ImageFont.truetype(path, size / line)
         except Exception:
+            oops.swallowed()
             f = None
     _metrics[key] = f
     return f

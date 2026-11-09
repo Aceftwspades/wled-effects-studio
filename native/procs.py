@@ -20,6 +20,7 @@ children never see the app's own copies of shared libraries.
 import os
 import subprocess
 import sys
+from native import oops
 
 # CREATE_NO_WINDOW: no console for a console child. Not CREATE_NEW_CONSOLE,
 # and not DETACHED_PROCESS, which leaves the child without stdio handles.
@@ -89,8 +90,8 @@ def kill_tree(proc):
         else:
             run(["pkill", "-TERM", "-P", str(proc.pid)], capture_output=True, timeout=10)
     except Exception:
-        pass
+        oops.swallowed()
     try:
         proc.terminate()
     except Exception:
-        pass
+        oops.swallowed()

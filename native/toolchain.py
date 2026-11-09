@@ -37,6 +37,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from native import paths
+from native import oops
 HERE = paths.RES                        # studio/, or the bundle: shim/, gen/
 ROOT = paths.TREE                       # the WLED checkout, or None
 BUILD = paths.BUILD                     # writable: the versioned libraries
@@ -99,7 +100,7 @@ def _msvc_env():
             if d.get("key") == key:
                 return d["env"]
         except Exception:
-            pass
+            oops.swallowed()
     r = procs.run(f'"{vc}" x64 >nul && set', shell=True, capture_output=True, text=True)
     if r.returncode != 0:
         raise ToolchainError("vcvarsall failed:\n" + (r.stdout or "") + (r.stderr or ""))
@@ -217,6 +218,7 @@ def _compiler_id(compiler, env):
             r = procs.run([compiler, "--version"], capture_output=True, text=True, env=env, timeout=30)
             line = (r.stdout or r.stderr or "").strip().splitlines()[0]
         except Exception:
+            oops.swallowed()
             line = ""
         _CID[compiler] = hashlib.sha1((os.path.basename(compiler).lower() + "|" + line + "|" + " ".join(COMMON_FLAGS))
                                       .encode("utf-8", "replace")).hexdigest()[:12]

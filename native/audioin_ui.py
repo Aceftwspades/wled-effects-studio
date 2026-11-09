@@ -21,6 +21,7 @@ from native import typeface
 from native import form
 
 from native import audioin, weight
+from native import oops
 
 TAG = "audioin_win"
 PIN_TAGS = ("ain_sd", "ain_ws", "ain_sck", "ain_mclk")
@@ -206,7 +207,7 @@ def send(app):
         try:
             before = audioin.from_wled_cfg(devices._get(host, "/json/cfg", 6))
         except Exception:
-            pass
+            oops.swallowed()
         try:
             _post(host, "/json/cfg", body)
         except Exception as e:

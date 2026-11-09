@@ -13,6 +13,7 @@ this cannot drift from what the firmware would do.
 import ctypes as C
 import os
 import numpy as np
+from native import oops
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -68,7 +69,7 @@ def _unload(lib):
             libc.dlclose.restype = C.c_int
             libc.dlclose(lib._handle)
     except Exception:
-        pass
+        oops.swallowed()
 
 
 def parse_meta(s):

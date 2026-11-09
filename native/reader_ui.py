@@ -17,6 +17,7 @@ from native.typeface import px
 from native import typeface
 
 from native import reader, weight
+from native import oops
 
 TAG = "reader_win"
 WELCOME = "welcome_win"
@@ -568,6 +569,7 @@ def _play():
                     from native.textures import registry
                     got = S.textures[a["path"]] = (dpg.add_dynamic_texture(w, h, data, parent=registry()), w, h)
                 except Exception:
+                    oops.swallowed()
                     S.anims.pop(item, None); continue
             a["tex"] = got[0]
             dpg.configure_item(item, texture_tag=a["tex"])
@@ -575,6 +577,7 @@ def _play():
             try:
                 a["frames"] = _gif_frames(a["path"], a["w"], a["h"])
             except Exception:
+                oops.swallowed()
                 S.anims.pop(item, None); continue
             a["i"], a["next"] = 0, now
         if len(a["frames"]) < 2 or now < a["next"]:

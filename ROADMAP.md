@@ -16,10 +16,14 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 ## 2. Fewer places for state to hide (stability)
 - [ ] **A runtime object per subsystem** in place of loose `app._x` attributes (about 240 of them across 38
       modules), each with an explicit `reset()` and `close()`. The VJ first, where the review rounds' bugs were.
-- [ ] **One play clock that never jumps**: the render's hold under it, instead of each timer correcting for
-      `clock.shifted()`.
-- [ ] **Swallowed errors made visible**: the 192 bare `except Exception:` blocks log once (crash log or status
-      line) instead of passing silently.
+      Done: the VJ (`native/vj_state.py`, ~70 attributes) and the pads with their clip editor
+      (`native/pads_state.py`, 27). Left: the sequence, modulators, MIDI, devices, the graph editor.
+- [x] **One play clock that never jumps**: the render's hold under it, instead of each timer correcting for
+      `clock.shifted()`. Released, the clock runs on from where the render left it; the corrections are gone.
+- [x] **Swallowed errors made visible**: the 192 bare `except Exception:` blocks log once (crash log or status
+      line) instead of passing silently. `oops.swallowed()` says each place once in the studio's log and counts
+      the rest (in a problem report's `carried_on.txt`); the expected ones (an empty queue, a device not there,
+      a graph that is not scriptable) catch exactly that and stay quiet.
 
 ## 3. Split the largest files (maintainability)
 - [ ] `graph_ui.py` (5,300 lines), `app.py` (4,300), `sequence_ui.py` (3,800): one responsibility per module.

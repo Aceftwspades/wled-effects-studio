@@ -28,6 +28,7 @@ import numpy as np
 
 from native import shapes, shape_io, render, units
 from native.geometry import Geometry
+from native import oops
 
 TAG = "shape_win"
 MESH_MODES = (("edges", "LEDs along the edges"), ("vertices", "an LED per vertex"), ("surface", "LEDs over the surface"))
@@ -1143,7 +1144,7 @@ def nudge(app, i, **fields):
             app.apply_geometry(g2)
             return
     except Exception:
-        pass
+        oops.swallowed()
     _poll_pending(app, force=True)
 
 
@@ -1480,6 +1481,7 @@ def open_build_sheet(app):
     try:
         checks = [(c.kind, c.text) for c in shape_checks.run(app)]
     except Exception:
+        oops.swallowed()
         checks = []
     name = os.path.basename(os.path.normpath(app.project.path))
     page = build_sheet.sheet(g, app.project.options.get("outputs") or {}, f"{name}: build sheet", checks, name)

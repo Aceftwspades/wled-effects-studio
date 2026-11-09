@@ -23,6 +23,7 @@ would hold and offers the next step as a button (the first a primary).
 import time
 
 import dearpygui.dearpygui as dpg
+from native import oops
 
 RED = (226, 76, 76)
 _weighted = {}          # item -> kind
@@ -205,6 +206,7 @@ def _undo_state(app):
     try:
         t = app.undo_target()
     except Exception:
+        oops.swallowed()
         return True, True
     gp, p = app.gp, app.project
     if t == "graph":
@@ -248,6 +250,7 @@ def tint_of(item):
     try:
         return tint(dpg.get_item_configuration(item).get("enabled", True))
     except Exception:
+        oops.swallowed()
         return tint(True)
 
 
@@ -275,6 +278,7 @@ def poll(app, every=0.2):
         try:
             on = bool(what(app)) if callable(what) else bool(st.get(what, True))
         except Exception:
+            oops.swallowed()
             on = True
         if S.item_last.get(item) != on:
             S.item_last[item] = on

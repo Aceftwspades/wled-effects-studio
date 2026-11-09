@@ -18,6 +18,7 @@ import numpy as np
 from native import form, num, typeface, vj, vj_looks, weight
 from native.typeface import px
 from native import vj_state
+from native import oops
 
 TAG = "vj_win"
 BROWSE = "vj_browse_win"
@@ -860,6 +861,7 @@ def _draw_thumb(app, n, e, now, snd):
             img = np.repeat(img[:, :, None], 3, -1)
         img = img[:, :, :3]                                  # one with its own transparency: its colour
     except Exception:
+        oops.swallowed()
         img = np.zeros((TH_H, TH_W, 3), np.float32)
     took = time.perf_counter() - t_draw
     e["n"] = e.get("n", 0) + 1

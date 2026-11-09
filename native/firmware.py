@@ -19,6 +19,7 @@ import urllib.parse
 import urllib.request
 
 from native import paths
+from native import oops
 
 RELEASES_URL = "https://api.github.com/repos/wled/WLED/releases?per_page=20"
 CACHE = os.path.join(paths.HOME, "firmware")
@@ -115,16 +116,18 @@ def releases(force=False):
         try:
             return json.load(open(cf, encoding="utf-8"))
         except Exception:
-            pass
+            oops.swallowed()
     url = os.environ.get("STUDIO_WLED_RELEASES_URL") or RELEASES_URL
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "wled-effects-studio"})
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
             raw = json.loads(r.read().decode("utf-8", "replace"))
     except Exception:
+        oops.swallowed()
         try:
             return json.load(open(cf, encoding="utf-8"))
         except Exception:
+            oops.swallowed()
             return []
     out = []
     for d in raw if isinstance(raw, list) else []:

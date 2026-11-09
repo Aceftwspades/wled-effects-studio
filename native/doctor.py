@@ -11,6 +11,7 @@ import shutil
 import sys
 
 from native import paths
+from native import oops
 
 REQUIRED = (("numpy", "numpy"), ("dearpygui", "dearpygui"), ("PIL", "pillow"))
 
@@ -54,6 +55,7 @@ def check():
         try:
             m = importlib.import_module(mod); out.append((True, f"{pkg} {_ver(m)}", ""))
         except Exception:
+            oops.swallowed()
             out.append((False, f"{pkg} missing", f"{pip} {pkg}"))
     for mod, pkg, what in optional():
         try:

@@ -10,6 +10,7 @@ import threading
 import dearpygui.dearpygui as dpg
 
 from native import device_ui
+from native import oops
 
 
 def _call(item, label):
@@ -229,7 +230,7 @@ def process_stats(app):
             ru = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
             rss = ru / 1e6 if sys.platform == "darwin" else ru / 1e3
     except Exception:
-        pass
+        oops.swallowed()
     return {"rss_mb": round(rss, 1), "items": len(dpg.get_all_items()), "effect_ms": round(app.frame_ms, 2),
             "app_ms": round(getattr(app, "loop_ms", 0.0), 2), "threads": threading.active_count(),
             "effect": app.eng.names[app.eng.idx] if app.eng.names else "", "geometry": app.project.geometry.kind}

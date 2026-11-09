@@ -28,6 +28,7 @@ import time
 from multiprocessing import shared_memory
 
 import numpy as np
+from native import oops
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -65,11 +66,11 @@ class Block:
         try:
             self.shm.close()
         except Exception:
-            pass
+            oops.swallowed()
         try:
             self.shm.unlink()          # a no-op on Windows, where the last handle frees it
         except Exception:
-            pass
+            oops.swallowed()
 
 
 # --- the app's side ---------------------------------------------------------------
@@ -98,7 +99,7 @@ class Popouts:
         try:
             self._write(view, blk, np.zeros((eng.rows, eng.cols, 3), np.uint8), eng, cam)
         except Exception:
-            pass
+            oops.swallowed()
         # frozen, the exe is the app: told to be a popout by its arguments (studio.py)
         args = ([sys.executable, "--popout"] if getattr(sys, "frozen", False) else [sys.executable, "-m", "native.popout"])
         proc = procs.popen(args + [view, name, str(os.getpid())], cwd=HERE)
@@ -115,6 +116,7 @@ class Popouts:
                 try:
                     proc.wait(2.0)
                 except Exception:
+                    oops.swallowed()
                     proc.kill()
         finally:
             blk.close()
@@ -146,7 +148,7 @@ class Popouts:
                 blk.i[9] = int(flags)
                 self._write(view, blk, net, eng, cam, rgb)  # last: its frame number tells the window to draw
             except Exception:
-                pass
+                oops.swallowed()
 
     def _write(self, view, blk, net, eng, cam, rgb=None):
         g = eng.geom
@@ -199,7 +201,7 @@ def _on_screen(x, y, w, h):
         x = max(vx, min(x, vx + vw - min(w, vw)))
         y = max(vy, min(y, vy + vh - min(h, vh)))
     except Exception:
-        pass
+        oops.swallowed()
     return x, y
 
 def _own_window():
@@ -259,6 +261,7 @@ def _win_full(on, ui):
             u32.SetWindowPos(h, 0, x, y, cw, ch, SWP_FRAMECHANGED | SWP_NOOWNERZORDER)
         return True
     except Exception:
+        oops.swallowed()
         return False
 
 
@@ -270,6 +273,7 @@ def _load_pos(view):
     try:
         return json.loads(scratch.read_text(_pos_file(view)))
     except Exception:
+        oops.swallowed()
         return {}
 
 
@@ -293,6 +297,7 @@ def _parent_alive(pid):
         os.kill(int(pid), 0)
         return True
     except Exception:
+        oops.swallowed()
         return True
 
 
@@ -564,7 +569,7 @@ def run(view, name, parent=0):
                     os.remove(req)
                     dpg.output_frame_buffer(scratch.path(f"popout_{view}.png"))
                 except Exception:
-                    pass
+                    oops.swallowed()
     finally:
         try:
             if ui["full"]:
@@ -576,7 +581,7 @@ def run(view, name, parent=0):
             if x > -10000 and y > -10000 and w >= 160 and h >= 160:
                 scratch.write_text(_pos_file(view), json.dumps({"x": int(x), "y": int(y), "w": w, "h": h}))
         except Exception:
-            pass
+            oops.swallowed()
         dpg.destroy_context()
         blk.close()
 

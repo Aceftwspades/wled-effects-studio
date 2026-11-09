@@ -15,6 +15,7 @@ the File menu cover it.
 import os
 import sys
 import threading
+from native import oops
 
 WM_DROPFILES = 0x0233
 GWLP_WNDPROC = -4
@@ -63,7 +64,7 @@ class DropFiles:
                     with self._lock:
                         self.paths.extend(got)
                 except Exception:
-                    pass
+                    oops.swallowed()
                 return 0
             return u32.CallWindowProcW(self._old, h, msg, wp, lp)
 
@@ -117,6 +118,7 @@ def classify(path):
             import json
             d = json.load(open(path, encoding="utf-8"))
         except Exception:
+            oops.swallowed()
             return None
         if isinstance(d, dict) and "map" in d:
             return "ledmap"

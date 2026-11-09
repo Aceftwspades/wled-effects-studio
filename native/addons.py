@@ -30,6 +30,7 @@ import re
 import shutil
 
 from native import gallery, paths
+from native import oops
 
 PACKS_MAX = 1 << 20              # packs.json
 LOOK_MAX = 512 << 10             # a .milk or a .glsl: the biggest of the cream of the crop is ~40 KB
@@ -225,6 +226,7 @@ def preview(pack):
             data = gallery._get(pack.preview_url(), PREVIEW_MAX)
             Image.open(io.BytesIO(data)).verify()
         except Exception:
+            oops.swallowed()
             return None
         with open(p, "wb") as f:
             f.write(data)
@@ -232,6 +234,7 @@ def preview(pack):
         import numpy as np
         return np.asarray(Image.open(p).convert("RGB"))
     except Exception:
+        oops.swallowed()
         return None
 
 

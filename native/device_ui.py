@@ -18,6 +18,7 @@ moved by hand; floating, it can.
     poll(app)             # per frame: scans and probes finishing, grips on floating frames
 """
 import os
+import queue
 import time
 import dearpygui.dearpygui as dpg
 
@@ -802,7 +803,7 @@ def poll_wled(app):
     for _ in range(20):
         try:
             kind, v = q.get_nowait()
-        except Exception:
+        except queue.Empty:
             break
         if kind == "line":
             _wled_log(v)
@@ -1413,7 +1414,7 @@ def poll_flash(app):
     while n < 60:
         try:
             line = job.q.get_nowait()
-        except Exception:
+        except queue.Empty:
             break
         dpg.add_text(line, parent="flash_log", color=c.RED if "error" in line.lower() else c.TEXT)
         n += 1

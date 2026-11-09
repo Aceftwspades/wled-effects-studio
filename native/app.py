@@ -66,6 +66,7 @@ import shutil
 import sys
 from native import vj_state
 from native import pads_state
+from native import oops
 
 STEP = 23
 CUBE_MAX = 620          # cube render cost is quadratic in this, so it is capped
@@ -644,7 +645,7 @@ class App(Features, Recorder, EditBuild):
             try:
                 self.live.close()
             except Exception:
-                pass
+                oops.swallowed()
         self.live = None
         dpg.configure_item("live_btn", label="use live audio")
 
@@ -724,7 +725,7 @@ class App(Features, Recorder, EditBuild):
                 try:
                     history.keep(project, kind, stem, ext, text)
                 except Exception:
-                    pass
+                    oops.swallowed()
         threading.Thread(target=work, daemon=True).start()
 
     def set_gpu_net(self, on):
@@ -792,7 +793,7 @@ class App(Features, Recorder, EditBuild):
         try:
             dpg.set_value("pal_combo", self.palette_name_for(self.eng.pal))
         except Exception:
-            pass
+            oops.swallowed()
 
     # --- geometry --------------------------------------------------------------
     GEOM_FIELDS = {
@@ -824,6 +825,7 @@ class App(Features, Recorder, EditBuild):
                     self.eng.set_geometry(back)
                     break
                 except Exception:
+                    oops.swallowed()
                     continue
             if self.project.geometry is geom:
                 self.project.geometry = self.eng.geom
@@ -846,7 +848,7 @@ class App(Features, Recorder, EditBuild):
             dpg.set_value("geom_desc", geom.describe())
             dpg.configure_item("map1d2d_row", show=geom.is2d)
         except Exception:
-            pass
+            oops.swallowed()
 
     def on_geom_kind(self, s, val):
         if val == "xyz":
@@ -1701,7 +1703,7 @@ class App(Features, Recorder, EditBuild):
                                 ("Cancel", None)])
                 return
         except Exception:
-            pass
+            oops.swallowed()
         go()
 
     def save_current(self):
@@ -1942,9 +1944,12 @@ class App(Features, Recorder, EditBuild):
 
     @classmethod
     def _valid_arrangement(cls, arr):
+        if not isinstance(arr, (list, tuple)):           # none saved
+            return None
         try:
             cols = [[str(s) for s in c] for c in arr]
         except Exception:
+            oops.swallowed()
             return None
         flat = sorted(s for c in cols for s in c)
         if flat == sorted(s for s in cls.CORE if s != "props") and all(cols):
@@ -3618,6 +3623,7 @@ class App(Features, Recorder, EditBuild):
                     if self._ab_pokes:
                         self._ab_pokes_land()
                 except Exception:
+                    oops.swallowed()
                     self.ab = None
                     self.ab_before = None
             self.acc -= STEP
@@ -3998,6 +4004,7 @@ def build(app):
                         from native.audio import list_inputs
                         _devs = ["system output"] + [n for _, n in list_inputs()]
                     except Exception:
+                        oops.swallowed()
                         _devs = ["system output"]
                     with form.row("source"):
                         dpg.add_combo(_devs, tag="live_dev", width=-1, default_value=_devs[0])
@@ -4234,6 +4241,7 @@ def main():
                 _t.append(time.perf_counter())
                 app._prof = [(b - a) * 1000.0 for a, b in zip(_t, _t[1:])]
             except Exception:
+                oops.swallowed()
                 # One bad frame should not take the window down with it. The
                 # traceback goes to the console AND to a file, because the
                 # console scrolls away and the interesting one is always the
@@ -4246,7 +4254,7 @@ def main():
                     try:
                         scratch.write_text(crash, tb + "\n", append=True)     # not through a link
                     except Exception:
-                        pass
+                        oops.swallowed()
                     app.gp.status(f"a frame failed: {tb.strip().splitlines()[-1][:90]}" + (" - see crash.txt" if crash else ""), "error")
                 app.playing = False
             _r0 = time.perf_counter()

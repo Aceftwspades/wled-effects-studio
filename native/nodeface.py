@@ -16,6 +16,7 @@ import os
 import re
 
 import numpy as np
+from native import oops
 
 # --- a face per category ---------------------------------------------------------
 # nine muted hues, apart from each other, dark enough for white text
@@ -532,6 +533,7 @@ def summary(n, d, wired=(), extra=None):
     try:
         text = f(V, extra or {}) if f else _generic(n, d, V)
     except Exception:
+        oops.swallowed()
         text = _generic(n, d, V)
     text = re.sub(r"\s+", " ", str(text)).strip()
     return text if len(text) <= 60 else text[:57] + "..."
@@ -801,6 +803,7 @@ def pattern(n, d, wired=(), N=32, live=None):
     try:
         a = np.asarray(f(N, V), dtype=float)
     except Exception:
+        oops.swallowed()
         return None
     return np.clip(np.nan_to_num(a), 0.0, 1.0)
 

@@ -24,6 +24,7 @@ import time
 import urllib.request
 
 from native import paths
+from native import oops
 ROOT = paths.TREE or paths.RES           # the flash builds in the WLED checkout; without one the frame says so
 
 USERMOD = "usermod_studio"
@@ -148,6 +149,7 @@ def effect_sizes(env):
     try:
         out = procs.run([tool] + objs + built, capture_output=True, text=True, timeout=60).stdout
     except Exception:
+        oops.swallowed()
         return {}
     # Objects of effects staged for an earlier build stay in the build
     # directory; only what is staged now was linked.
@@ -325,7 +327,7 @@ def usermod_info(name):
         if d.get("description"):
             return str(d["description"]).strip()
     except Exception:
-        pass
+        oops.swallowed()
     for rd in ("README.md", "readme.md", "README.txt"):
         try:
             for line in open(os.path.join(p, rd), encoding="utf-8", errors="replace"):
@@ -562,7 +564,7 @@ def wled_version():
             import json
             ver = json.load(open(os.path.join(ROOT, "package.json"), encoding="utf-8")).get("version", "?")
         except Exception:
-            pass
+            oops.swallowed()
     return ver, vid
 
 
@@ -644,6 +646,7 @@ def stage_builtins(project, log):
     try:
         meta = json.load(open(lj, encoding="utf-8"))
     except Exception:
+        oops.swallowed()
         meta = {"version": "1.0.0"}
     meta["name"] = BUILTIN_STAGED                   # its own library: the tree's cube_fx is not built beside it
     json.dump(meta, open(lj, "w", encoding="utf-8"), indent=2)
@@ -902,6 +905,7 @@ def device_info(host, timeout=4):
             info["_at"] = time.time()                       # when it said its uptime: verify_reboot needs it
             return info
     except Exception:
+        oops.swallowed()
         return None
 
 

@@ -18,6 +18,7 @@ from native import typeface
 
 from native import midi, osc, weight, transition, bank
 from native import vj_state
+from native import oops
 
 TAG = "midi_win"
 
@@ -198,6 +199,7 @@ def targets(app):
             try:
                 d = g.node_def(n)
             except Exception:
+                oops.swallowed()
                 continue
             for i in d["inputs"]:
                 if i["type"] in ("float", "bool") and (nid, i["name"]) not in wired and app.gp.pin_read(n, i):
@@ -428,6 +430,7 @@ def switch_effect(app, name):
         try:
             prev = sequence.capture(app.eng, app.seg_cols, int(getattr(app, "bri", 128)))
         except Exception:
+            oops.swallowed()
             prev = None
     style = st.get("xstyle", "fade") if st.get("xstyle") in transition.STYLES else "fade"
     app.on_effect(None, name)
@@ -628,7 +631,7 @@ def _replug(app, m, now=None):
             m.open(m.port)
             app.gp.status(f"MIDI: {m.port} is back")
         except Exception:
-            pass
+            oops.swallowed()
 
 
 def poll(app):
@@ -645,7 +648,7 @@ def poll(app):
             try:
                 m.open(st["port"])
             except Exception:
-                pass
+                oops.swallowed()
     _replug(app, m)
     _clock(app, st)
     for ok, msg in app.devfx.messages():

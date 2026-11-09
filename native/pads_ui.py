@@ -19,6 +19,7 @@ import dearpygui.dearpygui as dpg
 from native.typeface import px
 from native import clip_ui, form, num, pads, pads_hw, vj_clips
 from native import pads_state
+from native import oops
 
 TAG = "pads_win"
 GRID = "pads_grid"
@@ -433,6 +434,7 @@ def _labels_for(app):
     try:
         return idx, tuple(eng.meta[idx]["labels"]), modulate.signature(app), decks
     except Exception:
+        oops.swallowed()
         return idx, None, modulate.signature(app), decks
 
 

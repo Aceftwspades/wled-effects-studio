@@ -22,6 +22,7 @@ seeking only when it has drifted further (a seek every frame would stutter).
 import time
 
 import numpy as np
+from native import oops
 
 RATES = {0: 24.0, 1: 25.0, 2: 29.97, 3: 30.0}    # MTC's rate code (the hours byte's bits 5-6)
 STALE_S = 0.25                   # no word for this long: stopped
@@ -291,7 +292,7 @@ class LtcIn:
         try:
             self.stream.stop(); self.stream.close()
         except Exception:
-            pass
+            oops.swallowed()
 
 
 def chase(target, tc, running, offset=0.0, drift=DRIFT_S):

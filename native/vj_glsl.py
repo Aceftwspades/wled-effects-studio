@@ -63,6 +63,7 @@ import threading
 import time
 
 import numpy as np
+from native import oops
 
 HEADER = """#version 330
 uniform vec3 iResolution;
@@ -192,6 +193,7 @@ def channels_of(src):
     try:
         return [passes(src)[-1][2][k] for k in range(4)]
     except Exception:
+        oops.swallowed()
         return list(DEFAULT_CHANNELS)
 
 
@@ -377,6 +379,7 @@ class _GL:
                 t = self.ctx.texture(im.size, 4, im.tobytes())
                 t.repeat_x = t.repeat_y = True
             except Exception:
+                oops.swallowed()
                 t = None
             if got and got[1] is not None:
                 got[1].release()
@@ -452,7 +455,7 @@ class _GL:
                     else:
                         prog[k].value = val
                 except Exception:
-                    pass
+                    oops.swallowed()
         fbo = self.fbos.get(("frag", w, h))
         if fbo is None:
             fbo = self.fbos[("frag", w, h)] = self.ctx.simple_framebuffer((w, h), components=4)

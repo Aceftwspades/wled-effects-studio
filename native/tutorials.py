@@ -27,6 +27,7 @@ import os
 import re
 
 from native import paths
+from native import oops
 
 DIR = os.path.join(paths.RES, "docs", "nodes")
 TUTORIALS = "Node tutorials"                 # the project the lessons run in
@@ -125,6 +126,7 @@ def used_in(node):
             try:
                 g = json.load(open(os.path.join(d, f), encoding="utf-8"))
             except Exception:
+                oops.swallowed()
                 continue
             if any(n.get("type") == node for n in g.get("nodes", [])):
                 title = g.get("name") or f[:-5]
@@ -252,7 +254,7 @@ def _restore(app, t):
     try:
         view3d.restore(app, was["cam"])
     except Exception:
-        pass
+        oops.swallowed()
     app.request_layout()
 
 

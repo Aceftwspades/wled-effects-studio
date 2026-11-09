@@ -38,6 +38,7 @@ And at frame scope:
 User nodes live in <project>/nodes/*.json with the same shape and are merged
 in at start; a user node with a library node's name replaces it.
 """
+from native import oops
 
 F, C, B, V = "float", "color", "bool", "vector"
 
@@ -1593,7 +1594,7 @@ def library(extra=()):
         try:
             lib[d["name"]] = d
         except Exception:
-            pass
+            oops.swallowed()
     from native.nodedocs import apply
     return apply(lib)
 
@@ -1764,6 +1765,7 @@ def text_drawn(text, face, height):
         img = Image.new("L", (w, height), 0)
         ImageDraw.Draw(img).text((0, 0), text, font=f, fill=255)
     except Exception:
+        oops.swallowed()
         return None
     px = img.load()
     rows = [[px[x, y] for x in range(w)] for y in range(height)]

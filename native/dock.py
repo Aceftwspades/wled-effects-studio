@@ -22,6 +22,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import oops
 
 TAB_H = 34                  # the tab strip at 100%
 MIN_W = 240                 # a tab's narrowest column, at 100%
@@ -183,7 +184,7 @@ def _float_window(app, slot):
     try:
         dpg.set_y_scroll(tag, 0)
     except Exception:
-        pass
+        oops.swallowed()
     dpg.focus_item(tag)
 
 

@@ -31,6 +31,7 @@ import numpy as np
 
 from native import clock, vj_clips, vj_layer, vj_looks
 from native import vj_state
+from native import oops
 
 CANVASES = (("64x48", "64 x 48 (light)"), ("96x72", "96 x 72"), ("128x96", "128 x 96 (fine)"),
             ("64x64", "64 x 64 (square)"), ("128x72", "128 x 72 (16:9, a wide panel)"),
@@ -228,7 +229,7 @@ def toggle_favourite(app, name):
         from native.project import save_prefs
         save_prefs(app.prefs)
     except Exception:
-        pass
+        oops.swallowed()
     return on
 
 
@@ -308,7 +309,7 @@ def _close_all(pool):
             try:
                 src.close()
             except Exception:
-                pass
+                oops.swallowed()
     pool.clear()
 
 
@@ -489,7 +490,7 @@ def _drop_dead(app, key):
         try:
             ent[0].close()
         except Exception:
-            pass
+            oops.swallowed()
 
 
 def _open_soon(app, s, key):
@@ -561,7 +562,7 @@ def _collect(app):
             try:
                 got[0].close()
             except Exception:
-                pass
+                oops.swallowed()
 
 
 def _dead(src):
@@ -596,7 +597,7 @@ def _release(app):
             try:
                 src.close()
             except Exception:
-                pass
+                oops.swallowed()
 
 
 CAM_CHECK_TICKS = 30              # the pads' cameras looked over this often (frames)
@@ -741,6 +742,7 @@ def sound(app):
     try:
         f = np.asarray(eng.fft, np.float32) / 255.0
     except Exception:
+        oops.swallowed()
         f = np.zeros(16, np.float32)
     bass, mid, treb = float(f[0:3].mean()), float(f[4:9].mean()), float(f[10:16].mean())
     vol = float(getattr(eng, "last_audio", (0.0, 0))[0])
@@ -862,6 +864,7 @@ def _tempo(app):
         from native import modulate
         return modulate.tempo(app)
     except Exception:
+        oops.swallowed()
         return 120.0
 
 
@@ -884,7 +887,7 @@ def _per_bar(app, src):
             from native import sequence_ui
             return int(sequence_ui._steps(app).get("bar") or 4)
         except Exception:
-            pass
+            oops.swallowed()
     return 4
 
 
@@ -899,7 +902,7 @@ def beat_count(app):
             first = float(S.get("first") or 0.0)
             return max(0.0, (pos - first) * bpm / 60.0), "the show's bars"
     except Exception:
-        pass
+        oops.swallowed()
     last = getattr(app, "last_hit_at", None)
     if last is not None and clock.now() - last < HEARD_FOR:
         return vj_state.of(app).beats, "the tempo, kept on the beats heard"
@@ -1084,6 +1087,7 @@ def draw_deck(app, i, dt, snd, beat, hit):
     try:
         c.bands = np.asarray(app.eng.fft, np.float32) / 255.0             # the sixteen bands, for a shader's spectrum
     except Exception:
+        oops.swallowed()
         c.bands = None
     v = run.video
     if v is not None and v.shape[:2] != (h, w):                         # a frame of another size (a canvas change)
@@ -1644,6 +1648,7 @@ def _section_now(app):
             if float(s["at"]) <= pos < float(s["at"]) + float(s["len"]):
                 return (k, s.get("kind", "verse"))
     except Exception:
+        oops.swallowed()
         return None
     return None
 
@@ -1872,6 +1877,7 @@ def _fade_from_here(app, step):
         from native import sequence_ui
         style = str(sequence_ui._steps(app).get("style") or "fade")
     except Exception:
+        oops.swallowed()
         style = "fade"
     vj_state.of(app).fade = {"t0": clock.now(), "dur": dur, "from": np.array(last, copy=True), "style": style}
 

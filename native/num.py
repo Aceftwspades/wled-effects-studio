@@ -33,6 +33,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import typeface
+from native import oops
 
 FILL_H = 2               # the fill's height at 100%
 CLICK_PX = 3             # a press that moves less than this and lets go is a click: typing
@@ -50,6 +51,7 @@ def _id(item):
     try:
         return dpg.get_alias_id(item) if isinstance(item, str) else int(item)
     except Exception:
+        oops.swallowed()
         return item
 
 
@@ -274,6 +276,7 @@ def any_active():
             if dpg.does_item_exist(item) and dpg.is_item_active(item):
                 return True
         except Exception:
+            oops.swallowed()
             continue
     return False
 

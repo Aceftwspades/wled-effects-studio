@@ -26,6 +26,7 @@ import threading
 import time
 
 import numpy as np
+from native import oops
 
 RATE = 44100                     # every file decoded to this, stereo: the mixer adds them sample for sample
 PEAK = 256                       # frames a point of a sound's wave picture (its loudest), 5.8 ms
@@ -293,7 +294,7 @@ class Player:
             try:
                 s.stop(); s.close()
             except Exception:
-                pass
+                oops.swallowed()
 
 
 # --- what the effects hear ---------------------------------------------------------------------

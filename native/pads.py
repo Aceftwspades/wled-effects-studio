@@ -30,6 +30,7 @@ import json
 import time
 from native import vj_state
 from native import pads_state
+from native import oops
 
 GRID_MIN, GRID_MAX = 2, 8
 BUTTONS = ("trigger", "toggle", "hold")
@@ -287,6 +288,7 @@ def _paused(app, i):
         ent = vj._pool(app).get(run.src_key)
         return bool(ent and ent[0] is not None and ent[0].paused)
     except Exception:
+        oops.swallowed()
         return False
 
 
@@ -325,6 +327,7 @@ def value(app, t):
             from native import modulate
             return modulate.value(app, t)
     except Exception:
+        oops.swallowed()
         return None
     return None
 
@@ -378,7 +381,7 @@ def _step(app, t):
             if key == "rate" and m is not None and m.get("sync", True):
                 return 1.0 / (len(modulate.PERIODS) - 1)
     except Exception:
-        pass
+        oops.swallowed()
     return 2e-3
 
 

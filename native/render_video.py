@@ -28,6 +28,7 @@ import numpy as np
 
 from native import clock, procs
 from native.typeface import px
+from native import oops
 
 TAG = "render_video_win"
 VIEWS = (("cube", "the 3-D view"), ("net", "the logical net"), ("both", "both, side by side"))
@@ -352,7 +353,7 @@ def _end(app, words, ok=False):
             try:
                 job.proc.kill()
             except Exception:
-                pass
+                oops.swallowed()
             for p in {job.video, job.path, job.path[:-4] + ".audio.wav"}:
                 try:
                     if os.path.exists(p):
