@@ -2083,7 +2083,8 @@ on and install what it carries.
   in its `graphs/`) are effects rebuilt from the firmware's own; `python examples/build_examples.py
   --check` compiles, builds and runs them all (and every scriptable one in
   the Script effect). `python tests/smoke_app.py` drives the app through
-  its main flows and fails on any traceback; `python tests/walk_menus.py`
+  its main flows and fails on any traceback (`-s vj` runs one suite of
+  them, `-l` lists the suites); `python tests/walk_menus.py`
   calls every menu item and context-menu row. The smoke test works in a
   project of its own (made from the examples, deleted after); both turn on
   the app's remote control (`STUDIO_REMOTE_CONTROL=1`), which is off in

@@ -11,7 +11,13 @@ start and deleted at the end, so it starts the same on any machine and
 leaves the others alone; the app's remote control is turned on for it
 (STUDIO_REMOTE_CONTROL=1), in the private scratch folder (native/scratch.py).
 
-    python tests/smoke_app.py          # from studio; ~60 s; exits 1 on a traceback
+    python tests/smoke_app.py              # from studio; all of it, ~7 min; exits 1 on a traceback
+    python tests/smoke_app.py -s vj -s modulators   # the opening steps, then only those suites (-l lists them)
+
+STEPS is in suites: a "suite:<name>" string starts one, and runs to the next. The steps before the first
+(the run's project, a graph built) always run; a suite may come back later in the list (its steps then run
+in their places). A suite chosen alone starts from those opening steps, not from where the suite before
+it left the app, so each is written to need nothing but them.
 
 It is deliberately not a pytest: it needs the window, the engine and a
 minute; run it before a release, not on every save.
@@ -77,7 +83,7 @@ MAP_STEPS = [
 # back in as a part of as many LEDs
 _LIVE_TREE = ("np.stack([(40 * (1 - np.linspace(0, 1, 60)) + 4) * np.cos(np.linspace(0, 8 * np.pi, 60)), "
               "(40 * (1 - np.linspace(0, 1, 60)) + 4) * np.sin(np.linspace(0, 8 * np.pi, 60)), np.linspace(0, 120, 60)], 1)")
-_EXPORT = "__import__('os').path.join(app.project.path, 'export', 'lightwork_layout.csv')"
+_EXPORT = "os.path.join(app.project.path, 'export', 'lightwork_layout.csv')"
 LIVE_MAP_STEPS = [
     ([{"py": "camera_map_ui.show(app)"}, {"py": "dpg.set_value('map_method', camera_map_ui.METHODS[1][1])"},
       {"py": "num.set('map_n', 60)"}, {"py": "num.set('map_bright', 200)"}, {"py": "dpg.set_value('map_cam', 'synthetic')"},
@@ -121,11 +127,11 @@ MULTI_STEPS = [
 # the show to two devices at once - the stream's two - and started on both together
 MULTI_SEND_STEPS = [
     ([{"py": "app.add_device('127.0.0.2:8771')"}, {"py": f"app.stream_config().update(multi=True, targets={_HALVES})"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).__setitem__('to_all', True)"},
-      {"check": "__import__('native.sequence_ui', fromlist=['x']).send_hosts(app) == ['127.0.0.1:8770', '127.0.0.2:8771']"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).send(app, run=True)"}], 22.0),
+      {"py": "sequence_ui._steps(app).__setitem__('to_all', True)"},
+      {"check": "sequence_ui.send_hosts(app) == ['127.0.0.1:8770', '127.0.0.2:8771']"},
+      {"py": "sequence_ui.send(app, run=True)"}], 22.0),
     ([{"expect": ["seq_log", "sent to 2 of 2 devices"]}, {"expect": ["seq_log", "started together on 2"]},
-      {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).__setitem__('to_all', False)"}, {"py": "device_ui._set_multi(app, False)"},
+      {"py": "sequence_ui._steps(app).__setitem__('to_all', False)"}, {"py": "device_ui._set_multi(app, False)"},
       {"py": "app.remove_device('127.0.0.2:8771')"}], 0.5),
 ]
 
@@ -140,9 +146,9 @@ def _holds(other):
 
 _SUBS = {"smoke_bad": "{broken", "smoke_a": _holds("smoke_b"), "smoke_b": _holds("smoke_a")}
 _SUBS_WRITE = ("(lambda os: (os.makedirs(app.gp.sub_dir, exist_ok=True), [open(os.path.join(app.gp.sub_dir, k + '.json'), 'w').write(v) "
-               f"for k, v in {_SUBS!r}.items()]))(__import__('os'))")
+               f"for k, v in {_SUBS!r}.items()]))(os)")
 _SUBS_REMOVE = ("(lambda os: [os.remove(os.path.join(app.gp.sub_dir, k + '.json')) for k in "
-                f"{list(_SUBS)!r} if os.path.exists(os.path.join(app.gp.sub_dir, k + '.json'))])(__import__('os'))")
+                f"{list(_SUBS)!r} if os.path.exists(os.path.join(app.gp.sub_dir, k + '.json'))])(os)")
 
 STEPS = [
     # the run's own project, from the examples; Maelstrom's graph compiled, built and put on the effects list
@@ -153,6 +159,7 @@ STEPS = [
     ([{"wait_build": True}, {"check": f"app.project.path.endswith({SMOKE!r})"}, {"layout": "graph"},
       {"graph_open": "maelstrom.json"}, {"py": "app.gp.compile()"}, {"py": "app.project.set_imported('maelstrom.cpp', True)"}], 5.0),
     ([{"wait_build": True}, {"expect": ["edit_status", "loaded cubefx_"]}, {"layout": "both"}, {"effect": "Maelstrom"}], 1.5),
+    "suite:graph",
     # a rewire seen at once: with Live on, the edit runs as bytecode in the sim's Studio Script effect a moment
     # after it is made - under the graph's own name - while its C++ builds; the build takes over at the same clock
     ([{"check": "app.eng.names[app.eng.idx] == 'Maelstrom'"}, {"layout": "graph"}, {"graph_open": "maelstrom.json"},
@@ -191,7 +198,7 @@ STEPS = [
       {"param": ["sx", 201]}], 0.8),
     ([{"check": "app.ab.names[app.ab.idx] == app.eng.names[app.eng.idx] and app.ab.fx['sx'] == app.eng.fx['sx'] == 201"},
       {"compare": "Rainbow"}], 1.0),
-    ([{"check": "app.ab_before is None and app.ab_name == 'Rainbow' and app.ab.library.endswith('_ab' + __import__('os').path.splitext(app.eng.library)[1])"},
+    ([{"check": "app.ab_before is None and app.ab_name == 'Rainbow' and app.ab.library.endswith('_ab' + os.path.splitext(app.eng.library)[1])"},
       {"compare": ""}], 0.5),
     ([{"check": "app.ab is None and app.ab_before is None"}], 0.2),
     # the LED under a point of the net and of the 3-D view, by wiring index
@@ -336,6 +343,7 @@ STEPS = [
     ([{"graph_open": "box_fire.json"}, {"py": "(app.gp.add_node('Send'), app.gp.add_node('Receive'))"},
       {"py": "app.gp.graph.link(6, 't', max(app.gp.graph.nodes) - 1, 'in')"},
       {"py": "'Receive' not in app.gp.graph.compile() and 'Send' not in app.gp.graph.compile()"}, {"graph_undo": True}, {"graph_undo": True}], 1.0),
+    "suite:control",
     # MIDI learn without a controller: the window, Speed learnt from an injected CC and driven to 255, a typed pin
     # of the graph learnt and driven to the top of its range, the slider's right-click menu; the mappings cleared
     ([{"graph_open": "box_fire.json"}, {"action": "midi"}, {"midi_learn": {"kind": "fx", "key": "sx"}}, {"midi": [176, 7, 64]}], 1.0),
@@ -375,7 +383,7 @@ STEPS = [
                 "== app.eng.names[app.eng.idx]"},
       {"check": "len(__import__('json').loads(__import__('urllib.request', fromlist=['x']).urlopen("
                 "f'http://127.0.0.1:{app.phone.port}/state?k={app.phone.key}', timeout=5).read())['pads']['controls']) "
-                "== len(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'])"},
+                "== len(pads.current(pads_ui._st(app))['controls'])"},
       {"check": "b'pointerdown' in __import__('urllib.request', fromlist=['x']).urlopen("
                 "f'http://127.0.0.1:{app.phone.port}/pads?k={app.phone.key}', timeout=5).read()"},
       {"py": "__import__('urllib.request', fromlist=['x']).urlopen(__import__('urllib.request', fromlist=['x']).Request("
@@ -389,12 +397,12 @@ STEPS = [
     ([{"check": "not app.phone.is_open and not app.blackout and app.master_bri == 255"}], 0.1),
     # a shader in: File > New effect from a shader... - one with a texture refused with its line, the example made
     # into a code effect, built, and drawing; then the code pane's effect is the one before again
-    ([{"py": "__import__('native.shader_ui', fromlist=['x']).show(app)"}, {"check": "dpg.is_item_shown('shader_dialog')"},
-      {"check": "__import__('native.shader_ui', fromlist=['x']).make(app, 'Smoke Texture', "
+    ([{"py": "shader_ui.show(app)"}, {"check": "dpg.is_item_shown('shader_dialog')"},
+      {"check": "shader_ui.make(app, 'Smoke Texture', "
                 "'void mainImage(out vec4 o, vec2 u) {\\n o = texture(iChannel0, u);\\n}') is None"},
       {"expect": ["shader_msg", "line 2: a texture"]},
-      {"py": "setattr(app, '_shader_f', __import__('native.shader_ui', fromlist=['x']).make(app, 'Smoke Shader', "
-             "__import__('native.shader_ui', fromlist=['x']).EXAMPLE))"}], 1.0),
+      {"py": "setattr(app, '_shader_f', shader_ui.make(app, 'Smoke Shader', "
+             "shader_ui.EXAMPLE))"}], 1.0),
     ([{"wait_build": True}, {"check": "app._shader_f and 'Smoke Shader' in app.eng.names and not dpg.is_item_shown('shader_dialog')"},
       {"effect": "Smoke Shader"}], 1.0),
     ([{"check": "int(app.frame_rgb().max()) > 40"}], 0.1),
@@ -431,6 +439,7 @@ STEPS = [
     ([{"check": "app.osc.port is None and dpg.get_value('osc_state') == ''"},
       {"py": "dpg.hide_item('midi_ctx')"}, {"py": "dpg.hide_item('midi_win')"}, {"graph_undo": True},
       {"py": "(app.project.options.pop('midi', None), app.project.save())"}], 0.5),
+    "suite:ui",
     # the help: the guide in its window, a search that marks the words and scrolls to them, F1 with a node
     # selected landing on that node's entry, Back to where the guide was, the node's menu with its keys and
     # its reference row, the first-run panel; all put away again
@@ -485,7 +494,7 @@ STEPS = [
     # any node with something to set brings its properties up (12, a Noise: its settings and its free input); a value
     # set there is the node's field's too, and one set on the node theirs; undone, both go back; a node with nothing
     # to set (6, a Time) brings none
-    ([{"graph_selected": [12]}], 1.0),
+    ([{"py": "app.gp.set_overview_zoom(0.0)"}, {"graph_selected": [12]}], 1.0),    # the node's own fields drawn at any zoom
     ([{"check": "dpg.is_item_shown('props_fly') and {dpg.get_item_user_data(w) for w in app.gp._props_widgets} >= "
                 "{(12, 'octaves'), (12, 'roughness'), (12, 'scale')}"},
       {"py": "setattr(app, '_twins', lambda name: [dpg.get_value(w) for w in app.gp._widgets if dpg.does_item_exist(w) "
@@ -721,6 +730,7 @@ STEPS = [
       {"pane_move": ["send", "cube", "bottom"]}, {"pane_move": ["flash", "side", "top"]}, {"pane_move": ["devices", "main", "right"]},
       {"dock": ["devices", False]}, {"dock": ["send", False]}, {"dock": ["flash", False]},
       {"arrangement": [["main"], ["cube", "props"], ["side"]]}], 3.0),
+    "suite:shape",
     # the shape editor: parts added, one placed by a click on the 3-D view, the grid layout, undo, and back to the cube
     ([{"layout": "both"}, {"frame": "shape"}, {"shape": ["clear"]}, {"shape": ["add", "ring"]}, {"shape": ["add", "panel"]},
       {"shape": ["add", "cube"]}, {"shape": ["select", 1]}, {"shape": ["place", 120, 120]}, {"shape": ["layout", "grid"]},
@@ -865,20 +875,21 @@ STEPS = [
       {"geometry": {"kind": "shape", "params": {"parts": [{"kind": "text", "name": "text", "params": {"text": "OPEN", "height": 12.0,
                     "style": "center", "font": "", "pitch": 1.0, "order": "shortest"}, "pos": [0, 0, 0], "rot": [0, 0, 0],
                     "scale": 1.0, "reverse": False}]}}},
-      {"py": "open(__import__('os').path.join(app.project.path, 'export', '_smoke.svg'), 'w').write("
+      {"py": "open(os.path.join(app.project.path, 'export', '_smoke.svg'), 'w').write("
              "'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200mm\" height=\"100mm\" viewBox=\"0 0 200 100\">"
              "<circle cx=\"50\" cy=\"50\" r=\"40\"/><path d=\"M110 90 L150 10 L190 90\"/><text>x</text></svg>')"},
-      {"py": "shape_ui.import_file(app, __import__('os').path.join(app.project.path, 'export', '_smoke.svg'))"}], 2.0),
+      {"py": "shape_ui.import_file(app, os.path.join(app.project.path, 'export', '_smoke.svg'))"}], 2.0),
     ([{"check": "[p['kind'] for p in app.project.geometry.params['parts']] == ['text', 'outline'] and app.project.geometry.count > 60"},
       {"expect": ["messages", "_smoke.svg: 2 strokes"]}, {"expect": ["messages", "left out: 1 text"]},
       {"check": "__import__('native.power_plan', fromlist=['p']).for_geometry(app.project.geometry).feeds() >= 1"},
-      {"py": "shape_ui.export_template(app, __import__('os').path.join(app.project.path, 'export', '_smoke_template.svg'))"}], 1.0),
-    ([{"check": "__import__('os').path.getsize(__import__('os').path.join(app.project.path, 'export', '_smoke_template.svg')) > 1000"},
+      {"py": "shape_ui.export_template(app, os.path.join(app.project.path, 'export', '_smoke_template.svg'))"}], 1.0),
+    ([{"check": "os.path.getsize(os.path.join(app.project.path, 'export', '_smoke_template.svg')) > 1000"},
       {"expect": ["messages", "print at actual size"]},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 1.0),
     ([{"check": "not dpg.is_item_shown('fx_fit_note')"}, {"action": "tutorial_tree"}], 1.5),
     ([{"check": "dpg.is_item_shown('reader_win')"}, {"py": "chrome.close_dialog('reader_win') or dpg.hide_item('reader_win')"},
       {"effect": "Rainbow"}], 0.5),
+    "suite:devices",
     # live output to the fake device on this machine, and the wiring test; the stream asks the device how it takes
     # one - the fake says nothing of Respect LED maps, so WLED's default: in logical order, its map applied there
     ([{"frame": "send"}, {"stream": "127.0.0.1:8770"}, {"wiring_test": "chase"}, {"wiring_test": "index"}, {"wiring_test": "part"},
@@ -929,6 +940,7 @@ STEPS = [
       {"geometry": {"kind": "shape", "params": {"parts": [_TREE]}}}, {"py": "app.read_device_wiring()"}], 2.0),
     ([{"expect": ["messages", "a shape's wiring is its parts' order"]}, {"check": "app.project.geometry.kind == 'shape'"},
       {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.5),
+    "suite:sequence",
     # a sequence: two steps from the sim, played, a step loaded back, one deleted
     ([{"frame": "sequence"}, {"effect": "Rainbow"}, {"seq": ["add"]}, {"effect": "Ace 3-D Maelstrom"}, {"seq": ["add"]},
       {"seq": ["field", "dur", 1.0]}, {"seq": ["play"]}], 3.0),
@@ -941,25 +953,25 @@ STEPS = [
       {"check": "len(app.project.options['sequence']['steps']) == 2"}], 0.5),
     # the sequence and the schedule sent to the fake: presets, the playlist, the timers with their Off preset
     ([{"seq": ["stop"]}, {"seq": ["load", 0]}, {"seq": ["ramp", "sx", 250]}, {"seq": ["ramp", "ix", 40, "up and back"]},
-      {"check": "__import__('native.sequence', fromlist=['x']).ramp_of(app.project.options['sequence']['steps'][0], 'ix') == (40, 'up and back')"},
+      {"check": "sequence.ramp_of(app.project.options['sequence']['steps'][0], 'ix') == (40, 'up and back')"},
       {"seq": ["ramp_del", "ix"]}, {"check": "'ix' not in (app.project.options['sequence']['steps'][0].get('ramps') or {})"},
       {"seq": ["ramp", "ix", 40, "ease out"]},
       # the ramp as a curve drawn on the timeline: sampled from its shape, a point added, one moved, one taken away
       {"seq": ["ramp", "ix", 40, "curve"]},
-      {"check": "__import__('native.sequence', fromlist=['x']).ramp_of(app.project.options['sequence']['steps'][0], 'ix') == (40, 'curve') "
-                "and len(__import__('native.sequence', fromlist=['x']).curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 4"},
-      {"check": "__import__('native.sequence_ui', fromlist=['x']).curve_add(app, 0.6, 250, 'ix') and "
-                "len(__import__('native.sequence', fromlist=['x']).curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 5"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).curve_move(app, 'ix', 0, 0.3, 10)"},
-      {"check": "__import__('native.sequence', fromlist=['x']).curve_points(app.project.options['sequence']['steps'][0], 'ix')[0] == [0.3, 10]"},
-      {"check": "__import__('native.sequence_ui', fromlist=['x']).curve_remove(app, 'ix', 1) and "
-                "len(__import__('native.sequence', fromlist=['x']).curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 4"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).send(app, run=True)"}], 22.0),
+      {"check": "sequence.ramp_of(app.project.options['sequence']['steps'][0], 'ix') == (40, 'curve') "
+                "and len(sequence.curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 4"},
+      {"check": "sequence_ui.curve_add(app, 0.6, 250, 'ix') and "
+                "len(sequence.curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 5"},
+      {"py": "sequence_ui.curve_move(app, 'ix', 0, 0.3, 10)"},
+      {"check": "sequence.curve_points(app.project.options['sequence']['steps'][0], 'ix')[0] == [0.3, 10]"},
+      {"check": "sequence_ui.curve_remove(app, 'ix', 1) and "
+                "len(sequence.curve_points(app.project.options['sequence']['steps'][0], 'ix')) == 4"},
+      {"py": "sequence_ui.send(app, run=True)"}], 22.0),
     ([{"expect": ["seq_log", "saved on the device"]}, {"expect": ["seq_sent", "as it is here"]},
       {"seq": ["select", 0]}, {"seq": ["field", "trans", 1.5]}, {"expect": ["seq_sent", "changed since"]},
       {"seq": ["timer", "playlist"]}, {"seq": ["timer", "off"]},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).send_timers(app)"}], 6.0),
-    ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).read_timers(app)"}], 3.0),
+      {"py": "sequence_ui.send_timers(app)"}], 6.0),
+    ([{"expect": ["seq_tlog", "timer(s) sent"]}, {"py": "sequence_ui.read_timers(app)"}], 3.0),
     *MULTI_SEND_STEPS,
     # the show's audio: a short WAV onto a track at the first step, heard where the show is while it plays (the
     # speakers at volume 0), the effects hearing it; the clip moved, its fades set by hand and made automatic again,
@@ -967,69 +979,69 @@ STEPS = [
     ([{"py": "(lambda w, np, p: (lambda f: (f.setnchannels(1), f.setsampwidth(2), f.setframerate(22050), "
              "f.writeframes((np.sin(np.arange(44100) * 0.06) * 3000).astype(np.int16).tobytes()), f.close()))(w.open(p, 'wb')))"
              "(__import__('wave'), __import__('numpy'), __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 0)"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).add_audio(app, __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"}], 3.0),
+      {"py": "sequence_ui.select(app, 0)"},
+      {"py": "sequence_ui.add_audio(app, __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"}], 3.0),
     ([{"check": "len(app.project.options['sequence']['tracks']) == 1 and app.project.options['sequence']['tracks'][0]['clips'][0]['file'] == 'assets/audio/smoke_tone.wav'"},
       {"check": "abs(app.project.options['sequence']['tracks'][0]['clips'][0]['len'] - 2.0) < 0.05"},
       {"py": "setattr(app._show_player, 'volume', 0.0) if getattr(app, '_show_player', None) else None"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).play(app, 0)"}], 1.2),
-    ([{"check": "type(__import__('native.sequence_ui', fromlist=['x']).show_source(app)).__name__ == 'ShowAudio'"},
-      {"check": "abs(app._show_player.position - __import__('native.sequence_ui', fromlist=['x']).position(app)) < 0.15"},
+      {"py": "sequence_ui.play(app, 0)"}], 1.2),
+    ([{"check": "type(sequence_ui.show_source(app)).__name__ == 'ShowAudio'"},
+      {"check": "abs(app._show_player.position - sequence_ui.position(app)) < 0.15"},
       {"seq": ["stop"]},
       {"py": "app.project.options['sequence']['tracks'][0]['clips'][0].update(at=1.0, fade_in=0.5)"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x'])._audio_changed(app)"}], 0.4),
+      {"py": "sequence_ui._audio_changed(app)"}], 0.4),
     ([{"check": "__import__('native.showaudio', fromlist=['x']).fades(app.project.options['sequence']['tracks'][0])[0] == (0.5, 0.0)"},
-      {"check": "__import__('native.sequence_ui', fromlist=['x']).show_source(app) is None"},
-      {"py": "setattr(app, '_clip_sel', (0, 0))"}, {"check": "__import__('native.sequence_ui', fromlist=['x']).delete_clip(app)"},
+      {"check": "sequence_ui.show_source(app) is None"},
+      {"py": "setattr(app, '_clip_sel', (0, 0))"}, {"check": "sequence_ui.delete_clip(app)"},
       {"check": "app.project.options['sequence']['tracks'][0]['clips'] == []"},
-      {"py": "app.project.options['sequence']['tracks'].clear()"}, {"py": "__import__('native.sequence_ui', fromlist=['x'])._audio_changed(app)"}], 0.4),
+      {"py": "app.project.options['sequence']['tracks'].clear()"}, {"py": "sequence_ui._audio_changed(app)"}], 0.4),
     # song sections and a show made from them: two sections laid by hand at 120 bpm, a show made from three
     # effects of a setlist (measured on the spare engine) - a step a 4 bars over the 16 s verse and the 8 s drop -
     # then undone to the steps before; the sections, the tempo and the setlist put back
-    ([{"py": "setattr(app, '_as_before', (len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']), __import__('native.midi_ui', fromlist=['m'])._st(app).get('setlist'), __import__('native.sequence_ui', fromlist=['x'])._steps(app).get('bpm')))"},
-      {"py": "__import__('native.midi_ui', fromlist=['m'])._st(app).__setitem__('setlist', [n for n in app.eng.names if n in ('Rainbow', 'Fire 2012', 'Colorwaves')])"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).update(bpm=120, sections=[{'name': 'Verse', 'kind': 'verse', 'at': 0.0, 'len': 16.0}, "
+    ([{"py": "setattr(app, '_as_before', (len(sequence_ui._steps(app)['steps']), midi_ui._st(app).get('setlist'), sequence_ui._steps(app).get('bpm')))"},
+      {"py": "midi_ui._st(app).__setitem__('setlist', [n for n in app.eng.names if n in ('Rainbow', 'Fire 2012', 'Colorwaves')])"},
+      {"py": "sequence_ui._steps(app).update(bpm=120, sections=[{'name': 'Verse', 'kind': 'verse', 'at': 0.0, 'len': 16.0}, "
              "{'name': 'Drop', 'kind': 'drop', 'at': 16.0, 'len': 8.0}])"},
       {"py": "__import__('native.autoshow', fromlist=['a']).show(app)"}, {"check": "dpg.is_item_shown('autoshow_win')"},
       {"py": "__import__('native.autoshow', fromlist=['a']).options(app).update(pool='setlist', bars=4)"}, {"py": "__import__('native.autoshow', fromlist=['a']).make(app)"}], 8.0),
-    ([{"check": "len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) == 3 and abs(sum(s['dur'] for s in __import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) - 24.0) < 0.1"},
-      {"check": "__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps'][2]['trans'] == 0.0"},
+    ([{"check": "len(sequence_ui._steps(app)['steps']) == 3 and abs(sum(s['dur'] for s in sequence_ui._steps(app)['steps']) - 24.0) < 0.1"},
+      {"check": "sequence_ui._steps(app)['steps'][2]['trans'] == 0.0"},
       {"py": "dpg.hide_item('autoshow_win')"}, {"seq": ["undo"]}], 1.0),
-    ([{"check": "len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) == app._as_before[0]"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).pop('sections', None)"}, {"py": "__import__('native.sequence_ui', fromlist=['x'])._steps(app).update(bpm=app._as_before[2])"},
-      {"py": "__import__('native.midi_ui', fromlist=['m'])._st(app).__setitem__('setlist', app._as_before[1]) if app._as_before[1] is not None else __import__('native.midi_ui', fromlist=['m'])._st(app).pop('setlist', None)"},
+    ([{"check": "len(sequence_ui._steps(app)['steps']) == app._as_before[0]"},
+      {"py": "sequence_ui._steps(app).pop('sections', None)"}, {"py": "sequence_ui._steps(app).update(bpm=app._as_before[2])"},
+      {"py": "midi_ui._st(app).__setitem__('setlist', app._as_before[1]) if app._as_before[1] is not None else midi_ui._st(app).pop('setlist', None)"},
       {"py": "app.project.save()"}], 0.6),
     # timecode in: MTC on the MIDI port (a stand-in port), a full frame locating 00:00:00:15 at 30 - the show held
     # half a second in; the timecode off again
     ([{"py": "setattr(app, '_tc_port', app.midi.port) or setattr(app.midi, 'port', app.midi.port or 'smoke')"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).tc_set(app, source='mtc', start='00:00:00:00')"},
+      {"py": "sequence_ui.tc_set(app, source='mtc', start='00:00:00:00')"},
       {"py": "app.midi.inject([0xF0, 0x7F, 0x7F, 0x01, 0x01, 0x60, 0, 0, 15, 0xF7])"}], 0.5),
-    ([{"check": "abs(__import__('native.sequence_ui', fromlist=['x']).position(app) - 0.5) < 0.05 and app._seq_play.get('paused') is not None"},
+    ([{"check": "abs(sequence_ui.position(app) - 0.5) < 0.05 and app._seq_play.get('paused') is not None"},
       {"check": "dpg.get_value('seq_tc_words').startswith('00:00:00:15')"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).tc_set(app, source='off')"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).stop(app)"},
+      {"py": "sequence_ui.tc_set(app, source='off')"}, {"py": "sequence_ui.stop(app)"},
       {"py": "setattr(app.midi, 'port', app._tc_port)"}], 0.4),
     # the show rendered to a video, frame by frame on the held clock: the second step (1 s) at 720p and 24 frames a
     # second, 24 frames in an mp4 in captures/ (taken away again), the clock the real one after - without ffmpeg on the
     # path (the Windows runner), the render says so and the mp4's checks are left out
-    ([{"py": "__import__('native.render_video', fromlist=['r']).options(app).update(size='1280x720', fps=24, view='both', "
+    ([{"py": "render_video.options(app).update(size='1280x720', fps=24, view='both', "
              "length='step', camera='slow', audio=True)"},
-      {"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 1)"},
-      {"py": "__import__('native.render_video', fromlist=['r']).show(app)"},
+      {"py": "sequence_ui.select(app, 1)"},
+      {"py": "render_video.show(app)"},
       {"check": "'24 frames' in dpg.get_value('rv_words')"},
-      {"py": "__import__('native.render_video', fromlist=['r']).start(app)"}], 20.0),
-    ([{"check": "not __import__('native.render_video', fromlist=['r']).rendering(app) and not __import__('native.clock', fromlist=['c']).held()"},
+      {"py": "render_video.start(app)"}], 20.0),
+    ([{"check": "not render_video.rendering(app) and not __import__('native.clock', fromlist=['c']).held()"},
       {"check": "not app.has_ffmpeg() or ('24 frames' in app.rec_msg and app.rec_msg.split(':')[0].endswith('.mp4'))"},
-      {"py": "__import__('os').remove(__import__('os').path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, "
+      {"py": "os.remove(os.path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, "
              "app.rec_msg.split(':')[0])) if app.has_ffmpeg() else None"},
       {"py": "chrome.close_dialog('render_video_win')"}], 0.4),
     # the same step exported for Falcon Player: 20 frames of every LED in an FSEQ v2 file (read back, taken away)
-    ([{"py": "__import__('native.render_fseq', fromlist=['r']).options(app).update(fps=20, length='step', audio=False)"}, {"py": "__import__('native.render_fseq', fromlist=['r']).show(app)"},
-      {"check": "'20 frames' in dpg.get_value('fs_words')"}, {"py": "__import__('native.render_fseq', fromlist=['r']).start(app)"}], 6.0),
-    ([{"check": "not __import__('native.render_fseq', fromlist=['r']).exporting(app) and not __import__('native.clock', fromlist=['c']).held()"},
-      {"py": "setattr(app, '_fs_path', __import__('os').path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, app.rec_msg.split(':')[0]))"},
-      {"check": "app._fs_path.endswith('.fseq') and __import__('native.render_fseq', fromlist=['r']).read(app._fs_path)[0]['frames'] == 20 and "
-                "__import__('native.render_fseq', fromlist=['r']).read(app._fs_path)[0]['channels'] == 3 * app.project.geometry.count"},
-      {"py": "__import__('os').remove(app._fs_path)"}, {"py": "chrome.close_dialog('render_fseq_win')"}], 0.4),
+    ([{"py": "render_fseq.options(app).update(fps=20, length='step', audio=False)"}, {"py": "render_fseq.show(app)"},
+      {"check": "'20 frames' in dpg.get_value('fs_words')"}, {"py": "render_fseq.start(app)"}], 6.0),
+    ([{"check": "not render_fseq.exporting(app) and not __import__('native.clock', fromlist=['c']).held()"},
+      {"py": "setattr(app, '_fs_path', os.path.join(__import__('native.recorder', fromlist=['r']).GIF_DIR, app.rec_msg.split(':')[0]))"},
+      {"check": "app._fs_path.endswith('.fseq') and render_fseq.read(app._fs_path)[0]['frames'] == 20 and "
+                "render_fseq.read(app._fs_path)[0]['channels'] == 3 * app.project.geometry.count"},
+      {"py": "os.remove(app._fs_path)"}, {"py": "chrome.close_dialog('render_fseq_win')"}], 0.4),
     # a GIF for the device: half a second of the sim caught at the matrix's size and sent to the fake - which, a WLED
     # without the Image effect, refuses it (the sending against a WLED that has one: tests/test_devicegif.py)
     ([{"py": "__import__('native.devicegif', fromlist=['d']).options(app).update(seconds=2, fps=10, name='smoke.gif')"}, {"py": "__import__('native.devicegif', fromlist=['d']).show(app)"},
@@ -1037,42 +1049,43 @@ STEPS = [
       {"py": "__import__('native.devicegif', fromlist=['d']).start(app)"}, {"py": "app._dg_cap.update(end=app._dg_cap['end'] - 1.5)"}], 2.5),
     ([{"check": "getattr(app, '_dg_cap', None) is None"}, {"expect": ["dg_words", "no Image effect"]},
       {"py": "chrome.close_dialog('devgif_win')"}], 0.3),
+    "suite:vj",
     # the mixer: deck B (Rainbow) beside the effect, the fader at B showing B alone, then off
-    ([{"py": "__import__('native.mixer', fromlist=['m']).options(app).update(on=True, b='Rainbow', fader=1.0, mode='screen')"}, {"py": "__import__('native.mixer', fromlist=['m']).show(app)"}], 0.8),
-    ([{"check": "__import__('native.mixer', fromlist=['m']).deck_b(app) is not None and bool((app.frame_rgb() == __import__('native.mixer', fromlist=['m']).deck_b(app).rgb()).all())"},
-      {"py": "__import__('native.mixer', fromlist=['m']).set_fader(app, 0.0)"}, {"py": "__import__('native.mixer', fromlist=['m']).options(app).update(on=False)"},
+    ([{"py": "mixer.options(app).update(on=True, b='Rainbow', fader=1.0, mode='screen')"}, {"py": "mixer.show(app)"}], 0.8),
+    ([{"check": "mixer.deck_b(app) is not None and bool((app.frame_rgb() == mixer.deck_b(app).rgb()).all())"},
+      {"py": "mixer.set_fader(app, 0.0)"}, {"py": "mixer.options(app).update(on=False)"},
       {"py": "chrome.close_dialog('mixer_win')"}], 0.3),
     # the VJ frame: Plasma on deck A, Thermal on the test pattern on deck B, on air - the views show its mix; the
     # fader at B; a step added while on air is the VJ's, and played puts its decks back on air; off air, the step
     # taken away again
-    ([{"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0].update(look='Plasma', source={'kind': 'none', 'path': '', 'name': '', 'url': ''})"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1].update(look='Thermal', source={'kind': 'test', 'path': '', 'name': '', 'url': ''})"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(fader=1.0)"}, {"py": "device_ui.show(app, 'vj')"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, True)"}], 1.5),
+    ([{"py": "vj.options(app)['decks'][0].update(look='Plasma', source={'kind': 'none', 'path': '', 'name': '', 'url': ''})"},
+      {"py": "vj.options(app)['decks'][1].update(look='Thermal', source={'kind': 'test', 'path': '', 'name': '', 'url': ''})"},
+      {"py": "vj.options(app).update(fader=1.0)"}, {"py": "device_ui.show(app, 'vj')"}, {"py": "vj_ui.set_on(app, True)"}], 1.5),
     ([{"check": "vj_state.of(app).out is not None and bool((app.frame_rgb() == vj_state.of(app).out).all()) and vj_state.of(app).out.any()"},
-      {"check": "bool((vj_state.of(app).out == __import__('native.vj', fromlist=['v']).deck_led(app, 1)).all())"},
-      {"py": "setattr(app, '_vj_n', len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']))"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).add_step(app)"}], 0.5),
-    ([{"check": "__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps'][app._seq_sel].get('vj', {}).get('decks', [{}])[1].get('look') == 'Thermal' "
-                "and __import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps'][app._seq_sel]['name'].startswith('VJ:')"},
-      {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).load_step(app, app._seq_sel)"}], 0.4),
-    ([{"check": "__import__('native.vj', fromlist=['v']).on(app)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).del_step(app, app._seq_sel)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
+      {"check": "bool((vj_state.of(app).out == vj.deck_led(app, 1)).all())"},
+      {"py": "setattr(app, '_vj_n', len(sequence_ui._steps(app)['steps']))"}, {"py": "sequence_ui.add_step(app)"}], 0.5),
+    ([{"check": "sequence_ui._steps(app)['steps'][app._seq_sel].get('vj', {}).get('decks', [{}])[1].get('look') == 'Thermal' "
+                "and sequence_ui._steps(app)['steps'][app._seq_sel]['name'].startswith('VJ:')"},
+      {"py": "vj_ui.set_on(app, False)"}, {"py": "sequence_ui.load_step(app, app._seq_sel)"}], 0.4),
+    ([{"check": "vj.on(app)"}, {"py": "sequence_ui.del_step(app, app._seq_sel)"}, {"py": "vj_ui.set_on(app, False)"},
       {"py": "setattr(vj_state.of(app), 'by_show', False)"}, {"py": "device_ui.close(app, 'vj')"}], 0.5),
-    ([{"check": "len(__import__('native.sequence_ui', fromlist=['x'])._steps(app)['steps']) == app._vj_n and not __import__('native.vj', fromlist=['v']).on(app)"}], 0.1),
+    ([{"check": "len(sequence_ui._steps(app)['steps']) == app._vj_n and not vj.on(app)"}], 0.1),
     # the VJ's look browser (a click puts Tunnel on deck B), a wipe in place of the blend, and undo taking back a knob
-    ([{"py": "device_ui.show(app, 'vj')"}, {"py": "__import__('native.vj_ui', fromlist=['v']).browse(app, 1)"}], 1.5),
+    ([{"py": "device_ui.show(app, 'vj')"}, {"py": "vj_ui.browse(app, 1)"}], 1.5),
     ([{"check": "dpg.is_item_shown('vj_browse_win') and len(vj_state.of(app).thumbs) >= 30"},
-      {"py": "__import__('native.vj_ui', fromlist=['v'])._browse_pick(app, 'Tunnel')"}, {"py": "chrome.close_dialog('vj_browse_win')"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(wipe='swipe right', fader=0.5)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, True)"}], 0.6),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['look'] == 'Tunnel' and vj_state.of(app).out is not None"},
-      {"py": "__import__('native.vj_ui', fromlist=['v'])._flush_save(app, now=True)"}, {"py": "setattr(app, '_vj_amt0', __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['amount'])"},
-      {"py": "__import__('native.vj_ui', fromlist=['v'])._set_deck(app, 0, 'amount', 0.93)"}, {"py": "__import__('native.vj_ui', fromlist=['v'])._flush_save(app, now=True)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).undo(app)"}], 0.4),
+      {"py": "vj_ui._browse_pick(app, 'Tunnel')"}, {"py": "chrome.close_dialog('vj_browse_win')"},
+      {"py": "vj.options(app).update(wipe='swipe right', fader=0.5)"}, {"py": "vj_ui.set_on(app, True)"}], 0.6),
+    ([{"check": "vj.options(app)['decks'][1]['look'] == 'Tunnel' and vj_state.of(app).out is not None"},
+      {"py": "vj_ui._flush_save(app, now=True)"}, {"py": "setattr(app, '_vj_amt0', vj.options(app)['decks'][0]['amount'])"},
+      {"py": "vj_ui._set_deck(app, 0, 'amount', 0.93)"}, {"py": "vj_ui._flush_save(app, now=True)"}, {"py": "vj_ui.undo(app)"}], 0.4),
     # deck C over the mix at its level; the cue the deck off the mix
-    ([{"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][2].update(look='Metaballs', level=1.0)"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(wipe='blend', fader=0.0, cue=True, c_mode='screen')"}], 0.5),
-    ([{"check": "not bool((vj_state.of(app).out == __import__('native.vj', fromlist=['v']).deck_led(app, 0)).all()) and __import__('native.vj', fromlist=['v']).deck_led(app, 2) is not None"},
-      {"check": "bool((__import__('native.vj', fromlist=['v']).cue_picture(app) == __import__('native.vj', fromlist=['v']).deck_led(app, 1)).all())"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][2].update(level=0.0)"}, {"py": "__import__('native.vj', fromlist=['v']).options(app).update(cue=False)"}], 0.3),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['amount'] == app._vj_amt0"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(wipe='blend', fader=0.0)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
+    ([{"py": "vj.options(app)['decks'][2].update(look='Metaballs', level=1.0)"},
+      {"py": "vj.options(app).update(wipe='blend', fader=0.0, cue=True, c_mode='screen')"}], 0.5),
+    ([{"check": "not bool((vj_state.of(app).out == vj.deck_led(app, 0)).all()) and vj.deck_led(app, 2) is not None"},
+      {"check": "bool((vj.cue_picture(app) == vj.deck_led(app, 1)).all())"},
+      {"py": "vj.options(app)['decks'][2].update(level=0.0)"}, {"py": "vj.options(app).update(cue=False)"}], 0.3),
+    ([{"check": "vj.options(app)['decks'][0]['amount'] == app._vj_amt0"},
+      {"py": "vj.options(app).update(wipe='blend', fader=0.0)"}, {"py": "vj_ui.set_on(app, False)"},
       {"py": "device_ui.close(app, 'vj')"}], 0.4),
     # the add-on packs (the fake gallery's one): listed, installed, its looks in the browser under the pack and
     # favoured; its shader on a deck, steered; the pack removed and its looks gone
@@ -1081,216 +1094,219 @@ STEPS = [
       {"check": "'smoke-pack' not in __import__('native.addons', fromlist=['a']).installed()"},
       {"py": "__import__('native.vj_packs_ui', fromlist=['v'])._install(app, 'smoke-pack', None)"}], 1.5),
     ([{"check": "len(__import__('native.addons', fromlist=['a']).installed()['smoke-pack'].items) == 2"},
-      {"check": "__import__('native.vj_looks', fromlist=['v']).look_source('Milk: Smoke spin') == ('addon', 'smoke-pack')"},
-      {"py": "__import__('native.vj', fromlist=['v']).toggle_favourite(app, 'Milk: Smoke spin')"},
-      {"py": "chrome.close_dialog('vj_packs_win')"}, {"py": "__import__('native.vj_ui', fromlist=['v'])._set_browse_filter(app, 'favourites')"},
-      {"py": "__import__('native.vj_ui', fromlist=['v']).browse(app, 0)"}], 1.0),
-    ([{"check": "dict(__import__('native.vj_ui', fromlist=['v']).browse_sections(app, 'favourites')) == {'Smoke: test looks  (non-commercial)': ['Milk: Smoke spin']}"},
+      {"check": "vj_looks.look_source('Milk: Smoke spin') == ('addon', 'smoke-pack')"},
+      {"py": "vj.toggle_favourite(app, 'Milk: Smoke spin')"},
+      {"py": "chrome.close_dialog('vj_packs_win')"}, {"py": "vj_ui._set_browse_filter(app, 'favourites')"},
+      {"py": "vj_ui.browse(app, 0)"}], 1.0),
+    ([{"check": "dict(vj_ui.browse_sections(app, 'favourites')) == {'Smoke: test looks  (non-commercial)': ['Milk: Smoke spin']}"},
       {"check": "dpg.get_value('vj_br_filter') == 'favourites' and 'pack: Smoke: test looks' in dpg.get_item_configuration('vj_br_filter')['items']"},
-      {"py": "__import__('native.vj', fromlist=['v']).toggle_favourite(app, 'Milk: Smoke spin')"},
-      {"py": "__import__('native.vj_ui', fromlist=['v'])._set_browse_filter(app, 'all looks')"}, {"py": "chrome.close_dialog('vj_browse_win')"},
-      {"py": "setattr(app, '_pk_toy', next(n for n in __import__('native.vj_looks', fromlist=['v']).LOOKS if __import__('native.vj_looks', fromlist=['v']).look_source(n) == ('addon', 'smoke-pack') and not n.startswith('Milk')))"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0].update(look=app._pk_toy, sh_mouse=True, sh_mx=1.0, sh_my=0.5)"},
-      {"py": "__import__('native.vj_ui', fromlist=['v']).refresh(app)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, True)"}], 1.0),
+      {"py": "vj.toggle_favourite(app, 'Milk: Smoke spin')"},
+      {"py": "vj_ui._set_browse_filter(app, 'all looks')"}, {"py": "chrome.close_dialog('vj_browse_win')"},
+      {"py": "setattr(app, '_pk_toy', next(n for n in vj_looks.LOOKS if vj_looks.look_source(n) == ('addon', 'smoke-pack') and not n.startswith('Milk')))"},
+      {"py": "vj.options(app)['decks'][0].update(look=app._pk_toy, sh_mouse=True, sh_mx=1.0, sh_my=0.5)"},
+      {"py": "vj_ui.refresh(app)"}, {"py": "vj_ui.set_on(app, True)"}], 1.0),
     # a picture only where shaders run: the CI's Windows and ARM runners have no OpenGL 3.3 (test_vj skips there too)
     ([{"check": "dpg.is_item_shown('vj_steerrow0') and dpg.get_value('vj_steer0')"},
       {"check": "(vj_state.of(app).out is not None and vj_state.of(app).out.any()) or not __import__('native.vj_glsl', fromlist=['v']).available()[0]"},
-      {"check": "'Milk: Smoke spin' not in __import__('native.vj', fromlist=['v']).favourites(app)"},
-      {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0].update(look='Plasma', sh_mouse=False, sh_mx=0.5, sh_my=0.5)"},
+      {"check": "'Milk: Smoke spin' not in vj.favourites(app)"},
+      {"py": "vj_ui.set_on(app, False)"},
+      {"py": "vj.options(app)['decks'][0].update(look='Plasma', sh_mouse=False, sh_mx=0.5, sh_my=0.5)"},
       {"py": "__import__('native.vj_packs_ui', fromlist=['v'])._remove(app, 'smoke-pack', None)"}], 0.5),
-    ([{"check": "'smoke-pack' not in __import__('native.addons', fromlist=['a']).installed() and 'Milk: Smoke spin' not in __import__('native.vj_looks', fromlist=['v']).LOOKS"},
+    ([{"check": "'smoke-pack' not in __import__('native.addons', fromlist=['a']).installed() and 'Milk: Smoke spin' not in vj_looks.LOOKS"},
       {"py": "device_ui.close(app, 'vj')"}], 0.3),
     # the pads: the starter bank drawn; Cut pressed moves the fader; a second bank switched to and back with the
     # picture untouched; editing - a cell picked, a hold added and given deck B's kaleidoscope, played, undone
-    ([{"py": "device_ui.show(app, 'vj')"}, {"py": "__import__('native.pads_ui', fromlist=['p']).show(app)"}], 1.0),
-    ([{"check": "dpg.is_item_shown('pads_win') and len(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls']) == 10 and len(dpg.get_item_children('pads_grid', 2)) > 10"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(fader=0.0, quant='now')"},
-      {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1))"},
-      {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1))"}], 0.6),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['fader'] == 1.0"},
-      {"py": "setattr(app, '_pads_snap', repr((__import__('native.vj', fromlist=['v']).options(app)['fader'], __import__('native.vj', fromlist=['v']).options(app)['decks'])))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_bank(app)"}], 0.4),
-    ([{"check": "__import__('native.pads_ui', fromlist=['p'])._st(app)['bank'] == 1 and len(__import__('native.pads_ui', fromlist=['p'])._st(app)['banks']) == 2 and dpg.does_item_exist('pads_bank1')"},
-      {"py": "__import__('native.pads_ui', fromlist=['p']).switch_bank(app, 0)"}], 0.3),
-    ([{"check": "app._pads_snap == repr((__import__('native.vj', fromlist=['v']).options(app)['fader'], __import__('native.vj', fromlist=['v']).options(app)['decks'])) and __import__('native.pads_ui', fromlist=['p'])._st(app)['bank'] == 0"},
-      {"py": "dpg.set_value('pads_edit', True)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=5)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 0))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'hold')"}], 0.4),
-    ([{"check": "dpg.is_item_shown('pads_side') and isinstance(__import__('native.pads_ui', fromlist=['p'])._sel(app), dict) and __import__('native.pads_ui', fromlist=['p'])._sel(app)['type'] == 'hold'"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 1 and t.get('key') == 'kaleido'))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._ctl_set(app, 'hi', 0.5)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1].update(kaleido=0)"},
-      {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 0))"}], 0.3),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['kaleido'] == 6 and dpg.get_value('pads_s_target') == 'VJ B: kaleidoscope'"},
-      {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 0))"}], 0.3),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['kaleido'] == 0"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._undo(app)"}], 0.3),
-    ([{"check": "__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 0)['hi'] == 1.0"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 1))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'xy')"}], 0.3),
+    ([{"py": "device_ui.show(app, 'vj')"}, {"py": "pads_ui.show(app)"}], 1.0),
+    ([{"check": "dpg.is_item_shown('pads_win') and len(pads.current(pads_ui._st(app))['controls']) == 10 and len(dpg.get_item_children('pads_grid', 2)) > 10"},
+      {"py": "vj.options(app).update(fader=0.0, quant='now')"},
+      {"py": "pads.press(app, pads.at(pads.current(pads_ui._st(app)), 0, 1))"},
+      {"py": "pads.release(app, pads.at(pads.current(pads_ui._st(app)), 0, 1))"}], 0.6),
+    ([{"check": "vj.options(app)['fader'] == 1.0"},
+      {"py": "setattr(app, '_pads_snap', repr((vj.options(app)['fader'], vj.options(app)['decks'])))"},
+      {"py": "pads_ui._add_bank(app)"}], 0.4),
+    ([{"check": "pads_ui._st(app)['bank'] == 1 and len(pads_ui._st(app)['banks']) == 2 and dpg.does_item_exist('pads_bank1')"},
+      {"py": "pads_ui.switch_bank(app, 0)"}], 0.3),
+    ([{"check": "app._pads_snap == repr((vj.options(app)['fader'], vj.options(app)['decks'])) and pads_ui._st(app)['bank'] == 0"},
+      {"py": "dpg.set_value('pads_edit', True)"}, {"py": "pads_ui._set_edit(app, True)"},
+      {"py": "pads_ui._grid_size(app, cols=5)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 0))"},
+      {"py": "pads_ui._add_control(app, 'hold')"}], 0.4),
+    ([{"check": "dpg.is_item_shown('pads_side') and isinstance(pads_ui._sel(app), dict) and pads_ui._sel(app)['type'] == 'hold'"},
+      {"py": "pads_ui._pick_action(app, next(l for l, t in pads_ui.labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 1 and t.get('key') == 'kaleido'))"},
+      {"py": "pads_ui._ctl_set(app, 'hi', 0.5)"}, {"py": "pads_ui._set_edit(app, False)"},
+      {"py": "vj.options(app)['decks'][1].update(kaleido=0)"},
+      {"py": "pads.press(app, pads.at(pads.current(pads_ui._st(app)), 4, 0))"}], 0.3),
+    ([{"check": "vj.options(app)['decks'][1]['kaleido'] == 6 and dpg.get_value('pads_s_target') == 'VJ B: kaleidoscope'"},
+      {"py": "pads.release(app, pads.at(pads.current(pads_ui._st(app)), 4, 0))"}], 0.3),
+    ([{"check": "vj.options(app)['decks'][1]['kaleido'] == 0"},
+      {"py": "pads_ui._undo(app)"}], 0.3),
+    ([{"check": "pads.at(pads.current(pads_ui._st(app)), 4, 0)['hi'] == 1.0"},
+      {"py": "pads_ui._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 1))"},
+      {"py": "pads_ui._add_control(app, 'xy')"}], 0.3),
     # an XY pad: across on deck A's hue, up and down on its kaleidoscope (to 0.5); touched and moved, then let go
     # (snap back); a staged look onto the deck off the air, then GO
-    ([{"check": "isinstance(__import__('native.pads_ui', fromlist=['p'])._sel(app), dict) and __import__('native.pads_ui', fromlist=['p'])._sel(app)['type'] == 'xy' and (__import__('native.pads_ui', fromlist=['p'])._sel(app)['w'], __import__('native.pads_ui', fromlist=['p'])._sel(app)['h']) == (1, 2) and dpg.is_item_shown('pads_s_xyrow')"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 0 and t.get('key') == 'hue'))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_axis(app, 'up and down')"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 0 and t.get('key') == 'kaleido'))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._ctl_set(app, 'hi_y', 0.5)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
-      {"py": "__import__('native.vj', fromlist=['v']).knob_set(app, 0, 'hue', 0.1)"}, {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0].update(kaleido=0)"},
-      {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 1), xy=(0.5, 1.0))"}], 0.3),
-    ([{"check": "abs(__import__('native.vj', fromlist=['v']).knob_get(app, 0, 'hue') - 0.5) < 1e-3 and __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['kaleido'] == 6 and dpg.get_value('pads_s_drives') == 'UP AND DOWN DRIVES'"},
-      {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 1))"}], 0.3),
-    ([{"check": "abs(__import__('native.vj', fromlist=['v']).knob_get(app, 0, 'hue') - 0.1) < 1e-3 and __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['kaleido'] == 0"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(fader=0.0)"},
-      {"py": "setattr(app, '_pads_stg', __import__('native.pads', fromlist=['p']).new_control(__import__('native.pads_ui', fromlist=['p'])._st(app), 'trigger', 0, 0, target={'kind': 'pad_look', 'deck': 0, 'look': 'Plasma'}))"},
-      {"py": "app._pads_stg.update(stage=True)"}, {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1].update(look='Metaballs')"},
-      {"py": "__import__('native.pads', fromlist=['p']).press(app, app._pads_stg)"}, {"py": "__import__('native.pads', fromlist=['p']).release(app, app._pads_stg)"}], 0.3),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['look'] == 'Plasma' and __import__('native.pads', fromlist=['p']).staged(app, app._pads_stg) == 1 and __import__('native.vj', fromlist=['v']).options(app)['fader'] == 0.0"},
-      {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1))"},
-      {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1))"}], 0.4),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['fader'] == 1.0 and __import__('native.pads', fromlist=['p']).staged(app, app._pads_stg) is None"},
+    ([{"check": "isinstance(pads_ui._sel(app), dict) and pads_ui._sel(app)['type'] == 'xy' and (pads_ui._sel(app)['w'], pads_ui._sel(app)['h']) == (1, 2) and dpg.is_item_shown('pads_s_xyrow')"},
+      {"py": "pads_ui._pick_action(app, next(l for l, t in pads_ui.labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 0 and t.get('key') == 'hue'))"},
+      {"py": "pads_ui._set_axis(app, 'up and down')"},
+      {"py": "pads_ui._pick_action(app, next(l for l, t in pads_ui.labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 0 and t.get('key') == 'kaleido'))"},
+      {"py": "pads_ui._ctl_set(app, 'hi_y', 0.5)"}, {"py": "pads_ui._set_edit(app, False)"},
+      {"py": "vj.knob_set(app, 0, 'hue', 0.1)"}, {"py": "vj.options(app)['decks'][0].update(kaleido=0)"},
+      {"py": "pads.press(app, pads.at(pads.current(pads_ui._st(app)), 4, 1), xy=(0.5, 1.0))"}], 0.3),
+    ([{"check": "abs(vj.knob_get(app, 0, 'hue') - 0.5) < 1e-3 and vj.options(app)['decks'][0]['kaleido'] == 6 and dpg.get_value('pads_s_drives') == 'UP AND DOWN DRIVES'"},
+      {"py": "pads.release(app, pads.at(pads.current(pads_ui._st(app)), 4, 1))"}], 0.3),
+    ([{"check": "abs(vj.knob_get(app, 0, 'hue') - 0.1) < 1e-3 and vj.options(app)['decks'][0]['kaleido'] == 0"},
+      {"py": "vj.options(app).update(fader=0.0)"},
+      {"py": "setattr(app, '_pads_stg', pads.new_control(pads_ui._st(app), 'trigger', 0, 0, target={'kind': 'pad_look', 'deck': 0, 'look': 'Plasma'}))"},
+      {"py": "app._pads_stg.update(stage=True)"}, {"py": "vj.options(app)['decks'][1].update(look='Metaballs')"},
+      {"py": "pads.press(app, app._pads_stg)"}, {"py": "pads.release(app, app._pads_stg)"}], 0.3),
+    ([{"check": "vj.options(app)['decks'][1]['look'] == 'Plasma' and pads.staged(app, app._pads_stg) == 1 and vj.options(app)['fader'] == 0.0"},
+      {"py": "pads.press(app, pads.at(pads.current(pads_ui._st(app)), 0, 1))"},
+      {"py": "pads.release(app, pads.at(pads.current(pads_ui._st(app)), 0, 1))"}], 0.4),
+    ([{"check": "vj.options(app)['fader'] == 1.0 and pads.staged(app, app._pads_stg) is None"},
       {"py": "setattr(app, '_pads_maps', len(midi_ui._st(app)['maps']))"},
-      {"py": "__import__('native.pads_hw', fromlist=['p']).learn(app, ('control', __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1)['id']))"},
+      {"py": "pads_hw.learn(app, ('control', pads.at(pads.current(pads_ui._st(app)), 0, 1)['id']))"},
       {"py": "app.midi.inject([0x90, 40, 100])"}], 0.3),
     # a pad controller: Cut learns note 40 from the MIDI port (the MIDI window's maps untouched), and the note plays it
-    ([{"check": "__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1)['midi'] == ['note', 0, 40] and __import__('native.pads_hw', fromlist=['p']).learning(app) is None and len(midi_ui._st(app)['maps']) == app._pads_maps"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app).update(fader=0.0)"}, {"py": "app.midi.inject([0x90, 40, 100])"},
+    ([{"check": "pads.at(pads.current(pads_ui._st(app)), 0, 1)['midi'] == ['note', 0, 40] and pads_hw.learning(app) is None and len(midi_ui._st(app)['maps']) == app._pads_maps"},
+      {"py": "vj.options(app).update(fader=0.0)"}, {"py": "app.midi.inject([0x90, 40, 100])"},
       {"py": "app.midi.inject([0x80, 40, 0])"}], 0.3),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['fader'] == 1.0"},
-      {"py": "__import__('native.pads_hw', fromlist=['p']).forget(app, ('control', __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 0, 1)['id']))"},
-      {"py": "__import__('native.pads_hw', fromlist=['p']).learn(app, ('bank', 0))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._fill_banks(app)"},
+    ([{"check": "vj.options(app)['fader'] == 1.0"},
+      {"py": "pads_hw.forget(app, ('control', pads.at(pads.current(pads_ui._st(app)), 0, 1)['id']))"},
+      {"py": "pads_hw.learn(app, ('bank', 0))"}, {"py": "pads_ui._fill_banks(app)"},
       {"py": "app.midi.inject([0x90, 45, 100])"}], 0.3),
     # the bank's button learned: its Learn button says what, not "press it..."
-    ([{"check": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['midi'] == ['note', 0, 45] and dpg.get_item_configuration('pads_blearn')['label'] == 'note 45 ch 1'"},
-      {"py": "__import__('native.pads_hw', fromlist=['p']).forget(app, ('bank', 0))"},
+    ([{"check": "pads.current(pads_ui._st(app))['midi'] == ['note', 0, 45] and dpg.get_item_configuration('pads_blearn')['label'] == 'note 45 ch 1'"},
+      {"py": "pads_hw.forget(app, ('bank', 0))"},
       # a clip pad: a file kept with the project, the CLIP section shown with its strip of frames
-      {"py": "__import__('os').makedirs(__import__('os').path.join(app.project.path, 'assets', 'vj'), exist_ok=True)"},
-      {"py": "(__import__('subprocess').run([__import__('shutil').which('ffmpeg'), '-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=30:duration=4', '-pix_fmt', 'yuv420p', __import__('os').path.join(app.project.path, 'assets', 'vj', 'smoke_clip.mp4')], check=True)) if __import__('shutil').which('ffmpeg') else None"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'trigger')"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ C: a video clip (set it below)')"},
-      {"py": "__import__('native.clip_ui', fromlist=['c'])._set_file(app, 'assets/vj/smoke_clip.mp4')"}], 2.0),
+      {"py": "os.makedirs(os.path.join(app.project.path, 'assets', 'vj'), exist_ok=True)"},
+      {"py": "(__import__('subprocess').run([__import__('shutil').which('ffmpeg'), '-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=30:duration=4', '-pix_fmt', 'yuv420p', os.path.join(app.project.path, 'assets', 'vj', 'smoke_clip.mp4')], check=True)) if __import__('shutil').which('ffmpeg') else None"},
+      {"py": "pads_ui._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"},
+      {"py": "pads_ui._add_control(app, 'trigger')"},
+      {"py": "pads_ui._pick_action(app, 'VJ C: a video clip (set it below)')"},
+      {"py": "clip_ui._set_file(app, 'assets/vj/smoke_clip.mp4')"}], 2.0),
     ([{"check": "not __import__('shutil').which('ffmpeg') or (dpg.is_item_shown('pads_s_cliprow') and dpg.get_value('pads_clip_file') == 'assets/vj/smoke_clip.mp4' and dpg.does_item_exist('pads_clip_tex') and len(dpg.get_item_children('pads_clip_strip', 2)) >= 5 and dpg.get_value('pads_clip_how').startswith('Each press'))"},
-      {"py": "__import__('native.clip_ui', fromlist=['c'])._set_part(app, 'in', 1.0)"},
-      {"py": "__import__('native.clip_ui', fromlist=['c'])._set_part(app, 'out', 3.0)"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._flush(app)"}], 0.3),
-    ([{"check": "not __import__('shutil').which('ffmpeg') or (__import__('native.pads_ui', fromlist=['p'])._sel(app)['target']['in'] == 1.0 and __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']['out'] == 3.0 and dpg.get_value('pads_clip_len').startswith('2.00 s of 4.0'))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
-      {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, True)"},
-      {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},
-      {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"}], 1.0),
+      {"py": "clip_ui._set_part(app, 'in', 1.0)"},
+      {"py": "clip_ui._set_part(app, 'out', 3.0)"},
+      {"py": "pads_ui._flush(app)"}], 0.3),
+    ([{"check": "not __import__('shutil').which('ffmpeg') or (pads_ui._sel(app)['target']['in'] == 1.0 and pads_ui._sel(app)['target']['out'] == 3.0 and dpg.get_value('pads_clip_len').startswith('2.00 s of 4.0'))"},
+      {"py": "pads_ui._set_edit(app, False)"},
+      {"py": "vj_ui.set_on(app, True)"},
+      {"py": "pads.press(app, pads.at(pads.current(pads_ui._st(app)), 4, 3))"},
+      {"py": "pads.release(app, pads.at(pads.current(pads_ui._st(app)), 4, 3))"}], 1.0),
     # pressed: deck C plays it (its first picture started it), the pad lit while it plays
-    ([{"check": "not __import__('shutil').which('ffmpeg') or (__import__('native.vj_clips', fromlist=['c'])._rt(app).get(2, {}).get('t0') is not None and __import__('native.vj', fromlist=['v'])._runs(app)[2].video is not None and __import__('native.pads', fromlist=['p']).lit(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)))"},
-      {"py": "__import__('native.vj_clips', fromlist=['c']).let_go(app)"}, {"py": "__import__('native.vj_ui', fromlist=['v']).set_on(app, False)"},
-      {"py": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'].remove(__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},
+    ([{"check": "not __import__('shutil').which('ffmpeg') or (__import__('native.vj_clips', fromlist=['c'])._rt(app).get(2, {}).get('t0') is not None and vj._runs(app)[2].video is not None and pads.lit(app, pads.at(pads.current(pads_ui._st(app)), 4, 3)))"},
+      {"py": "__import__('native.vj_clips', fromlist=['c']).let_go(app)"}, {"py": "vj_ui.set_on(app, False)"},
+      {"py": "pads.current(pads_ui._st(app))['controls'].remove(pads.at(pads.current(pads_ui._st(app)), 4, 3))"},
       # a live camera pad on the same cell: its CAMERA section - the camera (a made-up name: no real one opened),
       # the deck, the envelope - with no file, mode or strip of a clip's
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'trigger')"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ C: a live camera (pick it below)')"},
-      {"py": "__import__('native.clip_ui', fromlist=['c'])._set(app, name='Smoke Cam')"}], 0.3),
+      {"py": "pads_ui._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"},
+      {"py": "pads_ui._add_control(app, 'trigger')"},
+      {"py": "pads_ui._pick_action(app, 'VJ C: a live camera (pick it below)')"},
+      {"py": "clip_ui._set(app, name='Smoke Cam')"}], 0.3),
     ([{"check": "dpg.is_item_shown('pads_s_cliprow') and dpg.get_value('pads_clip_head') == 'CAMERA' and dpg.is_item_shown('pads_clip_camrow') and not dpg.is_item_shown('pads_clip_parts') and not dpg.is_item_shown('pads_clip_filerow') and dpg.get_value('pads_clip_cam') == 'Smoke Cam' and dpg.get_value('pads_clip_how').startswith('A press brings')"},
-      {"check": "__import__('native.pads_ui', fromlist=['p'])._sel(app)['target']['kind'] == 'pad_cam' and __import__('native.pads_ui', fromlist=['p']).target_label(app, __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']) == 'VJ C: camera Smoke Cam'"},
-      {"py": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'].remove(__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},
+      {"check": "pads_ui._sel(app)['target']['kind'] == 'pad_cam' and pads_ui.target_label(app, pads_ui._sel(app)['target']) == 'VJ C: camera Smoke Cam'"},
+      {"py": "pads.current(pads_ui._st(app))['controls'].remove(pads.at(pads.current(pads_ui._st(app)), 4, 3))"},
       # a deck select pad on the same cell: deck B selected, the pad lit; an effect pad shows its effect's row
-      {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'trigger')"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ: select deck B')"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
-      {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"}, {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"}], 0.3),
-    ([{"check": "__import__('native.vj', fromlist=['v']).selected(app) == 1 and __import__('native.pads', fromlist=['p']).lit(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)) and __import__('native.pads_ui', fromlist=['p']).target_label(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)['target']) == 'VJ: select deck B'"},
-      {"py": "__import__('native.vj', fromlist=['v']).select_deck(app, 0)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)['id'])"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ selected deck: this effect (pick it below)')"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._fill_side(app)"}], 0.3),
-    ([{"check": "dpg.is_item_shown('pads_s_fxrow') and len(dpg.get_item_configuration('pads_s_fx')['items']) > 0 and __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)['target']['deck'] == __import__('native.vj', fromlist=['v']).SEL"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
-      {"py": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'].remove(__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},   # (its cell for the steps after)
+      {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"}, {"py": "pads_ui._add_control(app, 'trigger')"},
+      {"py": "pads_ui._pick_action(app, 'VJ: select deck B')"}, {"py": "pads_ui._set_edit(app, False)"},
+      {"py": "pads.press(app, pads.at(pads.current(pads_ui._st(app)), 4, 3))"}, {"py": "pads.release(app, pads.at(pads.current(pads_ui._st(app)), 4, 3))"}], 0.3),
+    ([{"check": "vj.selected(app) == 1 and pads.lit(app, pads.at(pads.current(pads_ui._st(app)), 4, 3)) and pads_ui.target_label(app, pads.at(pads.current(pads_ui._st(app)), 4, 3)['target']) == 'VJ: select deck B'"},
+      {"py": "vj.select_deck(app, 0)"}, {"py": "pads_ui._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', pads.at(pads.current(pads_ui._st(app)), 4, 3)['id'])"},
+      {"py": "pads_ui._pick_action(app, 'VJ selected deck: this effect (pick it below)')"}, {"py": "pads_ui._fill_side(app)"}], 0.3),
+    ([{"check": "dpg.is_item_shown('pads_s_fxrow') and len(dpg.get_item_configuration('pads_s_fx')['items']) > 0 and pads.at(pads.current(pads_ui._st(app)), 4, 3)['target']['deck'] == vj.SEL"},
+      {"py": "pads_ui._set_edit(app, False)"},
+      {"py": "pads.current(pads_ui._st(app))['controls'].remove(pads.at(pads.current(pads_ui._st(app)), 4, 3))"},   # (its cell for the steps after)
       {"py": "chrome.close_dialog('pads_win')"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
     # the VJ's deck source: a clip speed dragged goes on once it rests (not an ffmpeg a frame); another kind does
     # not keep the last kind's name
-    ([{"py": "device_ui.show(app, 'vj')"}, {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source'].update(kind='screen', name='the whole desktop')"},
-      {"py": "setattr(app, '_sm_sp', __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source']['speed'])"}, {"py": "__import__('native.vj_ui', fromlist=['v'])._set_src(app, 0, speed=2.5)"},
-      {"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source']['speed'] == app._sm_sp"}, {"py": "__import__('native.vj_ui', fromlist=['v'])._set_src(app, 0, kind='webcam')"}], 0.6),
-    ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source']['speed'] == 2.5 and __import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source']['name'] != 'the whole desktop'"},
-      {"py": "__import__('native.vj', fromlist=['v']).options(app)['decks'][0]['source'].update(kind='none', name='', speed=1.0)"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
+    ([{"py": "device_ui.show(app, 'vj')"}, {"py": "vj.options(app)['decks'][0]['source'].update(kind='screen', name='the whole desktop')"},
+      {"py": "setattr(app, '_sm_sp', vj.options(app)['decks'][0]['source']['speed'])"}, {"py": "vj_ui._set_src(app, 0, speed=2.5)"},
+      {"check": "vj.options(app)['decks'][0]['source']['speed'] == app._sm_sp"}, {"py": "vj_ui._set_src(app, 0, kind='webcam')"}], 0.6),
+    ([{"check": "vj.options(app)['decks'][0]['source']['speed'] == 2.5 and vj.options(app)['decks'][0]['source']['name'] != 'the whole desktop'"},
+      {"py": "vj.options(app)['decks'][0]['source'].update(kind='none', name='', speed=1.0)"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),
+    "suite:modulators",
     # a modulator: a square wave on Speed, half a beat long, moving it either side of its place; taken away, Speed
     # left where it was set
-    ([{"py": "setattr(app, '_mo_sx', app.eng.fx['sx'])"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='sx', kind='lfo', shape='square', period=0.5, depth=40)"},
-      {"py": "__import__('native.modulate', fromlist=['m']).show(app)"}], 0.15),
-    ([{"check": "__import__('native.modulate', fromlist=['m']).place(app, 'sx') == app._mo_sx and abs(app.eng.fx['sx'] - app._mo_sx) in (20, 0) and "
+    ([{"py": "setattr(app, '_mo_sx', app.eng.fx['sx'])"}, {"py": "modulate.add(app, key='sx', kind='lfo', shape='square', period=0.5, depth=40)"},
+      {"py": "modulate.show(app)"}], 0.15),
+    ([{"check": "modulate.place(app, 'sx') == app._mo_sx and abs(app.eng.fx['sx'] - app._mo_sx) in (20, 0) and "
                 "app.eng.fx['sx'] in (max(0, app._mo_sx - 20), min(255, app._mo_sx + 20))"},
-      {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
+      {"py": "modulate.modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
     ([{"check": "app.eng.fx['sx'] == app._mo_sx"}], 0.1),
     # a modulator on two sliders, at a free rate; its depth turned from a control (as a pad or MIDI does) shown in the dialog
-    ([{"py": "__import__('native.modulate', fromlist=['m']).add(app, key='ix', period=4)"}, {"py": "__import__('native.modulate', fromlist=['m']).show(app)"}, {"py": "__import__('native.modulate', fromlist=['m']).add_key(app, 0)"},
-      {"py": "__import__('native.modulate', fromlist=['m']).edit(app, 0, sync=False)"}], 0.2),
-    ([{"check": "dpg.does_item_exist('mod_hz_0') and len(__import__('native.modulate', fromlist=['m']).modulators(app)[0]['keys']) == 2"},
-      {"py": "__import__('native.midi_ui', fromlist=['m']).apply_target(app, {'kind': 'mod', 'id': __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'key': 'depth'}, 1.0, 1.0)"}], 0.2),
-    ([{"check": "__import__('native.modulate', fromlist=['m']).modulators(app)[0]['depth'] == 255 and int(dpg.get_value('mod_depth_0')) == 255"},
-      {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
+    ([{"py": "modulate.add(app, key='ix', period=4)"}, {"py": "modulate.show(app)"}, {"py": "modulate.add_key(app, 0)"},
+      {"py": "modulate.edit(app, 0, sync=False)"}], 0.2),
+    ([{"check": "dpg.does_item_exist('mod_hz_0') and len(modulate.modulators(app)[0]['keys']) == 2"},
+      {"py": "midi_ui.apply_target(app, {'kind': 'mod', 'id': modulate.modulators(app)[0]['id'], 'key': 'depth'}, 1.0, 1.0)"}], 0.2),
+    ([{"check": "modulate.modulators(app)[0]['depth'] == 255 and int(dpg.get_value('mod_depth_0')) == 255"},
+      {"py": "modulate.modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
     # an envelope played from MIDI's play target: its four numbers in the dialog; a wave that runs while held
-    ([{"py": "app.eng.fx.update(ix=40)"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='ix', kind='env', depth=120, attack=0.05)"},
-      {"py": "__import__('native.modulate', fromlist=['m']).add(app, key='c1', kind='lfo', start='held')"}, {"py": "__import__('native.modulate', fromlist=['m']).show(app)"},
-      {"py": "__import__('native.midi_ui', fromlist=['m']).apply_target(app, {'kind': 'mod_gate', 'id': __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']}, 127, 127.0, ('note', 0, 61))"}], 0.4),
-    ([{"check": "dpg.does_item_exist('mod_env_attack_0') and dpg.does_item_exist('mod_env_release_0') and app.eng.fx['ix'] > 40 and __import__('native.modulate', fromlist=['m']).gated(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'])"},
-      {"py": "__import__('native.midi_ui', fromlist=['m']).apply_target(app, {'kind': 'mod_gate', 'id': __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']}, 0, 127.0, ('note', 0, 61))"}], 1.2),
-    ([{"check": "app.eng.fx['ix'] == 40 and not __import__('native.modulate', fromlist=['m']).gated(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']) and __import__('native.modulate', fromlist=['m']).place(app, 'c1') is None"},
-      {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
+    ([{"py": "app.eng.fx.update(ix=40)"}, {"py": "modulate.add(app, key='ix', kind='env', depth=120, attack=0.05)"},
+      {"py": "modulate.add(app, key='c1', kind='lfo', start='held')"}, {"py": "modulate.show(app)"},
+      {"py": "midi_ui.apply_target(app, {'kind': 'mod_gate', 'id': modulate.modulators(app)[0]['id']}, 127, 127.0, ('note', 0, 61))"}], 0.4),
+    ([{"check": "dpg.does_item_exist('mod_env_attack_0') and dpg.does_item_exist('mod_env_release_0') and app.eng.fx['ix'] > 40 and modulate.gated(app, modulate.modulators(app)[0]['id'])"},
+      {"py": "midi_ui.apply_target(app, {'kind': 'mod_gate', 'id': modulate.modulators(app)[0]['id']}, 0, 127.0, ('note', 0, 61))"}], 1.2),
+    ([{"check": "app.eng.fx['ix'] == 40 and not modulate.gated(app, modulate.modulators(app)[0]['id']) and modulate.place(app, 'c1') is None"},
+      {"py": "modulate.modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
     # a wave attached from the pad editor: a fader on Speed, + LFO, the band drawn over it; a rate knob; taken off
-    ([{"py": "__import__('native.pads_ui', fromlist=['p']).show(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"},
-      {"py": "setattr(pads_state.of(app), 'sel', __import__('native.pads_ui', fromlist=['p'])._free_cell(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'fader')"}, {"py": "setattr(app, '_sm_fd', pads_state.of(app).sel)"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t == {'kind': 'fx', 'key': 'sx'}))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._attach(app)"}], 0.4),
-    ([{"check": "dpg.is_item_shown('pads_s_modrow') and len(__import__('native.modulate', fromlist=['m']).on_key(app, 'sx')) == 1 and len(dpg.get_item_children('pads_s_mods', 1)) >= 2 and len(dpg.get_item_children('pads_mods_layer', 2)) >= 2"},
-      {"py": "setattr(app, '_sm_cols', __import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['cols'])"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols + 1)"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._mod_pad(app, __import__('native.modulate', fromlist=['m']).on_key(app, 'sx')[0]['id'], 'knob', 'mod', 'rate')"}], 0.3),
-    ([{"check": "__import__('native.pads_ui', fromlist=['p'])._sel(app)['type'] == 'knob' and __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']['key'] == 'rate' and __import__('native.pads_ui', fromlist=['p']).target_label(app, __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']).endswith(': rate')"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._detach(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'sx')"}], 0.3),
-    ([{"check": "not __import__('native.modulate', fromlist=['m']).modulators(app) and not dpg.get_item_children('pads_mods_layer', 2)"},
-      {"py": "setattr(pads_state.of(app), 'sel', app._sm_fd)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"}], 0.3),
+    ([{"py": "pads_ui.show(app)"}, {"py": "pads_ui._set_edit(app, True)"},
+      {"py": "setattr(pads_state.of(app), 'sel', pads_ui._free_cell(pads.current(pads_ui._st(app))))"},
+      {"py": "pads_ui._add_control(app, 'fader')"}, {"py": "setattr(app, '_sm_fd', pads_state.of(app).sel)"},
+      {"py": "pads_ui._pick_action(app, next(l for l, t in pads_ui.labels(app) if t == {'kind': 'fx', 'key': 'sx'}))"},
+      {"py": "pads_ui._attach(app)"}], 0.4),
+    ([{"check": "dpg.is_item_shown('pads_s_modrow') and len(modulate.on_key(app, 'sx')) == 1 and len(dpg.get_item_children('pads_s_mods', 1)) >= 2 and len(dpg.get_item_children('pads_mods_layer', 2)) >= 2"},
+      {"py": "setattr(app, '_sm_cols', pads.current(pads_ui._st(app))['cols'])"},
+      {"py": "pads_ui._grid_size(app, cols=app._sm_cols + 1)"},
+      {"py": "pads_ui._mod_pad(app, modulate.on_key(app, 'sx')[0]['id'], 'knob', 'mod', 'rate')"}], 0.3),
+    ([{"check": "pads_ui._sel(app)['type'] == 'knob' and pads_ui._sel(app)['target']['key'] == 'rate' and pads_ui.target_label(app, pads_ui._sel(app)['target']).endswith(': rate')"},
+      {"py": "pads_ui._remove_control(app)"}, {"py": "pads_ui._detach(app, modulate.modulators(app)[0]['id'], 'sx')"}], 0.3),
+    ([{"check": "not modulate.modulators(app) and not dpg.get_item_children('pads_mods_layer', 2)"},
+      {"py": "setattr(pads_state.of(app), 'sel', app._sm_fd)"}, {"py": "pads_ui._remove_control(app)"}, {"py": "pads_ui._grid_size(app, cols=app._sm_cols)"}, {"py": "pads_ui._set_edit(app, False)"}], 0.3),
     # the sound on Intensity, a wave on Mod 1's depth, two sliders a wave apart: their rows, scopes drawn; undone
-    ([{"py": "__import__('native.modulate', fromlist=['m']).add(app, key='ix', kind='audio', band='bass')"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, keys=['m' + str(__import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']) + '.depth', 'c1', 'c2'], spread=1.0)"},
-      {"py": "__import__('native.modulate', fromlist=['m']).show(app)"}], 0.4),
-    ([{"check": "dpg.does_item_exist('mod_amt_1_2') and dpg.does_item_exist('mod_spread_1') and len(dpg.get_item_children('mod_scope_1', 2) or []) >= 2 and ('m' + str(__import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']) + '.depth') in app._mod_over"},
-      {"py": "__import__('native.modulate', fromlist=['m']).undo(app)"}], 0.2),
-    ([{"check": "len(__import__('native.modulate', fromlist=['m']).modulators(app)) == 1 and not dpg.does_item_exist('mod_amt_1_0')"},
-      {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
+    ([{"py": "modulate.add(app, key='ix', kind='audio', band='bass')"}, {"py": "modulate.add(app, keys=['m' + str(modulate.modulators(app)[0]['id']) + '.depth', 'c1', 'c2'], spread=1.0)"},
+      {"py": "modulate.show(app)"}], 0.4),
+    ([{"check": "dpg.does_item_exist('mod_amt_1_2') and dpg.does_item_exist('mod_spread_1') and len(dpg.get_item_children('mod_scope_1', 2) or []) >= 2 and ('m' + str(modulate.modulators(app)[0]['id']) + '.depth') in app._mod_over"},
+      {"py": "modulate.undo(app)"}], 0.2),
+    ([{"check": "len(modulate.modulators(app)) == 1 and not dpg.does_item_exist('mod_amt_1_0')"},
+      {"py": "modulate.modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
     # an XY pad on Speed across: + LFO, a stripe over it, its amount field in the panel; taken off
-    ([{"py": "__import__('native.pads_ui', fromlist=['p']).show(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"},
-      {"py": "setattr(app, '_sm_cols', __import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['cols'])"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols + 2)"},
-      {"py": "setattr(pads_state.of(app), 'sel', (app._sm_cols, 0))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'xy')"}, {"py": "setattr(app, '_sm_xy', pads_state.of(app).sel)"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t == {'kind': 'fx', 'key': 'sx'}))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._attach(app)"}], 0.4),
-    ([{"check": "dpg.does_item_exist('pads_s_mamt_' + str(__import__('native.modulate', fromlist=['m']).on_key(app, 'sx')[0]['id'])) and len(dpg.get_item_children('pads_mods_layer', 2)) >= 2"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._detach(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'sx')"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"}], 0.3),
-    ([{"check": "not __import__('native.modulate', fromlist=['m']).modulators(app) and not dpg.get_item_children('pads_mods_layer', 2)"}], 0.1),
+    ([{"py": "pads_ui.show(app)"}, {"py": "pads_ui._set_edit(app, True)"},
+      {"py": "setattr(app, '_sm_cols', pads.current(pads_ui._st(app))['cols'])"}, {"py": "pads_ui._grid_size(app, cols=app._sm_cols + 2)"},
+      {"py": "setattr(pads_state.of(app), 'sel', (app._sm_cols, 0))"}, {"py": "pads_ui._add_control(app, 'xy')"}, {"py": "setattr(app, '_sm_xy', pads_state.of(app).sel)"},
+      {"py": "pads_ui._pick_action(app, next(l for l, t in pads_ui.labels(app) if t == {'kind': 'fx', 'key': 'sx'}))"},
+      {"py": "pads_ui._attach(app)"}], 0.4),
+    ([{"check": "dpg.does_item_exist('pads_s_mamt_' + str(modulate.on_key(app, 'sx')[0]['id'])) and len(dpg.get_item_children('pads_mods_layer', 2)) >= 2"},
+      {"py": "pads_ui._detach(app, modulate.modulators(app)[0]['id'], 'sx')"}, {"py": "pads_ui._remove_control(app)"},
+      {"py": "pads_ui._grid_size(app, cols=app._sm_cols)"}, {"py": "pads_ui._set_edit(app, False)"}], 0.3),
+    ([{"check": "not modulate.modulators(app) and not dpg.get_item_children('pads_mods_layer', 2)"}], 0.1),
+    "suite:sequence",
     # a number field dragged: its pace from its width as drawn, so a wide one keeps up with the pointer
     ([{"py": "num._on_activated(None, dpg.get_alias_id('inp_sx'))"},
       {"check": "dpg.get_item_rect_size('inp_sx')[0] <= 0 or "
                 "abs(dpg.get_item_configuration('inp_sx')['speed'] - 255 / (1.5 * max(60.0, dpg.get_item_rect_size('inp_sx')[0]))) < 1e-3"}], 0.2),
     # the timeline zoomed to the first step and moved along, its overview drawn with the box
-    ([{"py": "__import__('native.sequence_ui', fromlist=['x']).fit_step(app, 0)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).zoom(app, 2.0)"}], 0.4),
-    ([{"check": "app._tl_view is not None and app._tl_view['span'] < __import__('native.sequence_ui', fromlist=['x'])._starts(app)[1]"},
-      {"check": "'of' in dpg.get_value('seq_zoom_words')"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).set_view(app, 0.5, 2.0)"}], 0.3),
-    ([{"check": "abs(app._tl_view['t0'] - 0.5) < 1e-6 and dpg.does_item_exist('seq_tl_ov')"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).fit_all(app)"}], 0.3),
+    ([{"py": "sequence_ui.fit_step(app, 0)"}, {"py": "sequence_ui.zoom(app, 2.0)"}], 0.4),
+    ([{"check": "app._tl_view is not None and app._tl_view['span'] < sequence_ui._starts(app)[1]"},
+      {"check": "'of' in dpg.get_value('seq_zoom_words')"}, {"py": "sequence_ui.set_view(app, 0.5, 2.0)"}], 0.3),
+    ([{"check": "abs(app._tl_view['t0'] - 0.5) < 1e-6 and dpg.does_item_exist('seq_tl_ov')"}, {"py": "sequence_ui.fit_all(app)"}], 0.3),
     # Edit live while the show plays: the effect changed goes into the step on the playhead; a step chosen is played from
-    ([{"py": "__import__('native.sequence_ui', fromlist=['x']).toggle_edit(app, True)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).play(app, 0)"}], 1.5),
-    ([{"check": "__import__('native.sequence_ui', fromlist=['x'])._play_i(app) == 0 and app._seq_sel == 0"}, {"py": "__import__('native.sequence_ui', fromlist=['x'])._set_effect(app, 'Ace 3-D Maelstrom')"}], 0.8),
-    ([{"check": "app.project.options['sequence']['steps'][0]['segments'][0]['effect'] == 'Ace 3-D Maelstrom'"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 1)"}], 0.4),
-    ([{"check": "__import__('native.sequence_ui', fromlist=['x'])._play_i(app) == 1 and app._seq_sel == 1"}, {"seq": ["stop"]}, {"py": "__import__('native.sequence_ui', fromlist=['x']).toggle_edit(app, False)"}], 0.4),
+    ([{"py": "sequence_ui.toggle_edit(app, True)"}, {"py": "sequence_ui.play(app, 0)"}], 1.5),
+    ([{"check": "sequence_ui._play_i(app) == 0 and app._seq_sel == 0"}, {"py": "sequence_ui._set_effect(app, 'Ace 3-D Maelstrom')"}], 0.8),
+    ([{"check": "app.project.options['sequence']['steps'][0]['segments'][0]['effect'] == 'Ace 3-D Maelstrom'"}, {"py": "sequence_ui.select(app, 1)"}], 0.4),
+    ([{"check": "sequence_ui._play_i(app) == 1 and app._seq_sel == 1"}, {"seq": ["stop"]}, {"py": "sequence_ui.toggle_edit(app, False)"}], 0.4),
     # automation recorded: Custom 1 moved by hand while the first step plays becomes a curve on it
-    ([{"py": "__import__('native.sequence_ui', fromlist=['x']).select(app, 0)"}, {"py": "__import__('native.sequence_ui', fromlist=['x']).toggle_rec(app, True)"}], 1.4),
+    ([{"py": "sequence_ui.select(app, 0)"}, {"py": "sequence_ui.toggle_rec(app, True)"}], 1.4),
     ([{"py": "(app.eng.fx.__setitem__('c1', 40), app.eng.push())"}], 0.15),
     ([{"py": "(app.eng.fx.__setitem__('c1', 120), app.eng.push())"}], 0.15),
     ([{"py": "(app.eng.fx.__setitem__('c1', 220), app.eng.push())"}], 0.15),
-    ([{"check": "__import__('native.sequence_ui', fromlist=['x'])._REC.armed and any(k == 'c1' for _, k in __import__('native.sequence_ui', fromlist=['x'])._REC.takes)"}, {"seq": ["stop"]}], 0.4),
-    ([{"check": "not __import__('native.sequence_ui', fromlist=['x'])._REC.armed and (app.project.options['sequence']['steps'][0].get('ramps') or {}).get('c1', {}).get('shape') == 'curve'"},
+    ([{"check": "sequence_ui._REC.armed and any(k == 'c1' for _, k in sequence_ui._REC.takes)"}, {"seq": ["stop"]}], 0.4),
+    ([{"check": "not sequence_ui._REC.armed and (app.project.options['sequence']['steps'][0].get('ramps') or {}).get('c1', {}).get('shape') == 'curve'"},
       {"expect": ["messages", "automation recorded"]}], 0.2),
     ([{"expect": ["seq_tlog", "read from the device"]}, {"seq": ["del", 1]}, {"seq": ["del", 0]}, {"seq": ["timer_del", 1]}, {"seq": ["timer_del", 0]},
       {"seq": ["tap"]}, {"seq": ["snap", 120.0, 4]}, {"camera": "front"}, {"camera": ["save", 1]}, {"camera": "isometric"}], 1.5),
     # undo in the frames: a deleted step comes back, and goes again on redo
     ([{"py": "len(app.project.options['sequence']['steps'])"}, {"seq": ["undo"]}, {"py": "len(app.project.options['sequence']['steps'])"},
       {"seq": ["redo"]}, {"py": "len(app.project.options['sequence']['steps'])"}, {"expect": ["messages", "sequence: redo"]}], 1.0),
+    "suite:devices",
     # custom palettes: one made, a stop added, used by the sim, one from the sim's palette, both removed
     ([{"frame": "palettes"}, {"cpal": ["new"]}, {"cpal": ["stop", 64, 0, 0, 255]}, {"cpal": ["use"]}, {"cpal": ["current"]},
       {"py": "__import__('native.palette_ui', fromlist=['x']).send(app, True)"}], 3.0),
@@ -1309,6 +1325,7 @@ STEPS = [
       {"audioin": ["send"]}], 3.0),
     ([{"expect": ["ain_log", "after a reboot"]}, {"py": "dpg.hide_item('confirm_dialog')"}, {"audioin": ["meter", True]}], 2.5),
     ([{"expect": ["ain_source", "I2S digital"]}, {"audioin": ["meter", False]}, {"audioin": ["preset", "inmp441"]}], 1.0),
+    "suite:errors",
     # sad paths: a wire between types that do not convert, a graph with no output, a C++ effect that does not
     # compile, a device that is off - a status line each, never a traceback
     ([{"layout": "graph"}, {"py": "app.gp.new('sad_smoke')"},
@@ -1350,6 +1367,7 @@ STEPS = [
       {"py": "messages.clear(app, 'graph:sad_smoke.json')"}], 0.5),
     # a problem report bundled, the project zipped (both land in captures/; the test removes them)
     ([{"report": True}, {"py": "app.export_project_zip()"}, {"expect": ["edit_status", "project zipped"]}], 3.0),
+    "suite:library",
     # the library: three banks (the project's graphs, the usermod effects, WLED's stock ones), thumbnails made on a
     # worker for every effect - each from a clean cube, hearing the synth - with a bar while they are; a preview
     # generated with its own bar; the frame docked and floated
@@ -1387,6 +1405,7 @@ STEPS = [
     ([{"check": "app.project.path.endswith('smoke_run') and app.gp.file == 'wave_tutorial.json' and getattr(app, '_tutorial', None) is None"},
       {"check": "not dpg.is_item_shown('reader_tut_row') and not reader_ui.S.side and app.prefs.get('graph_panel_open') == app._tut_panel_was"},
       {"py": "chrome.close_dialog(reader_ui.TAG)"}], 0.5),
+    "suite:video",
     # S22 live video: the test pattern into the engine's video slot from the VIDEO section, paused, stopped
     ([{"check": "dpg.does_item_exist('video_kind') and dpg.does_item_exist('video_play')"},
       {"py": "video_ui.start(app, 'test')"}], 0.8),
@@ -1423,6 +1442,8 @@ STEPS = [
     ([{"check": "app.video_src is None and 'not a stream address' in dpg.get_value('video_msg')"},
       {"py": "video_ui._set(app, 'url', '')"}, {"py": "video_ui._set_kind(app, 'test pattern')"},
       {"py": "phone_ui._st(app).update(host='', port=8765, https=app._https_was)"}, {"py": "phone_ui.set_on(app, False)"}], 0.3),
+    "suite:files",
+    # a graph exported and imported again (its IMU feature off), and the graphs as a usermod
     ([{"graph_open": "gyro_sand.json"}, {"graph_export": None}, {"confirm": 0}, {"feature": ["imu", False]},
       {"graph_import": f"projects/{SMOKE}/export/gyro_sand.graph.json"}, {"confirm": 0}, {"export_usermod": True}], 3.0),
     # a graph or a project from elsewhere is code: asked first, nothing written on Cancel, imported on the answer
@@ -1461,11 +1482,11 @@ STEPS = [
       {"expect": ["messages", "settings restored"]}], 0.5),
     # a project.json that does not read (issue #5): kept aside as project.json.bad-<time>, said in a dialog and a held
     # problem, the project on its defaults - and nothing of it held once another project is open
-    ([{"py": "(lambda d: (__import__('os').makedirs(d, exist_ok=True), open(__import__('os').path.join(d, 'project.json'), 'w').write('{broken')))"
-             "(__import__('os').path.join(__import__('os').path.dirname(app.project.path), 'smoke_bad'))"},
+    ([{"py": "(lambda d: (os.makedirs(d, exist_ok=True), open(os.path.join(d, 'project.json'), 'w').write('{broken')))"
+             "(os.path.join(os.path.dirname(app.project.path), 'smoke_bad'))"},
       {"project": "smoke_bad"}], 2.0),
     ([{"check": "dpg.is_item_shown('confirm_dialog') and 'project:load' in messages.HELD"},
-      {"check": "any(f.startswith('project.json.bad-') for f in __import__('os').listdir(app.project.path))"},
+      {"check": "any(f.startswith('project.json.bad-') for f in os.listdir(app.project.path))"},
       {"py": "dpg.hide_item('confirm_dialog')"}, {"project": SMOKE}], 2.0),
     ([{"check": f"app.project.path.endswith({SMOKE!r}) and 'project:load' not in messages.HELD"}], 0.5),
     # sub-graph files that do not read, or hold each other (a in b in a): said and left out - either raised through
@@ -1491,7 +1512,7 @@ STEPS = [
       {"py": "dpg.hide_item('confirm_dialog')"}, {"effect": "Spirals (gallery)"}], 1.0),
     ([{"check": "__import__('native.gallery_ui', fromlist=['x']).share(app, 'Smoke Share', 'From the smoke test.', ['test'], "
                 "'smoke', open_after=False) is not None"},
-      {"check": "__import__('os').path.exists(__import__('os').path.join(__import__('native.paths', fromlist=['x']).CAPTURES, "
+      {"check": "os.path.exists(os.path.join(__import__('native.paths', fromlist=['x']).CAPTURES, "
                 "'gallery-share', 'smoke-share', 'entry.json'))"},
       {"py": "__import__('native.library_ui', fromlist=['x'])._set_bank(app, 'graphs')"}], 0.5),
 ]
@@ -1547,6 +1568,65 @@ send.last_wait = 0.0
 # AI: end
 
 
+# AI: below section was generated by an AI
+SUITE = "suite:"
+
+
+# what a suite needs from the ones before it, when it runs without them (-s): steps of its own, or other suites
+_BOX_FIRE = [([{"layout": "graph"}, {"graph_open": "box_fire.json"}, {"py": "app.gp.compile()"}], 5.0),    # its C++ for the code pane
+             ([{"wait_build": True}, {"expect": ["edit_status", "loaded cubefx_"]}, {"layout": "both"}, {"effect": "Maelstrom"}], 1.5)]
+_DEVICE = [([{"device": "127.0.0.1:8770"}], 1.0)]                                             # the fake WLED, as the graph suite leaves it
+PREP = {
+    "control": _BOX_FIRE + _DEVICE + [([{"effect": "Rainbow"}], 0.5)],         # an effect whose first slider is Speed
+    "ui": _BOX_FIRE,
+    "sequence": _DEVICE + [                       # the fake running the studio's script (its effects), as the devices suite leaves it
+        ([{"frame": "devices"}, {"scan": "all"}, {"layout": "graph"}, {"graph_open": "fan.json"}, {"py": "app.send_script()"}], 6.0),
+        ([{"expect": ["send_status", "the device is running it"]}, {"effect": "Rainbow"}, {"layout": "both"}], 1.0)],
+    "shape": [([{"arrangement": [["main"], ["cube", "props"], ["side"]]}], 1.0)],   # the panes as the ui suite leaves them
+}
+NEEDS = {"modulators": {"vj"}}                                                               # the pad editor the vj suite opens
+
+
+def suite_names():
+    """The suites, in the order they first come in STEPS."""
+    return list(dict.fromkeys(s[len(SUITE):] for s in STEPS if isinstance(s, str)))
+
+
+def pick(chosen):
+    """STEPS without its suite markers: all of them, or the opening steps and the chosen suites' (in place),
+    each after its PREP, with the suites it NEEDS."""
+    for name in list(chosen):
+        chosen |= NEEDS.get(name, set())
+    out, on, prepped = [], True, set()
+    for s in STEPS:
+        if isinstance(s, str):
+            name = s[len(SUITE):]
+            on = not chosen or name in chosen
+            if chosen and on and name not in prepped:
+                out += PREP.get(name, [])
+                prepped.add(name)
+        elif on:
+            out.append(s)
+    return out
+
+
+def chosen_suites(argv):
+    """The suites named with -s (repeatable; -s a,b too) - an empty set for all. -l lists them and exits."""
+    if "-l" in argv:
+        print(chr(10).join(suite_names()))
+        sys.exit(0)
+    got = set()
+    for k, a in enumerate(argv):
+        if a == "-s" and k + 1 < len(argv):
+            got |= {n.strip() for n in argv[k + 1].split(",")}
+    unknown = got - set(suite_names())
+    if unknown:
+        print(f"smoke: no suite {', '.join(sorted(unknown))} (there are: {', '.join(suite_names())})")
+        sys.exit(2)
+    return got
+# AI: end
+
+
 def make_films():
     """The S18 films: two sides of a small tree lit by the camera plan, as mp4s. False without ffmpeg."""
     import shutil
@@ -1576,6 +1656,11 @@ def main():
         sys.stdout.reconfigure(errors="replace")         # the app's lines can hold what a Windows console cannot print
     except Exception:
         pass
+    chosen = chosen_suites(sys.argv[1:])
+    ran = chosen or set(suite_names())                   # the end's checks are those of the suites that ran
+    STEPS[:] = pick(chosen)
+    if chosen:
+        print(f"smoke: suites {', '.join(sorted(chosen))} ({len(STEPS)} steps)")
     if not scratch.DIR:
         print("smoke: no private scratch folder to drive the app through (native/scratch.py)")
         return 1
@@ -1601,6 +1686,8 @@ def main():
         ddp2 = None
         print("no 127.0.0.2 on this machine: the steps streaming to two devices are left out")
         STEPS[:] = [s for s in STEPS if s not in MULTI_STEPS and s not in MULTI_SEND_STEPS]
+    if os.path.exists(CMD):
+        os.remove(CMD)                                       # a stopped run's last commands: not this app's to take
     with open(LOG, "w") as log:
         # the console variant of the packaged app keeps its stdout, which is the log the test reads
         cmd = [EXE] if EXE else [sys.executable, "-u", "-m", "native.app"]
@@ -1620,6 +1707,9 @@ def main():
             if not send(cmds, wait, STEPS[k + 1][0] if k + 1 < len(STEPS) else None):
                 early = f"the app stopped taking commands: step {k} of {len(STEPS)} was never taken"
                 print(early); break
+        end = time.time() + 30                          # the last step's commands taken, not left for the next run's app
+        while early is None and os.path.exists(CMD) and time.time() < end and proc.poll() is None:
+            time.sleep(0.2)
         if early is None and proc.poll() is not None:
             early = f"the app exited early (code {proc.returncode}) during the last step"
     finally:
@@ -1643,26 +1733,29 @@ def main():
            or l.startswith("command {")]                          # a step's command that raised: the rest of its step never ran
     if early:
         bad.append(early)
+    dev, seq = "devices" in ran, "sequence" in ran        # the fakes' frames and files: what those suites sent
     if "remote control: write" not in text:
         bad.append("the app's output was not captured, or its remote control was off (no 'remote control: write' line): "
                    "a buffered stdout, the wrong exe, or STUDIO_REMOTE_CONTROL not reaching it")
-    if ddp.ddp_frames < 10:
+    if dev and ddp.ddp_frames < 10:
         bad.append(f"the DDP stream sent {ddp.ddp_frames} frames; 10 or more expected")
-    if ddp2 is not None and not any(isinstance(v, dict) and "playlist" in v for v in ddp2.presets.values()):
+    if seq and ddp2 is not None and not any(isinstance(v, dict) and "playlist" in v for v in ddp2.presets.values()):
         bad.append("the second device got no playlist from the show sent to both")
-    if ddp2 is not None and (ddp2.ddp_frames < 10 or not getattr(ddp2, "ddp_last", b"") or len(ddp2.ddp_last) % 3):
+    if dev and ddp2 is not None and (ddp2.ddp_frames < 10 or not getattr(ddp2, "ddp_last", b"") or len(ddp2.ddp_last) % 3):
         bad.append(f"the second device got {ddp2.ddp_frames} frames ({len(getattr(ddp2, 'ddp_last', b''))} bytes the last); 10 or more expected")
     # the cube's net in logical order, 6912 bytes, is 14 universes of 510 (the last 282): from 3 in E1.31, from 0 in Art-Net
-    for name, univ, first in (("E1.31", ddp.e131_univ, 3), ("Art-Net", ddp.artnet_univ, 0)):
+    for name, univ, first in ((("E1.31", ddp.e131_univ, 3), ("Art-Net", ddp.artnet_univ, 0)) if dev else ()):
         if sorted(univ) != list(range(first, first + 14)):
             bad.append(f"the {name} stream's universes were {sorted(univ)}; {first}..{first + 13} expected")
         elif sum(len(univ[u]) for u in univ) != 48 * 48 * 3:
             bad.append(f"the {name} stream's universes held {sum(len(univ[u]) for u in univ)} bytes; {48 * 48 * 3} expected")
-    if len(ddp.ddp_last) != 48 * 48 * 3:                 # the cube's whole net, in logical order - not its 1280 LEDs in wiring order
+    if dev and len(ddp.ddp_last) != 48 * 48 * 3:                 # the cube's whole net, in logical order - not its 1280 LEDs in wiring order
         bad.append(f"the last streamed frame was {len(ddp.ddp_last)} bytes; the 48 x 48 cube in logical order is {48 * 48 * 3}")
     bad += [l for l in text.splitlines() if "EXPECT FAILED" in l]
     rep = next((l.split(None, 1)[1].strip() for l in text.splitlines() if l.startswith("report ")), "")
-    if not rep or not os.path.exists(rep):
+    if "errors" not in ran:
+        pass
+    elif not rep or not os.path.exists(rep):
         bad.append("Help > Report a problem made no zip")
     else:
         import zipfile
@@ -1674,7 +1767,7 @@ def main():
     for f in (set(os.listdir(os.path.join(ROOT, "captures"))) if os.path.isdir(os.path.join(ROOT, "captures")) else set()) - caps_before:
         if f.endswith(".zip"):                                  # the project zip the run made
             os.remove(os.path.join(ROOT, "captures", f))
-    for name in ("/studio.bin", "/ledmap.json", "/geometry.bin"):
+    for name in (("/studio.bin", "/ledmap.json", "/geometry.bin") if dev else ()):
         if name not in ddp.files:
             bad.append(f"the fake device never received {name}")
     if bad:

@@ -35,7 +35,12 @@ def _hook_names(app):
     from native import camera_map, camera_map_ui
     from native import flash
     from native import library_ui, tutorials, phone_ui
-    return {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "phone_ui": phone_ui, "video_ui": video_ui, "midi_ui": midi_ui, "bank_ui": bank_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
+    from native import pads, pads_ui, pads_hw, sequence, sequence_ui, vj, vj_ui, vj_looks, modulate, mixer, clip_ui
+    from native import render_fseq, render_video, shader_ui
+    more = {"os": os, "pads": pads, "pads_ui": pads_ui, "pads_hw": pads_hw, "sequence": sequence, "sequence_ui": sequence_ui,
+            "vj": vj, "vj_ui": vj_ui, "vj_looks": vj_looks, "modulate": modulate, "mixer": mixer, "clip_ui": clip_ui,
+            "render_fseq": render_fseq, "render_video": render_video, "shader_ui": shader_ui}
+    return more | {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "phone_ui": phone_ui, "video_ui": video_ui, "midi_ui": midi_ui, "bank_ui": bank_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
             "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
             "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,

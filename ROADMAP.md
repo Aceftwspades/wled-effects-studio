@@ -10,8 +10,10 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 - [x] **Smoke checks wait for a condition, not a time**: fixed waits flaked three times in the 1.23.1 release.
       A step whose next batch opens with checks now polls them (the remote's `until`) instead of sleeping: the
       local run went from ~674 s of sleeps to 391 s in all.
-- [ ] **The smoke test in suites** (VJ, pads, sequence, devices...), so a change runs only its own; repeated
-      one-liners become helpers.
+- [x] **The smoke test in suites** (VJ, pads, sequence, devices...), so a change runs only its own; repeated
+      one-liners become helpers. `python tests/smoke_app.py -s vj` runs the opening steps and one of twelve
+      suites, each passing alone (a suite's `PREP` sets up what the ones before it would have left); the
+      ~430 `__import__('native.x', ...)` in its steps are plain names the remote's hooks know.
 
 ## 2. Fewer places for state to hide (stability)
 - [ ] **A runtime object per subsystem** in place of loose `app._x` attributes (about 240 of them across 38
