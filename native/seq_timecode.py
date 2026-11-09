@@ -32,7 +32,7 @@ def tc_set(app, source=None, start=None, device=None):
     if device is not None:
         o["device"] = device
     _tc_close(app)
-    app._tc_was = None
+    seq_state.of(app).tc_was = None
     if dpg.does_item_exist("seq_tc_src"):                  # set from elsewhere (a script, a test): the row shows it
         dpg.set_value("seq_tc_src", dict(TC_SOURCES)[o["source"]])
         dpg.set_value("seq_tc_start", o["start"])
@@ -49,11 +49,11 @@ def tc_set(app, source=None, start=None, device=None):
 
 
 def _tc_close(app):
-    ltc = getattr(app, "_ltc_in", None)
+    ltc = seq_state.of(app).ltc_in
     if ltc is not None:
         ltc.close()
-    app._ltc_in = None
-    app._ltc_error = ""
+    seq_state.of(app).ltc_in = None
+    seq_state.of(app).ltc_error = ""
 
 
 def _tc_source(app):
@@ -63,7 +63,7 @@ def _tc_source(app):
         m = getattr(app, "midi", None)
         return m.mtc if m is not None and m.port else None
     if o["source"] == "ltc":
-        if getattr(app, "_ltc_in", None) is None and not getattr(app, "_ltc_error", ""):
+        if seq_state.of(app).ltc_in is None and not seq_state.of(app).ltc_error:
             from native import audio, timecode
             names = audio.list_inputs()
             dev = next((i for i, n in names if n == o["device"]), None)
@@ -71,10 +71,10 @@ def _tc_source(app):
                 dpg.configure_item("seq_tc_dev", items=[n for _, n in names])
                 dpg.set_value("seq_tc_dev", o["device"] if dev is not None else (names[0][1] if names else ""))
             try:
-                app._ltc_in = timecode.LtcIn(dev)
+                seq_state.of(app).ltc_in = timecode.LtcIn(dev)
             except Exception as e:
-                app._ltc_error = str(e) or "no input"
-        return getattr(app, "_ltc_in", None)
+                seq_state.of(app).ltc_error = str(e) or "no input"
+        return seq_state.of(app).ltc_in
     return None
 
 
@@ -84,8 +84,8 @@ def _tc_words(app, t, running, fps):
         w = ""
     elif o["source"] == "mtc" and not (getattr(app, "midi", None) and app.midi.port):
         w = "no MIDI input open (the MIDI frame)"
-    elif o["source"] == "ltc" and getattr(app, "_ltc_error", ""):
-        w = "LTC: " + app._ltc_error
+    elif o["source"] == "ltc" and seq_state.of(app).ltc_error:
+        w = "LTC: " + seq_state.of(app).ltc_error
     elif t is None:
         w = "waiting for timecode"
     else:
@@ -105,8 +105,8 @@ def poll_timecode(app):
     src = _tc_source(app)
     t, running, fps = src.position() if src is not None else (None, False, 30.0)
     now = clock.now()
-    if now - getattr(app, "_tc_words_at", 0.0) > 0.1:
-        app._tc_words_at = now
+    if now - seq_state.of(app).tc_words_at > 0.1:
+        seq_state.of(app).tc_words_at = now
         _tc_words(app, t, running, fps)
     if t is None or not SU._steps(app)["steps"]:
         return
@@ -114,8 +114,8 @@ def poll_timecode(app):
     p = seq_state.of(app).play
     pos = SU.position(app)
     act = timecode.chase((pos, p is not None and p.get("paused") is None), t, running, offset)
-    was = getattr(app, "_tc_was", None)
-    app._tc_was = (running, t)
+    was = seq_state.of(app).tc_was
+    seq_state.of(app).tc_was = (running, t)
     if act is None:
         return
     kind, at = act

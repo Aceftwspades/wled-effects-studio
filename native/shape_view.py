@@ -247,6 +247,12 @@ def pointer(app):
     (a test's process cannot bring the window to the front, so the real
     pointer may be over another window)."""
     t = getattr(app, "_test_pointer", None)
+    if t is not None and t[0] == "led":           # over LED t[1], wherever the view has it this frame
+        v, g = view(app), drawn(app)
+        if v is None or g is None:
+            return 0.0, 0.0, False
+        sx, sy, ok, _ = project(v, wiring(g)[0][[int(t[1])]])
+        return float(sx[0]), float(sy[0]), bool(ok[0])
     if t is not None:
         return float(t[0]), float(t[1]), True
     mx, my = dpg.get_mouse_pos(local=False)
@@ -456,9 +462,9 @@ def poll(app):
     # 2b. where power is fed in (power_plan.py): a ring and "+" at every feed after a run's first
     if app.prefs.get("shape_feeds", True):
         from native import power_plan
-        pl = getattr(app, "_feed_plan", None)
+        pl = shape_state.of(app).feed_plan
         if pl is None or pl[0] is not g:                  # a geometry is made anew at every change: worked out once each
-            pl = app._feed_plan = (g, power_plan.for_geometry(g, app.project.options.get("outputs") or {}))
+            pl = shape_state.of(app).feed_plan = (g, power_plan.for_geometry(g, app.project.options.get("outputs") or {}))
         plan = pl[1]
         if plan is not None:
             amber = (255, 184, 70, 255)
@@ -575,9 +581,9 @@ def _poll_reference(app):
     key = None if segs is None or len(segs) == 0 else (round(app.yaw, 4), round(app.pitch, 4), round(app.dist, 3),
                                                        tuple(np.round(app.look, 4)), app.ortho, v.x0, v.y0, v.size,
                                                        float(v.frame[1]), tuple(np.round(v.frame[0], 4)), len(segs), id(parts), tuple(cov))
-    if key == getattr(app, "_ref_key", "unset"):
+    if key == shape_state.of(app).ref_key:
         return
-    app._ref_key = key
+    shape_state.of(app).ref_key = key
     dpg.delete_item("ref_dl", children_only=True)
     if key is None:
         return

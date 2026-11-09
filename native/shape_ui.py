@@ -1289,7 +1289,7 @@ def generate_preview(app, mode=None, seconds=None):
     """The turntable rendered on a worker; shown and saved when it is done."""
     import threading
     from native import shape_preview
-    if getattr(app, "_prev_job", None) is not None and app._prev_job.is_alive():
+    if shape_state.of(app).prev_job is not None and shape_state.of(app).prev_job.is_alive():
         return
     if dpg.does_item_exist("shape_prev_hdr"):
         dpg.set_value("shape_prev_hdr", True)                # the View menu's "Generate a preview" lands here folded
@@ -1298,31 +1298,31 @@ def generate_preview(app, mode=None, seconds=None):
     seconds = max(1.0, min(20.0, seconds))
     dpg.set_value("shape_prev_status", f"rendering a {seconds:.0f} s turn ({mode})...")
     dpg.configure_item("shape_prev_go", enabled=False)
-    app._prev_result = None
+    shape_state.of(app).prev_result = None
 
     def work():
         try:
             frames = shape_preview.turntable(app, mode, seconds, 15, 320, 1.0, log=lambda m: None)
             paths = shape_preview.save(app, frames, 15)
-            app._prev_result = (frames, paths, None)
+            shape_state.of(app).prev_result = (frames, paths, None)
         except Exception as e:
-            app._prev_result = (None, None, str(e))
-    app._prev_job = threading.Thread(target=work, daemon=True); app._prev_job.start()
+            shape_state.of(app).prev_result = (None, None, str(e))
+    shape_state.of(app).prev_job = threading.Thread(target=work, daemon=True); shape_state.of(app).prev_job.start()
 
 
 def _poll_preview(app):
     """The finished preview into the frame: a looping texture, the paths."""
-    res = getattr(app, "_prev_result", None)
+    res = shape_state.of(app).prev_result
     if res is not None:
-        app._prev_result = None
+        shape_state.of(app).prev_result = None
         frames, paths, err = res
         if dpg.does_item_exist("shape_prev_go"):
             dpg.configure_item("shape_prev_go", enabled=True)
         if err:
             dpg.set_value("shape_prev_status", f"preview failed: {err}"); return
         h, w = frames[0].shape[:2]
-        app._prev_frames = frames; app._prev_k = -1
-        if dpg.does_item_exist("shape_prev_tex") and getattr(app, "_prev_tex_size", None) == (w, h):
+        shape_state.of(app).prev_frames = frames; shape_state.of(app).prev_k = -1
+        if dpg.does_item_exist("shape_prev_tex") and shape_state.of(app).prev_tex_size == (w, h):
             dpg.set_value("shape_prev_tex", _rgba(frames[0]))
         else:
             # the image goes before its texture: a texture cannot be deleted
@@ -1333,16 +1333,16 @@ def _poll_preview(app):
             from native.textures import registry
             dpg.add_dynamic_texture(w, h, _rgba(frames[0]), tag="shape_prev_tex", parent=registry())
             dpg.add_image("shape_prev_tex", width=px(200), height=px(200), parent="shape_prev_img")
-            app._prev_tex_size = (w, h)
+            shape_state.of(app).prev_tex_size = (w, h)
         g = app.project.geometry
         dpg.set_value("shape_prev_status", f"{g.describe()}: {len(frames)} frames -> {os.path.basename(paths[0])}" + (f", {os.path.basename(paths[1])}" if paths[1] else "") + " in export/")
         app.gp.status(f"preview saved: {paths[0]}")
-    frames = getattr(app, "_prev_frames", None)
+    frames = shape_state.of(app).prev_frames
     if frames and dpg.does_item_exist("shape_prev_tex") and dpg.is_item_shown(TAG):
         import time as _t
         k = int(_t.time() * 15) % len(frames)
-        if k != getattr(app, "_prev_k", -1):
-            app._prev_k = k
+        if k != shape_state.of(app).prev_k:
+            shape_state.of(app).prev_k = k
             dpg.set_value("shape_prev_tex", _rgba(frames[k]))
 
 

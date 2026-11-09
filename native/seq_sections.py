@@ -80,7 +80,7 @@ def draw_sections(app, t0, sx, w):
         typeface.draw_text((px(6), 1), "sections: Find sections (SHOW), or right-click here for one", px(10),
                            color=c.DIM, parent=dl)
         return
-    sel = getattr(app, "_sec_sel", None)
+    sel = seq_state.of(app).sec_sel
     for k, s in enumerate(secs):
         a, b = (float(s["at"]) - t0) * sx, (float(s["at"]) + float(s["len"]) - t0) * sx
         if b < 0 or a > w:
@@ -119,7 +119,7 @@ def sections_mouse(app):
     """The strip's pointer: an edge dragged moves it (the section before ends, the one after starts there), a
     section clicked is selected (a double-click plays from it), a right-click its menu. True while it has the
     mouse."""
-    drag = getattr(app, "_sec_drag", None)
+    drag = seq_state.of(app).sec_drag
     mx, my = dpg.get_mouse_pos(local=False)
     secs = _sections(app)
     if drag is not None:
@@ -140,7 +140,7 @@ def sections_mouse(app):
             cur["at"], cur["len"] = round(t, 3), round(end - t, 3)
             seq_state.of(app).tl_dirty = True
         else:
-            app._sec_drag = None
+            seq_state.of(app).sec_drag = None
             SU._save(app)
         return True
     hit = _sec_hit(app, mx, my)
@@ -152,9 +152,9 @@ def sections_mouse(app):
     if not dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
         return False
     if hit[0] == "edge":
-        app._sec_drag = hit[1]
+        seq_state.of(app).sec_drag = hit[1]
     elif hit[0] == "sec":
-        app._sec_sel = hit[1]
+        seq_state.of(app).sec_sel = hit[1]
         seq_state.of(app).tl_dirty = True
         if dpg.is_mouse_button_double_clicked(dpg.mvMouseButton_Left):
             SU.seek(app, float(secs[hit[1]]["at"]))
@@ -199,7 +199,7 @@ def set_section_kind(app, k, kind):
 
 def delete_section(app, k):
     _sections(app).pop(k)
-    app._sec_sel = None
+    seq_state.of(app).sec_sel = None
     SU._save(app); seq_state.of(app).tl_dirty = True
 
 
@@ -236,7 +236,7 @@ def _sec_menu(app, hit):
                                 ("Find sections in the audio", lambda: find_sections(app))])
         return
     k = hit[1]
-    app._sec_sel = k
+    seq_state.of(app).sec_sel = k
     s = _sections(app)[k]
     items = [(f"{showanalysis.WORDS[kd]}{'  (it is)' if s.get('kind') == kd else ''}", (lambda kd=kd: set_section_kind(app, k, kd)))
              for kd in showanalysis.KINDS]

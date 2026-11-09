@@ -358,7 +358,7 @@ def build(app):
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("AUDIO", color=c.ACCENT))
             dpg.add_button(label="+ Audio...", tag="seq_audio_add", small=True,
-                           callback=lambda: (setattr(app, "_audio_to_track", None), dpg.show_item("seq_audio_dialog")))
+                           callback=lambda: (setattr(seq_state.of(app), "audio_to_track", None), dpg.show_item("seq_audio_dialog")))
             c.tip("an audio file onto the show, at the playhead (or the selected step's start), on a track with room "
                   "there: heard while the show plays, and by its effects; copied into the project")
             dpg.add_button(label="+ Track", tag="seq_track_add", small=True, callback=lambda: seq_audio.add_track(app))
@@ -367,7 +367,7 @@ def build(app):
         dpg.add_drawlist(tag="seq_tl_audio", width=px(600), height=seq_audio._audio_height(app))
         from native.audio import AUDIO_EXTS
         with dpg.file_dialog(directory_selector=False, show=False, tag="seq_audio_dialog", width=px(620), height=px(420),
-                             callback=lambda s, a: seq_audio.add_audio(app, a.get("file_path_name", ""), getattr(app, "_audio_to_track", None))):
+                             callback=lambda s, a: seq_audio.add_audio(app, a.get("file_path_name", ""), seq_state.of(app).audio_to_track)):
             dpg.add_file_extension("{" + ",".join(AUDIO_EXTS) + "}", color=(120, 170, 255))
             dpg.add_file_extension(".*")
         # a drop on the list below its rows: a step moved to the end, or an effect from the Library added there
@@ -637,7 +637,7 @@ def refresh(app):
 
 def select(app, i):
     seq_state.of(app).sel = int(i)
-    app._clip_sel = None
+    seq_state.of(app).clip_sel = None
     if seq_state.of(app).edit and seq_state.of(app).play is not None and _play_i(app) != seq_state.of(app).sel:
         # editing while the show plays edits the step on the playhead (_edit_poll keeps the selection there): a step
         # chosen - on the timeline, in the list - is played from, or it was taken back a frame later
@@ -653,7 +653,7 @@ def refresh_ramps(app, st):
     """The selected step's ramps, a row each: what moves, from where to where, how; and the picker of one more."""
     c = _c()
     dpg.delete_item("seq_ramps", children_only=True)
-    names = app._ramp_names = _ramp_names(app, st)
+    names = seq_state.of(app).ramp_names = _ramp_names(app, st)
     ramps = st.get("ramps") or {}
     free = [lab for k, lab in names.items() if k not in ramps]
     dpg.configure_item("seq_ramp_add", items=free)
@@ -682,7 +682,7 @@ def add_ramp(app, label):
     if not (0 <= sel < len(S["steps"])):
         return
     st = S["steps"][sel]
-    key = next((k for k, lab in (getattr(app, "_ramp_names", None) or {}).items() if lab == label), None)
+    key = next((k for k, lab in (seq_state.of(app).ramp_names or {}).items() if lab == label), None)
     if key is None:
         return
     st.setdefault("ramps", {})[key] = {"end": sequence.ramp_value(st, key, 0), "shape": "linear"}
@@ -1416,12 +1416,12 @@ def beats_from_wav(app):
 def tap(app):
     """Tap tempo: the bpm from the gaps between taps (the last eight; a pause of two seconds starts over)."""
     now = time.perf_counter()
-    taps = getattr(app, "_taps", [])
+    taps = seq_state.of(app).taps
     if taps and now - taps[-1] > 2.0:
         taps = []
     if not taps:
         vj_state.of(app).downbeat = __import__("native.clock", fromlist=["c"]).now()   # the VJ's bars start on the first tap
-    taps.append(now); taps = taps[-8:]; app._taps = taps
+    taps.append(now); taps = taps[-8:]; seq_state.of(app).taps = taps
     if len(taps) >= 2:
         bpm = 60.0 * (len(taps) - 1) / (taps[-1] - taps[0])
         set_tempo(app, bpm=round(bpm, 1)); dpg.set_value("seq_tap", f"{len(taps)} taps: {bpm:.1f} bpm")
@@ -1743,15 +1743,15 @@ def _wave(app):
     live = getattr(app, "live", None)
     if not isinstance(live, audio.FileAudio):
         return None
-    if getattr(app, "_wave_key", None) != id(live):
+    if seq_state.of(app).wave_key != id(live):
         res = max(1, min(WAVE_RES, len(live.samples) // 16))
         n = len(live.samples) // res
         if n < 1:
             return None
         a = np.abs(live.samples[:n * res].reshape(res, n)).mean(1)
         a = a / (a.max() or 1.0)
-        app._wave_key, app._wave = id(live), np.concatenate([[0.0], np.cumsum(a)])
-    return app._wave
+        seq_state.of(app).wave_key, seq_state.of(app).wave = id(live), np.concatenate([[0.0], np.cumsum(a)])
+    return seq_state.of(app).wave
 
 
 def wave_columns(cs, seconds, t0, sx, w, end, every=2):
@@ -2165,7 +2165,7 @@ def draw_overview(app):
         if i == sel:
             dpg.draw_rectangle((t * k, h - 3), ((t + d) * k, h), color=(0, 0, 0, 0), fill=c.ACCENT, parent=dl)
     at = position(app)
-    app._ov_scale = (k, h)                                  # for _move_ov_head, between redraws
+    seq_state.of(app).ov_scale = (k, h)                                  # for _move_ov_head, between redraws
     if at is not None:
         dpg.draw_line((at * k, 0), (at * k, h), color=(255, 255, 255, 230), thickness=1.5, parent=dl, tag="seq_ov_head")
     t0, span, _ = _span_now(app)
@@ -2177,7 +2177,7 @@ def draw_overview(app):
 
 def _move_ov_head(app):
     """The overview's playhead to where the show is now, the strip as it was drawn (drawn again when it has none)."""
-    at, sc = position(app), getattr(app, "_ov_scale", None)
+    at, sc = position(app), seq_state.of(app).ov_scale
     if at is None or sc is None or not dpg.does_item_exist("seq_ov_head"):
         if at is not None:
             draw_overview(app)
@@ -2565,7 +2565,7 @@ def key(app, code):
     ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
     if code == dpg.mvKey_Spacebar and not ctrl and _has_steps(app):
         play_pause(app); return True
-    if code == dpg.mvKey_Delete and getattr(app, "_clip_sel", None) is not None and seq_audio.delete_clip(app):
+    if code == dpg.mvKey_Delete and seq_state.of(app).clip_sel is not None and seq_audio.delete_clip(app):
         return True                                       # a clip selected: the clip
     if code == dpg.mvKey_Delete and _has_sel(app):
         del_step(app, seq_state.of(app).sel); return True

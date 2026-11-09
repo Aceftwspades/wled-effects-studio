@@ -27,6 +27,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native import render, units
+from native import shape_state
 from native.typeface import px
 
 HOME = (-0.6, 0.75, 4.6)                  # the view the studio opens with
@@ -329,10 +330,10 @@ def place_buttons(app):
     for t in ("gizmo_move", "gizmo_turn", "gizmo_move_tip", "gizmo_turn_tip", "gizmo_gap"):
         if dpg.does_item_exist(t) and dpg.get_item_configuration(t).get("show") != ed:
             dpg.configure_item(t, show=ed)
-    if ed and not getattr(app, "_gizmo_weighed", False):
+    if ed and not shape_state.of(app).gizmo_weighed:
         from native import shape_tools
-        shape_tools.set_mode(app, getattr(app, "_gizmo", "move"))
-        app._gizmo_weighed = True
+        shape_tools.set_mode(app, shape_state.of(app).gizmo)
+        shape_state.of(app).gizmo_weighed = True
     bw = dpg.get_item_rect_size("view3d_btns")[0] or px(190)
     from native import room
     right = px(128) if room.pip_on(app) else px(48)      # over the graph: clear of its size grip, maximize and tuck too

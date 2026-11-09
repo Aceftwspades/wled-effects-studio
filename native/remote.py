@@ -481,7 +481,7 @@ def service_command(app):
                     x, y = int(round(float(sx[0]))), int(round(float(sy[0])))
                     print("led_at", k, x, y, "part", int(owner[k]), "ok", bool(ok[0]))
                     if how in ("hover", "leave"):
-                        app._test_pointer = (x, y) if how == "hover" else None   # the pointer's stand-in (shape_view.pointer)
+                        app._test_pointer = ("led", k) if how == "hover" else None   # the pointer's stand-in, kept on LED k as the view moves (shape_view.pointer)
                     elif how and os.name == "nt":
                         import ctypes, ctypes.wintypes as wt, time as _tm
                         u32 = ctypes.windll.user32

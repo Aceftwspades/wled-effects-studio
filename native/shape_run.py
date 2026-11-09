@@ -339,7 +339,7 @@ def draw_corners(app, v, D):
     W = world_corners(part)
     sx, sy, ok, _ = sv.project(v, W)
     cov = sv.covers(app)
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     drag = t.get("corner") if t and t.get("kind") == "corner" else None
     mx, my, on = sv.pointer(app)
     for k in range(len(W)):
@@ -366,13 +366,13 @@ def corner_press(app):
     if not hit:
         return False
     k = hit[0]
-    app._tool = {"kind": "corner", "part": i, "corner": k, "start": W.copy(), "pre": json.dumps(app.project.geometry.params),
+    shape_state.of(app).tool = {"kind": "corner", "part": i, "corner": k, "start": W.copy(), "pre": json.dumps(app.project.geometry.params),
                  "g0": app.project.geometry, "moved": False}
     return True
 
 
 def corner_drag(app):
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     if t is None or t.get("kind") != "corner":
         return False
     sv = _sv()
@@ -410,10 +410,10 @@ def corner_drag(app):
 
 
 def corner_release(app):
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     if t is None or t.get("kind") != "corner":
         return False
-    app._tool = None
+    shape_state.of(app).tool = None
     if t.get("moved"):
         _ui()._apply(app, t["parts"], undo_from=t["pre"])
         app.gp.status("corner moved")

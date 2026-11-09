@@ -145,7 +145,7 @@ def gizmo(app, v):
     """The handles for the selection now: {"p0" world, "c" screen, "axes":
     {a: (dir, length px, px a unit)}, "planes": {(a, b): square}, "rings":
     {a: points}} or None (nothing movable, or a modal move running)."""
-    if getattr(app, "_tool", None) is not None and app._tool.get("kind") in ("modal", "corner"):
+    if shape_state.of(app).tool is not None and shape_state.of(app).tool.get("kind") in ("modal", "corner"):
         return None
     if shape_state.of(app).place or _run().active(app):
         return None
@@ -158,7 +158,7 @@ def gizmo(app, v):
     if not ok or not v.inside(*c):
         return None
     k = _px_per_unit(v, depth)
-    out = {"p0": p0, "c": c, "depth": depth, "axes": {}, "planes": {}, "rings": {}, "mode": getattr(app, "_gizmo", "move")}
+    out = {"p0": p0, "c": c, "depth": depth, "axes": {}, "planes": {}, "rings": {}, "mode": shape_state.of(app).gizmo}
     for a in range(3):
         u, ka = _axis_screen(v, p0, a)
         if u is None:
@@ -220,11 +220,11 @@ def handle_at(gz, mx, my):
 
 def set_mode(app, mode):
     """The handles' mode: "move" (arrows and squares) or "turn" (rings)."""
-    app._gizmo = "turn" if mode == "turn" else "move"
+    shape_state.of(app).gizmo = "turn" if mode == "turn" else "move"
     for m in ("move", "turn"):
         if dpg.does_item_exist(f"gizmo_{m}"):
             from native import weight
-            (weight.primary if m == app._gizmo else weight.plain)(f"gizmo_{m}")
+            (weight.primary if m == shape_state.of(app).gizmo else weight.plain)(f"gizmo_{m}")
 
 
 # --- a transform of the selection from its start ----------------------------------------------
@@ -238,7 +238,7 @@ def _begin(app, kind, **kw):
     t = {"kind": kind, "start": json.loads(json.dumps(parts)), "idx": idx, "p0": pivot(parts, idx),
          "pre": json.dumps(app.project.geometry.params), "g0": app.project.geometry, "join": None}
     t.update(kw)
-    app._tool = t
+    shape_state.of(app).tool = t
     return t
 
 
@@ -429,14 +429,14 @@ def _commit(app, t, what):
             msg = f"{name(i)} joined {how} {name(j)}: {'next after' if how == 'after' else 'just before'} it in the wiring now"
         else:
             msg = f"{name(i)} joined {how} {name(j)}"
-    app._tool = None
+    shape_state.of(app).tool = None
     ui._apply(app, parts, undo_from=t["pre"])
     app.gp.status(msg)
 
 
 def _cancel(app):
-    t = getattr(app, "_tool", None)
-    app._tool = None
+    t = shape_state.of(app).tool
+    shape_state.of(app).tool = None
     if t and t.get("g0") is not None:
         app.project.geometry = t["g0"]                      # the engine never had the move
         app.gp.status("put back")
@@ -450,7 +450,7 @@ def press(app):
     release() makes a pick)."""
     if not view3d.editing(app):
         return False
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     if t is not None and t.get("kind") == "modal":
         _keep(app, t)
         return True
@@ -463,14 +463,14 @@ def press(app):
     if v is None:
         return False
     mx, my, _ = sv.pointer(app)
-    app._press = (mx, my)
+    shape_state.of(app).press = (mx, my)
     gz = gizmo(app, v)
     h = handle_at(gz, mx, my)
     if h is not None:
         t = _begin(app, "handle", handle=h, m0=np.array([mx, my], np.float64), depth=gz["depth"])
         return t is not None
     if _shift():
-        app._tool = {"kind": "box", "m0": (mx, my), "m1": (mx, my)}
+        shape_state.of(app).tool = {"kind": "box", "m0": (mx, my), "m1": (mx, my)}
         return True
     return False
 
@@ -478,7 +478,7 @@ def press(app):
 def drag(app):
     if _run().corner_drag(app):
         return True
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     if t is None or t.get("kind") not in ("handle", "box"):
         return False
     sv = _sv()
@@ -489,7 +489,7 @@ def drag(app):
         return True
     if v is None:
         return True
-    if t["handle"][0] == "ring" or (t["handle"][0] == "free" and getattr(app, "_gizmo", "move") == "turn"):
+    if t["handle"][0] == "ring" or (t["handle"][0] == "free" and shape_state.of(app).gizmo == "turn"):
         _turn_to(app, v, t, mx, my)
     else:
         _move_to(app, v, t, mx, my)
@@ -502,25 +502,25 @@ def release(app):
     taken away; on nothing, none."""
     if _run().corner_release(app):
         return True
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     sv = _sv()
     if t is not None and t.get("kind") == "handle":
         moved = t.get("delta") is not None or t.get("deg") is not None
         if not moved:
-            app._tool = None
+            shape_state.of(app).tool = None
             return True
         _commit(app, t, _handle_words(app, t))
         return True
     if t is not None and t.get("kind") == "box":
-        app._tool = None
+        shape_state.of(app).tool = None
         (x0, y0), (x1, y1) = t["m0"], t["m1"]
         if abs(x1 - x0) < CLICK and abs(y1 - y0) < CLICK:
             _click(app, x0, y0, toggle=True)
             return True
         _box(app, min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
         return True
-    p = getattr(app, "_press", None)
-    app._press = None
+    p = shape_state.of(app).press
+    shape_state.of(app).press = None
     if p is None or not view3d.editing(app):
         return False
     mx, my, _ = sv.pointer(app)
@@ -641,7 +641,7 @@ def poll(app):
     """Per frame: a modal move follows the pointer (or the typed number);
     the part's menu kept inside the window."""
     _keep_menu_in(app)
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     if t is None or t.get("kind") != "modal":
         return
     if not view3d.editing(app):
@@ -688,7 +688,7 @@ def key(app, code):
     Esc puts it back. True when taken."""
     if _run().key(app, code):
         return True                                         # drawing a run: Enter, Backspace, Esc
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     if t is None or t.get("kind") != "modal":
         return False
     if code == dpg.mvKey_Escape:
@@ -767,7 +767,7 @@ def draw(app, v, D):
     cov = sv.covers(app)
     _run().draw(app, v, D)                                  # a run being drawn
     _run().draw_corners(app, v, D)                          # a lone selected path's corners
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     if t is not None and t.get("kind") == "box":
         (x0, y0), (x1, y1) = t["m0"], t["m1"]
         acc = tuple(chrome.ACCENT[:3])
@@ -853,7 +853,7 @@ def right(app):
     when taken."""
     if not view3d.editing(app):
         return False
-    t = getattr(app, "_tool", None)
+    t = shape_state.of(app).tool
     if t is not None and t.get("kind") == "modal":
         _cancel(app); return True
     sv = _sv()
@@ -1014,7 +1014,7 @@ def test_point(app, where):
         return None
     if "join" in where:                                     # during G: where the pointer brings part i's first LED onto part j's end
         i, j = (int(x) for x in where["join"])
-        t = getattr(app, "_tool", None)
+        t = shape_state.of(app).tool
         parts = t["start"] if t else _parts(app)
         ej, ei = shapes.ends(parts[j]), shapes.ends(parts[i])
         tgt, ok1, _ = _screen(v, ej[2] + ej[3] * ej[4])
@@ -1085,4 +1085,4 @@ def test_hook(app, op):
         got = right(app)
         TEST_MODS.clear()
     print("tool", what, None if xy is None else [round(xy[0]), round(xy[1])], "->", got,
-          "sel", sorted(_ui().selection(app)), "tool", (app._tool or {}).get("kind") if getattr(app, "_tool", None) else None)
+          "sel", sorted(_ui().selection(app)), "tool", (shape_state.of(app).tool or {}).get("kind") if shape_state.of(app).tool else None)

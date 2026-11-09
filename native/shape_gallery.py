@@ -18,6 +18,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native import shapes, units, render, typeface, form, num, weight
+from native import shape_state
 from native.typeface import px
 
 TAG = "shape_gallery"
@@ -93,7 +94,7 @@ def show(app, kind=None, preset=None):
     if not dpg.does_item_exist(TAG):
         return
     _fill_tiles(app)
-    choose(app, kind or getattr(app, "_gallery_kind", None) or "strip", preset=preset)
+    choose(app, kind or shape_state.of(app).gallery_kind or "strip", preset=preset)
     chrome._centre(TAG, 760, 600)
     dpg.show_item(TAG)
     dpg.focus_item(TAG)
@@ -133,11 +134,11 @@ def choose(app, kind, preset=None):
     from native import chrome, shape_fields as sf
     if kind not in shapes.KINDS:
         kind = "strip"
-    app._gallery_kind = kind
+    shape_state.of(app).gallery_kind = kind
     if preset is not None and preset.get("kind") == kind:
-        app._gallery_part = json.loads(json.dumps(preset))
+        shape_state.of(app).gallery_part = json.loads(json.dumps(preset))
     else:
-        app._gallery_part = _sample(kind) if kind in ("polyline", "points") else shapes.new_part(kind)
+        shape_state.of(app).gallery_part = _sample(kind) if kind in ("polyline", "points") else shapes.new_part(kind)
     for _, kinds in GROUPS:
         for k in kinds:
             if dpg.does_item_exist(f"gallery_tile_{k}"):
@@ -151,7 +152,7 @@ def choose(app, kind, preset=None):
     for f in sf.FIELDS.get(kind, []):
         if not f.ask:
             continue
-        v = sf.value(app._gallery_part, f, sp)
+        v = sf.value(shape_state.of(app).gallery_part, f, sp)
         if f.type == "bool":
             form.check(f.label, width=110, parent=P, default_value=bool(v), user_data=f, callback=lambda s, a, u: _set(app, u, bool(a)))
             continue
@@ -174,10 +175,10 @@ def choose(app, kind, preset=None):
     dpg.add_text("", tag="gallery_where", parent=P, color=chrome.DIM, wrap=px(270))
     dpg.add_spacer(height=px(6), parent=P)
     with dpg.group(horizontal=True, parent=P):
-        dpg.add_button(label="Add", tag="gallery_add", width=px(90), callback=lambda: add(app, app._gallery_part, close=True))
+        dpg.add_button(label="Add", tag="gallery_add", width=px(90), callback=lambda: add(app, shape_state.of(app).gallery_part, close=True))
         weight.primary("gallery_add")
         chrome.tip("into the shape, placed as said above; the gallery closes (Add another keeps it open)")
-        dpg.add_button(label="Add another", callback=lambda: add(app, app._gallery_part, close=False))
+        dpg.add_button(label="Add another", callback=lambda: add(app, shape_state.of(app).gallery_part, close=False))
         chrome.tip("into the shape, and the gallery stays open for the next")
     _amounts(app)
 
@@ -185,14 +186,14 @@ def choose(app, kind, preset=None):
 def _set(app, f, v):
     from native import shape_fields as sf
     sp = app.project.geometry.params if app.project.geometry.kind == "shape" else {}
-    app._gallery_part = sf.put(app._gallery_part, f, v, sp)
+    shape_state.of(app).gallery_part = sf.put(shape_state.of(app).gallery_part, f, v, sp)
     _amounts(app)
 
 
 def _amounts(app):
     """What the part comes to, and where it will go."""
     from native import shape_fields as sf, shape_ui
-    part = app._gallery_part
+    part = shape_state.of(app).gallery_part
     sp = app.project.geometry.params if app.project.geometry.kind == "shape" else {}
     n = shapes.part_count(part)
     extra = ""
@@ -265,5 +266,5 @@ def add(app, part, close=True):
     app.gp.status(f"{q['name']} added: {shapes.part_count(q)} LEDs, part {at + 1} in the wiring")
     if close and dpg.does_item_exist(TAG):
         dpg.hide_item(TAG)
-    elif dpg.does_item_exist(TAG) and dpg.is_item_shown(TAG) and getattr(app, "_gallery_part", None) is not None:
+    elif dpg.does_item_exist(TAG) and dpg.is_item_shown(TAG) and shape_state.of(app).gallery_part is not None:
         _amounts(app)                                       # the gallery open: where the next one would go

@@ -89,3 +89,21 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       `native/shape_state.py` (18; `PROJECT` names what another project's opening drops). The selected part read
       as 0 in one place and -1 in three; it is -1 everywhere (the first part is still what a fresh selection
       shows). `_shape_checks` was written and never read: gone.
+
+## 7. Tests that do not flake, MilkDrop's next costs, the state left over
+- [x] **The shape view's hover check** waited 20 s for a part under a pointer that never moved, while the view
+      framed the parts just added and moved the LED away from it. The tests' stand-in pointer now follows its
+      LED (`led_at ... hover` keeps `("led", k)`, `shape_view.pointer` projects it each frame).
+- [x] **Builds side by side** (the pre-push check's tests, or a test beside the studio) took the same version number -
+      two links into one `cubefx_<n>.dll` (LNK1104) - and pruned each other's library before it was loaded ("cannot
+      find the file"). A version is claimed by creating its file (`toolchain._claim_version`), and a library younger
+      than two minutes is never pruned. A clash in the pre-push check now says what failed.
+- [x] **MilkDrop's per-point waves** cleaned each point's six values with a scalar `nan_to_num` (~11 us a call,
+      ~94,000 calls over the 23 presets' frames profiled): once per array after the loop now, and the sampler's
+      clean-up by `isfinite` (a third quicker); every deterministic preset's frames the same. All 23 presets
+      983 -> 937 ms. What is left is the MD2 shaders' wait on the GPU (section 6) and the per-pixel mesh's upscale.
+      Two dead definitions in `milk.py` (an earlier `_num` and `_fn`, each replaced further down) are gone.
+- [x] **The show's and the shape editor's last loose state**: 17 `app._x` of the show's sections, audio tracks and
+      timecode into `seq_state`, 13 of the shape view's tools, preview and gallery into `shape_state`. The show's
+      section drag was `app._sec_drag`, the name the side panel's section grips use: dragging a section's edge on
+      the timeline was taken by the panel's mouse handlers as a grip's drag (by reading the code, not reproduced).

@@ -37,6 +37,21 @@ class ShapeState:
     exact: bool = False             # the exact-numbers fold is open
     warns: int = 0                  # the checks' warnings last counted (more: said on the footer)
 
+    # --- the view's tools, the preview, the gallery ---------------------------------------------------------
+    tool: object = None             # a drag or modal tool under way: {"kind": "box"|"handle"|"modal"|"corner", ...}
+    press: object = None            # where the left button went down on the view (x, y), until it is released
+    gizmo: str = "move"             # the handles' mode: "move" or "turn"
+    gizmo_weighed: bool = False     # the mode's buttons have been given their weights once
+    feed_plan: object = None        # (the shape, its power plan) as last worked out, for the feed marks
+    ref_key: object = "unset"       # the reference wireframes as last drawn (another: drawn again)
+    prev_job: object = None         # the preview's worker thread
+    prev_result: object = None      # what it made: (frames, paths, error), taken by the next poll
+    prev_frames: object = None      # the preview's frames
+    prev_k: int = -1                # the frame on show (-1: none yet)
+    prev_tex_size: object = None    # the preview texture's (w, h)
+    gallery_kind: object = None     # the kind the gallery last showed
+    gallery_part: object = None     # the part the gallery is setting up, added by its Add
+
     def forget(self, *names):
         """Fields put back to their defaults."""
         for n in names:

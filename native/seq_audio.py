@@ -90,8 +90,8 @@ def add_audio(app, path, ti=None, at=None):
     def done(snd):
         T = _tracks(app)
         k = ti
-        if k is None and getattr(app, "_clip_sel", None) is not None and app._clip_sel[0] < len(T):
-            k = app._clip_sel[0]
+        if k is None and seq_state.of(app).clip_sel is not None and seq_state.of(app).clip_sel[0] < len(T):
+            k = seq_state.of(app).clip_sel[0]
         if k is None:
             end = at + snd.seconds
             k = next((j for j, tr in enumerate(T)
@@ -100,7 +100,7 @@ def add_audio(app, path, ti=None, at=None):
             k = add_track(app)
         T[k].setdefault("clips", []).append({"file": rel, "at": round(float(at), 3), "in": 0.0,
                                              "len": round(snd.seconds, 3), "gain": 1.0})
-        app._clip_sel = (k, len(T[k]["clips"]) - 1)
+        seq_state.of(app).clip_sel = (k, len(T[k]["clips"]) - 1)
         SU._save(app)
         _audio_changed(app)
         app.gp.status(f"{os.path.basename(rel)}: {snd.seconds:.1f} s on {T[k].get('name', 'a track')} at {SU._fmt_t(at)}")
@@ -110,7 +110,7 @@ def add_audio(app, path, ti=None, at=None):
 def _audio_changed(app):
     """The lanes drawn again, and the speakers given the clips anew (_poll_audio)."""
     seq_state.of(app).tl_dirty = True
-    app._audio_key = None
+    seq_state.of(app).audio_key = None
     if dpg.does_item_exist("seq_tl_audio"):
         h = _audio_height(app)
         if dpg.get_item_configuration("seq_tl_audio")["height"] != h:
@@ -175,7 +175,7 @@ def draw_audio(app, t0, sx, total):
         while X(t) <= w:
             dpg.draw_line((X(t), 0), (X(t), h), color=(255, 255, 255, 18), thickness=1, parent=dl)
             t += bl
-    sel = getattr(app, "_clip_sel", None)
+    sel = seq_state.of(app).clip_sel
     root = app.project.path
     for ti, tr in enumerate(T):
         y0, y1 = ti * px(LANE_H), (ti + 1) * px(LANE_H)
@@ -224,18 +224,18 @@ def draw_audio(app, t0, sx, total):
                            fill=(230, 160, 60, 255) if muted else (0, 0, 0, 0), rounding=2, parent=dl)
         typeface.draw_text((px(5), y0 + px(1)), "M", px(10), face="mono", color=(20, 20, 20, 255) if muted else (230, 233, 240, 220), parent=dl)
         typeface.draw_text((px(20), y0 + px(1)), str(tr.get("name", "")), px(11), color=(230, 233, 240, 220), parent=dl)
-    drag = getattr(app, "_au_drag", None)
+    drag = seq_state.of(app).au_drag
     if drag and drag[0] == "move" and drag[5] is not None:            # the track a clip would go to
         ty = drag[5] * px(LANE_H)
         dpg.draw_rectangle((0, ty), (w, ty + px(LANE_H)), color=c.ACCENT, thickness=1, parent=dl)
     at = SU.position(app)
-    app._au_scale = (sx, h, t0)
+    seq_state.of(app).au_scale = (sx, h, t0)
     if at is not None:
         dpg.draw_line((X(at), 0), (X(at), h), color=(255, 255, 255, 240), thickness=2, parent=dl, tag="seq_au_head")
 
 
 def _move_au_head(app):
-    at, sc = SU.position(app), getattr(app, "_au_scale", None)
+    at, sc = SU.position(app), seq_state.of(app).au_scale
     if at is None or sc is None or not dpg.does_item_exist("seq_au_head"):
         return
     sx, h, t0 = sc
@@ -311,11 +311,11 @@ def audio_mouse(app):
     track's menu; a double-click on a clip plays from its start. True while the strip has the mouse."""
     from native import showaudio
     g = _lane_geometry(app)
-    drag = getattr(app, "_au_drag", None)
+    drag = seq_state.of(app).au_drag
     mx, my = dpg.get_mouse_pos(local=False)
     if drag is not None:
         if g is None:
-            app._au_drag = None
+            seq_state.of(app).au_drag = None
             return False
         x0, y0, w, h = g
         gt = SU._tl_geometry(app)
@@ -324,7 +324,7 @@ def audio_mouse(app):
         kind, ti, ci, grab, orig = drag[:5]
         T = _tracks(app)
         if not (0 <= ti < len(T) and 0 <= ci < len(T[ti].get("clips") or [])):
-            app._au_drag = None
+            seq_state.of(app).au_drag = None
             return True
         cl = T[ti]["clips"][ci]
         snd = showaudio.sound(os.path.join(app.project.path, cl.get("file", "")))
@@ -334,7 +334,7 @@ def audio_mouse(app):
                 at = _snap(app, max(0.0, orig["at"] + (t - grab)), (ti, ci))
                 cl["at"] = round(max(0.0, at), 3)
                 to = int((my - y0) // px(LANE_H))
-                app._au_drag = drag[:5] + ((to if 0 <= to < len(T) and to != ti else None),)
+                seq_state.of(app).au_drag = drag[:5] + ((to if 0 <= to < len(T) and to != ti else None),)
             elif kind == "trim_l":
                 at = _snap(app, t, (ti, ci))
                 at = max(orig["at"] - orig["in"], min(orig["at"] + orig["len"] - 0.05, at))
@@ -348,13 +348,13 @@ def audio_mouse(app):
             elif kind == "fade_out":
                 cl["fade_out"] = round(max(0.0, min(orig["len"], orig["at"] + orig["len"] - t)), 3)
             seq_state.of(app).tl_dirty = True
-            app._audio_key = None
+            seq_state.of(app).audio_key = None
         else:
-            app._au_drag = None
+            seq_state.of(app).au_drag = None
             to = drag[5] if len(drag) > 5 else None
             if kind == "move" and to is not None:                    # onto another track
                 T[to].setdefault("clips", []).append(T[ti]["clips"].pop(ci))
-                app._clip_sel = (to, len(T[to]["clips"]) - 1)
+                seq_state.of(app).clip_sel = (to, len(T[to]["clips"]) - 1)
             SU._save(app)
             _audio_changed(app)
         return True
@@ -375,12 +375,12 @@ def audio_mouse(app):
         SU._save(app); _audio_changed(app)
         return True
     if hit[0] == "lane":
-        app._clip_sel = None
+        seq_state.of(app).clip_sel = None
         seq_state.of(app).tl_dirty = True
         return False                                             # an empty lane: the timeline's own (a middle drag)
     ti, ci = hit[1], hit[2]
     cl = _tracks(app)[ti]["clips"][ci]
-    app._clip_sel = (ti, ci)
+    seq_state.of(app).clip_sel = (ti, ci)
     if dpg.is_mouse_button_double_clicked(dpg.mvMouseButton_Left):
         SU.seek(app, float(cl.get("at", 0)))
         return True
@@ -388,7 +388,7 @@ def audio_mouse(app):
     gt = SU._tl_geometry(app)
     t0, sx = SU._view(app, gt[4] if gt else _extent(app), g[2])
     kind = {"clip": "move"}.get(hit[0], hit[0])
-    app._au_drag = (kind, ti, ci, t0 + (mx - g[0]) / sx,
+    seq_state.of(app).au_drag = (kind, ti, ci, t0 + (mx - g[0]) / sx,
                     {"at": float(cl.get("at", 0)), "in": float(cl.get("in", 0)), "len": float(cl.get("len", 0))}, None)
     seq_state.of(app).tl_dirty = True
     return True
@@ -406,7 +406,7 @@ def _menu(app, title, items):
 
 
 def _clip_menu(app, ti, ci):
-    app._clip_sel = (ti, ci)
+    seq_state.of(app).clip_sel = (ti, ci)
     T = _tracks(app)
     cl = T[ti]["clips"][ci]
 
@@ -417,14 +417,14 @@ def _clip_menu(app, ti, ci):
         import copy
         d = copy.deepcopy(cl)
         d["at"] = round(float(cl.get("at", 0)) + float(cl.get("len", 0)), 3)
-        T[ti]["clips"].append(d); app._clip_sel = (ti, len(T[ti]["clips"]) - 1); SU._save(app); _audio_changed(app)
+        T[ti]["clips"].append(d); seq_state.of(app).clip_sel = (ti, len(T[ti]["clips"]) - 1); SU._save(app); _audio_changed(app)
 
     def delete():
-        T[ti]["clips"].pop(ci); app._clip_sel = None; SU._save(app); _audio_changed(app)
+        T[ti]["clips"].pop(ci); seq_state.of(app).clip_sel = None; SU._save(app); _audio_changed(app)
 
     def new_track():
         k = add_track(app)
-        T[k]["clips"].append(T[ti]["clips"].pop(ci)); app._clip_sel = (k, 0); SU._save(app); _audio_changed(app)
+        T[k]["clips"].append(T[ti]["clips"].pop(ci)); seq_state.of(app).clip_sel = (k, 0); SU._save(app); _audio_changed(app)
 
     def play_here():
         SU.seek(app, float(cl.get("at", 0)))
@@ -445,10 +445,10 @@ def _track_menu(app, ti):
         tr["mute"] = not tr.get("mute"); SU._save(app); _audio_changed(app)
 
     def remove():
-        T.pop(ti); app._clip_sel = None; SU._save(app); _audio_changed(app)
+        T.pop(ti); seq_state.of(app).clip_sel = None; SU._save(app); _audio_changed(app)
 
     def add():
-        app._audio_to_track = ti
+        seq_state.of(app).audio_to_track = ti
         dpg.show_item("seq_audio_dialog")
 
     _menu(app, str(tr.get("name", "")), [("Unmute" if tr.get("mute") else "Mute", mute), ("Add audio here...", add),
@@ -456,12 +456,12 @@ def _track_menu(app, ti):
 
 
 def delete_clip(app):
-    sel = getattr(app, "_clip_sel", None)
+    sel = seq_state.of(app).clip_sel
     T = _tracks(app)
     if sel is None or not (0 <= sel[0] < len(T) and 0 <= sel[1] < len(T[sel[0]].get("clips") or [])):
         return False
     T[sel[0]]["clips"].pop(sel[1])
-    app._clip_sel = None
+    seq_state.of(app).clip_sel = None
     SU._save(app); _audio_changed(app)
     return True
 
@@ -483,10 +483,10 @@ def _poll_audio(app):
         if pl.error:
             app.gp.status(pl.error, "warn")
     key = (json.dumps(T, sort_keys=True, default=str), showaudio.decoding(), len(showaudio._CACHE))
-    if key != getattr(app, "_audio_key", None):
-        app._audio_key = key
-        app._audio_resolved = showaudio.resolve(SU._steps(app), app.project.path)
-        pl.set(app._audio_resolved)
+    if key != seq_state.of(app).audio_key:
+        seq_state.of(app).audio_key = key
+        seq_state.of(app).audio_resolved = showaudio.resolve(SU._steps(app), app.project.path)
+        pl.set(seq_state.of(app).audio_resolved)
         seq_state.of(app).tl_dirty = True                                     # a file decoded since: its wave drawn
     p = seq_state.of(app).play
     from native import render_video, render_fseq
@@ -499,11 +499,11 @@ def _poll_audio(app):
 def show_source(app):
     """What the effects hear while the show plays or is held at a time and has audio: its mix where it is
     (showaudio.ShowAudio), in place of the synth or the live audio; None otherwise."""
-    if seq_state.of(app).play is None or not getattr(app, "_audio_resolved", None):
+    if seq_state.of(app).play is None or not seq_state.of(app).audio_resolved:
         return None
     src = seq_state.of(app).audio_src
     if src is None:
         from native import showaudio
-        src = seq_state.of(app).audio_src = showaudio.ShowAudio(lambda: getattr(app, "_audio_resolved", []), lambda: SU.position(app))
+        src = seq_state.of(app).audio_src = showaudio.ShowAudio(lambda: (seq_state.of(app).audio_resolved or []), lambda: SU.position(app))
     return src
 # AI: end
