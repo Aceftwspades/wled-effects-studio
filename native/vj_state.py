@@ -42,7 +42,6 @@ class VJState:
     pulse: float = 0.0              # the beat's pulse, decaying between beats
     pulse_beats: object = None      # the beat count the pulse was last taken at
     count: tuple = (None, None)     # (whether the show's count is the clock, the beats) at the last look
-    clock_seen: object = None       # clock.shifted() as last seen: a render's jump moved by it
     bar_k: object = None            # the auto-mix's bar, as last counted (None: not yet - the first fires nothing)
     cbar_k: object = None           # deck C's, the same
     sec: object = UNSET             # the auto-mix's song section, as last seen (None: none; UNSET: not looked yet)

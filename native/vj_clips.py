@@ -147,14 +147,6 @@ def stop_tries(app, keep=None):
             _gate_off(p)
 
 
-def shift(app, d):
-    """Every clip's times moved by d seconds (the clock jumped at a render's end: vj._follow_clock)."""
-    for p in _rt(app).values():
-        for k in ("pressed", "t0", "at"):
-            if p[k] is not None:
-                p[k] += d
-
-
 def started(app, i, take):
     """Deck i showed its clip's first frame (vj._take_video): its time starts now - a file's opening (a fraction
     of a second) not counted against its length."""

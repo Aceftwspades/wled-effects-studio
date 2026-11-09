@@ -1604,7 +1604,7 @@ run_x.drawn_at = clock.now()
 vj.draw_deck(ax, 2, 1 / 30, vj.sound(ax), 0.0, False)
 check(getattr(run_x, "xfade", None) is None, "a clip ending on deck C: no crossfade back from its last frame")
 # round 7: a render that ran ahead of real time lets the clock go - the fader's sweep goes on from where it was
-# (it swung A-B-A); one that ran behind - a clip's times move with it
+# (it swung A-B-A); one that ran behind - a clip's time does not count the wait
 aj = App(g)
 oj = vj.options(aj)
 oj.update(on=True, fader=0.0)
@@ -1615,7 +1615,7 @@ vj_state.of(aj).sweep = (clock.now(), 1.0, 0.0, 1.0)
 clock.step(0.3)
 vj.update(aj, 1 / 30)
 mid = oj["fader"]
-clock.release()                                              # now() back six seconds
+clock.release()                                              # now() runs on from there (6.3 s ahead)
 seen = []
 for _ in range(14):
     time.sleep(0.1)
@@ -1625,14 +1625,13 @@ check(all(b >= a for a, b in zip([mid] + seen, seen)) and seen[-1] == 1.0,
       f"after a render that ran ahead: the fader's sweep goes on, not back and forth ({mid:.2f} then {seen})")
 vj_clips.play(aj, dict(vj_clips.DEFAULT, file="x.mp4", **{"out": 2.0}), "j")
 vj_clips.started(aj, 2, vj_clips._rt(aj)[2]["take"])
-t0_was = vj_clips._rt(aj)[2]["t0"]
 vj.update(aj, 1 / 30)
 clock.hold()
 time.sleep(0.4)                                              # a render running behind real time
 clock.release()
 vj.update(aj, 1 / 30)
-moved = vj_clips._rt(aj)[2]["t0"] - t0_was
-check(0.3 < moved < 0.6, f"after a render that ran behind: a clip's time moved with the clock ({moved:.2f} s)")
+played = clock.now() - vj_clips._rt(aj)[2]["t0"]
+check(played < 0.3, f"after a render that ran behind: a clip's time does not count the wait ({played:.2f} s played)")
 vj.close(aj)
 # round 8: a browser of costly looks - each animates in its own turn, none frozen
 from native import vj_ui                                      # noqa: E402
@@ -1655,18 +1654,20 @@ finally:
     vj_ui.dpg.is_item_shown, vj_ui.dpg.set_value = real_dpg
     for k in range(13):
         vj_looks.LOOKS.pop(f"Slow {k}", None)
-# a render's jump while the VJ was not running: a sweep left from before not moved by it (it swung A-B-A)
+# a render while the VJ was not running: a sweep left from before stays done (it once swung A-B-A); the clock
+# runs on from the render's end and never goes back
 aq = App(g)
 oq = vj.options(aq)
 vj.update(aq, 1 / 30)
 vj_state.of(aq).sweep = (clock.now() - 10.0, 1.0, 0.0, 1.0)          # a fade long done, its sweep left behind
+before = clock.now()
 clock.hold()
-clock.step(-300.0)                                           # a render far behind real time (+300 s at release)
+clock.step(300.0)                                            # a five-minute render
 clock.release()
-vj.clock_seen(aq)                                            # (the VJ off and hidden: what poll does)
+check(clock.now() >= before + 300.0, f"the clock runs on from the render's end ({clock.now() - before:.1f} s on)")
 vj.update(aq, 1 / 30)
 check(oq["fader"] == 1.0 and vj_state.of(aq).sweep is None,
-      f"a render's jump with the VJ not running: an old sweep not moved by it (fader {oq['fader']})")
+      f"a render with the VJ not running: an old sweep stays done (fader {oq['fader']})")
 # a pad's hold on a VJ knob: not saved (it goes back on release; an undo brought the held value back)
 from native import midi_ui                                    # noqa: E402
 ah = App(g)

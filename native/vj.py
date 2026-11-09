@@ -626,36 +626,6 @@ def _warm_cams(app):
             _open_soon(app, s, key)
 
 
-def _follow_clock(app):
-    """The fader's and deck C's sweeps and the pads' clips moved by the clock's jump since the last frame (a
-    render that ran ahead of real time let go: the sweep swung A-B-A, deck C froze; one that ran behind: a one
-    shot let go before its picture reached Out)."""
-    seen = vj_state.of(app).clock_seen
-    vj_state.of(app).clock_seen = got = clock.shifted()
-    d = 0.0 if seen is None else got - seen
-    if not d:
-        return
-    sw = vj_state.of(app).sweep
-    if sw is not None:
-        vj_state.of(app).sweep = (sw[0] + d,) + tuple(sw[1:])
-    csw = vj_state.of(app).csweep
-    if csw is not None:
-        vj_state.of(app).csweep = (csw[0] + d,) + tuple(csw[1:])
-    fade = vj_state.of(app).fade
-    if isinstance(fade, dict) and "t0" in fade:              # a show step's blend into the VJ
-        fade["t0"] += d
-    hit = getattr(app, "last_hit_at", None)
-    if hit is not None:                                      # the last beat heard (in the render: on its clock)
-        app.last_hit_at = min(clock.now(), hit + d)
-    vj_clips.shift(app, d)
-
-
-def clock_seen(app):
-    """The clock's jumps so far taken as seen (the VJ not running: nothing of it ran across them, so none moves
-    later - a sweep long done moved minutes ahead swung the fader A-B-A when the VJ came back)."""
-    vj_state.of(app).clock_seen = clock.shifted()
-
-
 SEL = 3                            # a target's deck that is "the selected deck" (resolve: the one selected now)
 
 
@@ -1515,7 +1485,6 @@ def update(app, dt=None):
     _flames(app)
     f = fader_now(app)
     vj_state.of(app).tick = vj_state.of(app).tick + 1
-    _follow_clock(app)                                      # a render let the clock go: the times on it moved
     vj_clips.tick(app)                                      # the pads' clips: their envelopes, the one-shots ended
     _collect(app)                                           # sources opened on workers, into the pool
     _warm_cams(app)                                         # the cameras pads bring up, open

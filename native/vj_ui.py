@@ -1639,7 +1639,6 @@ def poll(app):
         if vj_state.of(app).clips:
             from native import vj_clips
             vj_clips.let_go(app)                                    # a pad pressed with the VJ off: nothing plays
-        vj.clock_seen(app)                                          # (a render's jump meanwhile: none of it ran)
         _rest_src(app)
         return
     _rest_src(app)
