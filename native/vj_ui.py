@@ -1464,6 +1464,21 @@ def _pick_source(app, i):
         dpg.configure_item(f"vj_url{i}", show=True)
 
 
+_DECK_THEMES = {}
+
+
+def _deck_theme(i):
+    """The selected deck's frame: its border in the deck's colour (vj.DECK_RGB), twice as thick."""
+    t = _DECK_THEMES.get(i)
+    if t is None or not dpg.does_item_exist(t):
+        with dpg.theme() as t:
+            with dpg.theme_component(dpg.mvChildWindow):
+                dpg.add_theme_color(dpg.mvThemeCol_Border, tuple(vj.DECK_RGB[i]) + (255,))
+                dpg.add_theme_style(dpg.mvStyleVar_ChildBorderSize, 2)
+        _DECK_THEMES[i] = t
+    return t
+
+
 def refresh(app):
     if not dpg.does_item_exist(TAG):
         return
@@ -1471,6 +1486,9 @@ def refresh(app):
     for i in range(vj.DECKS):                                # the deck the "selected deck" actions drive, said
         if dpg.does_item_exist(f"vj_dtitle{i}"):
             dpg.set_value(f"vj_dtitle{i}", f"DECK {LETTER[i]}" + ("  - selected" if vj.selected(app) == i else ""))
+            dpg.configure_item(f"vj_dtitle{i}", color=tuple(vj.DECK_RGB[i]) + (255,))
+        if dpg.does_item_exist(f"vj_deck{i}"):              # and its border in its colour (the pads' strips the same)
+            dpg.bind_item_theme(f"vj_deck{i}", _deck_theme(i) if vj.selected(app) == i else 0)
     dpg.set_value("vj_on", bool(o["on"]))
     dpg.set_value("vj_map", dict(vj.MAPS)[o["map"]])
     dpg.set_value("vj_canvas", dict(vj.CANVASES).get(o["canvas"], o["canvas"]))

@@ -755,6 +755,25 @@ def group_of(t):
     return "Other"
 
 
+def deck_of(app, t):
+    """The deck (0 A, 1 B, 2 C) a target acts on - "the selected deck" resolved to the one selected now - or None."""
+    from native import vj
+    g = group_of(t or {})
+    if g == "Selected deck":
+        return vj.selected(app)
+    return _DECKS.index(g) if g in _DECKS[:3] else None
+
+
+def decks_of(app, c):
+    """The decks a control acts on, through each of its axes' targets, in axis order without repeats."""
+    out = []
+    for _, key, _, _, _ in pads.AXES:
+        d = deck_of(app, c.get(key)) if c.get(key) else None
+        if d is not None and d not in out:
+            out.append(d)
+    return out
+
+
 def grouped(app, items):
     """[label] of (label, target) items as the listbox shows them: the recent picks first, then each group, each
     under its header; groups with nothing in them left out."""
@@ -1005,8 +1024,24 @@ def _drawn(app, cw, ch, gap):
         out.append((c["id"], c["type"], c["x"], c["y"], c["w"], c["h"], c.get("colour"), c.get("orient"), lab,
                     (not edit) and bool(pads.lit(app, c)),
                     round(pads.position(app, c), 4) if c["type"] in pads.SLIDERS else None,
-                    pads.where(app, c) if c["type"] in pads.SURFACES else None))
+                    pads.where(app, c) if c["type"] in pads.SURFACES else None, tuple(decks_of(app, c))))
     return out
+
+
+def _draw_deck_strip(app, c, x0, y0, x1, y1):
+    """Along the bottom of a control that acts on a deck, that deck's colour (vj.DECK_RGB) - a control on "the
+    selected deck" in the colour of the one selected now, so a glance says where the pads go; split between the
+    decks of an XY pad whose axes act on more than one."""
+    from native import vj
+    ds = decks_of(app, c)
+    if not ds:
+        return
+    pad, h = px(7), px(4)
+    w = (x1 - x0 - 2 * pad) / len(ds)
+    for k, d in enumerate(ds):
+        a = x0 + pad + k * w
+        dpg.draw_rectangle((a, y1 - pad - h), (a + w, y1 - pad), fill=tuple(vj.DECK_RGB[d]) + (255,),
+                           color=(0, 0, 0, 0), rounding=px(2), parent=GRID)
 
 
 def _redraw(app, cw, ch, gap):
@@ -1077,6 +1112,7 @@ def _draw(app, cw, ch, gap):
                       size=px(14),
                       color=(12, 12, 14, 255) if on and c["type"] in pads.BUTTONS else (232, 234, 238, 255),
                       parent=GRID)
+        _draw_deck_strip(app, c, x0, y0, x1, y1)
         if edit and isinstance(sel, dict) and sel["id"] == c["id"]:
             dpg.draw_rectangle((x0 - px(2), y0 - px(2)), (x1 + px(2), y1 + px(2)), color=(255, 255, 255, 255),
                                rounding=px(9), thickness=px(2), parent=GRID)

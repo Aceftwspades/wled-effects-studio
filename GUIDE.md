@@ -1227,7 +1227,10 @@ air. A **Cut** or **Fade** pad is the GO.
 
 **The selected deck**: a pad (or a MIDI control) can **select deck A**, **B**
 or **C**, or **the next deck** - lit while its deck is the selected one,
-and the VJ frame says which (its title: DECK B - selected). Every deck
+and the VJ frame says which (its title: DECK B - selected, its frame in
+the deck's colour: A blue, B orange, C violet). A pad that acts on a deck
+has a strip in that deck's colour along its bottom - on the selected deck,
+the colour of the one selected now. Every deck
 action also comes as **VJ selected deck: ...** - its look, its knobs, the
 look along the list, its next video file, pause, this look, this effect,
 a preset, a clip or a camera - driving whichever deck is selected when it

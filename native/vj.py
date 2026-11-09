@@ -629,6 +629,8 @@ def _warm_cams(app):
 
 
 SEL = 3                            # a target's deck that is "the selected deck" (resolve: the one selected now)
+# each deck's colour: its title and, when selected, its border in the VJ frame; a strip on the pads that act on it
+DECK_RGB = ((86, 186, 255), (255, 146, 66), (190, 124, 255))      # A blue, B orange, C violet
 
 
 def selected(app):

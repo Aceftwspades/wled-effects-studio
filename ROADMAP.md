@@ -64,5 +64,7 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 - [x] **The pad panel's settings in reach**: CLIP and CAMERA without scrolling past the action list.
       The list folds once a control drives something - what the action needs (look, clip, camera, range) right
       under it - and **Change what it drives** opens it again; a pick folds it.
-- [ ] **The selected deck at a glance**: a coloured border on it and on the pads that act on it.
+- [x] **The selected deck at a glance**: a coloured border on it and on the pads that act on it.
+      Each deck a colour (`vj.DECK_RGB`: A blue, B orange, C violet): the selected deck's frame in it, every
+      deck's title in its own, and a strip along each pad that acts on a deck (the selected deck's: as selected now).
 - [ ] **A starter "live show" project** with pads, a clip pad and a camera pad already set up.

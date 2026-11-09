@@ -1226,6 +1226,9 @@ STEPS = [
       {"py": "vj.select_deck(app, 0)"}, {"py": "pads_ui._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', pads.at(pads.current(pads_ui._st(app)), 4, 3)['id'])"},
       {"py": "pads_ui._pick_action(app, 'VJ selected deck: this effect (pick it below)')"}, {"py": "pads_ui._fill_side(app)"}], 0.3),
     ([{"check": "dpg.is_item_shown('pads_s_fxrow') and len(dpg.get_item_configuration('pads_s_fx')['items']) > 0 and pads.at(pads.current(pads_ui._st(app)), 4, 3)['target']['deck'] == vj.SEL"},
+      # the selected deck at a glance: its frame's border in its colour, the pads on "the selected deck" in it too
+      {"check": "dpg.get_item_theme('vj_deck0') == vj_ui._deck_theme(0) and not dpg.get_item_theme('vj_deck1') and "
+                "pads_ui.decks_of(app, pads.at(pads.current(pads_ui._st(app)), 4, 3)) == [0]"},
       {"py": "pads_ui._set_edit(app, False)"},
       {"py": "pads.current(pads_ui._st(app))['controls'].remove(pads.at(pads.current(pads_ui._st(app)), 4, 3))"},   # (its cell for the steps after)
       {"py": "chrome.close_dialog('pads_win')"}, {"py": "device_ui.close(app, 'vj')"}], 0.3),

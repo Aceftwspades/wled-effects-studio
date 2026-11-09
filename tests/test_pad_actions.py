@@ -46,6 +46,19 @@ check(rows[:3] == [P.header("Recent"), "LFO 1: rate", "Speed"], f"the recent pic
 check(rows.count("Speed") == 2, "a recent pick in its group too")
 check(all(h in P.HEADERS for h in rows if h.startswith("---")), "every header known as one (a pick of it picks nothing)")
 check(not any(lab in P.HEADERS for lab, _ in items), "no action's label looks like a header")
+# the deck a control acts on (the strip in that deck's colour on the pad): "the selected deck" as selected now
+dk = SimpleNamespace(prefs={}, project=SimpleNamespace(options={}))
+vj.options(dk)["sel"] = 1
+check(P.deck_of(dk, {"kind": "vj_knob", "deck": 0, "key": "hue"}) == 0, "deck A's target: deck A")
+check(P.deck_of(dk, {"kind": "pad_look", "deck": vj.SEL, "look": ""}) == 1, "the selected deck's: the one selected now (B)")
+check(P.deck_of(dk, {"kind": "fx", "key": "sx"}) is None and P.deck_of(dk, {"kind": "vj_cut"}) is None,
+      "the effect's and the mix's: no deck")
+xy = {"type": "xy", "target": {"kind": "vj_knob", "deck": 2, "key": "hue"}, "target_y": {"kind": "vj_look", "deck": vj.SEL},
+      "target_p": {"kind": "vj_knob", "deck": 2, "key": "amount"}}
+check(P.decks_of(dk, xy) == [2, 1], f"an XY pad's decks through its axes, each once ({P.decks_of(dk, xy)})")
+vj.options(dk)["sel"] = 2
+check(P.decks_of(dk, xy) == [2], "the selection moved to C: the pad's strip follows")
+check(len(vj.DECK_RGB) == vj.DECKS and len(set(vj.DECK_RGB)) == vj.DECKS, "a colour for each deck, all different")
 print("FAILED:", failed) if failed else print("all ok")
 sys.exit(1 if failed else 0)
 # AI: end
