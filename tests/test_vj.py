@@ -12,7 +12,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 
-from native import clock, geometry, vj, vj_looks, vj_state
+from native import clock, geometry, vj, vj_looks, vj_state, seq_state
 
 fails = []
 
@@ -1028,20 +1028,20 @@ keep = (sequence_ui.position, sequence_ui._steps)
 o = vj.options(app)
 o["auto"].update(mix="bars", bars=4)
 o["quant"] = "bar"
-vj_state.of(app).beats, app._seq_play, vj_state.of(app).sweep = 1000.3, None, None
+vj_state.of(app).beats, seq_state.of(app).play, vj_state.of(app).sweep = 1000.3, None, None
 vj.update(app, 1 / 40)
 vj.launch(app, 0.0)
 check(vj_state.of(app).pending is not None and vj_state.of(app).pending[0] == 1004.0, "a Cut waiting for the tempo's next bar")
 try:
     sequence_ui.position = lambda a: 1.0
     sequence_ui._steps = lambda a: {"bpm": 120, "first": 0.0, "bar": 4, "steps": []}
-    app._seq_play = 1
+    seq_state.of(app).play = 1
     vj.update(app, 1 / 40)
     check(vj_state.of(app).sweep is None and vj_state.of(app).pending is not None and vj_state.of(app).pending[0] == 4.0,
           f"the show started at its beat 2: no fade for the jump, the Cut waits for its bar 4 ({vj_state.of(app).pending})")
 finally:
     sequence_ui.position, sequence_ui._steps = keep
-    app._seq_play = None
+    seq_state.of(app).play = None
 o["auto"]["mix"], o["quant"] = "off", "now"
 vj_state.of(app).pending = None
 # a project switched: a Cut waiting in the last one does not go off in the next

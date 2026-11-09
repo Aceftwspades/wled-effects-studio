@@ -26,7 +26,7 @@ import wave
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from native import clock, procs
+from native import clock, procs, seq_state
 from native.typeface import px
 from native import oops
 
@@ -63,7 +63,7 @@ def span(app):
     from native import sequence_ui
     starts, total = sequence_ui._starts(app)
     if options(app)["length"] == "step":
-        i = getattr(app, "_seq_sel", 0)
+        i = seq_state.of(app).sel
         steps = sequence_ui._steps(app)["steps"]
         if 0 <= i < len(steps):
             return starts[i], starts[i] + float(steps[i].get("dur", 10))
@@ -216,11 +216,11 @@ def start(app):
     sequence_ui.stop(app)
     clock.hold()
     sequence_ui.seek(app, t0)
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     if p is not None and p.get("paused") is not None:
         sequence_ui.play_pause(app)
-    if getattr(app, "_seq_play", None) is not None:
-        app._seq_play["once"] = True
+    if seq_state.of(app).play is not None:
+        seq_state.of(app).play["once"] = True
     app.playing = True
     app._video_job = job
     refresh(app)

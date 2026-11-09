@@ -19,7 +19,7 @@ import json
 import random
 
 import numpy as np
-from native import oops
+from native import oops, seq_state
 
 TAG = "autoshow_win"
 TARGET = {"intro": 0.25, "verse": 0.5, "build": 0.6, "drop": 0.95, "breakdown": 0.3, "outro": 0.2}
@@ -191,7 +191,7 @@ def make(app, again=False):
     if not sequence_ui._sections(app):
         if not sequence_ui.find_sections(app):
             return False
-        app._autoshow_after = True                                    # made once the sections are in (poll)
+        seq_state.of(app).autoshow_after = True                                    # made once the sections are in (poll)
         return True
     names = pool_names(app, o["pool"])
     if not names:
@@ -224,10 +224,10 @@ def make(app, again=False):
         S = sequence_ui._steps(app)
         sequence_ui.stop(app)
         S["steps"] = steps
-        app._seq_sel = 0
+        seq_state.of(app).sel = 0
         sequence_ui._save(app)
-        app._tl_dirty = True
-        app._seq_rows_dirty = True
+        seq_state.of(app).tl_dirty = True
+        seq_state.of(app).rows_dirty = True
         app.gp.status(f"a show of {len(steps)} steps over {len(secs)} sections - Another take for other choices; undo "
                       "for the steps before")
     return tasks.run(app, "autoshow", f"making a show from {len(names)} effects", work, done)
@@ -236,7 +236,7 @@ def make(app, again=False):
 def poll(app):
     """A show asked for before its sections were found: made once they are."""
     from native import sequence_ui
-    if getattr(app, "_autoshow_after", False) and sequence_ui._sections(app):
-        app._autoshow_after = False
+    if seq_state.of(app).autoshow_after and sequence_ui._sections(app):
+        seq_state.of(app).autoshow_after = False
         make(app)
 # AI: end

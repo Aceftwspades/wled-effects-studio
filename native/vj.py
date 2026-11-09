@@ -29,7 +29,7 @@ import time
 
 import numpy as np
 
-from native import clock, vj_clips, vj_layer, vj_looks
+from native import clock, vj_clips, vj_layer, vj_looks, seq_state
 from native import vj_state
 from native import oops
 
@@ -898,7 +898,7 @@ def beat_count(app):
         pos = sequence_ui.position(app)
         S = sequence_ui._steps(app)
         bpm = float(S.get("bpm") or 0)
-        if pos is not None and bpm > 0 and getattr(app, "_seq_play", None) is not None:
+        if pos is not None and bpm > 0 and seq_state.of(app).play is not None:
             first = float(S.get("first") or 0.0)
             return max(0.0, (pos - first) * bpm / 60.0), "the show's bars"
     except Exception:

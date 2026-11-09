@@ -22,7 +22,7 @@ import time
 
 import dearpygui.dearpygui as dpg
 
-from native import phone, phone_tls, midi
+from native import phone, phone_tls, midi, seq_state
 from native.typeface import px
 from native import typeface
 from native import vj_state
@@ -233,9 +233,9 @@ def apply(app, cmd):
     elif a == "blackout":
         app.blackout = bool(cmd["v"])
     elif a == "play":
-        if getattr(app, "_seq_play", None) is None:
-            sequence_ui.play(app, getattr(app, "_seq_sel", 0))
-        elif app._seq_play.get("paused") is not None:
+        if seq_state.of(app).play is None:
+            sequence_ui.play(app, seq_state.of(app).sel)
+        elif seq_state.of(app).play.get("paused") is not None:
             sequence_ui.play_pause(app)                     # paused: on from where it was
     elif a == "stop":
         sequence_ui.stop(app)
@@ -243,7 +243,7 @@ def apply(app, cmd):
         n = len(sequence_ui._steps(app)["steps"])
         i = int(cmd["v"])
         if 0 <= i < n:
-            app._seq_sel = i
+            seq_state.of(app).sel = i
             sequence_ui.play(app, i)                        # a step tapped is a cue: the show from there
 
 
@@ -266,7 +266,7 @@ def state(app):
     pals = eng.palette_list()
     pal = next((n for n, i in pals if i == eng.pal), "")
     S = sequence_ui._steps(app)
-    play = getattr(app, "_seq_play", None)
+    play = seq_state.of(app).play
     import os
     return {"project": os.path.basename(app.project.path.rstrip("/\\")),
             "effects": list(eng.names), "effect": eng.names[eng.idx] if eng.names else "",
@@ -277,7 +277,7 @@ def state(app):
             "mixer": {"on": __import__("native.mixer", fromlist=["m"]).on(app),
                       "fader": float(__import__("native.mixer", fromlist=["m"]).options(app)["fader"])},
             "steps": [str(s.get("name") or f"step {i + 1}") for i, s in enumerate(S["steps"])],
-            "step": play["i"] if play else getattr(app, "_seq_sel", -1),
+            "step": play["i"] if play else seq_state.of(app).sel,
             "playing": bool(play) and play.get("paused") is None}
 
 

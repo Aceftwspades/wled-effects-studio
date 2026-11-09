@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import dearpygui.dearpygui as dpg                              # noqa: E402
 import numpy as np                                             # noqa: E402
 
-from native import sequence, sequence_ui as S                  # noqa: E402
+from native import sequence, seq_state, sequence_ui as S                 # noqa: E402
 
 dpg.create_context()                                           # the frame's items are asked after: none exist
 
@@ -63,9 +63,9 @@ def test_the_view_stays_inside_the_show():
     S.set_view(app, 0.0, 0.01)
     assert S._span_now(app)[1] == S.MIN_SPAN
     S.set_view(app, 3.0, 90.0)                                    # more than the show: the whole show again
-    assert app._tl_view is None and S._span_now(app) == (0.0, 60.0, 60.0)
+    assert seq_state.of(app).tl_view is None and S._span_now(app) == (0.0, 60.0, 60.0)
     S.zoom(app, 1 / 3)                                            # zoomed out past it: the same
-    assert app._tl_view is None
+    assert seq_state.of(app).tl_view is None
 
 
 def test_fitted_to_a_step_and_back():
@@ -74,7 +74,7 @@ def test_fitted_to_a_step_and_back():
     t0, span, _ = S._span_now(app)
     assert abs(t0 - 9.0) < 1e-9 and abs(span - 22.0) < 1e-9
     S.fit_all(app)
-    assert app._tl_view is None
+    assert seq_state.of(app).tl_view is None
 
 
 def test_a_step_off_the_timeline_is_brought_onto_it():
@@ -91,12 +91,12 @@ def test_the_page_turns_with_the_playhead():
     app = _app()
     S.set_view(app, 0.0, 10.0)
     now = time.perf_counter()
-    app._seq_play = {"i": 1, "next": now + 15.0, "paused": None}  # 15 s into the show
+    seq_state.of(app).play = {"i": 1, "next": now + 15.0, "paused": None}  # 15 s into the show
     S._follow_head(app)
     t0, span, _ = S._span_now(app)
     assert t0 <= 15.0 <= t0 + span and abs(t0 - (15.0 - 0.2)) < 0.05
     app.prefs["seq_follow"] = False
-    app._seq_play["next"] = now + 1.0                               # 29 s: off the page, but follow is off
+    seq_state.of(app).play["next"] = now + 1.0                               # 29 s: off the page, but follow is off
     S._follow_head(app)
     assert abs(S._span_now(app)[0] - t0) < 1e-9
 

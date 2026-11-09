@@ -19,7 +19,8 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 - [ ] **A runtime object per subsystem** in place of loose `app._x` attributes (about 240 of them across 38
       modules), each with an explicit `reset()` and `close()`. The VJ first, where the review rounds' bugs were.
       Done: the VJ (`native/vj_state.py`, ~70 attributes) and the pads with their clip editor
-      (`native/pads_state.py`, 27). Left: the sequence, modulators, MIDI, devices, the graph editor.
+      (`native/pads_state.py`, 27), the show and its timeline
+      (`native/seq_state.py`, 35). Left: modulators, MIDI, devices, the graph editor.
 - [x] **One play clock that never jumps**: the render's hold under it, instead of each timer correcting for
       `clock.shifted()`. Released, the clock runs on from where the render left it; the corrections are gone.
 - [x] **Swallowed errors made visible**: the 192 bare `except Exception:` blocks log once (crash log or status

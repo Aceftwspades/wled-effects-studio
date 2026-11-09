@@ -14,7 +14,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
-from native import clock
+from native import clock, seq_state
 from native import num
 from native import typeface
 from native import form
@@ -674,7 +674,7 @@ class Features:
     def _seq_dim(self, rgb):
         """The frame at a playing sequence's step brightness (WLED's presets set it: the sim shows what the device
         will), and at the master brightness the phone remote sets (0 in a blackout); as it is otherwise."""
-        bri = getattr(self, "_seq_bri", None)
+        bri = seq_state.of(self).bri
         bri = 255 if bri is None else int(max(0, min(255, bri)))
         master = 0 if getattr(self, "blackout", False) else int(max(0, min(255, getattr(self, "master_bri", 255))))
         bri = bri * master // 255

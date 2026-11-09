@@ -12,7 +12,7 @@ import time
 import dearpygui.dearpygui as dpg
 
 from native.typeface import px
-from native import num
+from native import num, seq_state
 from native import typeface
 from native import form
 
@@ -51,7 +51,7 @@ def _has_steps(app):
 
 
 def _has_sel(app):
-    return 0 <= getattr(app, "_seq_sel", 0) < len(_steps(app).get("steps") or [])
+    return 0 <= seq_state.of(app).sel < len(_steps(app).get("steps") or [])
 
 
 def _dev_steps(app):
@@ -59,7 +59,7 @@ def _dev_steps(app):
 
 
 def _save(app):
-    app._seq_save_at = None
+    seq_state.of(app).save_at = None
     _follow(app)
     app.project.save()
     refresh(app)
@@ -71,7 +71,7 @@ def _follow(app):
     highlight jumped, the blend came from the wrong step and one was skipped. Found again by identity; gone
     with the list another length (deleted), playing stops; gone with the same length (an undo made new
     copies of the steps), the index stays."""
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     if p is None or p.get("st") is None:
         return
     steps = _steps(app)["steps"]
@@ -102,13 +102,13 @@ def _nset(tag, v):
 
 def _queue_save(app):
     """Saved once the numbers settle: a drag is one undo step, not one a frame."""
-    app._seq_save_at = time.perf_counter() + 0.5
+    seq_state.of(app).save_at = time.perf_counter() + 0.5
 
 
 def _flush_save(app, now=False):
-    due = getattr(app, "_seq_save_at", None)
+    due = seq_state.of(app).save_at
     if due is not None and (now or time.perf_counter() >= due):
-        app._seq_save_at = None
+        seq_state.of(app).save_at = None
         app.project.save()
 
 
@@ -122,7 +122,7 @@ def _live(app):
         _nset(f"seq_len_{i}", float(st.get("dur", 10)))
         if dpg.does_item_exist(f"seq_bars_{i}"):
             dpg.set_value(f"seq_bars_{i}", _bars_words(app, st.get("dur", 10)))
-    sel = getattr(app, "_seq_sel", 0)
+    sel = seq_state.of(app).sel
     if 0 <= sel < len(steps):
         st = steps[sel]
         _nset("seq_dur", float(st.get("dur", 10)))
@@ -133,7 +133,7 @@ def _live(app):
         _nset("seq_bri", int(st.get("bri", 255)))
     _, total = _starts(app)
     _nset("seq_len_all", round(total, 1))
-    app._tl_dirty = True
+    seq_state.of(app).tl_dirty = True
     refresh_sent(app)
 
 
@@ -141,7 +141,7 @@ def _num_changed(app, key, v, i=None):
     """A step's number changed (the selected step's, or row i's): held seconds, bars, blend, brightness."""
     S = _steps(app)
     steps = S["steps"]
-    i = getattr(app, "_seq_sel", 0) if i is None else int(i)
+    i = seq_state.of(app).sel if i is None else int(i)
     if not (0 <= i < len(steps)):
         return
     st = steps[i]
@@ -166,7 +166,7 @@ def _num_changed(app, key, v, i=None):
 
 def _follow_playing(app, i, delta):
     """The step playing made longer or shorter: its time left follows (it ends where its new length says)."""
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     if not delta or p is None or p["i"] != i:
         return
     if p.get("paused") is not None:
@@ -250,7 +250,7 @@ def undo(app, redo=False):
         app.gp.status("nothing to " + ("redo" if redo else "undo") + " in the sequence"); return
     (p.redo if redo else p.undo)(key)
     _follow(app)                                          # the steps are new copies now: the playing one kept
-    app._tl_dirty = True
+    seq_state.of(app).tl_dirty = True
     refresh(app); refresh_timers(app)
     app.gp.status(f"{'schedule' if key == 'schedule' else 'sequence'}: {'redo' if redo else 'undo'}")
 
@@ -384,7 +384,7 @@ def build(app):
             dpg.add_button(label="Duplicate", small=True, callback=lambda: duplicate_step(app))
             weight.need(dpg.last_item(), _has_sel)
             c.tip("a copy of the selected step, after it (Ctrl+D)")
-            dpg.add_button(label="Delete", small=True, callback=lambda: del_step(app, getattr(app, "_seq_sel", 0)))
+            dpg.add_button(label="Delete", small=True, callback=lambda: del_step(app, seq_state.of(app).sel))
             weight.danger(dpg.last_item())
             weight.need(dpg.last_item(), _has_sel)
             c.tip("the selected step away (Delete); undo brings it back")
@@ -544,8 +544,8 @@ def refresh(app):
     if dpg.get_value("seq_tc_src") != dict(TC_SOURCES)[tco["source"]] or dpg.get_value("seq_tc_start") != tco["start"]:
         tc_set(app)
     steps = S["steps"]
-    sel = min(getattr(app, "_seq_sel", 0), len(steps) - 1)
-    app._seq_sel = max(0, sel)
+    sel = min(seq_state.of(app).sel, len(steps) - 1)
+    seq_state.of(app).sel = max(0, sel)
     dpg.delete_item("seq_rows", children_only=True)
     total = sum(float(s.get("dur", sequence.DUR_DEFAULT)) for s in steps)
     playing = _play_i(app)
@@ -597,7 +597,7 @@ def refresh(app):
                      [("Add what the sim shows", lambda: add_step(app))])
     # the list as tall as its steps, four to eight rows
     dpg.configure_item("seq_rows", height=px(ROW_H * max(3, min(8, len(steps))) + 20))    # the cells' padding: no scrollbar for 8 px
-    app._tl_dirty = True
+    seq_state.of(app).tl_dirty = True
     dpg.set_value("seq_total", f"{len(steps)} step{'s' if len(steps) != 1 else ''}, the show" if steps else "")
     dpg.configure_item("seq_len_all__num", show=bool(steps)); _nset("seq_len_all", round(total, 1))
     _nset("seq_base", int(S.get("base", 10))); _nset("seq_pid", int(S.get("pid", 9)))
@@ -632,14 +632,14 @@ def refresh(app):
 
 
 def select(app, i):
-    app._seq_sel = int(i)
+    seq_state.of(app).sel = int(i)
     app._clip_sel = None
-    if getattr(app, "_seq_edit", False) and getattr(app, "_seq_play", None) is not None and _play_i(app) != app._seq_sel:
+    if seq_state.of(app).edit and seq_state.of(app).play is not None and _play_i(app) != seq_state.of(app).sel:
         # editing while the show plays edits the step on the playhead (_edit_poll keeps the selection there): a step
         # chosen - on the timeline, in the list - is played from, or it was taken back a frame later
         starts = _starts(app)[0]
-        if 0 <= app._seq_sel < len(starts):
-            seek(app, starts[app._seq_sel])
+        if 0 <= seq_state.of(app).sel < len(starts):
+            seek(app, starts[seq_state.of(app).sel])
     _into_view(app, int(i))
     refresh(app)
 
@@ -674,7 +674,7 @@ def refresh_ramps(app, st):
 
 def add_ramp(app, label):
     """A ramp on the selected step for the slider (or the brightness) the picker names, ending where it starts."""
-    S = _steps(app); sel = getattr(app, "_seq_sel", 0)
+    S = _steps(app); sel = seq_state.of(app).sel
     if not (0 <= sel < len(S["steps"])):
         return
     st = S["steps"][sel]
@@ -682,7 +682,7 @@ def add_ramp(app, label):
     if key is None:
         return
     st.setdefault("ramps", {})[key] = {"end": sequence.ramp_value(st, key, 0), "shape": "linear"}
-    app.project.save(); app._tl_dirty = True; refresh(app)
+    app.project.save(); seq_state.of(app).tl_dirty = True; refresh(app)
 
 
 # --- the schedule: WLED's timers ----------------------------------------------------------------
@@ -868,10 +868,10 @@ def add_step(app):
     S = _steps(app)
     st = sequence.capture(app.eng, app.seg_cols, 255, "", 10.0, 0.7, rgb=_undimmed(app))
     _take_vj(app, st)
-    at = getattr(app, "_seq_sel", -1) + 1 if S["steps"] else 0
+    at = seq_state.of(app).sel + 1 if S["steps"] else 0
     at = max(0, min(len(S["steps"]), at))
     S["steps"].insert(at, st)
-    app._seq_sel = at
+    seq_state.of(app).sel = at
     _gather_look(app, st)
     _save(app)
     app.gp.status(f"step {at + 1} added: {st['name']}")
@@ -879,7 +879,7 @@ def add_step(app):
 
 def update_step(app):
     S = _steps(app)
-    i = getattr(app, "_seq_sel", 0)
+    i = seq_state.of(app).sel
     if 0 <= i < len(S["steps"]):
         old = S["steps"][i]
         st = sequence.capture(app.eng, app.seg_cols, int(old.get("bri", 255)), old.get("name"), old.get("dur", 10),
@@ -904,12 +904,12 @@ def _take_vj(app, st):
 
 def duplicate_step(app, i=None):
     S = _steps(app)
-    i = getattr(app, "_seq_sel", 0) if i is None else i
+    i = seq_state.of(app).sel if i is None else i
     if 0 <= i < len(S["steps"]):
         cp = json.loads(json.dumps(S["steps"][i]))
         cp["name"] = f"{cp.get('name', 'step')} (copy)"
         S["steps"].insert(i + 1, cp)
-        app._seq_sel = i + 1
+        seq_state.of(app).sel = i + 1
         _save(app)
         app.gp.status(f"step {i + 1} duplicated")
 
@@ -950,7 +950,7 @@ def _ramp_names(app, step):
 
 def set_ramp(app, key, end=None, shape=None):
     """A ramp on the selected step: its end value and / or shape."""
-    S = _steps(app); sel = getattr(app, "_seq_sel", 0)
+    S = _steps(app); sel = seq_state.of(app).sel
     if key in (None, "none") or not (0 <= sel < len(S["steps"])):
         return
     st = S["steps"][sel]
@@ -964,20 +964,20 @@ def set_ramp(app, key, end=None, shape=None):
         st.setdefault("ramps", {})[key] = {"shape": "curve", "points": pts}
     else:
         st.setdefault("ramps", {})[key] = {"end": int(end if end is not None else cur[0]), "shape": shape}
-    _queue_save(app); _ramp_desc(app, st); app._tl_dirty = True; refresh_sent(app)
+    _queue_save(app); _ramp_desc(app, st); seq_state.of(app).tl_dirty = True; refresh_sent(app)
     if shape != cur[1]:
         refresh_ramps(app, st)
 
 
 def remove_ramp(app, key):
-    S = _steps(app); sel = getattr(app, "_seq_sel", 0)
+    S = _steps(app); sel = seq_state.of(app).sel
     if key in (None, "none") or not (0 <= sel < len(S["steps"])):
         return
     st = S["steps"][sel]
     (st.get("ramps") or {}).pop(key, None)
     if not st.get("ramps"):
         st.pop("ramps", None)
-    app.project.save(); app._tl_dirty = True; refresh(app)
+    app.project.save(); seq_state.of(app).tl_dirty = True; refresh(app)
 
 
 def _ramp_desc(app, st):
@@ -988,7 +988,7 @@ def _ramp_desc(app, st):
 
 def load_step(app, i=None, quiet=False):
     S = _steps(app)
-    i = getattr(app, "_seq_sel", 0) if i is None else i
+    i = seq_state.of(app).sel if i is None else i
     if 0 <= i < len(S["steps"]):
         sequence.apply(app.eng, S["steps"][i])
         __import__("native.vj", fromlist=["v"]).apply_step(app, S["steps"][i], playing=_play_i(app) is not None)
@@ -1100,14 +1100,14 @@ def refresh_fx(app):
         with form.row("blend mode", parent="seq_opts", tip="how this layer lands on the ones under it"):
             dpg.add_combo(modes, tag="seqo_blend", width=-1, default_value=modes[bm if bm < len(modes) else 0],
                           callback=lambda s, v: (app.on_seg_blend(modes.index(v)), app.rebuild_seg_fields()))
-    app._seq_fx_sig = _fx_sig(app)
+    seq_state.of(app).fx_sig = _fx_sig(app)
 
 
 def _sync_fx(app):
     """Both views to the engine's values: the card's and the panel's sliders, checks, palette and the layer's
     options - each one not being dragged or typed in. An effect, a layer or the layers changed: the card again."""
     e = app.eng
-    if _fx_sig(app) != getattr(app, "_seq_fx_sig", None):
+    if _fx_sig(app) != seq_state.of(app).fx_sig:
         refresh_fx(app)
     for k in ("sx", "ix", "c1", "c2", "c3"):
         v = int(e.fx.get(k, 0))
@@ -1134,11 +1134,11 @@ def _edit_index(app):
     """The step Edit live edits now: the selected one, or while the show plays (or is held at a time) the one on
     the playhead - the one the sim shows. None while not editing, and during a blend between two steps (the sim
     shows neither then)."""
-    if not getattr(app, "_seq_edit", False) or getattr(app, "_transition", None) is not None:
+    if not seq_state.of(app).edit or getattr(app, "_transition", None) is not None:
         return None
-    if getattr(app, "_seq_play", None) is not None:
+    if seq_state.of(app).play is not None:
         return _play_i(app)
-    return getattr(app, "_seq_sel", 0)
+    return seq_state.of(app).sel
 
 
 def _editable(app):
@@ -1166,8 +1166,8 @@ def _unramped(segs, st):
 def toggle_edit(app, on):
     if not on:
         edit_commit(app)                                  # a change of the last quarter second: kept
-    app._seq_edit = bool(on)
-    app._seq_edit_step = None                             # loaded on the next poll
+    seq_state.of(app).edit = bool(on)
+    seq_state.of(app).edit_step = None                             # loaded on the next poll
     if dpg.does_item_exist("seq_fx"):
         dpg.configure_item("seq_fx", show=bool(on))
     if on:
@@ -1180,7 +1180,7 @@ def toggle_edit(app, on):
 def _edit_poll(app):
     """The step and the sim kept as one while editing: the selected step loaded when it is not the one shown, the
     engine's state written into it when it changes, both views kept to the engine."""
-    if not getattr(app, "_seq_edit", False):
+    if not seq_state.of(app).edit:
         return
     if not (app.docked("sequence") or (dpg.does_item_exist(TAG) and dpg.is_item_shown(TAG))):
         # the frame closed: off - the side panel went on writing into a step nothing on screen showed
@@ -1193,37 +1193,37 @@ def _edit_poll(app):
     steps = _steps(app)["steps"]
     sel = _edit_index(app)
     if sel is None or not (0 <= sel < len(steps)):
-        app._seq_look_due = None                          # blending between steps: no look of an edit gathered meanwhile
-        app._seq_edit_step = None                         # (the last change was kept): the next step taken up after it
-        _fx_body(app, False, getattr(app, "_seq_sel", 0))
+        seq_state.of(app).look_due = None                          # blending between steps: no look of an edit gathered meanwhile
+        seq_state.of(app).edit_step = None                         # (the last change was kept): the next step taken up after it
+        _fx_body(app, False, seq_state.of(app).sel)
         return
-    playing = getattr(app, "_seq_play", None) is not None
-    if playing and getattr(app, "_seq_sel", -1) != sel:
+    playing = seq_state.of(app).play is not None
+    if playing and seq_state.of(app).sel != sel:
         select(app, sel)                                  # playing: the selection follows the playhead, card and all
     _fx_body(app, True, sel)
     st = steps[sel]
     now = time.perf_counter()
-    if getattr(app, "_seq_edit_step", None) is not st:
+    if seq_state.of(app).edit_step is not st:
         edit_commit(app)                                  # another step: the last change kept in the one left
         _flush_save(app, now=True)
         if not playing:
             load_step(app, sel, quiet=True)               # playing, the show has loaded it already (and its blend)
-        app._seq_edit_step = st
-        app._seq_edit_base = (_unramped(app.eng.segments(), st), [int(c) for c in app.seg_cols])
-        app._seq_edit_at = now
+        seq_state.of(app).edit_step = st
+        seq_state.of(app).edit_base = (_unramped(app.eng.segments(), st), [int(c) for c in app.seg_cols])
+        seq_state.of(app).edit_at = now
         refresh_fx(app)
         if dpg.does_item_exist("seq_fx_note"):
             dpg.set_value("seq_fx_note", f"step {sel + 1}, live{' on the playhead' if playing else ''} - here or in the side panel")
         return
     _sync_fx(app)
-    if now - getattr(app, "_seq_edit_at", 0.0) < SYNC_EVERY:
-        due = getattr(app, "_seq_look_due", None)
+    if now - seq_state.of(app).edit_at < SYNC_EVERY:
+        due = seq_state.of(app).look_due
         if due is not None and now >= due and not num.busy():
-            app._seq_look_due = None
+            seq_state.of(app).look_due = None
             _gather_look(app, st)                         # its look again, once the changes have settled
-            app._seq_look["edit"] = True
+            seq_state.of(app).look["edit"] = True
         return
-    app._seq_edit_at = now
+    seq_state.of(app).edit_at = now
     edit_commit(app)
 
 
@@ -1231,23 +1231,23 @@ def edit_commit(app):
     """The engine's segments and colours into the step being edited, when they changed since last time: from
     the poll (a quarter second apart), and from whatever is about to load something else into the sim - another
     step selected, editing turned off, play and seek - so the last change before it is kept."""
-    st = getattr(app, "_seq_edit_step", None)
-    if st is None or not getattr(app, "_seq_edit", False) or not any(s is st for s in _steps(app)["steps"]):
+    st = seq_state.of(app).edit_step
+    if st is None or not seq_state.of(app).edit or not any(s is st for s in _steps(app)["steps"]):
         return
     cur = (_unramped(app.eng.segments(), st), [int(c) for c in app.seg_cols])
-    if cur == getattr(app, "_seq_edit_base", None):
+    if cur == seq_state.of(app).edit_base:
         return
-    app._seq_edit_base = cur
+    seq_state.of(app).edit_base = cur
     segs, cols = cur
     old = (st.get("segments") or [{}])[0].get("effect")
     st["segments"] = json.loads(json.dumps(segs))
     st["colors"] = list(cols)
     if st.get("name") == old and segs:                    # a name that was its effect's follows the effect
         st["name"] = segs[0].get("effect") or st.get("name")
-    app._seq_look_due = time.perf_counter() + 1.2
+    seq_state.of(app).look_due = time.perf_counter() + 1.2
     _queue_save(app)
-    app._tl_dirty = True
-    app._seq_rows_dirty = True
+    seq_state.of(app).tl_dirty = True
+    seq_state.of(app).rows_dirty = True
 
 
 def _fx_body(app, editable, sel):
@@ -1263,28 +1263,28 @@ def _fx_body(app, editable, sel):
 def _gather_look(app, st):
     """The sim's frames for a moment, from now, as the step's look - while the sim goes on showing the effect it
     showed when this began (another effect picked meanwhile: the gathering stops, the look as it was)."""
-    app._seq_look = {"st": st, "idx": app.eng.idx, "until": time.perf_counter() + LOOK_SPAN, "next": 0.0, "frames": []}
+    seq_state.of(app).look = {"st": st, "idx": app.eng.idx, "until": time.perf_counter() + LOOK_SPAN, "next": 0.0, "frames": []}
 
 
 def _take_look(app):
-    g = getattr(app, "_seq_look", None)
+    g = seq_state.of(app).look
     if g is None:
         return
     i = _edit_index(app)
     steps_ = _steps(app)["steps"]
     if g.get("edit") and (i is None or not (0 <= i < len(steps_)) or steps_[i] is not g.get("st")):
-        app._seq_look = None                              # an edit's look, and the sim taken over meanwhile: dropped
+        seq_state.of(app).look = None                              # an edit's look, and the sim taken over meanwhile: dropped
         return
     now = time.perf_counter()
     if app.eng.idx != g["idx"]:
-        app._seq_look = None; return
+        seq_state.of(app).look = None; return
     if now >= g["next"]:
         g["next"] = now + LOOK_EVERY
         f = np.asarray(_undimmed(app))
         g["frames"].append(f[::2, ::2] if f.shape[0] > 8 and f.shape[1] > 8 else f)
     if now < g["until"]:
         return
-    app._seq_look = None
+    seq_state.of(app).look = None
     shapes = {f.shape for f in g["frames"]}
     if len(shapes) != 1:
         return                                            # the geometry changed under it
@@ -1292,7 +1292,7 @@ def _take_look(app):
     if lk and any(st is g["st"] for st in _steps(app)["steps"]):
         g["st"]["look"] = lk
         _save_quiet(app)
-        app._seq_rows_dirty = True; app._tl_dirty = True
+        seq_state.of(app).rows_dirty = True; seq_state.of(app).tl_dirty = True
 
 
 def _save_quiet(app):
@@ -1311,8 +1311,8 @@ def del_step(app, i):
     S = _steps(app)
     if 0 <= i < len(S["steps"]):
         S["steps"].pop(i)
-        app._seq_sel = min(i, len(S["steps"]) - 1)
-        p = getattr(app, "_seq_play", None)
+        seq_state.of(app).sel = min(i, len(S["steps"]) - 1)
+        p = seq_state.of(app).play
         if p is not None and p["i"] >= len(S["steps"]):
             stop(app)
         _save(app)
@@ -1337,11 +1337,11 @@ def add_effect(app, name, at=None):
     if name not in (app.eng.names or []):
         app.gp.status(f"{name}: not in the sim's effects - click its tile to build it, then drag it")
         return
-    if getattr(app, "_seq_play", None) is not None:
+    if seq_state.of(app).play is not None:
         stop(app)
-    if getattr(app, "_seq_edit", False):
+    if seq_state.of(app).edit:
         edit_commit(app)
-        app._seq_edit_step = None                     # the next poll loads the new step, which is the sim already
+        seq_state.of(app).edit_step = None                     # the next poll loads the new step, which is the sim already
     app.on_effect(None, name)
     if dpg.does_item_exist("fx_combo"):
         dpg.set_value("fx_combo", name)
@@ -1350,7 +1350,7 @@ def add_effect(app, name, at=None):
     n = len(S["steps"])
     at = n if at is None else max(0, min(n, int(at)))
     S["steps"].insert(at, st)
-    app._seq_sel = at
+    seq_state.of(app).sel = at
     _gather_look(app, st)
     _save(app)
     app.gp.status(f"step {at + 1} added from the Library: {st['name']}")
@@ -1366,13 +1366,13 @@ def move_to(app, i, j):
     j = max(0, min(n - 1, int(j)))
     st = S["steps"].pop(i)
     S["steps"].insert(j, st)
-    app._seq_sel = j
+    seq_state.of(app).sel = j
     _save(app)
 
 
 def set_field(app, key, value):
     S = _steps(app)
-    i = getattr(app, "_seq_sel", 0)
+    i = seq_state.of(app).sel
     if 0 <= i < len(S["steps"]):
         S["steps"][i][key] = value
         _save(app)
@@ -1403,7 +1403,7 @@ def beats_from_wav(app):
     if not got:
         app.gp.status("no beat found in the file"); return
     bpm, first, beats = got
-    app._seq_beats = beats
+    seq_state.of(app).beats = beats
     set_tempo(app, bpm=bpm)
     dpg.set_value("seq_tap", f"{_c()._fit_text(name, px(150))}: {bpm:.1f} bpm, {len(beats)} beats")
     app.gp.status(f"{bpm:.1f} bpm from {name}")
@@ -1453,13 +1453,13 @@ def _starts(app):
 
 
 def _play_i(app):
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     return p["i"] if p is not None and p["i"] >= 0 else None
 
 
 def position(app):
     """Seconds into the show while it plays or is paused, else None."""
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     if p is None or p["i"] < 0:
         return None
     starts, _ = _starts(app)
@@ -1480,7 +1480,7 @@ def play(app, i=0, offset=0.0):
     i = max(0, min(len(S["steps"]) - 1, int(i)))
     dur = float(S["steps"][i].get("dur", 10))
     app._transition = None
-    app._seq_play = {"i": i, "next": clock.now() + max(0.05, dur - offset), "paused": None,
+    seq_state.of(app).play = {"i": i, "next": clock.now() + max(0.05, dur - offset), "paused": None,
                      "st": S["steps"][i], "n": len(S["steps"])}
     app.playing = True
     live = getattr(app, "live", None)
@@ -1493,9 +1493,9 @@ def play(app, i=0, offset=0.0):
 
 def play_pause(app):
     """The transport's button: play from the selected step; while playing, pause; paused, go on."""
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     if p is None:
-        play(app, getattr(app, "_seq_sel", 0))
+        play(app, seq_state.of(app).sel)
     elif p.get("paused") is None:
         _rec_flush(app)                                   # a take ends with the pause
         p["paused"] = max(0.0, p["next"] - clock.now())
@@ -1521,13 +1521,13 @@ def seek(app, t):
     t = max(0.0, min(total - 0.01, float(t)))
     i = max(k for k, s in enumerate(starts) if s <= t)
     off = t - starts[i]
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     held = p is None or p.get("paused") is not None
     left = max(0.05, float(S["steps"][i].get("dur", 10)) - off)
     if p is None or p["i"] != i:
         load_step(app, i, quiet=True)
         app._transition = None
-    app._seq_play = {"i": i, "next": clock.now() + left, "paused": left if held else None,
+    seq_state.of(app).play = {"i": i, "next": clock.now() + left, "paused": left if held else None,
                      "st": S["steps"][i], "n": len(S["steps"])}
     app.playing = not held
     live = getattr(app, "live", None)
@@ -1535,7 +1535,7 @@ def seek(app, t):
         live.t0 = clock.now() - t
     _apply_ramps(app, i, off / max(0.05, float(S["steps"][i].get("dur", 10))))
     _sync_transport(app)
-    app._tl_dirty = True; app._seq_rows_dirty = True
+    seq_state.of(app).tl_dirty = True; seq_state.of(app).rows_dirty = True
 
 
 def render(app, fmt="gif"):
@@ -1549,7 +1549,7 @@ def render(app, fmt="gif"):
     if fmt == "mp4" and not app.has_ffmpeg():
         app.gp.status("a video needs ffmpeg on the path - not found"); return
     play(app, 0)
-    app._seq_play["once"] = True
+    seq_state.of(app).play["once"] = True
     app.start_rec(total, fmt)
     app.gp.status(f"rendering {total:.0f} s of the sequence to {fmt}...")
 
@@ -1561,10 +1561,10 @@ def stop(app):
         _REC.armed = False
         _rec_button(app)
     app._transition = None
-    app._seq_bri = None
-    app._seq_edit_step = None                             # editing: the selected step shown again (not the last played)
-    if getattr(app, "_seq_play", None) is not None:
-        app._seq_play = None
+    seq_state.of(app).bri = None
+    seq_state.of(app).edit_step = None                             # editing: the selected step shown again (not the last played)
+    if seq_state.of(app).play is not None:
+        seq_state.of(app).play = None
         app.playing = True
         dpg.set_value("seq_status", "")
         app.gp.status("sequence stopped")
@@ -1575,11 +1575,11 @@ def stop(app):
 def _sync_transport(app):
     """The play button as what it does now: play, or pause while playing."""
     from native.icons import texture
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     playing = p is not None and p.get("paused") is None
     if dpg.does_item_exist("seq_play"):
         dpg.configure_item("seq_play", texture_tag=texture("pause" if playing else "play", px(16)))
-    app._tl_dirty = True
+    seq_state.of(app).tl_dirty = True
 
 
 def _apply_ramps(app, i, t):
@@ -1590,7 +1590,7 @@ def _apply_ramps(app, i, t):
         return
     st = steps[i]
     ramps = st.get("ramps") or {}
-    app._seq_bri = sequence.ramp_value(st, sequence.BRI, t) if sequence.BRI in ramps else int(st.get("bri", 255))
+    seq_state.of(app).bri = sequence.ramp_value(st, sequence.BRI, t) if sequence.BRI in ramps else int(st.get("bri", 255))
     changed = False
     for k in ramps:
         if k == sequence.BRI or k in _REC.held:
@@ -1626,21 +1626,21 @@ def poll(app):
             timeline_mouse(app)
         _follow_head(app)
         fw = (dpg.get_item_rect_size(TAG)[0], _c().scrollbar_w(TAG))
-        if fw[0] and fw != getattr(app, "_tl_frame_w", None):
-            app._tl_frame_w = fw; app._tl_dirty = True          # laid out, resized, a scrollbar come or gone: it follows
-            app._seq_rows_dirty = True                          # the names fitted to the new width too
-        if getattr(app, "_seq_rows_dirty", False) and not num.busy():   # not under a number being typed in: it waits
-            app._seq_rows_dirty = False; refresh(app)
-        pl = getattr(app, "_seq_play", None)
+        if fw[0] and fw != seq_state.of(app).tl_frame_w:
+            seq_state.of(app).tl_frame_w = fw; seq_state.of(app).tl_dirty = True          # laid out, resized, a scrollbar come or gone: it follows
+            seq_state.of(app).rows_dirty = True                          # the names fitted to the new width too
+        if seq_state.of(app).rows_dirty and not num.busy():   # not under a number being typed in: it waits
+            seq_state.of(app).rows_dirty = False; refresh(app)
+        pl = seq_state.of(app).play
         state = (pl is not None, pl is not None and pl.get("paused") is not None, pl["i"] if pl is not None else None)
-        if getattr(app, "_tl_dirty", True) or getattr(app, "_tl_hover_was", None) != getattr(app, "_tl_hover", None)                 or state != getattr(app, "_tl_state_was", None) or (pl is not None and not dpg.does_item_exist("seq_tl_head")):
-            draw_timeline(app); draw_overview(app); app._tl_dirty = False; app._tl_hover_was = getattr(app, "_tl_hover", None)
-            app._tl_state_was = state
-        elif getattr(app, "_seq_play", None) is not None:
+        if seq_state.of(app).tl_dirty or seq_state.of(app).tl_hover_was != seq_state.of(app).tl_hover                 or state != seq_state.of(app).tl_state_was or (pl is not None and not dpg.does_item_exist("seq_tl_head")):
+            draw_timeline(app); draw_overview(app); seq_state.of(app).tl_dirty = False; seq_state.of(app).tl_hover_was = seq_state.of(app).tl_hover
+            seq_state.of(app).tl_state_was = state
+        elif seq_state.of(app).play is not None:
             _move_head(app); _move_ov_head(app); _move_au_head(app)   # playing: the playheads move, the rest stays (redrawn every
                                                             # frame it was 2 ms of each)
         _show_position(app)
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     if p is None:
         return
     S = _steps(app)
@@ -1664,14 +1664,14 @@ def poll(app):
         prev = steps[p["i"]] if 0 <= p["i"] < len(steps) else None
         p["i"] = i
         p["st"], p["n"] = steps[i], len(steps)
-        app._tl_dirty = True                                # the step playing is underlined: drawn again
+        seq_state.of(app).tl_dirty = True                                # the step playing is underlined: drawn again
         p["next"] = now + float(steps[i].get("dur", 10))
         trans = float(steps[i].get("trans", sequence.TRANS_DEFAULT))       # as the device's playlist blends it
         if prev is not None and trans > 0:
             app.transition_start(prev, trans, S.get("style", "fade"))
         load_step(app, i, quiet=True)
         _REC.applied = None                               # the next step's values are playback's, not the hand's
-        app._seq_rows_dirty = True
+        seq_state.of(app).rows_dirty = True
     i = p["i"]
     if 0 <= i < len(steps):
         dur = float(steps[i].get("dur", 10)) or 1.0
@@ -1690,7 +1690,7 @@ def _show_position(app):
     i = _play_i(app)
     steps = _steps(app)["steps"]
     if dpg.does_item_exist("seq_status"):
-        p = getattr(app, "_seq_play", None)
+        p = seq_state.of(app).play
         if i is not None and i < len(steps):
             dpg.set_value("seq_status", _c()._fit_text(f"{'paused at' if p.get('paused') is not None else 'playing'} "
                                                        f"step {i + 1}: {steps[i].get('name', '')}", px(260)))
@@ -1800,11 +1800,11 @@ def _set_pref(app, key, value):
 
 def _view(app, total, w):
     """(t0, sx): the time at the timeline's left edge and its pixels a second. The whole show until it is zoomed;
-    zoomed, app._tl_view {"t0", "span"} is kept inside the show (and the show's length, should it shrink)."""
-    v = getattr(app, "_tl_view", None)
+    zoomed, seq_state.of(app).tl_view {"t0", "span"} is kept inside the show (and the show's length, should it shrink)."""
+    v = seq_state.of(app).tl_view
     if not v or total <= 0 or v["span"] >= total:
         if v is not None and total > 0 and v["span"] >= total:
-            app._tl_view = None
+            seq_state.of(app).tl_view = None
         return 0.0, w / max(total, 1e-6)
     span = max(MIN_SPAN, float(v["span"]))
     t0 = max(0.0, min(total - span, float(v["t0"])))
@@ -1815,7 +1815,7 @@ def _view(app, total, w):
 def _span_now(app):
     """(t0, span, total) the timeline shows now."""
     total = _extent(app) if _starts(app)[1] > 0 else 0.0
-    v = getattr(app, "_tl_view", None)
+    v = seq_state.of(app).tl_view
     if not v or total <= 0:
         return 0.0, total, total
     span = max(MIN_SPAN, min(total, float(v["span"])))
@@ -1829,10 +1829,10 @@ def set_view(app, t0, span):
         return
     span = max(MIN_SPAN, float(span))
     if span >= total - 1e-6:
-        app._tl_view = None
+        seq_state.of(app).tl_view = None
     else:
-        app._tl_view = {"t0": max(0.0, min(total - span, float(t0))), "span": span}
-    app._tl_dirty = True
+        seq_state.of(app).tl_view = {"t0": max(0.0, min(total - span, float(t0))), "span": span}
+    seq_state.of(app).tl_dirty = True
 
 
 def zoom(app, factor, at=None):
@@ -1846,14 +1846,14 @@ def zoom(app, factor, at=None):
 
 
 def fit_all(app):
-    app._tl_view = None
-    app._tl_dirty = True
+    seq_state.of(app).tl_view = None
+    seq_state.of(app).tl_dirty = True
 
 
 def fit_step(app, i=None):
     """The step (the selected one) across the timeline, a twentieth of it either side."""
     starts, total = _starts(app)
-    i = getattr(app, "_seq_sel", 0) if i is None else i
+    i = seq_state.of(app).sel if i is None else i
     if not (0 <= i < len(starts)):
         return
     d = float(_steps(app)["steps"][i].get("dur", 10))
@@ -1862,7 +1862,7 @@ def fit_step(app, i=None):
 
 def _into_view(app, i):
     """A step selected off the zoomed timeline (in the list, say) brought onto it, its start a tenth in."""
-    if getattr(app, "_tl_view", None) is None:
+    if seq_state.of(app).tl_view is None:
         return
     starts, total = _starts(app)
     if not (0 <= i < len(starts)):
@@ -1876,10 +1876,10 @@ def _into_view(app, i):
 def _follow_head(app):
     """Playing and zoomed, with follow on: the page turned when the playhead reaches the timeline's right edge (or
     is behind its left), as an arrangement view does - not every frame, so the blocks stand still to be read."""
-    if getattr(app, "_tl_view", None) is None or not app.prefs.get("seq_follow", True):
+    if seq_state.of(app).tl_view is None or not app.prefs.get("seq_follow", True):
         return
-    p = getattr(app, "_seq_play", None)
-    if p is None or p.get("paused") is not None or getattr(app, "_tl_drag", None) is not None:
+    p = seq_state.of(app).play
+    if p is None or p.get("paused") is not None or seq_state.of(app).tl_drag is not None:
         return
     at = position(app)
     if at is None:
@@ -1903,10 +1903,10 @@ def _hold_scroll(app):
     theirs - zoomed in (it moves along the time), or with Ctrl (it zooms): it moved the frame under them as well.
     The whole show shown, the plain wheel scrolls the frame as it does anywhere in it."""
     ctrl = dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl)
-    zoomed = getattr(app, "_tl_view", None) is not None
+    zoomed = seq_state.of(app).tl_view is not None
     over = (zoomed or ctrl) and any(_over(t) for t in ("seq_tl", "seq_tl_ov", "seq_tl_grip", "seq_tl_audio", "seq_tl_sec"))
-    if over != getattr(app, "_tl_held", False):
-        app._tl_held = over
+    if over != seq_state.of(app).tl_held:
+        seq_state.of(app).tl_held = over
         dpg.configure_item(TAG, no_scroll_with_mouse=over)
 
 
@@ -1928,7 +1928,7 @@ def wheel(app, delta):
             mx = dpg.get_mouse_pos(local=False)[0]
             at = t0 + (mx - g[0]) / max(1.0, g[2]) * span
         zoom(app, ZOOM_STEP ** (1 if delta > 0 else -1), at)
-    elif getattr(app, "_tl_view", None) is not None:
+    elif seq_state.of(app).tl_view is not None:
         set_view(app, t0 - (1 if delta > 0 else -1) * span * 0.12, span)
     else:
         return False                                      # the whole show shown: the frame's to scroll
@@ -1939,7 +1939,7 @@ def _zoom_words(app):
     if not dpg.does_item_exist("seq_zoom_words"):
         return
     t0, span, total = _span_now(app)
-    if total <= 0 or getattr(app, "_tl_view", None) is None:
+    if total <= 0 or seq_state.of(app).tl_view is None:
         dpg.set_value("seq_zoom_words", "the whole show" if total > 0 else "")
     else:
         dpg.set_value("seq_zoom_words", f"{_fmt_t(t0)} - {_fmt_t(t0 + span)} of {_fmt_t(total)}")
@@ -1998,8 +1998,8 @@ def draw_timeline(app):
             for x, a in zip(xs.tolist(), (amp * (bot - top) * 0.5).tolist()):
                 dpg.draw_line((x, mid - a), (x, mid + a), color=(255, 255, 255, 34), thickness=1, parent=dl)
     # the steps (those on screen; the one before the first keeps its colour for the blend into it)
-    sel = min(getattr(app, "_seq_sel", 0), len(spans) - 1)
-    hover = getattr(app, "_tl_hover", None)
+    sel = min(seq_state.of(app).sel, len(spans) - 1)
+    hover = seq_state.of(app).tl_hover
     prev_end = None
     for i, (t, d, tr) in enumerate(spans):
         st = steps[i]
@@ -2082,11 +2082,11 @@ def draw_timeline(app):
         end = _fmt_t(total)
         typeface.draw_text((w - typeface.measure(end, "mono", px(10)) - 3, 2), end, px(10), face="mono", color=c.DIM, parent=dl)
     # the beats found in the WAV
-    for bt in getattr(app, "_seq_beats", None) or []:
+    for bt in seq_state.of(app).beats or []:
         if t0 <= bt <= min(total, t1):
             dpg.draw_line((X(bt), h - px(BEAT_LANE)), (X(bt), h - 1), color=(255, 200, 80, 150), thickness=1, parent=dl)
     # where a dragged step would go
-    drag = getattr(app, "_tl_drag", None)
+    drag = seq_state.of(app).tl_drag
     if drag and drag[0] == "move" and drag[3] is not None:
         j = drag[3]
         xs = [X(st_) for st_, _, _ in spans] + [X(total)]
@@ -2094,7 +2094,7 @@ def draw_timeline(app):
         dpg.draw_line((x, top - 2), (x, bot + 2), color=c.ACCENT, thickness=px(3), parent=dl)
     # the playhead, with its time
     at = position(app)
-    app._tl_scale = (sx, h, t0)                             # for _move_head, between redraws
+    seq_state.of(app).tl_scale = (sx, h, t0)                             # for _move_head, between redraws
     if at is not None:
         x = X(at)
         dpg.draw_line((x, 0), (x, h), color=(255, 255, 255, 240), thickness=2, parent=dl, tag="seq_tl_head")
@@ -2111,16 +2111,16 @@ def draw_timeline(app):
     if dpg.does_item_exist("seq_tl_grip"):
         dpg.delete_item("seq_tl_grip", children_only=True)
         gh = px(GRIP_H)
-        hot = getattr(app, "_tl_grip", None) is not None or _over("seq_tl_grip")
+        hot = seq_state.of(app).tl_grip is not None or _over("seq_tl_grip")
         dpg.draw_rectangle((w / 2 - px(24), gh / 2 - 1.5), (w / 2 + px(24), gh / 2 + 1.5), color=(0, 0, 0, 0),
                            fill=(255, 255, 255, 150 if hot else 60), rounding=2, parent="seq_tl_grip")
 
 
 def _move_head(app):
     """The playhead to where the show is now, the rest of the timeline as it was drawn."""
-    at, sh = position(app), getattr(app, "_tl_scale", None)
+    at, sh = position(app), seq_state.of(app).tl_scale
     if at is None or sh is None or not dpg.does_item_exist("seq_tl_head"):
-        app._tl_dirty = True
+        seq_state.of(app).tl_dirty = True
         return
     sx, h, t0 = sh
     x = (at - t0) * sx
@@ -2155,7 +2155,7 @@ def draw_overview(app):
         return
     k = w / total
     steps = _steps(app)["steps"]
-    sel = getattr(app, "_seq_sel", -1)
+    sel = seq_state.of(app).sel
     for i, (t, d, tr) in enumerate(spans):
         _fill_look(steps[i], t * k, (t + d) * k - (1 if d * k > 3 else 0), 3, h - 3, dl, 200)
         if i == sel:
@@ -2185,10 +2185,10 @@ def _move_ov_head(app):
 def overview_mouse(app):
     """The overview's pointer: the box dragged moves the timeline along the show, its sides zoom it; a press
     beside the box brings that part of the show onto the timeline. True while the overview has the mouse."""
-    drag = getattr(app, "_tl_ov", None)
+    drag = seq_state.of(app).tl_ov
     g = _ov_geometry(app)
     if g is None:
-        app._tl_ov = None
+        seq_state.of(app).tl_ov = None
         return False
     x0, y0, w, h, total, spans = g
     if total <= 0:
@@ -2199,7 +2199,7 @@ def overview_mouse(app):
     t0, span, _ = _span_now(app)
     if drag is not None:
         if not dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
-            app._tl_ov = None
+            seq_state.of(app).tl_ov = None
             return True
         kind, grab, a0, s0 = drag
         if kind == "box":
@@ -2215,42 +2215,42 @@ def overview_mouse(app):
         return False
     a, b = t0 * k + x0, (t0 + span) * k + x0
     if abs(mx - a) <= px(5):
-        app._tl_ov = ("left", t_at, t0, span)
+        seq_state.of(app).tl_ov = ("left", t_at, t0, span)
     elif abs(mx - b) <= px(5):
-        app._tl_ov = ("right", t_at, t0, span)
+        seq_state.of(app).tl_ov = ("right", t_at, t0, span)
     elif a <= mx <= b:
-        app._tl_ov = ("box", t_at, t0, span)
+        seq_state.of(app).tl_ov = ("box", t_at, t0, span)
     else:                                                    # beside it: that part brought on, and dragged from there
         set_view(app, t_at - span / 2, span)
         t0, span, _ = _span_now(app)
-        app._tl_ov = ("box", t_at, t0, span)
+        seq_state.of(app).tl_ov = ("box", t_at, t0, span)
     return True
 
 
 def grip_mouse(app):
     """The grip under the timeline dragged up or down: the timeline's height, kept for next time. True while it
     has the mouse."""
-    drag = getattr(app, "_tl_grip", None)
+    drag = seq_state.of(app).tl_grip
     my = dpg.get_mouse_pos(local=False)[1]
     if drag is not None:
         y0, h0 = drag
         h = int(max(px(TL_H_MIN), min(px(TL_H_MAX), h0 + (my - y0))))
         if h != dpg.get_item_configuration("seq_tl")["height"]:
             dpg.configure_item("seq_tl", height=h)
-            app._tl_dirty = True
+            seq_state.of(app).tl_dirty = True
         if not dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
-            app._tl_grip = None
+            seq_state.of(app).tl_grip = None
             _set_pref(app, "seq_tl_h", round(h / max(px(100), 1) * 100))      # at the interface size 1
-            app._tl_dirty = True
+            seq_state.of(app).tl_dirty = True
         return True
     if _over("seq_tl_grip") and dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
-        app._tl_grip = (my, dpg.get_item_configuration("seq_tl")["height"])
-        app._tl_dirty = True
+        seq_state.of(app).tl_grip = (my, dpg.get_item_configuration("seq_tl")["height"])
+        seq_state.of(app).tl_dirty = True
         return True
     hot = _over("seq_tl_grip")
-    if hot != getattr(app, "_tl_grip_hot", False):
-        app._tl_grip_hot = hot
-        app._tl_dirty = True
+    if hot != seq_state.of(app).tl_grip_hot:
+        seq_state.of(app).tl_grip_hot = hot
+        seq_state.of(app).tl_dirty = True
     return False
 # AI: end
 
@@ -2293,7 +2293,7 @@ def _curve_handles(app, st, a, b, top, bot):
 def _sel_block(app, g):
     """(index, step, a, b, top, bot) of the selected step's block in the timeline's coordinates, or None."""
     x0, y0, w, h, total, spans = g
-    sel = getattr(app, "_seq_sel", -1)
+    sel = seq_state.of(app).sel
     steps = _steps(app)["steps"]
     if total <= 0 or not (0 <= sel < len(spans)):
         return None
@@ -2339,7 +2339,7 @@ def _curve_keys(st):
 
 def curve_add(app, t, v, key=None):
     """One more point on the selected step's curve (`key`, or the curve whose line passes nearest), at (t, v)."""
-    S = _steps(app); sel = getattr(app, "_seq_sel", -1)
+    S = _steps(app); sel = seq_state.of(app).sel
     if not (0 <= sel < len(S["steps"])):
         return False
     st = S["steps"][sel]
@@ -2360,7 +2360,7 @@ def curve_add(app, t, v, key=None):
 
 def curve_move(app, key, j, t, v):
     """A curve point of the selected step moved to (t, v): between its neighbours, the last one held at the end."""
-    S = _steps(app); sel = getattr(app, "_seq_sel", -1)
+    S = _steps(app); sel = seq_state.of(app).sel
     if not (0 <= sel < len(S["steps"])):
         return
     st = S["steps"][sel]
@@ -2376,7 +2376,7 @@ def curve_move(app, key, j, t, v):
 
 def curve_remove(app, key, j):
     """A curve point of the selected step away; a curve keeps its last point (its end)."""
-    S = _steps(app); sel = getattr(app, "_seq_sel", -1)
+    S = _steps(app); sel = seq_state.of(app).sel
     if not (0 <= sel < len(S["steps"])):
         return False
     st = S["steps"][sel]
@@ -2393,7 +2393,7 @@ def _curve_changed(app, st, save=True):
     if save:
         _queue_save(app)
     _ramp_desc(app, st)
-    app._tl_dirty = True
+    seq_state.of(app).tl_dirty = True
     for k in (st.get("ramps") or {}):
         if dpg.does_item_exist(f"seq_ramp_end_{k}"):
             num.set(f"seq_ramp_end_{k}", sequence.ramp_of(st, k)[0])   # a curve's end field follows its last point
@@ -2435,21 +2435,21 @@ def timeline_mouse(app):
     x0, y0, w, h, total, spans = g
     mx, my = dpg.get_mouse_pos(local=False)
     down = dpg.is_mouse_button_down(dpg.mvMouseButton_Left)
-    drag = getattr(app, "_tl_drag", None)
+    drag = seq_state.of(app).tl_drag
     t0, sx = _view(app, total, w) if total > 0 else (0.0, 1.0)
     t_at = max(0.0, t0 + (mx - x0) / sx) if total > 0 else 0.0
     # the middle button: the timeline moved along the show, as a hand drags it
-    pan = getattr(app, "_tl_pan", None)
+    pan = seq_state.of(app).tl_pan
     if pan is not None:
         if dpg.is_mouse_button_down(dpg.mvMouseButton_Middle):
             set_view(app, pan[1] - (mx - pan[0]) / sx, pan[2])
         else:
-            app._tl_pan = None
+            seq_state.of(app).tl_pan = None
         return
-    if (dpg.is_mouse_button_clicked(dpg.mvMouseButton_Middle) and total > 0 and getattr(app, "_tl_view", None) is not None
+    if (dpg.is_mouse_button_clicked(dpg.mvMouseButton_Middle) and total > 0 and seq_state.of(app).tl_view is not None
             and ((x0 <= mx <= x0 + w and y0 <= my <= y0 + h) or _over("seq_tl_audio"))):
         v0, span, _ = _span_now(app)
-        app._tl_pan = (mx, v0, span)
+        seq_state.of(app).tl_pan = (mx, v0, span)
         return
     if drag is not None:
         steps = _steps(app)["steps"]
@@ -2487,20 +2487,20 @@ def timeline_mouse(app):
                     curve_move(app, drag[1], drag[2], t, int(round(v)))
             elif kind in ("block", "move"):
                 if kind == "block" and abs(mx - drag[2]) > px(6):
-                    app._tl_drag = drag = ("move", drag[1], drag[2], None)
+                    seq_state.of(app).tl_drag = drag = ("move", drag[1], drag[2], None)
                 if drag[0] == "move":
                     j = next((k for k, (t, d, tr) in enumerate(spans) if t <= t_at < t + d), len(spans) - 1)
-                    app._tl_drag = ("move", drag[1], drag[2], j)
-                    app._tl_dirty = True
+                    seq_state.of(app).tl_drag = ("move", drag[1], drag[2], j)
+                    seq_state.of(app).tl_dirty = True
         else:
-            app._tl_drag = None
+            seq_state.of(app).tl_drag = None
             if kind == "move" and drag[3] is not None and drag[3] != drag[1]:
                 move_to(app, drag[1], drag[3])
             elif kind in ("end", "blend", "curve"):
                 _save(app)
             elif kind == "block":
                 select(app, drag[1])
-            app._tl_dirty = True
+            seq_state.of(app).tl_dirty = True
         return
     # a curve's point on the selected step comes before the step under it: dragged, or taken away by a right-click;
     # Shift+click on the step's lower half puts one more there
@@ -2508,14 +2508,14 @@ def timeline_mouse(app):
     if pt is not None and dpg.is_mouse_button_clicked(dpg.mvMouseButton_Right):
         curve_remove(app, *pt); return
     if pt is not None and dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
-        app._tl_drag = ("curve", pt[0], pt[1]); return
+        seq_state.of(app).tl_drag = ("curve", pt[0], pt[1]); return
     shift = dpg.is_key_down(dpg.mvKey_LShift) or dpg.is_key_down(dpg.mvKey_RShift)
     if shift and dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
         at = _curve_from(app, g, mx, my)
         if at is not None and at[0] > 0.0 and curve_add(app, *at):
             return
     hit = _hit(app, g, mx, my)
-    app._tl_hover = hit if hit and hit[0] in ("block",) else (("ruler", round(hit[1], 1)) if hit and hit[0] == "ruler" else None)
+    seq_state.of(app).tl_hover = hit if hit and hit[0] in ("block",) else (("ruler", round(hit[1], 1)) if hit and hit[0] == "ruler" else None)
     if hit is None:
         return
     if dpg.is_mouse_button_clicked(dpg.mvMouseButton_Right) and hit[0] in ("block", "end", "blend"):
@@ -2523,16 +2523,16 @@ def timeline_mouse(app):
     if not dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
         return
     if dpg.is_mouse_button_double_clicked(dpg.mvMouseButton_Left) and hit[0] == "block":
-        app._tl_drag = None
+        seq_state.of(app).tl_drag = None
         select(app, hit[1]); load_step(app, hit[1]); return
     if hit[0] == "ruler":
-        app._tl_drag = ("scrub",); seek(app, hit[1])
+        seq_state.of(app).tl_drag = ("scrub",); seek(app, hit[1])
     elif hit[0] == "end":
-        app._tl_drag = ("end", hit[1], spans[hit[1]][0])
+        seq_state.of(app).tl_drag = ("end", hit[1], spans[hit[1]][0])
     elif hit[0] == "blend":
-        app._tl_drag = ("blend", hit[1], spans[hit[1]][0])
+        seq_state.of(app).tl_drag = ("blend", hit[1], spans[hit[1]][0])
     elif hit[0] == "block":
-        app._tl_drag = ("block", hit[1], mx)
+        seq_state.of(app).tl_drag = ("block", hit[1], mx)
 
 
 def _context(app, i):
@@ -2582,9 +2582,9 @@ def toggle_rec(app, on=None):
     _REC.held, _REC.applied = {}, None
     _rec_button(app)
     if on:
-        if getattr(app, "_seq_play", None) is None:
-            play(app, getattr(app, "_seq_sel", 0))
-        elif app._seq_play.get("paused") is not None:
+        if seq_state.of(app).play is None:
+            play(app, seq_state.of(app).sel)
+        elif seq_state.of(app).play.get("paused") is not None:
             play_pause(app)
         app.gp.status("recording automation: move a slider while the show plays - it goes into the step playing")
     else:
@@ -2639,7 +2639,7 @@ def _rec_poll(app, i, t):
             take.append((t, v))
     if any(sid == id(st) for sid, _ in _REC.takes):
         _REC.steps[id(st)] = st
-    app._tl_dirty = True
+    seq_state.of(app).tl_dirty = True
 
 
 def _rec_flush(app):
@@ -2670,8 +2670,8 @@ def _rec_flush(app):
         done += 1
     if done:
         _save(app)
-        app._tl_dirty = True
-        sel = getattr(app, "_seq_sel", 0)
+        seq_state.of(app).tl_dirty = True
+        sel = seq_state.of(app).sel
         steps = _steps(app)["steps"]
         if 0 <= sel < len(steps) and dpg.does_item_exist("seq_ramps"):
             refresh_ramps(app, steps[sel])
@@ -2748,7 +2748,7 @@ def add_audio(app, path, ti=None, at=None):
     if at is None:
         pos = position(app)
         starts = _starts(app)[0]
-        sel = getattr(app, "_seq_sel", 0)
+        sel = seq_state.of(app).sel
         at = pos if pos is not None else (starts[sel] if 0 <= sel < len(starts) else 0.0)
 
     def work():
@@ -2779,7 +2779,7 @@ def add_audio(app, path, ti=None, at=None):
 
 def _audio_changed(app):
     """The lanes drawn again, and the speakers given the clips anew (_poll_audio)."""
-    app._tl_dirty = True
+    seq_state.of(app).tl_dirty = True
     app._audio_key = None
     if dpg.does_item_exist("seq_tl_audio"):
         h = _audio_height(app)
@@ -3017,7 +3017,7 @@ def audio_mouse(app):
                 cl["fade_in"] = round(max(0.0, min(orig["len"], t - orig["at"])), 3)
             elif kind == "fade_out":
                 cl["fade_out"] = round(max(0.0, min(orig["len"], orig["at"] + orig["len"] - t)), 3)
-            app._tl_dirty = True
+            seq_state.of(app).tl_dirty = True
             app._audio_key = None
         else:
             app._au_drag = None
@@ -3046,7 +3046,7 @@ def audio_mouse(app):
         return True
     if hit[0] == "lane":
         app._clip_sel = None
-        app._tl_dirty = True
+        seq_state.of(app).tl_dirty = True
         return False                                             # an empty lane: the timeline's own (a middle drag)
     ti, ci = hit[1], hit[2]
     cl = _tracks(app)[ti]["clips"][ci]
@@ -3060,7 +3060,7 @@ def audio_mouse(app):
     kind = {"clip": "move"}.get(hit[0], hit[0])
     app._au_drag = (kind, ti, ci, t0 + (mx - g[0]) / sx,
                     {"at": float(cl.get("at", 0)), "in": float(cl.get("in", 0)), "len": float(cl.get("len", 0))}, None)
-    app._tl_dirty = True
+    seq_state.of(app).tl_dirty = True
     return True
 
 
@@ -3098,7 +3098,7 @@ def _clip_menu(app, ti, ci):
 
     def play_here():
         seek(app, float(cl.get("at", 0)))
-        p = getattr(app, "_seq_play", None)
+        p = seq_state.of(app).play
         if p is not None and p.get("paused") is not None:
             play_pause(app)                                       # held there: on from it
 
@@ -3143,13 +3143,13 @@ def _poll_audio(app):
     from native import showaudio
     T = _tracks(app)
     has = any(tr.get("clips") for tr in T)
-    pl = getattr(app, "_show_player", None)
+    pl = seq_state.of(app).player
     if not has:
         if pl is not None:
             pl.sync(None, False)
         return
     if pl is None:
-        pl = app._show_player = showaudio.Player()
+        pl = seq_state.of(app).player = showaudio.Player()
         if pl.error:
             app.gp.status(pl.error, "warn")
     key = (json.dumps(T, sort_keys=True, default=str), showaudio.decoding(), len(showaudio._CACHE))
@@ -3157,8 +3157,8 @@ def _poll_audio(app):
         app._audio_key = key
         app._audio_resolved = showaudio.resolve(_steps(app), app.project.path)
         pl.set(app._audio_resolved)
-        app._tl_dirty = True                                     # a file decoded since: its wave drawn
-    p = getattr(app, "_seq_play", None)
+        seq_state.of(app).tl_dirty = True                                     # a file decoded since: its wave drawn
+    p = seq_state.of(app).play
     from native import render_video, render_fseq
     if render_video.rendering(app) or render_fseq.exporting(app):
         pl.sync(None, False)                                     # a video rendering: its sound goes into the file
@@ -3169,12 +3169,12 @@ def _poll_audio(app):
 def show_source(app):
     """What the effects hear while the show plays or is held at a time and has audio: its mix where it is
     (showaudio.ShowAudio), in place of the synth or the live audio; None otherwise."""
-    if getattr(app, "_seq_play", None) is None or not getattr(app, "_audio_resolved", None):
+    if seq_state.of(app).play is None or not getattr(app, "_audio_resolved", None):
         return None
-    src = getattr(app, "_show_src", None)
+    src = seq_state.of(app).audio_src
     if src is None:
         from native import showaudio
-        src = app._show_src = showaudio.ShowAudio(lambda: getattr(app, "_audio_resolved", []), lambda: position(app))
+        src = seq_state.of(app).audio_src = showaudio.ShowAudio(lambda: getattr(app, "_audio_resolved", []), lambda: position(app))
     return src
 # AI: end
 
@@ -3222,11 +3222,11 @@ def find_sections(app):
         if got and not bar:
             set_tempo(app, bpm=got[0])
         if got:
-            app._seq_beats = got[2]
+            seq_state.of(app).beats = got[2]
         S["first"] = round(first, 3)                        # the show's first beat: the VJ's bars count from it
         S["sections"] = [{k: s[k] for k in ("name", "kind", "at", "len")} for s in secs]
         _save(app)
-        app._tl_dirty = True
+        seq_state.of(app).tl_dirty = True
         app.gp.status(f"{len(secs)} sections: " + ", ".join(s["name"] for s in secs))
     return tasks.run(app, "seq_sections", "listening for the sections", work, done)
 
@@ -3309,7 +3309,7 @@ def sections_mouse(app):
             t = max(float(prev["at"]) + 0.5, min(end - 0.5, t))
             prev["len"] = round(t - float(prev["at"]), 3)
             cur["at"], cur["len"] = round(t, 3), round(end - t, 3)
-            app._tl_dirty = True
+            seq_state.of(app).tl_dirty = True
         else:
             app._sec_drag = None
             _save(app)
@@ -3326,7 +3326,7 @@ def sections_mouse(app):
         app._sec_drag = hit[1]
     elif hit[0] == "sec":
         app._sec_sel = hit[1]
-        app._tl_dirty = True
+        seq_state.of(app).tl_dirty = True
         if dpg.is_mouse_button_double_clicked(dpg.mvMouseButton_Left):
             seek(app, float(secs[hit[1]]["at"]))
     return True
@@ -3345,7 +3345,7 @@ def add_section(app, t, kind="verse"):
     ln = (nxt - t) if nxt is not None else ((_barlen(app) or 1.0) * 8 if _barlen(app) else 8.0)
     secs.append({"name": showanalysis.WORDS.get(kind, "Section"), "kind": kind, "at": round(t, 3), "len": round(ln, 3)})
     secs.sort(key=lambda s: float(s["at"]))
-    _save(app); app._tl_dirty = True
+    _save(app); seq_state.of(app).tl_dirty = True
     return True
 
 
@@ -3357,7 +3357,7 @@ def split_section(app, k, t):
         return False
     secs.insert(k + 1, dict(s, at=round(t, 3), len=round(b - t, 3)))
     s["len"] = round(t - a, 3)
-    _save(app); app._tl_dirty = True
+    _save(app); seq_state.of(app).tl_dirty = True
     return True
 
 
@@ -3365,13 +3365,13 @@ def set_section_kind(app, k, kind):
     from native import showanalysis
     s = _sections(app)[k]
     s["kind"], s["name"] = kind, showanalysis.WORDS.get(kind, kind)
-    _save(app); app._tl_dirty = True
+    _save(app); seq_state.of(app).tl_dirty = True
 
 
 def delete_section(app, k):
     _sections(app).pop(k)
     app._sec_sel = None
-    _save(app); app._tl_dirty = True
+    _save(app); seq_state.of(app).tl_dirty = True
 
 
 def fit_steps(app, k):
@@ -3393,7 +3393,7 @@ def fit_steps(app, k):
     f = (b - a) / max(1e-6, have)
     for i in inside:
         steps[i]["dur"] = round(max(0.25, float(steps[i].get("dur", 10)) * f), 3)
-    _save(app); app._tl_dirty = True
+    _save(app); seq_state.of(app).tl_dirty = True
     app.gp.status(f"{len(inside)} step(s) fitted to {secs[k].get('name', 'the section')}")
     return True
 
@@ -3525,7 +3525,7 @@ def poll_timecode(app):
     if t is None or not _steps(app)["steps"]:
         return
     offset = timecode.parse_words(_tc_opts(app)["start"], fps) or 0.0
-    p = getattr(app, "_seq_play", None)
+    p = seq_state.of(app).play
     pos = position(app)
     act = timecode.chase((pos, p is not None and p.get("paused") is None), t, running, offset)
     was = getattr(app, "_tc_was", None)
@@ -3555,7 +3555,7 @@ def poll_timecode(app):
             starts, _ = _starts(app)
             i = max(k for k, s in enumerate(starts) if s <= at)
             play(app, i, at - starts[i])
-            p = getattr(app, "_seq_play", None)
+            p = seq_state.of(app).play
         if p is not None and p.get("paused") is None:
             play_pause(app)
         seek(app, at)
@@ -3575,7 +3575,7 @@ def key(app, code):
     if code == dpg.mvKey_Delete and getattr(app, "_clip_sel", None) is not None and delete_clip(app):
         return True                                       # a clip selected: the clip
     if code == dpg.mvKey_Delete and _has_sel(app):
-        del_step(app, getattr(app, "_seq_sel", 0)); return True
+        del_step(app, seq_state.of(app).sel); return True
     if code == dpg.mvKey_D and ctrl and _has_sel(app):
         duplicate_step(app); return True
     if code == dpg.mvKey_Z and not ctrl and _has_steps(app):
@@ -3634,7 +3634,7 @@ def send(app, run=False):
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
     if not S["steps"]:
         app.gp.status("no steps to send"); return
-    if getattr(app, "_seq_send", None) is not None and app._seq_send.is_alive():
+    if seq_state.of(app).send is not None and seq_state.of(app).send.is_alive():
         app.gp.status("a send is still going"); return
     snap = json.loads(json.dumps(S))                      # the steps as they are now: the worker reads its copy
     pid = int(S.get("pid", 9))
@@ -3650,8 +3650,8 @@ def send(app, run=False):
             # the device's lists read here too: two requests of up to 5 s each, on the main loop, froze the studio
             presets, playlist, err = _resolve(app, host, snap)
             if err:
-                app._seq_sent_now = None
-                app._seq_send_result = err
+                seq_state.of(app).sent_now = None
+                seq_state.of(app).send_result = err
                 return
             ok, msg = sequence.send(host, presets, playlist, pid)
             if ok:
@@ -3661,9 +3661,9 @@ def send(app, run=False):
                 msg += "; " + msg2
         except Exception as e:                            # the buttons come back and the log says, whatever went wrong
             msg = f"send failed: {e}"
-        app._seq_sent_now = sent
-        app._seq_send_result = msg
-    app._seq_send = threading.Thread(target=work, daemon=True); app._seq_send.start()
+        seq_state.of(app).sent_now = sent
+        seq_state.of(app).send_result = msg
+    seq_state.of(app).send = threading.Thread(target=work, daemon=True); seq_state.of(app).send.start()
 
 
 # AI: below section was generated by an AI
@@ -3674,7 +3674,7 @@ def _send_all(app, hosts, run):
     import threading
     if not _steps(app)["steps"]:
         app.gp.status("no steps to send"); return
-    if getattr(app, "_seq_send", None) is not None and app._seq_send.is_alive():
+    if seq_state.of(app).send is not None and seq_state.of(app).send.is_alive():
         app.gp.status("a send is still going"); return
     S = _steps(app)
     snap = json.loads(json.dumps(S))
@@ -3715,22 +3715,22 @@ def _send_all(app, hosts, run):
             for t in ts:
                 t.join()
             msg += f"; started together on {sum(started.values())}"
-        app._seq_sent_now = (", ".join(good), fp) if good else None
-        app._seq_send_result = msg
-    app._seq_send = threading.Thread(target=work, daemon=True); app._seq_send.start()
+        seq_state.of(app).sent_now = (", ".join(good), fp) if good else None
+        seq_state.of(app).send_result = msg
+    seq_state.of(app).send = threading.Thread(target=work, daemon=True); seq_state.of(app).send.start()
 # AI: end
 
 
 def _poll_send(app):
-    msg = getattr(app, "_seq_send_result", None)
+    msg = seq_state.of(app).send_result
     if msg is None:
         return
     from native import device_ui
-    app._seq_send_result = None
+    seq_state.of(app).send_result = None
     for t in ("seq_send", "seq_send_run"):
         if dpg.does_item_exist(t):
             dpg.configure_item(t, enabled=True)
-    sent = getattr(app, "_seq_sent_now", None)
+    sent = seq_state.of(app).sent_now
     if sent:
         host, fp = sent
         d = next((d for d in app.devices if d.get("host") == host), {})

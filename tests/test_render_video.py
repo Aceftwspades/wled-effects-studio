@@ -12,12 +12,14 @@ from types import SimpleNamespace
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np                                             # noqa: E402
 
-from native import clock, look, render_video as R              # noqa: E402
+from native import clock, look, seq_state, render_video as R             # noqa: E402
 
 
 def _app(durs=(2.0, 3.0, 5.0)):
     steps = [{"name": f"s{i}", "dur": d} for i, d in enumerate(durs)]
-    return SimpleNamespace(project=SimpleNamespace(options={"sequence": {"steps": steps}}, save=lambda: None), _seq_sel=1)
+    app = SimpleNamespace(project=SimpleNamespace(options={"sequence": {"steps": steps}}, save=lambda: None))
+    seq_state.of(app).sel = 1
+    return app
 
 
 def test_the_stretch_and_its_frames():

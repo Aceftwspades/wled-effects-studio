@@ -947,7 +947,7 @@ STEPS = [
     # the transport and the editing: the first step's look read as it played; a time sought, paused there; a copy
     # made, moved to the top, deleted
     ([{"check": "bool(app.project.options['sequence']['steps'][0].get('look'))"}, {"seq": ["seek", 10.5]}, {"seq": ["pause"]}], 0.6),
-    ([{"check": "app._seq_play['paused'] is not None and app._seq_play['i'] == 1"}, {"expect": ["seq_status", "paused at step 2"]},
+    ([{"check": "seq_state.of(app).play['paused'] is not None and seq_state.of(app).play['i'] == 1"}, {"expect": ["seq_status", "paused at step 2"]},
       {"seq": ["dup", 0]}, {"check": "len(app.project.options['sequence']['steps']) == 3"}, {"seq": ["move", 1, 0]},
       {"check": "app.project.options['sequence']['steps'][0]['name'].endswith('(copy)')"}, {"seq": ["del", 0]},
       {"check": "len(app.project.options['sequence']['steps']) == 2"}], 0.5),
@@ -983,10 +983,10 @@ STEPS = [
       {"py": "sequence_ui.add_audio(app, __import__('native.scratch', fromlist=['s']).path('smoke_tone.wav'))"}], 3.0),
     ([{"check": "len(app.project.options['sequence']['tracks']) == 1 and app.project.options['sequence']['tracks'][0]['clips'][0]['file'] == 'assets/audio/smoke_tone.wav'"},
       {"check": "abs(app.project.options['sequence']['tracks'][0]['clips'][0]['len'] - 2.0) < 0.05"},
-      {"py": "setattr(app._show_player, 'volume', 0.0) if getattr(app, '_show_player', None) else None"},
+      {"py": "setattr(seq_state.of(app).player, 'volume', 0.0) if seq_state.of(app).player else None"},
       {"py": "sequence_ui.play(app, 0)"}], 1.2),
     ([{"check": "type(sequence_ui.show_source(app)).__name__ == 'ShowAudio'"},
-      {"check": "abs(app._show_player.position - sequence_ui.position(app)) < 0.15"},
+      {"check": "abs(seq_state.of(app).player.position - sequence_ui.position(app)) < 0.15"},
       {"seq": ["stop"]},
       {"py": "app.project.options['sequence']['tracks'][0]['clips'][0].update(at=1.0, fade_in=0.5)"},
       {"py": "sequence_ui._audio_changed(app)"}], 0.4),
@@ -1016,7 +1016,7 @@ STEPS = [
     ([{"py": "setattr(app, '_tc_port', app.midi.port) or setattr(app.midi, 'port', app.midi.port or 'smoke')"},
       {"py": "sequence_ui.tc_set(app, source='mtc', start='00:00:00:00')"},
       {"py": "app.midi.inject([0xF0, 0x7F, 0x7F, 0x01, 0x01, 0x60, 0, 0, 15, 0xF7])"}], 0.5),
-    ([{"check": "abs(sequence_ui.position(app) - 0.5) < 0.05 and app._seq_play.get('paused') is not None"},
+    ([{"check": "abs(sequence_ui.position(app) - 0.5) < 0.05 and seq_state.of(app).play.get('paused') is not None"},
       {"check": "dpg.get_value('seq_tc_words').startswith('00:00:00:15')"},
       {"py": "sequence_ui.tc_set(app, source='off')"}, {"py": "sequence_ui.stop(app)"},
       {"py": "setattr(app.midi, 'port', app._tc_port)"}], 0.4),
@@ -1064,10 +1064,10 @@ STEPS = [
     ([{"check": "vj_state.of(app).out is not None and bool((app.frame_rgb() == vj_state.of(app).out).all()) and vj_state.of(app).out.any()"},
       {"check": "bool((vj_state.of(app).out == vj.deck_led(app, 1)).all())"},
       {"py": "setattr(app, '_vj_n', len(sequence_ui._steps(app)['steps']))"}, {"py": "sequence_ui.add_step(app)"}], 0.5),
-    ([{"check": "sequence_ui._steps(app)['steps'][app._seq_sel].get('vj', {}).get('decks', [{}])[1].get('look') == 'Thermal' "
-                "and sequence_ui._steps(app)['steps'][app._seq_sel]['name'].startswith('VJ:')"},
-      {"py": "vj_ui.set_on(app, False)"}, {"py": "sequence_ui.load_step(app, app._seq_sel)"}], 0.4),
-    ([{"check": "vj.on(app)"}, {"py": "sequence_ui.del_step(app, app._seq_sel)"}, {"py": "vj_ui.set_on(app, False)"},
+    ([{"check": "sequence_ui._steps(app)['steps'][seq_state.of(app).sel].get('vj', {}).get('decks', [{}])[1].get('look') == 'Thermal' "
+                "and sequence_ui._steps(app)['steps'][seq_state.of(app).sel]['name'].startswith('VJ:')"},
+      {"py": "vj_ui.set_on(app, False)"}, {"py": "sequence_ui.load_step(app, seq_state.of(app).sel)"}], 0.4),
+    ([{"check": "vj.on(app)"}, {"py": "sequence_ui.del_step(app, seq_state.of(app).sel)"}, {"py": "vj_ui.set_on(app, False)"},
       {"py": "setattr(vj_state.of(app), 'by_show', False)"}, {"py": "device_ui.close(app, 'vj')"}], 0.5),
     ([{"check": "len(sequence_ui._steps(app)['steps']) == app._vj_n and not vj.on(app)"}], 0.1),
     # the VJ's look browser (a click puts Tunnel on deck B), a wipe in place of the blend, and undo taking back a knob
@@ -1285,14 +1285,14 @@ STEPS = [
                 "abs(dpg.get_item_configuration('inp_sx')['speed'] - 255 / (1.5 * max(60.0, dpg.get_item_rect_size('inp_sx')[0]))) < 1e-3"}], 0.2),
     # the timeline zoomed to the first step and moved along, its overview drawn with the box
     ([{"py": "sequence_ui.fit_step(app, 0)"}, {"py": "sequence_ui.zoom(app, 2.0)"}], 0.4),
-    ([{"check": "app._tl_view is not None and app._tl_view['span'] < sequence_ui._starts(app)[1]"},
+    ([{"check": "seq_state.of(app).tl_view is not None and seq_state.of(app).tl_view['span'] < sequence_ui._starts(app)[1]"},
       {"check": "'of' in dpg.get_value('seq_zoom_words')"}, {"py": "sequence_ui.set_view(app, 0.5, 2.0)"}], 0.3),
-    ([{"check": "abs(app._tl_view['t0'] - 0.5) < 1e-6 and dpg.does_item_exist('seq_tl_ov')"}, {"py": "sequence_ui.fit_all(app)"}], 0.3),
+    ([{"check": "abs(seq_state.of(app).tl_view['t0'] - 0.5) < 1e-6 and dpg.does_item_exist('seq_tl_ov')"}, {"py": "sequence_ui.fit_all(app)"}], 0.3),
     # Edit live while the show plays: the effect changed goes into the step on the playhead; a step chosen is played from
     ([{"py": "sequence_ui.toggle_edit(app, True)"}, {"py": "sequence_ui.play(app, 0)"}], 1.5),
-    ([{"check": "sequence_ui._play_i(app) == 0 and app._seq_sel == 0"}, {"py": "sequence_ui._set_effect(app, 'Ace 3-D Maelstrom')"}], 0.8),
+    ([{"check": "sequence_ui._play_i(app) == 0 and seq_state.of(app).sel == 0"}, {"py": "sequence_ui._set_effect(app, 'Ace 3-D Maelstrom')"}], 0.8),
     ([{"check": "app.project.options['sequence']['steps'][0]['segments'][0]['effect'] == 'Ace 3-D Maelstrom'"}, {"py": "sequence_ui.select(app, 1)"}], 0.4),
-    ([{"check": "sequence_ui._play_i(app) == 1 and app._seq_sel == 1"}, {"seq": ["stop"]}, {"py": "sequence_ui.toggle_edit(app, False)"}], 0.4),
+    ([{"check": "sequence_ui._play_i(app) == 1 and seq_state.of(app).sel == 1"}, {"seq": ["stop"]}, {"py": "sequence_ui.toggle_edit(app, False)"}], 0.4),
     # automation recorded: Custom 1 moved by hand while the first step plays becomes a curve on it
     ([{"py": "sequence_ui.select(app, 0)"}, {"py": "sequence_ui.toggle_rec(app, True)"}], 1.4),
     ([{"py": "(app.eng.fx.__setitem__('c1', 40), app.eng.push())"}], 0.15),
