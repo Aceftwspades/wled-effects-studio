@@ -72,7 +72,7 @@ MAP_STEPS = [
       {"frame": "shape"}, {"py": "shape_ui.select(app, [0])"},
       {"py": "next(c for c in shape_checks.run(app) if 'no two sides' in c.text).show()"}], 0.8),
     # an estimate dragged where it is (by hand) is one no longer
-    ([{"py": "setattr(app, '_shape_drag', (0, 5)) or setattr(app, '_shape_drag_to', [0.0, 0.0, 50.0]) or shape_ui.release(app)"},
+    ([{"py": "setattr(shape_state.of(app), 'drag', (0, 5)) or setattr(shape_state.of(app), 'drag_to', [0.0, 0.0, 50.0]) or shape_ui.release(app)"},
       {"check": f"5 not in {_part}['guessed'] and 17 in {_part}['guessed']"},
       {"py": "chrome.close_dialog('map_win')"}, {"geometry": {"kind": "cube", "params": {"B": 16}}}], 0.8),
 ]
@@ -169,9 +169,9 @@ STEPS = [
       {"expect": ["messages", "runs it as a script until its build lands"]}], 0.3),
     ([{"wait_build": True}, {"check": "app.eng.names[app.eng.idx] == 'Maelstrom' and not app.gp.standin_on()"},
       {"check": "app.eng.clock()[0] >= 50000 and app.gp._shown is not None"},
-      {"py": "setattr(app, '_lib_live', app.eng.library)"}, {"graph_zoom": 0.85}], 0.9),
+      {"py": "setattr(app, '_smoke_lib', app.eng.library)"}, {"graph_zoom": 0.85}], 0.9),
     # an edit that changes no code (a zoom rebuilds the editor) builds nothing, Live or not
-    ([{"check": "not app.building and app.eng.library == app._lib_live and not app.gp.standin_on()"},
+    ([{"check": "not app.building and app.eng.library == app._smoke_lib and not app.gp.standin_on()"},
       {"graph_zoom": 1.0}, {"graph_auto": False}, {"graph_undo": True}, {"layout": "both"}], 0.5),
     # a graph compiled and built: the toolchain works (the bundled one in a packaged run) and box_fire.cpp exists for the code steps
     ([{"check": "app.eng.names[app.eng.idx] == 'Maelstrom'"}, {"layout": "graph"}, {"graph_open": "box_fire.json"},
@@ -755,8 +755,8 @@ STEPS = [
                 "np.abs(out[0].astype(int) - shape_view.part_colour(0) * shape_view.DIM_OTHERS).max() <= 1)"
                 "(shape_view.colours(app, app.frame_rgb(app.eng).reshape(-1, 3)))"},
       {"led_at": [30, "hover"]}], 0.6),
-    ([{"check": "app._shape_hover is not None and app._shape_hover[1] == 1 and abs(app._shape_hover[0] - 30) <= 2 or "
-                "str((app._shape_hover, app._test_pointer, shape_view.covers(app), [dpg.get_item_alias(w) for w in dpg.get_windows() if dpg.is_item_shown(w)]))"},
+    ([{"check": "shape_state.of(app).hover is not None and shape_state.of(app).hover[1] == 1 and abs(shape_state.of(app).hover[0] - 30) <= 2 or "
+                "str((shape_state.of(app).hover, app._test_pointer, shape_view.covers(app), [dpg.get_item_alias(w) for w in dpg.get_windows() if dpg.is_item_shown(w)]))"},
       {"led_at": [0, "leave"]}, {"key": "1", "over": "view"}], 0.6),
     ([{"check": "app.ortho and abs(abs(app.yaw) - np.pi) < 1e-3 and abs(app.pitch) < 1e-3"}, {"key": "5", "over": "view"}], 0.3),
     ([{"check": "not app.ortho"}, {"key": "7", "over": "view"}, {"py": "setattr(app, '_d0', app.dist)"}, {"key": "F", "over": "view"}], 0.6),
@@ -775,11 +775,11 @@ STEPS = [
     # six LEDs (10 cm at 60 a metre), R Z 90 turns it, S 2 scales it, G Y 5 Esc puts it back; G to the ring's end joins it
     # after the ring; the ring's menu locks it (a click passes over it), hidden it is dark; a copy made and deleted; a ring
     # handle turns the strip
-    ([{"shape": ["select", 1]}, {"py": "setattr(app, '_shape_place', False)"},                 # placing by hand (above) hides the handles
-      {"py": "setattr(app, '_x0', app.project.geometry.params['parts'][1]['pos'][0]) or setattr(app, '_u0', len(app._shape_undo))"},
+    ([{"shape": ["select", 1]}, {"py": "setattr(shape_state.of(app), 'place', False)"},                 # placing by hand (above) hides the handles
+      {"py": "setattr(app, '_x0', app.project.geometry.params['parts'][1]['pos'][0]) or setattr(app, '_u0', len(shape_state.of(app).undo))"},
       {"tool": ["press", {"handle": ["axis", 0]}]}, {"tool": ["drag", {"from_press": [40, 0]}]}, {"tool": ["drag", {"from_press": [80, 0]}]},
       {"tool": ["release", {"from_press": [80, 0]}]}], 0.6),
-    ([{"check": "app.project.geometry.params['parts'][1]['pos'][0] != app._x0 and len(app._shape_undo) == app._u0 + 1"},
+    ([{"check": "app.project.geometry.params['parts'][1]['pos'][0] != app._x0 and len(shape_state.of(app).undo) == app._u0 + 1"},
       {"tool": ["press", {"part": 0}]}, {"tool": ["release", {"part": 0}]}], 0.4),
     ([{"check": "shape_ui.selection(app) == {0}"}, {"tool": ["press", {"part": 2}, ["shift"]]}, {"tool": ["release", {"part": 2}, ["shift"]]}], 0.4),
     ([{"check": "shape_ui.selection(app) == {0, 2}"}, {"tool": ["press", {"view": [0.01, 0.02]}]}, {"tool": ["release", {"view": [0.01, 0.02]}]}], 0.4),
@@ -1389,10 +1389,10 @@ STEPS = [
     # generated with its own bar; the frame docked and floated
     ([{"frame": "library"}, {"py": "library_ui._set_bank(app, 'stock')"}], 14.0),
     ([{"check": "dpg.get_item_label('lib_bank_stock').startswith('Stock (') and dpg.get_item_label('lib_bank_usermod').startswith('Usermod effects (')"},
-      {"check": "len([k for k, v in app._lib_thumbs.items() if v]) > 150"},
+      {"check": "len([k for k, v in library_ui.state(app).thumbs.items() if v]) > 150"},
       {"py": "library_ui._set_bank(app, 'graphs')"}, {"py": "library_ui.generate_previews(app, 1.0, only=['Rainbow'])"}], 0.3),
-    ([{"check": "app._lib_gprog is not None and dpg.is_item_shown('lib_progress_row') and dpg.is_item_shown('lib_cancel')"}], 6.0),
-    ([{"check": "app._lib_gprog is None"}, {"check": "not dpg.is_item_shown('lib_cancel')"},
+    ([{"check": "library_ui.state(app).gprog is not None and dpg.is_item_shown('lib_progress_row') and dpg.is_item_shown('lib_cancel')"}], 6.0),
+    ([{"check": "library_ui.state(app).gprog is None"}, {"check": "not dpg.is_item_shown('lib_cancel')"},
       {"check": "'1 preview' in dpg.get_value('lib_status')"},
       {"dock": ["library", True]}, {"dock": ["library", False]}], 5.0),
     # S21 the node tutorials: Slew's page with its picture playing; Try it opens its graph live in the tutorials

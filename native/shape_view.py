@@ -28,6 +28,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native import shapes, units, view3d, typeface
+from native import shape_state
 from native.typeface import px
 
 DIM_OTHERS = 0.38            # the parts not selected, while one is
@@ -108,7 +109,7 @@ def colours(app, rgb):
         return rgb
     from native import shape_ui
     sel = shape_ui.selection(app)
-    hov = getattr(app, "_shape_hover", None)
+    hov = shape_state.of(app).hover
     base = np.stack([part_colour(k) for k in range(nparts)]).astype(np.float32)
     gain = np.full(nparts, DIM_OTHERS if sel else 1.0, np.float32)
     for k in sel:
@@ -378,7 +379,7 @@ def poll(app):
     if not dpg.does_item_exist("shape_dl"):
         return
     dpg.delete_item("shape_dl", children_only=True)
-    app._shape_hover = None
+    shape_state.of(app).hover = None
     if not view3d.editing(app):
         return
     v = view(app)
@@ -402,7 +403,7 @@ def poll(app):
     # the part under the pointer (for the colours next frame and the label now)
     mx, my, on = pointer(app)
     hit = pick(app, v, mx, my, g) if (on and clear(cov, mx, my)) else None
-    app._shape_hover = hit
+    shape_state.of(app).hover = hit
     # 1. the wiring along each part, arrows the way it runs - the selected part's in the text
     #    colour (its own colour is its LEDs', which would hide them), the rest in theirs, faint
     text = tuple(chrome.TEXT[:3])
@@ -542,7 +543,7 @@ def poll(app):
     from native import shape_tools
     shape_tools.draw(app, v, D)
     # 7. a dragged LED's new place (by hand placing)
-    to = getattr(app, "_shape_drag_to", None)
+    to = shape_state.of(app).drag_to
     if to is not None:
         tx, ty, tok, _ = project(v, np.asarray([to], np.float32))
         if tok[0]:

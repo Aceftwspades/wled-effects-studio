@@ -24,6 +24,7 @@ import time
 
 import dearpygui.dearpygui as dpg
 from native import oops
+from native import shape_state
 
 RED = (226, 76, 76)
 _weighted = {}          # item -> kind
@@ -214,7 +215,7 @@ def _undo_state(app):
     if t == "code":
         return bool(getattr(app, "_code_undo", None)), bool(getattr(app, "_code_redo", None))
     if t == "shape":
-        return bool(getattr(app, "_shape_undo", None)), False
+        return bool(shape_state.of(app).undo), False
     if t == "sequence":
         return (p.can_undo("sequence") or p.can_undo("schedule")), (p.can_redo("sequence") or p.can_redo("schedule"))
     if t == "palettes":

@@ -10,7 +10,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native import num, typeface, form, messages, scratch, vj_state, pads_state, seq_state
-from native import chrome, device_ui, shape_ui, midi_ui, bank_ui, reader_ui, room, weight, view3d, shape_tools, video_ui
+from native import chrome, device_ui, shape_ui, shape_state, midi_ui, bank_ui, reader_ui, room, weight, view3d, shape_tools, video_ui
 from native.geometry import Geometry
 from native.walk import _call, process_stats, walk_actions, walk_ctx, walk_frame, walk_menus, write_uiref
 
@@ -44,7 +44,7 @@ def _hook_names(app):
             "seq_timecode": seq_timecode, "live_show": live_show}
     return more | {"app": app, "dpg": dpg, "np": np, "flash": flash, "library_ui": library_ui, "tutorials": tutorials, "phone_ui": phone_ui, "video_ui": video_ui, "midi_ui": midi_ui, "bank_ui": bank_ui, "reader_ui": reader_ui, "room": room, "chrome": chrome,
             "device_ui": device_ui, "weight": weight, "num": num, "form": form, "typeface": typeface, "messages": messages,
-            "view3d": view3d, "shape_ui": shape_ui, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
+            "view3d": view3d, "shape_ui": shape_ui, "shape_state": shape_state, "shape_view": shape_view, "shape_tools": shape_tools, "shapes": shapes,
             "units": units, "shape_gallery": shape_gallery, "shape_run": shape_run, "shape_fields": shape_fields,
             "shape_checks": shape_checks, "shape_start": shape_start, "camera_map": camera_map, "camera_map_ui": camera_map_ui, "vj_state": vj_state, "pads_state": pads_state, "seq_state": seq_state}
 
@@ -286,7 +286,7 @@ def service_command(app):
                 elif op[0] == "nudge": (shape_ui.nudge(app, shape_ui._sel(app), **op[1]), shape_ui._poll_pending(app, force=True))
                 elif op[0] == "param": shape_ui.set_param(app, shape_ui._sel(app), op[1], op[2])
                 elif op[0] == "import": shape_ui.import_file(app, op[1])
-                elif op[0] == "reference": app._shape_ref = True; shape_ui.import_file(app, op[1])
+                elif op[0] == "reference": shape_state.of(app).ref = True; shape_ui.import_file(app, op[1])
                 elif op[0] == "layout": shape_ui._apply(app, layout=op[1])
                 elif op[0] == "undo": shape_ui.undo(app)
                 elif op[0] == "mark": shape_ui.select(app, [int(i) for i in op[1]])     # the selection (it was the list's ticks)
@@ -295,7 +295,7 @@ def service_command(app):
                 elif op[0] == "match": shape_ui.match_parts(app, op[1])
                 elif op[0] == "select": shape_ui.select(app, [int(op[1])])
                 elif op[0] == "place":
-                    app._shape_place = True
+                    shape_state.of(app).place = True
                     st = dpg.get_item_state("cube_img"); (x0, y0) = st["rect_min"]
                     shape_ui.click(app, at=(x0 + op[1], y0 + op[2]))
             if "gp_call" in c:                          # test hook: [method of the graph panel, args]

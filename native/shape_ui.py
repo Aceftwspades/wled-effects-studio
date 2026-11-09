@@ -20,6 +20,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import num
+from native import shape_state
 from native import typeface
 from native import form
 
@@ -69,20 +70,16 @@ def _apply(app, parts=None, undo_from=None, refit=None, replace=False, **more):
             p.pop("grid")                                 # an imported grid map names LEDs by number: other LEDs, not theirs
         p["parts"] = parts
     p.update(more)
-    stack = getattr(app, "_shape_undo", None)
-    if stack is None:
-        stack = app._shape_undo = []
+    S = shape_state.of(app)
+    stack = S.undo
     before = undo_from or _state_of(g)
     stack.append(before)
     del stack[:-40]
-    names = getattr(app, "_shape_undo_names", None)
-    if names is None:
-        names = app._shape_undo_names = []
+    names = S.undo_names
     after = dict(g.params if g.kind == "shape" else {}, **({"parts": parts} if parts is not None else {}), **more)
     names.append(step_name(_params_of(before), after))
     del names[:-40]
-    app._shape_redo = []                                    # a new step: the steps undone are gone
-    app._shape_redo_names = []
+    S.forget("redo", "redo_names")                          # a new step: the steps undone are gone
     was = g.kind
     app.apply_geometry(Geometry("shape", **p))
     if was != "shape" and dpg.does_item_exist("geom_kind"):
@@ -123,36 +120,19 @@ def _restore(app, state):
         dpg.set_value("geom_kind", g.kind); app.rebuild_geom_fields()
 
 
-def _names(app, which):
-    n = getattr(app, which, None)
-    if n is None:
-        n = []
-        setattr(app, which, n)
-    return n
-
-
-# the editor's state that belongs to one project's shape
-PROJECT_STATE = ("_shape_undo", "_shape_redo", "_shape_undo_names", "_shape_redo_names", "_shape_sels", "_shape_sel",
-                 "_shape_pending", "_shape_pre", "_shape_drag", "_shape_drag_to", "_shape_hover")
-
-
 def forget(app):
     """Another project opened: the shape editor's undo steps, selection and a drag under way are the last
     project's - Ctrl+Z here put the other project's shape into this one, and saved it."""
-    for k in PROJECT_STATE:
-        app.__dict__.pop(k, None)
+    shape_state.of(app).forget(*shape_state.PROJECT)
 
 
 def undo(app):
-    stack = getattr(app, "_shape_undo", None)
+    S = shape_state.of(app)
+    stack = S.undo
     if not stack:
         app.gp.status("nothing to undo in the shape"); return
-    g = app.project.geometry
-    redo_stack = getattr(app, "_shape_redo", None)
-    if redo_stack is None:
-        redo_stack = app._shape_redo = []
-    redo_stack.append(_state_of(g))
-    names, rnames = _names(app, "_shape_undo_names"), _names(app, "_shape_redo_names")
+    S.redo.append(_state_of(app.project.geometry))
+    names, rnames = S.undo_names, S.redo_names
     what = names.pop() if len(names) == len(stack) and names else "a change"
     rnames.append(what)
     _restore(app, stack.pop())
@@ -161,15 +141,12 @@ def undo(app):
 
 
 def redo(app):
-    stack = getattr(app, "_shape_redo", None)
+    S = shape_state.of(app)
+    stack = S.redo
     if not stack:
         app.gp.status("nothing to redo in the shape"); return
-    g = app.project.geometry
-    undo_stack = getattr(app, "_shape_undo", None)
-    if undo_stack is None:
-        undo_stack = app._shape_undo = []
-    undo_stack.append(_state_of(g))
-    names, rnames = _names(app, "_shape_undo_names"), _names(app, "_shape_redo_names")
+    S.undo.append(_state_of(app.project.geometry))
+    names, rnames = S.undo_names, S.redo_names
     what = rnames.pop() if len(rnames) == len(stack) and rnames else "a change"
     names.append(what)
     _restore(app, stack.pop())
@@ -179,15 +156,15 @@ def redo(app):
 
 def undo_steps(app):
     """The shape's steps, oldest first, named (for Edit > Undo history)."""
-    stack = getattr(app, "_shape_undo", None) or []
-    names = _names(app, "_shape_undo_names")
+    stack = shape_state.of(app).undo
+    names = shape_state.of(app).undo_names
     return names[-len(stack):] if len(names) >= len(stack) else ["a change"] * (len(stack) - len(names)) + names
 
 
 def undo_to(app, k):
     """k steps back."""
     for _ in range(max(0, int(k))):
-        if not getattr(app, "_shape_undo", None):
+        if not shape_state.of(app).undo:
             break
         undo(app)
 
@@ -224,9 +201,10 @@ def selection(app):
     """The selected parts: a set of indices. Before anything is picked, the
     part the frame shows (the first), as it always had."""
     parts = _parts(app) or []
-    sels = getattr(app, "_shape_sels", None)
+    S = shape_state.of(app)
+    sels = S.sels
     if sels is None:
-        sels = app._shape_sels = ({min(max(0, getattr(app, "_shape_sel", 0)), len(parts) - 1)} if parts else set())
+        sels = S.sels = ({min(max(0, S.sel), len(parts) - 1)} if parts else set())
     return {k for k in sels if 0 <= k < len(parts)}
 
 
@@ -236,15 +214,15 @@ def _sel(app):
     s = selection(app)
     if not s:
         return -1
-    i = getattr(app, "_shape_sel", -1)
+    i = shape_state.of(app).sel
     return i if i in s else max(s)
 
 
 def _set_sel(app, idxs, active=None):
     """The selection set without a refresh (an edit's _apply follows)."""
     idxs = set(int(i) for i in idxs)
-    app._shape_sels = idxs
-    app._shape_sel = active if active is not None else (max(idxs) if idxs else -1)
+    shape_state.of(app).sels = idxs
+    shape_state.of(app).sel = active if active is not None else (max(idxs) if idxs else -1)
 
 
 def select(app, idxs, add=False, toggle=False, active=None):
@@ -262,7 +240,7 @@ def select(app, idxs, add=False, toggle=False, active=None):
         cur = set(idxs)
     a = active if active is not None else next((i for i in reversed(idxs) if i in cur), None)
     if a is None or a not in cur:
-        a = getattr(app, "_shape_sel", -1) if getattr(app, "_shape_sel", -1) in cur else (max(cur) if cur else -1)
+        a = shape_state.of(app).sel if shape_state.of(app).sel in cur else (max(cur) if cur else -1)
     _set_sel(app, cur, a)
     refresh(app)
 
@@ -430,7 +408,7 @@ def _shape_run():
 
 def _import(app, reference):
     """The import dialog: a model's LEDs, or (reference) a mesh drawn to place LEDs against."""
-    app._shape_ref = bool(reference)
+    shape_state.of(app).ref = bool(reference)
     if dpg.does_item_exist("shape_import_opts"):
         dpg.configure_item("shape_import_opts", show=not reference)
     dpg.show_item("shape_import_dialog")
@@ -487,7 +465,7 @@ def refresh(app):
     g = app.project.geometry
     parts = _parts(app)
     if dpg.does_item_exist("shape_exact_tn"):
-        app._shape_exact = bool(dpg.get_value("shape_exact_tn"))            # the fold stays as it was left
+        shape_state.of(app).exact = bool(dpg.get_value("shape_exact_tn"))            # the fold stays as it was left
     dpg.delete_item("shape_parts", children_only=True)
     dpg.delete_item("shape_fields", children_only=True)
     _undo_buttons(app)
@@ -556,11 +534,11 @@ def refresh(app):
     P = "shape_fields"
     # a part picked (another than before): its tab comes forward - the Shape tab stays a click away
     picked = (frozenset(chosen), sel)
-    if picked != getattr(app, "_shape_tab_for", None):
-        app._shape_tab_for = picked
+    if picked != shape_state.of(app).tab_for:
+        shape_state.of(app).tab_for = picked
         if chosen:
-            app._shape_tab = "part"
-    tab = getattr(app, "_shape_tab", "part") if chosen else "shape"
+            shape_state.of(app).tab = "part"
+    tab = shape_state.of(app).tab if chosen else "shape"
     if len(chosen) == 1 and 0 <= sel < len(parts):
         part_label = f"Part {sel + 1}: {parts[sel].get('name', parts[sel]['kind'])}"
     else:
@@ -590,14 +568,14 @@ def _show_tab(app, tab, part_label):
 def _pick_tab(app, tab):
     """A tab clicked: the shape's settings or the selected part's below (the selection is left as it is)."""
     alias = dpg.get_item_alias(tab) if isinstance(tab, int) else tab
-    app._shape_tab = "part" if alias == "shape_tab_part" else "shape"
+    shape_state.of(app).tab = "part" if alias == "shape_tab_part" else "shape"
     refresh(app)
 
 
 def show_settings(app):
     """The Shape frame, open on the whole shape's settings (the side panel's way to them)."""
     from native import device_ui
-    app._shape_tab = "shape"
+    shape_state.of(app).tab = "shape"
     device_ui.show(app, "shape")
     refresh(app)
 
@@ -724,18 +702,18 @@ def _by_hand(app, P):
     c = _c()
     with dpg.group(horizontal=True, parent=P):
         typeface.label(dpg.add_text("BY HAND", color=c.ACCENT))
-        dpg.add_checkbox(label="place", tag="shape_place", default_value=bool(getattr(app, "_shape_place", False)),
-                         callback=lambda s, v: setattr(app, "_shape_place", bool(v)))
+        dpg.add_checkbox(label="place", tag="shape_place", default_value=bool(shape_state.of(app).place),
+                         callback=lambda s, v: setattr(shape_state.of(app), "place", bool(v)))
         c.tip("click the 3-D view to put an LED on the plane; they go into the selected points part, or a new one; drag one to move it")
         form.inline("plane")
-        dpg.add_combo(["z", "y", "x"], tag="shape_plane_axis", width=px(50), default_value=getattr(app, "_shape_plane", ("z", 0.0))[0],
-                      callback=lambda s, v: setattr(app, "_shape_plane", (v, getattr(app, "_shape_plane", ("z", 0.0))[1])))
+        dpg.add_combo(["z", "y", "x"], tag="shape_plane_axis", width=px(50), default_value=shape_state.of(app).plane[0],
+                      callback=lambda s, v: setattr(shape_state.of(app), "plane", (v, shape_state.of(app).plane[1])))
         dpg.add_text("=", color=c.DIM)
         sp = app.project.geometry.params
         typeface.mono(dpg.add_input_float(tag="shape_plane_v", width=px(80),
-                                          default_value=units.to_unit(getattr(app, "_shape_plane", ("z", 0.0))[1], sp), step=0,
+                                          default_value=units.to_unit(shape_state.of(app).plane[1], sp), step=0,
                                           format=f"%.1f {units.unit(sp)}",
-                                          callback=lambda s, v: setattr(app, "_shape_plane", (getattr(app, "_shape_plane", ("z", 0.0))[0],
+                                          callback=lambda s, v: setattr(shape_state.of(app), "plane", (shape_state.of(app).plane[0],
                                                                                               units.from_unit(float(v), app.project.geometry.params)))))
 
 
@@ -820,7 +798,7 @@ def _part_settings(app, P, sel, part, sp):
             dpg.add_button(label=ax, small=True, user_data=ax, callback=lambda s, a, u: quarter_turn(app, sorted(selection(app)), "XYZ".index(u)))
     # the exact ones, folded: its rotation, scale, the aim
     with dpg.tree_node(label="exact rotation, scale and aim", tag="shape_exact_tn", parent=P,
-                       default_open=bool(getattr(app, "_shape_exact", False))):
+                       default_open=bool(shape_state.of(app).exact)):
         _exact(app, "shape_exact_tn", sel, part, sp)
     _copies_settings(app, P, sel, part, sp)
     _heading(P, "WIRING")
@@ -1093,9 +1071,10 @@ def quarter_turn(app, idxs, axis):
 
 def _undo_buttons(app):
     """Undo and Redo greyed when there is nothing to step to."""
-    for tag, stack in (("shape_undo_btn", "_shape_undo"), ("shape_redo_btn", "_shape_redo")):
+    S = shape_state.of(app)
+    for tag, stack in (("shape_undo_btn", S.undo), ("shape_redo_btn", S.redo)):
         if dpg.does_item_exist(tag):
-            dpg.configure_item(tag, enabled=bool(getattr(app, stack, None)))
+            dpg.configure_item(tag, enabled=bool(stack))
 
 
 # --- edits -----------------------------------------------------------------------------------
@@ -1130,9 +1109,9 @@ def nudge(app, i, **fields):
         return
     parts[i].update(fields)
     g = app.project.geometry
-    if getattr(app, "_shape_pending", None) is None:
-        app._shape_pre = json.dumps(g.params)               # the undo step: where the drag started
-    app._shape_pending = parts
+    if shape_state.of(app).pending is None:
+        shape_state.of(app).pre = json.dumps(g.params)               # the undo step: where the drag started
+    shape_state.of(app).pending = parts
     try:
         g2 = Geometry("shape", **dict(g.params, parts=parts))
         if g2.count == g.count:
@@ -1149,13 +1128,13 @@ def nudge(app, i, **fields):
 
 
 def _poll_pending(app, force=False):
-    parts = getattr(app, "_shape_pending", None)
+    parts = shape_state.of(app).pending
     if parts is None:
         return
     if not force and dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
         return
-    app._shape_pending = None
-    pre = getattr(app, "_shape_pre", None); app._shape_pre = None
+    shape_state.of(app).pending = None
+    pre = shape_state.of(app).pre; shape_state.of(app).pre = None
     _apply(app, parts, undo_from=pre)
 
 
@@ -1380,7 +1359,7 @@ def import_file(app, path):
     ext = os.path.splitext(path)[1].lower()
     parts = list(_parts(app) or [])
     more = {}
-    as_ref = bool(getattr(app, "_shape_ref", False)); app._shape_ref = False
+    as_ref = shape_state.of(app).ref; shape_state.of(app).ref = False
     try:
         if as_ref:
             if ext not in (".obj", ".ply", ".stl"):
@@ -1599,7 +1578,7 @@ def frame_selection(app):
 
 
 def _plane(app):
-    ax, v = getattr(app, "_shape_plane", ("z", 0.0))
+    ax, v = shape_state.of(app).plane
     return {"x": 0, "y": 1, "z": 2}[ax], float(v)
 
 
@@ -1636,7 +1615,7 @@ def _local(part, p):
 def click(app, at=None):
     """A click on the 3-D view while placing: an LED under the pointer is
     picked up, else a new one is put on the plane. True when handled."""
-    if not getattr(app, "_shape_place", False) or _parts(app) is None:
+    if not shape_state.of(app).place or _parts(app) is None:
         return False
     from native import shape_view
     v = shape_view.view(app)
@@ -1645,7 +1624,7 @@ def click(app, at=None):
     mx, my = at or dpg.get_mouse_pos(local=False)
     hit = _hit(app, mx, my)
     if hit and hit[1] is not None:
-        app._shape_drag = hit
+        shape_state.of(app).drag = hit
         _set_sel(app, {hit[0]})
         return True
     axis, value = _plane(app)
@@ -1672,7 +1651,7 @@ def click(app, at=None):
 
 def drag(app):
     """The pointer moving with an LED picked up: it follows on the plane (applied on release)."""
-    hit = getattr(app, "_shape_drag", None)
+    hit = shape_state.of(app).drag
     if not hit:
         return False
     from native import shape_view
@@ -1683,17 +1662,17 @@ def drag(app):
     axis, value = _plane(app)
     p = shape_view.unproject(v, mx, my, axis, value)
     if p is not None:
-        app._shape_drag_to = [float(c) for c in p]
+        shape_state.of(app).drag_to = [float(c) for c in p]
     return True
 
 
 def release(app):
-    hit = getattr(app, "_shape_drag", None)
+    hit = shape_state.of(app).drag
     if not hit:
         return False
-    app._shape_drag = None
-    to = getattr(app, "_shape_drag_to", None)
-    app._shape_drag_to = None
+    shape_state.of(app).drag = None
+    to = shape_state.of(app).drag_to
+    shape_state.of(app).drag_to = None
     if to is None:
         return True
     parts = json.loads(json.dumps(_parts(app) or []))

@@ -21,8 +21,8 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       attributes), the pads with their clip editor (`native/pads_state.py`, 27), the show and its timeline
       (`native/seq_state.py`, 35); the modulators (`modulate.state`), MIDI and OSC (`midi_ui.state`) and the
       device frames (`device_ui.state`) in their own modules, as only they use them. The graph editor's is
-      already its `GraphPanel` (`app.gp`). Still loose, if they earn it later: the library's `_lib_*` and the
-      shape editor's `_shape_*`.
+      already its `GraphPanel` (`app.gp`). The library's and the shape
+      editor's followed in section 6.
 - [x] **One play clock that never jumps**: the render's hold under it, instead of each timer correcting for
       `clock.shifted()`. Released, the clock runs on from where the render left it; the corrections are gone.
 - [x] **Swallowed errors made visible**: the 192 bare `except Exception:` blocks log once (crash log or status
@@ -71,3 +71,21 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       File > Project > New live show project... (`native/live_show.py`): two looks on decks A and B, the Live bank
       and a Show bank (deck pickers, knobs on the selected deck, a Clip pad with a starter clip ffmpeg makes, a
       Camera pad on the first webcam found), the VJ and the pads opened.
+
+## 6. Next round: MilkDrop's real costs, the last loose state
+- [x] **MilkDrop's custom shapes ~1.9x quicker**, the same pixels (off by 4e-6 at most over every bundled preset's
+      shapes, replayed through the old and new code): each instance works on the pixels inside it only, a channel at a
+      time (numpy is ~10x slower broadcasting over a 3-wide last axis), a polygon of up to 16 sides finds its edge
+      from its sides' normals instead of arctan2 and cos over its box, and an instance no longer copies the frame or
+      re-reads the preset's variables. Feeling well 256 -> 87 ms a frame; all 23 presets 1,477 -> 1,031 ms.
+- [x] **The bilinear sampler** (`vj_looks.sample`: the feedback warp, textured shapes, every video look) a channel
+      at a time and its wrap by fmod: 1.3-1.5x, bit for bit the same.
+- [-] **The feedback warp on the GPU** for presets without a warp shader. Measured, not done: with the sampler above,
+      every bilinear read in MilkDrop (the warp, textured shapes, video) is 13% of a frame over the 23 presets
+      (5.0 of 38.3 s profiled), while the MD2 shaders' GPU passes are 27% (10.5 s) - nearly all of it waiting on the
+      GPU. A warp pass there would add that wait to the presets that have no GPU pass now, to save part of 13%.
+- [x] **The library's `_lib_*` and the shape editor's `_shape_*`** in a state object each, as the others:
+      `library_ui.state` (24 fields; its thumbnail and preview workers' queues, jobs and progress) and
+      `native/shape_state.py` (18; `PROJECT` names what another project's opening drops). The selected part read
+      as 0 in one place and -1 in three; it is -1 everywhere (the first part is still what a fresh selection
+      shows). `_shape_checks` was written and never read: gone.

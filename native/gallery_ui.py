@@ -91,8 +91,9 @@ def poll(app):
             break
         st["frames"][eid] = frames or []
         got += 1
-    if got and app.__dict__.get("_lib_bank") == "gallery":
-        app._lib_dirty = True                              # the tiles made again (not while a button is held)
+    from native import library_ui
+    if got and library_ui.state(app).bank == "gallery":
+        library_ui.state(app).dirty = True                              # the tiles made again (not while a button is held)
 
 
 def _refresh_lib(app):

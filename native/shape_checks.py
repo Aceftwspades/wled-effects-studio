@@ -21,6 +21,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native import shapes, units, view3d
+from native import shape_state
 from native.typeface import px
 
 NEAR = 0.25           # two LEDs nearer than this (spacings) are on one spot
@@ -145,9 +146,8 @@ def refresh(app):
         found = run(app)
     except Exception as e:                                   # a check must never cost the frame
         found = [Check("info", f"the checks could not run: {e}")]
-    app._shape_checks = found
     if not found:
-        app._shape_warns = 0
+        shape_state.of(app).warns = 0
         return
     warns = sum(1 for f in found if f.kind == "warn")
     for f in found[:5]:
@@ -158,6 +158,6 @@ def refresh(app):
                 dpg.add_button(label="show me", small=True, user_data=f.show, callback=lambda s, a, u: u())
     if len(found) > 5:
         dpg.add_text(f"and {len(found) - 5} more", parent="shape_checks", color=chrome.DIM)
-    if warns > getattr(app, "_shape_warns", 0):              # a word on the footer when there is newly more to look at
+    if warns > shape_state.of(app).warns:              # a word on the footer when there is newly more to look at
         app.gp.status(f"the shape: {warns} thing(s) to look at - see the Shape frame's checks")
-    app._shape_warns = warns
+    shape_state.of(app).warns = warns

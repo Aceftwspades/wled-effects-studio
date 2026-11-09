@@ -31,6 +31,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native import shapes, units, view3d, typeface
+from native import shape_state
 from native.typeface import px
 
 ANGLE = 15.0          # degrees a run's direction snaps to
@@ -82,7 +83,7 @@ def start(app, part=None):
         if 0 <= part < len(parts) and parts[part]["kind"] == "polyline":
             corners = [list(map(float, c)) for c in world_corners(parts[part])]
     app._run = {"corners": corners, "part": part, "pre": json.dumps(app.project.geometry.params)}
-    app._shape_place = False
+    shape_state.of(app).place = False
     _button(app)
     app.gp.status("drawing a run: click corners in the 3-D view (from above: on the floor; from the front or the side: on a wall); "
                   "Enter or a click on the last corner ends it, Backspace takes one back, Esc leaves")

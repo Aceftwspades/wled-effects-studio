@@ -36,6 +36,7 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 
 from native import shapes, units, view3d, typeface
+from native import shape_state
 from native.typeface import px
 
 AXIS_COL = {0: (232, 86, 86), 1: (118, 200, 92), 2: (86, 146, 240)}
@@ -146,7 +147,7 @@ def gizmo(app, v):
     {a: points}} or None (nothing movable, or a modal move running)."""
     if getattr(app, "_tool", None) is not None and app._tool.get("kind") in ("modal", "corner"):
         return None
-    if getattr(app, "_shape_place", False) or _run().active(app):
+    if shape_state.of(app).place or _run().active(app):
         return None
     idx = movable(app)
     if not idx:
