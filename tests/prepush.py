@@ -22,6 +22,7 @@ import argparse
 import concurrent.futures as cf
 import glob
 import os
+import re
 import runpy
 import shutil
 import subprocess
@@ -105,13 +106,15 @@ def main():
         if a.j > 1:
             ok, s, tail2 = _run(c, t)
             if ok:
-                clashes.append((c, t))
+                clashes.append((c, t, tail))
                 continue
             tail = tail2
         real.append((c, t, tail))
     print(f"\n{len(jobs)} runs in {time.perf_counter() - t0:.0f} s")
-    for c, t in clashes:
-        print(f"CLASH {c} {t}: failed beside other tests, passed alone")
+    for c, t, tail in clashes:       # its failure said, so a clash can be told from a test that flakes
+        print(f"CLASH {c} {t}: failed beside other tests, passed alone - it said:")
+        bad = [ln for ln in tail.splitlines() if re.search(r"FAIL|Error|error:|Traceback", ln)]
+        print("\n".join("    " + ln[:220] for ln in (bad or tail.splitlines())[-8:]))
     for c, t, tail in real:
         print(f"\n===== FAIL {c} {t}\n{tail}")
     print("\nall passed" if not real else f"\n{len(real)} failed")
