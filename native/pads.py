@@ -29,6 +29,7 @@ import copy
 import json
 import time
 from native import vj_state
+from native import pads_state
 
 GRID_MIN, GRID_MAX = 2, 8
 BUTTONS = ("trigger", "toggle", "hold")
@@ -428,9 +429,9 @@ def _rt(app):
     """The pads' run state, never saved: held controls, what a hold or a snapping XY pad changed (to put back),
     toggles' own on/off for targets that cannot be read, triggers' flash times, the staged pad and its deck, and how
     many hold each held control (the mouse, a phone, a controller: let go when the last does)."""
-    r = getattr(app, "_pads_rt", None)
+    r = pads_state.of(app).rt
     if r is None:
-        r = app._pads_rt = {"held": set(), "count": {}, "holds": {}, "on": {}, "flash": {}, "staged": None}
+        r = pads_state.of(app).rt = {"held": set(), "count": {}, "holds": {}, "on": {}, "flash": {}, "staged": None}
     return r
 
 
@@ -770,9 +771,9 @@ def let_go(app):
     mouse's drag and the phone's touches: a move or a lift that comes after drives nothing."""
     from native import pads_hw
     pads_hw.let_go(app)
-    app._pads_remote = None
-    if (getattr(app, "_pads_drag", None) or ("",))[0] == "play":
-        app._pads_drag = None
+    pads_state.of(app).remote = None
+    if (pads_state.of(app).drag or ("",))[0] == "play":
+        pads_state.of(app).drag = None
     st = state(app.project)
     for cid in list(_rt(app)["held"]):
         _rt(app)["count"].pop(cid, None)

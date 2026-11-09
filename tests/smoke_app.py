@@ -1115,7 +1115,7 @@ STEPS = [
       {"py": "__import__('native.pads_ui', fromlist=['p']).switch_bank(app, 0)"}], 0.3),
     ([{"check": "app._pads_snap == repr((__import__('native.vj', fromlist=['v']).options(app)['fader'], __import__('native.vj', fromlist=['v']).options(app)['decks'])) and __import__('native.pads_ui', fromlist=['p'])._st(app)['bank'] == 0"},
       {"py": "dpg.set_value('pads_edit', True)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=5)"}, {"py": "setattr(app, '_pads_sel', (4, 0))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=5)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 0))"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'hold')"}], 0.4),
     ([{"check": "dpg.is_item_shown('pads_side') and isinstance(__import__('native.pads_ui', fromlist=['p'])._sel(app), dict) and __import__('native.pads_ui', fromlist=['p'])._sel(app)['type'] == 'hold'"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 1 and t.get('key') == 'kaleido'))"},
@@ -1127,7 +1127,7 @@ STEPS = [
     ([{"check": "__import__('native.vj', fromlist=['v']).options(app)['decks'][1]['kaleido'] == 0"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._undo(app)"}], 0.3),
     ([{"check": "__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 0)['hi'] == 1.0"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(app, '_pads_sel', (4, 1))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 1))"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'xy')"}], 0.3),
     # an XY pad: across on deck A's hue, up and down on its kaleidoscope (to 0.5); touched and moved, then let go
     # (snap back); a staged look onto the deck off the air, then GO
@@ -1166,7 +1166,7 @@ STEPS = [
       # a clip pad: a file kept with the project, the CLIP section shown with its strip of frames
       {"py": "__import__('os').makedirs(__import__('os').path.join(app.project.path, 'assets', 'vj'), exist_ok=True)"},
       {"py": "(__import__('subprocess').run([__import__('shutil').which('ffmpeg'), '-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=30:duration=4', '-pix_fmt', 'yuv420p', __import__('os').path.join(app.project.path, 'assets', 'vj', 'smoke_clip.mp4')], check=True)) if __import__('shutil').which('ffmpeg') else None"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(app, '_pads_sel', (4, 3))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'trigger')"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ C: a video clip (set it below)')"},
       {"py": "__import__('native.clip_ui', fromlist=['c'])._set_file(app, 'assets/vj/smoke_clip.mp4')"}], 2.0),
@@ -1185,7 +1185,7 @@ STEPS = [
       {"py": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'].remove(__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},
       # a live camera pad on the same cell: its CAMERA section - the camera (a made-up name: no real one opened),
       # the deck, the envelope - with no file, mode or strip of a clip's
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(app, '_pads_sel', (4, 3))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'trigger')"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ C: a live camera (pick it below)')"},
       {"py": "__import__('native.clip_ui', fromlist=['c'])._set(app, name='Smoke Cam')"}], 0.3),
@@ -1193,11 +1193,11 @@ STEPS = [
       {"check": "__import__('native.pads_ui', fromlist=['p'])._sel(app)['target']['kind'] == 'pad_cam' and __import__('native.pads_ui', fromlist=['p']).target_label(app, __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']) == 'VJ C: camera Smoke Cam'"},
       {"py": "__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['controls'].remove(__import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"},
       # a deck select pad on the same cell: deck B selected, the pad lit; an effect pad shows its effect's row
-      {"py": "setattr(app, '_pads_sel', (4, 3))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'trigger')"},
+      {"py": "setattr(pads_state.of(app), 'sel', (4, 3))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'trigger')"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ: select deck B')"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
       {"py": "__import__('native.pads', fromlist=['p']).press(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"}, {"py": "__import__('native.pads', fromlist=['p']).release(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3))"}], 0.3),
     ([{"check": "__import__('native.vj', fromlist=['v']).selected(app) == 1 and __import__('native.pads', fromlist=['p']).lit(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)) and __import__('native.pads_ui', fromlist=['p']).target_label(app, __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)['target']) == 'VJ: select deck B'"},
-      {"py": "__import__('native.vj', fromlist=['v']).select_deck(app, 0)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(app, '_pads_sel', __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)['id'])"},
+      {"py": "__import__('native.vj', fromlist=['v']).select_deck(app, 0)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"}, {"py": "setattr(pads_state.of(app), 'sel', __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)['id'])"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, 'VJ selected deck: this effect (pick it below)')"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._fill_side(app)"}], 0.3),
     ([{"check": "dpg.is_item_shown('pads_s_fxrow') and len(dpg.get_item_configuration('pads_s_fx')['items']) > 0 and __import__('native.pads', fromlist=['p']).at(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app)), 4, 3)['target']['deck'] == __import__('native.vj', fromlist=['v']).SEL"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"},
@@ -1235,8 +1235,8 @@ STEPS = [
       {"py": "__import__('native.modulate', fromlist=['m']).modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
     # a wave attached from the pad editor: a fader on Speed, + LFO, the band drawn over it; a rate knob; taken off
     ([{"py": "__import__('native.pads_ui', fromlist=['p']).show(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"},
-      {"py": "setattr(app, '_pads_sel', __import__('native.pads_ui', fromlist=['p'])._free_cell(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))))"},
-      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'fader')"}, {"py": "setattr(app, '_sm_fd', app._pads_sel)"},
+      {"py": "setattr(pads_state.of(app), 'sel', __import__('native.pads_ui', fromlist=['p'])._free_cell(__import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))))"},
+      {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'fader')"}, {"py": "setattr(app, '_sm_fd', pads_state.of(app).sel)"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t == {'kind': 'fx', 'key': 'sx'}))"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._attach(app)"}], 0.4),
     ([{"check": "dpg.is_item_shown('pads_s_modrow') and len(__import__('native.modulate', fromlist=['m']).on_key(app, 'sx')) == 1 and len(dpg.get_item_children('pads_s_mods', 1)) >= 2 and len(dpg.get_item_children('pads_mods_layer', 2)) >= 2"},
@@ -1246,7 +1246,7 @@ STEPS = [
     ([{"check": "__import__('native.pads_ui', fromlist=['p'])._sel(app)['type'] == 'knob' and __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']['key'] == 'rate' and __import__('native.pads_ui', fromlist=['p']).target_label(app, __import__('native.pads_ui', fromlist=['p'])._sel(app)['target']).endswith(': rate')"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._detach(app, __import__('native.modulate', fromlist=['m']).modulators(app)[0]['id'], 'sx')"}], 0.3),
     ([{"check": "not __import__('native.modulate', fromlist=['m']).modulators(app) and not dpg.get_item_children('pads_mods_layer', 2)"},
-      {"py": "setattr(app, '_pads_sel', app._sm_fd)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"}], 0.3),
+      {"py": "setattr(pads_state.of(app), 'sel', app._sm_fd)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._remove_control(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, False)"}], 0.3),
     # the sound on Intensity, a wave on Mod 1's depth, two sliders a wave apart: their rows, scopes drawn; undone
     ([{"py": "__import__('native.modulate', fromlist=['m']).add(app, key='ix', kind='audio', band='bass')"}, {"py": "__import__('native.modulate', fromlist=['m']).add(app, keys=['m' + str(__import__('native.modulate', fromlist=['m']).modulators(app)[0]['id']) + '.depth', 'c1', 'c2'], spread=1.0)"},
       {"py": "__import__('native.modulate', fromlist=['m']).show(app)"}], 0.4),
@@ -1257,7 +1257,7 @@ STEPS = [
     # an XY pad on Speed across: + LFO, a stripe over it, its amount field in the panel; taken off
     ([{"py": "__import__('native.pads_ui', fromlist=['p']).show(app)"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._set_edit(app, True)"},
       {"py": "setattr(app, '_sm_cols', __import__('native.pads', fromlist=['p']).current(__import__('native.pads_ui', fromlist=['p'])._st(app))['cols'])"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._grid_size(app, cols=app._sm_cols + 2)"},
-      {"py": "setattr(app, '_pads_sel', (app._sm_cols, 0))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'xy')"}, {"py": "setattr(app, '_sm_xy', app._pads_sel)"},
+      {"py": "setattr(pads_state.of(app), 'sel', (app._sm_cols, 0))"}, {"py": "__import__('native.pads_ui', fromlist=['p'])._add_control(app, 'xy')"}, {"py": "setattr(app, '_sm_xy', pads_state.of(app).sel)"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._pick_action(app, next(l for l, t in __import__('native.pads_ui', fromlist=['p']).labels(app) if t == {'kind': 'fx', 'key': 'sx'}))"},
       {"py": "__import__('native.pads_ui', fromlist=['p'])._attach(app)"}], 0.4),
     ([{"check": "dpg.does_item_exist('pads_s_mamt_' + str(__import__('native.modulate', fromlist=['m']).on_key(app, 'sx')[0]['id'])) and len(dpg.get_item_children('pads_mods_layer', 2)) >= 2"},

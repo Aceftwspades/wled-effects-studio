@@ -645,7 +645,7 @@ def check_clip_strip(app, bad):
     app.send([{"py": f"{P}.show(app)"}], 0.6)                # (its first frame takes the project: a selection after)
     app.send([{"py": "dpg.set_value('pads_edit', True)"}, {"py": f"{P}._set_edit(app, True)"},
               {"py": f"{P}._grid_size(app, cols=5)"},                    # (the starter bank is full)
-              {"py": f"setattr(app, '_pads_sel', {P}._free_cell(__import__('native.pads', fromlist=['p']).current({P}._st(app))))"},
+              {"py": f"setattr(pads_state.of(app), 'sel', {P}._free_cell(__import__('native.pads', fromlist=['p']).current({P}._st(app))))"},
               {"py": f"{P}._add_control(app, 'trigger')"},
               {"py": f"{P}._pick_action(app, 'VJ C: a video clip (set it below)')"},
               {"py": "__import__('native.clip_ui', fromlist=['c'])._set_file(app, 'assets/vj/pointer_clip.mp4')"}], 2.5)

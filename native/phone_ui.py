@@ -26,6 +26,7 @@ from native import phone, phone_tls, midi
 from native.typeface import px
 from native import typeface
 from native import vj_state
+from native import pads_state
 
 PUBLISH_S = 0.25                 # the state the page reads, made again at most this often
 
@@ -286,8 +287,8 @@ def _pads_state(app):
     try:
         return pads_ui.remote_state(app)
     except Exception as e:                                  # the rest of the page's state still goes
-        if not getattr(app, "_pads_state_err", None):
-            app._pads_state_err = str(e)
+        if not pads_state.of(app).state_err:
+            pads_state.of(app).state_err = str(e)
             app.gp.status(f"phone remote: the pads: {e}", "warn")
         return None
 

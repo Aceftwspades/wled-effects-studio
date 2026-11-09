@@ -11,7 +11,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 
-from native import geometry, pads, vj, vj_looks
+from native import geometry, pads, vj, vj_looks, pads_state
 
 fails = []
 
@@ -275,9 +275,9 @@ o2["decks"][2]["level"] = 0.0
 pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "down"})
 check(vj.c_level(app2) > 0 and next(c for c in pads_ui.remote_state(app2)["controls"] if c["id"] == flc["id"])["lit"],
       "Flash C held from the page: deck C in, the pad shown lit")
-app2._pads_remote[flc["id"]][1] -= pads_ui.REMOTE_GONE_S + 1              # the phone fell silent
+pads_state.of(app2).remote[flc["id"]][1] -= pads_ui.REMOTE_GONE_S + 1              # the phone fell silent
 pads_ui.remote_poll(app2)
-check(vj.c_level(app2) == 0.0 and flc["id"] not in app2._pads_remote, "a phone silent mid-press: its pad let go")
+check(vj.c_level(app2) == 0.0 and flc["id"] not in pads_state.of(app2).remote, "a phone silent mid-press: its pad let go")
 pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "down"})
 pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "hold"})
 pads_ui.remote_poll(app2)
@@ -303,7 +303,7 @@ check(abs(vj.knob_get(app2, 0, "hue") - 0.7) < 1e-3 and abs(vj.knob_get(app2, 0,
 pads_ui.remote(app2, {"a": "pad", "id": xyc["id"], "e": "up"})
 check(pads_ui.remote_state(app2)["controls"][0]["xy"] is None, "let go: snapped back, no dot")
 pads_ui.remote(app2, {"a": "pad", "id": 99999, "e": "down"})
-check(not pads._rt(app2)["held"] and 99999 not in app2._pads_remote, "a control that is not there: nothing held")
+check(not pads._rt(app2)["held"] and 99999 not in pads_state.of(app2).remote, "a control that is not there: nothing held")
 # a phone's lift only lets go of what a phone pressed (a stray or late one let go of the mouse's hold)
 pads.press(app2, flc)                                                  # the mouse holds Flash C
 pads_ui.remote(app2, {"a": "pad", "id": flc["id"], "e": "up"})
@@ -349,16 +349,16 @@ check(abs(vj.knob_get(app2, 0, "hue") - 0.6) < 1e-3, "an XY pad pressed again fr
 pads.release(app2, sx)
 pads.release(app2, sx)
 check(abs(vj.knob_get(app2, 0, "hue") - h0) < 1e-3, "both let go: it snaps back where it was before the first touch")
-app2._pads_edit = True
+pads_state.of(app2).edit = True
 o2["fader"] = 0.2
 pads_ui.remote(app2, {"a": "pad", "id": hv["id"], "e": "down"})
 check(o2["fader"] == 0.2 and not pads._rt(app2)["held"] and pads_ui.remote_state(app2)["edit"],
       "the pads edited in the studio: the phone's press does nothing, and its page is told")
-app2._pads_edit = False
+pads_state.of(app2).edit = False
 
 # --- the labels by a table, made again for another effect; the grid drawn only when what it shows changes --------
 app2.eng.meta, app2.eng.idx = [{"labels": ["Speed", "Intensity"]}, {"labels": ["Rate", "Depth"]}], 0
-app2._pads_labels = None
+pads_state.of(app2).labels = None
 fxc = {"kind": "fx", "key": "sx"}
 from native import midi_ui
 midi_ui_targets = midi_ui.targets
@@ -383,10 +383,10 @@ check(pads_ui._drawn(app2, 80.0, 70.0, 6) != d1, "the window resized: drawn agai
 # --- a label typed: saved once the typing stops, not at each key --------------------------------------------------
 saves = []
 app2.project.save = lambda: saves.append(1)
-app2._pads_sel = hv["id"]
+pads_state.of(app2).sel = hv["id"]
 for k in ("H", "Ho", "Hol", "Hold!"):
     pads_ui._ctl_set(app2, "label", k, typed=True)
-t_typed = app2._pads_typed[0]
+t_typed = pads_state.of(app2).typed[0]
 pads_ui._flush(app2, t_typed + 0.1)
 check(hv["label"] == "Hold!" and not saves, "typing: the label changes at each key, nothing saved yet")
 pads_ui._flush(app2, t_typed + pads_ui.SAVE_AFTER_S + 0.01)
@@ -395,7 +395,7 @@ check(len(saves) == 1, "the typing stopped: saved once")
 pads_ui._ctl_set(app2, "label", "Hold", typed=True)
 pads_ui._flush(app2)
 check(len(saves) == 2, "the window closing: what was typed saved at once")
-app2._pads_sel = None
+pads_state.of(app2).sel = None
 pads.press(app2, hv)
 pads.press(app2, hv)
 pads.let_go(app2)
@@ -462,7 +462,7 @@ try:
     sp = pads.new_control(st6, "fader", cell[0], cell[1], target={"kind": "fx", "key": "sx"})
     b6["controls"].append(sp)
     app3.eng.fx["sx"] = 128
-    app3._pads_sel, app3._pads_axis = sp["id"], "x"
+    pads_state.of(app3).sel, pads_state.of(app3).axis = sp["id"], "x"
     pads_ui._attach(app3)
     on = modulate.on_key(app3, "sx")
     check(len(on) == 1 and on[0]["keys"] == ["sx"] and on[0].get("sync", True), "+ LFO: a synced wave on what the fader drives")
@@ -482,7 +482,7 @@ try:
     pads_ui._mod_pad(app3, m["id"], "knob", "mod", "rate")
     kn = b6["controls"][-1]
     check(len(b6["controls"]) == n + 1 and kn["type"] == "knob" and kn["target"] == {"kind": "mod", "id": m["id"], "key": "rate"}
-          and pads.fits(b6, kn) and app3._pads_sel == kn["id"], "rate knob: a knob on its rate in a free cell, selected")
+          and pads.fits(b6, kn) and pads_state.of(app3).sel == kn["id"], "rate knob: a knob on its rate in a free cell, selected")
     pads_ui._detach(app3, m["id"], "sx")
     modulate.apply(app3)
     check(not modulate.modulators(app3) and app3.eng.fx["sx"] == 128 and pads.swing(app3, sp) is None,
@@ -551,11 +551,11 @@ st4 = pads_ui._st(app4)
 st4["banks"].append(pads.new_bank("Big", 8, 8))
 b0 = st4["banks"][0]
 c0 = pads.at(b0, 0, 0)
-app4._pads_edit = True
-app4._pads_drag = ("move", c0["id"], (0, 0), (c0["x"], c0["y"]))
+pads_state.of(app4).edit = True
+pads_state.of(app4).drag = ("move", c0["id"], (0, 0), (c0["x"], c0["y"]))
 pads_ui.switch_bank(app4, 1)
-pads_ui._dragging(app4, app4._pads_drag, 6 * 50 + 10, 5 * 50 + 10, 0, 0, 50, 50, 6, pads.current(st4))
-check((c0["x"], c0["y"]) == (0, 0) and pads.fits(b0, c0) and app4._pads_drag is None,
+pads_ui._dragging(app4, pads_state.of(app4).drag, 6 * 50 + 10, 5 * 50 + 10, 0, 0, 50, 50, 6, pads.current(st4))
+check((c0["x"], c0["y"]) == (0, 0) and pads.fits(b0, c0) and pads_state.of(app4).drag is None,
       f"a move across a bank switch: the control left where it was ({c0['x']}, {c0['y']})")
 
 # --- the third review's ---------------------------------------------------------------------------------------

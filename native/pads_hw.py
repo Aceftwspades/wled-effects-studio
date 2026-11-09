@@ -24,6 +24,7 @@ buttons on the right for the banks. Not tried on the devices themselves: tests/t
 import time
 
 from native import pads
+from native import pads_state
 
 DEVICES = (("generic", "any (learned pads)"),       # lit by velocity 127 / 0
            ("launchpad", "Launchpad (Programmer)"),   # Novation Launchpad Mini MK3, X, Pro MK3
@@ -111,9 +112,9 @@ def program_mode(device):
 
 # --- coming in ------------------------------------------------------------------------------------------------
 def _rt(app):
-    r = getattr(app, "_pads_hw_rt", None)
+    r = pads_state.of(app).hw_rt
     if r is None:
-        r = app._pads_hw_rt = {"held": {}, "lights": {}, "at": 0.0, "out": None}
+        r = pads_state.of(app).hw_rt = {"held": {}, "lights": {}, "at": 0.0, "out": None}
     return r
 
 
@@ -128,12 +129,12 @@ def _same(a, b):
 
 def learning(app):
     """What a learn waits for: ("control", id) or ("bank", index), or None."""
-    return getattr(app, "_pads_learn", None)
+    return pads_state.of(app).learn
 
 
 def learn(app, what):
     """Wait for the next note or CC for ("control", id) or ("bank", index); None stops waiting."""
-    app._pads_learn = what
+    pads_state.of(app).learn = what
 
 
 def forget(app, what):
@@ -208,7 +209,7 @@ def events(app, evs):
                     c["midi"] = list(ctl)
             elif 0 <= want[1] < len(st["banks"]):
                 st["banks"][want[1]]["midi"] = list(ctl)
-            app._pads_learn = None
+            pads_state.of(app).learn = None
             app.project.save()
             app.gp.status(f"pads: learned {_words(ctl)}")
             pads_ui._fill_banks(app)
@@ -216,7 +217,7 @@ def events(app, evs):
             return []                                       # none go on: the MIDI window's learn does not see it
         return evs
     r = _rt(app)
-    editing = bool(getattr(app, "_pads_edit", False))
+    editing = bool(pads_state.of(app).edit)
     rest = []
     for ev in evs:
         ctl, v, full = ev
@@ -290,9 +291,9 @@ def poll(app):
     from native import midi, pads_ui
     if not midi.available():
         return
-    out = getattr(app, "_pads_out", None)
+    out = pads_state.of(app).out
     if out is None:
-        out = app._pads_out = midi.MidiOut()
+        out = pads_state.of(app).out = midi.MidiOut()
     h = hw(pads_ui._st(app))
     if h["out"] != out.port:
         if out.is_open:
@@ -301,10 +302,10 @@ def poll(app):
             _rt(app)["lights"] = {}
             out.close()
         # tried as it is picked, then again every RETRY_S while it is not there (said once, not each time)
-        tried, now = getattr(app, "_pads_out_tried", None), time.monotonic()
+        tried, now = pads_state.of(app).out_tried, time.monotonic()
         new = tried is None or tried[0] != h["out"]
         if h["out"] and (new or now - tried[1] >= RETRY_S):
-            app._pads_out_tried = (h["out"], now)              # looked for again only every RETRY_S (not each frame)
+            pads_state.of(app).out_tried = (h["out"], now)              # looked for again only every RETRY_S (not each frame)
             if new or h["out"] in midi.out_ports():
                 try:
                     out.open(h["out"])
@@ -315,7 +316,7 @@ def poll(app):
     if getattr(out, "error", None) is not None:            # a send failed (unplugged): the port closed, looked for
         app.gp.status(f"pads: the controller's lights stopped: {out.error}", "warn")   # again every RETRY_S
         out.error = None
-        app._pads_out_tried = (h["out"], time.monotonic())
+        pads_state.of(app).out_tried = (h["out"], time.monotonic())
         let_go_held(app)                                   # its lift will not come: what it holds let go
 
 

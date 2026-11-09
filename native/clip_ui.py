@@ -15,6 +15,7 @@ import numpy as np
 from native.typeface import px
 from native import form, num, vj_clips
 from native import vj_state
+from native import pads_state
 
 ROW = "pads_s_cliprow"
 DECK_WORDS = ("A", "B", "C", "selected")   # a clip's deck: one of the three, or the one selected when it is pressed
@@ -168,19 +169,19 @@ def fill(app, s):
         num.set(f"pads_clip_{k}", float(t[k]))
     _show_out(app, t)
     _draw_env(t)
-    app._clip_strip_key = None                       # drawn again next frame (poll)
+    pads_state.of(app).clip_strip_key = None                       # drawn again next frame (poll)
 
 
 def _look_for_cams(app, again=False):
     """The camera list filled - asked of ffmpeg on a worker the first time (or again), the pad's own camera in it
     though it is not plugged in now."""
     from native import tasks
-    names = getattr(app, "_clip_cams", None)
+    names = pads_state.of(app).clip_cams
     if names is None or again:
-        app._clip_cams = names = []
+        pads_state.of(app).clip_cams = names = []
 
         def done(got):
-            app._clip_cams = got
+            pads_state.of(app).clip_cams = got
             _cam_items(app)
         tasks.run(app, "pads_cam_list", "looking for cameras", vj_clips.cameras, done)
     _cam_items(app)
@@ -190,7 +191,7 @@ def _cam_items(app):
     _, t = _clip(app)
     if t is None or t.get("kind") != "pad_cam" or not dpg.does_item_exist("pads_clip_cam"):
         return
-    items = list(getattr(app, "_clip_cams", None) or [])
+    items = list(pads_state.of(app).clip_cams or [])
     if t["name"] and t["name"] not in items:
         items = [t["name"]] + items
     dpg.configure_item("pads_clip_cam", items=items)
@@ -329,7 +330,7 @@ def _set_part(app, which, v):
     _set(app, quiet=True, **{"in": round(max(0.0, a), 2), "out": round(b, 2)})
     num.set("pads_clip_in", float(t["in"]))
     _show_out(app, t)
-    app._clip_strip_key = None
+    pads_state.of(app).clip_strip_key = None
 
 
 def _show_out(app, t):
@@ -349,7 +350,7 @@ def _chosen(app, a):
     f = a.get("file_path_name", "")
     if not f or not os.path.isfile(f):
         return
-    opened = getattr(app, "_clip_dialog_for", None)
+    opened = pads_state.of(app).clip_dialog_for
     if opened and opened[2] is not app.project:      # another project opened while the file was picked: not
         app.gp.status("another project was opened while the file was picked - not copied", "warn")   # copied in
         return
@@ -395,13 +396,13 @@ def _add_many(app, a):
 def _open_dialog(app, tag):
     """A file dialog shown, the pad and the bank it is for kept (another may be picked while it is open)."""
     s, _ = _clip(app)
-    app._clip_dialog_for = (s["id"] if s else None, _ui()._st(app)["bank"], app.project)
+    pads_state.of(app).clip_dialog_for = (s["id"] if s else None, _ui()._st(app)["bank"], app.project)
     dpg.show_item(tag)
 
 
 def _dialog_for(app):
     """(pad id, bank) the open file dialog is for - none once another project is open (its ids are its own)."""
-    got = getattr(app, "_clip_dialog_for", None)
+    got = pads_state.of(app).clip_dialog_for
     if not got or got[2] is not app.project:
         return None, None
     return got[0], got[1]
@@ -482,7 +483,7 @@ def poll(app):
     """While the CLIP rows show: the strip drawn when it changes (its frames come in, it plays), In and Out dragged."""
     s, t = _clip(app)
     if t is None or not dpg.does_item_exist(STRIP) or not dpg.is_item_shown(ROW):
-        app._clip_drag = None
+        pads_state.of(app).clip_drag = None
         return
     if t["kind"] == "pad_cam":
         dpg.configure_item("pads_clip_play", label="Stop" if vj_clips.held(app, ("try", s["id"])) else "Play")
@@ -492,14 +493,14 @@ def poll(app):
     mx, _ = dpg.get_mouse_pos(local=False)
     x0 = dpg.get_item_rect_min(STRIP)[0]
     w = _w()
-    drag = getattr(app, "_clip_drag", None)
+    drag = pads_state.of(app).clip_drag
     down = dpg.is_mouse_button_down(dpg.mvMouseButton_Left)
     if drag is None and dur and dpg.is_item_hovered(STRIP) and dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
         xa, xb = w * float(t["in"]) / dur, w * (float(t["out"]) or dur) / dur
-        drag = app._clip_drag = "in" if abs(mx - x0 - xa) <= abs(mx - x0 - xb) else "out"
+        drag = pads_state.of(app).clip_drag = "in" if abs(mx - x0 - xa) <= abs(mx - x0 - xb) else "out"
     if drag is not None:
         if not down:
-            app._clip_drag = None
+            pads_state.of(app).clip_drag = None
             _ui()._save(app)
         elif dur:
             v = max(0.0, min(dur, (mx - x0) / w * dur))
@@ -508,8 +509,8 @@ def poll(app):
     dpg.configure_item("pads_clip_play", label="Stop" if playing else "Play")
     key = (t["file"], t["in"], t["out"], dur is not None, _THUMBS.get(_strip_key(app, t)) is not None, _playhead(app, t) is not None
            and round(_playhead(app, t), 1))
-    if key != getattr(app, "_clip_strip_key", None):
-        app._clip_strip_key = key
+    if key != pads_state.of(app).clip_strip_key:
+        pads_state.of(app).clip_strip_key = key
         _draw_strip(app, t)
         if not float(t["out"]):
             _show_out(app, t)                       # the file's length, once its probe is in

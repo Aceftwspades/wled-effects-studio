@@ -65,6 +65,7 @@ from native.remote import SHOT_DIR, SHOT_REQ, SHOT_PNG, CMD_FILE, REMOTE, servic
 import shutil
 import sys
 from native import vj_state
+from native import pads_state
 
 STEP = 23
 CUBE_MAX = 620          # cube render cost is quadratic in this, so it is capped
@@ -1080,11 +1081,10 @@ class App(Features, Recorder, EditBuild):
         """Nothing of the last project's run state reaching the next: its pads' held controls, the phone's holds, a
         learn waiting, a drag; the Modulators dialog shows the new project's."""
         from native import modulate
-        self._pads_rt = None
-        self._pads_remote = None
-        self._pads_learn = None
-        self._pads_drag = None
-        getattr(self, "_pads_hw_rt", {}).get("held", {}).clear()
+        P = pads_state.of(self)
+        P.forget("rt", "remote", "learn", "drag")
+        if P.hw_rt:                                  # the controller's notes held (its lights and output stay)
+            P.hw_rt.get("held", {}).clear()
         modulate.reset(self)
         modulate.refresh(self)
 

@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import dearpygui.dearpygui as dpg
 
-from native import geometry, pads, pads_hw, pads_ui, vj
+from native import geometry, pads, pads_hw, pads_ui, vj, pads_state
 
 fails = []
 
@@ -111,10 +111,10 @@ o["fader"] = 0.0
 rest = pads_hw.events(app, [note(40, 100), note(40, 0), note(99, 100), (("cc", 0, 7), 10, 127.0)])
 check(o["fader"] == 1.0 and rest == [note(99, 100), (("cc", 0, 7), 10, 127.0)],
       "what played a pad goes no further; the rest go on to the MIDI window's maps")
-app._pads_edit = True
+pads_state.of(app).edit = True
 o["fader"] = 0.0
 rest = pads_hw.events(app, [note(40, 100), note(40, 0)])
-app._pads_edit = False
+pads_state.of(app).edit = False
 check(o["fader"] == 0.0 and len(rest) == 2, "while the pads are edited a learned note plays nothing (and goes on)")
 pads_hw.events(app, [(("cc", 0, 21), 32, 127.0)])
 check(abs(o["fader"] - 32 / 127) < 1e-3, "the learned CC moves the crossfader")
@@ -257,7 +257,7 @@ was = (midi.available, midi.out_ports, pads_hw.RETRY_S)
 midi.available = lambda: True
 midi.out_ports = lambda: ["LP lights"] if fake.there else []
 pads_hw.RETRY_S = 0.0
-fake = app._pads_out = FakeMidiOut()
+fake = pads_state.of(app).out = FakeMidiOut()
 h["out"] = "LP lights"
 app.gp.said.clear()
 pads_hw.poll(app)
@@ -287,7 +287,7 @@ real = midi.MidiOut()
 dead = Handle()
 real._out, real.port = dead, "LP lights"
 real.open = lambda name: setattr(real, "_out", dead) or setattr(real, "port", name)
-app._pads_out = real
+pads_state.of(app).out = real
 pads_hw._rt(app).update(at=0.0, out=None)
 app.gp.said.clear()
 pads_hw.RETRY_S = 60.0                                     # (looked for again only after a while)
@@ -304,7 +304,7 @@ pads_hw.RETRY_S = 0.0
 pads_hw._rt(app).update(at=0.0)
 pads_hw.poll(app)
 check(real.is_open and dead.sent, "plugged back: opened again and lit")
-app._pads_out = fake
+pads_state.of(app).out = fake
 
 # a control over two grid pads: let go by the pad that pressed it, not by the other's lift
 app5 = App()

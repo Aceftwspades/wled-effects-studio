@@ -18,6 +18,7 @@ import dearpygui.dearpygui as dpg
 
 from native.typeface import px
 from native import clip_ui, form, num, pads, pads_hw, vj_clips
+from native import pads_state
 
 TAG = "pads_win"
 GRID = "pads_grid"
@@ -42,29 +43,29 @@ def _c():
 def _st(app):
     """The project's pads, made whole once for each project (and after an undo)."""
     o = app.project.options.get("pads")
-    if o is None or getattr(app, "_pads_whole", None) is not o:
+    if o is None or pads_state.of(app).whole is not o:
         o = pads.state(app.project)
-        app._pads_whole = o
+        pads_state.of(app).whole = o
     return o
 
 
 def _save(app):
-    app._pads_typed = None
+    pads_state.of(app).typed = None
     app.project.save()
 
 
 def _save_soon(app):
     """A name or a label as it is typed: saved (one undo) once the typing stops, not at each key."""
     import time
-    app._pads_typed = (time.monotonic(), app.project)
+    pads_state.of(app).typed = (time.monotonic(), app.project)
 
 
 def _flush(app, now=None):
     """What was typed saved once the typing has stopped - or at once (`now` None: the window closing) - into the
     project it was typed in (another opened since saves its own)."""
-    typed = getattr(app, "_pads_typed", None)
+    typed = pads_state.of(app).typed
     if typed is not None and (now is None or now - typed[0] >= SAVE_AFTER_S):
-        app._pads_typed = None
+        pads_state.of(app).typed = None
         typed[1].save()
 
 
@@ -213,7 +214,7 @@ def show(app):
         build(app)
     chrome._centre(TAG, 720, 620)
     dpg.show_item(TAG)
-    app._pads_labels = None
+    pads_state.of(app).labels = None
     _fill_banks(app)
     _fill_side(app)
 
@@ -235,7 +236,7 @@ def _fill_banks(app):
         dpg.add_button(label=b["name"], tag=tag, parent="pads_banks", user_data=i,
                        callback=lambda s, a, u: switch_bank(app, u))
         dpg.bind_item_theme(tag, _bank_theme(b["colour"], i == st["bank"]))
-    edit = bool(getattr(app, "_pads_edit", False))
+    edit = bool(pads_state.of(app).edit)
     dpg.configure_item("pads_bankrow", show=edit)
     b = pads.current(st)
     dpg.set_value("pads_bname", b["name"])
@@ -280,7 +281,7 @@ def switch_bank(app, i):
         return
     pads.let_go(app)
     st["bank"] = i                                              # saved with the next change (not an undo of its own)
-    app._pads_sel = None
+    pads_state.of(app).sel = None
     _fill_banks(app)
     _fill_side(app)
 
@@ -344,7 +345,7 @@ def _delete_bank(app):
     _no_bank_learn(app)
     st["banks"].pop(st["bank"])
     st["bank"] = max(0, st["bank"] - 1)
-    app._pads_sel = None
+    pads_state.of(app).sel = None
     _save(app)
     _fill_banks(app)
     _fill_side(app)
@@ -385,8 +386,8 @@ def _undo(app):
     modulate._flush(app, 0.0, force=True)             # so they are what is undone (and seen by latest)
     if app.project.latest(("pads", "modulators")) == "modulators":
         modulate.undo(app)
-        app._pads_labels = None
-        app._pads_mods_key = None
+        pads_state.of(app).labels = None
+        pads_state.of(app).mods_key = None
         _fill_side(app)
         return
     was = {c["id"]: copy.deepcopy(c) for b in _st(app)["banks"] for c in b["controls"]}
@@ -396,8 +397,8 @@ def _undo(app):
     for i, c in was.items():                          # one taken away or set to drive something else by the undo:
         if i not in now or now[i].get("type") != c.get("type") or now[i].get("target") != c.get("target"):
             pads.forget(app, c)                       # what it left latched let go
-    app._pads_whole = None
-    app._pads_sel = None
+    pads_state.of(app).whole = None
+    pads_state.of(app).sel = None
     _fill_banks(app)
     _fill_side(app)
 
@@ -406,8 +407,8 @@ def _undo(app):
 def _set_edit(app, on):
     pads.let_go(app)
     pads_hw.learn(app, None)
-    app._pads_edit = bool(on)
-    app._pads_sel = None
+    pads_state.of(app).edit = bool(on)
+    pads_state.of(app).sel = None
     dpg.configure_item(SIDE, show=bool(on))
     dpg.configure_item("pads_area", width=-px(SIDE_W + 8) if on else -1)     # the panel beside the grid, editing
     _fill_banks(app)
@@ -416,7 +417,7 @@ def _set_edit(app, on):
 
 def _sel(app):
     """The selected control, or the selected empty cell as (col, row), or None."""
-    s = getattr(app, "_pads_sel", None)
+    s = pads_state.of(app).sel
     if isinstance(s, int):
         return pads.find(_st(app), s)
     return s
@@ -439,7 +440,7 @@ def labels(app):
     """[(label, target)] of every action a control can drive: MIDI learn's, then the pads' own - made again when the
     effect changes. Each target's label is in a table too (target_label: each control's, every frame)."""
     key = _labels_for(app)
-    if getattr(app, "_pads_labels", None) is None or getattr(app, "_pads_labels_key", None) != key:
+    if pads_state.of(app).labels is None or pads_state.of(app).labels_key != key:
         from native import midi_ui, vj
         out = [(lab, t) for lab, t in midi_ui.targets(app) if t.get("kind") != "pin"]
         out.append(("the effect: this one (pick it below)", {"kind": "pad_effect", "name": ""}))
@@ -449,13 +450,13 @@ def labels(app):
             out.append((f"VJ {d}: a saved preset (pick it below)", {"kind": "pad_preset", "deck": i, "name": ""}))
             out.append((f"VJ {d}: a video clip (set it below)", dict(vj_clips.DEFAULT, deck=i)))
             out.append((f"VJ {d}: a live camera (pick it below)", dict(vj_clips.CAM_DEFAULT, deck=i)))
-        app._pads_labels, app._pads_labels_key, app._pads_label_ix = out, key, None
-    if getattr(app, "_pads_label_ix", None) is None:
+        pads_state.of(app).labels, pads_state.of(app).labels_key, pads_state.of(app).label_ix = out, key, None
+    if pads_state.of(app).label_ix is None:
         ix = {}
-        for lab, t in app._pads_labels:
+        for lab, t in pads_state.of(app).labels:
             ix.setdefault(_label_key(t), lab)                 # two the same: the first, as the list's scan found
-        app._pads_label_ix = ix
-    return app._pads_labels
+        pads_state.of(app).label_ix = ix
+    return pads_state.of(app).labels
 
 
 def _label_key(t):
@@ -489,26 +490,26 @@ def target_label(app, t):
     if k == "pad_cam":
         return f"VJ {d}: camera {vj_clips.words(t)}"
     labels(app)
-    return app._pads_label_ix.get(_label_key(t), k)
+    return pads_state.of(app).label_ix.get(_label_key(t), k)
 
 
 def _axis(app):
     """The axis the panel's action and range are for: (axis, target key, low key, high key, words) - always across
     for a control that is not an XY pad."""
     s = _sel(app)
-    a = getattr(app, "_pads_axis", "x") if isinstance(s, dict) and s["type"] in pads.SURFACES else "x"
+    a = pads_state.of(app).axis if isinstance(s, dict) and s["type"] in pads.SURFACES else "x"
     if a == "p" and isinstance(s, dict) and s["type"] != "pressure":
         a = "x"
     return next(x for x in pads.AXES if x[0] == a)
 
 
 def _set_axis(app, words):
-    app._pads_axis = next(a for a, _, _, _, w in pads.AXES if w == words)
+    pads_state.of(app).axis = next(a for a, _, _, _, w in pads.AXES if w == words)
     _fill_side(app)
 
 
 def _fill_side(app):
-    if not dpg.does_item_exist(SIDE) or not getattr(app, "_pads_edit", False):
+    if not dpg.does_item_exist(SIDE) or not pads_state.of(app).edit:
         return
     s = _sel(app)
     ctl = isinstance(s, dict)
@@ -624,8 +625,8 @@ def _mods_changed(app):
     from native import modulate
     key = tuple((m.get("id"), tuple(m.get("keys") or ()), bool(m.get("on", True)), int(m.get("depth", 0)),
                  modulate.brief(m), tuple(sorted((m.get("amt") or {}).items()))) for m in modulate.modulators(app))
-    if key != getattr(app, "_pads_mods_key", None) and not num.busy():
-        app._pads_mods_key = key
+    if key != pads_state.of(app).mods_key and not num.busy():
+        pads_state.of(app).mods_key = key
         _fill_side(app)
 
 
@@ -639,7 +640,7 @@ def _attach(app):
     key = modulate.key_of(s.get(_axis(app)[1])) if isinstance(s, dict) else None
     if key is not None:
         modulate.attach(app, key)
-        app._pads_labels = None                   # the new modulator's settings in the action list
+        pads_state.of(app).labels = None                   # the new modulator's settings in the action list
         _fill_side(app)
 
 
@@ -648,7 +649,7 @@ def _detach(app, mid, key):
     m = modulate.find(app, mid)
     if m is not None:
         modulate.detach(app, m, key)
-        app._pads_labels = None
+        pads_state.of(app).labels = None
         _fill_side(app)
 
 
@@ -672,8 +673,8 @@ def _mod_pad(app, mid, typ, kind, key):
     c = pads.new_control(st, typ, cell[0], cell[1], target=t, label=f"Mod {mid} {key or 'play'}",
                          colour=s.get("colour", "grey") if isinstance(s, dict) else "grey")
     b["controls"].append(c)
-    app._pads_sel = c["id"]
-    app._pads_axis = "x"
+    pads_state.of(app).sel = c["id"]
+    pads_state.of(app).axis = "x"
     _save(app)
     _fill_side(app)
 
@@ -765,12 +766,12 @@ def _add_control(app, typ):
         if pads.fits(b, c):
             break
     else:                                                     # the cell gone (the grid made smaller) or taken
-        app._pads_sel = None
+        pads_state.of(app).sel = None
         _fill_side(app)
         return
-    app._pads_axis = "x"
+    pads_state.of(app).axis = "x"
     b["controls"].append(c)
-    app._pads_sel = c["id"]
+    pads_state.of(app).sel = c["id"]
     _save(app)
     _fill_side(app)
 
@@ -782,7 +783,7 @@ def _remove_control(app):
     pads.forget(app, s)
     b = pads.current(_st(app))
     b["controls"] = [c for c in b["controls"] if c["id"] != s["id"]]
-    app._pads_sel = None
+    pads_state.of(app).sel = None
     _save(app)
     _fill_side(app)
 
@@ -813,7 +814,7 @@ def remote_state(app):
             d["xy"] = [round(v, 4) for v in at] if at else None
         out.append(d)
     return {"bank": st["bank"], "cols": b["cols"], "rows": b["rows"], "controls": out,
-            "edit": bool(getattr(app, "_pads_edit", False)),
+            "edit": bool(pads_state.of(app).edit),
             "banks": [{"name": x["name"], "rgb": _rgb(x.get("colour"))} for x in st["banks"]]}
 
 
@@ -825,14 +826,14 @@ def remote(app, cmd):
     if cmd["a"] == "padbank":
         switch_bank(app, int(cmd["v"]))
         return
-    if getattr(app, "_pads_edit", False):                          # the pads do nothing while they are edited
+    if pads_state.of(app).edit:                          # the pads do nothing while they are edited
         return
     c = next((x for x in pads.current(st)["controls"] if x["id"] == cmd["id"]), None)
     if c is None:                                                   # a bank switched since the page drew it
         return
-    seen = getattr(app, "_pads_remote", None)
+    seen = pads_state.of(app).remote
     if seen is None:
-        seen = app._pads_remote = {}
+        seen = pads_state.of(app).remote = {}
     e = cmd["e"]
     mine = seen.get(c["id"])                                        # [how many phone presses hold it, last heard]
     if e == "up":                                                   # only what a phone pressed: not the mouse's,
@@ -870,7 +871,7 @@ def remote_poll(app, gone=False):
     """Each frame: a control a phone holds but has not mentioned for REMOTE_GONE_S let go - every one at once when
     `gone` (the remote turned off: no phone can lift them)."""
     import time
-    seen = getattr(app, "_pads_remote", None)
+    seen = pads_state.of(app).remote
     if not seen:
         return
     now = time.monotonic()
@@ -907,7 +908,7 @@ def _drawn(app, cw, ch, gap):
     """All the grid shows, in brief: drawn again only when it changes (a full bank drawn each frame took 5 ms)."""
     st = _st(app)
     b = pads.current(st)
-    edit = bool(getattr(app, "_pads_edit", False))
+    edit = bool(pads_state.of(app).edit)
     sel = _sel(app)
     out = [st["bank"], b["cols"], b["rows"], round(cw, 2), round(ch, 2), gap, edit,
            sel["id"] if isinstance(sel, dict) else sel]
@@ -922,8 +923,8 @@ def _drawn(app, cw, ch, gap):
 
 def _redraw(app, cw, ch, gap):
     key = _drawn(app, cw, ch, gap)
-    if key != getattr(app, "_pads_drawn", None) or not dpg.get_item_children(GRID, 2):
-        app._pads_drawn = key
+    if key != pads_state.of(app).drawn or not dpg.get_item_children(GRID, 2):
+        pads_state.of(app).drawn = key
         _draw(app, cw, ch, gap)
     _draw_swings(app, cw, ch, gap)
 
@@ -932,7 +933,7 @@ def _draw(app, cw, ch, gap):
     from native import chrome
     st = _st(app)
     b = pads.current(st)
-    edit = bool(getattr(app, "_pads_edit", False))
+    edit = bool(pads_state.of(app).edit)
     dpg.delete_item(GRID, children_only=True)
     dpg.draw_rectangle((0, 0), (b["cols"] * cw + gap, b["rows"] * ch + gap), fill=chrome.BG, color=(0, 0, 0, 0),
                        parent=GRID)
@@ -998,7 +999,7 @@ def _draw(app, cw, ch, gap):
         dpg.draw_rectangle((x * cw + gap, y * ch + gap), ((x + 1) * cw, (y + 1) * ch), color=(255, 255, 255, 255),
                            rounding=px(6), thickness=px(2), parent=GRID)
     dpg.add_draw_layer(tag=MODS, parent=GRID)
-    app._pads_swung = None
+    pads_state.of(app).swung = None
 
 
 def _swings(app):
@@ -1018,9 +1019,9 @@ def _draw_swings(app, cw, ch, gap):
     the modulators swing it over, and a mark where the wave has it now."""
     sw = _swings(app)
     key = tuple((c["id"], ax, round(a, 3), round(b, 3), round(n, 3)) for c, ax, (a, b, n) in sw)
-    if key == getattr(app, "_pads_swung", None) or not dpg.does_item_exist(MODS):
+    if key == pads_state.of(app).swung or not dpg.does_item_exist(MODS):
         return
-    app._pads_swung = key
+    pads_state.of(app).swung = key
     dpg.delete_item(MODS, children_only=True)
     import math
     for c, ax, (a, b, n) in sw:
@@ -1108,7 +1109,8 @@ def _swell(app):
     touched, rising to full over SWELL_S held - an aftertouch swell. (How fast the pointer came in was tried: a
     mouse is still when it clicks and a touch jumps there at once, so it read the same for a tap and a slam.)"""
     import time
-    held = time.monotonic() - getattr(app, "_pads_down_at", time.monotonic())
+    down = pads_state.of(app).down_at
+    held = 0.0 if down is None else time.monotonic() - down
     return SWELL_FROM + (1.0 - SWELL_FROM) * max(0.0, min(1.0, held / SWELL_S))
 
 
@@ -1160,20 +1162,20 @@ def poll(app):
     import time
     _flush(app, time.monotonic())
     shown = dpg.does_item_exist(TAG) and dpg.is_item_shown(TAG)
-    clip_ui.keep_try(app, shown and getattr(app, "_pads_edit", False))
+    clip_ui.keep_try(app, shown and pads_state.of(app).edit)
     if not shown:
-        if getattr(app, "_pads_drag", None) is not None:
-            app._pads_drag = None
+        if pads_state.of(app).drag is not None:
+            pads_state.of(app).drag = None
             pads.let_go(app)
         return
-    if getattr(app, "_pads_project", None) is not app.project:
-        app._pads_project = app.project
-        app._pads_whole = None
-        app._pads_sel = None
-        app._pads_labels = None
+    if pads_state.of(app).project is not app.project:
+        pads_state.of(app).project = app.project
+        pads_state.of(app).whole = None
+        pads_state.of(app).sel = None
+        pads_state.of(app).labels = None
         _fill_banks(app)
         _fill_side(app)
-    if getattr(app, "_pads_edit", False):
+    if pads_state.of(app).edit:
         _mods_changed(app)
         clip_ui.poll(app)
     x0, y0, cw, ch, gap = _geometry(app)
@@ -1181,8 +1183,8 @@ def poll(app):
     b = pads.current(st)
     mx, my = dpg.get_mouse_pos(local=False)
     down = dpg.is_mouse_button_down(dpg.mvMouseButton_Left)
-    drag = getattr(app, "_pads_drag", None)
-    edit = bool(getattr(app, "_pads_edit", False))
+    drag = pads_state.of(app).drag
+    edit = bool(pads_state.of(app).edit)
     w, h = dpg.get_item_rect_size(GRID)
     over = x0 <= mx <= x0 + w and y0 <= my <= y0 + h and (dpg.is_item_hovered(GRID) or dpg.is_item_hovered("pads_area"))
     if drag is not None:
@@ -1194,7 +1196,7 @@ def poll(app):
             elif drag[0] in ("move", "size"):
                 _save(app)
                 _fill_side(app)
-            app._pads_drag = None
+            pads_state.of(app).drag = None
         else:
             _dragging(app, drag, mx, my, x0, y0, cw, ch, gap, b)
     elif over and dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
@@ -1203,28 +1205,28 @@ def poll(app):
             c = pads.at(b, *cell)
             if edit:
                 if c is None:
-                    app._pads_sel = cell
+                    pads_state.of(app).sel = cell
                 else:
-                    app._pads_sel = c["id"]
+                    pads_state.of(app).sel = c["id"]
                     rx0, ry0, rx1, ry1 = _rect(c, cw, ch, gap)
                     corner = mx >= x0 + rx1 - px(HANDLE) - px(4) and my >= y0 + ry1 - px(HANDLE) - px(4)
-                    app._pads_drag = ("size" if corner else "move", c["id"], cell, (c["x"], c["y"]))
+                    pads_state.of(app).drag = ("size" if corner else "move", c["id"], cell, (c["x"], c["y"]))
                 _fill_side(app)
             elif c is not None:
                 f = None
                 if c["type"] in pads.SURFACES:
                     import time
-                    app._pads_down_at = time.monotonic()
+                    pads_state.of(app).down_at = time.monotonic()
                     pads.press(app, c, xy=_surface_at(c, mx, my, x0, y0, cw, ch, gap), pressure=_swell(app))
-                    app._pads_drag = ("play", c["id"])
+                    pads_state.of(app).drag = ("play", c["id"])
                     _redraw(app, cw, ch, gap)
                     return
                 if c["type"] == "fader":
                     f = _travel(c, mx, my, x0, y0, cw, ch, gap)
                 elif c["type"] == "knob":
-                    app._pads_knob = (my, pads.position(app, c))
+                    pads_state.of(app).knob = (my, pads.position(app, c))
                 pads.press(app, c, f)
-                app._pads_drag = ("play", c["id"])
+                pads_state.of(app).drag = ("play", c["id"])
     _redraw(app, cw, ch, gap)
 
 
@@ -1232,7 +1234,7 @@ def _dragging(app, drag, mx, my, x0, y0, cw, ch, gap, b):
     st = _st(app)
     c = pads.find(st, drag[1])
     if c is None or (drag[0] != "play" and not any(o is c for o in b["controls"])):   # (the bank switched under a
-        app._pads_drag = None                                                          # move: not laid on another's grid)
+        pads_state.of(app).drag = None                                                          # move: not laid on another's grid)
         return
     if drag[0] == "play":
         if c["type"] in pads.SURFACES:
@@ -1241,7 +1243,7 @@ def _dragging(app, drag, mx, my, x0, y0, cw, ch, gap, b):
         elif c["type"] == "fader":
             pads.drag(app, c, _travel(c, mx, my, x0, y0, cw, ch, gap))
         elif c["type"] == "knob":
-            y_start, f0 = getattr(app, "_pads_knob", (my, 0.0))
+            y_start, f0 = pads_state.of(app).knob or (my, 0.0)
             pads.drag(app, c, f0 + (y_start - my) / px(KNOB_PX))
         return
     col = int((mx - x0) // cw)
