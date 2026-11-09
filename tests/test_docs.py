@@ -30,6 +30,11 @@ def _source(name):
     return io.open(os.path.join(ROOT, "native", name), encoding="utf-8").read()
 
 
+def _graph_and_show():
+    """graph_ui.py and the mixins its GraphPanel is made of (graph_*.py), and the modules split from sequence_ui.py (seq_*.py)."""
+    return sorted(f for f in os.listdir(os.path.join(ROOT, "native")) if f.endswith(".py") and f.startswith(("graph_", "seq_")))
+
+
 def test_guide_has_the_reference_section():
     g = _guide()
     assert "## reference: every menu, key and button" in g and "<!-- uiref end -->" in g, "run python tests/make_uiref.py"
@@ -38,7 +43,7 @@ def test_guide_has_the_reference_section():
 def test_every_menu_item_is_in_the_guide():
     guide = _guide()
     labels = []
-    for f in ("chrome.py", "app.py", "graph_ui.py"):
+    for f in ["chrome.py", "app.py"] + _graph_and_show():                 # graph_ui and its mixins, the show's modules
         s = _source(f)
         labels += re.findall(r'add_menu_item\(label="([^"]+)"', s) + re.findall(r'_mi\(app, "([^"]+)"', s)
     missing = sorted({l for l in labels if len(l) >= 3 and not _has(guide, l)})
@@ -56,7 +61,7 @@ def test_every_frame_button_is_in_the_guide():
     guide = _guide()
     missing = []
     for f in sorted(os.listdir(os.path.join(ROOT, "native"))):
-        if f.endswith("_ui.py") or f in ("chrome.py", "app.py", "messages.py", "view3d.py", "shape_view.py"):
+        if f.endswith("_ui.py") or f in _graph_and_show() or f in ("chrome.py", "app.py", "messages.py", "view3d.py", "shape_view.py"):
             for b in re.findall(r'add_button\(label="([^"]+)"', _source(f)):
                 if len(b) >= 4 and b not in GENERIC and not _has(guide, b.replace("\\n", " ")):
                     missing.append(f"{f}: {b}")
