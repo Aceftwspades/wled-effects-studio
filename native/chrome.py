@@ -117,6 +117,10 @@ def build_menus(app):
             with dpg.menu(label="Project"):
                 dpg.add_menu_item(label="New project...", callback=lambda: ask(
                     app, "New project", "a name, or a folder path", "", lambda v: app.new_project(v)))
+                dpg.add_menu_item(label="New live show project...", callback=lambda: ask(          # native/live_show.py
+                    app, "New live show project", "a name: the VJ's decks, two banks of pads, a clip and a camera set up",
+                    __import__("native.live_show", fromlist=["l"]).DEFAULT_NAME,
+                    lambda v: __import__("native.live_show", fromlist=["l"]).make(app, v)))
                 with dpg.menu(label="Open", tag="menu_open_project"):
                     pass
                 with dpg.menu(label="Recent", tag="menu_recent_project"):

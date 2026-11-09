@@ -67,4 +67,7 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 - [x] **The selected deck at a glance**: a coloured border on it and on the pads that act on it.
       Each deck a colour (`vj.DECK_RGB`: A blue, B orange, C violet): the selected deck's frame in it, every
       deck's title in its own, and a strip along each pad that acts on a deck (the selected deck's: as selected now).
-- [ ] **A starter "live show" project** with pads, a clip pad and a camera pad already set up.
+- [x] **A starter "live show" project** with pads, a clip pad and a camera pad already set up.
+      File > Project > New live show project... (`native/live_show.py`): two looks on decks A and B, the Live bank
+      and a Show bank (deck pickers, knobs on the selected deck, a Clip pad with a starter clip ffmpeg makes, a
+      Camera pad on the first webcam found), the VJ and the pads opened.

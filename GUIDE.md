@@ -1136,6 +1136,15 @@ device itself has no second deck (it blends between a show's presets).
 
 ## The VJ frame
 
+To start from a show already set up, **File > Project > New live show
+project...** makes a project with two looks on decks A and B, the pads' **Live**
+bank (shuffles, Cut and Fade, deck C, the crossfader) and a **Show** bank: pads
+that pick the deck, knobs on the selected deck's look, amount, speed and hue,
+a **Clip** pad playing a starter clip on deck C (made with ffmpeg, when it is
+installed) and a **Camera** pad on your first webcam - then opens the VJ and
+the pads. Without ffmpeg or a webcam, those two pads are left for their CLIP
+section to set.
+
 **Window > VJ** (Ctrl+Shift+J, or **VJ** on the toolbar) is a VJ's desk:
 two decks, each a **video** source and a **look**, a crossfader between
 them, and the mix on the shape. Tick **on air** and the mix shows in
@@ -2137,6 +2146,7 @@ on and install what it carries.
 - **File** › History... `Ctrl+Shift+Y`
 - **File** › Open graph as code
 - **File › Project** › New project...
+- **File › Project** › New live show project...
 - **File › Project** › Open › … the projects
 - **File › Project** › Recent › … the projects opened lately
 - **File › Project** › Open folder...

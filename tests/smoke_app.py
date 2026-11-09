@@ -1531,6 +1531,15 @@ STEPS = [
       {"check": "os.path.exists(os.path.join(__import__('native.paths', fromlist=['x']).CAPTURES, "
                 "'gallery-share', 'smoke-share', 'entry.json'))"},
       {"py": "__import__('native.library_ui', fromlist=['x'])._set_bank(app, 'graphs')"}], 0.5),
+    # File > New live show project: a project of its own with the VJ's decks and two banks of pads - Live and Show -
+    # the clip pad's starter clip made by ffmpeg (when it is here), the VJ and the pads open; then back to the run's
+    ([{"py": "live_show.make(app, 'smoke_live')"}], 1.0),
+    ([{"check": "app.project.path.endswith('smoke_live') and [b['name'] for b in pads_ui._st(app)['banks']] == ['Live', 'Show']"},
+      {"check": "[d['look'] for d in vj.options(app)['decks'][:2]] == list(live_show.LOOKS) and dpg.is_item_shown('pads_win')"},
+      {"check": "not __import__('native.video', fromlist=['v']).ffmpeg() or "
+                "live_show._pad(app, 'pad_clip')['target']['file'] == 'assets/vj/' + live_show.CLIP_FILE"},
+      {"py": "chrome.close_dialog('pads_win')"}, {"py": "device_ui.close(app, 'vj')"}, {"project": SMOKE}], 1.0),
+    ([{"check": f"app.project.path.endswith({SMOKE!r})"}], 0.3),
 ]
 
 
@@ -1684,7 +1693,7 @@ def main():
         print("no ffmpeg: the camera-map steps are left out")
         STEPS[:] = [s for s in STEPS if s not in MAP_STEPS]
     smoke_dir = os.path.join(ROOT, "projects", SMOKE)
-    for d in (smoke_dir, os.path.join(ROOT, "projects", "smoke_bad")):
+    for d in (smoke_dir, os.path.join(ROOT, "projects", "smoke_bad"), os.path.join(ROOT, "projects", "smoke_live")):
         if os.path.isdir(d):
             shutil.rmtree(d)                                  # a run that was stopped: started afresh
     tut_dir = os.path.join(ROOT, "projects", "node_tutorials")
@@ -1735,6 +1744,7 @@ def main():
             open(STUDIO_FILE, "w", encoding="utf-8").write(saved_prefs)
         shutil.rmtree(smoke_dir, ignore_errors=True)          # the run's project, and all it made in it
         shutil.rmtree(os.path.join(ROOT, "projects", "smoke_bad"), ignore_errors=True)    # the one with the broken project.json
+        shutil.rmtree(os.path.join(ROOT, "projects", "smoke_live"), ignore_errors=True)   # File > New live show project's
         if not tut_had:
             shutil.rmtree(tut_dir, ignore_errors=True)
     text = open(LOG, encoding="utf-8", errors="replace").read()
