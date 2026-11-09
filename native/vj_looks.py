@@ -76,8 +76,8 @@ def sample(img, u, v, wrap=False):
     y = np.asarray(v * (h - 1), np.float32)
     # a NaN or an infinity (a MilkDrop equation's divide, a look's own) read as the first column: as an index it
     # was a wild one - the corners are gathered by flat index, which nothing brings back in range
-    x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
-    y = np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
+    x = np.where(np.isfinite(x), x, np.float32(0))      # (nan_to_num's result, a third quicker)
+    y = np.where(np.isfinite(y), y, np.float32(0))
     if wrap:
         x = _wrap(x, w); y = _wrap(y, h)
     else:

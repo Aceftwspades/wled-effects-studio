@@ -242,10 +242,6 @@ def _binop(op, a, b):
             "&&": f"_and({a}, {b})", "&": f"_and({a}, {b})", "||": f"_or({a}, {b})", "|": f"_or({a}, {b})"}[op]
 
 
-def _num(x):
-    return np.asarray(x, np.float64) if isinstance(x, np.ndarray) else float(x)
-
-
 def _div(a, b):
     b = np.where(np.abs(b) < 1e-12, np.nan, b) if isinstance(b, np.ndarray) else b
     if isinstance(b, np.ndarray):
@@ -276,13 +272,6 @@ def _f(x):
 
 
 _FUNCS = {}
-
-
-def _fn(name):
-    def reg(f):
-        _FUNCS[name] = f
-        return f
-    return reg
 
 
 for _n, _impl in {
@@ -1113,7 +1102,9 @@ def _points_in_order(run, pv, count):
             p[k] = float(arrays[k][i])
         run(p)
         for k in keys:
-            out[k][i] = float(np.nan_to_num(p.get(k, 0.0)))
+            out[k][i] = float(p.get(k, 0.0))
+    for k in keys:                     # NaN 0, an infinity the largest float - once per array, not per point (~11 us each)
+        np.nan_to_num(out[k], copy=False)
     pv.update(out)
 
 
