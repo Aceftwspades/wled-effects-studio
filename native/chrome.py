@@ -59,7 +59,10 @@ WINDOW_FRAMES = (("devices", "Devices", "devices"), ("send", "Send to device", "
                  ("shape", "Shape editor", "shape"), ("sequence", "Sequence: presets and a playlist", "sequence"),
                  ("library", "Library", "library"), ("palettes", "Palettes (gradients)", "palettes"),
                  ("outputs", "LED outputs and power", "outputs"), ("audioin", "Audio input (mic / line-in)", "audioin"),
-                 ("vj", "VJ: two decks of video and looks", "vj"))
+                 ("vj", "VJ: two decks of video and looks", "vj"),
+                 ("pads", "Pads: buttons, knobs and faders to play", "pads"),
+                 ("modulators", "Modulators", "modulators"), ("mixer", "Mixer: a second effect, crossfaded", "mixer"),
+                 ("midi", "MIDI, OSC and phone", "midi"))
 
 
 def window_open(app, slot):
@@ -98,6 +101,7 @@ def refresh_windows(app):
 
 
 def build_menus(app):
+    _APP[:] = [app]
     with dpg.menu_bar(tag="menubar"):
         with dpg.menu(label="File"):
             _mi(app, "New graph effect...", "new", callback=lambda: app.new_effect("graph"))
@@ -352,7 +356,6 @@ def build_menus(app):
                     callback=lambda s, a, u: toggle_window(app, u))
             dpg.add_separator()
             _mi(app, "Snapshots...", "snapshots", callback=lambda: show_snapshots(app))
-            _mi(app, "MIDI, OSC and phone...", "midi", callback=lambda: app.run_action("midi"))
             _mi(app, "Effect slots...", "bank", callback=lambda: app.run_action("bank"))
             dpg.add_menu_item(label="Message log...", callback=lambda: __import__("native.messages", fromlist=["x"]).show_log(app))
             dpg.add_separator()
@@ -2037,7 +2040,15 @@ def set_dialog_title(tag, title):
         dpg.set_value(f"{tag}_head", title)
 
 
+_APP = []               # the app, once its menus are built: close_dialog is given a tag alone
+
+
 def close_dialog(tag):
+    from native import device_ui
+    slot = next((s for s, f in device_ui.FRAMES.items() if f[0] == tag), None)
+    if slot is not None and _APP:                # a frame (the pads, the mixer: dialogs once): its tab or its window away
+        device_ui.close(_APP[0], slot)
+        return
     cb = DIALOGS.get(tag)
     if cb:
         cb()

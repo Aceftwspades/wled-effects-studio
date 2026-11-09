@@ -125,8 +125,11 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       for the supply's, in amber; no outputs says how to make some.
 - [x] **Dialogs taller than the studio** (camera mapping, 755 in a 761 window) are as tall as fits and
       scroll (`chrome._fit_height`).
-- [ ] **Pads, Modulators, Mixer and MIDI as frames** that dock, with a toolbar button, as the other ten.
+- [x] **Pads, Modulators, Mixer and MIDI are frames**, as the other ten: a tab in the dock, a pane beside the VJ
+      by their grip, in the Window menu with an action each. They open floating, as the dialogs they were, until
+      docked (`dock.FLOAT_FIRST`); `chrome.close_dialog` of one closes its frame.
 - [ ] **A tooltip on every button** (132 of 354 have none), and a check that fails for a new one without.
-- [ ] **Clipped words** (the Library's tags, the VJ decks' descriptions), **areas with no title** (the logs of
-      Devices and Send), **controls shown before they can do anything** (Sequence, Palettes, Send).
+- [ ] **Clipped words** (the VJ decks' descriptions; the Library's tags are cut at a whole tag now, "3-D, both +3"),
+      **areas with no title** (the logs of Devices and Send), **controls shown before they can do anything**
+      (Sequence, Palettes, Send).
 - [ ] **Startup**: ~8,600 items and 180 windows are built before the first frame; what that costs is not measured.

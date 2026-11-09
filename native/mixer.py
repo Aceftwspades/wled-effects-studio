@@ -156,7 +156,8 @@ def build(app):
     from native.typeface import px
     o = options(app)
     with dpg.window(tag=TAG, show=False, no_title_bar=True, no_collapse=True, width=px(480), height=px(340)):
-        chrome.dialog_header(TAG, "Mixer")
+        from native import device_ui
+        device_ui.header(app, "mixer")
         dpg.add_text("Deck A is the effect the studio has; deck B runs beside it, hearing the same sound. The fader takes "
                      "the picture from one to the other through the blend - in the sim and the stream. MIDI (the "
                      "mixer's fader) and the phone move it too.", color=chrome.DIM, wrap=px(450))
@@ -190,16 +191,19 @@ def _set(app, key, v):
 
 def show(app):
     import dearpygui.dearpygui as dpg
-    from native import chrome
     if not dpg.does_item_exist(TAG):
         build(app)
+    from native import device_ui
+    device_ui.show(app, "mixer")                      # a frame (it calls refresh)
+
+
+def refresh(app):
+    import dearpygui.dearpygui as dpg
     o = options(app)
     if not o["b"]:
         o["b"] = next((n for n in app.eng.names if n != app.eng.names[app.eng.idx] and n.lower() != "solid"), "")
     dpg.configure_item("mx_b", items=list(app.eng.names))
     dpg.set_value("mx_b", o["b"])
-    chrome._centre(TAG, 480, 340)
-    dpg.show_item(TAG)
 
 
 def swap(app):

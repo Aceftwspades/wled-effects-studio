@@ -58,7 +58,7 @@ class AppInput:
     def _slot_label(self, slot):
         return {"main": {"edit": "Code", "graph": "Graph"}.get(self.layout, "Logical view"), "cube": "3-D view",
                 "side": "Panel", "props": "Properties", "devices": "Devices", "flash": "Flash firmware",
-                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs", "audioin": "Audio input", "vj": "VJ"}.get(slot, slot)
+                "send": "Send to device", "shape": "Shape", "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs", "audioin": "Audio input", "pads": "Pads", "modulators": "Modulators", "mixer": "Mixer", "midi": "MIDI, OSC and phone", "vj": "VJ"}.get(slot, slot)
 
     def on_mouse_click(self, sender, app_data):
         self._picker_click()
@@ -545,6 +545,9 @@ class AppInput:
             "vj":           lambda: device_ui.show(self, "vj"),
             "outputs":      lambda: device_ui.show(self, "outputs"),
             "audioin":      lambda: device_ui.show(self, "audioin"),
+            "pads":         lambda: device_ui.show(self, "pads"),
+            "modulators":   lambda: device_ui.show(self, "modulators"),
+            "mixer":        lambda: device_ui.show(self, "mixer"),
             "randomise":    self.randomise,
             "undo":         lambda: self.undo_where(),
             "redo":         lambda: self.undo_where(redo=True),

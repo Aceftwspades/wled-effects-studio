@@ -28,9 +28,12 @@ TAB_H = 34                  # the tab strip at 100%
 MIN_W = 240                 # a tab's narrowest column, at 100%
 NAMES = {"side": "Panel", "devices": "Devices", "flash": "Flash", "send": "Send", "shape": "Shape",
          "sequence": "Sequence", "library": "Library", "palettes": "Palettes", "outputs": "LED outputs",
-         "audioin": "Audio input", "vj": "VJ"}
+         "audioin": "Audio input", "vj": "VJ", "pads": "Pads", "modulators": "Modulators", "mixer": "Mixer",
+         "midi": "MIDI"}
 ICONS = {"devices": "devices", "flash": "flash", "send": "send", "shape": "shape", "sequence": "sequence",
-         "library": "library", "palettes": "palette", "outputs": "outputs", "audioin": "mic", "vj": "video"}
+         "library": "library", "palettes": "palette", "outputs": "outputs", "audioin": "mic", "vj": "video",
+         "pads": "swatches", "modulators": "sliders", "mixer": "both", "midi": "audio"}
+FLOAT_FIRST = ("pads", "modulators", "mixer", "midi")   # frames that open floating until they are docked: they were dialogs
 
 _sig = None                 # what the tab strip was built for
 
@@ -47,6 +50,12 @@ def state(app):
     st.setdefault("active", "side")
     st.setdefault("float", [])
     st.setdefault("w", {})
+    seen = st.setdefault("seen", [])
+    for s in FLOAT_FIRST:                             # once each: floating, as the dialog it was, until docked
+        if s not in seen:
+            seen.append(s)
+            if s not in st["float"] and s not in st["tabs"]:
+                st["float"].append(s)
     known = _frames()
     st["tabs"] = [t for t in dict.fromkeys(st["tabs"]) if t in known]
     if st["active"] != "side" and st["active"] not in st["tabs"]:
@@ -204,6 +213,10 @@ def close_frame(app, slot):
     if slot not in _frames():
         return
     tag = _frames()[slot][0]
+    from native import device_ui
+    hook = device_ui.ON_CLOSE.get(slot)
+    if hook:
+        hook(app)
     if paned(app, slot):
         app.unplace(slot)
     _leave(app, slot)

@@ -78,6 +78,9 @@ ACTIONS = [
     ("outputs",       "LED outputs and power",                               "Ctrl+Shift+O", "global"),
     ("audioin",       "Audio input: the device's microphone or line-in",    "Ctrl+Shift+M", "global"),
     ("vj",            "VJ: two decks of video and looks",                    "Ctrl+Shift+J", "global"),
+    ("pads",          "Pads: buttons, knobs and faders to play",             "",             "global"),
+    ("modulators",    "Modulators: sliders moved by a wave, the beat or the sound", "",      "global"),
+    ("mixer",         "Mixer: a second effect, crossfaded with the first",   "",             "global"),
     ("randomise",     "Randomise the settings",                              "Ctrl+Shift+X", "global"),
     # the graph
     ("undo",          "Undo (the graph, or the code)",                       "Ctrl+Z", "global"),

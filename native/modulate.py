@@ -1046,7 +1046,8 @@ def build(app):
     from native.typeface import px
     state(app).dialog_built = True
     with dpg.window(tag=TAG, show=False, no_title_bar=True, no_collapse=True, width=px(W), height=px(H)):
-        chrome.dialog_header(TAG, "Modulators")
+        from native import device_ui
+        device_ui.header(app, "modulators")
         dpg.add_text("Sliders, the VJ's knobs and faders, and other modulators' depth and rate, moved by a wave, the "
                      "beat, a pattern of steps, an envelope or the sound, around where each is set - in the sim and "
                      "the stream. Whatever sets a slider sets the place it moves around. A pad, MIDI or the phone can "
@@ -1274,12 +1275,10 @@ def _unbeats(words):
 
 def show(app):
     import dearpygui.dearpygui as dpg
-    from native import chrome
     if not dpg.does_item_exist(TAG):
         build(app)
-    refresh(app)
-    chrome._centre(TAG, W, H)
-    dpg.show_item(TAG)
+    from native import device_ui
+    device_ui.show(app, "modulators")                 # a frame (it calls refresh)
 
 
 def undo(app):

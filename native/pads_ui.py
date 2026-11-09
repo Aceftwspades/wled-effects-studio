@@ -75,7 +75,9 @@ def build(app):
     c = _c()
     with dpg.window(tag=TAG, show=False, no_title_bar=True, no_collapse=True, width=px(720), height=px(620),
                     no_scrollbar=True):
-        c.dialog_header(TAG, "Pads", on_close=lambda: _close(app))
+        from native import device_ui
+        device_ui.header(app, "pads")
+        device_ui.ON_CLOSE["pads"] = _close
         with dpg.group(horizontal=True):
             dpg.add_group(tag="pads_banks", horizontal=True)
             dpg.add_button(label="+", tag="pads_addbank", small=True, callback=lambda: _add_bank(app))
@@ -215,20 +217,22 @@ def _build_side(app):
 
 
 def show(app):
-    from native import chrome
     if not dpg.does_item_exist(TAG):
         build(app)
-    chrome._centre(TAG, 720, 620)
-    dpg.show_item(TAG)
+    from native import device_ui
+    device_ui.show(app, "pads")                       # a frame: floating as it opens, docked or among the panes if put there
+
+
+def refresh(app):
     pads_state.of(app).labels = None
     _fill_banks(app)
     _fill_side(app)
 
 
 def _close(app):
+    """As the frame closes (dock.close_frame): what was being typed kept, what the pads hold let go."""
     _flush(app)
     pads.let_go(app)
-    dpg.hide_item(TAG)
 
 
 # --- banks -------------------------------------------------------------------------------------------------------

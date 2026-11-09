@@ -69,7 +69,8 @@ def build(app):
     app.devfx = bank.Switcher()                           # the device's effect, switched with the sim's
     state(app).forget()                                   # a fresh window: no learn waiting, no OSC error, no setlist sending
     with dpg.window(tag=TAG, label="MIDI, OSC and phone", no_title_bar=True, show=False, width=px(600), height=px(670), no_collapse=True):
-        c.dialog_header(TAG, "MIDI, OSC and phone")                    # one window style (C8): the frames' header
+        from native import device_ui
+        device_ui.header(app, "midi")
         dpg.add_text("", tag="midi_note", color=c.DIM, wrap=px(580))
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("PORT", color=c.ACCENT))
@@ -159,9 +160,8 @@ def build(app):
 
 
 def show(app):
-    refresh(app)
-    _c()._centre(TAG, 600, 670)
-    dpg.show_item(TAG)
+    from native import device_ui
+    device_ui.show(app, "midi")                       # a frame (it calls refresh)
 
 
 # --- targets ------------------------------------------------------------------------------

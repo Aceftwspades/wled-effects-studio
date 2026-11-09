@@ -66,7 +66,8 @@ class AppLayout:
                ("3-D above the panel", [["main"], ["cube", "side"], ["props"]]),
                ("Panel under the 3-D, main pane on the right", [["cube", "side"], ["main", "props"]]))
     CORE = ("main", "cube", "side", "props")
-    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes", "outputs", "audioin", "vj")
+    OPTIONAL = ("devices", "flash", "send", "shape", "sequence", "library", "palettes", "outputs", "audioin", "vj",
+                "pads", "modulators", "mixer", "midi")
     SLOTS = CORE + OPTIONAL
 
     @classmethod

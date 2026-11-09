@@ -64,7 +64,14 @@ FRAMES = {"devices": ("devices_win", "Devices", 640, 420),
           "palettes": ("palettes_win", "Palettes", 560, 460),  # gradients of the project's own (palette_ui.py)
           "outputs": ("outputs_win", "LED outputs", 680, 420),  # the wiring as the device's busses, and the power (outputs_ui.py)
           "audioin": ("audioin_win", "Audio input", 640, 340),
-          "vj": ("vj_win", "VJ", 680, 720)}                    # two decks of video and looks (vj_ui.py)  # the device's microphone or line-in module (audioin_ui.py)
+          "vj": ("vj_win", "VJ", 680, 720),                    # two decks of video and looks (vj_ui.py)
+          # the four that were dialogs - over the panes, never docked or placed beside the VJ they are played
+          # with. They still open floating (dock.FLOAT_FIRST) until docked or dragged among the panes.
+          "pads": ("pads_win", "Pads", 720, 620),              # pads_ui.py
+          "modulators": ("modulators_win", "Modulators", 1000, 400),   # modulate.py
+          "mixer": ("mixer_win", "Mixer", 480, 340),           # mixer.py
+          "midi": ("midi_win", "MIDI, OSC and phone", 600, 670)}       # midi_ui.py
+ON_CLOSE = {}           # a frame -> what to do as it closes, given the app (the pads let go of what they hold)
 HEADER_H = 30
 
 
@@ -284,6 +291,10 @@ def build(app):
     audioin_ui.build(app)
     from native import vj_ui
     vj_ui.build(app)
+    from native import pads_ui, modulate, mixer
+    for m in (pads_ui, modulate, mixer):             # MIDI's is built with the menus (chrome.build)
+        if not dpg.does_item_exist(m.TAG):
+            m.build(app)
 
 
 # the firmware's sources, as the frame words them
@@ -870,6 +881,9 @@ def show(app, which):
     elif which == "vj":
         from native import vj_ui
         vj_ui.refresh(app)
+    elif which in ("pads", "modulators", "mixer", "midi"):
+        from native import pads_ui, modulate, mixer, midi_ui
+        {"pads": pads_ui, "modulators": modulate, "mixer": mixer, "midi": midi_ui}[which].refresh(app)
     # in the dock, its tab in front - over the panes only if it was floated (C8)
     from native import dock
     dock.open_frame(app, which)
