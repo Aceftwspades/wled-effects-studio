@@ -1297,7 +1297,9 @@ mouse, the phone or a controller): click an empty
 cell to add a control there, or a control to pick it - drag it to move it,
 drag its corner to make it span more cells. The panel beside the grid sets
 its kind, its label (the action's name if left empty), its colour and
-what it drives (type in **find an action** to narrow the list), and its
+what it drives - the actions grouped (the effect, the mix, each deck, the
+selected deck, the modulators), the last few you picked on top; type in
+**find an action** to narrow the list - and its
 range; on an XY pad, **across**, **up and down** and **pressure** choose
 which movement the action and range are for. **Remove this control** takes
 it off the grid. The row above the grid names the bank, colours its button, sets its

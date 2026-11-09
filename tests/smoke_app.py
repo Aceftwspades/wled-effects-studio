@@ -1134,7 +1134,13 @@ STEPS = [
       {"py": "pads_ui._grid_size(app, cols=5)"}, {"py": "setattr(pads_state.of(app), 'sel', (4, 0))"},
       {"py": "pads_ui._add_control(app, 'hold')"}], 0.4),
     ([{"check": "dpg.is_item_shown('pads_side') and isinstance(pads_ui._sel(app), dict) and pads_ui._sel(app)['type'] == 'hold'"},
+      # the action list in groups under header rows; every action of the studio's in a group of its own
+      {"check": "dpg.get_item_configuration('pads_s_actions')['items'][0].startswith('---') and "
+                "not [l for l, t in pads_ui.labels(app) if pads_ui.group_of(t) == 'Other']"},
       {"py": "pads_ui._pick_action(app, next(l for l, t in pads_ui.labels(app) if t.get('kind') == 'vj_knob' and t.get('deck') == 1 and t.get('key') == 'kaleido'))"},
+      {"py": "pads_ui._pick_action(app, pads_ui.header('Mix'))"},          # a header: nothing picked
+      {"check": "pads_ui._sel(app)['target'].get('key') == 'kaleido' and "
+                "dpg.get_item_configuration('pads_s_actions')['items'][:2] == [pads_ui.header('Recent'), 'VJ B: kaleidoscope']"},
       {"py": "pads_ui._ctl_set(app, 'hi', 0.5)"}, {"py": "pads_ui._set_edit(app, False)"},
       {"py": "vj.options(app)['decks'][1].update(kaleido=0)"},
       {"py": "pads.press(app, pads.at(pads.current(pads_ui._st(app)), 4, 0))"}], 0.3),
