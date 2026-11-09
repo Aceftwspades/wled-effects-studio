@@ -16,11 +16,13 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       ~430 `__import__('native.x', ...)` in its steps are plain names the remote's hooks know.
 
 ## 2. Fewer places for state to hide (stability)
-- [ ] **A runtime object per subsystem** in place of loose `app._x` attributes (about 240 of them across 38
-      modules), each with an explicit `reset()` and `close()`. The VJ first, where the review rounds' bugs were.
-      Done: the VJ (`native/vj_state.py`, ~70 attributes) and the pads with their clip editor
-      (`native/pads_state.py`, 27), the show and its timeline
-      (`native/seq_state.py`, 35). Left: modulators, MIDI, devices, the graph editor.
+- [x] **A runtime object per subsystem** in place of loose `app._x` attributes (about 240 of them across 38
+      modules), each with one default per field and a `forget()`. The VJ (`native/vj_state.py`, ~70
+      attributes), the pads with their clip editor (`native/pads_state.py`, 27), the show and its timeline
+      (`native/seq_state.py`, 35); the modulators (`modulate.state`), MIDI and OSC (`midi_ui.state`) and the
+      device frames (`device_ui.state`) in their own modules, as only they use them. The graph editor's is
+      already its `GraphPanel` (`app.gp`). Still loose, if they earn it later: the library's `_lib_*` and the
+      shape editor's `_shape_*`.
 - [x] **One play clock that never jumps**: the render's hold under it, instead of each timer correcting for
       `clock.shifted()`. Released, the clock runs on from where the render left it; the corrections are gone.
 - [x] **Swallowed errors made visible**: the 192 bare `except Exception:` blocks log once (crash log or status

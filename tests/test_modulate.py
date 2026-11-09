@@ -102,7 +102,7 @@ try:
     check(app.eng.fx["ix"] == 150 and app.eng.fx["c3"] == 30, f"the beat pushes; c3's modulator gone, it left at 30")
     mo.modulators(app).clear()
     mo.apply(app)
-    check(app.eng.fx["ix"] == 100 and app._mod_state == {}, "none left: every slider at its place, nothing kept")
+    check(app.eng.fx["ix"] == 100 and mo.state(app).run == {}, "none left: every slider at its place, nothing kept")
     n = app.eng.pushes
     mo.apply(app)
     check(app.eng.pushes == n, "nothing to do: the engine left alone")
@@ -144,14 +144,14 @@ try:
         mo.apply(app)
         worst, last = max(worst, abs(app.eng.fx["sx"] - last)), app.eng.fx["sx"]
     check(worst <= 16, f"the rate 4x faster: the wave moves on from where it was, no jump (most in a frame {worst})")
-    p = app._mod_state["phase"][1]
-    beats = app._mod_state["beats"]
+    p = mo.state(app).run["phase"][1]
+    beats = mo.state(app).run["beats"]
     off = lambda: ((beats - p[1]) / 1 - p[0] + 0.5) % 1.0 - 0.5          # noqa: E731
     check(abs(off()) > 0.05, f"off the grid at first ({off():.3f})")
     for _ in range(600):
         clock.step(1 / 60)
         mo.apply(app)
-    beats = app._mod_state["beats"]
+    beats = mo.state(app).run["beats"]
     check(abs(off()) < 1e-6, f"eased back onto the beat grid ({off():.2e})")
 
     # a free rate: so many a second, the tempo no matter
@@ -159,7 +159,7 @@ try:
     mo.restart(app, m)
     clock.step(0.125)
     mo.apply(app)
-    check(near(app._mod_state["phase"][1][0], 0.25, 1e-6), "free at 2 Hz: a quarter wave in 1/8 s")
+    check(near(mo.state(app).run["phase"][1][0], 0.25, 1e-6), "free at 2 Hz: a quarter wave in 1/8 s")
 
     # the settings as targets
     labs = [lab for lab, _ in mo.targets(app)]
@@ -185,7 +185,7 @@ try:
     clock.step(0.3)
     mo.apply(app)
     mo.set_target(app, {"kind": "mod_restart", "id": 1}, 1.0)
-    check(app._mod_state["phase"][1][0] == 0.0, "a restart: back to the start of its wave")
+    check(mo.state(app).run["phase"][1][0] == 0.0, "a restart: back to the start of its wave")
     mo.set_target(app, {"kind": "mod", "id": 99, "key": "rate"}, 1.0)
     check(mo.value(app, {"kind": "mod", "id": 99, "key": "rate"}) is None, "one no longer there: nothing done")
     saves = app.project.saves
@@ -237,7 +237,7 @@ try:
     check(app.eng.fx["sx"] == 100 and mo.place(app, "sx") is None, "while held, not held: silent, the slider at its place")
     gate(w, "a", 1.0)
     mo.apply(app)
-    check(app.eng.fx["sx"] == 130 and app._mod_state["phase"][w["id"]][0] == 0.0, f"pressed: from the top of its wave ({app.eng.fx['sx']})")
+    check(app.eng.fx["sx"] == 130 and mo.state(app).run["phase"][w["id"]][0] == 0.0, f"pressed: from the top of its wave ({app.eng.fx['sx']})")
     gate(w, "b", 1.0)
     gate(w, "a", 0.0)
     mo.apply(app)
@@ -250,9 +250,9 @@ try:
     for _ in range(4):
         clock.step(0.25)
         mo.apply(app)
-    check(app._mod_state["phase"][w["id"]][0] > 0.4, "restart on press: running unpressed")
+    check(mo.state(app).run["phase"][w["id"]][0] > 0.4, "restart on press: running unpressed")
     gate(w, "a", 1.0)
-    check(app._mod_state["phase"][w["id"]][0] == 0.0, "pressed: back to the top")
+    check(mo.state(app).run["phase"][w["id"]][0] == 0.0, "pressed: back to the top")
     gate(w, "a", 0.0)
     mo.modulators(app).clear()
     mo.apply(app)
@@ -282,12 +282,12 @@ try:
     for _ in range(3):
         clock.step(0.1)
         mo.apply(app)
-    check(app.eng.fx["sx"] == 50 and app._mod_state["env"][e["id"]][1] == "off", "released to nothing: at its place")
+    check(app.eng.fx["sx"] == 50 and mo.state(app).run["env"][e["id"]][1] == "off", "released to nothing: at its place")
     mo.set_target(app, {"kind": "mod_restart", "id": e["id"]}, 1.0)
     for _ in range(2):
         clock.step(0.05)
         mo.apply(app)
-    st_ = app._mod_state["env"][e["id"]][1]
+    st_ = mo.state(app).run["env"][e["id"]][1]
     clock.step(0.1)
     mo.apply(app)
     check(st_ == "r" and app.eng.fx["sx"] == 125, f"a restart unheld: one shot, from its peak straight to release ({st_}, {app.eng.fx['sx']})")
@@ -395,10 +395,10 @@ try:
           and mo.swing(app, f"m{w1['id']}.depth") is not None, "a depth knob shows the band it swings over")
     check(f"m{w1['id']}.depth" in mo.choices(app, w2) and f"m{w2['id']}.depth" not in mo.choices(app, w2),
           "the others' settings offered, not its own")
-    app._mod_over[f"m{w1['id']}.rate"] = 0.5
+    mo.state(app).over[f"m{w1['id']}.rate"] = 0.5
     check(near(mo._eff(app, w1)["period"], 2 ** 1.5) and mo._eff(app, w1)["_unlocked"] and w1["period"] == 2,
           "a synced rate moved: swept smoothly between the beat lengths, off the grid, its own kept")
-    del app._mod_over[f"m{w1['id']}.rate"]
+    del mo.state(app).over[f"m{w1['id']}.rate"]
     mo.remove(app, 0)
     check(w2["keys"] == [], "the one it moved taken away: no longer moved")
     mo.modulators(app).clear()
@@ -495,7 +495,7 @@ try:
     mo.apply(app)
     mo.modulators(app).clear()
     mo.apply(app)
-    check(app._mod_state == {}, "none left: nothing kept")
+    check(mo.state(app).run == {}, "none left: nothing kept")
     # Undo straight after a drag in the dialog (its save still waiting): the drag undone, not the change before too
     import tempfile
     from native.project import Project

@@ -703,11 +703,11 @@ STEPS = [
       {"py": "dpg.hide_item('confirm_dialog')"}, {"py": "device_ui.start_flash(app, confirmed=True)"}], 14.0),
     ([{"check": "app.flash_job.done and app.flash_job.ok and app.flash_job.source == 'file'"},
       {"check": "app.project.options['flash_history'][-1]['firmware'] == 'smoke_s3.bin'"},
-      {"py": "setattr(app, '_fw_rels', [{'tag': 'v16.0.1', 'name': 'x', 'pre': False, 'date': '2026-09-20', 'assets': ["
+      {"py": "setattr(device_ui.state(app), 'fw_rels', [{'tag': 'v16.0.1', 'name': 'x', 'pre': False, 'date': '2026-09-20', 'assets': ["
              "{'name': n, 'url': '', 'size': 1000} for n in ('WLED_16.0.1_ESP32.bin', 'WLED_16.0.1_ESP32-S3_8MB_opi.bin', "
              "'WLED_16.0.1_ESP32-S3_4M_qspi.bin')]}])"},
-      {"py": "setattr(app, '_fw_fetching', True)"}, {"py": "device_ui._set_source(app, 'release')"},
-      {"py": "(setattr(app, '_fw_fetching', False), setattr(app, '_fw_fresh', True))"}], 0.8),
+      {"py": "setattr(device_ui.state(app), 'fw_fetching', True)"}, {"py": "device_ui._set_source(app, 'release')"},
+      {"py": "(setattr(device_ui.state(app), 'fw_fetching', False), setattr(device_ui.state(app), 'fw_fresh', True))"}], 0.8),
     ([{"check": "dpg.is_item_shown('flash_rel_row') and dpg.get_item_configuration('flash_asset')['items'] == "
                 "['WLED_16.0.1_ESP32-S3_4M_qspi.bin', 'WLED_16.0.1_ESP32-S3_8MB_opi.bin']"},
       {"check": "any('several flash sizes' in dpg.get_value(i) for i in dpg.get_item_children('flash_manifest', 1))"},
@@ -1264,7 +1264,7 @@ STEPS = [
     # the sound on Intensity, a wave on Mod 1's depth, two sliders a wave apart: their rows, scopes drawn; undone
     ([{"py": "modulate.add(app, key='ix', kind='audio', band='bass')"}, {"py": "modulate.add(app, keys=['m' + str(modulate.modulators(app)[0]['id']) + '.depth', 'c1', 'c2'], spread=1.0)"},
       {"py": "modulate.show(app)"}], 0.4),
-    ([{"check": "dpg.does_item_exist('mod_amt_1_2') and dpg.does_item_exist('mod_spread_1') and len(dpg.get_item_children('mod_scope_1', 2) or []) >= 2 and ('m' + str(modulate.modulators(app)[0]['id']) + '.depth') in app._mod_over"},
+    ([{"check": "dpg.does_item_exist('mod_amt_1_2') and dpg.does_item_exist('mod_spread_1') and len(dpg.get_item_children('mod_scope_1', 2) or []) >= 2 and ('m' + str(modulate.modulators(app)[0]['id']) + '.depth') in modulate.state(app).over"},
       {"py": "modulate.undo(app)"}], 0.2),
     ([{"check": "len(modulate.modulators(app)) == 1 and not dpg.does_item_exist('mod_amt_1_0')"},
       {"py": "modulate.modulators(app).clear()"}, {"py": "chrome.close_dialog('modulators_win')"}], 0.3),
