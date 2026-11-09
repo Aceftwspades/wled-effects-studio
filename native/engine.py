@@ -129,6 +129,7 @@ class Engine:
             raise FileNotFoundError(
                 f"{dll} not found - build it with:  python build.py --native-only")
         self.lib = C.CDLL(dll)
+        self._frame_ms = None        # simFrameMs of this library, looked up at its first use (frame_ms)
         self.library = dll
         L = self.lib
         L.simEffectCount.restype = C.c_int
@@ -627,6 +628,20 @@ class Engine:
         self.sim_ms += dt
         self.now_ms += dt
         self.lib.simFrame(self.idx, dt)
+
+    def frame_ms(self):
+        """What the last frame() took inside the engine, in ms, by the engine's own clock - or None from an
+        engine without it. A time taken round frame() includes the wait for Python's lock on the way back."""
+        f = getattr(self, "_frame_ms", None)
+        if f is None:
+            try:
+                f = self.lib.simFrameMs
+            except AttributeError:
+                self._frame_ms = f = False
+            else:
+                f.restype, f.argtypes = C.c_double, []
+                self._frame_ms = f
+        return float(f()) if f else None
 
     def set_now(self, ms=0):
         """The engine's clock (strip.now) set: two runs from the same

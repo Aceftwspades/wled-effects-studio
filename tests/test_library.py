@@ -131,6 +131,15 @@ def test_a_graph_with_a_missing_sub_graph_still_has_its_tags():
     assert "3-D" in tags and "Input" in tags, tags
 
 
+def test_a_tiles_tags_are_cut_at_a_whole_tag():
+    """Cut at the sixteenth character the tags read "3-D, both, colou"; whole tags and a count of the rest now."""
+    line = library_ui.tags_line
+    assert line(["3-D", "both", "colour", "motion", "script"]) == "3-D, both +3"
+    assert line(["3-D", "script"]) == "3-D, script" and line(["audio"]) == "audio" and line([]) == ""
+    assert line(["averyveryverylongtag", "b"]) == "averyveryverylongtag +1"      # one tag is always shown whole
+    assert all(len(line(t)) <= 16 for t in (["colour", "pattern", "x"], ["a"] * 12, ["Input", "Maths", "Output"]))
+
+
 if __name__ == "__main__":
     import inspect
     bad = 0

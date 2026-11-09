@@ -65,4 +65,13 @@ def rows(limit=12):
 def clear():
     with _lock:
         _avg.clear()
+
+
+def without_waits(samples):
+    """The mean of some measures of one thing without their slowest tenth: a step now and then waits
+    milliseconds for another thread, and that wait is not what the step costs. A cost that comes more often
+    than one time in ten (a heavy frame every other) is kept."""
+    kept = sorted(samples)
+    kept = kept[:max(1, len(kept) - len(kept) // 10)]
+    return sum(kept) / len(kept)
 # AI: end

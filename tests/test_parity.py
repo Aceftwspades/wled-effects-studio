@@ -82,6 +82,9 @@ def test_script_matches_cpp():
     from native.engine import Engine
     from native.script import compile_script, ScriptError
     gs = _graphs()
+    # sources of its own: the example "Scenes" was written as Scenes.cpp into the folder test_nodes writes its
+    # scenes.cpp to - one file on Windows - and beside that test this one built the other's and missed its own
+    T.OUT = os.path.join(os.path.dirname(T.OUT), "census_parity")
     gs, rep = T._build(gs)
     assert rep.ok, "the build failed: " + rep.link_output[-600:]
     e = Engine(); e.load(rep.library)

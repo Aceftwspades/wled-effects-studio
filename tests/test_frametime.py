@@ -47,6 +47,14 @@ check("VJ deck A" not in [r[0] for r in F.rows()], "a part not measured lately d
 F.add("VJ deck A", 9.0, "polls")
 check(dict((n, ms) for n, ms, _ in F.rows())["VJ deck A"] == 9.0, "back after a while: from its new measure, not faded in")
 check(len(F.rows(limit=3)) == 3, "at most the rows asked for")
+
+# the effect's cost (the footer's "device ~N fps"): a step in thirty that waited 5 ms for another thread is not its cost
+steady = [0.08] * 96
+waits = [5.08 if i % 30 == 0 else 0.08 for i in range(96)]
+check(abs(F.without_waits(waits) - 0.08) < 1e-9, f"waits now and then left out ({F.without_waits(waits):.3f} ms, {sum(waits) / 96:.3f} as a plain mean)")
+check(abs(F.without_waits(steady) - 0.08) < 1e-9, "a steady cost is itself")
+check(abs(F.without_waits([1.0, 3.0] * 48) - 1.91) < 0.02, "a heavy frame every other still counted")
+check(F.without_waits([2.5]) == 2.5, "one measure is itself")
 print("FAILED:", failed) if failed else print("all ok")
 sys.exit(1 if failed else 0)
 # AI: end
