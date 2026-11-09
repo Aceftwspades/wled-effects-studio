@@ -42,6 +42,29 @@ def _hook_names(app):
             "shape_checks": shape_checks, "shape_start": shape_start, "camera_map": camera_map, "camera_map_ui": camera_map_ui}
 
 
+UNTIL_S = 20.0                                   # how long an "until" batch waits for its condition by default
+
+
+def _until_met(app, text, c):
+    """An "until" batch's condition: true now, or out of time (said as a failed check, and the batch runs).
+    The wait is kept against the batch's text, so a new batch starts a new wait."""
+    try:
+        v = eval(c["until"], _hook_names(app))
+    except Exception as e:
+        v = f"raised {e!r}"
+    if v is True or (v and not isinstance(v, str)):
+        app._until_wait = None
+        return True
+    w = getattr(app, "_until_wait", None)
+    if w is None or w[0] != text:
+        w = app._until_wait = (text, time.time() + float(c.get("within", UNTIL_S)))
+    if time.time() < w[1]:
+        return False
+    app._until_wait = None
+    print(f"EXPECT FAILED until {c['until'][:90]}: still {v!r} after {c.get('within', UNTIL_S)} s"[:240])
+    return True
+
+
 def service_command(app):
     """Drive the running app from outside, the same way a capture is asked
     for: a JSON file of commands, applied on the next tick and removed.
@@ -55,7 +78,11 @@ def service_command(app):
     Off unless STUDIO_REMOTE_CONTROL=1 (REMOTE): the "py" and "check"
     commands run Python, so the file is the tests' alone. A batch that
     starts with {"wait_build": true} waits for a build in hand to be loaded
-    (the file is left until then), however long this machine takes.
+    (the file is left until then), however long this machine takes. One that
+    starts with {"until": "<expression>", "within": 20} waits the same way
+    for the expression to be true - at most `within` seconds (default 20),
+    then fails as a check would and runs the batch anyway: a test waits for
+    what it needs, not a guessed time that a slow machine overruns.
     """
     if not REMOTE:
         return
@@ -75,6 +102,8 @@ def service_command(app):
         cmds = json.loads(text)
         if isinstance(cmds, list) and cmds and isinstance(cmds[0], dict) and cmds[0].get("wait_build") and app.building:
             return                                    # the build first: the batch is taken on a later frame
+        if isinstance(cmds, list) and cmds and isinstance(cmds[0], dict) and "until" in cmds[0] and not _until_met(app, text, cmds[0]):
+            return                                    # its condition first: taken on a later frame
         try:
             os.remove(CMD_FILE)
         except PermissionError:
