@@ -97,7 +97,10 @@ def _build(gs=None):
     the census's come first (the stock effects are registered on demand,
     after), so it is the tail of the stock 1-D list that is left off.
     build/latest is left alone: the app, and the other tests, keep the
-    engine they had."""
+    engine they had.
+    A graph built alone is named "one ...": every build's sources are copied into build/stage by file name
+    (build.staged), and "scenes" there was the census's Scenes.cpp on Windows - beside the parity test, which
+    builds the census, one of the two linked the other's effect and missed its own."""
     import build as B
     from native.toolchain import build_engine
     os.makedirs(OUT, exist_ok=True)
@@ -154,7 +157,7 @@ def test_live_parameters_poke_the_running_effect():
     src = g.compile()
     assert "GC_PARAM_TABLE float gc_param[" in src and (m, "b", None) in {v: k for k, v in g.live.items()}
     slot = next(k for k, v in g.live.items() if v == (m, "b", None))
-    gs, rep = _build({"live": g})
+    gs, rep = _build({"one live": g})
     assert rep.ok, rep.link_output[-600:]
     e = Engine(); e.load(rep.library)
     idx = e.names.index(g.name)
@@ -184,7 +187,7 @@ def test_a_colour_is_poked_live():
     g.compile()
     slots = {v[2]: k for k, v in g.live.items() if v[:2] == (o, "color")}
     assert set(slots) == {0, 1, 2} and [g.live_init[slots[j]] for j in range(3)] == [255.0, 0.0, 0.0]
-    gs, rep = _build({"livecol": g})
+    gs, rep = _build({"one livecol": g})
     assert rep.ok, rep.link_output[-600:]
     e = Engine(); e.load(rep.library)
     idx = e.names.index(g.name)
@@ -215,7 +218,7 @@ def test_tempo_follows_the_synth():
     g.compile()
     slot_bpm = next(k for k, v in g.probes.items() if v == (tp, "bpm"))
     slot_bar = next(k for k, v in g.probes.items() if v == (tp, "bar"))
-    gs, rep = _build({"tempo": g})
+    gs, rep = _build({"one tempo": g})
     assert rep.ok, rep.link_output[-600:]
     e = Engine(); e.load(rep.library)
     e.select(e.names.index(g.name))
@@ -277,7 +280,7 @@ def test_the_control_kit_behaves():
     g, k = kit_graph()
     g.compile()
     slot = {v: key for key, v in g.probes.items()}
-    gs, rep = _build({"kit": g})
+    gs, rep = _build({"one kit": g})
     assert rep.ok, rep.link_output[-600:]
     e = Engine(); e.load(rep.library)
     e.set_now(0)
@@ -358,7 +361,7 @@ def test_the_sound_nodes_read_what_they_hear():
     g.link(k["timbre"], "brightness", p, "index"); g.link(p, "color", o, "color")
     g.compile()
     slot = {v: key for key, v in g.probes.items()}
-    gs, rep = _build({"sound": g})
+    gs, rep = _build({"one sound": g})
     assert rep.ok, rep.link_output[-600:]
     e = Engine(); e.load(rep.library)
     e.set_now(0)
@@ -457,7 +460,7 @@ def test_the_scenes_fade_on_the_engine():
     g.name = "Census scenes"
     g.compile()
     slot = next(key for key, v in g.probes.items() if v == (k["a"], "result"))
-    gs, rep = _build({"scenes": g})
+    gs, rep = _build({"one scenes": g})
     assert rep.ok, rep.link_output[-600:]
     e = Engine(); e.load(rep.library)
     e.set_now(0)

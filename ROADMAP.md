@@ -132,4 +132,8 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 - [ ] **Clipped words** (the VJ decks' descriptions; the Library's tags are cut at a whole tag now, "3-D, both +3"),
       **areas with no title** (the logs of Devices and Send), **controls shown before they can do anything**
       (Sequence, Palettes, Send).
+- [ ] **build/stage holds sources by file name alone** (`build.staged`): two builds at once with files of one
+      name - or names that differ only by case, on Windows - compile each other's. The tests no longer do
+      (`test_nodes` built "scenes" beside `test_parity`'s census "Scenes": one linked the other's effect);
+      a test beside the studio, or two of the studio, still could.
 - [ ] **Startup**: ~8,600 items and 180 windows are built before the first frame; what that costs is not measured.

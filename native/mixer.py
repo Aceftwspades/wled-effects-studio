@@ -160,7 +160,7 @@ def build(app):
         device_ui.header(app, "mixer")
         dpg.add_text("Deck A is the effect the studio has; deck B runs beside it, hearing the same sound. The fader takes "
                      "the picture from one to the other through the blend - in the sim and the stream. MIDI (the "
-                     "mixer's fader) and the phone move it too.", color=chrome.DIM, wrap=px(450))
+                     "mixer's fader) and the phone move it too.", color=chrome.DIM, wrap=0)
         dpg.add_checkbox(label="mix in deck B", tag="mx_on", default_value=bool(o["on"]),
                          callback=lambda s, v: _set(app, "on", bool(v)))
         with form.row("deck B", tip="the second effect"):
