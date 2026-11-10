@@ -483,6 +483,7 @@ def build(app):
             dpg.add_button(label="Send and run it", tag="seq_send_run", small=True, callback=lambda: seq_send.send(app, run=True))
             weight.primary(dpg.last_item())
             weight.need(dpg.last_item(), _dev_steps)
+            c.tip("send the presets and the playlist to the device and start the playlist there")
             dpg.add_button(label="Send presets + playlist", tag="seq_send", small=True, callback=lambda: seq_send.send(app))
             weight.need(dpg.last_item(), _dev_steps)
             c.tip("about a second a preset: the device writes each one from its main loop, and the next is sent once it has")
@@ -499,12 +500,15 @@ def build(app):
         with dpg.collapsing_header(label="SCHEDULE", tag="seq_sched_head", default_open=False):
             with dpg.group(horizontal=True):
                 dpg.add_button(label="+ run the playlist at", small=True, callback=lambda: add_timer(app, "playlist"))
+                c.tip("a timer on the device that starts the playlist at a time of day")
                 dpg.add_button(label="+ off at", small=True, callback=lambda: add_timer(app, "off"))
                 c.tip("a time the lights go off: an Off preset (id 250) is saved on the device and timed")
                 dpg.add_button(label="Read the device's", small=True, callback=lambda: read_timers(app))
                 weight.need(dpg.last_item(), "device")
+                c.tip("the timers the device has now, into this schedule")
                 dpg.add_button(label="Send the schedule", small=True, callback=lambda: send_timers(app))
                 weight.need(dpg.last_item(), "device")
+                c.tip("write these timers to the device")
                 c.info("The device's timers - eight, plus sunrise and sunset: what preset runs when, on which days. "
                        "The device needs the time (NTP) for them to fire.")
             with dpg.child_window(tag="seq_timers", height=px(120), border=True):

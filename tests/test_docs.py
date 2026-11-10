@@ -58,6 +58,29 @@ def test_every_key_action_is_in_the_guide():
     assert not missing, "actions the guide does not name (run tests/make_uiref.py): " + ", ".join(missing)
 
 
+def test_every_button_in_the_guide_has_a_tooltip():
+    """The guide's button list is written from the running app (tests/make_uiref.py): a button there with no words
+    after it has no tooltip. 141 of 398 had none; a new one must have one, or be named in walk.UIREF_NO_TIP."""
+    import re
+    from native import walk
+    text = open(os.path.join(ROOT, "GUIDE.md"), encoding="utf-8").read()
+    sec = text[text.index("### Buttons"):text.index(walk.UIREF_END)]
+    ok = walk.UIREF_NO_TIP
+    bare = []
+    for line in sec.splitlines():
+        m = re.match(r"\*\*(.+?)\*\*: (.*)", line)
+        if not m:
+            continue
+        for item in re.split(r"; (?=`)", m.group(2)):
+            mm = re.match(r"`([^`]*)`( — )?", item)
+            if mm and not mm.group(2):
+                lbl = mm.group(1)
+                if lbl in ok or any(k.endswith("*") and lbl.startswith(k[:-1]) for k in ok):
+                    continue
+                bare.append(f"{m.group(1)}: {lbl}")
+    assert not bare, f"{len(bare)} button(s) with no tooltip (add one, or name it in walk.UIREF_NO_TIP): " + "; ".join(bare)
+
+
 def test_every_frame_button_is_in_the_guide():
     guide = _guide()
     missing = []

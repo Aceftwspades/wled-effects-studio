@@ -99,6 +99,17 @@ def walk_menus(app, skip=()):
 UIREF_START = "<!-- uiref start"
 UIREF_END = "<!-- uiref end -->"
 # buttons whose label is what they show now: named in the reference for what they are
+UIREF_ICON = "(an icon: this is its tooltip)"
+# Buttons that need no tooltip, by label (a "*" ends a prefix) -> why. Every other button has one: the guide's
+# button list is written from the running app, and tests/test_docs.py fails for a button there without words.
+UIREF_NO_TIP = {
+    "Close": "a dialog's way out", "Cancel": "a dialog's way out", "Not now": "a dialog's way out",
+    "vsplit_*": "a bar between panes, dragged: the pointer says so", "hsplit_*": "a bar between panes, dragged",
+    "help_split": "the bar over the graph's help, dragged",
+    "pip_max": "placed out of the flow: its words come up through chrome.placed",
+    "not built yet": "a Library tile: the tooltip is on the name under it", "making...": "a Library tile, as above",
+    "no picture": "a Library tile, as above",
+}
 UIREF_NAMED = {"msg_problems": ("N problems", "the problems that stay until they are fixed - a click opens the log at them"),
                "msg_line": ("the latest message", "short, the whole of it on hover; a click opens the log")}
 
@@ -164,6 +175,8 @@ def write_uiref(app, path=None):
                     lbl, tip = UIREF_NAMED[dpg.get_item_alias(k)]
                 elif not lbl and tip:                           # an icon button: named by its tooltip's first clause
                     lbl = re.split(r"[:(]|  ", tip)[0].strip()[:40]
+                    if tip == lbl:
+                        tip = UIREF_ICON                        # all its tooltip says is its name here
                 elif not lbl:
                     lbl = dpg.get_item_alias(k) or ""
                 if lbl and lbl not in (":::",):

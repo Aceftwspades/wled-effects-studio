@@ -244,6 +244,7 @@ class Section:
         with dpg.group(horizontal=True, tag=f"sec_{key}_hdr"):
             dpg.add_button(arrow=True, direction=dpg.mvDir_Right if shut else dpg.mvDir_Down, tag=f"sec_{key}_arrow",
                            callback=lambda: app.sec_toggle(key))
+            chrome.tip("fold or unfold this section")
             typeface.label(dpg.add_text(self.title, color=SECTION, tag=f"sec_{key}_title"))
             dpg.add_button(label=":::", tag=f"sec_{key}_grip", width=px(30), height=px(19))
             if dpg.does_item_exist("grip_theme"):
@@ -925,6 +926,7 @@ class App(AppProjects, AppCode, AppInput, AppLayout, Features, Recorder, EditBui
                           parent="geom_fields", **({"color": chrome.AMBER} if lost else {}))
             with form.under(parent="geom_fields"):
                 dpg.add_button(label="Edit the shape...", callback=lambda: device_ui.show(self, "shape"))
+                chrome.tip("the Shape frame: the parts, their places and the wiring")
                 dpg.add_button(label="Shape settings...", callback=lambda: shape_ui.show_settings(self))
                 chrome.tip("the Shape frame on the whole shape's settings: its sizes, what the effects see and how a grid "
                            "is projected, power")
@@ -1671,6 +1673,7 @@ def build(app):
                     dpg.add_button(label="replace", callback=lambda: app.replace_one())
                     chrome.tip("the match the cursor is on, then the next is found")
                     dpg.add_button(label="replace all", callback=lambda: app.replace_all())
+                    chrome.tip("every match in the file replaced")
                 with dpg.collapsing_header(label="Metadata - name, labels, palette, flags, defaults", default_open=False):
                     # the effect's WLED metadata string, a field a part (C6: each led by its name, the format on hover)
                     with form.row("name", width=128):
@@ -1687,7 +1690,9 @@ def build(app):
                         typeface.mono(dpg.add_input_text(tag="meta_defaults", width=px(360), hint="sx=128,ix=128,pal=0"))
                     with form.under(width=128):
                         dpg.add_button(label="read from file", callback=lambda: app.meta_read())
+                        chrome.tip("the effect's name, labels, palette and defaults as the file has them, into these fields")
                         dpg.add_button(label="apply to file", callback=lambda: app.meta_write())
+                        chrome.tip("these fields written into the effect's metadata line in the file")
                 with dpg.collapsing_header(label="API reference - click inserts at the cursor", default_open=False,
                                            tag="api_header"):
                     for group, items in API:
@@ -1754,7 +1759,9 @@ def build(app):
                     with form.row("segment"):
                         dpg.add_combo([], tag="seg_combo", width=-px(112), callback=lambda s, v: app.seg_pick(v))
                         dpg.add_button(label="+", small=True, callback=lambda: app.seg_add())
+                        chrome.tip("another segment, after the last")
                         dpg.add_button(label="-", small=True, callback=lambda: app.seg_remove())
+                        chrome.tip("remove the segment chosen")
                         dpg.add_button(label="undo", small=True, callback=lambda: app.seg_undo())
                         chrome.tip("the segments as they were before the last change (add, remove, bounds, blend, options)")
                     dpg.add_group(tag="seg_fields")
@@ -1835,7 +1842,9 @@ def build(app):
                     with form.under():
                         dpg.add_button(label="use live audio", tag="live_btn",
                                        callback=lambda: app.toggle_live())
+                        chrome.tip("the sound the computer hears (its input, or what it plays) in place of the synth")
                         dpg.add_button(label="play an audio file...", callback=lambda: dpg.show_item("wav_dialog"))
+                        chrome.tip("an audio file played as the live sound")
                     with dpg.file_dialog(directory_selector=False, show=False, tag="wav_dialog", width=px(620), height=px(420),
                                          callback=lambda s, a: app.start_file_audio(a.get("file_path_name", ""))):
                         from native.audio import AUDIO_EXTS

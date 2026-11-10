@@ -426,14 +426,19 @@ def _deck(app, i):
             dpg.add_button(label="Save as...", tag=f"vj_save{i}", small=True,
                            callback=lambda: c.ask(app, "Save a preset", "a name for this deck's look and knobs",
                                                   _default_preset(app, i), lambda v: _save_preset(app, i, v)))
+            c.tip("keep this deck's look and knobs as a preset, by a name")
             dpg.add_button(label="Rename...", tag=f"vj_ren{i}", small=True, callback=lambda: _rename_preset(app, i))
+            c.tip("another name for the preset chosen")
             dpg.add_button(label="Delete", tag=f"vj_del{i}", small=True, callback=lambda: _delete_preset(app, i))
             weight.danger(dpg.last_item())
+            c.tip("delete the preset chosen")
         with dpg.group(horizontal=True, tag=f"vj_flamerow{i}"):
             dpg.add_text("this flame", color=c.DIM)
             dpg.add_button(label="Rename...", small=True, callback=lambda: _rename_flame(app, i))
+            c.tip("another name for this flame")
             dpg.add_button(label="Forget", small=True, callback=lambda: _forget_flame(app, i))
             weight.danger(dpg.last_item())
+            c.tip("drop this flame from the ones kept")
             c.tip("this bred flame no longer kept; the deck goes back to the flame it came from")
     dpg.add_text("", tag=f"vj_desc{i}", color=c.DIM, wrap=px(300))
 

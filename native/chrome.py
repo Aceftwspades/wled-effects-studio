@@ -611,8 +611,11 @@ def build_dialogs(app):
         with dpg.group(horizontal=True):
             dpg.add_combo([], tag="um_pick", width=px(260))
             dpg.add_button(label="Add", callback=lambda: app.add_usermod(dpg.get_value("um_pick")))
+            tip("add the usermod picked to the firmware's build")
             dpg.add_button(label="Import a folder...", callback=lambda: dpg.show_item("um_dialog"))
+            tip("a usermod from a folder of its sources")
             dpg.add_button(label="Import a zip...", callback=lambda: dpg.show_item("um_zip_dialog"))
+            tip("a usermod from a zip of its sources")
         dpg.add_text("", tag="um_status", color=DIM, wrap=px(690))
     with dpg.file_dialog(directory_selector=True, show=False, tag="um_dialog", width=px(620), height=px(420),
                          callback=lambda s, a: app.import_usermod(a.get("file_path_name", ""))):
@@ -656,6 +659,7 @@ def build_dialogs(app):
                      "a stray one from the panel or a frame changes nothing.", color=DIM, wrap=px(600))
         with dpg.group(horizontal=True):
             dpg.add_button(label="Reset all to defaults", callback=lambda: (app.keys.reset(), refresh_keys(app)))
+            tip("every shortcut back to the key it came with")
             weight.danger(dpg.last_item())
         with dpg.child_window(tag="keys_rows", height=-1, border=False):
             pass
@@ -668,8 +672,11 @@ def build_dialogs(app):
         dpg.add_spacer(height=px(6))
         with dpg.group(horizontal=True):
             dpg.add_button(label="The studio on GitHub", small=True, callback=lambda: app.open_url(f"https://github.com/{version.REPO}"))
+            tip("the studio's page on GitHub, in the browser")
             dpg.add_button(label="The WLED fork", small=True, callback=lambda: app.open_url(f"https://github.com/{version.WLED_REPO}"))
+            tip("the WLED fork the cube effects live in, in the browser")
             dpg.add_button(label="WLED", small=True, callback=lambda: app.open_url(f"https://github.com/{version.WLED_UPSTREAM}"))
+            tip("WLED's own page on GitHub, in the browser")
         dpg.add_text("Built on WLED (Christian Schwinne and contributors), EUPL v1.2: the effects, palettes and colour maths "
                      "the sim runs are WLED's own, compiled from its sources; the firmware side lives in the fork.",
                      color=DIM, wrap=px(570))
@@ -685,7 +692,9 @@ def build_dialogs(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="Download and install", tag="update_go", callback=lambda: get_update(app))
             weight.primary(dpg.last_item())
+            tip("fetch the new version and install it over this one; projects, captures and the toolchain are kept")
             dpg.add_button(label="Release page", callback=lambda: app.open_url(getattr(app, "_update", {}).get("url") or f"https://github.com/{version.REPO}/releases"))
+            tip("what is new in this version, in the browser")
             dpg.add_button(label="Not now", callback=lambda: dpg.hide_item("update_win"))
             weight.quiet(dpg.last_item())
             dpg.add_checkbox(label="check once a day", tag="update_daily", default_value=bool(app.prefs.get("update_check", True)),
@@ -1166,6 +1175,7 @@ def _appearance_colours(app):
     with dpg.group(horizontal=True):
         for name in THEME_PRESETS:
             dpg.add_button(label=name, small=True, user_data=name, callback=lambda s, a, u: app.set_appearance(preset=u))
+            tip(f"the {name} theme: its colours for every part of the studio")
         dpg.add_text("", tag="app_preset", color=DIM)
     dpg.add_separator()
     for key, label, what in THEME_ROLES:
@@ -1201,6 +1211,7 @@ def _appearance_view(app):
     with dpg.group(horizontal=True):
         for name in look.PRESETS:
             dpg.add_button(label=look.PRESET_WORDS[name], small=True, user_data=name, callback=lambda s, a, u: set_look(app, preset=u))
+            tip(f"the 3-D view as {look.PRESET_WORDS[name]}: the knobs below set to it")
         dpg.add_text("", tag="look_preset", color=DIM)
     dpg.add_separator()
     for key in look.KEYS:
@@ -1307,9 +1318,13 @@ def _frames_content(app):
     dpg.add_group(tag="gc_rows")
     with dpg.group(horizontal=True):
         dpg.add_button(label="Save", callback=lambda: _gc_save(app))
+        tip("keep these colours as a gradient, by the name above")
         dpg.add_button(label="Save + use for nodes", callback=lambda: _gc_save(app, "sel"))
+        tip("keep the gradient and draw the selected nodes' frames with it")
         dpg.add_button(label="Save + use for pane", callback=lambda: _gc_save(app, "focus"))
+        tip("keep the gradient and draw the frame of the pane in focus with it")
         dpg.add_button(label="Delete", tag="gc_delete", callback=lambda: _gc_delete(app))
+        tip("delete this gradient of your own")
     dpg.add_text("", tag="gc_status", color=DIM)
 
 

@@ -38,13 +38,18 @@ def build(app):
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("SPLIT", color=c.ACCENT))
             dpg.add_button(label="one output", small=True, callback=lambda: do_split(app, "one"))
+            c.tip("the whole wiring on one output")
             dpg.add_button(label="one per part", small=True, callback=lambda: do_split(app, "parts"))
+            c.tip("an output for each part of the shape")
             dpg.add_button(label="by count:", small=True, callback=lambda: do_split(app, "count"))
+            c.tip("outputs of so many LEDs each (the number beside it)")
             typeface.mono(dpg.add_input_int(tag="out_per", width=px(60), step=0, default_value=300, min_value=1, min_clamped=True))
             c.tip("so many LEDs an output")
             dpg.add_button(label="+ output", small=True, callback=lambda: add_output(app))
+            c.tip("another output, after the last")
             dpg.add_button(label="Read the device's", small=True, callback=lambda: read_device(app))
             weight.need(dpg.last_item(), "device")
+            c.tip("the outputs and the power limit the device has now, into this project")
             c.info("The wiring split into the device's LED outputs: a pin, a start and a count each, the LED type and colour order, "
                    "reversed or not. Sent as the device's LED config.")
         with dpg.child_window(tag="out_rows", height=px(170), border=True):
@@ -151,6 +156,7 @@ def refresh(app):
                     dpg.add_checkbox(default_value=bool(o.get("rev")), user_data=(k, "rev"), callback=cb)
                     dpg.add_button(label="x", small=True, user_data=k, callback=lambda s, a, u: del_output(app, u))
                     weight.danger(dpg.last_item())
+                    c.tip("remove this output")
         for r in dpg.get_item_children(tbl, 1) or []:
             form.mono_values(r)
     if not outs:

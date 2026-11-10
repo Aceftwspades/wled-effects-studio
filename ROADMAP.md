@@ -128,7 +128,10 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
 - [x] **Pads, Modulators, Mixer and MIDI are frames**, as the other ten: a tab in the dock, a pane beside the VJ
       by their grip, in the Window menu with an action each. They open floating, as the dialogs they were, until
       docked (`dock.FLOAT_FIRST`); `chrome.close_dialog` of one closes its frame.
-- [ ] **A tooltip on every button** (132 of 354 have none), and a check that fails for a new one without.
+- [x] **A tooltip on every button**: 141 of 398 had none. All have one now but ten named in `walk.UIREF_NO_TIP`
+      with why (a dialog's Close, the bars dragged between panes, the Library's tiles), and
+      `tests/test_docs.py` fails for a button in the guide's list - written from the running app - without.
+      A tooltip goes after any line that still means its button by `dpg.last_item()`.
 - [ ] **Clipped words** (the VJ decks' descriptions; the Library's tags are cut at a whole tag now, "3-D, both +3"),
       **areas with no title** (the logs of Devices and Send), **controls shown before they can do anything**
       (Sequence, Palettes, Send).

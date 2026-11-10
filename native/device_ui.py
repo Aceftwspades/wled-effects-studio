@@ -164,9 +164,11 @@ def build(app):
             weight.primary(dpg.last_item())
             c.tip("asks by mDNS, asks every known device for the nodes it has heard of, and sweeps the subnet")
             dpg.add_button(label="Stop", tag="dev_scan_stop", enabled=False, callback=lambda: app.stop_scan())
+            c.tip("stop looking for devices")
             dpg.add_input_text(tag="dev_add_host", hint="or an address: 192.168.1.50", width=px(200),
                                on_enter=True, callback=lambda: app.add_device(dpg.get_value("dev_add_host")))
             dpg.add_button(label="Add", callback=lambda: app.add_device(dpg.get_value("dev_add_host")))
+            c.tip("add the device at this address (a name or an IP) to the list")
             dpg.add_button(label="Refresh all", callback=lambda: app.refresh_devices_info())
             c.tip("asks every listed device again what it is and runs")
             c.info("WLED devices on the network. The ticked one is the active device: where every send and the flash go.")
@@ -183,6 +185,7 @@ def build(app):
             dpg.add_text("to: no device chosen - Window > Devices...", tag="send_to", color=c.TEXT, wrap=0)
             dpg.add_button(label="Find a device", tag="send_find", show=False, callback=lambda: show(app, "devices"))
             weight.primary(dpg.last_item())
+            c.tip("open the Devices frame: look for devices on the network, or add one by its address")
         with dpg.group(horizontal=True):
             dpg.add_text("", tag="send_running", color=c.DIM, wrap=0)
             dpg.add_button(label="Read", small=True, callback=lambda: app.probe_active())
@@ -190,6 +193,7 @@ def build(app):
             c.tip("ask the device again what it is and runs")
             dpg.add_button(label="Open in the browser", small=True, callback=lambda: app.open_device_page())
             weight.need(dpg.last_item(), "device")
+            c.tip("the device's own page (WLED's interface) in the browser")
             dpg.add_button(label="Calibrate the speed factor", small=True, callback=lambda: app.calibrate_factor())
             weight.need(dpg.last_item(), "device")
             c.tip("the current effect's settings sent, the device's fps read for three seconds, and the footer's "
@@ -209,6 +213,7 @@ def build(app):
             c.tip("the ledmap (the wiring) and the positions table, so Position and Direction see the real shape")
             dpg.add_button(label="Send the ledmap only", width=px(200), callback=lambda: app.send_ledmap())
             weight.need(dpg.last_item(), "device")
+            c.tip("the wiring alone (ledmap.json): where each LED sits, without the effects or the outputs")
         with dpg.group(horizontal=True):
             dpg.add_button(label="Play a GIF on the device...", tag="send_gif", width=px(200),
                            callback=lambda: __import__("native.devicegif", fromlist=["d"]).show(app))
@@ -222,6 +227,7 @@ def build(app):
             weight.need(dpg.last_item(), "device")
             c.tip("the device's ledmap becomes the geometry: a matrix with its gaps and wiring, or a strip")
             dpg.add_button(label="Import a file...", small=True, callback=lambda: dpg.show_item("ledmap_dialog"))
+            c.tip("a ledmap.json from a file as this project's wiring")
         dpg.add_separator()
         # LIVE: the sim's frames to the device as they are drawn, and the wiring test
         with dpg.group(horizontal=True):
@@ -253,6 +259,7 @@ def build(app):
                    "controller per face. Each goes over its own protocol (choose the device as the active one to set it). "
                    "Fill from the LED outputs gives the ticked devices the outputs' ranges in turn.")
             dpg.add_button(label="Fill from the LED outputs", tag="live_fill", small=True, show=False, callback=lambda: fill_from_outputs(app))
+            c.tip("give the ticked devices the LED outputs' ranges, in turn")
         dpg.add_text("", tag="live_cover", color=c.DIM, wrap=0)
         dpg.add_group(tag="live_targets", show=False)
         with dpg.group(horizontal=True):
@@ -270,7 +277,9 @@ def build(app):
                                               callback=lambda s, v: setattr(app.wiring, "speed", max(0.5, float(v))) if getattr(app, "wiring", None) else None))
             c.tip("how fast the chase runs")
             dpg.add_button(label="<", small=True, callback=lambda: _wt_step(app, -1))
+            c.tip("the LED before, lit alone")
             dpg.add_button(label=">", small=True, callback=lambda: _wt_step(app, 1))
+            c.tip("the next LED, lit alone")
             typeface.mono(dpg.add_input_int(tag="wt_index", width=px(80), default_value=0, min_value=0, min_clamped=True, on_enter=True,
                                             callback=lambda s, v: _wt_set(app, int(v))))
             c.tip("the LED, the part or the output lit in the index, part and output modes; < and > step it")
@@ -336,6 +345,7 @@ def build_flash(app):
             dpg.add_input_text(tag="flash_file", width=px(420), default_value=app.project.options.get("flash_file", ""),
                                callback=lambda s, v: (app.project.options.__setitem__("flash_file", v), refresh_manifest(app)))
             dpg.add_button(label="Choose...", small=True, callback=lambda: dpg.show_item("flash_bin_dialog"))
+            c.tip("pick a firmware .bin file to flash")
         with dpg.group(horizontal=True, tag="flash_env_row"):
             form.inline("environment")
             dpg.add_combo(envs, tag="flash_env", width=px(260), default_value=app.project.options.get("flash_env") or default or "",
@@ -343,6 +353,7 @@ def build_flash(app):
             c.tip("the PlatformIO environment the build extends; the device's chip suggests one")
             dpg.add_button(label="", tag="flash_env_fit", small=True, show=False,
                            callback=lambda: (dpg.set_value("flash_env", dpg.get_item_user_data("flash_env_fit")), refresh_flash(app)))
+            c.tip("set the build to the board the chosen device reports itself to be")
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("WHAT GOES ON THE DEVICE", color=c.ACCENT))
             dpg.add_button(label="Preview (no compile)", small=True, callback=lambda: preview_build(app))
@@ -352,6 +363,7 @@ def build_flash(app):
         with dpg.group(horizontal=True, tag="flash_fx_head"):
             typeface.label(dpg.add_text("EFFECTS TO SHIP", color=c.ACCENT))
             dpg.add_button(label="all", small=True, callback=lambda: _ship_all(app, True))
+            c.tip("tick every effect: all of them go on the device")
             dpg.add_button(label="none", small=True, callback=lambda: _ship_all(app, False))
             c.tip("the project's effects and the built-in cube effects, all or none")
             dpg.add_button(label="what the project uses", small=True, callback=lambda: _ship_used(app))
@@ -362,6 +374,7 @@ def build_flash(app):
         with dpg.group(horizontal=True, tag="flash_feat_head"):
             typeface.label(dpg.add_text("FEATURES", color=c.ACCENT))
             dpg.add_button(label="Usermods...", small=True, callback=lambda: c.show_usermods(app))
+            c.tip("which usermods and features the firmware is built with")
             c.info("what the firmware carries: untick what this device lacks and the build shrinks; Usermods... has WLED's own too")
         with dpg.child_window(tag="flash_features", height=px(118), border=True):
             pass
@@ -407,12 +420,15 @@ def build_flash(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="Start", tag="flash_start", callback=lambda: start_flash(app))
             weight.primary(dpg.last_item())
+            c.tip("build the firmware and write it to the device")
             dpg.add_checkbox(label="build", tag="flash_build", default_value=True)
             dpg.add_checkbox(label="send to the device", tag="flash_upload", default_value=True)
             dpg.add_button(label="Cancel", tag="flash_cancel", enabled=False,
                            callback=lambda: app.flash_job and app.flash_job.cancel())
             weight.quiet(dpg.last_item())
+            c.tip("stop the build or the flash that is running")
             dpg.add_button(label="Open the build folder", callback=lambda: app.reveal(os.path.join(flash.ROOT, ".pio", "build")))
+            c.tip("the folder PlatformIO builds the firmware in, in the file manager")
         dpg.add_text("", tag="flash_status", color=c.DIM, wrap=0)
         dpg.add_progress_bar(tag="flash_progress", default_value=0.0, width=-1, show=False)
         with dpg.child_window(tag="flash_log", height=px(200), border=True):     # the frame scrolls: the log a set height
@@ -766,8 +782,10 @@ def build_wled_dialog(app):
         with dpg.group(horizontal=True):
             dpg.add_button(label="Clone" if wledtree.has_git() else "Download", tag="wled_go", callback=lambda: fetch_wled(app))
             weight.primary(dpg.last_item())
+            c.tip("fetch WLED's sources into a folder beside the studio, to build the firmware from")
             dpg.add_button(label="Restart the studio", tag="wled_restart", show=False, callback=lambda: (wledtree.restart(), dpg.stop_dearpygui()))
             weight.primary(dpg.last_item())
+            c.tip("close the studio and start it again, so the Flash frame has the checkout")
             dpg.add_button(label="Close", callback=lambda: dpg.hide_item("wled_dialog"))
             weight.quiet(dpg.last_item())
             dpg.add_text("" if wledtree.has_git() else "no git on the path: the branch comes as a zip (not a repository, which PlatformIO does not mind)",
@@ -925,8 +943,10 @@ def refresh_devices(app):
             if not d.get("reachable", True):
                 dpg.add_text("not answering", color=c.RED)
             dpg.add_button(label="use", small=True, user_data=host, callback=lambda s, a, u: app.set_active_device(u), show=not on)
+            c.tip("make this the device the studio sends to and streams to")
             dpg.add_button(label="remove", small=True, user_data=host, callback=lambda s, a, u: app.remove_device(u))
             weight.danger(dpg.last_item())
+            c.tip("take this device off the list (it is not touched)")
         # what it is, on a line of its own under its name: on one line with the buttons it ran past the frame's edge
         dpg.add_text(_device_line(d), parent="dev_rows", indent=px(32), wrap=0,
                      color=c.DIM if d.get("reachable", True) else c.RED)

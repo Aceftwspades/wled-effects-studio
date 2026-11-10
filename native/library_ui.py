@@ -104,6 +104,7 @@ def build(app):
         with dpg.group(horizontal=True):
             dpg.add_input_text(tag="lib_search", hint="search names and tags", width=px(220), callback=lambda s, v: refresh(app))
             dpg.add_button(label="Remake the thumbnails", small=True, callback=lambda: remake(app))
+            c.tip("make every thumbnail of this bank again, each from a clean cube")
             c.info("Every effect of the sim as a looping thumbnail, in three banks: the project's graphs, the usermod effects "
                    "(the cube effects and the project's code effects) and WLED's stock ones. Each is made on a clean cube, "
                    "hearing the synth's beat. Click a tile: its effect runs in the sim; a graph's waits in the graph pane "
@@ -116,7 +117,9 @@ def build(app):
             dpg.add_input_float(tag="lib_gen_secs", width=px(60), default_value=3.0, step=0, format="%.0f s")
             dpg.add_checkbox(label="only the ones shown", tag="lib_gen_shown", default_value=False)
             dpg.add_button(label="Cancel", tag="lib_cancel", small=True, show=False, callback=lambda: cancel(app))
+            c.tip("stop generating the previews")
             dpg.add_button(label="Open the folder", small=True, callback=lambda: app.reveal(os.path.join(app.project.path, "export", "library")))
+            c.tip("the previews' folder (export/library), in the file manager")
         with dpg.group(horizontal=True, tag="lib_progress_row", show=False):
             dpg.add_progress_bar(tag="lib_progress", default_value=0.0, width=px(260), overlay="")
             dpg.add_text("", tag="lib_progress_words", color=c.DIM)

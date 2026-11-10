@@ -112,15 +112,19 @@ def build(app):
             dpg.add_button(label="undo", small=True, callback=lambda: undo(app))
             c.tip("the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes")
             dpg.add_button(label="+ New", small=True, callback=lambda: new_palette(app))
+            c.tip("a new gradient of the project's own")
             dpg.add_button(label="From the sim's palette", small=True, callback=lambda: from_current(app))
             c.tip("a new one that starts as the palette the sim shows")
             dpg.add_button(label="Copy", small=True, callback=lambda: dup_palette(app))
             weight.need(dpg.last_item(), _has_sel)
+            c.tip("a copy of this palette, to change")
             dpg.add_button(label="Remove", small=True, callback=lambda: del_palette(app))
             weight.danger(dpg.last_item())
             weight.need(dpg.last_item(), _has_sel)
+            c.tip("delete this palette from the project")
             dpg.add_button(label="Use in the sim", small=True, callback=lambda: use_palette(app))
             weight.need(dpg.last_item(), _has_sel)
+            c.tip("the effect in the sim drawn with this palette")
             c.info("Gradients of your own: in the sim as palettes (ids 200 down), on the device as its custom palettes - "
                    "sent by position, so the first here replaces the device's palette0.json, the second its palette1.json.")
         with dpg.child_window(tag="pal_rows", height=px(120), border=True):
@@ -139,6 +143,7 @@ def build(app):
                                             callback=lambda s, v: set_pos(app, int(v))))
             c.tip("where the stop sits along the palette, 0..255")
             dpg.add_button(label="spread evenly", small=True, callback=lambda: spread(app))
+            c.tip("the colour stops at equal distances along the gradient")
         dpg.add_separator()
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
@@ -148,9 +153,11 @@ def build(app):
             c.tip("slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload")
             dpg.add_button(label="Send all", small=True, callback=lambda: send(app, True))
             weight.need(dpg.last_item(), _dev_any)
+            c.tip("every palette of the project to the device, as its custom palettes")
             dpg.add_button(label="Remove this one there", small=True, callback=lambda: remove_there(app))
             weight.danger(dpg.last_item())
             weight.need(dpg.last_item(), _dev_sel)
+            c.tip("delete this palette's file from the device")
         dpg.add_text("", tag="pal_log", color=c.DIM, wrap=0)
 
 

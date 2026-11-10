@@ -151,6 +151,7 @@ def empty(parent, text, steps=(), wrap=0, lead=True):
             with dpg.group(horizontal=True):
                 for k, (label, fn) in enumerate(steps):
                     b = dpg.add_button(label=label, user_data=fn, callback=lambda s, a, u: u())
+                    c.tip(text, item=b)              # the words over it, on hover too: every button has a tooltip
                     if k == 0 and lead:
                         primary(b)
     return g

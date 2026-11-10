@@ -2452,6 +2452,7 @@ def build_panel(app, panel):
     grip("graph_win")
     with dpg.group(horizontal=True):
         dpg.add_button(label="< back", tag="graph_back", show=False, callback=lambda: panel.back())
+        __import__("native.chrome", fromlist=["c"]).tip("out of this sub-graph, to the graph it is in")
         with dpg.group(horizontal=True, tag="graph_crumbs", show=False):     # inside a sub-graph: the trail down to it
             pass
         dpg.add_combo(panel.files(), tag="graph_file", width=px(220), default_value=panel.file or "",

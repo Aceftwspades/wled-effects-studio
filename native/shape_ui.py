@@ -285,7 +285,9 @@ def build(app):
             c.tip("open or save a shape; import a model, an xLights model or layout, a point list; a reference mesh; "
                   "export an xLights model or the positions; a preview")
             dpg.add_button(label="Undo", tag="shape_undo_btn", callback=lambda: undo(app))
+            c.tip("take back the last change to the shape")
             dpg.add_button(label="Redo", tag="shape_redo_btn", callback=lambda: redo(app))
+            c.tip("bring back the change last undone")
         dpg.add_group(tag="shape_checks")                    # what is likely a mistake, each with a "show me" (shape_checks)
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("WIRING", color=c.ACCENT))
@@ -313,6 +315,7 @@ def build(app):
                 dpg.add_button(label="Generate a preview", tag="shape_prev_go", small=True, callback=lambda: generate_preview(app))
                 c.tip("a turn of the shape, rendered off screen: a GIF and a PNG in the project's export folder, looping here")
                 dpg.add_button(label="Open the folder", small=True, callback=lambda: app.reveal(os.path.join(app.project.path, "export")))
+                c.tip("the project's export folder, in the file manager")
             dpg.add_text("", tag="shape_prev_status", color=c.DIM, wrap=0)
             with dpg.group(tag="shape_prev_img"):
                 pass
@@ -796,6 +799,7 @@ def _part_settings(app, P, sel, part, sp):
     with form.row("turn 90°", parent=P, tip="a quarter turn about each axis, about the part's own middle"):
         for ax in "XYZ":
             dpg.add_button(label=ax, small=True, user_data=ax, callback=lambda s, a, u: quarter_turn(app, sorted(selection(app)), "XYZ".index(u)))
+            c.tip(f"a quarter turn about {ax}")
     # the exact ones, folded: its rotation, scale, the aim
     with dpg.tree_node(label="exact rotation, scale and aim", tag="shape_exact_tn", parent=P,
                        default_open=bool(shape_state.of(app).exact)):
@@ -809,6 +813,7 @@ def _part_settings(app, P, sel, part, sp):
         from native import shape_tools
         for label, where in (("first", "first"), ("earlier", "earlier"), ("later", "later"), ("last", "last")):
             dpg.add_button(label=label, small=True, user_data=where, callback=lambda s, a, u: shape_tools.wiring_move(app, sel, u))
+            c.tip({"first": "this part first in the wiring", "earlier": "one place earlier in the wiring", "later": "one place later in the wiring", "last": "this part last in the wiring"}[where])
         dpg.add_button(label="light it", small=True, callback=lambda: shape_tools.light(app, sel))
         c.tip("the wiring test lighting this part: in the sim, and on the device while the sim is streamed to it")
 
@@ -907,8 +912,11 @@ def _kind_tools(app, P, sel, part, sp):
         with dpg.group(horizontal=True, parent=P):
             dpg.add_button(label="delete the last", small=True, callback=lambda: pop_point(app, sel))
             weight.danger(dpg.last_item())
+            c.tip("remove the last point of this part")
             dpg.add_button(label="renumber: nearest chain from the first", small=True, callback=lambda: chain_part(app, sel))
+            c.tip("wire the points in a chain: from the first, each to the nearest not yet taken")
             dpg.add_button(label="turn into a path", small=True, callback=lambda: set_part(app, sel, kind="polyline"))
+            c.tip("the points become the corners of a path, its LEDs spread along it")
         _by_hand(app, P)
 
 
@@ -948,10 +956,14 @@ def _exact(app, parent, sel, part, sp):
         c.tip("a turn about the direction, in degrees")
         for lbl, v in (("+X", (1, 0, 0)), ("-X", (-1, 0, 0)), ("+Y", (0, 1, 0)), ("-Y", (0, -1, 0)), ("+Z", (0, 0, 1)), ("-Z", (0, 0, -1))):
             dpg.add_button(label=lbl, small=True, user_data=v, callback=lambda s, a, u: _set_dir(u))
+            c.tip(f"the direction: along {lbl}")
     with dpg.group(horizontal=True, parent=parent):
         dpg.add_button(label="aim outward", small=True, callback=lambda: aim_part(app, sel, "outward"))
+        c.tip("point the part along the direction and put it the distance from the origin along it")
         dpg.add_button(label="turn only", small=True, callback=lambda: aim_part(app, sel, "turn"))
+        c.tip("point the part along the direction where it is")
         dpg.add_button(label="aim at the origin", small=True, callback=lambda: aim_part(app, sel, "origin"))
+        c.tip("point the part inward, at the origin, from where it is")
         dpg.add_button(label="from its place", small=True, callback=lambda: _set_dir(list(d0), units.to_unit(dist, sp)))
         c.tip("the direction and distance the part is at now, into the fields")
 
@@ -981,6 +993,7 @@ def _several_settings(app, P, idxs, sp):
     with form.row("turn 90°", parent=P, tip="each part a quarter turn about each axis, about its own middle"):
         for ax in "XYZ":
             dpg.add_button(label=ax, small=True, user_data=ax, callback=lambda s, a, u: quarter_turn(app, sorted(selection(app)), "XYZ".index(u)))
+            c.tip(f"a quarter turn about {ax}")
     with dpg.group(horizontal=True, parent=P):
         dpg.add_button(label="all", small=True, callback=lambda: select(app, range(len(_parts(app) or []))))
         c.tip("every part selected (A with the pointer on the 3-D view)")

@@ -156,6 +156,7 @@ def refresh(app):
             dpg.add_text(f.text, color=chrome.TEXT if f.kind == "warn" else chrome.DIM, wrap=px(430))
             if f.show is not None:
                 dpg.add_button(label="show me", small=True, user_data=f.show, callback=lambda s, a, u: u())
+                __import__("native.chrome", fromlist=["c"]).tip("select what this is about and bring it into view")
     if len(found) > 5:
         dpg.add_text(f"and {len(found) - 5} more", parent="shape_checks", color=chrome.DIM)
     if warns > shape_state.of(app).warns:              # a word on the footer when there is newly more to look at

@@ -139,6 +139,7 @@ def _build_side(app):
         for typ in pads.TYPES:
             dpg.add_button(label=pads.TYPE_WORDS[typ], width=-1, user_data=typ,
                            callback=lambda s, a, u: _add_control(app, u))
+            c.tip(f"add one to this bank: {pads.TYPE_WORDS[typ]}")
         dpg.add_button(label="video clips: a pad each...", width=-1,
                        callback=lambda: clip_ui._open_dialog(app, "pads_clips_dialog"))
         c.tip("video files made into pads: each copied into the project and given a pad, from this bank's free "
@@ -212,8 +213,10 @@ def _build_side(app):
             dpg.add_button(label="Learn", tag="pads_s_learn", small=True, callback=lambda: _learn(app, "control"))
             c.tip("press the controller's pad (or turn its knob) that should play this control")
             dpg.add_button(label="Forget", tag="pads_s_forget", small=True, callback=lambda: _forget(app))
+            c.tip("forget the key or MIDI control learnt for this control")
             dpg.add_text("", tag="pads_s_midi", color=c.DIM)
         dpg.add_button(label="Remove this control", width=-1, callback=lambda: _remove_control(app))
+        c.tip("take this control off the bank")
 
 
 def show(app):
