@@ -103,6 +103,7 @@ TOP = {"on": False, "fader": 0.0, "mode": "crossfade", "wipe": "blend", "map": "
        "c_mode": "screen", "c_up": 1.0,   # the level deck C's In (and Flash) brings it to
        "c_fade": 2.0,                     # deck C's In and Out, in beats (0: a cut)
        "cue": False,
+       "master": 1.0,                     # the mix's level, after everything (blackout and freeze are not kept)
        "sel": 0,                          # the selected deck (0 A, 1 B, 2 C): what "the selected deck"'s actions drive
        "pulse": "grid",                   # the decks' beat: "grid" (on the bar grid) or "heard" (every beat heard)
        "quant": "now",                    # Cut and Fade by hand: "now", or waiting for the next "beat" or "bar"
@@ -1104,7 +1105,7 @@ def draw_deck(app, i, dt, snd, beat, hit):
     c.channel_images = [media(app, p) if p else "" for p in (deck.get("channel_images") or ["", "", "", ""])][:4]
     c.amount, c.speed = amount, speed
     c.knob = lambda key: knob_value(app, i, key)          # a knob as it draws, a modulator's over it
-    c.grad = vj_looks.gradient(deck.get("colours", "neon"))
+    c.grad = colours(app, deck.get("colours", "neon"))
     c.flame_to = _flame_of(deck.get("morph_to")) if lk.family == "flame" else None
     try:
         img = np.asarray(lk.draw(c, run.state), np.float32)
@@ -1314,6 +1315,44 @@ def _effect_frame(app, i, run, deck, speed, amount, dt):
         return None
     run.error = ""
     return eng.rgb().copy()
+
+
+PAL_N = 31                         # a palette read at this many places along it (WLED's sixteen entries, and between)
+PAL_LAST = 240                     # ... the last at its sixteenth entry: grad(1) the palette's last colour, where an
+                                   # effect's index 255 is most of the way round to its first again
+PAL_EVERY_S = 1.0                  # ... again this often: one edited in the Palettes frame, one that moves by itself
+
+
+def colour_names(app):
+    """What a deck's colours can be: the VJ's own gradients, then the palettes the effects have - the project's
+    own (the Palettes frame's) and WLED's."""
+    out = list(vj_looks.GRADIENTS)
+    try:
+        pals = [n for n, _ in app.eng.palette_list()]
+    except Exception:                                         # no engine yet, or one without palettes
+        return out
+    own = [n for n in getattr(app.eng, "custom_names", None) or [] if n in pals]
+    return out + [n for n in own if n not in out] + [n for n in pals if n not in out and n not in own]
+
+
+def colours(app, name):
+    """A deck's colours as grad(x) for 0..1: one of the VJ's gradients, or a palette of the engine's by its name
+    (read along its length, and again each second). A name that is neither - a palette of another project's -
+    is the rainbow, as an unknown gradient always was."""
+    if not name or name in vj_looks.GRADIENTS:
+        return vj_looks.gradient(name or "neon")
+    st, now = vj_state.of(app), clock.now()
+    hit = st.pals.get(name)
+    if hit is None or not 0.0 <= now - hit[0] < PAL_EVERY_S:
+        g = None
+        try:
+            pid = dict(app.eng.palette_list()).get(name)
+            if pid is not None:
+                g = vj_looks.from_stops(np.asarray(app.eng.palette_swatch(pid, PAL_N, PAL_LAST), np.float32) / 255.0)
+        except Exception:
+            oops.swallowed()
+        hit = st.pals[name] = (now, g or vj_looks.gradient(name))
+    return hit[1]
 
 
 def deck_led(app, i):
@@ -1539,8 +1578,45 @@ def update(app, dt=None):
     for i in range(len(o["decks"])):
         p = deck_led(app, i)
         pics.append(p if p is not None and p.shape == shape else np.zeros(shape, np.uint8))
-    vj_state.of(app).out = mix(app, pics[0], pics[1], pics[2] if len(pics) > 2 else None,
-                      deck_alpha(app, 2) if len(pics) > 2 else None)
+    vj_state.of(app).out = _after(app, mix(app, pics[0], pics[1], pics[2] if len(pics) > 2 else None,
+                                           deck_alpha(app, 2) if len(pics) > 2 else None))
+
+
+# --- after the mix: freeze, the master level, blackout ---------------------------------------------
+def _after(app, out):
+    """The mix as it leaves the desk: held as it was while frozen, at the master level, dark under a blackout.
+    The decks run on under all three: let go, the picture is where the music is, not where it was left."""
+    st = vj_state.of(app)
+    if st.freeze:
+        if st.frozen is None or st.frozen.shape != out.shape:
+            st.frozen = out.copy()
+        out = st.frozen
+    else:
+        st.frozen = None
+    if st.blackout:
+        return np.zeros_like(out)
+    return _level(out, float(options(app).get("master", 1.0)))
+
+
+def set_master(app, f):
+    options(app)["master"] = round(max(0.0, min(1.0, float(f))), 4)
+    vj_state.of(app).knobs_moved = True
+
+
+def blackout(app, on=None):
+    """The blackout set, or flipped (None); whether it is on now."""
+    st = vj_state.of(app)
+    st.blackout = (not st.blackout) if on is None else bool(on)
+    return st.blackout
+
+
+def freeze(app, on=None):
+    """The freeze set, or flipped (None): the mix held as it is at the next frame. Whether it is on now."""
+    st = vj_state.of(app)
+    st.freeze = (not st.freeze) if on is None else bool(on)
+    if not st.freeze:
+        st.frozen = None
+    return st.freeze
 
 
 def _deck_words(app, i):

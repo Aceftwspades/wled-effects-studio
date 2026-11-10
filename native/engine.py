@@ -471,11 +471,13 @@ class Engine:
     def pal_source(self, v):
         self.lib.simSetPalSource(int(v))
 
-    def palette_swatch(self, pal, n=16):
-        """n colours across a palette, as (r,g,b) - for UI swatches and tests."""
+    def palette_swatch(self, pal, n=16, last=255):
+        """n colours across a palette, as (r,g,b) - for UI swatches and tests. `last` is the index the last one
+        is read at: 255 as an effect reads it (blended most of the way back to the first colour - a palette
+        wraps), 240 its sixteenth entry itself (the palette's own last colour)."""
         out = []
         for k in range(n):
-            c = self.lib.simPalColor(int(pal), (k * 255) // max(n - 1, 1))
+            c = self.lib.simPalColor(int(pal), (k * int(last)) // max(n - 1, 1))
             out.append(((c >> 16) & 255, (c >> 8) & 255, c & 255))
         return out
 

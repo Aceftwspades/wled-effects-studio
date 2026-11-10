@@ -54,6 +54,7 @@ CHECK_KEYS = ("o1", "o2", "o3")
 VJ_BUTTONS = ("vj_cut", "vj_fade", "vj_shuffle_a", "vj_shuffle_b", "vj_air", "vj_clip_a", "vj_clip_b", "vj_clip_c",
               "vj_pause_a", "vj_pause_b", "vj_pause_c", "vj_c_in", "vj_c_out", "vj_c_toggle", "vj_c_flash",
               "vj_clip_s", "vj_pause_s",                       # the selected deck's
+              "vj_blackout", "vj_freeze",                      # after the mix
               "vj_sel_a", "vj_sel_b", "vj_sel_c", "vj_sel_next")   # a deck selected
 MOD_BUTTONS = ("mod_on", "mod_restart")                       # a modulator switched on or off, its wave restarted (modulate.py)
 GATES = ("mod_gate",)                                          # held: every press and every let-go, in order

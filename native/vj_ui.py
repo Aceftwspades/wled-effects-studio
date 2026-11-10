@@ -146,6 +146,20 @@ def build(app):
             dpg.add_combo(list(vj.WIPES), tag="vj_wipe", width=px(100), default_value=o["wipe"],
                           callback=lambda s, v: _set(app, "wipe", v))
             c.tip("blend: the two through the blend mode; a wipe: the other deck swept or pushed in as the fader moves")
+        with dpg.group(horizontal=True):                  # after the mix: what leaves the desk
+            typeface.label(dpg.add_text("OUT", color=c.ACCENT))
+            num.add("vj_master", float(o.get("master", 1.0)), 0.0, 1.0, digits=2, width=px(140),
+                    callback=lambda s, v: (vj.set_master(app, float(v)), _save(app)))
+            c.tip("the master level: the whole mix, deck C and all, turned down (right-click: learn MIDI)")
+            _learnable(app, "vj_master", {"kind": "vj_master"})
+            dpg.add_checkbox(label="blackout", tag="vj_blackout", callback=lambda s, v: vj.blackout(app, bool(v)))
+            c.tip("the mix dark at once, the decks running on under it - unticked, the picture is where the music "
+                  "is (it is not kept with the project; right-click: learn MIDI)")
+            _learnable(app, "vj_blackout", {"kind": "vj_blackout"})
+            dpg.add_checkbox(label="freeze", tag="vj_freeze", callback=lambda s, v: vj.freeze(app, bool(v)))
+            c.tip("the mix held as it is now, the decks running on under it - a held frame for a break, let go on "
+                  "the drop (right-click: learn MIDI)")
+            _learnable(app, "vj_freeze", {"kind": "vj_freeze"})
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("AUTO", color=c.ACCENT))
             dpg.add_combo([w for _, w in AUTO], tag="vj_auto", width=px(170), default_value=dict(AUTO)[o["auto"]["mix"]],
@@ -334,8 +348,12 @@ def _deck(app, i):
     _row("speed", lambda: num.add(f"vj_spd{i}", float(d["speed"]), 0.0, vj.SPEED_MAX, digits=2,
                                   callback=lambda s, v: _set_deck(app, i, "speed", float(v))))
     _learnable(app, f"vj_spd{i}", {"kind": "vj_knob", "deck": i, "key": "speed"})
-    _row("colours", lambda: dpg.add_combo(list(vj_looks.GRADIENTS), tag=f"vj_col{i}", width=-1, default_value=d["colours"],
-                                          callback=lambda s, v: _set_deck(app, i, "colours", v)), tag=f"vj_colrow{i}")
+    def _colours():
+        dpg.add_combo(vj.colour_names(app), tag=f"vj_col{i}", width=-1, default_value=d["colours"],
+                      callback=lambda s, v: _set_deck(app, i, "colours", v))
+        c.tip("the look's colours: a gradient of the VJ's (the first seven), a palette of the project's (the Palettes "
+              "frame) or one of WLED's - the effects' palettes, so a show's looks and effects can share one")
+    _row("colours", _colours, tag=f"vj_colrow{i}")
     _row("its colours", lambda: dpg.add_combo([OWN_COLS] + list(vj_looks.GRADIENTS), tag=f"vj_fxcol{i}", width=-1,
                                               callback=lambda s, v: _set_fx_colours(app, i, "" if v == OWN_COLS else v)),
          tag=f"vj_fxcolrow{i}")
@@ -1512,6 +1530,7 @@ def refresh(app):
     dpg.set_value("vj_cfade", dict(vj.C_FADES).get(float(o["c_fade"]), "over two beats"))
     num.set("vj_cup", float(o["c_up"]))
     num.set("vj_clvl", float(o["decks"][2]["level"]))
+    num.set("vj_master", float(o.get("master", 1.0)))
     dpg.set_value("vj_cauto", dict(vj.C_AUTO)[o["auto"]["c"]])
     dpg.set_value("vj_cbars", f"{o['auto']['c_bars']} bars")
     pals = [OWN_PAL] + [n for n, _ in app.eng.palette_list()]
@@ -1538,7 +1557,8 @@ def refresh(app):
             else:
                 dpg.configure_item(f"vj_fxs{i}_{k}", show=k in sets, label=lab)
                 dpg.set_value(f"vj_fxs{i}_{k}", bool(v))
-        dpg.configure_item(f"vj_colrow{i}", show=not eff)
+        dpg.configure_item(f"vj_colrow{i}", show=not eff and getattr(lk, "colours", True))   # (a look that reads them)
+        dpg.configure_item(f"vj_col{i}", items=vj.colour_names(app))
         dpg.set_value(f"vj_fxcol{i}", d.get("fx_colours") or OWN_COLS)
         dpg.configure_item(f"vj_pal{i}", items=pals)
         dpg.set_value(f"vj_pal{i}", d.get("palette") or OWN_PAL)
@@ -1697,9 +1717,14 @@ def poll(app):
         o = vj.options(app)
         if abs(float(dpg.get_value("vj_fader")) - float(o["fader"])) > 1e-3 and not num.busy():
             num.set("vj_fader", float(o["fader"]))
+        st = vj_state.of(app)                                 # a pad or MIDI flips these too
+        for tag, on in (("vj_blackout", st.blackout), ("vj_freeze", st.freeze)):
+            if bool(dpg.get_value(tag)) != bool(on):
+                dpg.set_value(tag, bool(on))
         if vj_state.of(app).knobs_moved and not num.busy():       # MIDI or a modulator moved a knob
             vj_state.of(app).knobs_moved = False
             num.set("vj_clvl", o["decks"][2]["level"])
+            num.set("vj_master", float(o.get("master", 1.0)))
             for i in range(vj.DECKS):
                 d = o["decks"][i]
                 _sync_knobs(i, d)
@@ -1713,6 +1738,9 @@ def poll(app):
         errs = [f"deck {LETTER[i]}: {r.error}" for i, r in enumerate(vj._runs(app)) if r.error]
         errs += [f"looks/{f}: {e}" for f, e in vj_state.of(app).file_errs]
         words = "; ".join(errs) if errs else ("on air" if vj.on(app) else "off air - the effect shows")
+        held = [w for w, on in (("BLACKOUT", st.blackout), ("frozen", st.freeze)) if on]
+        if held:                                              # said: a dark shape with no word why is a fault to hunt
+            words = ", ".join(held) + " - " + words
         if dpg.get_value("vj_words") != words:
             dpg.set_value("vj_words", words)
 # AI: end

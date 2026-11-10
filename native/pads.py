@@ -49,7 +49,7 @@ COLOURS = (("grey", (120, 124, 132)), ("red", (226, 64, 64)), ("orange", (240, 1
            ("cyan", (60, 200, 240)), ("blue", (70, 120, 240)), ("violet", (150, 90, 240)), ("pink", (240, 90, 190)))
 COLOUR = dict(COLOURS)
 # switches that flip something on and off: a toggle shows it, a hold flips it back on release
-FLIPS = ("vj_air", "vj_c_toggle", "vj_pause_a", "vj_pause_b", "vj_pause_c", "vj_pause_s", "mod_on")
+FLIPS = ("vj_air", "vj_blackout", "vj_freeze", "vj_c_toggle", "vj_pause_a", "vj_pause_b", "vj_pause_c", "vj_pause_s", "mod_on")
 FLASH_MS = 0.15                 # a trigger shown lit this long after its press
 MAX_BANKS = 32
 
@@ -300,6 +300,9 @@ def value(app, t):
         if k == "vj_fader":
             from native import vj
             return float(vj.options(app)["fader"])
+        if k == "vj_master":
+            from native import vj
+            return float(vj.options(app).get("master", 1.0))
         if k == "vj_knob":
             from native import vj
             return float(vj.knob_get(app, int(t.get("deck", 0)), t.get("key", "amount")))
@@ -341,6 +344,9 @@ def is_on(app, t):
         return vj.selected(app) == "abc".index(k[-1])
     if k == "vj_air":
         return bool(vj.on(app))
+    if k in ("vj_blackout", "vj_freeze"):
+        from native import vj_state
+        return bool(getattr(vj_state.of(app), k[3:]))
     if k in ("vj_c_toggle", "vj_c_in"):
         return bool(vj.c_is_in(app))
     if k and k.startswith("vj_pause_"):

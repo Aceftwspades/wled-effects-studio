@@ -153,9 +153,9 @@ each knob's effect on each look measured, and the frame looked at in nine states
 - [x] **A deck's error stays while the deck is not drawn** (deck C at level 0): said long after another look is on.
 - [x] **An Image deck with no picture says "ValueError"**: the state every Image deck starts in. It asks for one, clear meanwhile.
 - [x] **Clipped at the frame's own width**: the mix row's wipe list, a deck's preset Delete, the browser's names (the fader shorter, the list over its buttons, a line each).
-- [ ] **A deck's colours are seven gradients of the VJ's own**: the project's palettes and WLED's are not offered.
-      And the list shows on the ten video looks that never read it.
-- [ ] **Nothing after the mix**: a blackout, a master level, a freeze.
+- [x] **A deck's colours are seven gradients of the VJ's own**: the project's palettes and WLED's are too now (`vj.colours`, read from the engine each second).
+      And the list showed on the looks that never read it (`Look.colours`).
+- [x] **Nothing after the mix**: a blackout, a master level, a freeze (`vj._after`; the OUT row, MIDI, pads).
 - [ ] **One "amount" a look, named "amount" whatever it does** (the dots' size, the blocks', the contrast), and no
       knobs of a look's own. On Drop: Pulse Grid, Bloom and Fireflies it changes next to nothing.
 - [ ] **Looks that sit still under music**: the twenty flames (as much motion in silence as on a beat), the video

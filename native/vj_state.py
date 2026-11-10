@@ -28,6 +28,10 @@ class VJState:
     hand_at: object = None          # when the crossfader was last moved by hand (a VJ show step yields to it)
     morphs: dict = field(default_factory=dict)      # deck -> a look morph under way (a preset going into another)
     mod: dict = field(default_factory=dict)         # (deck, knob) -> a modulator's value over the knob
+    pals: dict = field(default_factory=dict)        # a palette's name -> (when it was read, its grad(x)): vj.colours
+    blackout: bool = False          # the mix held dark (the decks run on under it): the hand's, never saved
+    freeze: bool = False            # the mix held as it was when this was set
+    frozen: object = None           # ... that picture (None: not held, or the next one is to be)
     dirty: bool = False             # the options changed: the panel redrawn, the project saved soon
     knobs_moved: bool = False       # a knob moved since the last undo snapshot
     save_at: object = None          # when the VJ's options are saved next

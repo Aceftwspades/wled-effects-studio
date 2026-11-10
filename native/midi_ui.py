@@ -199,6 +199,8 @@ def targets(app):
     out += [("VJ: the crossfader", {"kind": "vj_fader"}), ("VJ: cut to the other deck", {"kind": "vj_cut"}),
             ("VJ: fade to the other deck", {"kind": "vj_fade"}), ("VJ: shuffle deck A", {"kind": "vj_shuffle_a"}),
             ("VJ: shuffle deck B", {"kind": "vj_shuffle_b"}), ("VJ: on air, on or off", {"kind": "vj_air"}),
+            ("VJ: the master level", {"kind": "vj_master"}), ("VJ: blackout, on or off", {"kind": "vj_blackout"}),
+            ("VJ: freeze, on or off", {"kind": "vj_freeze"}),
             ("VJ C: in", {"kind": "vj_c_in"}), ("VJ C: out", {"kind": "vj_c_out"}),
             ("VJ C: in or out", {"kind": "vj_c_toggle"}), ("VJ C: a flash", {"kind": "vj_c_flash"})]
     from native import vj
@@ -744,13 +746,21 @@ def apply_target(app, t, v, full=127.0, ctl=None, keep=False):
     if kind == "setlist":
         switch_effect(app, midi.setlist_pick(app.eng.names, _st(app)["setlist"], ctl or ("cc", 0, 0), v, full))
         return
-    if kind in ("vj_fader", "vj_knob", "vj_look", "vj_fx") or kind in midi.VJ_BUTTONS:     # the VJ frame's (vj.py)
+    if kind in ("vj_fader", "vj_master", "vj_knob", "vj_look", "vj_fx") or kind in midi.VJ_BUTTONS:     # the VJ frame's (vj.py)
         from native import vj, vj_ui
         t = vj.resolve(app, t)                              # on "the selected deck": the deck selected now
         kind = t.get("kind")
         f = max(0.0, min(1.0, float(v) / float(full or 127.0)))
         if kind == "vj_fader":
             vj.set_fader(app, f)
+        elif kind == "vj_master":
+            vj.set_master(app, f)
+            if keep:
+                vj_ui._save(app)
+        elif kind == "vj_blackout":
+            vj.blackout(app)
+        elif kind == "vj_freeze":
+            vj.freeze(app)
         elif kind == "vj_knob":
             vj.knob_set(app, int(t.get("deck", 0)), t.get("key", "amount"), f)
             vj_state.of(app).dirty = True

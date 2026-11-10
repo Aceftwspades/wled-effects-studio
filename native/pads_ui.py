@@ -730,7 +730,7 @@ RECENT_N = 6                                         # the picks kept on top (st
 _DECKS = ("Deck A", "Deck B", "Deck C", "Selected deck")
 _LETTER = {"a": "Deck A", "b": "Deck B", "c": "Deck C", "s": "Selected deck"}
 _EFFECT_KINDS = ("fx", "check", "palette", "effect", "setlist", "next", "prev", "pad_effect")
-_MIX_KINDS = ("vj_fader", "vj_cut", "vj_fade", "vj_air", "vj_sel_next", "mixer")
+_MIX_KINDS = ("vj_fader", "vj_cut", "vj_fade", "vj_air", "vj_master", "vj_blackout", "vj_freeze", "vj_sel_next", "mixer")
 
 
 def header(group):

@@ -304,6 +304,79 @@ check(vj._runs(app)[2].error == "", f"a deck off the mix, another look put on it
                                     f"({vj._runs(app)[2].error!r})")
 o["decks"][2].update(look="Starfield", level=0.0)
 del app.eng.names, app.eng.idx
+# a deck's colours: the VJ's gradients, the project's palettes, WLED's - the engine's read to their own last colour
+asked = []
+app.eng.custom_names = ["Mine"]
+app.eng.palette_list = lambda: [("Default", 0), ("Lava", 35), ("fire", 36), ("Mine", 200)]
+app.eng.palette_swatch = lambda pal, n=16, last=255: (asked.append((pal, n, last)),
+                                                      [(255 * k // (n - 1), 0, pal) for k in range(n)])[1]
+names = vj.colour_names(app)
+check(names[:len(vj_looks.GRADIENTS)] == list(vj_looks.GRADIENTS) and names[len(vj_looks.GRADIENTS):] ==
+      ["Mine", "Default", "Lava"], f"a deck's colours: the gradients, the project's palettes, then WLED's ({names[-4:]})")
+ends = np.asarray(vj.colours(app, "Lava")(np.array([0.0, 0.5, 1.0], np.float32)))
+check(asked == [(35, vj.PAL_N, 240)] and np.allclose(ends[:, 0], [0.0, 0.5, 1.0], atol=0.01) and
+      np.allclose(ends[:, 2], 35 / 255, atol=0.01), f"a palette as grad(x): read to its sixteenth entry ({asked}, {ends[:, 0]})")
+vj.colours(app, "Lava")
+check(len(asked) == 1, "a palette read once a second, not a frame")
+clock.hold()
+try:
+    vj.colours(app, "Lava")
+    clock.step(vj.PAL_EVERY_S + 0.1)
+    vj.colours(app, "Lava")
+    check(len(asked) == 2, f"... and again after a second: one edited in the Palettes frame shows ({len(asked)})")
+finally:
+    clock.release()
+same = np.asarray(vj.colours(app, "fire")(np.array([0.5], np.float32)))
+check(len(asked) == 2 and np.allclose(same, np.asarray(vj_looks.gradient("fire")(np.array([0.5], np.float32)))),
+      "a gradient's name is the gradient, whatever palette shares it")
+rb = np.asarray(vj.colours(app, "one of another project's")(np.array([0.25], np.float32)))
+check(np.allclose(rb, np.asarray(vj_looks.gradient("nonesuch")(np.array([0.25], np.float32)))),
+      "a palette this project has not: the rainbow, as an unknown gradient")
+o["decks"][0].update(look="Plasma", colours="Lava")
+for _ in range(40):                                                # (past the blend from the look before)
+    vj.update(app, 1 / 40)
+cv = vj._runs(app)[0].canvas
+check(cv is not None and cv[..., 1].max() == 0.0 and cv[..., 0].max() > 0.2, "Plasma in a palette's colours")
+o["decks"][0]["colours"] = "neon"
+check(not vj_looks.LOOKS["Thermal"].colours and vj_looks.LOOKS["Gradient Map"].colours and vj_looks.LOOKS["Plasma"].colours
+      and not vj_looks.LOOKS["Image"].colours, "a look says whether it reads the deck's colours (the video looks do not)")
+del app.eng.palette_list, app.eng.palette_swatch, app.eng.custom_names
+vj_state.of(app).pals.clear()
+# after the mix: the master level, blackout, freeze - the decks running on under each
+o["fader"] = 0.0
+for _ in range(3):
+    vj.update(app, 1 / 40)
+full = vj_state.of(app).out.astype(int)
+vj.set_master(app, 0.5)
+vj.update(app, 1 / 40)
+half = vj_state.of(app).out.astype(int)
+check(full.max() > 100 and abs(half.sum() / max(1, full.sum()) - 0.5) < 0.1, "the master level at a half: half the light")
+vj.set_master(app, 1.0)
+check(vj.blackout(app) is True, "blackout flipped on")
+vj.update(app, 1 / 40)
+t_dark = vj._runs(app)[0].t
+check(not vj_state.of(app).out.any(), "a blackout: the mix dark")
+vj.update(app, 1 / 40)
+check(vj._runs(app)[0].t > t_dark, "... the deck running on under it")
+vj.blackout(app, False)
+vj.update(app, 1 / 40)
+check(vj_state.of(app).out.any(), "the blackout off: the mix again")
+vj.freeze(app, True)
+vj.update(app, 1 / 40)
+held = vj_state.of(app).out.copy()
+for _ in range(10):
+    vj.update(app, 1 / 40)
+check(np.array_equal(vj_state.of(app).out, held), "frozen: the mix as it was, ten frames on")
+vj.set_master(app, 0.25)
+vj.update(app, 1 / 40)
+check(vj_state.of(app).out.sum() < held.sum() * 0.5, "the master level turns a frozen mix down too")
+vj.set_master(app, 1.0)
+check(vj.freeze(app) is False and vj_state.of(app).frozen is None, "freeze flipped off: nothing held")
+vj.update(app, 1 / 40)
+check(not np.array_equal(vj_state.of(app).out, held), "let go: the picture where the deck is now")
+from native import pads as _pads                               # noqa: E402
+check(_pads.kind_of({"kind": "vj_blackout"}) == "flip" and _pads.kind_of({"kind": "vj_freeze"}) == "flip",
+      "blackout and freeze on a pad: flips, lit while on")
 o["decks"][0].update(look="Plasma", speed=1.0, amount=0.5)
 
 # the desk put back when the show lets the VJ go

@@ -38,6 +38,7 @@ import numpy as np
 class Look:
     def __init__(self, name, family, draw, desc, video=False):
         self.name, self.family, self.draw, self.desc, self.video = name, family, draw, desc, video
+        self.colours = True          # it reads the deck's colours (grad): False, and the deck does not offer them
 
 
 LOOKS = {}
@@ -1194,6 +1195,9 @@ for _name in FLAMES:
     if _name not in FIRST_FLAMES:
         _flame_look(_name, FLAMES[_name], CHILD_DESC if any(len(m["var"]) > 1 for m in FLAMES[_name]["maps"]) or
                     "final" in FLAMES[_name] else IFS_DESC)
+for _n in ("Clean", "Neon Edges", "Mosaic", "Thermal", "Halftone", "Chroma Split", "Melt", "Motion Trails", "Imprint",
+           "Follow Spot", "Image"):        # the video in its own colours (Gradient Map alone reads the deck's)
+    LOOKS[_n].colours = False
 BUILTIN = tuple(LOOKS)            # the looks that ship, in their order (MIDI's look target counts along these first)
 
 
@@ -1349,12 +1353,15 @@ def _load_file(path):
         lk = Look(name, "yours", vj_glsl.look_draw(src, name), "a Shadertoy shader of the project's, on the graphics card",
                   "iChannel0" in src)
         lk.glsl = src                                             # the deck's channels row reads its channels from it
+        lk.colours = False                                        # a shader's colours are its own
         return lk
     if ext == ".milk":
         from native import milk
         pre = milk.load(path)
         name = "Milk: " + base
-        return Look(name, "milkdrop", milk.look_draw(pre), milk.TEMPLATE_NOTE)
+        lk = Look(name, "milkdrop", milk.look_draw(pre), milk.TEMPLATE_NOTE)
+        lk.colours = False                                        # a preset's colours are its own
+        return lk
     ns = {"np": np, "math": math, "sample": sample, "hsv": hsv, "blur": blur, "noise": noise, "fbm": fbm,
           "luma": luma, "milkdrop_frame": milkdrop_frame, "flame_frame": flame_frame, "new_flame": new_flame,
           "__file__": path, "__name__": "vj_look_" + base}
@@ -1364,7 +1371,9 @@ def _load_file(path):
     name = str(ns.get("NAME") or base)
     if not callable(ns.get("draw")):
         raise ValueError("it has no draw(c, st)")
-    return Look(name, "yours", ns["draw"], str(ns.get("DESC") or "a look of the project's own"), bool(ns.get("VIDEO", False)))
+    lk = Look(name, "yours", ns["draw"], str(ns.get("DESC") or "a look of the project's own"), bool(ns.get("VIDEO", False)))
+    lk.colours = "grad" in code                                   # (c.grad: the only way to them)
+    return lk
 
 
 IMPORTS = (".milk", ".glsl", ".json")        # what Import... copies in (a Python look is made with New look..., not imported)
@@ -1513,6 +1522,12 @@ def gradient(name):
     stops = GRADIENTS.get(name)
     if stops is None:
         return lambda x: hsv(x, np.full_like(x, 0.9), np.ones_like(x))
+    return from_stops(stops)
+
+
+def from_stops(stops):
+    """grad(x) through colours spaced evenly: an (n, 3) array of 0..1 (a gradient's stops, a palette sampled)."""
+    stops = np.asarray(stops, np.float32)
     n = len(stops)
 
     def g(x):
