@@ -1171,6 +1171,13 @@ sphere's map (the Video node's projections). The canvas's size is beside
 it: 96 x 72 by default, coarser to cost less, finer to be sharper, or a
 wide panel's (16:9), a long strip's or a tall shape's own proportions.
 
+The decks take the room the frame has: as wide as it gives them, and as
+tall as leaves the mix's rows under them in view, so a frame floated and
+made bigger shows more of each deck and a small one still shows the
+crossfader. In a frame wide enough for three, **deck C** stands beside A
+and B; in a narrower one it is under its **DECK C** header, as the rows
+that say how it goes over the mix always are.
+
 A deck's **colours** are what its look draws in: one of the VJ's own seven
 gradients (rainbow, fire, ice, neon, sunset, ocean, mono), one of the
 project's palettes (the Palettes frame's - changed there, it changes on the

@@ -32,6 +32,7 @@ class VJState:
     blackout: bool = False          # the mix held dark (the decks run on under it): the hand's, never saved
     freeze: bool = False            # the mix held as it was when this was set
     frozen: object = None           # ... that picture (None: not held, or the next one is to be)
+    laid: object = None             # the frame's size the decks were last sized to (vj_ui._lay_out)
     dirty: bool = False             # the options changed: the panel redrawn, the project saved soon
     knobs_moved: bool = False       # a knob moved since the last undo snapshot
     save_at: object = None          # when the VJ's options are saved next

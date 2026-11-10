@@ -115,9 +115,9 @@ def build(app):
                     dpg.add_text("", tag="vj_tempo", color=c.DIM)
             dpg.add_image("vj_out_tex", width=px(84), height=px(84), tag="vj_out")
             c.tip("what is on air: the mix, on the shape's logical view")
-        with dpg.group(horizontal=True):
-            for i in (0, 1):
-                with dpg.child_window(tag=f"vj_deck{i}", width=px(326), height=px(500), border=True):
+        with dpg.group(horizontal=True, tag="vj_decks"):      # (sized to the frame, deck C here too when it is wide:
+            for i in (0, 1):                                   # _lay_out)
+                with dpg.child_window(tag=f"vj_deck{i}", width=px(DECK_W), height=px(DECK_H), border=True):
                     _deck(app, i)
         # the fader
         with dpg.group(horizontal=True):
@@ -220,7 +220,8 @@ def build(app):
                 dpg.add_combo([f"{b} bars" for b in vj.BAR_CHOICES], tag="vj_cbars", width=px(80),
                               default_value=f"{o['auto']['c_bars']} bars",
                               callback=lambda s, v: _set_auto(app, "c_bars", int(v.split()[0])))
-            with dpg.child_window(tag="vj_deck2", width=px(326), height=px(500), border=True):
+        with dpg.group(tag="vj_chold", show=False):          # deck C in a narrow frame: under its header, shown with
+            with dpg.child_window(tag="vj_deck2", width=px(DECK_W), height=px(DECK_H), border=True):   # it open
                 _deck(app, 2)
         dpg.add_text("", tag="vj_words", color=c.DIM, wrap=0)
     with dpg.file_dialog(directory_selector=False, show=False, tag="vj_impfile", width=px(620), height=px(420),
@@ -247,6 +248,45 @@ def build(app):
             dpg.add_file_extension(".*")
     _build_browser(app)
     refresh(app)
+
+
+DECK_W, DECK_H = 326, 500          # a deck as it is made (and deck C under its header, in a narrow frame)
+DECK_MIN_W, DECK_MIN_H = 300, 210  # ... and no smaller than this (its picture and its look), the frame scrolling then
+UNDER_DECKS = 196                  # the rows under the decks: the mix, OUT, AUTO, C, deck C's header, the words
+THREE_ACROSS = 3 * DECK_MIN_W + 40  # a frame this wide has deck C beside A and B
+
+
+def _lay_out(app):
+    """The decks sized to the frame: as wide as it gives them and as tall as leaves the rows under them in view -
+    each was a box of one size, scrolled inside a frame that scrolled, the same in a frame twice as big. Deck C
+    stands beside A and B in a frame wide enough for three, and under its header (as it always was) in one that
+    is not."""
+    try:
+        w, h = dpg.get_item_rect_size(TAG)
+        top = dpg.get_item_pos("vj_decks")[1]
+    except Exception:                                         # not drawn yet: no size to go by
+        return
+    if w <= 0 or h <= 0:
+        return
+    three = w >= px(THREE_ACROSS)
+    under = (not three) and bool(dpg.get_value("vj_chead"))  # deck C under its header: there while the header is open
+    if dpg.is_item_shown("vj_chold") != under:
+        dpg.configure_item("vj_chold", show=under)
+    key = (int(w), int(h), int(top))
+    st = vj_state.of(app)
+    if st.laid == key:
+        return
+    st.laid = key
+    n = 3 if three else 2
+    gap = px(8)
+    dw = max(px(DECK_MIN_W), int((w - px(28) - (n - 1) * gap) / n))
+    dh = max(px(DECK_MIN_H), int(h - top - px(UNDER_DECKS)))
+    for i in (0, 1):
+        dpg.configure_item(f"vj_deck{i}", width=dw, height=dh)
+    beside = dpg.get_item_alias(dpg.get_item_parent("vj_deck2")) == "vj_decks"
+    if three != beside:
+        dpg.move_item("vj_deck2", parent="vj_decks" if three else "vj_chold")
+    dpg.configure_item("vj_deck2", width=dw if three else px(DECK_W), height=dh if three else px(DECK_H))
 
 
 def _deck(app, i):
@@ -1709,6 +1749,8 @@ def poll(app):
         return
     _rest_src(app)
     vj_state.of(app).open = True
+    if shown:
+        _lay_out(app)
     vj_state.of(app).preview = {i for i in range(vj.DECKS) if dpg.is_item_visible(f"vj_pv{i}")} if shown else set()
     if time.monotonic() - vj_state.of(app).files_at > 1.0:     # the project's own looks, as they are saved
         vj_state.of(app).files_at = time.monotonic()
