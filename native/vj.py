@@ -1266,8 +1266,14 @@ def _effect_frame(app, i, run, deck, speed, amount, dt):
             or eng.cols != app.eng.cols or eng.rows != app.eng.rows):   # six faces, a ledmap's (a pooled engine's)
         eng.set_geometry(app.project.geometry)
         run.state = {}
+    if not name:                                              # a deck just put on Effect: the studio's own effect, to
+        names, idx = getattr(app.eng, "names", None) or [], getattr(app.eng, "idx", 0)    # start from
+        if 0 <= idx < len(names) and names[idx] in eng.names:
+            name = options(app)["decks"][i]["effect"] = names[idx]
+            vj_state.of(app).dirty = True                     # (the frame's effect list shows it)
     if name not in eng.names:
         run.error = f"no effect called {name!r}" if name else "no effect chosen"
+        run.led = None                                        # dark, not the last effect's last picture
         return None
     if run.state.get("sel") != name:
         eng.select(eng.names.index(name))
@@ -1519,6 +1525,8 @@ def update(app, dt=None):
         else:
             _skips(app)[i] += dt
             d = vj_clips.deck(app, i, o["decks"][i])
+            if run_i.error and run_i.look not in (None, d["look"]):
+                run_i.error = ""                              # what the look before it said: not this one's
             if d["look"] != EFFECT and d["source"].get("kind", "none") != "none":
                 _take_video(app, i, _runs(app)[i], d)         # its video rolling on off the mix
     if vj_state.of(app).take("release_due"):

@@ -1167,6 +1167,7 @@ def _image(ctx, st):
         key = (path, None, ctx.w, ctx.h)
     if "img" not in st or st.get("key") != key:
         st["key"], st["img"], st["err"] = key, None, None
+        st.pop("warn", None)
         if path:
             try:
                 from PIL import Image
@@ -1180,8 +1181,9 @@ def _image(ctx, st):
     if st.get("err"):
         raise ValueError(st["err"])
     img = st["img"]
-    if img is None:
-        raise ValueError("no picture chosen (the deck's image ...)")
+    if img is None:                                               # where every Image deck starts: nothing wrong, asked for
+        st["warn"] = "no picture yet - its \"picture ...\" chooses one"
+        return np.zeros((ctx.h, ctx.w, 4), np.float32)            # clear all over: the mix shows through
     rgb, alpha = vj_layer.prepare(img, ctx.w, ctx.h, getattr(ctx, "deck", None) or {}, ctx.t, ctx.amount, ctx.beat)
     return np.dstack([rgb, alpha])                                # RGBA: the deck keeps the alpha (vj.draw_deck)
 

@@ -124,7 +124,7 @@ def build(app):
             typeface.label(dpg.add_text("MIX", color=c.ACCENT))
             dpg.add_button(label="A", tag="vj_to_a", small=True, callback=lambda: _fade_to(app, 0.0))
             c.tip("all deck A")
-            num.add("vj_fader", float(o["fader"]), 0.0, 1.0, digits=2, width=px(200),
+            num.add("vj_fader", float(o["fader"]), 0.0, 1.0, digits=2, width=px(140),     # (the row fits the frame's width)
                     callback=lambda s, v: vj.set_fader(app, float(v)))
             c.tip("the crossfader: deck A at 0, deck B at 1 - MIDI and the phone move it too (right-click: learn MIDI)")
             _learnable(app, "vj_fader", {"kind": "vj_fader"})
@@ -420,9 +420,9 @@ def _deck(app, i):
             dpg.add_checkbox(label="strobe on the beat", tag=f"vj_str{i}", default_value=bool(d["strobe"]),
                              callback=lambda s, v: _set_deck(app, i, "strobe", bool(v)))
     with dpg.collapsing_header(label="PRESETS", tag=f"vj_prehead{i}", default_open=False):
-        with dpg.group(horizontal=True):
-            dpg.add_combo([], tag=f"vj_pre{i}", width=px(150), callback=lambda s, v: _load_preset(app, i, v))
-            c.tip("a look with its knobs, saved: picked here, it goes on this deck")
+        dpg.add_combo([], tag=f"vj_pre{i}", width=-1, callback=lambda s, v: _load_preset(app, i, v))
+        c.tip("a look with its knobs, saved: picked here, it goes on this deck")
+        with dpg.group(horizontal=True):                     # (under the list: beside it, Delete was off the deck)
             dpg.add_button(label="Save as...", tag=f"vj_save{i}", small=True,
                            callback=lambda: c.ask(app, "Save a preset", "a name for this deck's look and knobs",
                                                   _default_preset(app, i), lambda v: _save_preset(app, i, v)))
@@ -438,7 +438,6 @@ def _deck(app, i):
             c.tip("another name for this flame")
             dpg.add_button(label="Forget", small=True, callback=lambda: _forget_flame(app, i))
             weight.danger(dpg.last_item())
-            c.tip("drop this flame from the ones kept")
             c.tip("this bred flame no longer kept; the deck goes back to the flame it came from")
     dpg.add_text("", tag=f"vj_desc{i}", color=c.DIM, wrap=0)       # to the deck's width: at 300 a narrow deck cut it
 
@@ -740,7 +739,8 @@ def _fill_browser(app):
                 dpg.add_image_button(tag, width=px(TH_W * 1.4), height=px(TH_H * 1.4),
                                      callback=lambda s, a, u: _browse_pick(app, u), user_data=n)
                 c.tip(f"{n}: {vj_looks.LOOKS[n].desc}")
-                with dpg.group(horizontal=True):
+                dpg.add_text(_short(n)[:NAME_FITS], color=c.DIM)     # a line of its own: beside the star, eleven
+                with dpg.group(horizontal=True):                     # letters fitted ("Gradient Ma")
                     star = dpg.add_button(label="*" if n in fav else ".", small=True, user_data=n,
                                           callback=lambda s, a, u: _star(app, s, u))
                     c.tip("a favourite: the star keeps it in the favourites (every project's)")
@@ -749,7 +749,6 @@ def _fill_browser(app):
                     if addon:
                         dpg.add_button(label="x", small=True, user_data=n, callback=lambda s, a, u: _unpack(app, u))
                         c.tip("take this add-on look off this computer (Packs installs it again)")
-                    dpg.add_text(_short(n)[:9 if addon else 11], color=c.DIM)
             vj_state.of(app).thumbs[n] = {"tag": tag, "state": {}, "t": 0.0}
             shown += 1
     if not shown:
@@ -758,6 +757,9 @@ def _fill_browser(app):
                      parent="vj_br_grid", color=c.DIM)
     dpg.add_button(label="Effect", parent="vj_br_grid",
                    callback=lambda: _browse_pick(app, vj.EFFECT))
+
+
+NAME_FITS = 14                     # letters of a look's name under its thumbnail (the tooltip has it whole)
 
 
 def _short(n):

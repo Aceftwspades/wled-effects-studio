@@ -282,6 +282,28 @@ o["decks"][0].update(look=vj.EFFECT, effect="Rainbow", speed=2.5, amount=1.0)
 o["fader"] = 0.0
 vj.update(app, 1 / 40)
 check(fe.fx["sx"] == 255 and fe.fx["ix"] == 255, f"an Effect deck at speed 2.5: Speed 255, not wrapped ({fe.fx})")
+# a deck put on Effect with none chosen: the studio's own, not a dark deck saying "no effect chosen"
+app.eng.names, app.eng.idx = ["Solid", "Rainbow"], 1
+o["decks"][0].update(look=vj.EFFECT, effect="")
+vj.update(app, 1 / 40)
+check(o["decks"][0]["effect"] == "Rainbow" and not vj._runs(app)[0].error and vj._runs(app)[0].led is not None,
+      f"a deck put on Effect starts on the studio's effect ({o['decks'][0]['effect']!r}, {vj._runs(app)[0].error!r})")
+app.eng.idx = 0                                                    # one the deck's engine has not: said, and dark
+o["decks"][0].update(effect="")
+vj.update(app, 1 / 40)
+check(vj._runs(app)[0].error == "no effect chosen" and vj._runs(app)[0].led is None,
+      "an Effect deck with no effect to start on: said, dark (not the last effect's picture)")
+# what a look said is not said of the next, on a deck not drawn meanwhile (deck C at level 0)
+o["decks"][2].update(look="Plasma", level=0.5)
+vj.update(app, 1 / 40)
+vj._runs(app)[2].error = "Plasma: something it said"
+o["decks"][2].update(look="Tunnel", level=0.0)
+for _ in range(3):
+    vj.update(app, 1 / 40)
+check(vj._runs(app)[2].error == "", f"a deck off the mix, another look put on it: the old look's error gone "
+                                    f"({vj._runs(app)[2].error!r})")
+o["decks"][2].update(look="Starfield", level=0.0)
+del app.eng.names, app.eng.idx
 o["decks"][0].update(look="Plasma", speed=1.0, amount=0.5)
 
 # the desk put back when the show lets the VJ go
@@ -1851,12 +1873,13 @@ for path in ("", "", os.path.join(ag.project.path, "bad.png"), None):
     if path is not None:
         ictx.image_path = path
     try:
-        vj_looks.LOOKS["Image"].draw(ictx, ist)
+        blank = vj_looks.LOOKS["Image"].draw(ictx, ist)
+        msgs.append(ist.get("warn", "") if blank.shape == (12, 16, 4) and not blank.any() else "drew something")
     except Exception as e:
         msgs.append(str(e))
-check(len(msgs) == 4 and all("no picture chosen" in m for m in msgs[:2]) and all("could not read" in m
-                                                                                  for m in msgs[2:]),
-      f"the Image look says what is wrong, every frame ({msgs})")
+check(len(msgs) == 4 and all("no picture yet" in m for m in msgs[:2]) and all("could not read" in m
+                                                                               for m in msgs[2:]),
+      f"the Image look asks for a picture (clear meanwhile, no error) and says a file will not read, every frame ({msgs})")
 # a shader's code made WebGL's once, not each frame
 n0 = len(vj_glsl._WEBGL)
 code = "#define f(x) x*2.0\nfloat f = 1.0;\nvoid mainImage(out vec4 o, vec2 u){o = vec4(f(1.0));}"

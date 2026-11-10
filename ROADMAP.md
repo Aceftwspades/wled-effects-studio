@@ -144,3 +144,21 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       import ~1.4 s, the interface's build 1.1 s (the frames 0.38, the dialogs 0.41). A project with MilkDrop
       presets adds their parsing as it opens (23 presets: 0.63 s) whether or not a deck plays one - they could
       be parsed at their first frame, but a preset that cannot be read would then say so only when chosen.
+
+## 9. The VJ: what its decks and looks need
+From every built-in look timed (3-8 ms at 96 x 72, the slowest 21 ms at 192 x 108: speed is not what it needs),
+each knob's effect on each look measured, and the frame looked at in nine states.
+- [x] **A deck put on Effect has no effect**: dark, the last look's picture left in its preview, "no effect
+      chosen". It starts on the studio's own.
+- [x] **A deck's error stays while the deck is not drawn** (deck C at level 0): said long after another look is on.
+- [x] **An Image deck with no picture says "ValueError"**: the state every Image deck starts in. It asks for one, clear meanwhile.
+- [x] **Clipped at the frame's own width**: the mix row's wipe list, a deck's preset Delete, the browser's names (the fader shorter, the list over its buttons, a line each).
+- [ ] **A deck's colours are seven gradients of the VJ's own**: the project's palettes and WLED's are not offered.
+      And the list shows on the ten video looks that never read it.
+- [ ] **Nothing after the mix**: a blackout, a master level, a freeze.
+- [ ] **One "amount" a look, named "amount" whatever it does** (the dots' size, the blocks', the contrast), and no
+      knobs of a look's own. On Drop: Pulse Grid, Bloom and Fireflies it changes next to nothing.
+- [ ] **Looks that sit still under music**: the twenty flames (as much motion in silence as on a beat), the video
+      looks; and looks dark in silence (Beat Rings black, the Drop looks nearly).
+- [ ] **A deck is a box of one size**: it does not grow with the frame, scrolls inside a frame that scrolls, and
+      deck C is a folded header under the other two.
