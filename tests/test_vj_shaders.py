@@ -226,6 +226,12 @@ if ok:
         img, err = vj_glsl.render("multi", multi, 16, 12, uni, None, None, wait=True, picture=pic)
     check(not err and abs(img[6, 8, 0] - 0.3) < 0.02 and abs(img[6, 8, 1] - 0.25) < 0.02 and img[6, 8, 2] > 0.95,
           f"passes run: B adds a tenth a frame (three: 0.3), A's green, the picture's blue ({err} {img[6, 8] if img is not None else None})")
+    # a shader's own knobs: its //@ knob lines the names of iKnob0..3, the deck's values in them
+    ksrc = vj_glsl.with_knobs("//@ knob red = 1.0\n//@ knob green\nvoid mainImage(out vec4 f, in vec2 p)"
+                              "{ f = vec4(red, green, 0.0, 1.0); }\n")
+    img, err = vj_glsl.render("knobs", ksrc, 8, 8, dict(uni, iKnob0=0.25, iKnob1=0.75), None, None, wait=True)
+    check(not err and abs(img[4, 4, 0] - 0.25) < 0.02 and abs(img[4, 4, 1] - 0.75) < 0.02,
+          f"a shader's knobs: its names read the deck's values ({err} {img[4, 4] if img is not None else None})")
     img, err = vj_glsl.render("multi2", multi, 16, 12, uni, None, None, wait=True, picture=pic, channels=["", "", "", "none"])
     check(img is not None and img[6, 8, 2] < 0.05, "a deck's choice over the file's: iChannel3 nothing")
     # iFrame 0 the first frame drawn, as on Shadertoy: a buffer filled only then (a simulation's start) is filled

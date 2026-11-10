@@ -210,6 +210,45 @@ check(not errs and vj_looks.LOOKS.get("Pull Rings") and vj_looks.LOOKS["Pull Rin
 o["decks"][0]["look"] = "Pull Rings"
 vj.update(app, 1 / 40)
 check(vj._runs(app)[0].canvas is not None and not vj._runs(app)[0].error, "it draws")
+# a look's own knobs: the template's "pull", where it starts; the deck's lk1 its value, MIDI's and the modulators'
+pr = vj_looks.LOOKS["Pull Rings"]
+check(pr.knobs == (("pull", 0.25),) and pr.amount == "ring count" and pr.colours,
+      f"a look file's KNOBS and AMOUNT read ({pr.knobs}, {pr.amount!r})")
+check(o["decks"][0]["lk1"] == 0.25 and o["decks"][0]["lk_look"] == "Pull Rings" and
+      vj.look_knob_words(app, 0) == ["pull", "", "", ""], "a look put on a deck: its knobs where it starts them, named")
+seen = {}
+pr_draw = pr.draw
+pr.draw = lambda c, st: (seen.update(c.knobs), pr_draw(c, st))[1]
+vj.knob_set(app, 0, "lk1", 0.8)
+vj.update(app, 1 / 40)
+check(abs(seen.get("pull", 0) - 0.8) < 1e-6, f"the deck's knob reaches the look as c.knobs ({seen})")
+vj_state.of(app).mod = {(0, "lk1"): 0.1}
+vj.update(app, 1 / 40)
+check(abs(seen.get("pull", 0) - 0.1) < 1e-6, "a modulator on it moves what the look reads")
+vj_state.of(app).mod = {}
+pr.draw = pr_draw
+o["decks"][0]["look"] = "Plasma"
+vj.update(app, 1 / 40)
+o["decks"][0]["look"] = "Pull Rings"
+vj.update(app, 1 / 40)
+check(o["decks"][0]["lk1"] == 0.25, "the look put on again: its knob where it starts, not where the last look left it")
+vj.knob_set(app, 0, "lk1", 0.6)
+vj.save_preset(app, 0, "pulled")
+vj.knob_set(app, 0, "lk1", 0.0)
+vj.load_preset(app, 0, "pulled")
+vj.update(app, 1 / 40)
+check(abs(o["decks"][0]["lk1"] - 0.6) < 1e-6, "a preset keeps the look's knobs")
+vj.delete_preset(app, "pulled")
+check(vj_looks.own_knobs([("a", 2), "b", ("a", 0.1), ("c", "x"), ("d",), ("e", 0.5)]) ==
+      (("a", 1.0), ("b", 0.5), ("c", 0.5), ("d", 0.5)), "a look's knobs made safe: four, a name once, 0..1")
+from native import vj_glsl as _g                                # noqa: E402
+gsrc = "//@ knob twist = 0.3\n //@ knob glow\nvoid mainImage(out vec4 o, vec2 u){ o = vec4(twist, glow, 0., 1.); }\n"
+gk = _g.with_knobs(gsrc)
+check(_g.knobs_of(gsrc) == [("twist", 0.3), ("glow", 0.5)] and gk.splitlines()[0] == "#define twist iKnob0" and
+      gk.splitlines()[1] == "#define glow iKnob1" and gk.count("\n") == gsrc.count("\n"),
+      "a shader's knob lines: each a #define of an iKnob on its own line (the file's line numbers kept)")
+check(vj_looks.LOOKS["Halftone"].amount == "dot size" and vj_looks.LOOKS["Flame: Sheep"].amount == "zoom" and
+      vj_looks.LOOKS["Drop: Nebula"].amount == "motion", "a look says what its amount is")
 # a look file named like a built-in: refused (it hid Plasma, and took Plasma with it when it went); two files of
 # one name: the other's look back when one goes
 d_looks = os.path.dirname(path)
@@ -690,6 +729,24 @@ def ctx_of(w=64, h=36, **kw):
     for k, v in kw.items():
         setattr(cx, k, v)
     return cx
+
+
+uni = __import__('native.vj_glsl').vj_glsl.uniforms(ctx_of(look_knobs=[0.3, 0.9]), 1)
+check(uni.get("iKnob0") == 0.3 and uni.get("iKnob1") == 0.9 and "iKnob2" not in uni, "... and the deck's values its uniforms")
+# a Drop look's amount moves it: Pulse Grid (no warp) the same picture at 0.05 and 0.95 before
+def _drop(amount):
+    st = {}
+    c = ctx_of(96, 72, amount=amount, bass=0.6, mid=0.4, treb=0.3, level=0.6, beat=0.8, beat_hit=False, speed=1.0,
+               dt=1 / 40)
+    for n in range(40):
+        c.t = n / 40
+        c.beat_hit = n % 20 == 0
+        img = vj_looks.LOOKS["Drop: Pulse Grid"].draw(c, st)
+    return np.asarray(img)
+
+
+check(np.abs(_drop(0.05) - _drop(0.95)).mean() > 0.01, f"Drop: Pulse Grid's amount changes the picture "
+                                                        f"({np.abs(_drop(0.05) - _drop(0.95)).mean():.4f})")
 
 
 # the built-in MilkDrop looks in the deck's colours: on "mono", grey

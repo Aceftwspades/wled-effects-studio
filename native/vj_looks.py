@@ -39,11 +39,34 @@ class Look:
     def __init__(self, name, family, draw, desc, video=False):
         self.name, self.family, self.draw, self.desc, self.video = name, family, draw, desc, video
         self.colours = True          # it reads the deck's colours (grad): False, and the deck does not offer them
+        self.amount = ""             # what the deck's amount is on this look ("dot size"): the knob's label
+        self.knobs = ()              # knobs of its own, ((name, where it starts 0..1), ...) - KNOBS_MAX at most
 
 
 LOOKS = {}
 FAMILIES = (("video", "Video"), ("shader", "Shaders"), ("milkdrop", "MilkDrop"), ("flame", "Flames"), ("layer", "Text and image"),
             ("yours", "Yours"))
+
+
+KNOBS_MAX = 4                    # a look's own knobs at most (the deck has a row, MIDI and the pads a target, for each)
+
+
+def own_knobs(listed):
+    """A look's own knobs as it lists them - ((name, start), ...), or names alone - made safe: KNOBS_MAX at most,
+    each a short name once, its start 0..1 (0.5 when not said)."""
+    out = []
+    for it in list(listed or ()):
+        if len(out) >= KNOBS_MAX:
+            break
+        name, start = (it, 0.5) if isinstance(it, str) else (it[0], it[1] if len(it) > 1 else 0.5)
+        name = str(name).strip()[:24]
+        try:
+            start = max(0.0, min(1.0, float(start)))
+        except (TypeError, ValueError):
+            start = 0.5
+        if name and name not in [n for n, _ in out]:
+            out.append((name, start))
+    return tuple(out)
 
 
 def look(name, family, desc, video=False):
@@ -439,8 +462,9 @@ def milkdrop_frame(ctx, st, pre):
     if fb is None or fb.shape != (h, w, 3):
         fb = np.zeros((h, w, 3), np.float32)
     k = ctx.dt * 30.0                                                   # presets are tuned at 30 frames a second
-    zoom = _p(pre.get("zoom", 1.0), ctx) ** k
-    rot = _p(pre.get("rot", 0.0), ctx) * ctx.dt * 2 * math.pi * ctx.speed
+    move = 0.4 + 1.2 * ctx.amount                                       # the amount: how hard it moves (1 at a half) -
+    zoom = (1.0 + (_p(pre.get("zoom", 1.0), ctx) - 1.0) * move) ** k    # it was the warp's alone, and nothing at all on
+    rot = _p(pre.get("rot", 0.0), ctx) * ctx.dt * 2 * math.pi * ctx.speed * move      # a preset with no warp
     warp = _p(pre.get("warp", 0.0), ctx) * (0.5 + ctx.amount)
     x, y = ctx.x / zoom, ctx.y / zoom
     cr, sr = math.cos(rot), math.sin(rot)
@@ -1198,6 +1222,18 @@ for _name in FLAMES:
 for _n in ("Clean", "Neon Edges", "Mosaic", "Thermal", "Halftone", "Chroma Split", "Melt", "Motion Trails", "Imprint",
            "Follow Spot", "Image"):        # the video in its own colours (Gradient Map alone reads the deck's)
     LOOKS[_n].colours = False
+for _n, _w in (("Clean", "colour"), ("Neon Edges", "gain"), ("Mosaic", "block size"), ("Thermal", "heat"),
+               ("Gradient Map", "contrast"), ("Halftone", "dot size"), ("Chroma Split", "split"), ("Melt", "melt"),
+               ("Motion Trails", "trail"), ("Imprint", "hold"), ("Follow Spot", "spot size"), ("Plasma", "scale"),
+               ("Tunnel", "segments"), ("Warp", "scale"), ("Voronoi", "cells"), ("Kaleido Tunnel", "sides"),
+               ("Starfield", "pace"), ("Metaballs", "size"), ("Beat Rings", "pace"), ("Text", "beat hit"),
+               ("Image", "swell")):
+    LOOKS[_n].amount = _w            # what the amount is, look by look: the knob is labelled with it
+for _n, _lk in LOOKS.items():
+    if _lk.family == "milkdrop":
+        _lk.amount = "motion"
+    elif _lk.family == "flame":
+        _lk.amount = "zoom"
 BUILTIN = tuple(LOOKS)            # the looks that ship, in their order (MIDI's look target counts along these first)
 
 
@@ -1215,6 +1251,8 @@ function of where it is and the time - but on whole arrays (numpy) at once, not 
   c.bass, c.mid, c.treb, c.level   0..1        c.wave     the sound as 64 numbers -1..1
   c.video       the deck's video, (h, w, 3) 0..1, or None       c.video_prev  the frame before
   c.amount, c.speed   the deck's knobs         c.grad(x)  the deck's colours for 0..1
+  c.knobs["name"]     a knob of the look's own, 0..1: list up to four in KNOBS below, and the deck shows a row for
+                      each, MIDI, the pads and the modulators a target ("look knob 1"...)
 
 The helpers are here too: sample(img, u, v), hsv(h, s, v), blur(img), noise(x, y), fbm(x, y),
 milkdrop_frame(c, st, preset) and flame_frame(c, st, new_flame(seed)) - see native/vj_looks.py.
@@ -1222,10 +1260,12 @@ milkdrop_frame(c, st, preset) and flame_frame(c, st, new_flame(seed)) - see nati
 NAME = "{name}"
 DESC = "rings of colour pulled toward the middle, faster on the bass"
 VIDEO = False          # True: the look shows its deck's video (listed with the video looks' needs)
+AMOUNT = "ring count"  # what the deck's amount does here: the knob's label ("" leaves it "amount")
+KNOBS = (("pull", 0.25),)     # the look's own knobs, each a name and where it starts (0..1)
 
 
 def draw(c, st):
-    st["z"] = st.get("z", 0.0) + c.dt * (0.5 + c.bass * 2.0)
+    st["z"] = st.get("z", 0.0) + c.dt * (c.knobs["pull"] * 2.0 + c.bass * 2.0)
     rings = np.sin(c.r * (6.0 + c.amount * 20.0) - st["z"] * 4.0) * 0.5 + 0.5
     return c.grad(np.mod(rings * 0.5 + c.a / (2 * np.pi) + c.t * 0.05, 1.0)) * (rings ** 2)[..., None]
 '''
@@ -1354,6 +1394,7 @@ def _load_file(path):
                   "iChannel0" in src)
         lk.glsl = src                                             # the deck's channels row reads its channels from it
         lk.colours = False                                        # a shader's colours are its own
+        lk.knobs = own_knobs(vj_glsl.knobs_of(src))               # its  //@ knob name = 0.3  lines
         return lk
     if ext == ".milk":
         from native import milk
@@ -1373,6 +1414,8 @@ def _load_file(path):
         raise ValueError("it has no draw(c, st)")
     lk = Look(name, "yours", ns["draw"], str(ns.get("DESC") or "a look of the project's own"), bool(ns.get("VIDEO", False)))
     lk.colours = "grad" in code                                   # (c.grad: the only way to them)
+    lk.knobs = own_knobs(ns.get("KNOBS"))                         # its own knobs, read as c.knobs["name"]
+    lk.amount = str(ns.get("AMOUNT") or "")[:16]
     return lk
 
 

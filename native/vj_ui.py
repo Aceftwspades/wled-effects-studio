@@ -343,8 +343,15 @@ def _deck(app, i):
           "how much of deck C goes over the mix: 0, none of it")
     _learnable(app, f"vj_lvl{i}", {"kind": "vj_knob", "deck": i, "key": "level"})
     _row("amount", lambda: num.add(f"vj_amt{i}", float(d["amount"]), 0.0, 1.0, digits=2,
-                                   callback=lambda s, v: _set_deck(app, i, "amount", float(v))))
+                                   callback=lambda s, v: _set_deck(app, i, "amount", float(v))), tag=f"vj_amtrow{i}")
+    c.tip("the look's one knob every look has - labelled with what it is on this look (a video look's dot size, a "
+          "flame's zoom); MIDI and the pads call it amount")
     _learnable(app, f"vj_amt{i}", {"kind": "vj_knob", "deck": i, "key": "amount"})
+    for k in range(1, vj_looks.KNOBS_MAX + 1):               # the look's own knobs: shown, and named, for a look with them
+        _row(f"knob {k}", lambda k=k: num.add(f"vj_lk{k}_{i}", float(d[f"lk{k}"]), 0.0, 1.0, digits=2,
+                                             callback=lambda s, v, k=k: _set_deck(app, i, f"lk{k}", float(v))),
+             tag=f"vj_lkrow{k}_{i}")
+        _learnable(app, f"vj_lk{k}_{i}", {"kind": "vj_knob", "deck": i, "key": f"lk{k}"})
     _row("speed", lambda: num.add(f"vj_spd{i}", float(d["speed"]), 0.0, vj.SPEED_MAX, digits=2,
                                   callback=lambda s, v: _set_deck(app, i, "speed", float(v))))
     _learnable(app, f"vj_spd{i}", {"kind": "vj_knob", "deck": i, "key": "speed"})
@@ -570,6 +577,7 @@ KNOB_TAGS = (("vj_lvl", "level"), ("vj_amt", "amount"), ("vj_spd", "speed"), ("v
              ("vj_tgl", "text_glow"), ("vj_tsh", "text_shadow"), ("vj_tol", "text_outline"), ("vj_pscale", "pic_scale"),
              ("vj_px", "pic_x"), ("vj_py", "pic_y"), ("vj_prot", "pic_rot"), ("vj_ptol", "pic_tol"),
              ("vj_psoft", "pic_soft"), ("vj_pdrift", "pic_drift"), ("vj_shx", "sh_mx"), ("vj_shy", "sh_my")) + tuple((tag, key) for key, tag, *_ in FL_NUMS)
+KNOB_TAGS += tuple((f"vj_lk{k}_", f"lk{k}") for k in range(1, vj_looks.KNOBS_MAX + 1))
 
 
 def _sync_knobs(i, d):
@@ -881,6 +889,8 @@ def _draw_thumb(app, n, e, now, snd):
     e["prev"] = vid
     c.amount, c.speed = 0.5, 1.0
     c.grad = vj_looks.gradient("neon")
+    c.look_knobs = [s for _, s in getattr(lk, "knobs", None) or ()]      # its own knobs where it starts them
+    c.knobs = {n: s for n, s in getattr(lk, "knobs", None) or ()}
     try:
         img = np.clip(np.asarray(lk.draw(c, e["state"]), np.float32), 0, 1)
         if img.ndim == 2:                                    # a look's grey picture: as a colour one
@@ -1558,6 +1568,14 @@ def refresh(app):
                 dpg.configure_item(f"vj_fxs{i}_{k}", show=k in sets, label=lab)
                 dpg.set_value(f"vj_fxs{i}_{k}", bool(v))
         dpg.configure_item(f"vj_colrow{i}", show=not eff and getattr(lk, "colours", True))   # (a look that reads them)
+        from native import form
+        form.relabel(f"vj_amtrow{i}", "amount" if eff else (getattr(lk, "amount", "") or "amount"))
+        own = [] if eff else vj.look_knob_words(app, i)
+        for k in range(1, vj_looks.KNOBS_MAX + 1):
+            name = own[k - 1] if own else ""
+            dpg.configure_item(f"vj_lkrow{k}_{i}", show=bool(name))
+            if name:
+                form.relabel(f"vj_lkrow{k}_{i}", name)
         dpg.configure_item(f"vj_col{i}", items=vj.colour_names(app))
         dpg.set_value(f"vj_fxcol{i}", d.get("fx_colours") or OWN_COLS)
         dpg.configure_item(f"vj_pal{i}", items=pals)

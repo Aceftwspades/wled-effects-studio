@@ -84,7 +84,8 @@ FX_KEYS = ("sx", "ix", "c1", "c2", "c3")
 VJ_KNOBS = ("level", "amount", "speed", "hue", "kaleido", "trails", "blur", "text_size", "text_x", "text_y",
             "text_glow", "text_shadow", "text_outline", "pic_scale", "pic_x", "pic_y", "pic_rot", "pic_tol", "pic_soft",
             "pic_drift", "sh_mx", "sh_my", "morph", "drift", "fl_sym", "fl_trail", "fl_gamma", "fl_colour",
-            "fl_points", "fl_spin", "fl_x", "fl_y") + tuple(f"fl_w{k}" for k in range(1, 9))
+            "fl_points", "fl_spin", "fl_x", "fl_y") + tuple(f"fl_w{k}" for k in range(1, 9)) + (
+            "lk1", "lk2", "lk3", "lk4")
 VJ_KEYS = tuple(f"vj{i}.{k}" for i in (0, 1, 2) for k in VJ_KNOBS)
 MIX_KEYS = ("vj.fader", "mix.fader")               # the VJ's crossfader and the mixer's fader
 KEYS = FX_KEYS + VJ_KEYS + MIX_KEYS

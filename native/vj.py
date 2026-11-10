@@ -66,7 +66,9 @@ DECK = {"look": "Plasma", "source": SOURCE, "amount": 0.5, "speed": 1.0, "colour
         "channels": ["", "", "", ""],   # a shader's iChannel0..3: "" what its file says (vj_glsl.CHANNELS)
         "channels_look": "",            # the look they were chosen for: another look on the deck reads its file's
         "morph_to": "", "morph": 0.0,   # a flame's: the one it is becoming, and how far (0 itself, 1 that one)
-        "drift": 0.0, "breathe": 0, "mutate_bars": 0}
+        "drift": 0.0, "breathe": 0, "mutate_bars": 0,
+        "lk1": 0.5, "lk2": 0.5, "lk3": 0.5, "lk4": 0.5,     # the look's own knobs (vj_looks.Look.knobs), 0..1
+        "lk_look": ""}                  # ... the look they were set for: another look starts them where it says
 # a flame's own knobs (vj_looks.flame_frame reads them): its symmetry (0 its own), mirrored, the view held still,
 # trails, gamma, colour spread, points thrown a pass, spin, where it sits, and each map's weight (fl_w1..fl_w8)
 FLAME_KNOBS = {"fl_sym": 0, "fl_mirror": 0, "fl_lock": 0, "fl_trail": 0.94, "fl_gamma": 0.6, "fl_colour": 0.5,
@@ -1107,6 +1109,9 @@ def draw_deck(app, i, dt, snd, beat, hit):
     c.knob = lambda key: knob_value(app, i, key)          # a knob as it draws, a modulator's over it
     c.grad = colours(app, deck.get("colours", "neon"))
     c.flame_to = _flame_of(deck.get("morph_to")) if lk.family == "flame" else None
+    own = _own_knobs(app, i, lk)
+    c.look_knobs = [knob_value(app, i, f"lk{k + 1}") for k in range(len(own))]     # (a shader's iKnob0..3)
+    c.knobs = {name: c.look_knobs[k] for k, (name, _) in enumerate(own)}
     try:
         img = np.asarray(lk.draw(c, run.state), np.float32)
         if img.shape[:2] != (h, w):
@@ -1144,6 +1149,27 @@ def draw_deck(app, i, dt, snd, beat, hit):
             img = xf[0] * (1.0 - e) + img * e
     run.canvas = np.clip(img, 0, 1).astype(np.float32)
     run.drawn_at = clock.now()
+
+
+def _own_knobs(app, i, lk):
+    """The look's own knobs, ((name, start), ...) - and the deck's lk1..lk4 put where the look starts them the
+    first time it draws on the deck (however it got there: the list, a shuffle, MIDI; a preset brings its own)."""
+    own = tuple(getattr(lk, "knobs", None) or ())[:vj_looks.KNOBS_MAX]
+    d = options(app)["decks"][i]
+    if d.get("look") == lk.name and d.get("lk_look") != lk.name:      # (not a pad's clip's look: the deck's own)
+        d["lk_look"] = lk.name
+        for k, (_, start) in enumerate(own):
+            d[f"lk{k + 1}"] = float(start)
+        if own:
+            vj_state.of(app).dirty = True                     # the frame shows their rows
+    return own
+
+
+def look_knob_words(app, i):
+    """Deck i's look's own knobs by name, in the order of lk1..lk4 ("" where it has none)."""
+    lk = vj_looks.LOOKS.get(options(app)["decks"][i].get("look"))
+    own = [n for n, _ in (getattr(lk, "knobs", None) or ())][:vj_looks.KNOBS_MAX]
+    return own + [""] * (vj_looks.KNOBS_MAX - len(own))
 
 
 def post_shape(app, i, c, img, what=None, rv=0.0):
@@ -2079,7 +2105,8 @@ PRESET_KEYS = ("look", "effect", "amount", "speed", "colours", "kaleido", "mirro
                "text_align", "text_font", "text_shadow", "text_outline", "pic_key", "pic_key_col", "pic_tol",
                "pic_soft", "pic_fit", "pic_scale", "pic_x", "pic_y", "pic_rot", "pic_flip", "pic_drift",
                "channel_images", "sh_mouse", "sh_mx", "sh_my",
-               "fx_colours", "fx_set", "channels", "channels_look", "drift", "breathe", "mutate_bars") + tuple(FLAME_KNOBS)
+               "fx_colours", "fx_set", "channels", "channels_look", "drift", "breathe", "mutate_bars",
+               "lk1", "lk2", "lk3", "lk4", "lk_look") + tuple(FLAME_KNOBS)
 
 
 def save_preset(app, i, name):
@@ -2352,6 +2379,7 @@ KNOBS = (("level", 0.0, 1.0), ("amount", 0.0, 1.0), ("speed", 0.0, SPEED_MAX), (
          ("morph", 0.0, 1.0), ("drift", 0.0, 1.0), ("fl_sym", 0, 6), ("fl_trail", 0.0, 1.0),
          ("fl_gamma", 0.15, 2.0), ("fl_colour", 0.0, 1.0), ("fl_points", 500, 20000), ("fl_spin", -2.0, 2.0),
          ("fl_x", -1.0, 1.0), ("fl_y", -1.0, 1.0)) + tuple((f"fl_w{k}", 0.0, 2.0) for k in range(1, vj_looks.ARMS + 1))
+KNOBS += tuple((f"lk{k}", 0.0, 1.0) for k in range(1, vj_looks.KNOBS_MAX + 1))      # the look's own
 KNOB_WORDS = {"level": "level", "amount": "amount", "speed": "speed", "hue": "hue", "kaleido": "kaleidoscope",
               "trails": "trails", "blur": "blur", "text_size": "text size", "text_x": "text across",
               "text_y": "text up and down", "text_glow": "text glow", "text_shadow": "text shadow",
@@ -2363,6 +2391,7 @@ KNOB_WORDS = {"level": "level", "amount": "amount", "speed": "speed", "hue": "hu
               "fl_colour": "flame colour spread", "fl_points": "flame points", "fl_spin": "flame spin",
               "fl_x": "flame across", "fl_y": "flame up and down"}
 KNOB_WORDS.update({f"fl_w{k}": f"flame arm {k}" for k in range(1, vj_looks.ARMS + 1)})
+KNOB_WORDS.update({f"lk{k}": f"look knob {k}" for k in range(1, vj_looks.KNOBS_MAX + 1)})
 
 
 def knob_value(app, i, key):

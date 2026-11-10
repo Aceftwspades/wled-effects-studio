@@ -85,6 +85,10 @@ uniform float iMid;
 uniform float iTreble;
 uniform float iLevel;
 uniform float iAmount;
+uniform float iKnob0;
+uniform float iKnob1;
+uniform float iKnob2;
+uniform float iKnob3;
 out vec4 vj_fragColor;
 """
 FOOTER = """
@@ -111,7 +115,8 @@ TEMPLATE = """// A Shadertoy shader for the VJ frame: paste one from shadertoy.c
 // and it runs on its deck. Its channels: iChannel0 the deck's video, iChannel1 the sound (Shadertoy's
 // audio input), iChannel2 a noise texture, iChannel3 nothing - a line like  //@ iChannel3 = picture
 // changes one (video, sound, noise, picture, A..D, none). The studio's own: iBeat, iBass, iMid, iTreble,
-// iLevel, iAmount (0..1).
+// iLevel, iAmount (0..1). A knob of the shader's own (four at most): a line  //@ knob twist = 0.3  makes
+// "twist" a float 0..1, starting at 0.3, with a row on the deck and a target for MIDI and the pads.
 // Several passes (Buffer A..D, Common): each after a line  //@ buffer A  (//@ common, //@ image), and in
 // a pass  //@ iChannel0 = A  reads buffer A. Keyboard input will not work.
 // NAME: {name}
@@ -143,6 +148,33 @@ def name_of(source, fallback):
 
 _MARK = re.compile(r"^\s*//@\s*(common|image|buffer\s+([A-Da-d]))\s*$", re.I)
 _CHAN = re.compile(r"^\s*//@\s*iChannel([0-3])\s*[=:]\s*([A-Za-z]+)\s*$", re.I)
+
+
+_KNOB = re.compile(r"^[ \t]*//@[ \t]*knob[ \t]+([A-Za-z_]\w*)[ \t]*(?:[=:][ \t]*([-+0-9.eE]+))?[ \t]*$", re.M | re.I)
+KNOBS_MAX = 4                       # iKnob0..3
+
+
+def knobs_of(src):
+    """The knobs a shader's file asks for, ((name, start), ...): its  //@ knob name = 0.3  lines, four at most."""
+    out = []
+    for m in _KNOB.finditer(src or ""):
+        if len(out) < KNOBS_MAX and m.group(1) not in [n for n, _ in out]:
+            try:
+                start = float(m.group(2)) if m.group(2) else 0.5
+            except ValueError:
+                start = 0.5
+            out.append((m.group(1), max(0.0, min(1.0, start))))
+    return out
+
+
+def with_knobs(src):
+    """The source with each knob line made its name: `#define twist iKnob0`, on the same line (an error's line
+    number stays the file's). A line past the fourth is left a comment."""
+    names = [n for n, _ in knobs_of(src)]
+
+    def sub(m):
+        return f"#define {m.group(1)} iKnob{names.index(m.group(1))}" if m.group(1) in names else m.group(0)
+    return _KNOB.sub(sub, src or "")
 
 
 def passes(src):
@@ -807,7 +839,8 @@ def uniforms(ctx, frame):
             "iDate": (float(lt.tm_year), float(lt.tm_mon - 1), float(lt.tm_mday),
                       float(lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec)),
             "iBeat": float(ctx.beat), "iBass": float(ctx.bass), "iMid": float(ctx.mid), "iTreble": float(ctx.treb),
-            "iLevel": float(ctx.level), "iAmount": float(ctx.amount)}
+            "iLevel": float(ctx.level), "iAmount": float(ctx.amount),
+            **{f"iKnob{k}": float(v) for k, v in enumerate(list(getattr(ctx, "look_knobs", None) or [])[:KNOBS_MAX])}}
 
 
 def _mouse(ctx):
@@ -825,6 +858,7 @@ def _mouse(ctx):
 
 def look_draw(src, name):
     """A look's draw for a shader's source: its frame of a frame ago (dark until the first is back)."""
+    src = with_knobs(src)                                        # its knob lines: each the name of an iKnob
     passes(src)                                                  # a file whose passes cannot be read: said at once
 
     def draw(ctx, st):

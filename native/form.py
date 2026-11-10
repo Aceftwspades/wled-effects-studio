@@ -67,6 +67,24 @@ def label(text, width=None, tip=None, color=None):
     return t
 
 
+def relabel(row, text, width=None):
+    """A row's label changed (a knob named for what it does now): the text, and the spacer that sets it right."""
+    import math
+    kids = dpg.get_item_children(row, 1) or []
+    if len(kids) < 2:
+        return
+    w = px(width or LABEL_W)
+    room = w - px(GAP) - 1
+    shown = str(text)
+    if typeface.measure(shown) > room:
+        from native import nodeface
+        shown = nodeface.fit_width(shown, room, typeface.measure)
+    if dpg.get_value(kids[1]) == shown:
+        return
+    dpg.configure_item(kids[0], width=max(1, w - px(GAP) - math.ceil(typeface.measure(shown))))
+    dpg.set_value(kids[1], shown)
+
+
 def indent(width=None):
     """The label column left empty: what follows sits under the controls."""
     dpg.add_spacer(width=px(width or LABEL_W))

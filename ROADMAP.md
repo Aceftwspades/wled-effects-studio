@@ -156,8 +156,8 @@ each knob's effect on each look measured, and the frame looked at in nine states
 - [x] **A deck's colours are seven gradients of the VJ's own**: the project's palettes and WLED's are too now (`vj.colours`, read from the engine each second).
       And the list showed on the looks that never read it (`Look.colours`).
 - [x] **Nothing after the mix**: a blackout, a master level, a freeze (`vj._after`; the OUT row, MIDI, pads).
-- [ ] **One "amount" a look, named "amount" whatever it does** (the dots' size, the blocks', the contrast), and no
-      knobs of a look's own. On Drop: Pulse Grid, Bloom and Fireflies it changes next to nothing.
+- [x] **One "amount" a look, named "amount" whatever it does** (the dots' size, the blocks', the contrast), and no
+      knobs of a look's own. On Drop: Pulse Grid, Bloom and Fireflies it changed next to nothing. Now: the knob is labelled (`Look.amount`), a look lists up to four of its own (`Look.knobs`: a Python look's KNOBS, a shader's `//@ knob` lines; the deck's lk1..lk4), a Drop look's amount is how hard it moves.
 - [ ] **Looks that sit still under music**: the twenty flames (as much motion in silence as on a beat), the video
       looks; and looks dark in silence (Beat Rings black, the Drop looks nearly).
 - [ ] **A deck is a box of one size**: it does not grow with the frame, scrolls inside a frame that scrolls, and

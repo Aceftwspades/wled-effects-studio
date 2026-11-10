@@ -1180,6 +1180,19 @@ that has colours of its own - the video looks but Gradient Map, a shader or
 a MilkDrop preset from a file, a picture. A deck put on **Effect** starts on
 the studio's effect; its list picks another.
 
+The knob under **level** is the look's **amount**, and its label says what
+that is on the look the deck has: a Halftone's **dot size**, a Mosaic's
+**block size**, a flame's **zoom**, a Drop look's **motion** (how hard it
+zooms, turns and warps). MIDI, the pads and the modulators call it amount
+whatever the look. A look can have up to four knobs **of its own**, each a
+row under it by the name the look gave: a Python look lists them
+(`KNOBS = (("pull", 0.25),)` - a name and where it starts, read as
+`c.knobs["pull"]`, with `AMOUNT = "ring count"` to name its amount), a
+shader has a line each (`//@ knob twist = 0.3` makes `twist` a float from
+0 to 1). They start where the look says each time the look is put on a
+deck, are kept in a preset, and are **look knob 1** to **4** to MIDI, the
+pads and the modulators.
+
 **OUT**, under the crossfader, is what leaves the desk, after the mix and
 deck C: the **master level** turns all of it down, **blackout** makes it
 dark at once and **freeze** holds the picture as it is. The decks run on
