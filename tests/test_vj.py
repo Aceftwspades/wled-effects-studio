@@ -733,6 +733,33 @@ def ctx_of(w=64, h=36, **kw):
 
 uni = __import__('native.vj_glsl').vj_glsl.uniforms(ctx_of(look_knobs=[0.3, 0.9]), 1)
 check(uni.get("iKnob0") == 0.3 and uni.get("iKnob1") == 0.9 and "iKnob2" not in uni, "... and the deck's values its uniforms")
+# silence is not a black canvas: Beat Rings throws a ring without a beat, Pulse Grid's grid is faint
+def _silent(name, seconds=2.5):
+    st, c = {}, ctx_of(96, 72, bass=0.0, mid=0.0, treb=0.0, level=0.0, beat=0.0, beat_hit=False, dt=1 / 40)
+    for n in range(int(seconds * 40)):
+        c.t = n / 40
+        img = vj_looks.LOOKS[name].draw(c, st)
+    return float(np.asarray(img).max())
+
+
+check(_silent("Beat Rings") > 0.3 and _silent("Drop: Pulse Grid") > 0.05,
+      f"no beat: Beat Rings still throws a ring, Pulse Grid's grid shows ({_silent('Beat Rings'):.2f}, "
+      f"{_silent('Drop: Pulse Grid'):.2f})")
+
+
+# a flame on the beat: the whole figure bigger (moved, not brightened)
+def _flame_reach(beat, bass):
+    st = {}
+    c = ctx_of(96, 72, beat=beat, bass=bass, dt=1 / 40, deck={"fl_trail": 0.5, "fl_lock": 0})
+    for n in range(40):
+        c.t = n / 40
+        img = np.asarray(vj_looks.LOOKS["Flame: Sierpinski"].draw(c, st)).max(axis=2)
+    lit = img > 0.15
+    return float((np.hypot(c.x, c.y) * lit).sum() / max(1, lit.sum()))
+
+
+r0, r1 = _flame_reach(0.0, 0.0), _flame_reach(1.0, 1.0)
+check(r1 > r0 * 1.08, f"a flame swells on the beat and the bass: its points reach further out ({r0:.3f} -> {r1:.3f})")
 # a Drop look's amount moves it: Pulse Grid (no warp) the same picture at 0.05 and 0.95 before
 def _drop(amount):
     st = {}

@@ -158,7 +158,7 @@ each knob's effect on each look measured, and the frame looked at in nine states
 - [x] **Nothing after the mix**: a blackout, a master level, a freeze (`vj._after`; the OUT row, MIDI, pads).
 - [x] **One "amount" a look, named "amount" whatever it does** (the dots' size, the blocks', the contrast), and no
       knobs of a look's own. On Drop: Pulse Grid, Bloom and Fireflies it changed next to nothing. Now: the knob is labelled (`Look.amount`), a look lists up to four of its own (`Look.knobs`: a Python look's KNOBS, a shader's `//@ knob` lines; the deck's lk1..lk4), a Drop look's amount is how hard it moves.
-- [ ] **Looks that sit still under music**: the twenty flames (as much motion in silence as on a beat), the video
-      looks; and looks dark in silence (Beat Rings black, the Drop looks nearly).
+- [x] **Looks that sit still under music**: the twenty flames (as much motion in silence as on a beat), the video
+      looks; and looks dark in silence (Beat Rings black, the Drop looks nearly). A flame turns and swells on the beat and swells on the bass (`BEAT_TURN`, `BEAT_SWELL`, `BASS_SWELL`); Beat Rings throws a ring every two seconds without a beat, Pulse Grid's grid is faint between beats. The video looks are left as they are: a camera that bounces unasked is worse than one that does not, and a deck's SOUND (beat moves zoom) does it.
 - [ ] **A deck is a box of one size**: it does not grow with the frame, scrolls inside a frame that scrolls, and
       deck C is a folded header under the other two.

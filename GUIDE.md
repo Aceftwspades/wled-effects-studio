@@ -1438,7 +1438,9 @@ The looks:
   theirs, their maps bent a little by a variation (**Sierpinski Bloom**,
   **Swirl** and **Star**, **Carpet Lace**, **Pentaflake Rose**, **Dragon
   Ring**). **Mutate** breeds a new flame from the one on the deck, kept with
-  the project.
+  the project. A flame moves with the music: on each beat the whole figure
+  turns a little and swells, and the bass swells it too - eased in and let
+  go, never a flash.
 
   A flame's **FLAME** panel plays it:
   - **Mutate** puts the child on **at once**, or grows it out of the parent

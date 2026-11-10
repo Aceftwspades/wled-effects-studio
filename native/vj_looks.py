@@ -406,12 +406,16 @@ def _meta(ctx, st):
 
 
 RINGS_MAX = 24                       # Beat Rings' rings at most (each is a pass over the canvas)
+RINGS_IDLE_S = 2.0                   # no beat for this long: a ring thrown anyway, and one every so long (in silence
+                                     # the look was a black canvas)
 
 
 @look("Beat Rings", "shader", "a ring thrown out from the middle on every beat")
 def _rings(ctx, st):
     rings = st.setdefault("rings", [])
-    if ctx.beat_hit:
+    st["quiet"] = 0.0 if ctx.beat_hit else st.get("quiet", RINGS_IDLE_S) + ctx.dt
+    if ctx.beat_hit or st["quiet"] >= RINGS_IDLE_S:
+        st["quiet"] = 0.0
         rings.append(0.0)
         del rings[:-RINGS_MAX]                                    # at speed 0 none moves out: kept to the newest
     rings[:] = [r + ctx.dt * (0.6 + ctx.amount) * ctx.speed for r in rings if r < 2.0]
@@ -507,7 +511,7 @@ def milkdrop_frame(ctx, st, pre):
         fb = np.maximum(fb, ring[..., None] * _grad_colour(ctx, hue + 0.5))
     if pre.get("grid"):
         g = ((np.abs(np.mod(ctx.x * 4, 1.0) - 0.5) < 0.04) | (np.abs(np.mod(ctx.y * 4, 1.0) - 0.5) < 0.04))
-        fb = np.maximum(fb, g[..., None] * col * ctx.beat * 0.8)
+        fb = np.maximum(fb, g[..., None] * col * (0.12 + 0.88 * ctx.beat) * 0.8)   # (faint with no beat: not black)
     if ctx.video is not None:                                         # a deck's video seeds the feedback
         fb = np.maximum(fb, ctx.video * 0.08 * (0.5 + ctx.amount))
     st["fb"] = np.clip(fb, 0, 1)
@@ -698,6 +702,12 @@ def blend(a, b, k):
 
 
 DRIFT = 0.18                       # how far drift wanders a map's numbers
+# A flame on the beat: moved, not brightened - the beat's pulse (eased in over its attack, vj.ATTACK) a turn and
+# a swell of the whole figure, the bass a slower swell. Measured before: a flame moved as much in silence as
+# under a kick drum (its only beat a turn of one degree).
+BEAT_TURN = 0.11                   # radians the figure turns on a beat (and back as the pulse lets go)
+BEAT_SWELL = 0.10                  # how much bigger it is on a beat
+BASS_SWELL = 0.08                  # ... and at full bass
 
 
 def drift(flame, phase):
@@ -849,7 +859,8 @@ def flame_frame(ctx, st, flame):
         wts = np.ones(len(maps))
     cum = np.cumsum(wts); cum = cum / cum[-1]
     st["ang"] = st.get("ang", 0.0) + ctx.dt * 0.05 * _kn(ctx, "fl_spin", 1.0)
-    ang = st["ang"] + ctx.beat * 0.02
+    ang = st["ang"] + ctx.beat * BEAT_TURN
+    swell = 1.0 + ctx.beat * BEAT_SWELL + ctx.bass * BASS_SWELL
     decay = float(np.clip(_kn(ctx, "fl_trail", 0.94), 0.0, 1.0)) * 0.99
     spread = float(np.clip(_kn(ctx, "fl_colour", 0.5), 0.0, 1.0))
     gamma = float(np.clip(_kn(ctx, "fl_gamma", 0.6), 0.15, 2.0))
@@ -894,7 +905,7 @@ def flame_frame(ctx, st, flame):
             if fr is None:
                 fr = _flame_frame_of(q)
             cx, cy, ext = fr
-            zoom = (0.55 + ctx.amount * 0.6) / ext
+            zoom = (0.55 + ctx.amount * 0.6) * swell / ext
             ix = (((q[:, 0] - cx) * zoom * ctx.h / ctx.w) * 0.5 + 0.5 + _kn(ctx, "fl_x", 0.0) * 0.5) * (w - 1)
             iy = (((q[:, 1] - cy) * zoom) * 0.5 + 0.5 - _kn(ctx, "fl_y", 0.0) * 0.5) * (h - 1)
             ok = (ix >= 0) & (ix < w) & (iy >= 0) & (iy < h)
