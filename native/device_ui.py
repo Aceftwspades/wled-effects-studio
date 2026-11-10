@@ -173,8 +173,9 @@ def build(app):
             c.tip("asks every listed device again what it is and runs")
             c.info("WLED devices on the network. The ticked one is the active device: where every send and the flash go.")
         dpg.add_text("", tag="dev_status", color=c.DIM, wrap=0)
-        with dpg.child_window(tag="dev_rows", height=-70, border=True):
+        with dpg.child_window(tag="dev_rows", height=-px(96), border=True):
             pass
+        typeface.label(dpg.add_text("LOG", color=c.ACCENT))        # the area under the list had no name
         with dpg.child_window(tag="dev_log", height=-1, border=False):
             typeface.mono(dpg.last_container())         # a log: its lines in the monospace
             pass
@@ -286,6 +287,7 @@ def build(app):
         dpg.add_text("", tag="wt_status", color=c.TEXT, wrap=0)
         dpg.add_separator()
         dpg.add_text("", tag="send_status", color=c.DIM, wrap=0)
+        typeface.label(dpg.add_text("LOG", color=c.ACCENT))
         with dpg.child_window(tag="send_log", height=-1, border=False):
             typeface.mono(dpg.last_container())         # a log: its lines in the monospace
             pass

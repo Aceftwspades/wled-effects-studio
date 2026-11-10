@@ -440,7 +440,7 @@ def _deck(app, i):
             weight.danger(dpg.last_item())
             c.tip("drop this flame from the ones kept")
             c.tip("this bred flame no longer kept; the deck goes back to the flame it came from")
-    dpg.add_text("", tag=f"vj_desc{i}", color=c.DIM, wrap=px(300))
+    dpg.add_text("", tag=f"vj_desc{i}", color=c.DIM, wrap=0)       # to the deck's width: at 300 a narrow deck cut it
 
 
 MUTATE_WORDS = {0: "at once", 1: "over a bar"}
