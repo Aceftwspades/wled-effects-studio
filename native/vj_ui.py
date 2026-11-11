@@ -802,8 +802,8 @@ def _fill_browser(app):
             made[n] = tag
             addon = vj_looks.look_source(n)[0] == "addon"
             with dpg.group(parent=row):
-                dpg.add_image_button(tag, width=px(TH_W * 1.4), height=px(TH_H * 1.4),
-                                     callback=lambda s, a, u: _browse_pick(app, u), user_data=n)
+                tile = dpg.add_image_button(tag, width=px(TH_W * 1.4), height=px(TH_H * 1.4),
+                                            callback=lambda s, a, u: _browse_pick(app, u), user_data=n)
                 c.tip(f"{n}: {vj_looks.LOOKS[n].desc}")
                 dpg.add_text(_short(n)[:NAME_FITS], color=c.DIM)     # a line of its own: beside the star, eleven
                 with dpg.group(horizontal=True):                     # letters fitted ("Gradient Ma")
@@ -815,7 +815,7 @@ def _fill_browser(app):
                     if addon:
                         dpg.add_button(label="x", small=True, user_data=n, callback=lambda s, a, u: _unpack(app, u))
                         c.tip("take this add-on look off this computer (Packs installs it again)")
-            vj_state.of(app).thumbs[n] = {"tag": tag, "state": {}, "t": 0.0}
+            vj_state.of(app).thumbs[n] = {"tag": tag, "state": {}, "t": 0.0, "item": tile}
             shown += 1
     if not shown:
         dpg.add_text("No looks here" + (" - star one with its . to make it a favourite" if flt == "favourites" else "")
@@ -881,12 +881,20 @@ def _thumbs(app):
     if vj_state.of(app).th_src is None:
         vj_state.of(app).th_src = video.TestPattern(TH_W, TH_H)
         vj_state.of(app).th_ctx = None
-    names = list(th)
+    st = vj_state.of(app)
+    st.th_frame = st.th_frame + 1
+    if st.th_frame - st.th_seen_at >= THUMB_LOOK_EVERY or any(n not in th for n in st.th_seen):
+        # only the tiles in view are drawn: all of them were, in turn - with the packs in, a hundred looks no one
+        # was looking at, a pack's shader a third of a second each (the studio at eleven frames a second)
+        st.th_seen_at = st.th_frame
+        st.th_seen = [n for n, e in th.items() if _in_view(e.get("item"))]
+    names = list(st.th_seen)
+    if not names:
+        return
     k0 = vj_state.of(app).th_k
     now = time.perf_counter()
     snd = vj.sound(app)
     done = 0
-    vj_state.of(app).th_frame = vj_state.of(app).th_frame + 1
     for j in range(5):                                       # the cheap ones, in turn, within THUMB_BUDGET_S
         if j and time.perf_counter() - now > THUMB_BUDGET_S:
             break                                            # the frame's thumbnail time spent: on from here next
@@ -901,6 +909,16 @@ def _thumbs(app):
         ck = vj_state.of(app).th_ck % len(costly)
         vj_state.of(app).th_ck = ck + 1
         _draw_thumb(app, costly[ck], th[costly[ck]], now, snd)
+
+
+THUMB_LOOK_EVERY = 8               # frames between asking which tiles are in view (a scroll shows the new ones then)
+
+
+def _in_view(item):
+    try:
+        return bool(item) and dpg.is_item_visible(item)
+    except Exception:                                        # the tile gone (the browser filled again)
+        return False
 
 
 def _draw_thumb(app, n, e, now, snd):
@@ -1768,9 +1786,14 @@ def poll(app):
     with frametime.part("VJ look thumbnails", "polls"):
         _thumbs(app)
     if shown:
+        # the four small pictures at half the frames each, two a frame (A and C, then B and the mix): each was a
+        # resize and a texture sent every frame
+        turn = vj_state.of(app).tick % 2
         for i in range(vj.DECKS):
-            _preview(app, i)
-        _out_preview(app)
+            if i % 2 == turn:
+                _preview(app, i)
+        if turn:
+            _out_preview(app)
         p = float(vj_state.of(app).pulse)
         g = int(60 + 195 * p)
         dpg.configure_item("vj_beat", fill=(g, int(60 + 120 * p), 60, 255))

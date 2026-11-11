@@ -162,3 +162,27 @@ each knob's effect on each look measured, and the frame looked at in nine states
       looks; and looks dark in silence (Beat Rings black, the Drop looks nearly). A flame turns and swells on the beat and swells on the bass (`BEAT_TURN`, `BEAT_SWELL`, `BASS_SWELL`); Beat Rings throws a ring every two seconds without a beat, Pulse Grid's grid is faint between beats. The video looks are left as they are: a camera that bounces unasked is worse than one that does not, and a deck's SOUND (beat moves zoom) does it.
 - [x] **A deck is a box of one size**: it does not grow with the frame, scrolls inside a frame that scrolls, and
       deck C is a folded header under the other two. The decks are sized to the frame (`vj_ui._lay_out`): its width between them, the height that leaves the mix's rows in view; deck C beside A and B in a frame wide enough for three.
+
+## 10. The VJ's frame, profiled: what it did every frame, and every second
+From a profile of `vj.update` alone, then of the running studio idle, with the VJ on air, and with the look
+browser open (eleven packs installed: 128 looks).
+- [x] **A frame lost every second the VJ ran**: the looks' files are looked over each second for one saved, and
+      that read every pack's metadata and every pack look's file - 17 ms with eleven packs. The packs are read
+      when a pack's folder changes (`addons.stamp`: one listing) or 15 s have gone by: 0.7 ms.
+- [x] **The look browser held the studio at eleven frames a second**: every look's thumbnail was drawn in turn,
+      in view or not - a pack's shader or preset 170 to 490 ms each. Only the tiles in view are drawn
+      (`vj_ui._in_view`, asked every eight frames): a thumbnail pass 66 ms -> 4 ms, its worst 490 -> 9, on the
+      browser's first screen. Scrolled to a pack's raymarched shaders, those in view still cost what they cost.
+- [x] **A look's colours blended from their stops for every pixel**: looked up in a table of 1024 made once a
+      gradient (`vj_looks._table`), within 0.002 of the blend: 0.39 -> 0.13 ms a call at 96 x 72, the rainbow
+      0.98 -> 0.13. Plasma 3.4 -> 2.8 ms a frame, Voronoi at 192 x 108 21 -> 15.
+- [x] **The four small pictures of the frame sent every frame**: each at half the frames, two a frame.
+- [ ] **The VJ's options asked 57 times a frame**, each a check that they are the dicts last filled (4.6 us:
+      0.26 ms). Once a frame would do, if nothing in the frame replaces a deck's dict - to be shown first.
+- [ ] **The map onto the shape works out its four taps and weights again each frame** for a mapping that changes
+      only with the shape or MAP: 0.27 ms a deck on a 16 cube, 0.75 on a 32.
+- [ ] **Outside the VJ, every frame**: the LED under the pointer found again though neither the pointer nor the
+      view moved (1.2 ms under the profiler); some 80 "is it shown?" each making a whole dict of the item's
+      settings (0.8 ms); two files looked for (the capture's and the remote's requests, 0.2 ms).
+- [-] Not worth it: Voronoi's sort as a partition (0.67 ms either way); the flames (2 ms of their own a frame,
+      no one place).

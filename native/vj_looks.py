@@ -1301,6 +1301,11 @@ def py_files(project):
     return sorted(f for f in os.listdir(d) if f.lower().endswith(".py")) if os.path.isdir(d) else []
 
 
+PACKS_EVERY_S = 15.0             # the packs' files read again this often though no pack's folder has changed (one
+                                 # written over in place); a pack put in or taken out is read at once
+_PACKS = {"stamp": None, "at": None, "files": []}
+
+
 def load_user(project, allow_py=False):
     """The project's own looks registered - Python looks (looks/*.py), Shadertoy shaders (*.glsl) and MilkDrop
     presets (*.milk) - again when a file has changed, gone when it has gone. [(file, error)] for every one that
@@ -1308,24 +1313,34 @@ def load_user(project, allow_py=False):
     default: a project from elsewhere, not yet allowed on this machine) it is listed as not run, and nothing of it runs - a
     .glsl or a .milk cannot run anything but its own shader or equations."""
     import os
+    import time
     from native import addons
     seen = set()
     # the installed add-on packs first (no Python in them: a pack is .milk and .glsl), then the project's own -
-    # which win a name both have
-    places = []
-    try:
-        places = [(pd, False) for pd in addons.dirs()]
-    except OSError:
-        pass
-    places.append((user_dir(project), True))
-    files = []
-    for d, own in places:
-        if os.path.isdir(d):
-            files += [(d, f, own) for f in sorted(os.listdir(d))
-                      if f.lower().endswith((".py", ".glsl", ".milk") if own else (".glsl", ".milk"))]
+    # which win a name both have. The packs' folders are listed, and their files looked at, only when a pack's
+    # folder has changed or PACKS_EVERY_S have gone by: it was every pack's metadata and every look's file each
+    # second the VJ ran (17 ms with eleven packs - a frame lost a second, on air)
+    stamp, now = addons.stamp(), time.monotonic()
+    packs_read = (stamp is None or stamp != _PACKS["stamp"] or _PACKS["at"] is None
+                  or not 0.0 <= now - _PACKS["at"] < PACKS_EVERY_S)
+    if packs_read:
+        found = []
+        try:
+            for pd in addons.dirs():
+                if os.path.isdir(pd):
+                    found += [(pd, f, False) for f in sorted(os.listdir(pd)) if f.lower().endswith((".glsl", ".milk"))]
+        except OSError:
+            pass
+        _PACKS.update(stamp=stamp, at=now, files=found)
+    files = list(_PACKS["files"])
+    d = user_dir(project)
+    if os.path.isdir(d):
+        files += [(d, f, True) for f in sorted(os.listdir(d)) if f.lower().endswith((".py", ".glsl", ".milk"))]
     for d, f, own in files:
         path = os.path.join(d, f)
         seen.add(path)
+        if not own and not packs_read:
+            continue                                              # a pack's, as it was read last
         try:
             mt = os.path.getmtime(path)
         except OSError:
@@ -1572,22 +1587,46 @@ GRADIENTS = {
 }
 
 
+GRAD_N = 1024                    # a gradient's colours worked out at this many places, then looked up: a quarter
+                                 # of the time of blending its stops for every pixel (a seventh on the finest canvas)
+_RAINBOW = []
+_GRADS = {}                      # a gradient's name -> (its stops, its grad(x))
+
+
 def gradient(name):
     stops = GRADIENTS.get(name)
     if stops is None:
-        return lambda x: hsv(x, np.full_like(x, 0.9), np.ones_like(x))
-    return from_stops(stops)
+        if not _RAINBOW:
+            xs = np.linspace(0.0, 1.0, GRAD_N, dtype=np.float32)
+            _RAINBOW.append(_table(np.asarray(hsv(xs, np.full_like(xs, 0.9), np.ones_like(xs)), np.float32)))
+        return _RAINBOW[0]
+    made = _GRADS.get(name)                                       # its table made once (asked for every frame)
+    if made is None or made[0] is not stops:
+        made = _GRADS[name] = (stops, from_stops(stops))
+    return made[1]
+
+
+def _table(lut):
+    """grad(x) by looking x up in a table of colours across 0..1."""
+    top = len(lut) - 1
+
+    def g(x):
+        x = np.asarray(x, np.float32)
+        return lut[(np.clip(np.nan_to_num(x), 0.0, 1.0) * top + 0.5).astype(np.intp)]
+    return g
 
 
 def from_stops(stops):
     """grad(x) through colours spaced evenly: an (n, 3) array of 0..1 (a gradient's stops, a palette sampled)."""
     stops = np.asarray(stops, np.float32)
     n = len(stops)
+    if n < 2:
+        stops, n = np.repeat(stops[:1] if n else np.zeros((1, 3), np.float32), 2, 0), 2
 
-    def g(x):
+    def blend(x):
         x = np.clip(np.asarray(x, np.float32), 0, 1) * (n - 1)
         i = np.minimum(x.astype(np.int32), n - 2)
         f = (x - i)[..., None]
         return stops[i] * (1 - f) + stops[i + 1] * f
-    return g
+    return _table(np.asarray(blend(np.linspace(0.0, 1.0, GRAD_N, dtype=np.float32)), np.float32))
 # AI: end

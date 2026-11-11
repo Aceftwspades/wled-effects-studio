@@ -377,6 +377,16 @@ for _ in range(40):                                                # (past the b
 cv = vj._runs(app)[0].canvas
 check(cv is not None and cv[..., 1].max() == 0.0 and cv[..., 0].max() > 0.2, "Plasma in a palette's colours")
 o["decks"][0]["colours"] = "neon"
+xs_ = np.linspace(0.0, 1.0, 777, dtype=np.float32)
+st_ = np.asarray(vj_looks.GRADIENTS["neon"], np.float32)
+want = np.stack([np.interp(xs_ * (len(st_) - 1), np.arange(len(st_)), st_[:, ch]) for ch in range(3)], -1)
+got = np.asarray(vj_looks.gradient("neon")(xs_))
+check(got.shape == (777, 3) and got.dtype == np.float32 and np.abs(got - want).max() < 0.006,
+      f"a gradient from its table: the blend of its stops to within a step ({np.abs(got - want).max():.4f})")
+check(vj_looks.gradient("neon") is vj_looks.gradient("neon") and vj_looks.gradient("rainbow") is vj_looks.gradient("nope"),
+      "a gradient's table made once, not each frame")
+ends_ = np.asarray(vj_looks.gradient("mono")(np.array([-1.0, 0.0, 1.0, 2.0, np.nan], np.float32)))
+check(np.allclose(ends_[:, 0], [0, 0, 1, 1, 0]), f"out of 0..1 held to the ends, not a number the first colour ({ends_[:, 0]})")
 check(not vj_looks.LOOKS["Thermal"].colours and vj_looks.LOOKS["Gradient Map"].colours and vj_looks.LOOKS["Plasma"].colours
       and not vj_looks.LOOKS["Image"].colours, "a look says whether it reads the deck's colours (the video looks do not)")
 del app.eng.palette_list, app.eng.palette_swatch, app.eng.custom_names
@@ -1814,9 +1824,11 @@ check(played < 0.3, f"after a render that ran behind: a clip's time does not cou
 vj.close(aj)
 # round 8: a browser of costly looks - each animates in its own turn, none frozen
 from native import vj_ui                                      # noqa: E402
-real_dpg = (vj_ui.dpg.is_item_shown, vj_ui.dpg.set_value)
+real_dpg = (vj_ui.dpg.is_item_shown, vj_ui.dpg.set_value, vj_ui.dpg.is_item_visible)
 drawn_n = {}
+in_view = set(f"i{k}" for k in range(13))
 vj_ui.dpg.is_item_shown = lambda tag: True
+vj_ui.dpg.is_item_visible = lambda item: item in in_view
 vj_ui.dpg.set_value = lambda tag, v: drawn_n.__setitem__(tag, drawn_n.get(tag, 0) + 1)
 try:
     for k in range(13):
@@ -1824,13 +1836,29 @@ try:
             time.sleep(0.025), np.zeros((c.h, c.w, 3), np.float32))[1], "")
     ab = App(g)
     vj.options(ab)
-    vj_state.of(ab).thumbs = {f"Slow {k}": {"tag": f"t{k}", "state": {}, "t": 0.0} for k in range(13)}
+    vj_state.of(ab).thumbs = {f"Slow {k}": {"tag": f"t{k}", "state": {}, "t": 0.0, "item": f"i{k}"} for k in range(13)}
     for _ in range(13 * 2 + 13 * vj_ui.THUMB_SLOW_EVERY * 2):
         vj_ui._thumbs(ab)
     again = sum(1 for k in range(13) if drawn_n.get(f"t{k}", 0) > 2)
     check(again == 13, f"a browser of 13 costly looks: each drawn again in its turn ({again} of 13)")
+    # only the tiles in view are drawn: the rest (scrolled off - a hundred looks, with the packs in) cost nothing
+    in_view.intersection_update({"i0", "i1", "i2"})
+    for _ in range(vj_ui.THUMB_LOOK_EVERY + 1):
+        vj_ui._thumbs(ab)                                     # (which are in view is asked every few frames)
+    drawn_n.clear()
+    for _ in range(3 * vj_ui.THUMB_SLOW_EVERY * 3):
+        vj_ui._thumbs(ab)
+    check(set(drawn_n) == {"t0", "t1", "t2"} and min(drawn_n.values()) >= 2,
+          f"only the thumbnails in view are drawn ({sorted(drawn_n)})")
+    in_view.clear()
+    for _ in range(vj_ui.THUMB_LOOK_EVERY + 1):
+        vj_ui._thumbs(ab)
+    drawn_n.clear()
+    for _ in range(20):
+        vj_ui._thumbs(ab)
+    check(not drawn_n, "none in view: none drawn")
 finally:
-    vj_ui.dpg.is_item_shown, vj_ui.dpg.set_value = real_dpg
+    vj_ui.dpg.is_item_shown, vj_ui.dpg.set_value, vj_ui.dpg.is_item_visible = real_dpg
     for k in range(13):
         vj_looks.LOOKS.pop(f"Slow {k}", None)
 # a render while the VJ was not running: a sweep left from before stays done (it once swung A-B-A); the clock

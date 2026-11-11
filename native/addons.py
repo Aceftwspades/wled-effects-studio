@@ -45,6 +45,17 @@ def root():
     return d
 
 
+def stamp():
+    """What changes when the packs do, cheap to ask (one listing of the packs' folder): each pack's folder by name
+    with when something was last put in it or taken out. A look's file written over in place does not show here
+    (vj_looks.load_user reads them all again every so often for that)."""
+    try:
+        with os.scandir(root()) as it:
+            return tuple(sorted((e.name, e.stat().st_mtime_ns) for e in it))
+    except OSError:
+        return None
+
+
 class Item:
     __slots__ = ("file", "name", "author", "licence", "sha256", "tags", "note")
 
