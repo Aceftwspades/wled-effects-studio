@@ -358,7 +358,7 @@ class AppLayout:
         near the bottom - is moved back inside, so every row can be reached."""
         vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
         for tag in ("graph_ctx", "graph_menu", "compare_menu", "open_menu", "midi_ctx", "expr_win") + tuple(self.pane_menus.values()):
-            if not (dpg.does_item_exist(tag) and dpg.is_item_shown(tag)):
+            if not self.window_shown(tag):
                 continue
             w, h = dpg.get_item_rect_size(tag)
             if w <= 0 or h <= 0:
@@ -889,6 +889,7 @@ class AppLayout:
                 if isinstance(t, str) and dpg.does_alias_exist(t):
                     self._hole_names[dpg.get_alias_id(t)] = t
             self._shown = [t for t in tags if dpg.does_item_exist(t) and dpg.is_item_shown(t)]
+            self._shown_set, self._shown_frame = set(self._shown), dpg.get_frame_count()
             return self._shown
         at = getattr(self, "_sweep_at", 0) % max(1, len(tags))
         self._sweep_at = at + self.HOLE_SWEEP
@@ -897,7 +898,19 @@ class AppLayout:
         names = self._hole_names
         ask.update(names[i] for i in asked if i in names)
         self._shown = [t for t in tags if t in ask and dpg.does_item_exist(t) and dpg.is_item_shown(t)]
+        self._shown_set, self._shown_frame = set(self._shown), dpg.get_frame_count()
         return self._shown
+
+    def window_shown(self, tag):
+        """Whether a window (a dialog, a frame, a popup menu) is shown - from the list the holes keep, where it is
+        one of theirs and the list is this frame's or the last's; asked of Dear PyGui otherwise (the holes not
+        kept just now, or a window they do not list). The frame's loops over every dialog, every frame and
+        every menu asked Dear PyGui of each - 48 questions a frame, each answered with a dict of all the
+        window's settings, nearly all of them "no". A window shown after the holes looked is seen a frame on."""
+        names = getattr(self, "_hole_names", None)
+        if names and tag in names and dpg.get_frame_count() - getattr(self, "_shown_frame", -9) <= 1:
+            return names[tag] in self._shown_set
+        return bool(dpg.does_item_exist(tag) and dpg.is_item_shown(tag))
     # AI: end
 
     def _hole_tags(self):

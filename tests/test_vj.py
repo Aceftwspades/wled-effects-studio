@@ -80,6 +80,21 @@ for mode, _ in vj.MAPS:
     if out.shape != (g.h, g.w, 3) or out[~lit].any() or not out[lit].any():
         check(False, f"map {mode}: shape {out.shape}, dark where unlit, lit where lit")
 check(True, "every map: the grid's size, dark where there is no LED")
+# the map's taps and weights kept: the picture the sampler made each frame, to the byte - in every map, at two
+# canvases, and after the canvas's size changes
+rng_ = np.random.default_rng(5)
+same_ = True
+for size_ in ((CH, CW), (108, 192), (CH, CW)):
+    cv_ = rng_.random(size_ + (3,)).astype(np.float32)
+    for mode, _ in vj.MAPS:
+        u_, v_, lit_ = vj.mapping(g, g.h, g.w, mode)
+        want_ = vj_looks.sample(cv_, u_, v_)
+        want_[~lit_] = 0
+        want_ = (np.clip(want_, 0, 1) * 255 + 0.5).astype(np.uint8).reshape(g.h, g.w, 3)
+        same_ = same_ and np.array_equal(vj.to_shape(app, cv_, mode), want_)
+check(same_, "the map with its taps kept: the sampler's picture, to the byte")
+check(vj.to_shape(app, (rng_.random((CH, CW, 3)) * 255).astype(np.uint8) / np.float64(255)).shape == (g.h, g.w, 3),
+      "a canvas that is not float32 still maps (the sampler's own way)")
 u, v, lit = vj.mapping(g, g.h, g.w, "faces")
 pos = np.asarray(g.pos)[lit]
 top = np.abs(pos[:, 2] - pos[:, 2].max()) < 1e-3

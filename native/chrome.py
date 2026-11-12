@@ -2115,8 +2115,10 @@ def poll_dialogs():
     back inside it - not while the mouse holds it."""
     vw, vh = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
     held = dpg.is_mouse_button_down(dpg.mvMouseButton_Left)
+    shown = (_APP[0].window_shown if _APP and hasattr(_APP[0], "window_shown")
+             else (lambda t: dpg.does_item_exist(t) and dpg.is_item_shown(t)))
     for tag in DIALOGS:
-        if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and dpg.does_item_exist(f"{tag}_x"):
+        if shown(tag) and dpg.does_item_exist(f"{tag}_x"):
             rw, rh = dpg.get_item_rect_size(tag)
             w = rw or dpg.get_item_configuration(tag).get("width") or 0
             if w:

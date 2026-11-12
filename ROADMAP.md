@@ -168,7 +168,7 @@ From a profile of `vj.update` alone, then of the running studio idle, with the V
 browser open (eleven packs installed: 128 looks).
 - [x] **A frame lost every second the VJ ran**: the looks' files are looked over each second for one saved, and
       that read every pack's metadata and every pack look's file - 17 ms with eleven packs. The packs are read
-      when a pack's folder changes (`addons.stamp`: one listing) or 15 s have gone by: 0.7 ms.
+      when a pack's folder or a file in one changes (`addons.stamp`: a listing of each folder) or 15 s have gone by: 2 ms.
 - [x] **The look browser held the studio at eleven frames a second**: every look's thumbnail was drawn in turn,
       in view or not - a pack's shader or preset 170 to 490 ms each. Only the tiles in view are drawn
       (`vj_ui._in_view`, asked every eight frames): a thumbnail pass 66 ms -> 4 ms, its worst 490 -> 9, on the
@@ -177,12 +177,12 @@ browser open (eleven packs installed: 128 looks).
       gradient (`vj_looks._table`), within 0.002 of the blend: 0.39 -> 0.13 ms a call at 96 x 72, the rainbow
       0.98 -> 0.13. Plasma 3.4 -> 2.8 ms a frame, Voronoi at 192 x 108 21 -> 15.
 - [x] **The four small pictures of the frame sent every frame**: each at half the frames, two a frame.
-- [ ] **The VJ's options asked 57 times a frame**, each a check that they are the dicts last filled (4.6 us:
-      0.26 ms). Once a frame would do, if nothing in the frame replaces a deck's dict - to be shown first.
-- [ ] **The map onto the shape works out its four taps and weights again each frame** for a mapping that changes
-      only with the shape or MAP: 0.27 ms a deck on a 16 cube, 0.75 on a 32.
-- [ ] **Outside the VJ, every frame**: the LED under the pointer found again though neither the pointer nor the
+- [-] **The VJ's options asked 57 times a frame**, each a check that they are the dicts last filled (4.6 us:
+      0.26 ms). Left: once a frame is only right if nothing in the frame replaces a deck's dict (a preset, a show's step), and a deck drawn from one not yet filled fails - a quarter of a millisecond is not worth that.
+- [x] **The map onto the shape works out its four taps and weights again each frame** for a mapping that changes
+      only with the shape or MAP. Kept (`vj._taps`), the picture the same to the byte: 0.34 -> 0.26 ms a deck on a 16 cube, 0.96 -> 0.87 on a 32 - a quarter, not the half guessed: the rest is the blend itself, and a sum of weighted corners a channel at a time is no quicker.
+- [x] **Outside the VJ, every frame**: the LED under the pointer found again though neither the pointer nor the
       view moved (1.2 ms under the profiler); some 80 "is it shown?" each making a whole dict of the item's
-      settings (0.8 ms); two files looked for (the capture's and the remote's requests, 0.2 ms).
+      settings (0.8 ms); two files looked for (the capture's and the remote's requests, 0.2 ms). The loops over every dialog, frame and menu ask the list the holes keep (`AppLayout.window_shown`): 80 -> 31 questions a frame, 0.96 -> 0.49 ms. The pointer's LED is only worked out with the pointer over a view (the 1.2 ms was that, not a fixed cost) - left; the two files left (the tests wait on them).
 - [-] Not worth it: Voronoi's sort as a partition (0.67 ms either way); the flames (2 ms of their own a frame,
       no one place).

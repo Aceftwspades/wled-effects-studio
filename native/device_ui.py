@@ -1505,7 +1505,7 @@ def poll(app):
     as they are resized; docked ones are placed by the layout."""
     poll_wled(app)
     for slot, (tag, _, _, _) in FRAMES.items():
-        if dpg.does_item_exist(tag) and dpg.is_item_shown(tag) and not app.docked(slot):
+        if app.window_shown(tag) and not app.docked(slot):
             w = dpg.get_item_rect_size(tag)[0] or dpg.get_item_configuration(tag).get("width") or 0
             if w:
                 place_header(tag, w, False)

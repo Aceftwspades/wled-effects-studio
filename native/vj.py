@@ -819,9 +819,44 @@ def to_shape(app, canvas, mode=None):
     eng = app.eng
     rows, cols = eng.rows, eng.cols
     u, v, lit = mapping(app.project.geometry, rows, cols, mode or options(app)["map"])
-    px = vj_looks.sample(canvas, u, v)
+    h, w = canvas.shape[:2]
+    if canvas.dtype != np.float32 or canvas.ndim != 3:
+        px = vj_looks.sample(canvas, u, v)                    # (not a deck's canvas: the sampler's own way)
+    else:
+        i00, i01, i10, i11, fx, fy = _taps(u, v, w, h)
+        flat = canvas.reshape(h * w, -1)
+        px, b, c, d = flat.take(i00, 0), flat.take(i01, 0), flat.take(i10, 0), flat.take(i11, 0)
+        for k in range(px.shape[1]):                          # as vj_looks.sample blends them, a channel at a time
+            ak, ck = px[:, k], c[:, k]
+            ak += (b[:, k] - ak) * fx
+            ck += (d[:, k] - ck) * fx
+            ak += (ck - ak) * fy
     px[~lit] = 0
     return (np.clip(px, 0, 1) * 255 + 0.5).astype(np.uint8).reshape(rows, cols, 3)
+
+
+_TAPS = {}
+
+
+def _taps(u, v, w, h):
+    """Where each pixel of the shape reads a canvas of w x h, kept: its four corners' places in the flat canvas
+    and how far between them it is. vj_looks.sample works these out from u and v each time - for a look's warp,
+    which moves; a map moves only with the shape, its MAP and the canvas's size, and was 0.27 ms a deck a frame on
+    a 16 cube and 0.75 on a 32 of working out what it had the frame before."""
+    key = (id(u), w, h)
+    got = _TAPS.get(key)
+    if got is not None and got[0] is u:                       # the same mapping (not another given its id since)
+        return got[1]
+    x = np.clip(np.asarray(u * (w - 1), np.float32), 0, w - 1)
+    y = np.clip(np.asarray(v * (h - 1), np.float32), 0, h - 1)
+    x0, y0 = x.astype(np.int32), y.astype(np.int32)
+    x1, y1 = np.minimum(x0 + 1, w - 1), np.minimum(y0 + 1, h - 1)
+    r0, r1 = y0 * w, y1 * w
+    t = ((r0 + x0).ravel(), (r0 + x1).ravel(), (r1 + x0).ravel(), (r1 + x1).ravel(), (x - x0).ravel(), (y - y0).ravel())
+    if len(_TAPS) > 32:
+        _TAPS.clear()
+    _TAPS[key] = (u, t)
+    return t
 
 
 # --- the beat ------------------------------------------------------------------------------------

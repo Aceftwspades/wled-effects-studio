@@ -46,14 +46,23 @@ def root():
 
 
 def stamp():
-    """What changes when the packs do, cheap to ask (one listing of the packs' folder): each pack's folder by name
-    with when something was last put in it or taken out. A look's file written over in place does not show here
-    (vj_looks.load_user reads them all again every so often for that)."""
+    """What changes when the packs do, cheap to ask: every pack's folder and every file in it, by name, with when
+    it was last written and its size - a listing of each folder, which on Windows carries those with it (no file
+    is opened or asked after). vj_looks.load_user reads the packs again when this is not what it was."""
+    out = []
     try:
-        with os.scandir(root()) as it:
-            return tuple(sorted((e.name, e.stat().st_mtime_ns) for e in it))
+        with os.scandir(root()) as packs:
+            for pk in sorted(packs, key=lambda e: e.name):
+                if not pk.is_dir():
+                    continue
+                with os.scandir(pk.path) as files:
+                    for e in sorted(files, key=lambda e: e.name):
+                        st = e.stat()
+                        out.append((pk.name, e.name, st.st_mtime_ns, st.st_size))
+                out.append((pk.name,))
     except OSError:
         return None
+    return tuple(out)
 
 
 class Item:
