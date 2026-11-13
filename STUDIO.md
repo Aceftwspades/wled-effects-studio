@@ -4625,6 +4625,12 @@ and effects on pads, an Effect deck's Custom sliders and checks, and eight round
 macOS, no ffmpeg on the packaged Windows runner, macOS's step limits) before a release was made; the release is
 1.23.1, and the v1.23.0 tag is left without one.
 
+Released as 1.24.0 (2026-11-12): the work of ROADMAP.md's ten sections since 1.23.1 - the VJ's decks sized to the frame, a deck's colours from
+the project's and WLED's palettes, a master level, blackout and freeze, a look's own knobs, flames that move with the
+music, File > New live show project, Pads, Modulators, Mixer and MIDI as frames, a tooltip on every button, where a
+frame's time goes, and the state, file-splitting and speed work listed there. The tag's first run failed its Windows
+job on a flaky check of test_vj (the flames' swell; fixed after the tag) and passed when run again.
+
 ### From the second feature review (October 2026)
 
 The studio set again beside the software it shares ground with (2026-10-22),

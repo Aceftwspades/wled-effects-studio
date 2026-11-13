@@ -1,6 +1,6 @@
 # Roadmap: stability, maintainability, speed, ease of use
 
-The next round of work after 1.23.1, in the order it is being done. Each item is ticked when it is on `main`.
+The round of work after 1.23.1 (released as 1.24.0), in the order it was done. Each item is ticked when it is on `main`.
 
 ## 1. Catch CI's failures before a push (maintainability)
 - [x] **A pre-push check** (`python tests/prepush.py`): every `tests/test_*.py` as CI runs it, then again under
