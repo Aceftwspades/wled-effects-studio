@@ -129,21 +129,23 @@ def build(app):
                    "sent by position, so the first here replaces the device's palette0.json, the second its palette1.json.")
         with dpg.child_window(tag="pal_rows", height=px(120), border=True):
             pass
-        with dpg.group(horizontal=True):
-            form.inline("name")
-            dpg.add_input_text(tag="pal_name", width=px(200), on_enter=True, callback=lambda s, v: rename(app, v))
-            typeface.small(dpg.add_text("", tag="pal_id", color=c.DIM))
-        dpg.add_text("click: a stop  -  drag: move it  -  right-click: remove it", color=c.DIM, wrap=0)
-        dpg.add_drawlist(tag="pal_bar", width=_bar()[0], height=_bar()[1])
-        with dpg.group(horizontal=True):
-            form.inline("the stop")
-            form.swatch("pal_col", (255, 255, 255), lambda rgb: set_colour(app, rgb))
-            form.inline("at")
-            typeface.mono(dpg.add_input_int(tag="pal_pos", width=px(96), min_value=0, max_value=255, min_clamped=True, max_clamped=True,
-                                            callback=lambda s, v: set_pos(app, int(v))))
-            c.tip("where the stop sits along the palette, 0..255")
-            dpg.add_button(label="spread evenly", small=True, callback=lambda: spread(app))
-            c.tip("the colour stops at equal distances along the gradient")
+        # a palette's name, bar and stop wait for a palette: with none they were fields that changed nothing
+        with dpg.group(tag="pal_edit", show=False):
+            with dpg.group(horizontal=True):
+                form.inline("name")
+                dpg.add_input_text(tag="pal_name", width=px(200), on_enter=True, callback=lambda s, v: rename(app, v))
+                typeface.small(dpg.add_text("", tag="pal_id", color=c.DIM))
+            dpg.add_text("click: a stop  -  drag: move it  -  right-click: remove it", color=c.DIM, wrap=0)
+            dpg.add_drawlist(tag="pal_bar", width=_bar()[0], height=_bar()[1])
+            with dpg.group(horizontal=True):
+                form.inline("the stop")
+                form.swatch("pal_col", (255, 255, 255), lambda rgb: set_colour(app, rgb))
+                form.inline("at")
+                typeface.mono(dpg.add_input_int(tag="pal_pos", width=px(96), min_value=0, max_value=255, min_clamped=True, max_clamped=True,
+                                                callback=lambda s, v: set_pos(app, int(v))))
+                c.tip("where the stop sits along the palette, 0..255")
+                dpg.add_button(label="spread evenly", small=True, callback=lambda: spread(app))
+                c.tip("the colour stops at equal distances along the gradient")
         dpg.add_separator()
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
@@ -191,6 +193,7 @@ def refresh(app):
     if not pals:
         weight.empty("pal_rows", "No palettes of the project's own yet: a new gradient, or the one the sim shows.",
                      [("New palette", lambda: new_palette(app)), ("From the sim's palette", lambda: from_current(app))])
+    dpg.configure_item("pal_edit", show=sel >= 0)
     if sel < 0:
         dpg.set_value("pal_name", ""); dpg.set_value("pal_id", "")
         dpg.delete_item("pal_bar", children_only=True)

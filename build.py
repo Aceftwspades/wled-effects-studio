@@ -438,6 +438,9 @@ def engine_sources(extra=(), log=print):
     return srcs + [staged(e) for e in extra]
 
 
+STAGE_KEY = 10                                              # hex digits of a source folder's name in build/stage
+
+
 def staged(path):
     """A project's effect as the compiler sees it: a copy in build/stage.
     The compiler may map a file while it reads it (clang does on Windows),
@@ -445,14 +448,19 @@ def staged(path):
     code landing while a build runs would fail on the effect itself. Same
     name and contents: its errors still name the file, its object still
     matches. A copy a build is still reading gets one beside it, named by
-    its contents."""
+    its contents.
+    The copy is in a folder named by the folder the source is in: by file
+    name alone, two builds at once with files of one name (or names that
+    differ only by case, on Windows) wrote over each other's copy and
+    compiled each other's effect."""
     import hashlib
     path = os.path.abspath(path)
     try:
         data = open(path, "rb").read()
     except OSError:
         return path                                         # the compiler says what is wrong with it
-    d = os.path.join(paths.BUILD, "stage")
+    place = hashlib.sha1(os.path.normcase(os.path.dirname(path)).encode("utf-8", "replace")).hexdigest()[:STAGE_KEY]
+    d = os.path.join(paths.BUILD, "stage", place)
     out = os.path.join(d, os.path.basename(path))
     try:
         os.makedirs(d, exist_ok=True)

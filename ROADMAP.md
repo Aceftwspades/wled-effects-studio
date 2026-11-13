@@ -134,12 +134,12 @@ The next round of work after 1.23.1, in the order it is being done. Each item is
       A tooltip goes after any line that still means its button by `dpg.last_item()`.
 - [x] **Clipped words and areas with no title**: the Library's tags are cut at a whole tag ("3-D, both +3"), the
       VJ decks' descriptions wrap to the deck, the logs of Devices and Send are headed LOG.
-- [ ] **Controls shown before they can do anything**: the Sequence's beats, snapping and render rows with no
-      steps, the Palettes' colour stops with no palette.
-- [ ] **build/stage holds sources by file name alone** (`build.staged`): two builds at once with files of one
+- [x] **Controls shown before they can do anything**: the Sequence's beats, snapping and render rows with no
+      steps, the Palettes' colour stops with no palette. They wait: the three rows for a step (`seq_tools`), the name, bar and stop for a palette (`pal_edit`).
+- [x] **build/stage holds sources by file name alone** (`build.staged`): two builds at once with files of one
       name - or names that differ only by case, on Windows - compile each other's. The tests no longer do
       (`test_nodes` built "scenes" beside `test_parity`'s census "Scenes": one linked the other's effect);
-      a test beside the studio, or two of the studio, still could.
+      a test beside the studio, or two of the studio, still could. A source's copy is in a folder named by the folder it came from: two files of one name are two copies, and two objects.
 - [-] **Startup**, measured: 3.1-3.4 s to the first frame served (9,260 items, 433 windows). Of it the modules'
       import ~1.4 s, the interface's build 1.1 s (the frames 0.38, the dialogs 0.41). A project with MilkDrop
       presets adds their parsing as it opens (23 presets: 0.63 s) whether or not a deck plays one - they could

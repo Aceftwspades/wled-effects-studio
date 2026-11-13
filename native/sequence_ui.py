@@ -428,45 +428,47 @@ def build(app):
             dpg.add_text("", tag="seq_ramp_desc", color=c.DIM)
         dpg.add_group(tag="seq_ramps")
         dpg.pop_container_stack()
-        # the tempo: bars on the timeline, lengths in bars, drags on the beats
-        with dpg.group(horizontal=True):
-            typeface.label(dpg.add_text("BEATS", color=c.ACCENT))
-            num.add("seq_bpm", 0.0, 0.0, 300.0, unit="bpm", digits=1, width=px(110), wide=True, pace=120,
-                    callback=lambda s, v: _tempo_changed(app, bpm=v))
-            c.tip("the tempo the steps are laid on: bars on the timeline, lengths in bars, drags on the beats (0: none)")
-            dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
-            c.tip("tap tempo: tap on the beat, the bpm from the gaps")
-            dpg.add_button(label="Synth's", small=True, callback=lambda: set_tempo(app, bpm=float(getattr(app.syn, "bpm", 120))))
-            c.tip("the bpm of the sim's synthetic beat")
-            dpg.add_button(label="the file's", small=True, callback=lambda: beats_from_wav(app))
-            c.tip("the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file)")
-            form.inline("beats a bar")
-            num.add("seq_bar", 4, 1, 16, integer=True, width=px(60), callback=lambda s, v: _tempo_changed(app, bar=v))
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Snap lengths to bars", small=True, callback=lambda: snap_durations(app))
-            weight.need(dpg.last_item(), lambda a: _has_steps(a) and bool(_barlen(a)))
-            c.tip("every step's length rounded to whole bars, so the sequence changes on the music")
-            dpg.add_checkbox(label="drags on the beats", tag="seq_snap", default_value=True,
-                             callback=lambda s, v: (_steps(app).__setitem__("snap", bool(v)), app.project.save()))
-            c.tip("a step's end dragged on the timeline lands on a beat (hold Alt for anywhere)")
-            form.inline("blend as")
-            dpg.add_combo(transition.STYLES, tag="seq_style", width=px(110), default_value="fade",
-                          callback=lambda s, v: (_steps(app).__setitem__("style", v), app.project.save()))
-            c.tip("the transition's style, previewed here; on the device the transitions use its own blend-style setting")
-            dpg.add_text("", tag="seq_tap", color=c.DIM)
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Render GIF", small=True, callback=lambda: render(app, "gif"))
-            weight.need(dpg.last_item(), _has_steps)
-            c.tip("plays the sequence once from the top and records it as a GIF, into captures/")
-            dpg.add_button(label="Render video...", small=True, callback=lambda: __import__("native.render_video", fromlist=["r"]).show(app))
-            weight.need(dpg.last_item(), _has_steps)
-            c.tip("the show made into an mp4, frame by frame at the size, rate and quality chosen, with its audio - "
-                  "into captures/; needs ffmpeg on the path")
-            dpg.add_button(label="Export FSEQ...", tag="seq_fseq", small=True,
-                           callback=lambda: __import__("native.render_fseq", fromlist=["r"]).show(app))
-            weight.need(dpg.last_item(), _has_steps)
-            c.tip("the show frame by frame into an FSEQ file for Falcon Player, with its audio beside it - FPP plays it "
-                  "to the controllers, WLED among them")
+        # the rows that work on the steps wait for one: with none they were a tempo, a snap and three renders of nothing
+        with dpg.group(tag="seq_tools", show=False):
+            # the tempo: bars on the timeline, lengths in bars, drags on the beats
+            with dpg.group(horizontal=True):
+                typeface.label(dpg.add_text("BEATS", color=c.ACCENT))
+                num.add("seq_bpm", 0.0, 0.0, 300.0, unit="bpm", digits=1, width=px(110), wide=True, pace=120,
+                        callback=lambda s, v: _tempo_changed(app, bpm=v))
+                c.tip("the tempo the steps are laid on: bars on the timeline, lengths in bars, drags on the beats (0: none)")
+                dpg.add_button(label="Tap", small=True, callback=lambda: tap(app))
+                c.tip("tap tempo: tap on the beat, the bpm from the gaps")
+                dpg.add_button(label="Synth's", small=True, callback=lambda: set_tempo(app, bpm=float(getattr(app.syn, "bpm", 120))))
+                c.tip("the bpm of the sim's synthetic beat")
+                dpg.add_button(label="the file's", small=True, callback=lambda: beats_from_wav(app))
+                c.tip("the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file)")
+                form.inline("beats a bar")
+                num.add("seq_bar", 4, 1, 16, integer=True, width=px(60), callback=lambda s, v: _tempo_changed(app, bar=v))
+            with dpg.group(horizontal=True):
+                dpg.add_button(label="Snap lengths to bars", small=True, callback=lambda: snap_durations(app))
+                weight.need(dpg.last_item(), lambda a: _has_steps(a) and bool(_barlen(a)))
+                c.tip("every step's length rounded to whole bars, so the sequence changes on the music")
+                dpg.add_checkbox(label="drags on the beats", tag="seq_snap", default_value=True,
+                                 callback=lambda s, v: (_steps(app).__setitem__("snap", bool(v)), app.project.save()))
+                c.tip("a step's end dragged on the timeline lands on a beat (hold Alt for anywhere)")
+                form.inline("blend as")
+                dpg.add_combo(transition.STYLES, tag="seq_style", width=px(110), default_value="fade",
+                              callback=lambda s, v: (_steps(app).__setitem__("style", v), app.project.save()))
+                c.tip("the transition's style, previewed here; on the device the transitions use its own blend-style setting")
+                dpg.add_text("", tag="seq_tap", color=c.DIM)
+            with dpg.group(horizontal=True):
+                dpg.add_button(label="Render GIF", small=True, callback=lambda: render(app, "gif"))
+                weight.need(dpg.last_item(), _has_steps)
+                c.tip("plays the sequence once from the top and records it as a GIF, into captures/")
+                dpg.add_button(label="Render video...", small=True, callback=lambda: __import__("native.render_video", fromlist=["r"]).show(app))
+                weight.need(dpg.last_item(), _has_steps)
+                c.tip("the show made into an mp4, frame by frame at the size, rate and quality chosen, with its audio - "
+                      "into captures/; needs ffmpeg on the path")
+                dpg.add_button(label="Export FSEQ...", tag="seq_fseq", small=True,
+                               callback=lambda: __import__("native.render_fseq", fromlist=["r"]).show(app))
+                weight.need(dpg.last_item(), _has_steps)
+                c.tip("the show frame by frame into an FSEQ file for Falcon Player, with its audio beside it - FPP plays it "
+                      "to the controllers, WLED among them")
         dpg.add_separator()
         with dpg.group(horizontal=True):
             typeface.label(dpg.add_text("ON THE DEVICE", color=c.ACCENT))
@@ -615,6 +617,7 @@ def refresh(app):
     dpg.set_value("seq_snap", bool(S.get("snap", True)))
     has_tempo = bool(_barlen(app))
     dpg.configure_item("seq_step_card", show=bool(steps))
+    dpg.configure_item("seq_tools", show=bool(steps))
     dpg.configure_item("seq_dur_bars__num", show=has_tempo)          # a number field shows and hides by its group
     if 0 <= sel < len(steps):
         st = steps[sel]
