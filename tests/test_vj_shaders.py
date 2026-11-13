@@ -335,6 +335,48 @@ try:
 except ValueError:
     check(True, "a .py imported: refused")
 
+# --- the sampler: a large read on the graphics card, numpy's numbers; the blur's bits kept ------------------------
+def _numpy_sample(*args):
+    keep = vj_looks.GPU_SAMPLE_MIN
+    vj_looks.GPU_SAMPLE_MIN = 10 ** 9
+    try:
+        return vj_looks.sample(*args)
+    finally:
+        vj_looks.GPU_SAMPLE_MIN = keep
+
+
+rng_s = np.random.default_rng(11)
+worst, shapes_ok, on_card = 0.0, True, 0
+for (ih, iw, ic), (oh, ow) in (((72, 96, 3), (180, 320)), ((180, 320, 4), (180, 320)), ((97, 131, 3), (200, 300))):
+    img_s = rng_s.random((ih, iw, ic), dtype=np.float32)
+    uu_s, vv_s = np.meshgrid(np.linspace(-0.6, 1.7, ow, dtype=np.float32), np.linspace(-0.4, 1.5, oh, dtype=np.float32))
+    u_s = (uu_s + 0.05 * np.sin(vv_s * 9)).astype(np.float32)
+    v_s = (vv_s + 0.05 * np.cos(uu_s * 7)).astype(np.float32)
+    u_s[3, 5], v_s[7, 9], u_s[0, 0], v_s[0, 0], u_s[1, 1] = np.nan, np.inf, 1.0, 1.0, 0.0   # what a preset's divide makes
+    for wrap_s in (False, True):
+        for us, vs in ((u_s, v_s), (u_s.ravel()[:40001], v_s.ravel()[:40001])):     # a grid, and a list of points
+            want_s = _numpy_sample(img_s, us, vs, wrap_s)
+            on_card += vj_glsl.warp(img_s, us, vs, wrap_s) is not None
+            got_s = vj_looks.sample(img_s, us, vs, wrap_s)
+            shapes_ok = shapes_ok and got_s.shape == want_s.shape and got_s.dtype == np.float32 and got_s.flags.writeable
+            worst = max(worst, float(np.abs(got_s - want_s).max()))
+check(shapes_ok and worst < 1e-5, f"a large read through sample(): numpy's picture whoever worked it out (off by {worst:.1e} at most)")
+check(on_card == (12 if ok else 0), f"... the graphics card when there is one, numpy when not ({on_card} of 12 on the card)")
+small_s = rng_s.random((48, 64, 3), dtype=np.float32)
+gu_s, gv_s = np.meshgrid(np.linspace(0, 1, 64, dtype=np.float32), np.linspace(0, 1, 48, dtype=np.float32))
+check(np.array_equal(vj_looks.sample(small_s, gu_s, gv_s), _numpy_sample(small_s, gu_s, gv_s)),
+      "a small read is numpy's own, to the bit")
+same_b = True
+for shp_b in ((72, 96, 3), (270, 480, 3), (36, 64), (5, 7, 4)):
+    a_b = rng_s.random(shp_b, dtype=np.float32)
+    for n_b in (1, 3):
+        r_b = a_b
+        for _ in range(n_b):
+            r_b = (r_b + np.roll(r_b, 1, 0) + np.roll(r_b, -1, 0) + np.roll(r_b, 1, 1) + np.roll(r_b, -1, 1)) / 5.0
+        same_b = same_b and np.array_equal(vj_looks.blur(a_b, n_b), r_b) and vj_looks.blur(a_b, n_b).dtype == np.float32
+check(same_b, "blur: the five-point average round the edges, bit for bit what the rolled copies made")
+check(vj_looks.blur(np.arange(12, dtype=np.float64).reshape(3, 4)).dtype == np.float64, "blur of a picture that is not float32: as before")
+
 # --- the phone's VJ commands -----------------------------------------------------------------------
 check(phone.check({"a": "vjlevel", "d": 2, "v": 0.5}) == {"a": "vjlevel", "d": 2, "v": 0.5}, "a deck's level")
 check(phone.check({"a": "vjlook", "d": 1, "v": "Plasma"}) == {"a": "vjlook", "d": 1, "v": "Plasma"}, "a deck's look")

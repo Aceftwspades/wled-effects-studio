@@ -101,10 +101,23 @@ def _wrap(x, n):
     return r
 
 
+GPU_SAMPLE_MIN = 16000              # sample(): pixels read from which the graphics card is asked - past 128 x 96,
+#                                     where numpy (0.8 ms) and the card with its upload and read-back are level;
+#                                     192 x 108 is 2.1 against 1.0 ms, 256 x 256 5.5 against 1.9
+
+
 def sample(img, u, v, wrap=False):
     """img (h, w, c) read at u, v (0..1, arrays), bilinear; clamped at the edges (or wrapped). Float32 in, float32
     out: the four corners gathered from the image as rows of a flat (h * w, c) array, which is twice as quick as
-    indexing it by (y, x) - and the old sum of an int32 and a float32 made every video look's frame float64."""
+    indexing it by (y, x) - and the old sum of an int32 and a float32 made every video look's frame float64.
+    A large read (GPU_SAMPLE_MIN pixels and up, of a float picture of 3 or 4 channels, at a grid or a list of points) is the
+    graphics card's where there is one free (vj_glsl.warp): the same numbers to a rounding, 4-5 times as quick."""
+    if (np.size(u) >= GPU_SAMPLE_MIN and np.ndim(u) in (1, 2) and img.ndim == 3 and img.shape[2] in (3, 4)
+            and img.dtype == np.float32 and np.shape(u) == np.shape(v)):
+        from native import vj_glsl
+        got = vj_glsl.warp(img, u, v, wrap)
+        if got is not None:
+            return got
     h, w = img.shape[:2]
     flat = img.reshape(h * w, -1)
     if flat.dtype.kind != "f":
@@ -150,8 +163,21 @@ def hsv(hh, s, v):
 
 
 def blur(img, n=1):
+    """A pixel and its four neighbours (round the edges), averaged, `n` times. A float32 picture's neighbours are
+    added into one copy of it, in the order the four np.roll copies were (the same bits): a quarter of the time
+    at 640 x 360 (8.5 -> 2.2 ms), where the copies no longer fitted the processor's cache."""
+    if getattr(img, "dtype", None) != np.float32 or img.ndim < 2:
+        for _ in range(n):
+            img = (img + np.roll(img, 1, 0) + np.roll(img, -1, 0) + np.roll(img, 1, 1) + np.roll(img, -1, 1)) / 5.0
+        return img
     for _ in range(n):
-        img = (img + np.roll(img, 1, 0) + np.roll(img, -1, 0) + np.roll(img, 1, 1) + np.roll(img, -1, 1)) / 5.0
+        out = img.copy()
+        out[1:] += img[:-1]; out[:1] += img[-1:]                  # the row above (the last, for the first)
+        out[:-1] += img[1:]; out[-1:] += img[:1]                  # the row below
+        out[:, 1:] += img[:, :-1]; out[:, :1] += img[:, -1:]      # the column to the left
+        out[:, :-1] += img[:, 1:]; out[:, -1:] += img[:, :1]      # ... and to the right
+        out /= 5.0
+        img = out
     return img
 
 

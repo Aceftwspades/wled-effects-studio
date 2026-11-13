@@ -186,3 +186,22 @@ browser open (eleven packs installed: 128 looks).
       settings (0.8 ms); two files looked for (the capture's and the remote's requests, 0.2 ms). The loops over every dialog, frame and menu ask the list the holes keep (`AppLayout.window_shown`): 80 -> 31 questions a frame, 0.96 -> 0.49 ms. The pointer's LED is only worked out with the pointer over a view (the 1.2 ms was that, not a fixed cost) - left; the two files left (the tests wait on them).
 - [-] Not worth it: Voronoi's sort as a partition (0.67 ms either way); the flames (2 ms of their own a frame,
       no one place).
+
+## 11. Large canvases: what section 4 and 6 left, measured again from 192 x 108 to 640 x 360
+- [x] **The bilinear sampler on the graphics card** for a large read (`vj_glsl.warp`, asked by `vj_looks.sample` from
+      16,000 pixels): MilkDrop's feedback warp, its echo and textured shapes, every video look, the Drop looks.
+      Section 6 left it as "would add the GPU's wait" - that wait was the MD2 shaders' own work; a plain warp, its
+      upload and read-back included, is 1.0 against 2.1 ms at 192 x 108, 1.9 against 5.5 at 256 x 256, 6.9 against
+      30.7 at 640 x 360 (Intel UHD 630), the same numbers to 6e-8. Numpy still below 16,000 pixels (it is quicker
+      there), with no OpenGL, and while the card is busy with a deck's shader. The Drop looks at 640 x 360:
+      89 -> 51 ms beside a second deck; the 23 presets 170 -> 131.
+- [x] **blur** (the Drop looks' and others' five-point average): one copy added into, not four rolled copies -
+      bit for bit, 8.5 -> 2.2 ms at 640 x 360.
+- [-] **Shaders read back a frame late**: as section 4 found. At 640 x 360 a Shadertoy look's 15 ms is the card
+      drawing it, on its own thread, a frame behind; what holds the studio is moderngl keeping Python's lock while
+      it waits, which a later read-back does not change on this driver.
+- [-] **MilkDrop's per-pixel equations on the GPU**: a 32 x 24 mesh whatever the canvas - still not among the costs.
+- [ ] **Next in a large MilkDrop frame** (Berry maddog, 480 x 270, 67 ms): the shapes' own work (`_shapes`, `_reach`:
+      15 ms), `_borders` (5 ms: a blend over a 3-wide axis for a band a few pixels wide), `draw`'s own 5 ms.
+- [ ] **Canvases past 256 a side** are not offered (`vj.canvas_size` clamps); with the above 320 x 180 is 9 ms for a
+      Drop look - whether to offer it is the user's call.
