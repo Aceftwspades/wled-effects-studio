@@ -14,6 +14,9 @@ import numpy as np
 
 from native import clock, geometry, vj, vj_looks, vj_state, seq_state
 
+vj_looks.seed(20261112)                                # the looks' chance the same each run: a check of a flame's
+#                                                        picture failed one run in forty on the throw of its points
+
 fails = []
 
 
@@ -1059,6 +1062,18 @@ check(all(k in vj.PRESET_KEYS for k in ("text_move", "text_size", "text_x", "tex
       any(k == "text_x" for k, _, _ in vj.KNOBS), "the text's knobs kept in presets, and MIDI and the modulators move them")
 
 # --- flames: the classic fractals, morphs between a flame and its child, drift, knobs, edits --------------------
+def _seeded(name, n, frames=6):
+    vj_looks.seed(n)
+    st_, img_ = {}, None
+    for _ in range(frames):
+        img_ = np.array(vj_looks.LOOKS[name].draw(ctx_of(w=96, h=72), st_))
+    return img_
+
+
+for n in ("Flame: Sierpinski", "Flame: Dragon", "Starfield"):
+    a_, b_, c_ = _seeded(n, 7), _seeded(n, 7), _seeded(n, 8)
+    check(np.array_equal(a_, b_) and not np.array_equal(a_, c_), f"{n}: the same picture from the same seed, another from another")
+vj_looks.seed(20261112)
 for n in ("Flame: Sierpinski", "Flame: Sierpinski Carpet", "Flame: Fern", "Flame: Dragon", "Flame: Sierpinski Star"):
     st = {}
     for _ in range(25):

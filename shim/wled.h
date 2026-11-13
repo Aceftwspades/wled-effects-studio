@@ -38,6 +38,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <cmath>                   // std::abs of a float (WLED's 1-D effects): a newer libc++ - Emscripten's on CI -
+#include <cstdlib>                 // has it in std only through these two, not through math.h and stdlib.h
 #include <utility>                 // std::swap, used by WLED's soapPixels
 #include <algorithm>
 using std::min;
