@@ -1066,7 +1066,9 @@ for n in ("Flame: Sierpinski", "Flame: Sierpinski Carpet", "Flame: Fern", "Flame
     check(0.1 < float((img.max(axis=2) > 0.1).mean()) < 0.8, f"{n} draws, filling some of the canvas and not all")
 st = {}
 for _ in range(25):
-    img = vj_looks.LOOKS["Flame: Sierpinski"].draw(ctx_of(w=96, h=72, deck={"fl_spin": 0.0}), st)
+    # no bass and no turn: at() below is the figure unswollen and unturned (with them a corner sat a pixel or two off
+    # the 3 x 3 looked at, one run in forty)
+    img = vj_looks.LOOKS["Flame: Sierpinski"].draw(ctx_of(w=96, h=72, deck={"fl_spin": 0.0}, bass=0.0, t=0.0), st)
 cx, cy, ext = st["frame"]
 zoom = (0.55 + 0.5 * 0.6) / ext
 
