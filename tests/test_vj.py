@@ -1061,6 +1061,70 @@ for mv, _ in vj_looks.TEXT_MOVES:
 check(all(k in vj.PRESET_KEYS for k in ("text_move", "text_size", "text_x", "text_y", "text_glow")) and
       any(k == "text_x" for k, _, _ in vj.KNOBS), "the text's knobs kept in presets, and MIDI and the modulators move them")
 
+# --- decks copied, swapped and reset; the canvas that fits the shape; the keyboard's actions ---------------------
+class _Geo:
+    def __init__(self, w, h):
+        self.w, self.h = w, h
+
+
+class _EaseProj:
+    def __init__(self):
+        self.options, self.geometry, self.saved = {}, _Geo(128, 32), 0
+
+    def save(self):
+        self.saved += 1
+
+
+class _EaseApp:
+    def __init__(self):
+        self.project = _EaseProj()
+
+
+ea = _EaseApp()
+eo = vj.options(ea)
+eo["decks"][0].update(look="Tunnel", amount=0.9, hue=0.3, kaleido=6, colours="sunset")
+eo["decks"][2]["level"] = 0.25
+check(vj.copy_deck(ea, 0, 1) and vj.options(ea)["decks"][1]["look"] == "Tunnel" and vj.options(ea)["decks"][1]["hue"] == 0.3
+      and vj.options(ea)["decks"][1] is not vj.options(ea)["decks"][0], "a deck copied onto another: its twin, not the same dict")
+vj.copy_deck(ea, 0, 2)
+check(vj.options(ea)["decks"][2]["look"] == "Tunnel" and vj.options(ea)["decks"][2]["level"] == 0.25,
+      "copied onto deck C: C keeps its own level")
+check(vj.copy_deck(ea, 1, 1) is False, "a deck onto itself: nothing")
+eo = vj.options(ea)
+eo["decks"][1].update(look="Plasma")
+eo["fader"], eo["sel"] = 0.25, 0
+ra, rb = vj._runs(ea)[0], vj._runs(ea)[1]
+vj_state.of(ea).sweep = (10.0, 2.0, 0.25, 1.0)
+vj.swap_decks(ea)
+eo = vj.options(ea)
+check(eo["decks"][0]["look"] == "Plasma" and eo["decks"][1]["look"] == "Tunnel" and abs(eo["fader"] - 0.75) < 1e-9,
+      "A and B swapped, the crossfader with them: the picture on air the same")
+check(vj._runs(ea)[0] is rb and vj._runs(ea)[1] is ra and eo["sel"] == 1 and vj_state.of(ea).sweep == (10.0, 2.0, 0.75, 0.0),
+      "... what each deck had running, the selection and a fade in flight go with their deck")
+vj_state.of(ea).sweep = None
+d1 = eo["decks"][1]
+d1.update(fl_sym=5, lk1=0.9, lk_look="Tunnel", text="HELLO", trails=0.7, speed=2.0)
+vj.reset_deck(ea, 1)
+d1 = vj.options(ea)["decks"][1]
+check(d1["look"] == "Tunnel" and d1["colours"] == "sunset" and d1["text"] == "HELLO" and d1["amount"] == vj.DECK["amount"]
+      and d1["hue"] == 0.0 and d1["kaleido"] == 0 and d1["trails"] == 0.0 and d1["speed"] == 1.0 and d1["fl_sym"] == vj.FLAME_KNOBS["fl_sym"]
+      and d1["lk_look"] == "", "a deck reset: its knobs a new deck's, its look, colours and words kept")
+check([vj.fit_canvas(*g) for g in ((128, 32), (48, 48), (300, 1), (8, 64), (256, 128), (1, 1))] ==
+      [(128, 32), (56, 56), (112, 32), (32, 112), (208, 104), (56, 56)],
+      "the canvas that fits a shape: its proportions, a pixel an LED or more, within the choices' sizes")
+check(all(16 <= s <= 256 and s % vj.AUTO_STEP == 0 for g in ((1000, 1), (1, 1000), (500, 500), (3, 2)) for s in vj.fit_canvas(*g)),
+      "... each side a multiple of eight from 16 to 256, whatever the shape")
+vj.options(ea)["canvas"] = "auto"
+check(vj.canvas_size(ea) == (128, 32) and dict(vj.CANVASES)["auto"] == "fits the shape", "canvas \"auto\": the project's shape's")
+ea.project.geometry = _Geo(48, 48)
+check(vj.canvas_size(ea) == (56, 56), "... another shape: its canvas")
+from native import keys as _keys
+acts = {a: (b, cx) for a, _, b, cx in _keys.ACTIONS}
+check(all("vj_" + k in acts for k in ("on", "cut", "fade", "blackout", "freeze", "deck_a", "deck_b", "deck_c", "deck_next",
+                                       "shuffle", "swap", "browse")), "the keyboard's VJ actions are in the keymap")
+bound = [(b, cx) for b, cx in acts.values() if b]
+check(len(bound) == len(set(bound)), "no two actions on one key in one place")
+
 # --- flames: the classic fractals, morphs between a flame and its child, drift, knobs, edits --------------------
 def _seeded(name, n, frames=6):
     vj_looks.seed(n)

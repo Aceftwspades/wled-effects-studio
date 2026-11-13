@@ -546,6 +546,9 @@ class AppInput:
             "outputs":      lambda: device_ui.show(self, "outputs"),
             "audioin":      lambda: device_ui.show(self, "audioin"),
             "pads":         lambda: device_ui.show(self, "pads"),
+            **{"vj_" + k: (lambda k=k: __import__("native.vj_ui", fromlist=["x"]).key_action(self, k))
+               for k in ("on", "cut", "fade", "blackout", "freeze", "deck_a", "deck_b", "deck_c", "deck_next",
+                         "shuffle", "swap", "browse")},
             "modulators":   lambda: device_ui.show(self, "modulators"),
             "mixer":        lambda: device_ui.show(self, "mixer"),
             "randomise":    self.randomise,

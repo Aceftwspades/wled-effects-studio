@@ -205,3 +205,15 @@ browser open (eleven packs installed: 128 looks).
       15 ms), `_borders` (5 ms: a blend over a 3-wide axis for a band a few pixels wide), `draw`'s own 5 ms.
 - [ ] **Canvases past 256 a side** are not offered (`vj.canvas_size` clamps); with the above 320 x 180 is 9 ms for a
       Drop look - whether to offer it is the user's call.
+
+## 12. The VJ: quicker to set up, easier under the hand
+- [x] **A canvas that fits the shape** (`vj.fit_canvas`, the canvas list's first choice): the shape's proportions,
+      a pixel or more an LED, within the sizes the list has. The default is still 96 x 72 - a project's picture
+      does not change under it.
+- [x] **A deck copied onto another, A and B swapped, a deck's knobs put back** (`vj.copy_deck`, `swap_decks`,
+      `reset_deck`; **Deck** in a deck's header). A swap takes the crossfader, what each deck has running, the
+      selection and a fade in flight with it: the picture on air is the same.
+- [x] **A click on a deck's picture selects it** - it was a pad's or a MIDI control's to do.
+- [x] **Keys for the desk** (`keys.py`'s `vj_*`): on air, cut, fade, blackout, freeze, the decks, shuffle, the browser.
+- [ ] **Not done, worth asking about**: "fits the shape" as a new project's default; a first-run strip that says
+      what to press; drag a look's thumbnail onto a deck; a deck's knob put back by a double-click.

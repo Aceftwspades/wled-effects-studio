@@ -689,6 +689,56 @@ def check_clip_strip(app, bad):
     app.send([{"py": f"{P}._set_edit(app, False)"}, {"py": "chrome.close_dialog('pads_win')"}], 0.4)
 
 
+def check_vj_deck(app, bad):
+    """The VJ frame with the mouse: a click on deck B's picture selects it; deck A's Deck menu opens on a click and
+    its Copy, Swap and Reset do what they say; the keyboard's actions reach the desk."""
+    V = "__import__('native.vj', fromlist=['v'])"
+    U = "__import__('native.vj_ui', fromlist=['v'])"
+    app.send([{"frame": "vj"}], 1.5)
+    app.send([{"py": f"({V}.options(app)['decks'][0].update(look='Tunnel', hue=0.3), {V}.options(app)['decks'][1].update(look='Plasma'), "
+                     f"{V}.options(app).update(fader=0.25, sel=0), {U}.refresh(app))"}], 0.8)
+
+    def centre(tag):
+        r = app.rect(tag)
+        return None if not r else (r[0] + r[2] // 2, r[1] + r[3] // 2)
+
+    p = centre("vj_pv1")
+    if not p:
+        bad.append("deck B's picture is not shown")
+        return
+    app.click(*p)
+    time.sleep(0.4)
+    if app.ask(f"{V}.selected(app)") != 1:
+        bad.append(f"a click on deck B's picture: deck {app.ask(V + '.selected(app)')} selected")
+    for item, expr, want, what in (
+            ("vj_copy0_1", f"[{V}.options(app)['decks'][1][k] for k in ('look', 'hue')]", ["Tunnel", 0.3], "Copy to deck B"),
+            ("vj_swap0", f"round({V}.options(app)['fader'], 2)", 0.75, "Swap with deck B"),
+            ("vj_reset0", f"{V}.options(app)['decks'][0]['hue']", 0.0, "Reset its knobs")):
+        b = centre("vj_more0")
+        if not b:
+            bad.append("deck A has no Deck button")
+            return
+        app.click(*b)
+        time.sleep(0.5)
+        m = centre(item)
+        if not m:
+            bad.append(f"the Deck menu, clicked: no {what}")
+            continue
+        app.click(*m)
+        time.sleep(0.5)
+        got = app.ask(expr)
+        if got != want:
+            bad.append(f"{what}, clicked: {got}, not {want}")
+        if app.ask("dpg.is_item_shown('vj_morepop0')"):
+            bad.append(f"{what}, clicked: the menu stayed open")
+    for what, expr, want in (("blackout", "vj_state.of(app).blackout", True), ("blackout", "vj_state.of(app).blackout", False),
+                             ("deck_c", f"{V}.selected(app)", 2), ("cut", f"{V}.options(app)['fader'] in (0.0, 1.0)", True)):
+        app.send([{"py": f"app.run_action('vj_{what}')"}], 0.4)
+        if app.ask(expr) != want:
+            bad.append(f"the keyboard's vj_{what}: {app.ask(expr)}, not {want}")
+    app.send([{"py": f"({V}.select_deck(app, 0), {U}.refresh(app))"}, {"frame_close": "vj"}], 0.5)
+
+
 def main():
     if os.name != "nt":
         print("pointer: Windows only (it posts mouse messages to the studio's window)")
@@ -700,6 +750,7 @@ def main():
     try:
         app.start()
         for name, fn in (("a clip's In and Out dragged", lambda: check_clip_strip(app, bad)),   # (first: nothing over it)
+                         ("the VJ's decks by the mouse", lambda: check_vj_deck(app, bad)),
                          ("frame", lambda: check_frame(app, bad)), ("add menu", lambda: check_add_menu(app, bad)),
                          ("properties, panel open", lambda: check_properties(app, bad, "open_panel")),
                          ("properties, panel folded", lambda: check_properties(app, bad, "fold_panel")),
