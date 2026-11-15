@@ -1845,6 +1845,8 @@ def poll(app):
     _flush_save(app)
     if not dpg.does_item_exist(TAG):
         return
+    from native import vj_packs_ui
+    vj_packs_ui.poll(app)                                     # (which pack "Install every pack" is on)
     shown = dpg.is_item_shown(TAG)
     if not (vj.on(app) or shown):
         if vj_state.of(app).open:

@@ -204,6 +204,35 @@ def install(pack, files=None):
     return done
 
 
+def missing(packs, noncommercial=False):
+    """What "install every pack" would fetch: [(pack, [its files not here, or not the gallery's now])] for each
+    pack with any - the non-commercial packs (CC BY-NC-SA: not for paid work) only when asked for."""
+    out = []
+    for pk in packs:
+        if pk.noncommercial and not noncommercial:
+            continue
+        files = [f for f, s in state(pk).items() if s != "installed"]
+        if files:
+            out.append((pk, files))
+    return out
+
+
+def install_missing(packs, noncommercial=False, said=None):
+    """Every pack's missing looks installed, a pack at a time (`said(pack, k, n)` before each): (looks installed,
+    packs touched, the first error or ""). It stops at the first pack that fails - the ones before it are kept."""
+    todo = missing(packs, noncommercial)
+    looks = done = 0
+    for k, (pk, files) in enumerate(todo):
+        if said:
+            said(pk, k, len(todo))
+        try:
+            looks += len(install(pk, files))
+        except gallery.GalleryError as e:
+            return looks, done, f"{pk.name}: {e}"
+        done += 1
+    return looks, done, ""
+
+
 def _write_meta(pack, d):
     here = [i for i in pack.items if os.path.isfile(os.path.join(d, i.file))]
     if not here and not os.listdir(d):

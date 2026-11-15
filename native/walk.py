@@ -256,7 +256,8 @@ SKIP_BUTTON_TAGS = ("shader_make", "gal_page", "gal_s_go", "flash_start", "shape
                     "map_cam_find", "map_calib", "map_live",  # the webcam: a camera turned on is not a test's to do
                     "geom_read_wiring",                   # a real device's wiring read: the smoke reads the fake's
                     "flash_ports_refresh",                # the serial ports: a board plugged in is not a test's to probe
-                    "history_switch")                     # its rows would put the walked project's settings back: the smoke does, in its own
+                    "history_switch",                     # its rows would put the walked project's settings back: the smoke does, in its own
+                    "vj_pk_all")                          # every pack of the gallery fetched onto this computer: not a walk's to do
 SKIP_BUTTON = ("Clone", "Download", "Get the WLED fork", "Restart the studio", "Restart now", "Open in the browser", "Open the build folder", "Reboot the device",
                "Open the folder", "Scan the network", "Import the device's", "Generate previews", "Remake the thumbnails",
                "Render GIF", "Render video", "press a key", "Release page", "Pop out", "Quit", "Usermods...",

@@ -126,6 +126,30 @@ def test_install_one_look_then_the_rest_then_remove():
     _with_packs(check)
 
 
+def test_every_pack_at_once_leaves_the_non_commercial_unless_asked():
+    def check(d):
+        packs = addons.fetch_packs()
+        assert [p.noncommercial for p in packs] == [False, True]
+        assert [(p.id, f) for p, f in addons.missing(packs)] == [("test-milk", ["Spin one.milk", "Spin two.milk"])]
+        assert [p.id for p, _ in addons.missing(packs, True)] == ["test-milk", "test-toy-nc"]
+        addons.install(packs[0], ["Spin one.milk"])                      # one here already: only the other is fetched
+        said = []
+        assert addons.install_missing(packs, False, lambda pk, k, n: said.append((pk.id, k, n))) == (1, 1, "")
+        assert said == [("test-milk", 0, 1)] and list(addons.installed()) == ["test-milk"]
+        assert addons.missing(packs) == [] and addons.install_missing(packs) == (0, 0, "")
+        assert addons.install_missing(packs, True) == (1, 1, "") and sorted(addons.installed()) == ["test-milk", "test-toy-nc"]
+        assert addons.missing(packs, True) == []
+        # a look changed here is one of the missing; a pack that fails stops it, the ones before kept
+        with open(os.path.join(addons.root(), "test-milk", "Spin two.milk"), "ab") as fh:
+            fh.write(b"// changed here\n")
+        assert [(p.id, f) for p, f in addons.missing(packs)] == [("test-milk", ["Spin two.milk"])]
+        addons.remove("test-toy-nc")
+        os.remove(os.path.join(d, "looks", "test-toy-nc", "Test rings by someone.glsl"))
+        looks, n, err = addons.install_missing(packs, True)
+        assert (looks, n) == (1, 1) and err.startswith("Test: toys:") and set(addons.state(packs[0]).values()) == {"installed"}
+    _with_packs(check)
+
+
 def test_a_file_that_is_not_the_lists_is_refused():
     def check(d):
         pk = addons.fetch_packs()[0]

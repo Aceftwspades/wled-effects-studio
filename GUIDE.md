@@ -1239,7 +1239,9 @@ looks the [gallery](https://github.com/Aceftwspades/wled-effects-gallery)
 offers: MilkDrop presets and Shadertoy shaders in themes - tunnels,
 kaleidoscopes, liquid and fire, shapes and waves, raymarched worlds,
 colour, patterns - each with a picture of its looks, what it is and its
-licence. **Install all** fetches a pack, **Install** one look of it;
+licence. **Install every pack**, at the top, fetches all of them at once -
+without the packs marked non-commercial unless **the non-commercial ones
+too** beside it is ticked. **Install all** fetches a pack, **Install** one look of it;
 **Update** fetches the ones the gallery has changed; **Remove the pack**
 and **Remove** (one look) take them off again; **Look again** fetches the
 gallery's list anew. Installed looks are the studio's, for
