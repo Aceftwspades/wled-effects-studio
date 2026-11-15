@@ -4636,6 +4636,10 @@ graphics card, the VJ's canvas that fits the shape, a deck copied, swapped or re
 browser build mended (std::abs under CI's Emscripten: <cmath> in both shim headers; the pages workflow passes
 again). The gallery beside it gained seven packs of looks (30 written for the studio, 22 MilkDrop presets).
 
+Released as 1.25.1 (2026-11-15): the Packs dialog's Install every pack, and the tick beside it for the
+non-commercial packs. The gallery's Supernova & dancers lost two presets it already had under the same names
+(Hold candle to, the same file; Burnt Ice, of which the gallery has an edit), and its check refuses such a pair.
+
 ### From the second feature review (October 2026)
 
 The studio set again beside the software it shares ground with (2026-10-22),
