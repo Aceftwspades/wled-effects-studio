@@ -4631,6 +4631,11 @@ music, File > New live show project, Pads, Modulators, Mixer and MIDI as frames,
 frame's time goes, and the state, file-splitting and speed work listed there. The tag's first run failed its Windows
 job on a flaky check of test_vj (the flames' swell; fixed after the tag) and passed when run again.
 
+Released as 1.25.0 (2026-11-15): ROADMAP.md's sections 11 and 12 and the last of 8 - the sampler's large reads on the
+graphics card, the VJ's canvas that fits the shape, a deck copied, swapped or reset, keys for the desk - and the
+browser build mended (std::abs under CI's Emscripten: <cmath> in both shim headers; the pages workflow passes
+again). The gallery beside it gained seven packs of looks (30 written for the studio, 22 MilkDrop presets).
+
 ### From the second feature review (October 2026)
 
 The studio set again beside the software it shares ground with (2026-10-22),
