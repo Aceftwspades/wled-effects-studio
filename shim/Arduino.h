@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
+#include <cmath>                   // std::abs of a float (wled_math.cpp): a newer libc++ - Emscripten's on CI - has
+#include <cstdlib>                 // it in std only through these two, as shim/wled.h says
 #include <algorithm>
 #include "pgmspace.h"
 
