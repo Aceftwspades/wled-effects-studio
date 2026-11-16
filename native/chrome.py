@@ -2464,7 +2464,7 @@ def get_update(app):
 
     def work():
         try:
-            path = update.download(u["asset"], prog)
+            path = update.download(u["asset"], prog, digest=u.get("digest"))
             app._update_progress = ("ready: closing to update..." if update.can_apply() else f"downloaded: {path}")
             app._update_zip = path
         except Exception as e:
