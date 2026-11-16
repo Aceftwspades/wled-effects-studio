@@ -190,6 +190,15 @@ def boundary_def(base, n):
         elif t == "bool":   d["code"] = "$out.value = $p.default > 0.5f;"
         elif t == "vector": d["code"] = "$out.value = gc_v3($p.default, $p.default, $p.default);"
         else:               d["code"] = "$out.value = mq_scale(0xFFFFFFu, (uint8_t)(gc_sat($p.default) * 255.0f));"
+        v = n.get("params", {}).get("default")
+        if t in ("vector", "color") and isinstance(v, (list, tuple)) and v:
+            # a vector or colour typed on the sub node's unwired pin (flatten, unfold: _boundary) is the value
+            # whole - the float `default` setting gave only its first component, the same in x, y and z
+            if t == "vector":
+                x, y, z = (float(c) for c in (list(v) + [0, 0, 0])[:3])
+                d["code"] = f"$out.value = gc_v3({x}f, {y}f, {z}f);"
+            else:
+                d["code"] = f"$out.value = {_lit('color', v)};"
     else:
         d["inputs"] = [{"name": "value", "type": t, "default": 0}]
     return d
