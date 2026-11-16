@@ -252,14 +252,20 @@ def dependency_files(keys):
     return out
 
 
-def install_dependency_files(files):
-    """Bundled firmware files into this tree, where the tree lacks them.
-    Returns the paths written."""
+def install_dependency_files(files, keys=None):
+    """Bundled firmware files into this tree, where the tree lacks them: only the files the features `keys` (all
+    of them with None) are made of, as DEPENDENCIES names them - a bundle could name any file under usermods/
+    (another usermod's source, a library.json that pulls in a package) and it was written. Returns the paths
+    written."""
+    allowed = {f.replace("\\", "/") for k in (DEPENDENCIES if keys is None else keys)
+               for f in DEPENDENCIES.get(k, {}).get("files", [])}
     written = []
     for rel, text in (files or {}).items():
+        if not isinstance(rel, str) or not isinstance(text, str):
+            continue
         rel = rel.replace("\\", "/")
-        if not rel.startswith("usermods/") or ".." in rel:
-            continue                                    # only usermod sources, only under usermods/
+        if rel not in allowed or not rel.startswith("usermods/") or ".." in rel:
+            continue                                    # only the features' own usermod sources
         p = os.path.join(ROOT, *rel.split("/"))
         if os.path.exists(p):
             continue

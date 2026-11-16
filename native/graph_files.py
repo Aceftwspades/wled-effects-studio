@@ -204,7 +204,7 @@ class GraphFiles:
                 + "?")
 
         def enable():
-            written = flash.install_dependency_files(files)
+            written = flash.install_dependency_files(files, missing)
             for k in sorted(missing):
                 self.app.set_feature(k, "stock" if k == "audio" else True)
             self.status(f"features on: {', '.join(sorted(missing))}" + (f"; installed {', '.join(written)}" if written else ""))
