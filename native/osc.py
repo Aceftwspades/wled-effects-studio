@@ -198,10 +198,19 @@ class OscIn:
         """A message as if a sender sent it: the tests' and a hook's."""
         self.feed(message(address, *args))
 
+    DRAIN_MAX = 256                      # events a frame taken one by one; past it, each control's newest only
+
     def drain(self):
-        """Everything since the last call, oldest first: [(ctl, fraction)]."""
+        """Everything since the last call, oldest first: [(ctl, fraction)]. A flood (a sender looping, a fader
+        sending thousands a second) put up to the whole queue onto the main thread each frame, every one acted on,
+        and the window stalled: past DRAIN_MAX it is each control's newest value, in the order they came."""
         with self._lock:
             out = list(self._q); self._q.clear()
+        if len(out) > self.DRAIN_MAX:
+            newest = {}
+            for k, (ctl, v) in enumerate(out):
+                newest[ctl] = (k, v)
+            out = [(ctl, v) for ctl, (k, v) in sorted(newest.items(), key=lambda kv: kv[1][0])]
         if out:
             self.last = (out[-1][0], out[-1][1], time.time())
         return out

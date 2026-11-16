@@ -658,12 +658,18 @@ def _replug(app, m, now=None):
         pads_hw.let_go_held(app)
         app.gp.status(f"MIDI: {m.port} is gone (unplugged?) - opened again when it is back", "warn")
     elif there and state(app).gone:
-        state(app).gone = False
+        name = m.port
         try:
-            m.open(m.port)
-            app.gp.status(f"MIDI: {m.port} is back")
+            m.open(name)
         except Exception:
+            # listed before it will open (a controller still starting up): tried again in REPLUG_S - marked back
+            # first, a failed open was never retried and the controller stayed dead. (m.open closed the old port
+            # and cleared the name: kept, so the next look knows which port to wait for.)
             oops.swallowed()
+            m.port = name
+            return
+        state(app).gone = False
+        app.gp.status(f"MIDI: {name} is back")
 
 
 def poll(app):
