@@ -52,6 +52,16 @@ v = {"x": np.array([0.2, 0.7, 1.5])}
 milk.compile_code("y = if(above(x, .5), x * 2, 0); z = x % 2; megabuf(1) = 5; m = megabuf(1)")(v)
 check(np.allclose(v["y"], [0, 1.4, 3.0]) and np.allclose(v["z"], [0, 0, 1]) and v["m"] == 5.0,
       "per-pixel: if() by point, % on a grid, megabuf")
+# per-pixel memory and registers over a grid of rows and columns, and an expression past Python's nesting
+v = {"x": np.array([[0.1, 0.2], [0.3, 0.4]]), "y": np.array([[1.0, 2.0], [3.0, 4.0]])}
+milk.compile_code("megabuf(x * 10) = y; m = megabuf(4); reg05 = x; z = reg05 * 2")(v)
+f = {}
+milk.compile_code("b = reg05 + 1")(f)
+check(np.allclose(v["z"], v["x"] * 2) and float(np.max(v["m"])) == 4.0 and abs(f["b"] - 1.4) < 1e-9,
+      f"per-pixel megabuf writes on a grid; a register written per pixel is the last pixel's after ({f})")
+f = {}
+milk.compile_code("a = " + "+".join(["1"] * 1000) + "; b = 10 - 2 - 3 + 1; c = 2 * 3 * 4 - 1 * 2; d = 2 - 3 * 4 - 5")(f)
+check((f["a"], f["b"], f["c"], f["d"]) == (1000.0, 6.0, 22.0, -15.0), f"a 1000-term sum loads, chains keep their order ({f})")
 check(milk._carried("it = (it + 1)*above(sample,0); sw = (1-sw); x = sw") and milk._carried("n += 1; y = n")
       and not milk._carried("ti = q1; xa = sin(ti*t1); x = xa*sample") and not milk._carried("x = sample; x = x * 2"),
       "per-point code handing a value to the next point found (it runs point by point)")

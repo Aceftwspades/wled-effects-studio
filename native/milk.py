@@ -173,6 +173,7 @@ class _Parser:
     def expr(self, prec):
         """Precedence climbing: operators at least `prec` bind here; ^ to the right, the rest to the left."""
         left = self.unary()
+        fam_was = None                       # the operators `left` is a chain of, when this loop made it
         while True:
             kind, op = self.peek()
             if kind != "op" or op not in _BIN or _BIN[op] < prec:
@@ -180,7 +181,15 @@ class _Parser:
             p = _BIN[op]
             self.take()
             right = self.expr(p if op == "^" else p + 1)
-            left = _binop(op, left, right)
+            # a chain of + and - (or of *) stays one pair of brackets, (a + b - c), which Python reads left to
+            # right as ((a + b) - c): a bracket each made 300 terms more than Python's 200 levels of nesting,
+            # and the preset did not load
+            fam = "+-" if op in ("+", "-") else ("*" if op == "*" else None)
+            if fam is not None and fam == fam_was:
+                left = f"({left[1:-1]} {op} {right})"
+            else:
+                left = _binop(op, left, right)
+            fam_was = fam
         return left
 
     def unary(self):
@@ -513,8 +522,12 @@ def _mb(mem, i):
 
 def _mbs(mem, i, x):
     if isinstance(i, np.ndarray) or isinstance(x, np.ndarray):
-        ii = np.broadcast_to(np.asarray(i, np.float64), np.shape(x) if np.ndim(x) else np.shape(i)).ravel()
-        xx = np.broadcast_to(np.asarray(x, np.float64), ii.shape).ravel()
+        # matched up as numpy matches them, then flattened: flattening the index first refused every write on a
+        # grid of rows and columns (a per-pixel megabuf(x*4) = y raised each frame)
+        try:
+            ii, xx = (q.ravel() for q in np.broadcast_arrays(np.asarray(i, np.float64), np.asarray(x, np.float64)))
+        except ValueError:
+            return x                                     # shapes that do not match: nothing written
         for j, val in zip(ii, xx):
             k = _slot(j)
             if k >= 0:
@@ -585,7 +598,17 @@ def compile_code(src, what="equations", mem=None):
     def safe(v):
         with np.errstate(all="ignore"):
             run(v)
+        _settle_regs()
     return safe
+
+
+def _settle_regs():
+    """reg00..reg99 written by a block run over every pixel (or point) at once hold a value a pixel: MilkDrop runs
+    the pixels one after another, so what stays is the last one's. Left an array, the per-frame equations then
+    read it, their values became arrays too, and the frame broke on them."""
+    for k, x in list(_REG.items()):
+        if isinstance(x, np.ndarray):
+            _REG[k] = float(x.reshape(-1)[-1]) if x.size else 0.0
 
 
 # --- the file --------------------------------------------------------------------------------------
