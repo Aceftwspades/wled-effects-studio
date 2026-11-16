@@ -238,6 +238,7 @@ def trust_words(kind, name):
     An Expression node's text and a node of the file's own are C++ as written, and a project's effects are C++
     files - built, which happens as it opens, they run on this computer with the user's own rights."""
     what = {"graph": "This graph builds to C++ - its Expression nodes and any nodes of its own are code as written",
+            "code": "This effect is C++, and opening it builds it",
             "project": "This project brings its own effects in C++ (and graphs that build to C++), and opening it "
                        "builds them"}[kind]
     return (f"{name}: {what}. Built, they run on this computer with your rights, like any program you install. "

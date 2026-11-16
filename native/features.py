@@ -151,15 +151,21 @@ class Features:
                        [("Turn on", lambda: [self.set_feature(k, "stock" if k == "audio" else True) for k in sorted(missing)]),
                         ("Leave as is", None)])
 
-    def take_file(self, path):
+    def take_file(self, path, sure=False):
         """A file from the desktop: a graph or bundle opens in the graph pane,
-        a .cpp becomes a code effect, an image an Image node in the graph,
-        an XYZ file or a ledmap the geometry, a WAV the audio."""
+        a .cpp becomes a code effect (asked first, as a graph or a project
+        from elsewhere is: opening it builds and runs it; `sure`: asked
+        already), an image an Image node in the graph, an XYZ file or a
+        ledmap the geometry, a WAV the audio."""
         kind = classify(path)
         name = os.path.basename(path)
         if kind == "graph":
             self.gp.import_bundle(path)
             self.show_layout("graph")
+        elif kind == "code" and not sure:
+            from native.graph_files import trust_words
+            chrome.confirm(self, "Open this effect?", trust_words("code", name),
+                           [("Open it", lambda: self.take_file(path, True)), ("Cancel", None)])
         elif kind == "code":
             fname = os.path.basename(path)
             if not fname.endswith(".cpp"):
