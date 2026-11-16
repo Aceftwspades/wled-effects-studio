@@ -27,6 +27,20 @@ def _resolve(app, host=None, S=None):
     return presets, playlist, None
 
 
+def _clash(app):
+    """The show's presets against the MIDI setlist's (sequence.id_clash), said in the status: True when it may
+    not go."""
+    try:
+        from native import midi_ui
+        n = len(midi_ui._st(app).get("setlist") or [])
+    except Exception:
+        n = 0
+    msg = sequence.id_clash(SU._steps(app), n, "show")
+    if msg:
+        app.gp.status(msg)
+    return msg is not None
+
+
 def send_hosts(app):
     """The devices a show goes to: every one the stream goes to when the show says so (and the stream has
     several), else the active one."""
@@ -57,6 +71,8 @@ def send(app, run=False):
         device_ui.show(app, "devices"); app.gp.status("choose a device first"); return
     if not S["steps"]:
         app.gp.status("no steps to send"); return
+    if _clash(app):
+        return
     if seq_state.of(app).send is not None and seq_state.of(app).send.is_alive():
         app.gp.status("a send is still going"); return
     snap = json.loads(json.dumps(S))                      # the steps as they are now: the worker reads its copy
@@ -97,6 +113,8 @@ def _send_all(app, hosts, run):
     import threading
     if not SU._steps(app)["steps"]:
         app.gp.status("no steps to send"); return
+    if _clash(app):
+        return
     if seq_state.of(app).send is not None and seq_state.of(app).send.is_alive():
         app.gp.status("a send is still going"); return
     S = SU._steps(app)

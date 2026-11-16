@@ -493,6 +493,9 @@ def setlist_send(app):
             app.gp.status("the setlist is empty: Add current puts the effect on screen in it")
         return
     names, dur = list(st["setlist"]), int(st.get("sl_dur", 30))
+    clash = sequence.id_clash(app.project.options.get("sequence") or {}, len(names), "setlist")
+    if clash:
+        app.gp.status(clash); return                    # the show's presets on the device kept
     tt = int(round(float(st.get("xfade", 0.0) or 0.0) * 10))
     state(app).sl_send = "running"
     app.gp.status(f"sending the setlist ({len(names)} effects) to {host}...")
@@ -504,14 +507,14 @@ def setlist_send(app):
             for k, n in enumerate(names):
                 if n not in dev:
                     missing.append(n); continue
-                pid = 70 + len(ids)
+                pid = sequence.SETLIST_FIRST + len(ids)
                 presets[pid] = {"n": n, "on": True, "seg": [{"id": 0, "fx": dev.index(n), "fxdef": True}]}
                 ids.append(pid)
             if not ids:
                 state(app).sl_send = (False, "none of the setlist's effects is on the device: give them slots (Window > Effect slots...)")
                 return
             pl = {"n": "Setlist", "playlist": {"ps": ids, "dur": [dur * 10] * len(ids), "transition": [tt] * len(ids), "repeat": 0}}
-            ok, msg = sequence.send(host, presets, pl, 69)
+            ok, msg = sequence.send(host, presets, pl, sequence.SETLIST_PLAYLIST)
             if missing:
                 msg += f"; not on the device (no slot): {', '.join(missing)}"
             state(app).sl_send = (ok, msg)
