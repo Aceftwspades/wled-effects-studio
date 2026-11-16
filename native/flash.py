@@ -919,6 +919,11 @@ def verify_reboot(host, before, log, timeout=90):
         if info:
             ver, vid = info.get("ver", "?"), info.get("vid", "?")
             was = (before or {}).get("vid")
+            if was is None:
+                # nothing to compare with: it answering says nothing of whether the update took (a send that
+                # timed out leaves it answering on the old firmware), so it is not called a success
+                return False, (f"the device answers (WLED {ver}, build {vid}), but what it ran before is not known - "
+                               "whether the update took cannot be told")
             up, was_up = info.get("uptime"), (before or {}).get("uptime")
             # the build id is the tree's VERSION, which two builds of the same
             # tree share; the uptime starting over is what says it rebooted -
@@ -1243,7 +1248,7 @@ class Job:
             if self.source == "checkout":
                 self._send(bin_, f"WLED {wled_version()[0]} from the checkout ({env})"); return
             if self.upload:
-                before = device_info(self.host)
+                before = self._device_before()
                 if before:
                     self.log(f"device before: WLED {before.get('ver', '?')}, build {before.get('vid', '?')}, {before.get('name', '')}")
                 self.log("manifest: " + " | ".join(manifest_text(manifest(self.project, self.base_env, self.only))[:5]))
@@ -1278,9 +1283,26 @@ class Job:
         finally:
             self.done = True
 
+    def _device_before(self):
+        """The device's /json/info before an OTA, asked a second time with longer to answer when the first gave
+        nothing: a device busy drawing can take more than the four seconds, and without its answer the chip
+        is not known (see _chip_ok)."""
+        before = device_info(self.host)
+        if not (before or {}).get("arch"):
+            self.log("the device was slow to say what it is - asking again...")
+            before = device_info(self.host, timeout=12) or before
+        return before
+
     def _chip_ok(self, bin_, device):
-        """The binary is for the device's chip; else the job ends saying so and nothing is sent."""
+        """The binary is for the device's chip; else the job ends saying so and nothing is sent. A device that
+        did not say its chip gets nothing: the check would pass anything, and an image for another chip does
+        not boot."""
         from native import firmware
+        if not (device or {}).get("arch"):
+            self.result = ("not sent: the device did not say what chip it is (no answer from its /json/info), so "
+                           "the firmware could not be checked against it - check it is on and reachable, then try again")
+            self.log(self.result)
+            return False
         ok, words = firmware.check(bin_, (device or {}).get("arch"))
         self.log(f"checked: {words}")
         if not ok:
@@ -1317,7 +1339,7 @@ class Job:
         recorded."""
         if not self.upload:
             self.result = "built; not sent"; self.ok = True; return
-        before = device_info(self.host)
+        before = self._device_before()
         if before:
             self.log(f"device before: WLED {before.get('ver', '?')}, build {before.get('vid', '?')}, {before.get('name', '')}")
         if not self._chip_ok(path, before):
