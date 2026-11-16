@@ -28,11 +28,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
+# read only: the release job alone writes (the draft), so a test or a build step - which runs the pull
+# request's own code - never holds a token that can change the repository
 permissions:
-  contents: write
+  contents: read
 
 env:
   WINLIBS_URL: https://github.com/brechtsanders/winlibs_mingw/releases/download/16.2.0posix-14.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-16.2.0-mingw-w64ucrt-14.0.0-r1.zip
+  # the zip's sha256 as GitHub lists it for that release asset: the compiler goes into every Windows build, so a
+  # zip that is not this one stops the job. A new winlibs: its digest from the release's assets with it
+  WINLIBS_SHA256: c1f52294597c0b73786b2a78eb5d176d89226d2f21875eab75e783a8b1cefcc4
 
 jobs:
   linux:
@@ -260,6 +265,8 @@ jobs:
         shell: pwsh
         run: |
           Invoke-WebRequest -Uri $env:WINLIBS_URL -OutFile winlibs.zip
+          $got = (Get-FileHash winlibs.zip -Algorithm SHA256).Hash.ToLower()
+          if ($got -ne $env:WINLIBS_SHA256) { throw "winlibs.zip is not the expected file (sha256 $got)" }
           Expand-Archive winlibs.zip -DestinationPath mingw
           Get-ChildItem mingw
 
@@ -327,6 +334,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [linux, linux_arm, windows, macos]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write                   # the draft release and its files
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -350,7 +359,7 @@ jobs:
 
       # every build on the draft: the app's update check takes its own machine's (native/update.py asset_for)
       - name: the draft release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65   # v2, pinned: a tag can be moved
         with:
           draft: true
           files: |

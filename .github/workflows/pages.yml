@@ -9,10 +9,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# the build reads; only the deploy job writes the site
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -26,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: mymindstorm/setup-emsdk@v14
+      - uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021   # v14, pinned: a tag can be moved
       - name: Build the wasm engine
         run: python build.py --wasm-only
       - name: Assemble the site
@@ -41,6 +40,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
