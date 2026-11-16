@@ -795,10 +795,24 @@ class Graph:
 
     # --- compile -------------------------------------------------------------
     def _late(self, nid):
+        if self.nodes[nid].get("muted"):
+            return False                  # a muted Delay is a plain wire: ordered after what feeds it
         try:
             return bool(self.node_def(self.nodes[nid]).get("late"))
         except GraphError:
             return False
+
+    def _compile_defs(self):
+        """Every node's definition as the compilers see it: a muted node keeps no state and is not late (it
+        only passes its input on), so a muted Delay is ordered after its feeder - it read that feeder's
+        variable before it was declared, and the C++ did not build."""
+        defs = {}
+        for nid, n in self.nodes.items():
+            d = self.node_def(n)
+            if n.get("muted") and (d.get("late") or d.get("state")):
+                d = dict(d, late=None, late_code=None, state=None)
+            defs[nid] = d
+        return defs
 
     def _order(self):
         deps = {nid: set() for nid in self.nodes}
@@ -918,7 +932,9 @@ class Graph:
                 flat.nodes[nid] = dict(n, id=nid, params=dict(n.get("params", {})), inputs=dict(n.get("inputs", {})))
                 idmap[nid] = nid
                 flat.origin[nid] = nid
-        flat._next = max(flat.nodes.keys(), default=0) + 1
+        # past every id of this graph, the sub-graph instances' too: an inner node given a
+        # later instance's id would take that instance's wires when it is expanded
+        flat._next = max(self.nodes.keys(), default=0) + 1
         links = list(self.links)
         for nid, n in self.nodes.items():
             if not n["type"].startswith(SUB):
@@ -999,7 +1015,7 @@ class Graph:
         Sends are joined first, so their nodes are not in the plan."""
         if self.has_sends():
             return self.resolve_sends().plan()
-        defs = {nid: self.node_def(n) for nid, n in self.nodes.items()}
+        defs = self._compile_defs()
         order = [nid for nid in self._order() if not defs[nid].get("decor")]
         src_of = {(b, inp): (a, out) for a, out, b, inp in self.links}
         for nid, d in defs.items():
@@ -1135,7 +1151,7 @@ class Graph:
                     return self._compile_as(prev, title, profile)
         if len(outs) != 1:
             raise GraphError("the graph needs exactly one Output node" + (f" (it has {len(outs)})" if outs else ""))
-        defs = {nid: self.node_def(n) for nid, n in self.nodes.items()}
+        defs = self._compile_defs()
         order = [nid for nid in self._order() if not defs[nid].get("decor")]
         src_of = {(b, inp): (a, out) for a, out, b, inp in self.links}
         for nid, d in defs.items():
@@ -1210,7 +1226,8 @@ class Graph:
                     if src is None:
                         src = next((i for i in d["inputs"] if compatible(i["type"], o["type"])), None)
                     if src is not None:
-                        parts.append(f"$out.{o['name']} = $in.{src['name']};")
+                        # converted as a wire would be: a float pin into a vector output did not build
+                        parts.append(f"$out.{o['name']} = {_coerce('$in.' + src['name'], src['type'], o['type'])};")
                 code = " ".join(parts) or "/* muted */"
                 d = dict(d, state=None, fields=None, field=None, codegen=None)
             elif d.get("codegen") and not late:
