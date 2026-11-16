@@ -66,15 +66,21 @@ class Entry:
         self.name = _text(d.get("name"), 60) or self.id
         self.author = _text(d.get("author"), 60)
         self.description = _text(d.get("description"), 400)
-        self.tags = [_text(t, 20) for t in (d.get("tags") or [])[:8] if _text(t, 20)]
+        self.tags = [_text(t, 20) for t in _list(d.get("tags"))[:8] if _text(t, 20)]
         self.sha256 = str(d.get("sha256") or "").lower()
-        self.requires = [_text(t, 30) for t in (d.get("requires") or [])[:8] if _text(t, 30)]
+        self.requires = [_text(t, 30) for t in _list(d.get("requires"))[:8] if _text(t, 30)]
 
     def bundle_url(self):
         return f"{base_url()}effects/{self.id}.graph.json"
 
     def preview_url(self):
         return f"{base_url()}previews/{self.id}.gif"
+
+
+def _list(v):
+    """A list from the index, or none: a tag list given as a number (or a dict, a string) raised in the middle of
+    reading, and the Gallery stayed "reading" for good."""
+    return v if isinstance(v, list) else []
 
 
 def _text(v, n):
@@ -112,8 +118,13 @@ def parse_index(data):
             continue
         if not re.fullmatch(r"[0-9a-fA-F]{64}", str(e.get("sha256") or "")):
             continue
+        try:
+            ent = Entry(e)
+        except Exception:                                  # one malformed entry left out, not the whole index
+            oops.swallowed()
+            continue
         seen.add(e["id"])
-        out.append(Entry(e))
+        out.append(ent)
     return out
 
 

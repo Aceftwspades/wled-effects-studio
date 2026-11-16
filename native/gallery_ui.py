@@ -59,6 +59,8 @@ def load(app, again=False):
             return True, gallery.fetch_index()
         except gallery.GalleryError as e:
             return False, str(e)
+        except Exception as e:                             # anything else ends the reading too, said
+            return False, f"the gallery's index could not be read ({e})"
     if not tasks.run(app, "gallery:index", "reading the gallery", work, done):
         st["loading"] = False
 
