@@ -1662,6 +1662,11 @@ def poll(app):
         return
     now = clock.now()
     if now >= p["next"]:
+        # the next step starts where this one was due, not at the frame that saw it was due: from `now` each
+        # step began up to a frame late and a long show drifted off its audio (a second or two over 100 steps).
+        # Over a whole step behind (a stall), it starts from now rather than racing through the ones missed.
+        due = p["next"] if now - p["next"] < float(steps[p["i"]].get("dur", 10) if 0 <= p["i"] < len(steps) else 0) \
+            else now
         i = p["i"] + 1
         if i >= len(steps):
             if int(S.get("repeat", 0)) != 0 or p.get("once"):
@@ -1669,14 +1674,14 @@ def poll(app):
             i = 0
             live = getattr(app, "live", None)
             if live is not None and hasattr(live, "t0"):
-                live.t0 = now                                # round again: the WAV from its start with it
+                live.t0 = due                                # round again: the WAV from its start with it
         edit_commit(app)                                  # editing live: the step leaving keeps its last change
         seq_record._rec_flush(app)                                   # recording: the take on the step leaving goes into it
         prev = steps[p["i"]] if 0 <= p["i"] < len(steps) else None
         p["i"] = i
         p["st"], p["n"] = steps[i], len(steps)
         seq_state.of(app).tl_dirty = True                                # the step playing is underlined: drawn again
-        p["next"] = now + float(steps[i].get("dur", 10))
+        p["next"] = due + float(steps[i].get("dur", 10))
         trans = float(steps[i].get("trans", sequence.TRANS_DEFAULT))       # as the device's playlist blends it
         if prev is not None and trans > 0:
             app.transition_start(prev, trans, S.get("style", "fade"))
