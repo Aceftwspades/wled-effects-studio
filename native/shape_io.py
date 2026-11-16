@@ -823,7 +823,8 @@ def read_points(path, info=None):
             v = [float(x) for x in r[:4]]
         except (TypeError, ValueError, OverflowError):
             v = [math.nan]
-        if len(v) >= 3 and all(math.isfinite(x) for x in v):
+        if len(v) >= 3 and all(math.isfinite(x) and abs(x) < 1e30 for x in v[:3]) and all(math.isfinite(x) for x in v):
+            # (a coordinate of 1e39 is finite here and inf in the float32 the points are kept in: left out)
             good.append(v)
         else:
             skipped += 1
