@@ -512,10 +512,13 @@ class Project:
         src = re.sub(r'(PROGMEM\s*=\s*")[^@"]*', lambda m: m.group(1) + title.replace('"', "'"), src, count=1)
         src = src.replace(f"// {old_title}\n", f"// {title}\n", 1)      # the banner
         if old != ident:
-            # inside identifiers too: mode_<old>, _data_FX_MODE_<OLD>
-            edge = lambda w: r"(?<![A-Za-z0-9])" + re.escape(w) + r"(?![A-Za-z0-9])"
-            src = re.sub(edge(old), ident, src)
-            src = re.sub(edge(old.upper()), ident.upper(), src)
+            # the identifiers the templates make from the file name (project.py's, graph.py's, glsl.py's):
+            # mode_<old>, <old>_reg, _data_FX_MODE_<OLD> - whole identifiers only. Every word matching the old
+            # name was replaced before: renaming "Speed" to "Fast" turned SEGMENT.speed into SEGMENT.fast.
+            whole = lambda w: r"(?<![A-Za-z0-9_])" + re.escape(w) + r"(?![A-Za-z0-9_])"
+            for was, now in ((f"mode_{old}", f"mode_{ident}"), (f"{old}_reg", f"{ident}_reg"),
+                             (f"_data_FX_MODE_{old.upper()}", f"_data_FX_MODE_{ident.upper()}")):
+                src = re.sub(whole(was), now, src)
         self.write_effect(new, src)                      # the new file first: the old one goes once it is there
         if new != fname:
             # (a name that differs only in case is the same file on Windows and macOS: kept, not removed)

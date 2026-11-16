@@ -2487,8 +2487,10 @@ def poll_update_download(app):
     if not z:
         dpg.configure_item("update_go", enabled=True); return
     if update.can_apply():
-        update.apply(z)
-        dpg.stop_dearpygui()
+        # closed as Quit closes, everything saved first (it stopped straight away, and the open graph and
+        # what waited to be saved were lost); the script set going only once that is done
+        dpg.configure_item("update_go", enabled=True)
+        app.quit_studio(then=lambda: update.apply(z), title="Install the update", verb="install")
     else:
         app.reveal(os.path.dirname(z))
         dpg.configure_item("update_go", enabled=True)

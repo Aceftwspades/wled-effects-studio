@@ -1080,28 +1080,17 @@ class App(AppProjects, AppCode, AppInput, AppLayout, Features, Recorder, EditBui
         return self.gp.effect_file() or self.edit_file
 
     def restart_studio(self):
-        """The studio again (an interface size takes it): the code's unsaved
-        edits saved first if you say so - the graph saves as you go."""
+        """The studio again (an interface size takes it): saved as Quit saves - what waited to be saved (a
+        modulator dragged while paused) was lost here."""
         from native import wledtree
+        self.quit_studio(then=wledtree.restart, title="Restart the studio", verb="restart")
 
-        def go(save=False):
-            if save and self.edit_dirty:
-                self.edit_save()
-            self.gp.save()
-            save_prefs(self.prefs)
-            wledtree.restart()
-            dpg.stop_dearpygui()
-        if self.edit_dirty and self.edit_file:
-            chrome.confirm(self, "Restart the studio", f"{self.edit_file} has changes that are not saved.",
-                           [("Save and restart", lambda: go(True)), ("Restart without saving", lambda: go(False), "danger"),
-                            ("Cancel", None)])
-        else:
-            go()
-
-    def quit_studio(self):
+    def quit_studio(self, then=None, title="Quit the studio", verb="quit"):
         """File > Quit and the window's close: the open graph and the prefs saved, and the code's unsaved
         edits saved too if you say so - nothing asked before, and they were lost (as were a graph's edits with
-        Live off). Whatever goes wrong in the saving, it quits: a close that could fail would keep the window."""
+        Live off). Whatever goes wrong in the saving, it quits: a close that could fail would keep the window.
+        Restart and an update's install close this way too, `then` run once all is saved (the new studio
+        started, the update's script set going); if it fails the studio stays open."""
         def go(save=False):
             try:
                 if save and self.edit_dirty:
@@ -1113,11 +1102,18 @@ class App(AppProjects, AppCode, AppInput, AppLayout, Features, Recorder, EditBui
             except Exception:
                 import traceback
                 traceback.print_exc()
+            if then is not None:
+                try:
+                    then()
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                    return
             dpg.stop_dearpygui()
         try:
             if self.edit_dirty and self.edit_file:
-                chrome.confirm(self, "Quit the studio", f"{self.edit_file} has changes that are not saved.",
-                               [("Save and quit", lambda: go(True)), ("Quit without saving", lambda: go(False), "danger"),
+                chrome.confirm(self, title, f"{self.edit_file} has changes that are not saved.",
+                               [(f"Save and {verb}", lambda: go(True)), (f"{verb.capitalize()} without saving", lambda: go(False), "danger"),
                                 ("Cancel", None)])
                 return
         except Exception:
