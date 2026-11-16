@@ -340,8 +340,8 @@ static void simSegBuffer(SimSeg &S) {
 }
 
 static void simSegReset(SimSeg &S) {
-  if (S.seg.data) { free(S.seg.data); S.seg.data = nullptr; }
-  S.seg._dataLen = 0; S.seg.call = 0; S.seg.step = 0; S.seg.aux0 = 0; S.seg.aux1 = 0;
+  S.seg.deallocateData();                // and its share of MAX_SEGMENT_DATA back
+  S.seg.call = 0; S.seg.step = 0; S.seg.aux0 = 0; S.seg.aux1 = 0;
 }
 
 SIM_API void simInit(int w, int h) {
