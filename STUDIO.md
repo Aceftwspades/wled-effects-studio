@@ -1,4 +1,44 @@
-# WLED Effects Studio — the playground branch
+# WLED Effects Studio — the design log
+
+**Read this first.** This file is the studio's log: how it was designed and what
+was decided, entry by entry, as it happened - true on the day each entry was
+written, and left as written since. It is not the manual. Menu paths, keys and
+defaults in the older entries have moved since (the menus were regrouped in 1.2.0,
+when Build, Device and Window came in): what the studio has today is in
+[GUIDE.md](GUIDE.md), whose last section is written from the running app.
+[ROADMAP.md](ROADMAP.md) holds the rounds of work from 1.24.0 on.
+
+**Still open** in this log (each where it was written):
+
+- Camera moves for recordings: a turntable, depth of field.
+- AudioReactive out of tree (wled/WLED#5311, #5764): where the fork's PCM and
+  pitch-class slots go when the usermod moves.
+- The device's gamma against the sim's (#5666, #5722).
+- cube_fx controls in WLED's own UI through `/um.js` (wled/WLED#5741).
+- Effect parity: Dissolve Plus, multiple and slow meteors (#5758), WLED-MM's
+  Color Clouds, the pre-16 looks (#5684).
+- An xLights model from a mapped shape.
+- Watch: past 255 effects (#5108), the Pixel Bus driver (#5704).
+- The smoke's audio-sync check counts frames, not time.
+- Ableton Link (set aside: GPL against the studio's EUPL).
+- Stems: a show's audio split once into drums, bass, vocals and the rest.
+
+**Environment variables** the studio reads:
+
+| variable | what it does |
+|---|---|
+| `WLED_ROOT` | the WLED checkout to build the engine and flash from (else `../WLED` beside the studio, else the vendored `gen/` and `runtime/`) |
+| `SIM_CLANG` | the clang++ to build with |
+| `STUDIO_TOOLCHAIN` | a compiler folder to try instead of `toolchain/` |
+| `STUDIO_NO_UPDATE_CHECK` | no daily check for a newer release |
+| `STUDIO_UPDATE_URL` | the releases JSON the update check reads (a test's) |
+| `STUDIO_WLED_RELEASES_URL` | the releases JSON the Flash frame's WLED firmware list reads (a test's) |
+| `STUDIO_GALLERY_URL` | the gallery the Library's Gallery bank reads |
+| `STUDIO_NO_WELCOME` | no Welcome panel at the start |
+| `STUDIO_REMOTE_CONTROL` | `1`: the tests drive the app through a command file in its private scratch folder - never on otherwise, since a command runs Python |
+| `STUDIO_CONSOLE_CHILDREN` | the compiler's and PlatformIO's console windows shown, to watch a build |
+
+---
 
 The simulator grows into an effect editor for any WLED user: write an effect
 as C++ in the app and see it on your own geometry within a second, or build one
@@ -7,9 +47,11 @@ a matrix, a cube, a sphere, a cylinder, a torus, or a coordinate list you
 imported from your own build. What you make exports as a usermod file that
 compiles into stock WLED unchanged, plus the ledmap for your wiring.
 
-This branch is allowed to change firmware and other usermods. Every such change
-is made as if it will be brought forward: small, isolated, named, and with a
-fallback so a dropped patch degrades rather than breaks.
+It began as the `playground` branch of the WLED fork and is its own repository
+now; the firmware side stays in the fork (Aceftwspades/WLED, branch
+`playground`). Changes there to firmware and other usermods are made as if they
+will be brought forward: small, isolated, named, and with a fallback so a dropped
+patch degrades rather than breaks.
 
 ## Decisions taken at the start
 
@@ -3660,10 +3702,10 @@ LedFx have added that matters here, in the order it helps most.
       realtime override (#5666, in the fork); #5722 moves gamma to the bus and
       limits low brightness. Check a stream looks the same on the cube as in
       the view; follow #5722.
-- [ ] **Ledmap fixes from main**: the parser reading past the end (#5693, in
+- [x] **Ledmap fixes from main**: the parser reading past the end (#5693, in
       the fork) and trailing strips in sparse ledmaps (075abaff) - the studio
       writes ledmaps. The studio's side done 2026-10-27 (its map's size first,
-      a trailing strip said); 075abaff not yet in the fork's firmware.
+      a trailing strip said). 075abaff is in the fork as 9c03fada (#5745).
 - [x] **Streaming over the WebSocket** (DDP on `/ws`, nightly): a fallback
       where UDP is blocked. Done 2026-10-27 (the LIVE row's DDP over WebSocket).
 - [ ] **cube_fx controls in WLED's own UI** through `/um.js` (wled/WLED#5741)
@@ -4823,7 +4865,7 @@ What they have that the studio lacks, in the order they would pay back:
 
 ## On the cube (18 September 2026)
 
-Against the S3 cube at 192.168.1.17 (WLED 16.0.1, 48 x 48 net as five
+Against the S3 cube (WLED 16.0.1, 48 x 48 net as five
 WLED panels, a build from before the Studio Script rename and frame
 budget): **Send the graph as a script** put the sine-wave tutorial graph
 and then Maelstrom on the cube within a couple of seconds each, and WLED's
@@ -5099,22 +5141,26 @@ and `app` (the whole loop) in ms; the `measure` test hook prints the split.
 
 ## Running it
 
+From the repository's root (on Linux and macOS in a virtual environment, as the
+[README](README.md#get-it) shows):
+
 ```bash
-cd studio
-pip install dearpygui numpy pillow sounddevice        # pyaudiowpatch on Windows for loopback
+pip install -r requirements.txt
 python build.py --native-only                          # once; the app rebuilds incrementally
 python -m native.app
 ```
 
-Every action is on the menus with its shortcut; Settings > Keyboard
-shortcuts (F1) lists them and lets you change any of them. Keys: **G** node graph, **C** code pane, **Q** logical view, **E** 3-D, **W** both,
+Settings > Keyboard shortcuts (Shift+F1) lists every action with its key and
+lets you change any of them. Keys: **G** node graph, **C** code pane, **Q** logical view, **E** 3-D, **W** both,
 (again returns to the panels), **H** hide the controls, **space** pause, **Ctrl+N / Ctrl+S / F2 / F5** new, save, rename, build. In the graph: **Delete** removes selected nodes,
 **Ctrl+Z / Ctrl+Y** undo / redo, **Ctrl+C / X / V** copy, cut, paste, **wheel / Ctrl+= / Ctrl+- / Ctrl+0** zoom,
 **M** mute, **Shift+D** duplicate with inputs, **Ctrl+L** arrange, **Ctrl+H** hide unwired pins, **F** connect two
-selected nodes, **Alt+click** detach a node. Projects live in `projects/<name>/` beside the app;
-the default one is created on first run.
+selected nodes, **Alt+click** detach a node. Projects live in `projects/<name>/` beside the app
+(a packaged app in a folder it cannot write keeps them in its user folder instead:
+a `WLED Effects Studio` folder in `%LOCALAPPDATA%`, `~/Library/Application Support`
+or `$XDG_DATA_HOME` (`~/.local/share`)); the default one is created on first run.
 
-## Compatibility rules for this branch
+## Compatibility rules for the firmware side
 
 - Firmware changes live in one clearly-marked block per file with a comment
   naming what depends on it, and everything that depends on it must work

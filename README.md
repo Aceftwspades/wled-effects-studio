@@ -10,7 +10,7 @@ script, as its settings, or flashed into the firmware.
 - **[GUIDE.md](GUIDE.md)** - how to use it, from the first run to a show on the device
 - **[TUTORIAL.md](TUTORIAL.md)** - a first effect, node by node
 - **[NODES.md](NODES.md)** - every node
-- **[STUDIO.md](STUDIO.md)** - the design and the history, as a log
+- **[STUDIO.md](STUDIO.md)** - the design log: how it was built and why
 - **[ROADMAP.md](ROADMAP.md)** - the latest rounds of work, and what is still open
 
 ## What it does
