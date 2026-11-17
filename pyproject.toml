@@ -1,6 +1,6 @@
 [project]
 name = "wled-effects-studio"
-version = "1.25.1"   # native/version.py's; tests/test_update.py keeps the two the same
+version = "1.25.2"   # native/version.py's; tests/test_update.py keeps the two the same
 description = "Node graphs and C++ compiled into WLED effects, previewed on a simulated cube, sphere, matrix or strip"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.26", "dearpygui>=1.11", "pillow>=10"]
