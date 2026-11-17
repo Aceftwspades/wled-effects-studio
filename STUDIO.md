@@ -4682,6 +4682,12 @@ Released as 1.25.1 (2026-11-15): the Packs dialog's Install every pack, and the 
 non-commercial packs. The gallery's Supernova & dancers lost two presets it already had under the same names
 (Hold candle to, the same file; Burnt Ice, of which the gallery has an edit), and its check refuses such a pair.
 
+Released as 1.25.2 (2026-11-17): the fixes of a full code review (sub-graph wires, muted nodes, the shim's colour
+helpers as WLED has them, the sequencer's timing and slider capture, the updater's sha256 check, Restore against a
+flash, OSC floods, MilkDrop's megabuf) and a documentation round - the tutorial with new pictures from
+tests/make_tutorial_shots.py, GUIDE.md, the node docs with each pin's default and range, the README, this log's
+header. Levels' gamma now bends as Adjust's does. The smoke caught the Slew lesson's new up of 20 still checked as 40.
+
 ### From the second feature review (October 2026)
 
 The studio set again beside the software it shares ground with (2026-10-22),
