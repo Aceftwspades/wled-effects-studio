@@ -1411,7 +1411,7 @@ STEPS = [
     ([{"py": "1"}], 6.0),                                  # (a slow runner: its GIFs decoded on a worker, then played)
     ([{"check": "any(a['frames'] and a['i'] > 0 for a in reader_ui.S.anims.values())"},
       {"py": "reader_ui.follow(app, 'studio:try/slew/1')"}], 1.0),
-    ([{"check": "app.gp.graph.nodes[2]['inputs']['up'] == 40.0 and dpg.is_item_shown('props_fly')"},
+    ([{"check": "app.gp.graph.nodes[2]['inputs']['up'] == 20.0 and dpg.is_item_shown('props_fly')"},
       {"py": "reader_ui.follow(app, 'studio:try/wave/1')"}], 8.0),
     ([{"check": "app.gp.file == 'tutorial_wave.json' and app.gp.graph.nodes[4]['params']['shape'] == 'square'"},
       {"check": "app._tutorial['back'][0].endswith('smoke_run') and app._tutorial['node'] == 'Wave'"},
