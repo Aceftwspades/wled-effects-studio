@@ -1,6 +1,8 @@
 # Roadmap: stability, maintainability, speed, ease of use
 
-The round of work after 1.23.1 (released as 1.24.0), in the order it was done. Each item is ticked when it is on `main`.
+The rounds of work after 1.23.1, in the order they were done: sections 1 to 10 were released as 1.24.0, 11 and 12 as
+1.25.0. Each item is ticked when it is on `main`. Smaller fixes since, and the reviews' findings, are in the git
+log rather than here; the open items left over from before 1.24.0 are at the top of [STUDIO.md](STUDIO.md).
 
 ## 1. Catch CI's failures before a push (maintainability)
 - [x] **A pre-push check** (`python tests/prepush.py`): every `tests/test_*.py` as CI runs it, then again under
@@ -10,7 +12,7 @@ The round of work after 1.23.1 (released as 1.24.0), in the order it was done. E
 - [x] **Smoke checks wait for a condition, not a time**: fixed waits flaked three times in the 1.23.1 release.
       A step whose next batch opens with checks now polls them (the remote's `until`) instead of sleeping: the
       local run went from ~674 s of sleeps to 391 s in all.
-- [x] **The smoke test in suites** (VJ, pads, sequence, devices...), so a change runs only its own; repeated
+- [x] **The smoke test in suites** (VJ, sequence, devices...), so a change runs only its own; repeated
       one-liners become helpers. `python tests/smoke_app.py -s vj` runs the opening steps and one of twelve
       suites, each passing alone (a suite's `PREP` sets up what the ones before it would have left); the
       ~430 `__import__('native.x', ...)` in its steps are plain names the remote's hooks know.
