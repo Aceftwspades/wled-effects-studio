@@ -14,7 +14,7 @@
   "Watch the right meter lag the left: it climbs after each kick and sinks smoothly between them."
  ],
  "try": [
-  {"label": "Snappy rise", "text": "up 40: Slew rises forty a second - it catches each kick at once - but still falls at its own pace, a peak meter.", "set": [[2, "up", 40.0]]},
+  {"label": "Snappy rise", "text": "up 20 (its most): Slew rises twenty a second - it catches each kick at once - but still falls at its own pace, a peak meter.", "set": [[2, "up", 20.0]]},
   {"label": "Slow fall", "text": "down 0.3: after a kick the meter takes three seconds to sink, so it barely drops between beats and holds near the top.", "set": [[2, "down", 0.3]]},
   {"label": "Lazy both ways", "text": "up 0.5 and down 0.5: Slew can no longer keep up with the beat at all, so it settles at a level that rises and falls with how busy the music is.", "set": [[2, "up", 0.5], [2, "down", 0.5]]}
  ],

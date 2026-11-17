@@ -10,7 +10,7 @@
   "**Audio**'s `beat` fires **Emitters**' trigger: on every kick a new emitter is dropped at a random place on the surface (its `random` setting), and lives four seconds.",
   "A **Random hold** on the same beat picks a new random number per kick - the emitter's tag, so each shell gets its own colour.",
   "Emitters' `slots` go into Shells' **slots**, and **Position**'s `pos` into **pos**: each pixel asks how much shell is passing through its place in the cube.",
-  "**speed** is 1: a shell grows one cube-width a second. **width** is 0.2: how thick its skin is.",
+  "**speed** is 1: a shell's radius grows one Position unit a second - half the cube's width. **width** is 0.2: how thick its skin is.",
   "`value` is the **Palette**'s brightness and `tag` its index: rings of light, each its own colour."
  ],
  "try": [

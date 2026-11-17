@@ -4,7 +4,7 @@
  "caption": "Graph input: a sub-graph's speed pin - previewed on its own, at its default of 0.3",
  "why": [
   "A piece of graph you use again and again - a fire, a sparkle layer, a scroll - can become a node of its own: a sub-graph. Graph input and Graph output are its pins: each Graph input becomes an input of the node, each Graph output an output.",
-  "Select nodes and Node > Fold into a sub-graph makes one, with these pins already in place. Its neighbours: Send and Receive carry values within one graph; Graph input and output carry them in and out of a sub-graph."
+  "Select nodes and Node > Sub-graph > Fold the selection into one (Ctrl+G) makes one, with these pins already in place. Its neighbours: Send and Receive carry values within one graph; Graph input and output carry them in and out of a sub-graph."
  ],
  "steps": [
   "**name** is speed: the pin the node made from this graph will show.",

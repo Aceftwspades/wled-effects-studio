@@ -63,9 +63,11 @@ DOCS = {
 
     # ------------------------------------------------------------ signals
     "Time": {
-        "doc": "The clock. t counts seconds since the effect started; feed it into a Wave, a Noise's z, or an Add to make "
-               "something drift. dt is how long this frame took, for things that move a fixed amount per second.",
-        "out": {"t": "seconds since the effect started", "dt": "this frame's length in milliseconds"}},
+        "doc": "The clock. t counts seconds on WLED's clock - since the device started - and goes back to 0 every hour; "
+               "feed it into a Wave, a Noise's z, or an Add to make something drift (anything it scrolls jumps once an "
+               "hour: Integrate never does). dt is how long this frame took, for things that move a fixed amount per "
+               "second.",
+        "out": {"t": "seconds on the clock, 0 .. 3600 then back to 0", "dt": "this frame's length in milliseconds"}},
     "Audio": {
         "doc": "What the microphone hears, as numbers 0..1. volume is the overall loudness; bass, mid and treble are the "
                "low, middle and high bands; beat is true on the frame a kick lands; hit is how hard it landed. "
@@ -82,14 +84,15 @@ DOCS = {
         "doc": "A position that jumps forward on each beat and settles over a few frames - the way a hit should move a "
                "pattern. Add its phase to whatever you scroll (a Wave's phase, a Palette index) and the picture lurches "
                "on the kick and eases.",
-        "in": {"beat": "the beat, from Audio", "throw": "how far each beat throws it"},
+        "in": {"beat": "the beat, from Audio",
+               "throw": "how far each beat throws it: at 1 about 0.4 of a cycle, at 2.5 about a whole one"},
         "out": {"phase": "the running offset: add it to a position"}},
     "Tempo": {
         "doc": "Musical time. Wire Audio's beat in and it measures the tempo from the gaps between hits (30..300 bpm, "
                "smoothed) and counts time in beats: a Wave with `beats` / 4 on its x is one cycle a bar at whatever "
                "speed the song runs. On each hit the count snaps to the nearest whole beat, so the phase stays with "
                "the music; without beats it runs at the fallback bpm (the synth's, in the sim).",
-        "in": {"beat": "the beat, from Audio", "fallback": "the bpm to run at until beats arrive"},
+        "in": {"beat": "the beat, from Audio", "fallback": "the bpm to run at until beats arrive - read once, as the effect starts"},
         "out": {"bpm": "the tempo measured", "beats": "time in beats, running", "phase": "where in the beat, 0..1",
                 "bar": "where in a four-beat bar, 0..1"}},
     "Integrate": {
@@ -105,7 +108,8 @@ DOCS = {
                "flickers becomes a swell that breathes. Put it between Audio and anything that would flicker.",
         "in": {"x": "the signal to smooth"},
         "out": {"value": "the smoothed signal"},
-        "params": {"attack": "how fast it rises, in milliseconds", "release": "how fast it falls, in milliseconds"}},
+        "params": {"attack": "how long it takes to rise, in milliseconds - bigger is slower",
+                   "release": "how long it takes to fall, in milliseconds - bigger is slower"}},
     "Random hold": {
         "doc": "A random number that stays put until the trigger fires, then picks a new one. Feed it the beat and "
                "something changes direction, colour or place on every kick and holds in between.",
@@ -128,7 +132,7 @@ DOCS = {
                 "clarity": "how far the strongest stands out, 0 when every note is alike, 1 when it is alone"},
         "params": {"smooth": "0 = as heard, near 1 = slow and steady"}},
     "Onset": {
-        "doc": "A hit anywhere in the sound - a snare, a hat, a pluck: true for one frame when the bands rise more "
+        "doc": "A hit anywhere in the sound - a snare, a hat, a pluck: true for one frame, just after the bands rise more "
                "than they have been lately (the spectral flux against its recent mean and spread). Audio's beat is "
                "a jump in the loudness and mostly hears the kick; this hears what lands over a steady bass too. "
                "Narrow from and to to listen to part of the spectrum.",
@@ -199,7 +203,7 @@ DOCS = {
                 "wrap": "true for the frame the count goes back to 0 - every steps-th trigger"}},
     "Hold": {
         "doc": "Sample and hold: x as it was the last time trigger turned on, kept until it turns on again. Feed it a "
-               "Random, a spectrum level or the time and trigger it from the beat: a value that changes only on the "
+               "Hash, a spectrum level or the time and trigger it from the beat: a value that changes only on the "
                "beat and holds in between.",
         "in": {"x": "the value to catch", "trigger": "a rise catches x"},
         "out": {"value": "x as it was at the last rise", "changed": "true on the frame it caught a new one"}},
@@ -247,7 +251,7 @@ DOCS = {
                "tag": "a number kept with it - a hue, say (Loudest bin)",
                "life": "how many seconds each one lives"},
         "out": {"slots": "the list - wire this to Shells", "count": "how many are alive"},
-        "params": {"random": "drop each one at a random point on the surface instead of x, y, z"}},
+        "params": {"random": "drop each one at a random point on the surface instead of at pos"}},
     "Delay": {
         "doc": "Remembers a number for one frame. It is the one node a wire may loop back through: feed it a value "
                "and plug its output back into what made that value, and each frame sees last frame's result. "
@@ -356,7 +360,7 @@ DOCS = {
         "doc": "Which face this pixel is on, and where on that face - a and b run 0..1 across each face, so the same "
                "picture repeats on every face (tiles, sprites). nx, ny, nz is the face's outward normal.",
         "out": {"face": "0 east, 1 west, 2 north, 3 south, 4 lid, 5 bottom", "a": "across the face, 0..1",
-                "b": "down the face, 0..1", "normal": "the face's outward direction as one vector wire",
+                "b": "up the face, 0 at its bottom edge .. 1 at its top (on the lid and bottom: along y)", "normal": "the face's outward direction as one vector wire",
                 "nx": "the face's outward direction, x", "ny": "y", "nz": "z"}},
     "Cube ring": {
         "doc": "The cube as a well: 'around' goes once round the walls (0..1), 'depth' goes from the middle of the "
@@ -438,18 +442,18 @@ DOCS = {
         "params": {"iterations": "how carefully to look - more shows finer detail, costs more",
                    "julia": "draw a Julia set instead"}},
     "Sprites": {
-        "doc": "Draws Particles as dots. At each pixel: how much particle is here (a soft dot `size` across), and "
+        "doc": "Draws Particles as dots. At each pixel: how much particle is here (a soft dot `size` in radius), and "
                "the nearest one's tag (colour it), age (fade it as it dies) and speed (stretch or brighten it).",
-        "in": {"slots": "from Particles", "pos": "this pixel's position (Position's pos)", "size": "how big each dot is"},
+        "in": {"slots": "from Particles", "pos": "this pixel's position (Position's pos)", "size": "each dot's radius, in Position units (the cube is 2 across)"},
         "out": {"value": "how much particle is here, 0..1", "tag": "the nearest particle's tag", "age": "its age, 0 born .. 1 dying",
                 "speed": "how fast it is going"},
         "params": {"falloff": "soft (a smooth dot), hard (a disc), spark (a bright pin with a faint halo)"}},
     "Shells": {
-        "doc": "Spheres growing out of every Emitter: at each pixel, how much of a shell is passing through. Wire "
-               "Emitters' slots here and Position into x, y, z, and each beat becomes a ring that crosses every "
+        "doc": "Spheres growing out of each thing Emitters dropped: at each pixel, how much of a shell is passing through. "
+               "Wire Emitters' slots here and Position's pos into pos, and each beat becomes a ring that crosses every "
                "edge of the cube as one ring.",
         "in": {"slots": "from Emitters", "pos": "this pixel's position (Position's pos)",
-               "speed": "how fast the shells grow, in cube-widths per second", "width": "how thick a shell is"},
+               "speed": "how fast the shells grow, in Position units a second (the cube is 2 across: 1 is half its width a second)", "width": "how thick a shell is"},
         "out": {"value": "how much shell is here, 0..1", "tag": "the tag of the strongest shell (its colour)",
                 "age": "how old that shell is, in seconds"}},
     "Reaction diffusion": {
@@ -465,7 +469,7 @@ DOCS = {
                "x -> x*x + c ends up. Read it with u (the c axis) and v (the x axis); narrow the windows to zoom in. "
                "Brightness is how often the sequence lands there.",
         "in": {"u": "across: which c, 0..1 of the window", "v": "down: which x, 0..1 of the window",
-               "c_lo": "the c window's left edge", "c_hi": "its right edge", "x_lo": "the x window's bottom", "x_hi": "its top"},
+               "c_lo": "the c window's left edge", "c_hi": "its right edge", "x_lo": "the x window's start, read at v = 0 (the top, with Coords v)", "x_hi": "its end, at v = 1 (the bottom)"},
         "out": {"density": "how often the sequence visits here, 0..1"},
         "params": {"trail": "how long visits glow, 0 .. 0.99", "orbits": "how many steps to run each frame"}},
     "Video": {
@@ -473,7 +477,7 @@ DOCS = {
                "at this pixel. The projection puts it on any shape: the picture as it is, through the shape from the "
                "front or the top, round it, on every cube face, or all round a sphere. The style is a quick look: the "
                "palette, a few flat colours, shades of Colour 1, outlines, or big blocks. Video plays in the studio; "
-               "the LEDs get it by streaming (Device > Stream) - on the device by itself the node is black.",
+               "the LEDs get it by streaming (Device > Stream the sim to the device) - on the device by itself the node is black.",
         "in": {"u": "where on the frame, across, 0..1 (the picture projection)",
                "v": "where on the frame, down, 0..1 (the picture projection)",
                "levels": "posterize: how many steps each colour has",
@@ -573,10 +577,11 @@ DOCS = {
                "you want it and, with steps above 0, in whole steps. Wire a slider into out high and the range itself "
                "becomes something the user controls.",
         "in": {"x": "the value to remap", "in_lo": "the input's low end", "in_hi": "the input's high end",
-               "out_lo": "what in low becomes", "out_hi": "what in high becomes", "steps": "0 for smooth, or how many steps"},
+               "out_lo": "what in low becomes", "out_hi": "what in high becomes",
+               "steps": "0 for smooth, or N steps: N + 1 levels from out low to out high"},
         "out": {"result": "the remapped value"},
         "params": {"ease": "how it runs between the ends: linear, smooth, ease in, ease out, ease in-out",
-                   "clamp": "hold the result inside the output range"}},
+                   "clamp": "hold the result inside the output range (only linear needs it: the eases stay inside)"}},
     "Float curve": {
         "doc": "A curve you draw on the node: points along 0..1, each with a value, smoothly joined. Feed a "
                "gradient, a heat or a phase through it to reshape it by hand - a fade that lingers, a response "
@@ -623,8 +628,10 @@ DOCS = {
         "out": {"v": "the turned vector"}},
     "Math": {
         "doc": "One node for every sum: pick the operation from the dropdown. Covers what Add, Multiply and the rest do, "
-               "plus sqrt, sign, round, ceil, snap (round to a step of b), ping-pong (bounce between 0 and b), wrap, "
-               "less / greater / equal (1 or 0), sin / cos / tan in turns, log and exp.",
+               "plus power (a below 0 counts as 0), sqrt, abs, sign, round, floor, ceil, fract, snap (round to a step of b), "
+               "ping-pong (bounce between 0 and b), modulo or wrap (the same: a into 0..b), smooth min / smooth max "
+               "(a soft corner, 0.2 wide), less / greater / equal (1 or 0), sin / cos / tan of turns, asin / acos / "
+               "atan2 back in turns, log and exp.",
         "in": {"a": "the first number",
                "b": "the second number - on the node only while the operation takes two (a one-input one: sqrt, abs, "
                     "sign, round, ceil, floor, fract, sin, cos, tan, asin, acos, log, exp - leaves it off, unless wired)"},
@@ -701,8 +708,9 @@ DOCS = {
                            "overlay, difference, soft light, and hue / saturation / colour / luminosity (take that part of 'over')"}},
     "Layers": {
         "doc": "A stack of up to four layers on a base colour, each with its own blend mode and amount - the "
-               "whole picture's layering in one node instead of a chain of Blends. A layer with nothing wired is "
-               "skipped.",
+               "whole picture's layering in one node instead of a chain of Blends. Where a layer is black - and one with "
+               "nothing wired is black everywhere - it is skipped, so a black layer neither covers (over) nor darkens "
+               "(multiply).",
         "in": {"base": "the bottom layer", "layer 1": "the first layer on top", "amount 1": "how much of layer 1 shows, 0..1",
                "layer 2": "the next layer", "amount 2": "how much of it, 0..1", "layer 3": "the next", "amount 3": "how much, 0..1",
                "layer 4": "the top layer", "amount 4": "how much, 0..1"},
@@ -741,7 +749,7 @@ DOCS = {
     "Field": {
         "doc": "A hidden number stored per pixel between frames - a simulation's memory (heat, water, sand) kept "
                "separate from the colour. This reads last frame's value at any pixel; Field write stores this "
-               "pixel's new value. Two fields per graph, 0 and 1.",
+               "pixel's new value. Four fields per graph, 0 to 3.",
         "in": {"u": "which pixel, across, 0..1", "v": "which pixel, down, 0..1"},
         "out": {"value": "the stored number there, from last frame"},
         "params": {"field": "which field, 0 to 3"}},
@@ -795,7 +803,8 @@ DOCS = {
         "params": {"expr": "the C++ expression"}},
 
     # ------------------------------------------------------------ output
-    "Output": {"doc": "The colour this pixel will show. Every graph needs exactly one.",
+    "Output": {"doc": "The colour this pixel will show. Every graph needs exactly one - but a sub-graph, whose Graph "
+                      "outputs are its pins (the first colour one stands in for an Output when it runs alone).",
                "in": {"color": "the final colour"}},
     "Effect settings": {
         "doc": "Settings for the effect as a whole: which palette it starts with, whether it is for a strip, a "
@@ -808,11 +817,11 @@ DOCS = {
         "doc": "When this graph is used as a node inside another graph, this is one of that node's input pins. Name "
                "it, choose its type, and give it a default for when nothing is wired in.",
         "out": {"value": "whatever the parent wires in (or the default)"},
-        "params": {"name": "the pin's name on the outer node", "type": "number, colour or switch", "default": "the value when unwired"}},
+        "params": {"name": "the pin's name on the outer node", "type": "number, colour, switch or vector", "default": "the value when unwired"}},
     "Graph output": {
         "doc": "When this graph is used as a node inside another graph, this is one of that node's output pins.",
         "in": {"value": "what the outer node's pin gives"},
-        "params": {"name": "the pin's name on the outer node", "type": "number, colour or switch"}},
+        "params": {"name": "the pin's name on the outer node", "type": "number, colour, switch or vector"}},
     "Knot": {"doc": "A bend in a wire, to route it neatly. Changes nothing.", "in": {"in": "any number"}, "out": {"out": "the same value"}},
     "Knot colour": {"doc": "A bend in a colour wire. Changes nothing.", "in": {"in": "any colour"}, "out": {"out": "the same colour"}},
     "Send": {
@@ -884,6 +893,39 @@ def gaps():
     return out
 
 
+# AI: below section was generated by an AI
+def _num(v):
+    """A number as a reader writes it: 1 not 1.0, 0.25 not 0.250000001."""
+    if isinstance(v, bool):
+        return "on" if v else "off"
+    if isinstance(v, float):
+        return f"{v:.4g}"
+    return str(v)
+
+
+def _pin_facts(p):
+    """An input's or a setting's type with what the node definition knows beyond the doc text: its default, and its
+    range and unit where the library gives them - so NODES.md cannot say one range while the slider has another."""
+    t, d = p["type"], p.get("default")
+    if t == "color":
+        dv = "#%02X%02X%02X" % tuple(d[:3]) if isinstance(d, (list, tuple)) and len(d) >= 3 else ("black" if not d else str(d))
+    elif t == "vector" and isinstance(d, (list, tuple)):
+        dv = "(" + ", ".join(_num(float(x)) for x in d) + ")"
+    elif t in ("text", "choice"):
+        dv = repr(d) if d not in (None, "") else ""
+    else:
+        dv = _num(d) if d is not None else ""
+    parts = [t]
+    if dv:
+        parts.append(f"default {dv}")
+    if p.get("min") is not None and p.get("max") is not None:
+        parts.append(f"{_num(p['min'])} .. {_num(p['max'])}" + (f" {p['unit']}" if p.get("unit") else ""))
+    elif p.get("unit"):
+        parts.append(p["unit"])
+    return "; ".join(parts)
+# AI: end
+
+
 def markdown():
     """The whole reference as Markdown, one section per category; a node with
     a lesson (docs/nodes, tutorials.py) has its tutorial under its reference."""
@@ -916,7 +958,8 @@ def markdown():
                     # the name the node shows, and its key where that differs: what an expression may call it by
                     shown = label(name, p["name"])
                     key_ = f" `{p['name']}`" if shown != p["name"] else ""
-                    out.append(f"- **{shown}**{key_} *({p['type']})*: {p.get('doc', '')}")
+                    facts = p["type"] if key == "outputs" else _pin_facts(p)
+                    out.append(f"- **{shown}**{key_} *({facts})*: {p.get('doc', '')}")
                 out.append("")
             if name in lessons:                            # why it is there, a graph round it, changes to try
                 out += tutorials.markdown(name, lessons[name])

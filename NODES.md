@@ -14,8 +14,8 @@ The first checkbox on the WLED page. Plug it into a Select to switch between two
 - **on** *(bool)*: true when the box is ticked
 
 **Settings**
-- **label** *(text)*: the name the checkbox shows
-- **default** *(bool)*: ticked to start with
+- **label** *(text; default 'Check 1')*: the name the checkbox shows
+- **default** *(bool; default off)*: ticked to start with
 
 **Why use it**
 
@@ -50,8 +50,8 @@ The second checkbox on the WLED page.
 - **on** *(bool)*: true when the box is ticked
 
 **Settings**
-- **label** *(text)*: the name the checkbox shows
-- **default** *(bool)*: ticked to start with
+- **label** *(text; default 'Check 2')*: the name the checkbox shows
+- **default** *(bool; default off)*: ticked to start with
 
 **Why use it**
 
@@ -86,8 +86,8 @@ The third checkbox on the WLED page. On a cube it is taken by 'Flat mode', so pr
 - **on** *(bool)*: true when the box is ticked
 
 **Settings**
-- **label** *(text)*: the name the checkbox shows
-- **default** *(bool)*: ticked to start with
+- **label** *(text; default 'Check 3')*: the name the checkbox shows
+- **default** *(bool; default off)*: ticked to start with
 
 **Why use it**
 
@@ -205,8 +205,8 @@ The third slider on the WLED page, 0..1, with whatever name you give it.
 - **value** *(float)*: the slider's position, 0..1
 
 **Settings**
-- **label** *(text)*: the name the slider shows
-- **default** *(int)*: where the slider starts, 0..255
+- **label** *(text; default 'Custom 1')*: the name the slider shows
+- **default** *(int; default 128; 0 .. 255)*: where the slider starts, 0..255
 
 **Why use it**
 
@@ -241,8 +241,8 @@ The fourth slider on the WLED page, 0..1, with whatever name you give it.
 - **value** *(float)*: the slider's position, 0..1
 
 **Settings**
-- **label** *(text)*: the name the slider shows
-- **default** *(int)*: where the slider starts, 0..255
+- **label** *(text; default 'Custom 2')*: the name the slider shows
+- **default** *(int; default 128; 0 .. 255)*: where the slider starts, 0..255
 
 **Why use it**
 
@@ -277,8 +277,8 @@ The fifth slider, 0..1. On the device it has only 32 steps, so use it for choice
 - **value** *(float)*: the slider's position, 0..1, in 32 steps
 
 **Settings**
-- **label** *(text)*: the name the slider shows
-- **default** *(int)*: where the slider starts, 0..31
+- **label** *(text; default 'Custom 3')*: the name the slider shows
+- **default** *(int; default 16; 0 .. 31)*: where the slider starts, 0..31
 
 **Why use it**
 
@@ -313,8 +313,8 @@ The Intensity slider on the WLED page, 0..1. Use it for how much - brightness, s
 - **value** *(float)*: the slider's position, 0..1
 
 **Settings**
-- **label** *(text)*: the name the slider shows on the WLED page
-- **default** *(int)*: where the slider starts, 0..255
+- **label** *(text; default 'Intensity')*: the name the slider shows on the WLED page
+- **default** *(int; default 128; 0 .. 255)*: where the slider starts, 0..255
 
 **Why use it**
 
@@ -349,8 +349,8 @@ The Speed slider on the WLED page, as a number from 0 (left) to 1 (right). Multi
 - **value** *(float)*: the slider's position, 0..1
 
 **Settings**
-- **label** *(text)*: the name the slider shows on the WLED page (set in the properties; the node's title carries it)
-- **default** *(int)*: where the slider starts, 0..255 (set in the properties)
+- **label** *(text; default 'Speed')*: the name the slider shows on the WLED page (set in the properties; the node's title carries it)
+- **default** *(int; default 128; 0 .. 255)*: where the slider starts, 0..255 (set in the properties)
 
 **Why use it**
 
@@ -385,18 +385,18 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.js
 An envelope fired by a switch, as a synth shapes a note. One shot: every time gate turns on, the value climbs to 1 over attack and falls back to 0 over decay, however long gate stays on - a flash on the kick that fades the way you shape it. Held: it climbs, falls to sustain and stays there while gate is on, then falls to 0 over release when it goes off. Feed it Audio's beat, a Gate or a Counter.
 
 **Inputs**
-- **gate** *(bool)*: the switch that fires it (the beat)
-- **attack** *(float)*: how long the climb to 1 takes, in milliseconds
-- **decay** *(float)*: how long the fall from 1 takes, in milliseconds
-- **sustain** *(float)*: held: the level it stays at while gate is on, 0..1
-- **release** *(float)*: held: how long the fall to 0 takes once gate is off, in milliseconds
+- **gate** *(bool; default off)*: the switch that fires it (the beat)
+- **attack** *(float; default 10; 1 .. 5000 ms)*: how long the climb to 1 takes, in milliseconds
+- **decay** *(float; default 300; 1 .. 5000 ms)*: how long the fall from 1 takes, in milliseconds
+- **sustain** *(float; default 0.5; 0 .. 1)*: held: the level it stays at while gate is on, 0..1
+- **release** *(float; default 400; 1 .. 1e+04 ms)*: held: how long the fall to 0 takes once gate is off, in milliseconds
 
 **Outputs**
 - **value** *(float)*: the envelope, 0..1
 - **active** *(bool)*: true while it is anywhere but at rest
 
 **Settings**
-- **mode** *(choice)*: one shot (attack, decay on each rise) or held (attack, decay, sustain, release)
+- **mode** *(choice; default 'one shot')*: one shot (attack, decay on each rise) or held (attack, decay, sustain, release)
 
 **Why use it**
 
@@ -465,8 +465,8 @@ Box Fire (`box_fire.json`), Candy Knot (`candy_knot.json`), Cell Weave (`cell_we
 A position that jumps forward on each beat and settles over a few frames - the way a hit should move a pattern. Add its phase to whatever you scroll (a Wave's phase, a Palette index) and the picture lurches on the kick and eases.
 
 **Inputs**
-- **beat** *(bool)*: the beat, from Audio
-- **throw** *(float)*: how far each beat throws it
+- **beat** *(bool; default 0)*: the beat, from Audio
+- **throw** *(float; default 1; 0 .. 4 x)*: how far each beat throws it: at 1 about 0.4 of a cycle, at 2.5 about a whole one
 
 **Outputs**
 - **phase** *(float)*: the running offset: add it to a position
@@ -482,16 +482,16 @@ Its neighbours: Spring swings back and forth after a kick; Ease glides to a targ
 ![Beat kick: stripes that lurch forward on every kick and settle, instead of jumping](docs/nodes/beat_kick.gif)
 
 1. **Audio**'s `beat` is the **beat** input: true on the frame a kick lands.
-2. **throw** is 1: how far each kick moves the phase - one whole cycle of whatever it scrolls.
-3. `phase` is a **Wave**'s phase (x from **Coords** `u`, 4 cycles, triangle): on each kick the stripes lurch along by a cycle and ease to a stop. That wave is the **Palette**'s brightness.
+2. **throw** is 1: how far each kick moves the phase - at 1, about 0.4 of a cycle of whatever it scrolls.
+3. `phase` is a **Wave**'s phase (x from **Coords** `u`, 4 cycles, triangle): on each kick the stripes lurch along by a little under half a cycle and ease to a stop. That wave is the **Palette**'s brightness.
 4. Watch the stripes: still between kicks, a quick lurch on each one that eases to a stop.
 
 [Try it in the studio](studio:try/beat_kick): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
 
 **Try this**
 
-- [Harder kicks](studio:try/beat_kick/1): throw 2.5: each kick throws the stripes two and a half cycles - a big lurch.
-- [Nudge](studio:try/beat_kick/2): throw 0.25: a quarter cycle per kick - a gentle nudge on the beat.
+- [Harder kicks](studio:try/beat_kick/1): throw 2.5: each kick throws the stripes about one whole cycle - a big lurch.
+- [Nudge](studio:try/beat_kick/2): throw 0.25: about a tenth of a cycle per kick - a gentle nudge on the beat.
 - [Finer stripes](studio:try/beat_kick/3): the Wave's cycles at 10: narrow stripes, so the same throw moves them past many stripes at once.
 
 **Used in**
@@ -506,7 +506,7 @@ A fixed colour you pick.
 - **color** *(color)*: the colour
 
 **Settings**
-- **rgb** *(color)*: the colour
+- **rgb** *(color; default #FF8000)*: the colour
 
 **Why use it**
 
@@ -538,9 +538,9 @@ Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Lightning (`lightnin
 Counts: each time trigger turns on, one more, and at steps it starts again from 0. wrap fires on the trigger that brings it back to 0, so with the beat in and 4 steps it fires once a bar - a clock divider. phase is the count as 0..1, for stepping through a palette or a set of looks.
 
 **Inputs**
-- **trigger** *(bool)*: a rise counts one (the beat)
-- **reset** *(bool)*: true holds the count at 0
-- **steps** *(float)*: how many counts before it starts again
+- **trigger** *(bool; default off)*: a rise counts one (the beat)
+- **reset** *(bool; default off)*: true holds the count at 0
+- **steps** *(float; default 4; 1 .. 64)*: how many counts before it starts again
 
 **Outputs**
 - **count** *(float)*: the count, 0 .. steps-1
@@ -579,7 +579,7 @@ Video Switchboard (`video_switchboard.json`)
 Remembers a number for one frame. It is the one node a wire may loop back through: feed it a value and plug its output back into what made that value, and each frame sees last frame's result. For 'only restart the cycle when the cycle is over' and the like. The editor puts one on a wire for you when the wire would close a loop (undo takes it out again).
 
 **Inputs**
-- **x** *(float)*: the value to remember
+- **x** *(float; default 0)*: the value to remember
 
 **Outputs**
 - **value** *(float)*: what x was last frame (0 on the first)
@@ -615,8 +615,8 @@ Question Block (`question_block.json`)
 A value that glides instead of jumping. Give it a target - a slider, a switch, a random - and it moves there over about `seconds`, so a change on the WLED page fades in rather than snapping.
 
 **Inputs**
-- **target** *(float)*: where to go
-- **seconds** *(float)*: roughly how long the glide takes
+- **target** *(float; default 0)*: where to go
+- **seconds** *(float; default 1; 0.02 .. 20 s)*: roughly how long the glide takes
 
 **Outputs**
 - **value** *(float)*: where it is now
@@ -649,17 +649,17 @@ Its neighbours: Slew moves at a fixed speed (a big jump takes longer); Spring ov
 Drops a thing on the surface each time the trigger fires - up to eight alive at once - and remembers where and how old each is. Plug the beat into trigger and the Shells node reads them: rings spreading from wherever each kick landed.
 
 **Inputs**
-- **trigger** *(bool)*: true drops a new one (the beat)
-- **pos** *(vector)*: where to drop it, if not random (a vector; z = 1 is the lid)
-- **tag** *(float)*: a number kept with it - a hue, say (Loudest bin)
-- **life** *(float)*: how many seconds each one lives
+- **trigger** *(bool; default off)*: true drops a new one (the beat)
+- **pos** *(vector; default (0, 0, 1))*: where to drop it, if not random (a vector; z = 1 is the lid)
+- **tag** *(float; default 0)*: a number kept with it - a hue, say (Loudest bin)
+- **life** *(float; default 4; 0.05 .. 30 s)*: how many seconds each one lives
 
 **Outputs**
 - **slots** *(float)*: the list - wire this to Shells
 - **count** *(float)*: how many are alive
 
 **Settings**
-- **random** *(bool)*: drop each one at a random point on the surface instead of x, y, z
+- **random** *(bool; default on)*: drop each one at a random point on the surface instead of at pos
 
 **Why use it**
 
@@ -692,14 +692,14 @@ Cube Ripples (`cube_ripples.json`)
 Smooths a jumpy signal. It follows rises quickly (attack) and falls slowly (release), so a bass that flickers becomes a swell that breathes. Put it between Audio and anything that would flicker.
 
 **Inputs**
-- **x** *(float)*: the signal to smooth
+- **x** *(float; default 0)*: the signal to smooth
 
 **Outputs**
 - **value** *(float)*: the smoothed signal
 
 **Settings**
-- **attack** *(float)*: how fast it rises, in milliseconds
-- **release** *(float)*: how fast it falls, in milliseconds
+- **attack** *(float; default 20; 1 .. 2000 ms)*: how long it takes to rise, in milliseconds - bigger is slower
+- **release** *(float; default 250; 1 .. 5000 ms)*: how long it takes to fall, in milliseconds - bigger is slower
 
 **Why use it**
 
@@ -735,7 +735,7 @@ One of the sixteen frequency bands the microphone is split into, from low (0) to
 - **level** *(float)*: how loud that band is, 0..1
 
 **Settings**
-- **bin** *(int)*: which band, 0 (lowest) to 15 (highest)
+- **bin** *(int; default 0; 0 .. 15)*: which band, 0 (lowest) to 15 (highest)
 
 **Why use it**
 
@@ -797,9 +797,9 @@ Breakout (`breakout.json`)
 A switch with a gap: it turns on when x reaches high and only turns off again when x falls to low. A level that wobbles about one point - a bass band, a noisy volume - would flicker a plain Threshold; the gap between high and low stops that. rise is true for the one frame it turns on.
 
 **Inputs**
-- **x** *(float)*: the level to watch
-- **high** *(float)*: turns on when x reaches this
-- **low** *(float)*: turns off when x falls to this
+- **x** *(float; default 0)*: the level to watch
+- **high** *(float; default 0.6; 0 .. 1)*: turns on when x reaches this
+- **low** *(float; default 0.4; 0 .. 1)*: turns off when x falls to this
 
 **Outputs**
 - **on** *(bool)*: true while on
@@ -833,8 +833,8 @@ Its neighbours: Threshold is the single line (fine for steady values); Rising ed
 Which way is down, as a direction in the cube's own frame. With a motion sensor fitted it is the real down; without one it is straight down, tilted by the two inputs. Feed the direction into Dot 3 with Position to get 'height', or step along it to make things fall.
 
 **Inputs**
-- **tilt x** `tilt_x` *(float)*: lean, -1..1, used when there is no sensor
-- **tilt y** `tilt_y` *(float)*: lean the other way, -1..1
+- **tilt x** `tilt_x` *(float; default 0)*: lean, -1..1, used when there is no sensor
+- **tilt y** `tilt_y` *(float; default 0)*: lean the other way, -1..1
 
 **Outputs**
 - **g** *(vector)*: down, as one vector wire
@@ -871,11 +871,11 @@ Gyro Sand (`gyro_sand.json`)
 
 ### Hold
 
-Sample and hold: x as it was the last time trigger turned on, kept until it turns on again. Feed it a Random, a spectrum level or the time and trigger it from the beat: a value that changes only on the beat and holds in between.
+Sample and hold: x as it was the last time trigger turned on, kept until it turns on again. Feed it a Hash, a spectrum level or the time and trigger it from the beat: a value that changes only on the beat and holds in between.
 
 **Inputs**
-- **x** *(float)*: the value to catch
-- **trigger** *(bool)*: a rise catches x
+- **x** *(float; default 0)*: the value to catch
+- **trigger** *(bool; default off)*: a rise catches x
 
 **Outputs**
 - **value** *(float)*: x as it was at the last rise
@@ -908,14 +908,14 @@ Its neighbours: Random hold holds a new random number per trigger; Peak hold kee
 A number that keeps growing at a rate you set - the way to make a phase, a scroll or an angle that never stops. Plug a Speed slider into rate and you have a clock the slider controls. wrap makes it start over at that value (1 for a phase, 0 to never wrap).
 
 **Inputs**
-- **rate** *(float)*: how much to add per second (a slider, a Multiply of one)
-- **reset** *(bool)*: true starts it from 0 again (the beat, to restart on a kick)
+- **rate** *(float; default 1; /s)*: how much to add per second (a slider, a Multiply of one)
+- **reset** *(bool; default off)*: true starts it from 0 again (the beat, to restart on a kick)
 
 **Outputs**
 - **value** *(float)*: the running total
 
 **Settings**
-- **wrap** *(float)*: start over when it reaches this; 0 = never
+- **wrap** *(float; default 1)*: start over when it reaches this; 0 = never
 
 **Why use it**
 
@@ -953,8 +953,8 @@ Which of the sixteen frequency bands is loudest right now, as a number from 0 (b
 - **level** *(float)*: its loudness, 0..1
 
 **Settings**
-- **from** *(int)*: only look at bands from this one
-- **to** *(int)*: up to this one
+- **from** *(int; default 1; 0 .. 15)*: only look at bands from this one
+- **to** *(int; default 15; 0 .. 15)*: up to this one
 
 **Why use it**
 
@@ -987,7 +987,7 @@ Cube Chladni (`cube_chladni.json`), Cube Ripples (`cube_ripples.json`), Firework
 Which notes are sounding: the strength of each of the twelve pitch classes, C first (C, C#, D ... B), over the last fifth of a second, the strongest 1 - read at index 0..1 across the twelve (unwired, the pixel's u: a strip shows the twelve as keys). note is the strongest as 0..1 round the circle of notes - put it into a hue and each chord gets its colour; clarity is how far it stands out. It reads the studio's audioreactive patch, on an ESP32 or an S3; elsewhere all 0.
 
 **Inputs**
-- **index** *(float)*: which note, 0..1 across the twelve - unwired, the pixel's u
+- **index** *(float; default 0; 0 .. 1)*: which note, 0..1 across the twelve - unwired, the pixel's u
 
 **Outputs**
 - **level** *(float)*: that note's strength, 0..1
@@ -995,7 +995,7 @@ Which notes are sounding: the strength of each of the twelve pitch classes, C fi
 - **clarity** *(float)*: how far the strongest stands out, 0 when every note is alike, 1 when it is alone
 
 **Settings**
-- **smooth** *(float)*: 0 = as heard, near 1 = slow and steady
+- **smooth** *(float; default 0.5; 0 .. 0.99)*: 0 = as heard, near 1 = slow and steady
 
 **Why use it**
 
@@ -1027,7 +1027,7 @@ A fixed number you type in. Most pins can be typed straight on the node instead;
 - **value** *(float)*: the number
 
 **Settings**
-- **value** *(float)*: the number
+- **value** *(float; default 1; -1000 .. 1000)*: the number
 
 **Why use it**
 
@@ -1052,18 +1052,18 @@ Its neighbours: Speed, Intensity and the other controls are numbers the person s
 
 ### Onset
 
-A hit anywhere in the sound - a snare, a hat, a pluck: true for one frame when the bands rise more than they have been lately (the spectral flux against its recent mean and spread). Audio's beat is a jump in the loudness and mostly hears the kick; this hears what lands over a steady bass too. Narrow from and to to listen to part of the spectrum.
+A hit anywhere in the sound - a snare, a hat, a pluck: true for one frame, just after the bands rise more than they have been lately (the spectral flux against its recent mean and spread). Audio's beat is a jump in the loudness and mostly hears the kick; this hears what lands over a steady bass too. Narrow from and to to listen to part of the spectrum.
 
 **Inputs**
-- **sensitivity** *(float)*: how far over the recent rise a hit must be: lower hears more
+- **sensitivity** *(float; default 1.5; 0.5 .. 4)*: how far over the recent rise a hit must be: lower hears more
 
 **Outputs**
 - **onset** *(bool)*: true for the frame after a hit
 - **strength** *(float)*: how big the last rise was, 0..1
 
 **Settings**
-- **from** *(int)*: the lowest band to listen to, 0..15
-- **to** *(int)*: the highest, 0..15
+- **from** *(int; default 0; 0 .. 15)*: the lowest band to listen to, 0..15
+- **to** *(int; default 15; 0 .. 15)*: the highest, 0..15
 
 **Why use it**
 
@@ -1092,26 +1092,26 @@ Narrow it to part of the spectrum to hear only the hats or only the snare. Its n
 Sparks, rain, fireworks, embers. Points are born at `rate` a second (and `burst size` at once when burst is true), fly with a velocity plus some random spread, fall with gravity, slow with drag, and die after `life` seconds. They stay on the cube's surface unless you say otherwise. Wire slots to Sprites to see them.
 
 **Inputs**
-- **rate** *(float)*: how many are born a second
-- **burst** *(bool)*: true births a burst (the beat)
-- **burst size** `burst_count` *(float)*: how many in a burst
-- **pos** *(vector)*: where they are born (unless random)
-- **velocity** *(vector)*: the speed and direction they start with
-- **spread** *(float)*: how much random is added to that
-- **gravity** *(vector)*: the pull, e.g. (0, 0, -1) for down
-- **drag** *(float)*: how quickly they slow, 0 never
-- **life** *(float)*: seconds each lives
-- **tag** *(float)*: a number kept with each - a hue
+- **rate** *(float; default 10; 0 .. 200 /s)*: how many are born a second
+- **burst** *(bool; default off)*: true births a burst (the beat)
+- **burst size** `burst_count` *(float; default 8)*: how many in a burst
+- **pos** *(vector; default (0, 0, 1))*: where they are born (unless random)
+- **velocity** *(vector; default (0, 0, 0))*: the speed and direction they start with
+- **spread** *(float; default 0.5; 0 .. 2)*: how much random is added to that
+- **gravity** *(vector; default (0, 0, -1))*: the pull, e.g. (0, 0, -1) for down
+- **drag** *(float; default 0.2; 0 .. 5)*: how quickly they slow, 0 never
+- **life** *(float; default 2; 0.05 .. 20 s)*: seconds each lives
+- **tag** *(float; default 0)*: a number kept with each - a hue
 
 **Outputs**
 - **slots** *(float)*: the particles - wire this to Sprites
 - **count** *(float)*: how many are alive
 
 **Settings**
-- **max** *(int)*: the most alive at once (up to 48)
-- **born anywhere** `random_pos` *(bool)*: born anywhere on the surface instead of at pos
-- **on the surface** `on_surface` *(bool)*: keep them on the cube's surface
-- **floor** *(choice)*: at the bottom edge: die, bounce, or wrap to the lid
+- **max** *(int; default 32; 1 .. 48)*: the most alive at once (up to 48)
+- **born anywhere** `random_pos` *(bool; default off)*: born anywhere on the surface instead of at pos
+- **on the surface** `on_surface` *(bool; default on)*: keep them on the cube's surface
+- **floor** *(choice; default 'die')*: at the bottom edge: die, bounce, or wrap to the lid
 
 **Why use it**
 
@@ -1145,9 +1145,9 @@ Fireworks (`fireworks.json`)
 A VU meter's falling bar: it jumps at once to each new peak of x, holds it for hold, then falls at fall a second - never below x. The highest a level has been lately, for a meter or a flash that lingers.
 
 **Inputs**
-- **x** *(float)*: the level to follow
-- **hold** *(float)*: how long a peak is held before it falls, in milliseconds
-- **fall** *(float)*: how fast it falls after that, in units a second
+- **x** *(float; default 0)*: the level to follow
+- **hold** *(float; default 500; 0 .. 5000 ms)*: how long a peak is held before it falls, in milliseconds
+- **fall** *(float; default 1; 0 .. 10 /s)*: how fast it falls after that, in units a second
 
 **Outputs**
 - **value** *(float)*: the held peak
@@ -1180,7 +1180,7 @@ Its neighbours: Envelope rises fast and falls smoothly (no hold); Slew limits bo
 A random number that stays put until the trigger fires, then picks a new one. Feed it the beat and something changes direction, colour or place on every kick and holds in between.
 
 **Inputs**
-- **trigger** *(bool)*: true to pick a new random (the beat)
+- **trigger** *(bool; default off)*: true to pick a new random (the beat)
 
 **Outputs**
 - **value** *(float)*: the current random, 0..1
@@ -1217,7 +1217,7 @@ Liquid (`liquid.json`), Slab Cut (`slab_cut.json`), Truchet Cube (`truchet_cube.
 Turns a switch into a tap: true for exactly one frame when its input goes from off to on. Use it when something should happen once per press or per beat, not for as long as the input stays on.
 
 **Inputs**
-- **x** *(bool)*: the switch to watch
+- **x** *(bool; default off)*: the switch to watch
 
 **Outputs**
 - **pulse** *(bool)*: true for one frame when x turns on
@@ -1253,8 +1253,8 @@ Video Switchboard (`video_switchboard.json`)
 Scenes on the device: the graph's snapshots (Snapshots, Ctrl+Shift+K) kept in the effect, and the one index picks faded to over fade seconds - every typed value on a pin moving from where it was to the scene's, a switch crossing at the middle. A verse look and a chorus look in one effect: a Counter on the beat into index steps through them a bar at a time, a slider picks one. A node's settings are the build's (they are compiled in); a snapshot without a pin's value leaves it as built. Rebuild after saving a snapshot: the table is made when the graph compiles.
 
 **Inputs**
-- **index** *(float)*: which scene: 0 the first, 1 the next... (rounded, held to the last)
-- **fade** *(float)*: seconds to fade to a newly picked scene (0: at once)
+- **index** *(float; default 0)*: which scene: 0 the first, 1 the next... (rounded, held to the last)
+- **fade** *(float; default 1; 0 .. 30 s)*: seconds to fade to a newly picked scene (0: at once)
 
 **Outputs**
 - **scene** *(float)*: the scene picked
@@ -1290,11 +1290,11 @@ Snapshots are taken in the studio (Snapshots, Ctrl+Shift+K); the Scenes node put
 A timed cycle of up to four phases - a bump, a spin, a hold, a rest - each lasting the seconds you give it, started by the trigger (or straight away). It tells you which phase is on, how far through it is (0..1) and how long since the cycle began; loop makes it repeat.
 
 **Inputs**
-- **trigger** *(bool)*: true starts the cycle from the top (the beat)
-- **phase 1** `t1` *(float)*: phase 1's length in seconds
-- **phase 2** `t2` *(float)*: phase 2's length
-- **phase 3** `t3` *(float)*: phase 3's length
-- **phase 4** `t4` *(float)*: phase 4's length
+- **trigger** *(bool; default off)*: true starts the cycle from the top (the beat)
+- **phase 1** `t1` *(float; default 1; s)*: phase 1's length in seconds
+- **phase 2** `t2` *(float; default 1; s)*: phase 2's length
+- **phase 3** `t3` *(float; default 1; s)*: phase 3's length
+- **phase 4** `t4` *(float; default 1; s)*: phase 4's length
 
 **Outputs**
 - **phase** *(float)*: 1, 2, 3 or 4 while running, 0 when finished
@@ -1303,8 +1303,8 @@ A timed cycle of up to four phases - a bump, a spin, a hold, a rest - each lasti
 - **running** *(bool)*: true until the last phase ends
 
 **Settings**
-- **loop** *(bool)*: start again at the end
-- **run at start** `start_running` *(bool)*: run once from the first frame without a trigger
+- **loop** *(bool; default off)*: start again at the end
+- **run at start** `start_running` *(bool; default on)*: run once from the first frame without a trigger
 
 **Why use it**
 
@@ -1333,9 +1333,9 @@ Drive different parts of the effect from which phase it is, and their speed from
 Whether there is any sound. sound stays on while the volume has passed threshold in the last hold seconds; quiet counts the seconds since it last did; mix is 1 while there is sound and falls to 0 over fade seconds after the hold. Blend a music look by mix and an idle look by 1 - mix, and the cube settles into the idle one when the music stops.
 
 **Inputs**
-- **threshold** *(float)*: the volume that counts as sound, 0..1
-- **hold** *(float)*: seconds of quiet before it gives up
-- **fade** *(float)*: seconds mix takes to fall to 0 after that
+- **threshold** *(float; default 0.03; 0 .. 1)*: the volume that counts as sound, 0..1
+- **hold** *(float; default 1.5; 0 .. 30 s)*: seconds of quiet before it gives up
+- **fade** *(float; default 2; 0 .. 30 s)*: seconds mix takes to fall to 0 after that
 
 **Outputs**
 - **sound** *(bool)*: true while there is sound
@@ -1369,9 +1369,9 @@ Blend the music look by that mix and an idle look by the rest, and the effect se
 Follows x, but no faster than up a second while rising and down a second while falling - a straight glide at a speed. Ease and Envelope glide in curves over a time; Slew moves at a pace, so a big jump takes longer than a small one.
 
 **Inputs**
-- **x** *(float)*: where to go
-- **up** *(float)*: the most it may rise in a second
-- **down** *(float)*: the most it may fall in a second
+- **x** *(float; default 0)*: where to go
+- **up** *(float; default 2; 0 .. 20 /s)*: the most it may rise in a second
+- **down** *(float; default 1; 0 .. 20 /s)*: the most it may fall in a second
 
 **Outputs**
 - **value** *(float)*: where it is now
@@ -1396,7 +1396,7 @@ Its speeds are separate for rising and falling, which is how a VU meter behaves:
 
 **Try this**
 
-- [Snappy rise](studio:try/slew/1): up 40: Slew rises forty a second - it catches each kick at once - but still falls at its own pace, a peak meter.
+- [Snappy rise](studio:try/slew/1): up 20 (its most): Slew rises twenty a second - it catches each kick at once - but still falls at its own pace, a peak meter.
 - [Slow fall](studio:try/slew/2): down 0.3: after a kick the meter takes three seconds to sink, so it barely drops between beats and holds near the top.
 - [Lazy both ways](studio:try/slew/3): up 0.5 and down 0.5: Slew can no longer keep up with the beat at all, so it settles at a level that rises and falls with how busy the music is.
 
@@ -1409,14 +1409,14 @@ Video Switchboard (`video_switchboard.json`), VS Motion (sub-graph) (`subgraphs/
 The whole spectrum as a curve you can read anywhere: index 0 is the lowest band, 1 the highest. Feed a coordinate into index and the bands spread across the cube - a graphic equaliser along u, or round the ring. smooth stops it flickering.
 
 **Inputs**
-- **index** *(float)*: where to read, 0 (bass) .. 1 (treble); a coordinate spreads the spectrum out
+- **index** *(float; default 0; 0 .. 1)*: where to read, 0 (bass) .. 1 (treble); a coordinate spreads the spectrum out
 
 **Outputs**
 - **level** *(float)*: how loud it is there, 0..1
 
 **Settings**
-- **smooth** *(float)*: 0 = raw, near 1 = very smooth and slow
-- **interpolate** *(bool)*: blend between bands rather than stepping
+- **smooth** *(float; default 0.5; 0 .. 0.99)*: 0 = raw, near 1 = very smooth and slow
+- **interpolate** *(bool; default on)*: blend between bands rather than stepping
 
 **Why use it**
 
@@ -1448,8 +1448,8 @@ Slab Cut (`slab_cut.json`)
 The sixteen bands as they were over the last two seconds: read at index 0..1 across the bands and age 0 (now) to 1 (the oldest). Unwired, index is the pixel's u and age its v - the spectrum across the picture flowing down it, a waterfall.
 
 **Inputs**
-- **index** *(float)*: which band, 0 (bass) .. 1 (treble) - unwired, the pixel's u
-- **age** *(float)*: how long ago, 0 now .. 1 about 2 s - unwired, the pixel's v
+- **index** *(float; default 0; 0 .. 1)*: which band, 0 (bass) .. 1 (treble) - unwired, the pixel's u
+- **age** *(float; default 0; 0 .. 1)*: how long ago, 0 now .. 1 about 2 s - unwired, the pixel's v
 
 **Outputs**
 - **level** *(float)*: how loud that band was then, 0..1
@@ -1481,16 +1481,16 @@ Its neighbours: Spectrum is only now; Previous at could scroll a picture down by
 A weight on a spring. It is pulled toward target, and a kick sends it swinging: overshoot, swing back, settle. Plug the beat's hit into kick and use the value to tilt or bounce something - it will slosh like liquid rather than snap.
 
 **Inputs**
-- **target** *(float)*: where it settles
-- **kick** *(float)*: a push - the beat's hit
+- **target** *(float; default 0)*: where it settles
+- **kick** *(float; default 0)*: a push - the beat's hit
 
 **Outputs**
 - **value** *(float)*: where it is now
 - **velocity** *(float)*: how fast it is moving
 
 **Settings**
-- **swings a second** `hz` *(float)*: how many swings a second
-- **damping** *(float)*: how quickly the swinging dies away, 0 (forever) .. 1
+- **swings a second** `hz` *(float; default 1.2; 0.05 .. 20 Hz)*: how many swings a second
+- **damping** *(float; default 0.15; 0 .. 1)*: how quickly the swinging dies away, 0 (forever) .. 1
 
 **Why use it**
 
@@ -1529,7 +1529,7 @@ The least, the most and the average of a field over every pixel, from last frame
 - **mean** *(float)*: the average
 
 **Settings**
-- **field** *(int)*: which field to measure
+- **field** *(int; default 0; 0 .. 3)*: which field to measure
 
 **Why use it**
 
@@ -1561,8 +1561,8 @@ VS Motion (sub-graph) (`subgraphs/vs_motion.json`)
 A step sequencer: eight values (sliders on the node), one at a time - each trigger moves to the next, the last wraps to the first, reset goes back to the start. Trigger it from Audio's beat, a Tempo's phase through a Threshold and Rising edge, or any pulse. The value drives whatever you like: a palette index that jumps on the beat, a brightness pattern, which of the States shows.
 
 **Inputs**
-- **trigger** *(bool)*: a rise here moves to the next step
-- **reset** *(bool)*: back to the first step while true
+- **trigger** *(bool; default off)*: a rise here moves to the next step
+- **reset** *(bool; default off)*: back to the first step while true
 
 **Outputs**
 - **value** *(float)*: the current step's value
@@ -1570,15 +1570,15 @@ A step sequencer: eight values (sliders on the node), one at a time - each trigg
 - **changed** *(bool)*: true on the frame a step changes
 
 **Settings**
-- **length** *(int)*: how many of the eight play
-- **step 1** `s1` *(float)*: step 1
-- **step 2** `s2` *(float)*: step 2
-- **step 3** `s3` *(float)*: step 3
-- **step 4** `s4` *(float)*: step 4
-- **step 5** `s5` *(float)*: step 5
-- **step 6** `s6` *(float)*: step 6
-- **step 7** `s7` *(float)*: step 7
-- **step 8** `s8` *(float)*: step 8
+- **length** *(int; default 8; 1 .. 8)*: how many of the eight play
+- **step 1** `s1` *(float; default 1; 0 .. 1)*: step 1
+- **step 2** `s2` *(float; default 0; 0 .. 1)*: step 2
+- **step 3** `s3` *(float; default 0.5; 0 .. 1)*: step 3
+- **step 4** `s4` *(float; default 0; 0 .. 1)*: step 4
+- **step 5** `s5` *(float; default 1; 0 .. 1)*: step 5
+- **step 6** `s6` *(float; default 0; 0 .. 1)*: step 6
+- **step 7** `s7` *(float; default 0.5; 0 .. 1)*: step 7
+- **step 8** `s8` *(float; default 0; 0 .. 1)*: step 8
 
 **Why use it**
 
@@ -1607,8 +1607,8 @@ Its neighbours: Counter counts (the steps are its numbers); Sequencer runs timed
 Musical time. Wire Audio's beat in and it measures the tempo from the gaps between hits (30..300 bpm, smoothed) and counts time in beats: a Wave with `beats` / 4 on its x is one cycle a bar at whatever speed the song runs. On each hit the count snaps to the nearest whole beat, so the phase stays with the music; without beats it runs at the fallback bpm (the synth's, in the sim).
 
 **Inputs**
-- **beat** *(bool)*: the beat, from Audio
-- **fallback** *(float)*: the bpm to run at until beats arrive
+- **beat** *(bool; default off)*: the beat, from Audio
+- **fallback** *(float; default 120; 30 .. 300 bpm)*: the bpm to run at until beats arrive - read once, as the effect starts
 
 **Outputs**
 - **bpm** *(float)*: the tempo measured
@@ -1627,7 +1627,7 @@ On each hit the count snaps to the nearest whole beat, so it stays with the musi
 ![Tempo: the beat's speed measured, and a phase that runs 0 to 1 every beat in time with the music](docs/nodes/tempo.gif)
 
 1. **Audio**'s `beat` is the **beat** input. **fallback** is 120: the bpm it runs at when there are no beats (here the synth's beats are always there).
-2. `bpm` is the measured tempo; `beats` counts beats; `phase` runs 0..1 through each beat; `bar` counts bars.
+2. `bpm` is the measured tempo; `beats` counts beats; `phase` runs 0..1 through each beat; `bar` runs 0..1 through each four-beat bar.
 3. `phase` drives a level meter: the value plus **Coords** `v` reaches 1 (a **Threshold**) only where `v` is above 1 minus the value, so a column is lit from the bottom as high as the value, in the **Palette**'s colours across - a ramp that rises through every beat and drops on the next.
 4. The trace shows the phase: a sawtooth, one tooth per beat, locked to the synth's kicks.
 
@@ -1659,15 +1659,15 @@ Its neighbours: Audio gives the levels; Loudest bin gives the strongest band; No
 
 ### Time
 
-The clock. t counts seconds since the effect started; feed it into a Wave, a Noise's z, or an Add to make something drift. dt is how long this frame took, for things that move a fixed amount per second.
+The clock. t counts seconds on WLED's clock - since the device started - and goes back to 0 every hour; feed it into a Wave, a Noise's z, or an Add to make something drift (anything it scrolls jumps once an hour: Integrate never does). dt is how long this frame took, for things that move a fixed amount per second.
 
 **Outputs**
-- **t** *(float)*: seconds since the effect started
+- **t** *(float)*: seconds on the clock, 0 .. 3600 then back to 0
 - **frame ms** `dt` *(float)*: this frame's length in milliseconds
 
 **Why use it**
 
-Anything that moves without being pushed by the music moves with the clock. Time counts seconds since the effect started; times a speed, it is a scroll, a spin, a drift. It also gives how long this frame took, for things that should move a fixed amount a second however fast the effect runs.
+Anything that moves without being pushed by the music moves with the clock. Time counts seconds on WLED's clock (from the device's start, back to 0 every hour); times a speed, it is a scroll, a spin, a drift. It also gives how long this frame took, for things that should move a fixed amount a second however fast the effect runs.
 
 Its neighbours: Integrate grows at a rate (and keeps its place when the rate changes); Frame count counts frames; Tempo counts beats; Time is plain seconds.
 
@@ -1675,7 +1675,7 @@ Its neighbours: Integrate grows at a rate (and keeps its place when the rate cha
 
 ![Time: the clock scrolling the palette across the matrix](docs/nodes/time.gif)
 
-1. Time has no inputs or settings. `t` is the seconds since the effect started; `frame ms` is how long this frame took, in milliseconds.
+1. Time has no inputs or settings. `t` is the seconds on the clock; `frame ms` is how long this frame took, in milliseconds.
 2. `t` times 0.3 (a **Multiply**) is added to **Coords** `u` (an **Add**): the **Palette**'s index, so the colours scroll steadily left.
 3. The trace shows `frame ms`: steady here, as the sim runs at a fixed step; on the device it rises when the effect is busy.
 
@@ -1695,13 +1695,13 @@ Box Fire (`box_fire.json`), Gyro Sand (`gyro_sand.json`), Watershed (`watershed.
 A switch: on or off as you set it, and flipped each time flip turns on - wire the beat in and it changes on every kick (a flip-flop). Nothing wired, it is a fixed on or off.
 
 **Inputs**
-- **flip** *(bool)*: a rise flips it
+- **flip** *(bool; default off)*: a rise flips it
 
 **Outputs**
 - **on** *(bool)*: the switch
 
 **Settings**
-- **on** *(bool)*: how it starts
+- **on** *(bool; default on)*: how it starts
 
 **Why use it**
 
@@ -1734,8 +1734,8 @@ Video Switchboard (`video_switchboard.json`)
 The sound's own shape, as a scope draws it: the last 23 ms of it, read at index 0..1 - unwired, the pixel's u, so the wave lies across the picture. sample swings -1..1 about 0; level is its size. It reads the studio's audioreactive patch (the PCM waveform); with WLED's stock audioreactive it is flat.
 
 **Inputs**
-- **index** *(float)*: where along the 23 ms to read, 0..1 - unwired, the pixel's u
-- **gain** *(float)*: how much to scale it by
+- **index** *(float; default 0; 0 .. 1)*: where along the 23 ms to read, 0..1 - unwired, the pixel's u
+- **gain** *(float; default 1; 0 .. 4 x)*: how much to scale it by
 
 **Outputs**
 - **sample** *(float)*: the waveform there, -1..1
@@ -1789,7 +1789,7 @@ It gives the place several ways, for different jobs: `u` and `v` run 0..1 across
 
 1. Coords has no inputs or settings - it only answers. Its six outputs are six ways of saying where this pixel is.
 2. `u` goes into a **Mix**'s a, and the Mix's result into the **Palette**'s index: with the Mix's t at 0 it passes a straight through, so the colours run left to right across the matrix.
-3. `angle` waits in the Mix's b - the angle round the centre, 0..1 for a full turn. The Mix chooses between u and angle, so one change shows the other.
+3. `angle` waits in the Mix's b - the angle round the centre, in radians: -3.14 to 3.14 for a full turn. The Mix chooses between u and angle, so one change shows the other.
 4. `r` - the distance from the centre - goes into a **Smoothstep** whose edges are 1.2 and 0: bright where r is 0, fading to dark by r 1.2. That is the Palette's brightness, so the corners fall away.
 5. `v`, `centred x` and `centred y` are left unwired here; v is u's partner down the matrix, centred x and y are u and v moved so the centre is 0.
 
@@ -1797,7 +1797,7 @@ It gives the place several ways, for different jobs: `u` and `v` run 0..1 across
 
 **Try this**
 
-- [Colour by angle](studio:try/coords/1): the Mix's t at 1: the palette's index comes from angle instead of u, so the colours go round the centre - a colour wheel, the start of every spinner.
+- [Colour by angle](studio:try/coords/1): the Mix's t at 1: the palette's index comes from angle instead of u, so the colours go round the centre. The angle is in radians, so the palette wraps about six times round - multiply it by 0.159 (one over 6.28) for a single colour wheel, the start of every spinner.
 - [Halfway](studio:try/coords/2): the Mix's t at 0.5: the index is half u and half angle, so the bands bend - a spiral between a gradient and a wheel.
 - [No falloff](studio:try/coords/3): the Smoothstep's edges at -1 and -0.5: r is never below them, so the brightness is 1 everywhere and the whole matrix is lit evenly.
 
@@ -1812,7 +1812,7 @@ Which face this pixel is on, and where on that face - a and b run 0..1 across ea
 **Outputs**
 - **face** *(float)*: 0 east, 1 west, 2 north, 3 south, 4 lid, 5 bottom
 - **a** *(float)*: across the face, 0..1
-- **b** *(float)*: down the face, 0..1
+- **b** *(float)*: up the face, 0 at its bottom edge .. 1 at its top (on the lid and bottom: along y)
 - **normal** *(vector)*: the face's outward direction as one vector wire
 - **normal x** `nx` *(float)*: the face's outward direction, x
 - **normal y** `ny` *(float)*: y
@@ -1822,7 +1822,7 @@ Which face this pixel is on, and where on that face - a and b run 0..1 across ea
 
 Coords sees the cube as the unfolded net - one flat picture with the faces laid out in a cross - so a pattern drawn from it is cut and turned at the folds. When you want the same thing on every face, each face the right way round, you need coordinates that start again on each face. Cube face gives them.
 
-`a` and `b` run 0..1 across and down each face; `face` numbers the faces (0 east, 1 west, 2 north, 3 south, 4 lid, 5 bottom), so each can be treated differently; `normal x`, `normal y`, `normal z` say which way the face looks. Its neighbours: Coords is the whole net; Direction and Position see the cube as a solid; Cube face is one tile per face.
+`a` runs 0..1 across each face and `b` 0..1 up it (on the lid and bottom, along y); `face` numbers the faces (0 east, 1 west, 2 north, 3 south, 4 lid, 5 bottom), so each can be treated differently; `normal x`, `normal y`, `normal z` say which way the face looks. Its neighbours: Coords is the whole net; Direction and Position see the cube as a solid; Cube face is one tile per face.
 
 **Tutorial**
 
@@ -1923,17 +1923,17 @@ Candy Knot (`candy_knot.json`), Feigenbaum (`feigenbaum.json`), Kaleidoscope (`k
 u and v turned round: left for right, top for bottom, or swapped so the picture lies on its diagonal. Between Coords and the nodes that draw, to mirror a whole effect without touching it.
 
 **Inputs**
-- **u** *(float)*: across, 0..1 - unwired, the pixel's u
-- **v** *(float)*: down, 0..1 - unwired, the pixel's v
+- **u** *(float; default 0)*: across, 0..1 - unwired, the pixel's u
+- **v** *(float; default 0)*: down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **u** *(float)*: across, flipped as asked
 - **v** *(float)*: down, flipped as asked
 
 **Settings**
-- **left-right** `flip_u` *(bool)*: mirror left-right
-- **top-bottom** `flip_v` *(bool)*: mirror top-bottom
-- **swap** *(bool)*: u and v exchanged
+- **left-right** `flip_u` *(bool; default on)*: mirror left-right
+- **top-bottom** `flip_v` *(bool; default off)*: mirror top-bottom
+- **swap** *(bool; default off)*: u and v exchanged
 
 **Why use it**
 
@@ -2033,7 +2033,7 @@ Cell Weave (`cell_weave.json`), Cube Axes (`cube_axes.json`), Cube Chladni (`cub
 Any point in the box - even one slightly off the surface - to the pixel that shows it. Take Position, add a small step in some direction, and this tells you which pixel is that way: the neighbour a grain of sand falls into.
 
 **Inputs**
-- **pos** *(vector)*: the point, as a vector (Position plus a step)
+- **pos** *(vector; default (0, 0, 1))*: the point, as a vector (Position plus a step)
 
 **Outputs**
 - **u** *(float)*: that pixel, across
@@ -2071,8 +2071,8 @@ Gyro Sand (`gyro_sand.json`)
 The reverse of Cube ring: give it a point as around and depth and it tells you which pixel shows it, as the u, v that Previous at and Field read. Add a little to depth and you are reading the pixel one step down the wall - how fire rises and rain leaves a trail.
 
 **Inputs**
-- **around** *(float)*: round the cube, 0..1
-- **depth** *(float)*: 0 lid centre .. 1 bottom edge
+- **around** *(float; default 0)*: round the cube, 0..1
+- **depth** *(float; default 0.5)*: 0 lid centre .. 1 bottom edge
 
 **Outputs**
 - **u** *(float)*: that pixel, across
@@ -2110,7 +2110,7 @@ Box Fire (`box_fire.json`)
 A shape (GEOMETRY > shape) is parts in wiring order - strips, rings, panels, a cube... This says which part the pixel belongs to and where along that part it sits, so one graph can treat the parts differently: a chase along each strip, ring 2 in another colour. On a cube net or a matrix, or on the device without the shape table sent, every pixel is part 0 of 1.
 
 **Inputs**
-- **pick** *(float)*: the part number whose mask you want (0 is the first)
+- **pick** *(float; default 0)*: the part number whose mask you want (0 is the first)
 
 **Outputs**
 - **part** *(float)*: the part's number, 0 for the first
@@ -2146,14 +2146,14 @@ It also gives a mask for one part you pick, the simplest way to make one ring or
 Moves, turns and zooms a pair of coordinates about a pivot - feed Coords' u, v through it and anything drawn from the result pans, spins or scales. A clock into turns spins the whole picture.
 
 **Inputs**
-- **u** *(float)*: the coordinate across - unwired, the pixel's u
-- **v** *(float)*: the coordinate down - unwired, the pixel's v
-- **move across** `move_u` *(float)*: shift across
-- **move down** `move_v` *(float)*: shift down
-- **turns** *(float)*: spin, 1 = a full circle
-- **zoom** *(float)*: 1 leaves it, 2 zooms in, 0.5 out
-- **pivot across** `pivot_u` *(float)*: the point it turns and zooms about, across
-- **pivot down** `pivot_v` *(float)*: and down
+- **u** *(float; default 0)*: the coordinate across - unwired, the pixel's u
+- **v** *(float; default 0)*: the coordinate down - unwired, the pixel's v
+- **move across** `move_u` *(float; default 0)*: shift across
+- **move down** `move_v` *(float; default 0)*: shift down
+- **turns** *(float; default 0; turns)*: spin, 1 = a full circle
+- **zoom** *(float; default 1; 0.1 .. 10 x)*: 1 leaves it, 2 zooms in, 0.5 out
+- **pivot across** `pivot_u` *(float; default 0.5)*: the point it turns and zooms about, across
+- **pivot down** `pivot_v` *(float; default 0.5)*: and down
 
 **Outputs**
 - **u** *(float)*: the new coordinate across
@@ -2189,25 +2189,25 @@ A clock into its turns spins the whole picture; a beat into its zoom pulses it. 
 The famous fig-tree diagram of chaos: for each value of c across the picture, where the sequence x -> x*x + c ends up. Read it with u (the c axis) and v (the x axis); narrow the windows to zoom in. Brightness is how often the sequence lands there.
 
 **Inputs**
-- **u** *(float)*: across: which c, 0..1 of the window - unwired, the pixel's u
-- **v** *(float)*: down: which x, 0..1 of the window - unwired, the pixel's v
-- **c from** `c_lo` *(float)*: the c window's left edge
-- **c to** `c_hi` *(float)*: its right edge
-- **x from** `x_lo` *(float)*: the x window's bottom
-- **x to** `x_hi` *(float)*: its top
+- **u** *(float; default 0)*: across: which c, 0..1 of the window - unwired, the pixel's u
+- **v** *(float; default 0)*: down: which x, 0..1 of the window - unwired, the pixel's v
+- **c from** `c_lo` *(float; default -1.6)*: the c window's left edge
+- **c to** `c_hi` *(float; default 0.3)*: its right edge
+- **x from** `x_lo` *(float; default -1.5)*: the x window's start, read at v = 0 (the top, with Coords v)
+- **x to** `x_hi` *(float; default 1.5)*: its end, at v = 1 (the bottom)
 
 **Outputs**
 - **density** *(float)*: how often the sequence visits here, 0..1
 
 **Settings**
-- **trail** *(float)*: how long visits glow, 0 .. 0.99
-- **orbits** *(int)*: how many steps to run each frame
+- **trail** *(float; default 0.9; 0 .. 0.99)*: how long visits glow, 0 .. 0.99
+- **orbits** *(int; default 6; 1 .. 32)*: how many steps to run each frame
 
 **Why use it**
 
 Some of the most beautiful pictures in mathematics come from a single rule repeated: here, x becomes x times x plus c. For some values of c the sequence settles on one number, for others it flips between two, four, eight - and then into chaos. Plotting where it lands, for every c across the picture, draws the famous branching fig tree.
 
-Use it for a slow, hypnotic, structured texture that keeps glowing as the sequence wanders - ambient pieces, something to stare at. Its neighbours: Mandelbrot draws a still picture of which points escape; Reaction diffusion grows organic shapes; Bifurcation draws where a chaotic orbit lives, and keeps sparkling as it moves.
+Use it for a slow, hypnotic, structured texture that builds up and glows as the sequence wanders - ambient pieces, something to stare at. Its neighbours: Mandelbrot draws a still picture of which points escape; Reaction diffusion grows organic shapes; Bifurcation draws where a chaotic orbit lives.
 
 **Tutorial**
 
@@ -2216,7 +2216,7 @@ Use it for a slow, hypnotic, structured texture that keeps glowing as the sequen
 1. **Bifurcation** reads the pixel's place itself: **u** (across) picks a value of c inside the window **c from** .. **c to** (-1.6 to 0.3), and **v** (down) picks a value of x inside **x from** .. **x to** (-1.5 to 1.5). Both are unwired, so they are the pixel's own u and v.
 2. Every frame it runs the sequence **orbits** (24) more steps for each column, and lights the pixels it lands on. Its `density` output is how often a pixel has been visited lately.
 3. **trail** is 0.97: a visit fades slowly, so the branches build up into lines instead of flickering dots.
-4. The density lights the **Palette**: its brightness is the density, its index runs across with **Coords** `u`, so the stable left side, the forking middle and the chaotic right take different colours.
+4. The density lights the **Palette**: its brightness is the density, its index runs across with **Coords** `u`, so the chaotic left side (c below about -1.4), the forking middle and the single stable line on the right take different colours.
 
 [Try it in the studio](studio:try/bifurcation): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
 
@@ -2235,15 +2235,15 @@ Feigenbaum (`feigenbaum.json`)
 Pixel art you type: one line per row, a digit for a coloured pixel, a dot for an empty one. Read it with a coordinate and send slot to Colour pick to give each digit a colour.
 
 **Inputs**
-- **u** *(float)*: where to read, across, 0..1 - unwired, the pixel's u
-- **v** *(float)*: where to read, down, 0..1 - unwired, the pixel's v
+- **u** *(float; default 0)*: where to read, across, 0..1 - unwired, the pixel's u
+- **v** *(float; default 0)*: where to read, down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **slot** *(float)*: the digit there (0..9)
 - **on** *(bool)*: false where there is a dot
 
 **Settings**
-- **rows** *(text)*: the rows: digits and dots, one row per line
+- **rows** *(text; default '0110/1001/1001/0110')*: the rows: digits and dots, one row per line
 
 **Why use it**
 
@@ -2277,10 +2277,10 @@ Question Block (`question_block.json`)
 A brick wall, alternate rows offset by half a brick, with a mortar gap you can size.
 
 **Inputs**
-- **x** *(float)*: across - unwired, the pixel's u
-- **y** *(float)*: down - unwired, the pixel's v
-- **scale** *(float)*: rows of bricks per unit
-- **mortar** *(float)*: how wide the gaps are, 0..0.5
+- **x** *(float; default 0)*: across - unwired, the pixel's u
+- **y** *(float; default 0)*: down - unwired, the pixel's v
+- **scale** *(float; default 4; 0.1 .. 64 x)*: rows of bricks per unit
+- **mortar** *(float; default 0.1; 0 .. 0.5)*: how wide the gaps are, 0..0.5
 
 **Outputs**
 - **value** *(float)*: 1 on a brick, 0 in the mortar
@@ -2315,9 +2315,9 @@ That last part is what makes it useful: `row` and `column` number the bricks, so
 A chessboard of 1s and 0s.
 
 **Inputs**
-- **x** *(float)*: across - unwired, the pixel's u
-- **y** *(float)*: down - unwired, the pixel's v
-- **scale** *(float)*: squares per unit
+- **x** *(float; default 0)*: across - unwired, the pixel's u
+- **y** *(float; default 0)*: down - unwired, the pixel's v
+- **scale** *(float; default 4; 0.1 .. 64 x)*: squares per unit
 
 **Outputs**
 - **value** *(float)*: 1 or 0, alternating
@@ -2350,14 +2350,14 @@ Use it as a pattern on its own (a retro floor, a flag), or as a mask - multiply 
 A smooth ramp in the shape you pick: along x, curved, round the centre, from the centre, or diagonal. Feed Coords' cx, cy for the round ones.
 
 **Inputs**
-- **x** *(float)*: across (cx for radial and spherical) - unwired, the pixel's u
-- **y** *(float)*: down (cy) - unwired, the pixel's v
+- **x** *(float; default 0)*: across (cx for radial and spherical) - unwired, the pixel's u
+- **y** *(float; default 0)*: down (cy) - unwired, the pixel's v
 
 **Outputs**
 - **value** *(float)*: 0..1
 
 **Settings**
-- **shape** *(choice)*: linear, quadratic, radial (angle round the centre), spherical (bright at the centre), diagonal
+- **shape** *(choice; default 'linear')*: linear, quadratic, radial (angle round the centre), spherical (bright at the centre), diagonal
 
 **Why use it**
 
@@ -2387,9 +2387,9 @@ Pick the shape with a setting: linear and quadratic run along x, diagonal across
 A random number that is always the same for the same inputs. Feed it a cell number and every cell gets its own fixed random - a colour per tile, a speed per column. Change seed to reshuffle them all.
 
 **Inputs**
-- **x** *(float)*: what to hash (a cell, a column)
-- **y** *(float)*: and this
-- **seed** *(float)*: reshuffle: a different seed, different randoms
+- **x** *(float; default 0)*: what to hash (a cell, a column)
+- **y** *(float; default 0)*: and this
+- **seed** *(float; default 0)*: reshuffle: a different seed, different randoms
 
 **Outputs**
 - **value** *(float)*: the random, 0..1
@@ -2426,8 +2426,8 @@ Gyro Sand (`gyro_sand.json`), Lightning (`lightning.json`), Meteors (`meteors.js
 A picture file, baked into the effect. Pick the file, choose how many pixels across and down and how many colours, and read it with any coordinate - Cube face's a, b puts it on every face. The device needs no file. Right-click the node to turn it into editable pixel art.
 
 **Inputs**
-- **u** *(float)*: where to read, across, 0..1 - unwired, the pixel's u
-- **v** *(float)*: where to read, down, 0..1 - unwired, the pixel's v
+- **u** *(float; default 0)*: where to read, across, 0..1 - unwired, the pixel's u
+- **v** *(float; default 0)*: where to read, down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **color** *(color)*: the picture's colour there
@@ -2436,10 +2436,10 @@ A picture file, baked into the effect. Pick the file, choose how many pixels acr
 
 **Settings**
 - **file** *(file)*: the image file (png, jpg, gif...)
-- **width** *(int)*: pixels across
-- **height** *(int)*: pixels down
-- **colours** *(int)*: how many colours to keep
-- **transparent is off** `alpha_clear` *(bool)*: treat transparent pixels as off
+- **width** *(int; default 16; 1 .. 64 px)*: pixels across
+- **height** *(int; default 16; 1 .. 64 px)*: pixels down
+- **colours** *(int; default 8; 2 .. 16)*: how many colours to keep
+- **transparent is off** `alpha_clear` *(bool; default on)*: treat transparent pixels as off
 
 **Why use it**
 
@@ -2473,17 +2473,17 @@ Smiley (`smiley.json`)
 The Mandelbrot set. Give it a point x, y and it says how quickly that point escapes (0 = at once, 1 = never, it is inside). Scale and offset a coordinate to zoom around the edge. Julia mode draws a Julia set instead, with jx, jy as its constant.
 
 **Inputs**
-- **x** *(float)*: the point's x (real part) - unwired, the pixel's cx
-- **y** *(float)*: the point's y (imaginary part) - unwired, the pixel's cy
-- **julia x** `jx` *(float)*: the Julia constant's x (Julia mode)
-- **julia y** `jy` *(float)*: the Julia constant's y (Julia mode)
+- **x** *(float; default 0)*: the point's x (real part) - unwired, the pixel's cx
+- **y** *(float; default 0)*: the point's y (imaginary part) - unwired, the pixel's cy
+- **julia x** `jx` *(float; default 0)*: the Julia constant's x (Julia mode)
+- **julia y** `jy` *(float; default 0)*: the Julia constant's y (Julia mode)
 
 **Outputs**
 - **value** *(float)*: 0 (escaped at once) .. 1 (inside the set)
 
 **Settings**
-- **iterations** *(int)*: how carefully to look - more shows finer detail, costs more
-- **julia** *(bool)*: draw a Julia set instead
+- **iterations** *(int; default 40; 4 .. 200)*: how carefully to look - more shows finer detail, costs more
+- **julia** *(bool; default off)*: draw a Julia set instead
 
 **Why use it**
 
@@ -2517,17 +2517,17 @@ Mandelbrot (`mandelbrot.json`)
 Smooth random blobs - clouds, plasma, flames. Give it a point (Direction's nx, ny, nz for a seamless cube, or Coords) and it returns 0..1 that varies smoothly from place to place. Plug Time into z to make the blobs drift; raise scale for smaller blobs.
 
 **Inputs**
-- **x** *(float)*: where to sample - unwired, the pixel's position x
-- **y** *(float)*: where to sample - unwired, the pixel's position y
-- **z** *(float)*: where to sample - Time makes it move - unwired, the pixel's position z
-- **scale** *(float)*: how many blobs across: bigger = finer
+- **x** *(float; default 0)*: where to sample - unwired, the pixel's position x
+- **y** *(float; default 0)*: where to sample - unwired, the pixel's position y
+- **z** *(float; default 0)*: where to sample - Time makes it move - unwired, the pixel's position z
+- **scale** *(float; default 4; 0.05 .. 64 x)*: how many blobs across: bigger = finer
 
 **Outputs**
 - **value** *(float)*: the noise, 0..1
 
 **Settings**
-- **octaves** *(int)*: 1 is smooth blobs; 3-5 adds finer and finer detail on top - clouds, smoke
-- **roughness** *(float)*: how strong each finer layer is, 0..1
+- **octaves** *(int; default 1; 1 .. 6)*: 1 is smooth blobs; 3-5 adds finer and finer detail on top - clouds, smoke
+- **roughness** *(float; default 0.5; 0 .. 1)*: how strong each finer layer is, 0..1
 
 **Why use it**
 
@@ -2562,7 +2562,7 @@ Box Fire (`box_fire.json`), Lightning (`lightning.json`), Snowstorm (`snowstorm.
 A route through the cube, from points you type (x, y, z in the -1..1 box, one point per ';'). For each pixel: how far it is from the route, and how far along the route the nearest point is - a light running along a track (Band on `along` plus a clock), a glowing wire, a shape's outline.
 
 **Inputs**
-- **pos** *(vector)*: this pixel's position (Position) - unwired, the pixel's position
+- **pos** *(vector; default (0, 0, 0))*: this pixel's position (Position) - unwired, the pixel's position
 
 **Outputs**
 - **distance** *(float)*: how far from the route
@@ -2570,8 +2570,8 @@ A route through the cube, from points you type (x, y, z in the -1..1 box, one po
 - **nearest** *(vector)*: that point
 
 **Settings**
-- **points** *(text)*: the corners: x,y,z; x,y,z; ...
-- **closed** *(bool)*: join the last point back to the first
+- **points** *(text; default '-1,-1,1; 1,-1,1; 1,1,1; -1,1,1')*: the corners: x,y,z; x,y,z; ...
+- **closed** *(bool; default on)*: join the last point back to the first
 
 **Why use it**
 
@@ -2601,18 +2601,18 @@ Distance gives you a glowing wire, an outline, a tube; along gives you something
 Real chemistry: two substances that spread and react on a small hidden grid, making tendrils, spots and stripes that grow, split and merge - with a memory, so the picture is never the same twice. Read it with any coordinate (Coords u, v; or Cube ring). feed and kill choose the pattern family.
 
 **Inputs**
-- **u** *(float)*: where to read, across, 0..1 (wraps)
-- **v** *(float)*: where to read, down, 0..1
+- **u** *(float; default 0)*: where to read, across, 0..1 (wraps)
+- **v** *(float; default 0)*: where to read, down, 0..1
 
 **Outputs**
 - **v** *(float)*: the second substance - the tendrils, 0..1
 - **u** *(float)*: the first substance - the background, 0..1
 
 **Settings**
-- **feed** *(float)*: 0.03 .. 0.06: how much fuel comes in
-- **kill** *(float)*: 0.055 .. 0.065: how fast the pattern dies
-- **steps** *(int)*: simulation steps per frame - faster growth, more work
-- **seed** *(float)*: how much to start with
+- **feed** *(float; default 0.037)*: 0.03 .. 0.06: how much fuel comes in
+- **kill** *(float; default 0.06)*: 0.055 .. 0.065: how fast the pattern dies
+- **steps** *(int; default 2; 1 .. 8)*: simulation steps per frame - faster growth, more work
+- **seed** *(float; default 0.02)*: how much to start with
 
 **Why use it**
 
@@ -2646,10 +2646,10 @@ Liquid Tunnel (`liquid_tunnel.json`)
 Rings spreading from a point, like a drop in water. cx, cy is the centre in the -1..1 picture; phase moves the rings outward; rings is how many.
 
 **Inputs**
-- **centre x** `cx` *(float)*: the centre, across, -1..1
-- **centre y** `cy` *(float)*: the centre, up, -1..1
-- **phase** *(float)*: a clock spreads the rings
-- **rings** *(float)*: how many rings across the picture
+- **centre x** `cx` *(float; default 0)*: the centre, across, -1..1
+- **centre y** `cy` *(float; default 0)*: the centre, up, -1..1
+- **phase** *(float; default 0; turns)*: a clock spreads the rings
+- **rings** *(float; default 4; 0.5 .. 32)*: how many rings across the picture
 
 **Outputs**
 - **value** *(float)*: the rings, 0..1
@@ -2679,13 +2679,13 @@ Move the centre and the rings spread from somewhere else; drive the phase with a
 
 ### Shells
 
-Spheres growing out of every Emitter: at each pixel, how much of a shell is passing through. Wire Emitters' slots here and Position into x, y, z, and each beat becomes a ring that crosses every edge of the cube as one ring.
+Spheres growing out of each thing Emitters dropped: at each pixel, how much of a shell is passing through. Wire Emitters' slots here and Position's pos into pos, and each beat becomes a ring that crosses every edge of the cube as one ring.
 
 **Inputs**
-- **slots** *(float)*: from Emitters
-- **pos** *(vector)*: this pixel's position (Position's pos)
-- **speed** *(float)*: how fast the shells grow, in cube-widths per second
-- **width** *(float)*: how thick a shell is
+- **slots** *(float; default 0)*: from Emitters
+- **pos** *(vector; default (0, 0, 0))*: this pixel's position (Position's pos)
+- **speed** *(float; default 1; 0 .. 10 /s)*: how fast the shells grow, in Position units a second (the cube is 2 across: 1 is half its width a second)
+- **width** *(float; default 0.2; 0.01 .. 1)*: how thick a shell is
 
 **Outputs**
 - **value** *(float)*: how much shell is here, 0..1
@@ -2705,7 +2705,7 @@ It reads where the spheres are from Emitters, which drops one on each trigger an
 1. **Audio**'s `beat` fires **Emitters**' trigger: on every kick a new emitter is dropped at a random place on the surface (its `random` setting), and lives four seconds.
 2. A **Random hold** on the same beat picks a new random number per kick - the emitter's tag, so each shell gets its own colour.
 3. Emitters' `slots` go into Shells' **slots**, and **Position**'s `pos` into **pos**: each pixel asks how much shell is passing through its place in the cube.
-4. **speed** is 1: a shell grows one cube-width a second. **width** is 0.2: how thick its skin is.
+4. **speed** is 1: a shell's radius grows one Position unit a second - half the cube's width. **width** is 0.2: how thick its skin is.
 5. `value` is the **Palette**'s brightness and `tag` its index: rings of light, each its own colour.
 
 [Try it in the studio](studio:try/shells): the graph opens live in the Node tutorials project; your own project is saved and comes back with **Back to my project**.
@@ -2725,8 +2725,8 @@ Cube Ripples (`cube_ripples.json`)
 Random pixels lit. density is what fraction; change seed (Time through a Floor for steps) to make them twinkle.
 
 **Inputs**
-- **density** *(float)*: what fraction of pixels are lit, 0..1
-- **seed** *(float)*: a different seed lights different pixels
+- **density** *(float; default 0.1; 0 .. 1)*: what fraction of pixels are lit, 0..1
+- **seed** *(float; default 0)*: a different seed lights different pixels
 
 **Outputs**
 - **value** *(float)*: 1 where lit, else 0
@@ -2759,12 +2759,12 @@ Snowstorm (`snowstorm.json`)
 
 ### Sprites
 
-Draws Particles as dots. At each pixel: how much particle is here (a soft dot `size` across), and the nearest one's tag (colour it), age (fade it as it dies) and speed (stretch or brighten it).
+Draws Particles as dots. At each pixel: how much particle is here (a soft dot `size` in radius), and the nearest one's tag (colour it), age (fade it as it dies) and speed (stretch or brighten it).
 
 **Inputs**
-- **slots** *(float)*: from Particles
-- **pos** *(vector)*: this pixel's position (Position's pos)
-- **size** *(float)*: how big each dot is
+- **slots** *(float; default 0)*: from Particles
+- **pos** *(vector; default (0, 0, 0))*: this pixel's position (Position's pos)
+- **size** *(float; default 0.15; 0.01 .. 1)*: each dot's radius, in Position units (the cube is 2 across)
 
 **Outputs**
 - **value** *(float)*: how much particle is here, 0..1
@@ -2773,7 +2773,7 @@ Draws Particles as dots. At each pixel: how much particle is here (a soft dot `s
 - **speed** *(float)*: how fast it is going
 
 **Settings**
-- **falloff** *(choice)*: soft (a smooth dot), hard (a disc), spark (a bright pin with a faint halo)
+- **falloff** *(choice; default 'soft')*: soft (a smooth dot), hard (a disc), spark (a bright pin with a faint halo)
 
 **Why use it**
 
@@ -2807,9 +2807,9 @@ Fireworks (`fireworks.json`)
 Several bitmaps, one shown at a time: the states are separated by '|', each is rows of digits separated by '/' ('.' transparent) like Bitmap. The state at index is read at u, v - wire a beat counter, a Random hold or a slider into index for a face that changes, a sprite that animates. The digit is a colour slot for Colour pick; count says how many states there are.
 
 **Inputs**
-- **u** *(float)*: across, 0..1 - unwired, the pixel's u
-- **v** *(float)*: down, 0..1 - unwired, the pixel's v
-- **index** *(float)*: which state, 0, 1, 2... (rounded down, clamped)
+- **u** *(float; default 0)*: across, 0..1 - unwired, the pixel's u
+- **v** *(float; default 0)*: down, 0..1 - unwired, the pixel's v
+- **index** *(float; default 0)*: which state, 0, 1, 2... (rounded down, clamped)
 
 **Outputs**
 - **slot** *(float)*: the digit at the pixel (0 where transparent)
@@ -2817,7 +2817,7 @@ Several bitmaps, one shown at a time: the states are separated by '|', each is r
 - **count** *(float)*: how many states
 
 **Settings**
-- **states** *(text)*: the states, '|' between them; rows of digits, '/' between rows, '.' for none
+- **states** *(text; default '0110/1001/1001/0110|0000/0110/0110/0000|1001/0110/0110/1001')*: the states, '|' between them; rows of digits, '/' between rows, '.' for none
 
 **Why use it**
 
@@ -2847,10 +2847,10 @@ Each state is rows of digits like Bitmap's, and each digit is a colour slot. Its
 Hard-edged bands along a coordinate. count is how many, duty how wide the bright ones are, phase scrolls them.
 
 **Inputs**
-- **x** *(float)*: the coordinate to stripe along - unwired, the pixel's u
-- **count** *(float)*: how many stripes
-- **phase** *(float)*: slides the stripes
-- **duty** *(float)*: how much of each stripe is bright, 0..1
+- **x** *(float; default 0)*: the coordinate to stripe along - unwired, the pixel's u
+- **count** *(float; default 6; 1 .. 64)*: how many stripes
+- **phase** *(float; default 0; turns)*: slides the stripes
+- **duty** *(float; default 0.5; 0 .. 1)*: how much of each stripe is bright, 0..1
 
 **Outputs**
 - **value** *(float)*: 1 in a stripe, else 0
@@ -2887,9 +2887,9 @@ Fan (`fan.json`), Marquee (`marquee.json`), Pinwheel (`pinwheel.json`)
 Words baked into the effect: in the 5x7 pixel font (only the letters used go in), or drawn in one of this machine's faces - sans, bold or mono (Segoe UI and Consolas on Windows, Helvetica and Menlo on macOS, DejaVu on Linux) - at a height in pixels, when the graph compiles. Wire Coords u, v; colour the 'on' pixels with a Palette, a Colour, anything, or scale a colour by 'level' for the face's smooth edges - 'i' runs 0..1 along the text so each letter can take its own colour. To scroll, wire Time x speed into offset: the text moves left, and with loop on it comes round again after a gap of the matrix's width. row places the top of the letters (-1 centres them).
 
 **Inputs**
-- **u** *(float)*: across, 0..1 (Coords u) - unwired, the pixel's u
-- **v** *(float)*: down, 0..1 (Coords v) - unwired, the pixel's v
-- **offset** *(float)*: scroll, in pixels - Time x speed
+- **u** *(float; default 0)*: across, 0..1 (Coords u) - unwired, the pixel's u
+- **v** *(float; default 0)*: down, 0..1 (Coords v) - unwired, the pixel's v
+- **offset** *(float; default 0)*: scroll, in pixels - Time x speed
 
 **Outputs**
 - **on** *(bool)*: true on a letter's pixel (half covered or more, in a face)
@@ -2897,12 +2897,12 @@ Words baked into the effect: in the 5x7 pixel font (only the letters used go in)
 - **level** *(float)*: how much of the pixel the letter covers, 0..1 - smooth edges in a face; 0 or 1 in the 5x7
 
 **Settings**
-- **text** *(text)*: the words (ASCII in the 5x7; a face draws what it has)
-- **size** *(int)*: the 5x7's pixels per font pixel, 1..4
-- **row** *(int)*: the top row of the letters; -1 centres them
-- **loop** *(bool)*: scroll round again after a gap of the width
-- **font** *(choice)*: 5x7 (the same everywhere), or sans, bold or mono: this machine's face, drawn when the graph compiles
-- **height** *(int)*: a face's line in pixels, 6..32 - its capitals take about three fifths of it
+- **text** *(text; default 'WLED')*: the words (ASCII in the 5x7; a face draws what it has)
+- **size** *(int; default 1; 1 .. 4 x)*: the 5x7's pixels per font pixel, 1..4
+- **row** *(int; default -1; -1 .. 255)*: the top row of the letters; -1 centres them
+- **loop** *(bool; default on)*: scroll round again after a gap of the width
+- **font** *(choice; default '5x7')*: 5x7 (the same everywhere), or sans, bold or mono: this machine's face, drawn when the graph compiles
+- **height** *(int; default 12; 6 .. 32)*: a face's line in pixels, 6..32 - its capitals take about three fifths of it
 
 **Why use it**
 
@@ -2932,8 +2932,8 @@ It tells you, for every pixel, whether it is on a letter, how much of it the let
 A looping, twisted tube floating inside the cube, seen from the middle. Feed it Direction and it tells you whether this pixel looks at the tube, how far along the tube that spot is (for stripes), how close to its edge (for shading), and which way its surface faces (for lighting).
 
 **Inputs**
-- **dir** *(vector)*: the pixel's direction (Direction's dir)
-- **tube** *(float)*: how fat the tube is
+- **dir** *(vector; default (0, 0, 1))*: the pixel's direction (Direction's dir)
+- **tube** *(float; default 0.25; 0.01 .. 1)*: how fat the tube is
 
 **Outputs**
 - **on** *(float)*: 1 where the tube is seen, else 0
@@ -2945,10 +2945,10 @@ A looping, twisted tube floating inside the cube, seen from the middle. Feed it 
 - **Nz** *(float)*: z
 
 **Settings**
-- **p** *(int)*: how many times the knot winds round
-- **q** *(int)*: how many times it winds through
-- **R** *(float)*: the knot's overall size
-- **r** *(float)*: the loop's size
+- **p** *(int; default 2; 1 .. 7)*: how many times the knot winds round
+- **q** *(int; default 3; 1 .. 9)*: how many times it winds through
+- **R** *(float; default 0.62)*: the knot's overall size
+- **r** *(float; default 0.3)*: the loop's size
 
 **Why use it**
 
@@ -2979,22 +2979,22 @@ Candy Knot (`candy_knot.json`)
 
 ### Video
 
-Live video - a webcam, a video file or the test pattern, chosen in the side panel's VIDEO section - at this pixel. The projection puts it on any shape: the picture as it is, through the shape from the front or the top, round it, on every cube face, or all round a sphere. The style is a quick look: the palette, a few flat colours, shades of Colour 1, outlines, or big blocks. Video plays in the studio; the LEDs get it by streaming (Device > Stream) - on the device by itself the node is black.
+Live video - a webcam, a video file or the test pattern, chosen in the side panel's VIDEO section - at this pixel. The projection puts it on any shape: the picture as it is, through the shape from the front or the top, round it, on every cube face, or all round a sphere. The style is a quick look: the palette, a few flat colours, shades of Colour 1, outlines, or big blocks. Video plays in the studio; the LEDs get it by streaming (Device > Stream the sim to the device) - on the device by itself the node is black.
 
 **Inputs**
-- **u** *(float)*: where on the frame, across, 0..1 (the picture projection) - unwired, the pixel's u
-- **v** *(float)*: where on the frame, down, 0..1 (the picture projection) - unwired, the pixel's v
-- **levels** *(float)*: posterize: how many steps each colour has
-- **blocks** *(float)*: pixelate: how many blocks across and down
-- **gain** *(float)*: edges: how bright the outlines are
+- **u** *(float; default 0)*: where on the frame, across, 0..1 (the picture projection) - unwired, the pixel's u
+- **v** *(float; default 0)*: where on the frame, down, 0..1 (the picture projection) - unwired, the pixel's v
+- **levels** *(float; default 4)*: posterize: how many steps each colour has
+- **blocks** *(float; default 12)*: pixelate: how many blocks across and down
+- **gain** *(float; default 4)*: edges: how bright the outlines are
 
 **Outputs**
 - **color** *(color)*: the video's colour here, in the style chosen
 - **luma** *(float)*: the video's brightness here, 0..1 - for a mask, a palette index, anything
 
 **Settings**
-- **projection** *(choice)*: how the frame lies on the shape: picture, front, top, around, faces or sphere
-- **style** *(choice)*: none, palette, posterize, mono (Colour 1), edges or pixelate
+- **projection** *(choice; default 'picture')*: how the frame lies on the shape: picture, front, top, around, faces or sphere
+- **style** *(choice; default 'none')*: none, palette, posterize, mono (Colour 1), edges or pixelate
 
 **Why use it**
 
@@ -3030,9 +3030,9 @@ FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Clean (sub-graph) (
 Cells. Random points are scattered through space and every pixel belongs to the nearest one - the pattern of a giraffe, dried mud, stained glass. Feed Position (seamless on the cube) and use distance for soft cells, edge for the cracks between them, id to colour each cell.
 
 **Inputs**
-- **pos** *(vector)*: where to sample (Position) - unwired, the pixel's position
-- **scale** *(float)*: how many cells per unit: bigger = smaller cells
-- **seed** *(float)*: a different seed, different cells
+- **pos** *(vector; default (0, 0, 0))*: where to sample (Position) - unwired, the pixel's position
+- **scale** *(float; default 3; 0.1 .. 32 x)*: how many cells per unit: bigger = smaller cells
+- **seed** *(float; default 0)*: a different seed, different cells
 
 **Outputs**
 - **distance** *(float)*: how far to the nearest point, 0 at it
@@ -3068,16 +3068,16 @@ It answers three ways: the distance to the nearest point (soft round cells), how
 A repeating wave along its input: sine, triangle, square or saw. Feed a coordinate into x for stripes and a phase (Integrate, or Time times a speed) to scroll them. cycles is how many waves fit in one unit of x.
 
 **Inputs**
-- **x** *(float)*: what to wave along - a coordinate - unwired, the pixel's u
-- **phase** *(float)*: slides the wave along; a clock scrolls it
-- **cycles** *(float)*: waves per unit of x
-- **distort** *(float)*: bends the wave with noise, 0 = straight
+- **x** *(float; default 0)*: what to wave along - a coordinate - unwired, the pixel's u
+- **phase** *(float; default 0; turns)*: slides the wave along; a clock scrolls it
+- **cycles** *(float; default 3; 0 .. 32 x)*: waves per unit of x
+- **distort** *(float; default 0; 0 .. 2)*: bends the wave with noise, 0 = straight
 
 **Outputs**
 - **value** *(float)*: the wave, 0..1
 
 **Settings**
-- **shape** *(choice)*: sine (smooth), triangle (linear), square (on/off), saw (ramp)
+- **shape** *(choice; default 'sine')*: sine (smooth), triangle (linear), square (on/off), saw (ramp)
 
 **Why use it**
 
@@ -3115,7 +3115,7 @@ Breakout (`breakout.json`), Butterfly (`butterfly.json`), Curtain (`curtain.json
 Drops the sign: -0.3 becomes 0.3. Distance from zero.
 
 **Inputs**
-- **x** *(float)*: any number
+- **x** *(float; default 0)*: any number
 
 **Outputs**
 - **result** *(float)*: |x|
@@ -3151,8 +3151,8 @@ Breakout (`breakout.json`), Butterfly (`butterfly.json`), Cube Chladni (`cube_ch
 a + b. Offsets a value, or sums two patterns.
 
 **Inputs**
-- **a** *(float)*: the first number
-- **b** *(float)*: the second number
+- **a** *(float; default 0)*: the first number
+- **b** *(float; default 0)*: the second number
 
 **Outputs**
 - **result** *(float)*: a + b
@@ -3188,8 +3188,8 @@ Box Fire (`box_fire.json`), Butterfly (`butterfly.json`), Candy Knot (`candy_kno
 A soft bright band around every whole number of x - slabs, bars, rings. sharp makes the bands narrower.
 
 **Inputs**
-- **x** *(float)*: in turns
-- **sharp** *(float)*: 1 = wide and soft, 10 = thin lines
+- **x** *(float; default 0)*: in turns
+- **sharp** *(float; default 1)*: 1 = wide and soft, 10 = thin lines
 
 **Outputs**
 - **result** *(float)*: 0..1
@@ -3225,14 +3225,14 @@ Maelstrom (`maelstrom.json`), Slab Cut (`slab_cut.json`)
 Keeps a value between lo and hi.
 
 **Inputs**
-- **x** *(float)*: the value to limit
+- **x** *(float; default 0)*: the value to limit
 
 **Outputs**
 - **result** *(float)*: x, held between lo and hi
 
 **Settings**
-- **low** `lo` *(float)*: the lowest allowed
-- **high** `hi` *(float)*: the highest allowed
+- **low** `lo` *(float; default 0)*: the lowest allowed
+- **high** `hi` *(float; default 1)*: the highest allowed
 
 **Why use it**
 
@@ -3265,7 +3265,7 @@ Candy Knot (`candy_knot.json`), Cube Chladni (`cube_chladni.json`), Liquid (`liq
 A smooth 0..1 hump for every whole number of x: 1 at 0, 0 at 0.5, 1 at 1, and so on.
 
 **Inputs**
-- **x** *(float)*: in turns: 1 = one full cycle
+- **x** *(float; default 0)*: in turns: 1 = one full cycle
 
 **Outputs**
 - **result** *(float)*: 0..1
@@ -3301,8 +3301,8 @@ Cube Chladni (`cube_chladni.json`), Moire (`moire.json`)
 A direction in 3-D from two angles: turn round (a), then tilt up (b). Feed clocks in and the direction sweeps about - a slab's normal, a light.
 
 **Inputs**
-- **round** `turns_a` *(float)*: round, in turns
-- **up** `turns_b` *(float)*: up, in turns (0.25 = straight up)
+- **round** `turns_a` *(float; default 0)*: round, in turns
+- **up** `turns_b` *(float; default 0)*: up, in turns (0.25 = straight up)
 
 **Outputs**
 - **dir** *(vector)*: the direction as one vector wire
@@ -3341,8 +3341,8 @@ Slab Cut (`slab_cut.json`)
 a / b (0 when b is 0).
 
 **Inputs**
-- **a** *(float)*: the number to divide
-- **b** *(float)*: what to divide it by
+- **a** *(float; default 1)*: the number to divide
+- **b** *(float; default 1)*: what to divide it by
 
 **Outputs**
 - **result** *(float)*: a / b
@@ -3378,8 +3378,8 @@ Butterfly (`butterfly.json`), Feigenbaum (`feigenbaum.json`), Gyro Sand (`gyro_s
 How far a point lies along a direction (the dot product). Position against Gravity gives height; Position against a slab's direction gives which slab; Direction against a light gives brightness.
 
 **Inputs**
-- **a** *(vector)*: the point (a vector)
-- **b** *(vector)*: the direction (a vector)
+- **a** *(vector; default (0, 0, 0))*: the point (a vector)
+- **b** *(vector; default (1, 0, 0))*: the direction (a vector)
 
 **Outputs**
 - **result** *(float)*: the distance along the direction
@@ -3415,7 +3415,7 @@ Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_sand.json`), Kaleidoscope (`kal
 e to the power x. A zoom that shrinks by the same proportion every second is Exp of a clock.
 
 **Inputs**
-- **x** *(float)*: any number
+- **x** *(float; default 0)*: any number
 
 **Outputs**
 - **result** *(float)*: e^x
@@ -3450,13 +3450,13 @@ Feigenbaum (`feigenbaum.json`), Mandelbrot (`mandelbrot.json`)
 A curve you draw on the node: points along 0..1, each with a value, smoothly joined. Feed a gradient, a heat or a phase through it to reshape it by hand - a fade that lingers, a response that kicks in late, a bump in the middle.
 
 **Inputs**
-- **x** *(float)*: where to read, 0..1
+- **x** *(float; default 0)*: where to read, 0..1
 
 **Outputs**
 - **result** *(float)*: the curve's value there
 
 **Settings**
-- **points** *(curve)*: the points: position and value, any number from two
+- **points** *(curve; default [[0.0, 0.0], [0.5, 0.8], [1.0, 1.0]])*: the points: position and value, any number from two
 
 **Why use it**
 
@@ -3485,7 +3485,7 @@ Its neighbours: Smoothstep, Power and Exp are fixed shapes; Map range with ease 
 Rounds down to a whole number. Turns a smooth coordinate into cell numbers.
 
 **Inputs**
-- **x** *(float)*: any number
+- **x** *(float; default 0)*: any number
 
 **Outputs**
 - **result** *(float)*: x rounded down
@@ -3521,7 +3521,7 @@ Candy Knot (`candy_knot.json`), Fan (`fan.json`), Garlands (`garlands.json`), Li
 The part after the decimal point: 2.7 becomes 0.7. Turns a growing number into a 0..1 that wraps - the usual way to make anything repeat.
 
 **Inputs**
-- **x** *(float)*: any number
+- **x** *(float; default 0)*: any number
 
 **Outputs**
 - **result** *(float)*: x's fraction, 0..1
@@ -3557,7 +3557,7 @@ Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Garlands (`garla
 Distance from the origin: the size of a 2-D or 3-D vector. Length of (cx, cy) is the radius.
 
 **Inputs**
-- **v** *(vector)*: the vector (make one with Vector for 2-D: x, y, 0)
+- **v** *(vector; default (0, 0, 0))*: the vector (make one with Vector for 2-D: x, y, 0)
 
 **Outputs**
 - **result** *(float)*: its length
@@ -3593,7 +3593,7 @@ Breakout (`breakout.json`), Gyro Sand (`gyro_sand.json`), Liquid (`liquid.json`)
 The natural logarithm. log of a radius makes rings that are evenly spaced when zooming.
 
 **Inputs**
-- **x** *(float)*: must be positive
+- **x** *(float; default 1)*: must be positive
 
 **Outputs**
 - **result** *(float)*: ln(x)
@@ -3629,19 +3629,19 @@ Liquid Tunnel (`liquid_tunnel.json`), Maelstrom (`maelstrom.json`)
 Remap with everything on pins: what was in low..in high becomes out low..out high, with an easing curve if you want it and, with steps above 0, in whole steps. Wire a slider into out high and the range itself becomes something the user controls.
 
 **Inputs**
-- **x** *(float)*: the value to remap
-- **in low** `in_lo` *(float)*: the input's low end
-- **in high** `in_hi` *(float)*: the input's high end
-- **out low** `out_lo` *(float)*: what in low becomes
-- **out high** `out_hi` *(float)*: what in high becomes
-- **steps** *(float)*: 0 for smooth, or how many steps
+- **x** *(float; default 0)*: the value to remap
+- **in low** `in_lo` *(float; default 0)*: the input's low end
+- **in high** `in_hi` *(float; default 1)*: the input's high end
+- **out low** `out_lo` *(float; default 0)*: what in low becomes
+- **out high** `out_hi` *(float; default 1)*: what in high becomes
+- **steps** *(float; default 0; 0 .. 64)*: 0 for smooth, or N steps: N + 1 levels from out low to out high
 
 **Outputs**
 - **result** *(float)*: the remapped value
 
 **Settings**
-- **ease** *(choice)*: how it runs between the ends: linear, smooth, ease in, ease out, ease in-out
-- **clamp** *(bool)*: hold the result inside the output range
+- **ease** *(choice; default 'linear')*: how it runs between the ends: linear, smooth, ease in, ease out, ease in-out
+- **clamp** *(bool; default on)*: hold the result inside the output range (only linear needs it: the eases stay inside)
 
 **Why use it**
 
@@ -3672,17 +3672,17 @@ FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Thermal (sub-graph) 
 
 ### Math
 
-One node for every sum: pick the operation from the dropdown. Covers what Add, Multiply and the rest do, plus sqrt, sign, round, ceil, snap (round to a step of b), ping-pong (bounce between 0 and b), wrap, less / greater / equal (1 or 0), sin / cos / tan in turns, log and exp.
+One node for every sum: pick the operation from the dropdown. Covers what Add, Multiply and the rest do, plus power (a below 0 counts as 0), sqrt, abs, sign, round, floor, ceil, fract, snap (round to a step of b), ping-pong (bounce between 0 and b), modulo or wrap (the same: a into 0..b), smooth min / smooth max (a soft corner, 0.2 wide), less / greater / equal (1 or 0), sin / cos / tan of turns, asin / acos / atan2 back in turns, log and exp.
 
 **Inputs**
-- **a** *(float)*: the first number
-- **b** *(float)*: the second number - on the node only while the operation takes two (a one-input one: sqrt, abs, sign, round, ceil, floor, fract, sin, cos, tan, asin, acos, log, exp - leaves it off, unless wired)
+- **a** *(float; default 0)*: the first number
+- **b** *(float; default 1)*: the second number - on the node only while the operation takes two (a one-input one: sqrt, abs, sign, round, ceil, floor, fract, sin, cos, tan, asin, acos, log, exp - leaves it off, unless wired)
 
 **Outputs**
 - **result** *(float)*: the answer
 
 **Settings**
-- **operation** `op` *(choice)*: which operation - the dropdown in groups: arithmetic, compare, rounding, trigonometry
+- **operation** `op` *(choice; default 'add')*: which operation - the dropdown in groups: arithmetic, compare, rounding, trigonometry
 
 **Why use it**
 
@@ -3712,8 +3712,8 @@ Its second pin shows only for operations that need two numbers. Its neighbours: 
 The larger of the two. Lays one pattern over another, brightest wins.
 
 **Inputs**
-- **a** *(float)*: one value
-- **b** *(float)*: the other
+- **a** *(float; default 0)*: one value
+- **b** *(float; default 0)*: the other
 
 **Outputs**
 - **result** *(float)*: the larger
@@ -3749,8 +3749,8 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.js
 The smaller of the two. Cuts one pattern by another.
 
 **Inputs**
-- **a** *(float)*: one value
-- **b** *(float)*: the other
+- **a** *(float; default 0)*: one value
+- **b** *(float; default 0)*: the other
 
 **Outputs**
 - **result** *(float)*: the smaller
@@ -3786,13 +3786,13 @@ Truchet Cube (`truchet_cube.json`)
 A kaleidoscope for the whole cube. Give it a direction and it reflects that direction into one wedge, so whatever you draw from the result is mirrored over the whole solid - 6 to 120 copies depending on the symmetry. Draw after the fold, not before.
 
 **Inputs**
-- **v** *(vector)*: a direction (Direction's dir, perhaps through Vector rotate)
+- **v** *(vector; default (0, 0, 1))*: a direction (Direction's dir, perhaps through Vector rotate)
 
 **Outputs**
 - **v** *(vector)*: the folded direction
 
 **Settings**
-- **symmetry** *(choice)*: which mirror set: dihedral n (a pie of n slices), tetrahedral, octahedral (matches the cube), icosahedral (most copies)
+- **symmetry** *(choice; default 'octahedral')*: which mirror set: dihedral n (a pie of n slices), tetrahedral, octahedral (matches the cube), icosahedral (most copies)
 
 **Why use it**
 
@@ -3825,9 +3825,9 @@ Kaleidoscope (`kaleidoscope.json`)
 Slides between two values: t = 0 gives a, t = 1 gives b, halfway gives the average. Crossfades.
 
 **Inputs**
-- **a** *(float)*: the value at t = 0
-- **b** *(float)*: the value at t = 1
-- **t** *(float)*: the slider, 0..1
+- **a** *(float; default 0)*: the value at t = 0
+- **b** *(float; default 1)*: the value at t = 1
+- **t** *(float; default 0.5; 0 .. 1)*: the slider, 0..1
 
 **Outputs**
 - **result** *(float)*: the blend
@@ -3863,8 +3863,8 @@ Cube Chladni (`cube_chladni.json`), VS Motion (sub-graph) (`subgraphs/vs_motion.
 The remainder after dividing by m, always 0..m. Like Fract but for any period.
 
 **Inputs**
-- **x** *(float)*: any number
-- **period** `m` *(float)*: the period
+- **x** *(float; default 0)*: any number
+- **period** `m` *(float; default 1)*: the period
 
 **Outputs**
 - **result** *(float)*: x wrapped into 0..m
@@ -3900,8 +3900,8 @@ Breakout (`breakout.json`), Meteors (`meteors.json`), Question Block (`question_
 a x b. Scales a value (a slider times a rate), or masks one pattern with another.
 
 **Inputs**
-- **a** *(float)*: the first number
-- **b** *(float)*: the second number
+- **a** *(float; default 1)*: the first number
+- **b** *(float; default 1)*: the second number
 
 **Outputs**
 - **result** *(float)*: a x b
@@ -3937,7 +3937,7 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.js
 Flips a switch: on becomes off.
 
 **Inputs**
-- **on** *(bool)*: the switch
+- **on** *(bool; default 0)*: the switch
 
 **Outputs**
 - **result** *(bool)*: the opposite
@@ -3972,8 +3972,8 @@ Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_san
 x to the power e. With x in 0..1, a high e squeezes a gradient toward 0 (sharp falloff, gloss highlights); e below 1 spreads it.
 
 **Inputs**
-- **x** *(float)*: the base, usually 0..1
-- **exponent** `e` *(float)*: the exponent
+- **x** *(float; default 0)*: the base, usually 0..1
+- **exponent** `e` *(float; default 2)*: the exponent
 
 **Outputs**
 - **result** *(float)*: x^e
@@ -4009,16 +4009,16 @@ Candy Knot (`candy_knot.json`), Lightning (`lightning.json`), Meteors (`meteors.
 Changes a value's range: what was in low..in high becomes out low..out high. The everyday node for turning a 0..1 slider into 'between 2 and 8 stripes'.
 
 **Inputs**
-- **x** *(float)*: the value to remap
+- **x** *(float; default 0)*: the value to remap
 
 **Outputs**
 - **result** *(float)*: the remapped value
 
 **Settings**
-- **in low** `in_lo` *(float)*: the input's low end
-- **in high** `in_hi` *(float)*: the input's high end
-- **out low** `out_lo` *(float)*: what in low becomes
-- **out high** `out_hi` *(float)*: what in high becomes
+- **in low** `in_lo` *(float; default 0)*: the input's low end
+- **in high** `in_hi` *(float; default 1)*: the input's high end
+- **out low** `out_lo` *(float; default 0)*: what in low becomes
+- **out high** `out_hi` *(float; default 1)*: what in high becomes
 
 **Why use it**
 
@@ -4051,9 +4051,9 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.js
 Turns a pair of coordinates round the origin. Feed a clock into turns and a pattern spins; three of these on x, y, z tumble the whole cube.
 
 **Inputs**
-- **x** *(float)*: the point's x
-- **y** *(float)*: the point's y
-- **turns** *(float)*: how far to turn: 1 = a full circle
+- **x** *(float; default 0)*: the point's x
+- **y** *(float; default 0)*: the point's y
+- **turns** *(float; default 0; turns)*: how far to turn: 1 = a full circle
 
 **Outputs**
 - **x** *(float)*: the turned x
@@ -4089,9 +4089,9 @@ Candy Knot (`candy_knot.json`), Cell Weave (`cell_weave.json`), Kaleidoscope (`k
 One of two values, chosen by a switch: b when on, a when off. A checkbox into on and the effect changes behaviour.
 
 **Inputs**
-- **on** *(bool)*: the switch
-- **a** *(float)*: the value when off
-- **b** *(float)*: the value when on
+- **on** *(bool; default 0)*: the switch
+- **a** *(float; default 0)*: the value when off
+- **b** *(float; default 1)*: the value when on
 
 **Outputs**
 - **result** *(float)*: a or b
@@ -4122,7 +4122,7 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Candy Knot (`candy_knot.
 A sine wave: -1..1, one full wave per turn of x. (Wave gives 0..1 with more shapes.)
 
 **Inputs**
-- **x** *(float)*: in turns
+- **x** *(float; default 0)*: in turns
 
 **Outputs**
 - **result** *(float)*: -1 .. 1
@@ -4158,14 +4158,14 @@ Cell Weave (`cell_weave.json`), Kaleidoscope (`kaleidoscope.json`), Liquid (`liq
 A soft switch: 0 below edge 0, 1 above edge 1, an S-curve between. Turns a gradient into a soft edge - the usual way to get 'bright near here, dark elsewhere' without a hard line. Swap the edges to flip it.
 
 **Inputs**
-- **x** *(float)*: the value to soften
+- **x** *(float; default 0)*: the value to soften
 
 **Outputs**
 - **result** *(float)*: 0..1
 
 **Settings**
-- **edge 0** `e0` *(float)*: where it starts rising
-- **edge 1** `e1` *(float)*: where it reaches 1
+- **edge 0** `e0` *(float; default 0)*: where it starts rising
+- **edge 1** `e1` *(float; default 1)*: where it reaches 1
 
 **Why use it**
 
@@ -4198,8 +4198,8 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Cube Chladni (`cube_chla
 a - b. A difference, or a distance from a level.
 
 **Inputs**
-- **a** *(float)*: the number to subtract from
-- **b** *(float)*: the number taken away
+- **a** *(float; default 0)*: the number to subtract from
+- **b** *(float; default 0)*: the number taken away
 
 **Outputs**
 - **result** *(float)*: a - b
@@ -4235,8 +4235,8 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.js
 A hard switch: on when x reaches 'at'. Gives both a true/false and a 1/0 number.
 
 **Inputs**
-- **x** *(float)*: the value
-- **at** *(float)*: the level
+- **x** *(float; default 0)*: the value
+- **at** *(float; default 0.5)*: the level
 
 **Outputs**
 - **on** *(bool)*: x >= at
@@ -4273,9 +4273,9 @@ Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Gyro Sand (`gyro_san
 Three numbers joined into one vector wire, for the nodes that take a vector (Dot 3, Length, Vector math). The opposite of Vector split.
 
 **Inputs**
-- **x** *(float)*: the x part
-- **y** *(float)*: the y part
-- **z** *(float)*: the z part
+- **x** *(float; default 0)*: the x part
+- **y** *(float; default 0)*: the y part
+- **z** *(float; default 0)*: the z part
 
 **Outputs**
 - **v** *(vector)*: the vector
@@ -4310,16 +4310,16 @@ Breakout (`breakout.json`), Candy Knot (`candy_knot.json`), Cube Ripples (`cube_
 Arithmetic on vectors, chosen by the dropdown. add / subtract / multiply / min / max work part by part; scale multiplies by the number; normalize makes the length 1; cross gives the direction at right angles to both; dot, distance and length give a number (on the value pin); reflect bounces a off b; project drops a onto b.
 
 **Inputs**
-- **a** *(vector)*: the first vector
-- **b** *(vector)*: the second vector - on the node only while the operation takes one, unless wired
-- **scale** *(float)*: the number - on the node only for scale, unless wired
+- **a** *(vector; default (0, 0, 0))*: the first vector
+- **b** *(vector; default (0, 0, 0))*: the second vector - on the node only while the operation takes one, unless wired
+- **scale** *(float; default 1)*: the number - on the node only for scale, unless wired
 
 **Outputs**
 - **v** *(vector)*: the vector result
 - **value** *(float)*: the number result (dot, distance, length; else the result's length)
 
 **Settings**
-- **operation** `op` *(choice)*: which operation
+- **operation** `op` *(choice; default 'add')*: which operation
 
 **Why use it**
 
@@ -4348,9 +4348,9 @@ Its neighbours: Dot 3 and Length are single operations; Vector and Vector split 
 Turns a vector about any axis - a whole cube tumbling in one node when fed Direction and a clock.
 
 **Inputs**
-- **v** *(vector)*: the vector to turn
-- **axis** *(vector)*: the axis to turn about (a direction)
-- **turns** *(float)*: how far: 1 = a full circle
+- **v** *(vector; default (1, 0, 0))*: the vector to turn
+- **axis** *(vector; default (0, 0, 1))*: the axis to turn about (a direction)
+- **turns** *(float; default 0)*: how far: 1 = a full circle
 
 **Outputs**
 - **v** *(vector)*: the turned vector
@@ -4382,7 +4382,7 @@ Its neighbours: Rotate turns a 2-D pair about the origin; Transform moves and zo
 A vector wire taken apart into its three numbers.
 
 **Inputs**
-- **v** *(vector)*: the vector
+- **v** *(vector; default (0, 0, 0))*: the vector
 
 **Outputs**
 - **x** *(float)*: its x part
@@ -4421,13 +4421,13 @@ Kaleidoscope (`kaleidoscope.json`)
 Tweaks a colour the way a photo app does: shift the hue round the wheel, boost or drain the saturation, brighten, add contrast, apply gamma, or invert.
 
 **Inputs**
-- **color** *(color)*: the colour to adjust
-- **hue** *(float)*: shift round the wheel, in turns (0.5 = opposite colour)
-- **saturation** *(float)*: 1 leaves it, 0 makes grey, 2 doubles it
-- **value** *(float)*: brightness multiplier
-- **contrast** *(float)*: 1 leaves it, above 1 pushes toward black and white
-- **gamma** *(float)*: 1 leaves it, below 1 lifts the mids, above 1 deepens them
-- **invert** *(bool)*: swap for the opposite colour
+- **color** *(color; default black)*: the colour to adjust
+- **hue** *(float; default 0; -1 .. 1 turns)*: shift round the wheel, in turns (0.5 = opposite colour)
+- **saturation** *(float; default 1; 0 .. 3 x)*: 1 leaves it, 0 makes grey, 2 doubles it
+- **value** *(float; default 1; 0 .. 3 x)*: brightness multiplier
+- **contrast** *(float; default 1; 0 .. 3 x)*: 1 leaves it, above 1 pushes toward black and white
+- **gamma** *(float; default 1; 0.2 .. 4)*: 1 leaves it, below 1 lifts the mids, above 1 deepens them
+- **invert** *(bool; default off)*: swap for the opposite colour
 
 **Outputs**
 - **color** *(color)*: the adjusted colour
@@ -4464,7 +4464,7 @@ FX Clean (sub-graph) (`subgraphs/fx_clean.json`)
 The colour of something hot: a candle, a bulb, daylight, a blue-white star. Feed a heat value remapped to 1000..10000 for a fire that goes red, orange, yellow, white.
 
 **Inputs**
-- **kelvin** *(float)*: the temperature: 1500 candle, 3000 bulb, 6500 daylight, 10000 blue-white
+- **kelvin** *(float; default 3000)*: the temperature: 1500 candle, 3000 bulb, 6500 daylight, 10000 blue-white
 
 **Outputs**
 - **color** *(color)*: that glow
@@ -4497,15 +4497,15 @@ Feed it a heat value and fire looks right without hand-picking colours: red wher
 Puts one colour on top of another - the layering node. 'over' covers 'under' by amount; 'add' adds light; 'max' keeps the brighter; 'multiply' darkens; 'screen' lightens. Chain Blends to stack layers.
 
 **Inputs**
-- **under** *(color)*: the layer below
-- **over** *(color)*: the layer on top
-- **amount** *(float)*: how much of 'over' shows, 0..1
+- **under** *(color; default black)*: the layer below
+- **over** *(color; default black)*: the layer on top
+- **amount** *(float; default 1; 0 .. 1)*: how much of 'over' shows, 0..1
 
 **Outputs**
 - **color** *(color)*: the result
 
 **Settings**
-- **mode** *(choice)*: over (cover), add (light adds up), max (brighter wins), min, multiply (darken), screen (lighten), overlay, difference, soft light, and hue / saturation / colour / luminosity (take that part of 'over')
+- **mode** *(choice; default 'over')*: over (cover), add (light adds up), max (brighter wins), min, multiply (darken), screen (lighten), overlay, difference, soft light, and hue / saturation / colour / luminosity (take that part of 'over')
 
 **Why use it**
 
@@ -4542,7 +4542,7 @@ Last frame's picture, softened: the average of the pixels around this one. Blend
 - **color** *(color)*: the blurred colour here
 
 **Settings**
-- **radius** *(int)*: how wide the blur is, in pixels (1 = the 3 x 3 around)
+- **radius** *(int; default 1; 1 .. 3 px)*: how wide the blur is, in pixels (1 = the 3 x 3 around)
 
 **Why use it**
 
@@ -4572,20 +4572,20 @@ Fed back into the picture through a Fade it makes things bloom and drift into cl
 One of eight colours you set, chosen by number: 0 gives the first, 1 the second... The palette for a Bitmap's digits, or for a cell number.
 
 **Inputs**
-- **index** *(float)*: which colour, 0..7
+- **index** *(float; default 0)*: which colour, 0..7
 
 **Outputs**
 - **color** *(color)*: the colour
 
 **Settings**
-- **colour 0** `c0` *(color)*: colour 0
-- **colour 1** `c1` *(color)*: colour 1
-- **colour 2** `c2` *(color)*: colour 2
-- **colour 3** `c3` *(color)*: colour 3
-- **colour 4** `c4` *(color)*: colour 4
-- **colour 5** `c5` *(color)*: colour 5
-- **colour 6** `c6` *(color)*: colour 6
-- **colour 7** `c7` *(color)*: colour 7
+- **colour 0** `c0` *(color; default #FFFFFF)*: colour 0
+- **colour 1** `c1` *(color; default #FF0000)*: colour 1
+- **colour 2** `c2` *(color; default #00FF00)*: colour 2
+- **colour 3** `c3` *(color; default #0000FF)*: colour 3
+- **colour 4** `c4` *(color; default #FFFF00)*: colour 4
+- **colour 5** `c5` *(color; default #00FFFF)*: colour 5
+- **colour 6** `c6` *(color; default #FF00FF)*: colour 6
+- **colour 7** `c7` *(color; default #808080)*: colour 7
 
 **Why use it**
 
@@ -4619,14 +4619,14 @@ Question Block (`question_block.json`)
 A gradient you draw on the node: colour stops along 0..1, read at t. The strip shows it. Add and remove stops, set each one's position and colour; linear blends between them, constant makes hard bands, ease blends softly. Your own palette without leaving the graph.
 
 **Inputs**
-- **t** *(float)*: where to read, 0..1 - a coordinate, a heat, a phase
+- **t** *(float; default 0)*: where to read, 0..1 - a coordinate, a heat, a phase
 
 **Outputs**
 - **color** *(color)*: the gradient's colour there
 
 **Settings**
-- **stops** *(ramp)*: the stops: position and colour, any number from two
-- **mode** *(choice)*: linear, constant (bands) or ease
+- **stops** *(ramp; default [[0.0, 0, 0, 0], [0.5, 255, 80, 0], [1.0, 255, 255, 255]])*: the stops: position and colour, any number from two
+- **mode** *(choice; default 'linear')*: linear, constant (bands) or ease
 
 **Why use it**
 
@@ -4660,9 +4660,9 @@ FX Thermal (sub-graph) (`subgraphs/fx_thermal.json`)
 Makes a colour from red, green and blue amounts, each 0..1.
 
 **Inputs**
-- **r** *(float)*: red, 0..1
-- **g** *(float)*: green
-- **b** *(float)*: blue
+- **r** *(float; default 0)*: red, 0..1
+- **g** *(float; default 0)*: green
+- **b** *(float; default 0)*: blue
 
 **Outputs**
 - **color** *(color)*: the colour
@@ -4704,8 +4704,8 @@ Water running downhill over the pixels. Given a height field and a water field, 
 - **height** *(float)*: this pixel's height, from the field
 
 **Settings**
-- **heights** `height_field` *(int)*: the field holding heights
-- **water** `water_field` *(int)*: the field holding water
+- **heights** `height_field` *(int; default 0; 0 .. 3)*: the field holding heights
+- **water** `water_field` *(int; default 1; 0 .. 3)*: the field holding water
 
 **Why use it**
 
@@ -4739,8 +4739,8 @@ Watershed (`watershed.json`)
 Dims a colour by keep - the same as Scale, named for what it does after Previous: keep 0.9 and trails fade over about a second.
 
 **Inputs**
-- **color** *(color)*: the colour
-- **keep** *(float)*: how much survives each frame, 0..1
+- **color** *(color; default black)*: the colour
+- **keep** *(float; default 0.9; 0 .. 1)*: how much survives each frame, 0..1
 
 **Outputs**
 - **color** *(color)*: the faded colour
@@ -4774,17 +4774,17 @@ Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`), FX Follow Spot
 
 ### Field
 
-A hidden number stored per pixel between frames - a simulation's memory (heat, water, sand) kept separate from the colour. This reads last frame's value at any pixel; Field write stores this pixel's new value. Two fields per graph, 0 and 1.
+A hidden number stored per pixel between frames - a simulation's memory (heat, water, sand) kept separate from the colour. This reads last frame's value at any pixel; Field write stores this pixel's new value. Four fields per graph, 0 to 3.
 
 **Inputs**
-- **u** *(float)*: which pixel, across, 0..1 - unwired, the pixel's u
-- **v** *(float)*: which pixel, down, 0..1 - unwired, the pixel's v
+- **u** *(float; default 0)*: which pixel, across, 0..1 - unwired, the pixel's u
+- **v** *(float; default 0)*: which pixel, down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **value** *(float)*: the stored number there, from last frame
 
 **Settings**
-- **field** *(int)*: which field, 0 to 3
+- **field** *(int; default 0; 0 .. 3)*: which field, 0 to 3
 
 **Why use it**
 
@@ -4818,10 +4818,10 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.js
 Stores a number for this pixel, to be read by Field next frame. The other half of a simulation: compute the new heat, write it here, read it back next frame with Field.
 
 **Inputs**
-- **value** *(float)*: this pixel's number for next frame
+- **value** *(float; default 0)*: this pixel's number for next frame
 
 **Settings**
-- **field** *(int)*: which field, 0 to 3
+- **field** *(int; default 0; 0 .. 3)*: which field, 0 to 3
 
 **Why use it**
 
@@ -4855,14 +4855,14 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Gyro Sand (`gyro_sand.js
 Bloom: a colour plus a blurred copy of last frame's picture, so anything bright bleeds light into its neighbours. Put it just before Output.
 
 **Inputs**
-- **color** *(color)*: the picture
-- **amount** *(float)*: how much glow, 0..1
+- **color** *(color; default black)*: the picture
+- **amount** *(float; default 0.5; 0 .. 1)*: how much glow, 0..1
 
 **Outputs**
 - **color** *(color)*: the picture with its glow
 
 **Settings**
-- **radius** *(int)*: how far the glow reaches, in pixels
+- **radius** *(int; default 1; 1 .. 3 px)*: how far the glow reaches, in pixels
 
 **Why use it**
 
@@ -4892,9 +4892,9 @@ Put it just before the Output and the whole effect gets a softer, more luminous 
 A colour from hue, saturation and brightness. h goes round the rainbow (0 red, 0.33 green, 0.67 blue, 1 red again, so it wraps); s 0 is white/grey, 1 full colour; v is brightness.
 
 **Inputs**
-- **hue** `h` *(float)*: hue, 0..1 round the wheel
-- **saturation** `s` *(float)*: saturation, 0 grey .. 1 vivid
-- **value** `v` *(float)*: brightness, 0..1
+- **hue** `h` *(float; default 0)*: hue, 0..1 round the wheel
+- **saturation** `s` *(float; default 1)*: saturation, 0 grey .. 1 vivid
+- **value** `v` *(float; default 1)*: brightness, 0..1
 
 **Outputs**
 - **color** *(color)*: the colour
@@ -4924,27 +4924,27 @@ Hue goes round the rainbow and wraps, so a growing number cycles through every c
 
 ### Layers
 
-A stack of up to four layers on a base colour, each with its own blend mode and amount - the whole picture's layering in one node instead of a chain of Blends. A layer with nothing wired is skipped.
+A stack of up to four layers on a base colour, each with its own blend mode and amount - the whole picture's layering in one node instead of a chain of Blends. Where a layer is black - and one with nothing wired is black everywhere - it is skipped, so a black layer neither covers (over) nor darkens (multiply).
 
 **Inputs**
-- **base** *(color)*: the bottom layer
-- **layer 1** *(color)*: the first layer on top
-- **amount 1** *(float)*: how much of layer 1 shows, 0..1
-- **layer 2** *(color)*: the next layer
-- **amount 2** *(float)*: how much of it, 0..1
-- **layer 3** *(color)*: the next
-- **amount 3** *(float)*: how much, 0..1
-- **layer 4** *(color)*: the top layer
-- **amount 4** *(float)*: how much, 0..1
+- **base** *(color; default black)*: the bottom layer
+- **layer 1** *(color; default black)*: the first layer on top
+- **amount 1** *(float; default 1; 0 .. 1)*: how much of layer 1 shows, 0..1
+- **layer 2** *(color; default black)*: the next layer
+- **amount 2** *(float; default 1; 0 .. 1)*: how much of it, 0..1
+- **layer 3** *(color; default black)*: the next
+- **amount 3** *(float; default 1; 0 .. 1)*: how much, 0..1
+- **layer 4** *(color; default black)*: the top layer
+- **amount 4** *(float; default 1; 0 .. 1)*: how much, 0..1
 
 **Outputs**
 - **color** *(color)*: the stack
 
 **Settings**
-- **mode 1** *(choice)*: how layer 1 combines: over, add, max, screen, multiply
-- **mode 2** *(choice)*: for layer 2
-- **mode 3** *(choice)*: for layer 3
-- **mode 4** *(choice)*: for layer 4
+- **mode 1** *(choice; default 'add')*: how layer 1 combines: over, add, max, screen, multiply
+- **mode 2** *(choice; default 'add')*: for layer 2
+- **mode 3** *(choice; default 'add')*: for layer 3
+- **mode 4** *(choice; default 'add')*: for layer 4
 
 **Why use it**
 
@@ -4978,10 +4978,10 @@ FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Motion Trails (sub-g
 The last touch on a colour: brightness scales it, contrast stretches it about mid grey (above 1 punchier, below 1 flatter), gamma bends it (below 1 brightens the darks, above 1 deepens them, the same way round as Adjust's). 1, 1, 1 changes nothing.
 
 **Inputs**
-- **color** *(color)*: the colour to adjust
-- **brightness** *(float)*: 0..3, 1 as is
-- **contrast** *(float)*: 0..3, 1 as is
-- **gamma** *(float)*: 0.2..4, 1 as is, below 1 lighter
+- **color** *(color; default black)*: the colour to adjust
+- **brightness** *(float; default 1; 0 .. 3 x)*: 0..3, 1 as is
+- **contrast** *(float; default 1; 0 .. 3 x)*: 0..3, 1 as is
+- **gamma** *(float; default 1; 0.2 .. 4)*: 0.2..4, 1 as is, below 1 lighter
 
 **Outputs**
 - **color** *(color)*: the adjusted colour
@@ -5018,8 +5018,8 @@ FX Imprint (sub-graph) (`subgraphs/fx_imprint.json`)
 Shows a colour only where the mask is bright: colour times a 0..1 pattern. Noise as the mask makes clouds of that colour.
 
 **Inputs**
-- **color** *(color)*: the colour
-- **mask** *(float)*: 0 hides it .. 1 shows it
+- **color** *(color; default black)*: the colour
+- **mask** *(float; default 1; 0 .. 1)*: 0 hides it .. 1 shows it
 
 **Outputs**
 - **color** *(color)*: the masked colour
@@ -5056,8 +5056,8 @@ Liquid (`liquid.json`), Question Block (`question_block.json`), FX Follow Spot (
 A colour from the palette chosen on the WLED page. index 0..1 runs through the palette and wraps, so a coordinate plus a clock gives a scrolling rainbow; brightness dims it. This is how most effects get their colour.
 
 **Inputs**
-- **index** *(float)*: where in the palette, 0..1 (wraps)
-- **brightness** *(float)*: 0 dark .. 1 full
+- **index** *(float; default 0)*: where in the palette, 0..1 (wraps)
+- **brightness** *(float; default 1; 0 .. 1)*: 0 dark .. 1 full
 
 **Outputs**
 - **color** *(color)*: the colour
@@ -5095,8 +5095,8 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.js
 Like Palette, but reads the 'palette source' setting - the colours the audio-reactive palettes are built from - instead of the segment's palette. Falls back to the segment's palette on a build without that usermod.
 
 **Inputs**
-- **index** *(float)*: where in it, 0..1 (wraps)
-- **brightness** *(float)*: 0 dark .. 1 full
+- **index** *(float; default 0)*: where in it, 0..1 (wraps)
+- **brightness** *(float; default 1)*: 0 dark .. 1 full
 
 **Outputs**
 - **color** *(color)*: the colour
@@ -5163,8 +5163,8 @@ Cube Ripples (`cube_ripples.json`), Fireworks (`fireworks.json`), FX Imprint (su
 What another pixel showed last frame. Give it a u, v and you read that pixel's colour from the frame before - read the pixel below to make things rise, beside to smear, and feed the result back into the output (through a Fade) for trails.
 
 **Inputs**
-- **u** *(float)*: which pixel, across, 0..1 - unwired, the pixel's u
-- **v** *(float)*: which pixel, down, 0..1 - unwired, the pixel's v
+- **u** *(float; default 0)*: which pixel, across, 0..1 - unwired, the pixel's u
+- **v** *(float; default 0)*: which pixel, down, 0..1 - unwired, the pixel's v
 
 **Outputs**
 - **color** *(color)*: that pixel's colour last frame
@@ -5201,8 +5201,8 @@ FX Melt (sub-graph) (`subgraphs/fx_melt.json`)
 Dims a colour by a number (1 leaves it, 0.5 halves it, 0 is black).
 
 **Inputs**
-- **color** *(color)*: the colour
-- **by** *(float)*: how much to keep, 0..1
+- **color** *(color; default black)*: the colour
+- **by** *(float; default 1; 0 .. 1)*: how much to keep, 0..1
 
 **Outputs**
 - **color** *(color)*: the dimmed colour
@@ -5239,7 +5239,7 @@ Question Block (`question_block.json`)
 Takes a colour apart into red, green, blue and brightness, each 0..1.
 
 **Inputs**
-- **color** *(color)*: the colour to take apart
+- **color** *(color; default black)*: the colour to take apart
 
 **Outputs**
 - **r** *(float)*: red, 0..1
@@ -5281,15 +5281,15 @@ FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Neon Edges (sub-gra
 A node you write yourself, giving a colour: one line of C++, with a, b and the colour 'under' to use. Helpers: gc_hsv(h, s, v), mq_scale(c, 0..255), color_blend(a, b, 0..255), SEGCOLOR(0).
 
 **Inputs**
-- **a** *(float)*: a number
-- **b** *(float)*: another
-- **under** *(color)*: a colour
+- **a** *(float; default 0)*: a number
+- **b** *(float; default 0)*: another
+- **under** *(color; default black)*: a colour
 
 **Outputs**
 - **color** *(color)*: what the expression gives
 
 **Settings**
-- **expr** *(text)*: the C++ expression
+- **expr** *(text; default 'gc_hsv(a, 1.0f, b)')*: the C++ expression
 
 **Why use it**
 
@@ -5317,15 +5317,15 @@ Its neighbours: HSV, Blend and Scale are the same jobs as nodes; Expression give
 A node you write yourself: one line of C++ giving a number, using a, b, c and the pixel's coordinates (u, v, cx, cy, r, ang, nx, ny, nz, t). For the one calculation the other nodes do not have.
 
 **Inputs**
-- **a** *(float)*: a number your expression can use
-- **b** *(float)*: another
-- **c** *(float)*: another
+- **a** *(float; default 0)*: a number your expression can use
+- **b** *(float; default 0)*: another
+- **c** *(float; default 0)*: another
 
 **Outputs**
 - **result** *(float)*: what the expression gives
 
 **Settings**
-- **expr** *(text)*: the C++ expression, e.g. sinf(a * 6.283f) * b
+- **expr** *(text; default 'a * b + c')*: the C++ expression, e.g. sinf(a * 6.283f) * b
 
 **Why use it**
 
@@ -5355,9 +5355,9 @@ It compiles into the effect like any node. Its neighbours: Math has a list of op
 Settings for the effect as a whole: which palette it starts with, whether it is for a strip, a matrix or both, whether it wants audio, and names for the colour pickers. One per graph.
 
 **Settings**
-- **palette** *(int)*: the palette id it starts with (11 is Rainbow)
-- **dimensions** *(choice)*: where it runs
-- **audio** *(choice)*: what it listens to, if anything
+- **palette** *(int; default 11; 0 .. 255)*: the palette id it starts with (11 is Rainbow)
+- **dimensions** *(choice; default 'both')*: where it runs
+- **audio** *(choice; default 'none')*: what it listens to, if anything
 - **colours** *(text)*: names for the three colour pickers, comma separated
 
 **Why use it**
@@ -5387,10 +5387,10 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.js
 
 ### Output
 
-The colour this pixel will show. Every graph needs exactly one.
+The colour this pixel will show. Every graph needs exactly one - but a sub-graph, whose Graph outputs are its pins (the first colour one stands in for an Output when it runs alone).
 
 **Inputs**
-- **color** *(color)*: the final colour
+- **color** *(color; default black)*: the final colour
 
 **Why use it**
 
@@ -5423,16 +5423,16 @@ Box Fire (`box_fire.json`), Breakout (`breakout.json`), Butterfly (`butterfly.js
 A titled box to group nodes. Drag it and the nodes inside come along. Not part of the effect.
 
 **Settings**
-- **title** *(text)*: the box's title
-- **width** `w` *(int)*: width
-- **height** `h` *(int)*: height
-- **colour** *(color)*: its colour
+- **title** *(text; default 'group')*: the box's title
+- **width** `w` *(int; default 400; 80 .. 4000)*: width
+- **height** `h` *(int; default 300; 60 .. 4000)*: height
+- **colour** *(color; default #5A6EA0)*: its colour
 
 **Why use it**
 
 A graph of twenty nodes is hard to read when it is just nodes: which ones make the colour, which the motion, which the audio? Frame is a titled, coloured box you draw round a group of nodes - drag it and the nodes inside move with it.
 
-Its neighbours: Note is text on the graph; sub-graphs (Node > Fold into a sub-graph) turn a group into a single node; Frame keeps the nodes visible but grouped. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph.
+Its neighbours: Note is text on the graph; sub-graphs (Node > Sub-graph > Fold the selection into one (Ctrl+G)) turn a group into a single node; Frame keeps the nodes visible but grouped. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph.
 
 **Tutorial**
 
@@ -5458,15 +5458,15 @@ When this graph is used as a node inside another graph, this is one of that node
 - **value** *(float)*: whatever the parent wires in (or the default)
 
 **Settings**
-- **name** *(text)*: the pin's name on the outer node
-- **type** *(choice)*: number, colour or switch
-- **default** *(float)*: the value when unwired
+- **name** *(text; default 'in')*: the pin's name on the outer node
+- **type** *(choice; default 'float')*: number, colour, switch or vector
+- **default** *(float; default 0)*: the value when unwired
 
 **Why use it**
 
 A piece of graph you use again and again - a fire, a sparkle layer, a scroll - can become a node of its own: a sub-graph. Graph input and Graph output are its pins: each Graph input becomes an input of the node, each Graph output an output.
 
-Select nodes and Node > Fold into a sub-graph makes one, with these pins already in place. Its neighbours: Send and Receive carry values within one graph; Graph input and output carry them in and out of a sub-graph.
+Select nodes and Node > Sub-graph > Fold the selection into one (Ctrl+G) makes one, with these pins already in place. Its neighbours: Send and Receive carry values within one graph; Graph input and output carry them in and out of a sub-graph.
 
 **Tutorial**
 
@@ -5492,17 +5492,17 @@ FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Clean (sub-graph) (
 When this graph is used as a node inside another graph, this is one of that node's output pins.
 
 **Inputs**
-- **value** *(float)*: what the outer node's pin gives
+- **value** *(float; default 0)*: what the outer node's pin gives
 
 **Settings**
-- **name** *(text)*: the pin's name on the outer node
-- **type** *(choice)*: number, colour or switch
+- **name** *(text; default 'out')*: the pin's name on the outer node
+- **type** *(choice; default 'float')*: number, colour, switch or vector
 
 **Why use it**
 
 A piece of graph you use again and again - a fire, a sparkle layer, a scroll - can become a node of its own: a sub-graph. Graph input and Graph output are its pins: each Graph input becomes an input of the node, each Graph output an output.
 
-Select nodes and Node > Fold into a sub-graph makes one, with these pins already in place. Its neighbours: Send and Receive carry values within one graph; Graph input and output carry them in and out of a sub-graph.
+Select nodes and Node > Sub-graph > Fold the selection into one (Ctrl+G) makes one, with these pins already in place. Its neighbours: Send and Receive carry values within one graph; Graph input and output carry them in and out of a sub-graph.
 
 **Tutorial**
 
@@ -5528,7 +5528,7 @@ FX Chroma Split (sub-graph) (`subgraphs/fx_chroma.json`), FX Clean (sub-graph) (
 A bend in a wire, to route it neatly. Changes nothing.
 
 **Inputs**
-- **in** *(float)*: any number
+- **in** *(float; default 0)*: any number
 
 **Outputs**
 - **out** *(float)*: the same value
@@ -5554,7 +5554,7 @@ Its neighbours: Knot colour does the same for a colour wire; Send and Receive sk
 A bend in a colour wire. Changes nothing.
 
 **Inputs**
-- **in** *(color)*: any colour
+- **in** *(color; default black)*: any colour
 
 **Outputs**
 - **out** *(color)*: the same colour
@@ -5579,7 +5579,7 @@ Its neighbours: Knot for a number wire; Send colour and Receive colour skip the 
 A note to yourself on the graph. Not part of the effect.
 
 **Settings**
-- **text** *(text)*: the note
+- **text** *(text; default 'note')*: the note
 
 **Why use it**
 
@@ -5613,7 +5613,7 @@ The other end of a Send: gives what feeds the Send of the same name. A Receive w
 - **out** *(float)*: what the Send is fed
 
 **Settings**
-- **name** *(text)*: the Send to listen to
+- **name** *(text; default 'a')*: the Send to listen to
 
 **Why use it**
 
@@ -5644,7 +5644,7 @@ The other end of a Send colour: the colour fed to the Send colour of the same na
 - **out** *(color)*: the colour the Send colour is fed
 
 **Settings**
-- **name** *(text)*: the Send colour to listen to
+- **name** *(text; default 'a')*: the Send colour to listen to
 
 **Why use it**
 
@@ -5671,10 +5671,10 @@ Its neighbours: Send and Receive for numbers; Knot colour to route a colour wire
 A plot of whatever is wired in, in the node: the last seconds of it, its min and max written. A frame-scope value as it is, a per-pixel one at the centre pixel. Leave one on a wire to watch it; the compiler skips it, so it costs the effect nothing.
 
 **Inputs**
-- **x** *(float)*: the value to watch
+- **x** *(float; default 0)*: the value to watch
 
 **Settings**
-- **seconds** *(float)*: how long a stretch the plot shows
+- **seconds** *(float; default 3; 0.5 .. 10)*: how long a stretch the plot shows
 
 **Why use it**
 
@@ -5702,10 +5702,10 @@ The compiler skips it, so it costs the effect nothing on the device. Its neighbo
 A wire with no line drawn. Whatever feeds a Send named `bass` reaches every Receive named `bass`, wherever they sit - the compiler joins each pair and both nodes vanish, so they cost nothing. For a value used all over a big graph (the beat, the time, a master speed) without wires crossing everything. Names are local to one graph file; a Send with nothing wired in sends the value typed on it. A loop through a pair is a loop like any other.
 
 **Inputs**
-- **in** *(float)*: the number to send
+- **in** *(float; default 0)*: the number to send
 
 **Settings**
-- **name** *(text)*: the name its Receives answer to
+- **name** *(text; default 'a')*: the name its Receives answer to
 
 **Why use it**
 
@@ -5733,10 +5733,10 @@ Its neighbours: Knot routes a wire neatly; sub-graphs hide wiring inside a node;
 A Send for a colour: what feeds it reaches every Receive colour of the same name.
 
 **Inputs**
-- **in** *(color)*: the colour to send
+- **in** *(color; default black)*: the colour to send
 
 **Settings**
-- **name** *(text)*: the name its Receive colours answer to
+- **name** *(text; default 'a')*: the name its Receive colours answer to
 
 **Why use it**
 

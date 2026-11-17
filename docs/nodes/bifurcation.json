@@ -4,13 +4,13 @@
  "caption": "Bifurcation: the fig-tree diagram of chaos filling in, coloured across by the palette",
  "why": [
   "Some of the most beautiful pictures in mathematics come from a single rule repeated: here, x becomes x times x plus c. For some values of c the sequence settles on one number, for others it flips between two, four, eight - and then into chaos. Plotting where it lands, for every c across the picture, draws the famous branching fig tree.",
-  "Use it for a slow, hypnotic, structured texture that keeps glowing as the sequence wanders - ambient pieces, something to stare at. Its neighbours: Mandelbrot draws a still picture of which points escape; Reaction diffusion grows organic shapes; Bifurcation draws where a chaotic orbit lives, and keeps sparkling as it moves."
+  "Use it for a slow, hypnotic, structured texture that builds up and glows as the sequence wanders - ambient pieces, something to stare at. Its neighbours: Mandelbrot draws a still picture of which points escape; Reaction diffusion grows organic shapes; Bifurcation draws where a chaotic orbit lives."
  ],
  "steps": [
   "**Bifurcation** reads the pixel's place itself: **u** (across) picks a value of c inside the window **c from** .. **c to** (-1.6 to 0.3), and **v** (down) picks a value of x inside **x from** .. **x to** (-1.5 to 1.5). Both are unwired, so they are the pixel's own u and v.",
   "Every frame it runs the sequence **orbits** (24) more steps for each column, and lights the pixels it lands on. Its `density` output is how often a pixel has been visited lately.",
   "**trail** is 0.97: a visit fades slowly, so the branches build up into lines instead of flickering dots.",
-  "The density lights the **Palette**: its brightness is the density, its index runs across with **Coords** `u`, so the stable left side, the forking middle and the chaotic right take different colours."
+  "The density lights the **Palette**: its brightness is the density, its index runs across with **Coords** `u`, so the chaotic left side (c below about -1.4), the forking middle and the single stable line on the right take different colours."
  ],
  "try": [
   {

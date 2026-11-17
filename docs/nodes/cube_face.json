@@ -4,7 +4,7 @@
  "caption": "Cube face: the same checkerboard on every face, each face its own colour",
  "why": [
   "Coords sees the cube as the unfolded net - one flat picture with the faces laid out in a cross - so a pattern drawn from it is cut and turned at the folds. When you want the same thing on every face, each face the right way round, you need coordinates that start again on each face. Cube face gives them.",
-  "`a` and `b` run 0..1 across and down each face; `face` numbers the faces (0 east, 1 west, 2 north, 3 south, 4 lid, 5 bottom), so each can be treated differently; `normal x`, `normal y`, `normal z` say which way the face looks. Its neighbours: Coords is the whole net; Direction and Position see the cube as a solid; Cube face is one tile per face."
+  "`a` runs 0..1 across each face and `b` 0..1 up it (on the lid and bottom, along y); `face` numbers the faces (0 east, 1 west, 2 north, 3 south, 4 lid, 5 bottom), so each can be treated differently; `normal x`, `normal y`, `normal z` say which way the face looks. Its neighbours: Coords is the whole net; Direction and Position see the cube as a solid; Cube face is one tile per face."
  ],
  "steps": [
   "Cube face has no inputs or settings: it only says, for each pixel, which face it is on and where.",

@@ -4,7 +4,7 @@
  "caption": "Frame: a titled box round the nodes that make the motion - the graph tidied, the effect unchanged",
  "why": [
   "A graph of twenty nodes is hard to read when it is just nodes: which ones make the colour, which the motion, which the audio? Frame is a titled, coloured box you draw round a group of nodes - drag it and the nodes inside move with it.",
-  "Its neighbours: Note is text on the graph; sub-graphs (Node > Fold into a sub-graph) turn a group into a single node; Frame keeps the nodes visible but grouped. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph."
+  "Its neighbours: Note is text on the graph; sub-graphs (Node > Sub-graph > Fold the selection into one (Ctrl+G)) turn a group into a single node; Frame keeps the nodes visible but grouped. It changes nothing on the LEDs - the picture is the graph's own; the node is for whoever reads the graph."
  ],
  "steps": [
   "**title** is Motion: the words on the box's top edge.",

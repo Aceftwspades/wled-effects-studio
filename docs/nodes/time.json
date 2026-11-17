@@ -3,11 +3,11 @@
  "star": 1,
  "caption": "Time: the clock scrolling the palette across the matrix",
  "why": [
-  "Anything that moves without being pushed by the music moves with the clock. Time counts seconds since the effect started; times a speed, it is a scroll, a spin, a drift. It also gives how long this frame took, for things that should move a fixed amount a second however fast the effect runs.",
+  "Anything that moves without being pushed by the music moves with the clock. Time counts seconds on WLED's clock (from the device's start, back to 0 every hour); times a speed, it is a scroll, a spin, a drift. It also gives how long this frame took, for things that should move a fixed amount a second however fast the effect runs.",
   "Its neighbours: Integrate grows at a rate (and keeps its place when the rate changes); Frame count counts frames; Tempo counts beats; Time is plain seconds."
  ],
  "steps": [
-  "Time has no inputs or settings. `t` is the seconds since the effect started; `frame ms` is how long this frame took, in milliseconds.",
+  "Time has no inputs or settings. `t` is the seconds on the clock; `frame ms` is how long this frame took, in milliseconds.",
   "`t` times 0.3 (a **Multiply**) is added to **Coords** `u` (an **Add**): the **Palette**'s index, so the colours scroll steadily left.",
   "The trace shows `frame ms`: steady here, as the sim runs at a fixed step; on the device it rises when the effect is busy."
  ],

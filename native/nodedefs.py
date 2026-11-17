@@ -1511,7 +1511,7 @@ UNITS = {
     "Adjust":     {"hue": ("turns", -1.0, 1.0, None), "saturation": ("x", 0.0, 3.0, None), "value": ("x", 0.0, 3.0, None),
                    "contrast": ("x", 0.0, 3.0, None), "gamma": ("", 0.2, 4.0, "log")},
     "Levels":     {"brightness": ("x", 0.0, 3.0, None), "contrast": ("x", 0.0, 3.0, None), "gamma": ("", 0.2, 4.0, "log")},
-    "Glow":       {"amount": ("", 0.0, 2.0, None), "radius": ("px", None, None, None)},
+    "Glow":       {"amount": ("", 0.0, 1.0, None), "radius": ("px", None, None, None)},
     "Blur":       {"radius": ("px", None, None, None)},
     "Sparkle":    {"density": ("", 0.0, 1.0, None)},
     "Sprites":    {"size": ("", 0.01, 1.0, "log")},

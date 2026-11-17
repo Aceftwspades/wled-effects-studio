@@ -9,12 +9,12 @@
  "steps": [
   "Coords has no inputs or settings - it only answers. Its six outputs are six ways of saying where this pixel is.",
   "`u` goes into a **Mix**'s a, and the Mix's result into the **Palette**'s index: with the Mix's t at 0 it passes a straight through, so the colours run left to right across the matrix.",
-  "`angle` waits in the Mix's b - the angle round the centre, 0..1 for a full turn. The Mix chooses between u and angle, so one change shows the other.",
+  "`angle` waits in the Mix's b - the angle round the centre, in radians: -3.14 to 3.14 for a full turn. The Mix chooses between u and angle, so one change shows the other.",
   "`r` - the distance from the centre - goes into a **Smoothstep** whose edges are 1.2 and 0: bright where r is 0, fading to dark by r 1.2. That is the Palette's brightness, so the corners fall away.",
   "`v`, `centred x` and `centred y` are left unwired here; v is u's partner down the matrix, centred x and y are u and v moved so the centre is 0."
  ],
  "try": [
-  {"label": "Colour by angle", "text": "the Mix's t at 1: the palette's index comes from angle instead of u, so the colours go round the centre - a colour wheel, the start of every spinner.", "set": [[2, "t", 1.0]]},
+  {"label": "Colour by angle", "text": "the Mix's t at 1: the palette's index comes from angle instead of u, so the colours go round the centre. The angle is in radians, so the palette wraps about six times round - multiply it by 0.159 (one over 6.28) for a single colour wheel, the start of every spinner.", "set": [[2, "t", 1.0]]},
   {"label": "Halfway", "text": "the Mix's t at 0.5: the index is half u and half angle, so the bands bend - a spiral between a gradient and a wheel.", "set": [[2, "t", 0.5]]},
   {"label": "No falloff", "text": "the Smoothstep's edges at -1 and -0.5: r is never below them, so the brightness is 1 everywhere and the whole matrix is lit evenly.", "set": [[3, "e0", -1.0], [3, "e1", -0.5]]}
  ],

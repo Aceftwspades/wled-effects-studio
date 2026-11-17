@@ -8,14 +8,14 @@
  ],
  "steps": [
   "**Audio**'s `beat` is the **beat** input: true on the frame a kick lands.",
-  "**throw** is 1: how far each kick moves the phase - one whole cycle of whatever it scrolls.",
-  "`phase` is a **Wave**'s phase (x from **Coords** `u`, 4 cycles, triangle): on each kick the stripes lurch along by a cycle and ease to a stop. That wave is the **Palette**'s brightness.",
+  "**throw** is 1: how far each kick moves the phase - at 1, about 0.4 of a cycle of whatever it scrolls.",
+  "`phase` is a **Wave**'s phase (x from **Coords** `u`, 4 cycles, triangle): on each kick the stripes lurch along by a little under half a cycle and ease to a stop. That wave is the **Palette**'s brightness.",
   "Watch the stripes: still between kicks, a quick lurch on each one that eases to a stop."
  ],
  "try": [
   {
    "label": "Harder kicks",
-   "text": "throw 2.5: each kick throws the stripes two and a half cycles - a big lurch.",
+   "text": "throw 2.5: each kick throws the stripes about one whole cycle - a big lurch.",
    "set": [
     [
      1,
@@ -26,7 +26,7 @@
   },
   {
    "label": "Nudge",
-   "text": "throw 0.25: a quarter cycle per kick - a gentle nudge on the beat.",
+   "text": "throw 0.25: about a tenth of a cycle per kick - a gentle nudge on the beat.",
    "set": [
     [
      1,
