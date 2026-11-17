@@ -1,15 +1,18 @@
-# WLED Effects Studio — a short guide
+# WLED Effects Studio — the user guide
 
 Effects for a WLED LED cube (or any matrix or strip), built as node graphs
 or as C++, previewed on a simulated cube with synthetic or live audio, and
 sent to the device three ways. [The node reference](NODES.md) lists every
 node; [the tutorial](TUTORIAL.md) builds a first effect node by node;
-[STUDIO.md](STUDIO.md) is the long history and roadmap.
+[STUDIO.md](STUDIO.md) is the design log and its history;
+[ROADMAP.md](ROADMAP.md) the latest rounds of work and what is still open.
 
 ## First run
 
-**The packaged app** (a release zip, or `python package.py` from the
-tree): unzip anywhere and run `WLED Effects Studio.exe`. It is portable -
+**The packaged app** on Windows (a release zip, or `python package.py` from
+the tree): unzip anywhere and run `WLED Effects Studio.exe`. Linux and
+macOS have tarballs of their own, which build effects with the system's
+compiler - [the README's Get it](README.md#get-it) says what each needs. It is portable -
 projects, builds and captures land in its folder (or in `%LOCALAPPDATA%\WLED
 Effects Studio` when the folder cannot be written to). The engine comes
 prebuilt, and the release ships a compiler (a cut-down MinGW-w64 GCC in
@@ -34,7 +37,7 @@ a checkout the answer is `git pull`.
 
 ```bash
 cd wled-effects-studio                                 # the clone
-pip install -r requirements.txt                        # dearpygui, numpy, pillow; the audio packages
+pip install -r requirements.txt                        # the studio's packages, the optional ones too
 python -m native.doctor                                # what is here and what is missing
 python build.py --native-only                          # once; the app rebuilds the engine as it needs
 python -m native.app                                   # or the desktop shortcut
@@ -100,13 +103,16 @@ every control - a pill at the bottom says how to come back, and **Esc**
 does too; **space** pauses. A key on its own - a letter, a digit, a sign -
 acts with the pointer over the views or the graph (or while presenting):
 a stray one from the side panel, a frame or the code changes nothing, and
-the footer says where it works. Every key is on the menus and under
-Settings > Keyboard shortcuts (Shift+F1), where any can be changed. The
-menus are File, Edit, View, Node, **Build** (compile, Live, Watch, run as
-a script, flash the firmware), Playback, Device (what is done to a
-device), **Window** (every frame and window - checked while it is open, a
-click opens or closes it, and Close every frame), Settings and Help; each
-command is in one place. The **command palette** (Ctrl+P) finds any of
+the footer says where it works. Every key is under Settings > Keyboard
+shortcuts (Shift+F1), where any can be changed, and nearly every one is on
+a menu too - those that are not: **[** and **]** step through the effects,
+**Shift+[** and **]** the palettes, **Ctrl+Shift+H** shows or hides the side
+panel, and the VJ desk's **Alt** keys (its section below). The menus are
+File, Edit, Device (what is done to a device), View, Node, Playback,
+**Build** (compile, Live, Watch, run as a script, flash the firmware),
+**Window** (every frame and window - checked while it is open, a click
+opens or closes it, and Close every frame), Settings and Help; each command
+is in one place. The **command palette** (Ctrl+P) finds any of
 them by name - every action and every menu command, the graphs to open
 and the recent projects too; Up and Down choose one as you type, Enter runs
 it (the first, until you choose). Every control
@@ -129,7 +135,7 @@ the window is wide enough for them, as icons when it is not: Devices
 (Ctrl+Shift+N), Flash (Ctrl+Shift+U), Send (Ctrl+Shift+S), Stream (the
 DDP stream on or off, Ctrl+Shift+T, lit amber while it runs); then Shape
 (Ctrl+Shift+E), Sequence (Ctrl+Shift+Q), Library (Ctrl+Shift+L), Palettes
-(Ctrl+Shift+G), Outputs (Ctrl+Shift+O) and Audio in (Ctrl+Shift+M). A
+(Ctrl+Shift+G), Outputs (Ctrl+Shift+O), Audio in (Ctrl+Shift+M) and VJ. A
 frame's word (or icon) is lit in the accent while the frame is open, and
 a click opens it or closes it, as the Window menu does. Playback >
 Randomise is Ctrl+Shift+X.
@@ -370,8 +376,33 @@ Settings > Keyboard shortcuts lists the rest.
 
 **As code.** Ctrl+N in the code pane makes a `.cpp` from the effect
 skeleton; the editor colours it, errors from a build go to their lines,
-and the API reference under it lists what the firmware offers - a click
-puts the snippet at the cursor. Find (Enter next, Shift+Enter previous,
+and the API reference under it (also Help > Effect API reference) lists
+what the firmware offers - a click puts the snippet at the cursor.
+
+The skeleton is an ordinary WLED effect, and it drops into the firmware's
+`usermods/cube_fx/` unchanged. What it is made of:
+
+- `#include "wled.h"`, `"cube_fx_common.h"` and `"cube_fx_bank.h"`;
+- a `static FX_RET mode_<name>()` that draws one frame and ends with
+  `FX_DONE;` - the sliders are `SEGMENT.speed`, `.intensity`, `.custom1` to
+  `.custom3`, the checkboxes `.check1` to `.check3`, the clock `strip.now`;
+- the metadata string, `"Name@Speed,Intensity,...;;!;12;sx=120,ix=200,pal=11"`:
+  the name, the sliders' and checkboxes' labels, the colours, the palette,
+  the flags (1 a strip, 2 a matrix, 12 both; f the frequency, v the volume)
+  and the defaults. The fields over the editor read it from the file and
+  write it back (**read from file**, **apply to file**), so it need not be
+  typed by hand;
+- `static CfxBankReg <name>_reg(&mode_<name>, _data_FX_MODE_<NAME>);` - the
+  line that puts it on the firmware's effect list.
+
+Keep its state in `SEGENV.data` (`SEGENV.allocateData(n)`, and when that
+fails, fill and return) or `SEGENV.aux0` / `.aux1` / `.step`, never in a
+global: two segments run the same effect. Speeds read well through
+`fx_dt()` and `fx_step()`, which turn a rate per 23 ms frame into this
+frame's share. WLED's own maths names are the current ones - `sin8_t`,
+`beatsin8_t`, `perlin8`, `hw_random8` - not FastLED's old `sin8`,
+`inoise8` or `random8`; the API reference offers only names that build.
+No `delay()` in an effect. Find (Enter next, Shift+Enter previous,
 F3 / Shift+F3 the same, the status saying "3 of 12"; "case" and "word"
 narrow it) and replace - one at the cursor, or all. A graph can
 also be handed to the code pane (File > Open graph as code) when the nodes
@@ -383,13 +414,14 @@ image shader - paste the "Image" tab's code, or **Open a file...** (.glsl,
 project, opened in the code pane and built. Every LED runs the shader's
 `mainImage` at its own place (the matrix, or the cube's net, as one
 picture; y up as on Shadertoy), with `iTime` (scaled by Speed),
-`iResolution`, `iFrame` and `iTimeDelta`; Intensity is the brightness.
+`iResolution`, `iFrame` and `iTimeDelta` (`iMouse` is zero, `iDate` the
+time of day); Intensity is the brightness.
 The file carries the small vector library it needs (vec2 to vec4, mat2,
 mat3, the GLSL functions), so it builds into any firmware like any code
 effect - read it as GLSL in C++: swizzles are methods (`p.xy()`), the
 functions are `gl_` named. What an LED cannot have - textures and buffers
-(`iChannel0`, `texture()`), derivatives, `ivec` and `mat4` - is refused
-with its line. A device runs it in floats, pixel by pixel, where a GPU
+(`iChannel0`, `texture()`), derivatives, `ivec`, `bvec` and `mat4`, and a
+shader of more than one pass - is refused with its line. A device runs it in floats, pixel by pixel, where a GPU
 runs thousands at once: keep a shader light (few loops, few octaves) for
 the cube.
 
@@ -397,12 +429,36 @@ the cube.
 you edit it. File > "Add to the effects list" (Ctrl+I) makes it part of the
 project: always built, exported, shipped.
 
+## Projects
+
+A project is a folder under `projects/` (File > Project > Open the project
+folder shows it): the geometry and the settings in `project.json`, the code
+effects in `effects/`, the graphs in `graphs/`, their sub-graphs in
+`subgraphs/`, nodes of your own in `nodes/`, the pictures and files the nodes read in `assets/`, the saved
+copies File > History lists in `history/`, and what goes to a device in
+`export/` (the ledmap, the usermod). The studio keeps one project open at a
+time; File > Project makes, opens and lists them (**Open folder...** takes
+one from anywhere).
+
+To hand work to someone, or keep it:
+
+- **File > Project > Export project as zip** packs the whole project - its
+  effects, graphs, sub-graphs, user nodes, assets and settings - as one zip
+  in `captures/`; **Import project from zip...** unpacks one into
+  `projects/` and opens it.
+- **File > Export graph bundle** packs one graph with the sub-graphs and
+  user nodes it uses into a single `.graph.json`, and **Import graph
+  bundle...** adds one to the open project - the way to share an effect
+  rather than a project (the tutorial's finished graph is one).
+- **File > Export usermod** writes the project's effects as a WLED usermod,
+  a folder and a zip, to build into firmware outside the studio.
+
 ## Seeing it properly
 
 The geometry section sets the cube's face size and whether it has six
 faces (a lit bottom; it takes the net's bottom-right corner block, and
 the flash build and the settings push tell the device) - or a matrix,
-cylinder, sphere, strip, or an XYZ file - and for the cube its wiring - which face
+cylinder, sphere, torus, strip, or an XYZ file - and for the cube its wiring - which face
 first, turns, serpentine - which is what the exported ledmap says. The
 wiring can come from the device, whatever the geometry: **Read the
 device's wiring** (under GEOMETRY, or Device > Read the device's wiring)
@@ -451,7 +507,7 @@ compiled again; the status line says the frame's and the top three, and how
 much is the rest (each pixel's coordinates, the drawing). The device's own
 proportions can differ (a division or a sine costs more there next to a
 multiply): read the shares as where the time goes. A **MIDI
-controller** (Window > MIDI, OSC and phone...) puts its knobs on the
+controller** (Window > MIDI, OSC and phone) puts its knobs on the
 sliders: pick the port ("Rescan" after plugging one in), pick what a knob
 should drive - a parameter slider, a check, the palette or the effect by
 index, the effect from the setlist, the next or the previous effect, a
@@ -822,7 +878,7 @@ as **the letters' outlines** (channel letters, edge-lit acrylic) - with
 the letters' height, `\n` for a new line, and the wiring between strokes
 the **shortest** (each next stroke the nearest end to where the last
 finished) or in reading order. **An SVG drawing...** (the gallery's FROM A
-FILE, or File > Import) reads a sign, a logo or lettering drawn in
+FILE, or the Shape frame's File... > Import) reads a sign, a logo or lettering drawn in
 Inkscape, Illustrator, Figma or a cutter's program: every path and shape -
 curves, arcs, transforms, groups, `<use>` - at the drawing's real size
 (its width and height in mm, cm or inches) or fitted to a width, as an
@@ -954,7 +1010,7 @@ it moves to the same music, stock firmware too, no microphone needed.
 **multicast** is how WLEDs send it themselves (239.0.0.1, port 11988);
 **broadcast** is for a network that drops multicast; **unicast** sends to
 the active device only. A device receives with its audio input set to
-**network sound only** (Device > Audio input), or with Sync set to
+**network sound only** (Window > Audio input), or with Sync set to
 Receive in its own audioreactive settings. The line under it counts the
 packets sent, about fifty a second.
 
@@ -1224,7 +1280,7 @@ on air, **Alt+X** cut, **Alt+F** fade, **Alt+B** blackout, **Alt+Z**
 freeze, **Alt+1**, **2**, **3** select deck A, B, C, **Alt+R** another
 look on the selected deck and **Alt+L** the look browser for it; swapping
 the decks and "the next deck" have no key until you give them one
-(**Help > Keyboard shortcuts**).
+(**Settings > Keyboard shortcuts**, Shift+F1).
 
 **Looks**: **Browse...** on a deck shows every look as a moving thumbnail,
 and a click puts it on that deck; **look** lists them too. Over the
@@ -1743,7 +1799,7 @@ the sim after it, Duplicate, Delete. The step playing is underlined.
 out at the pointer, and a **middle-button drag** moves it as if by hand.
 The **-** and **+** over it zoom about its middle, **All** puts the
 whole show across it again, and **Step** the selected step with a
-little either side (**Z** and **Shift+Z** with the frame's keyboard); the
+little either side (**Shift+Z** and **Z** with the frame's keyboard); the
 time it shows is written beside them. The strip over the timeline is the
 **overview**: the whole show in its colours, with a box round the part the
 timeline shows - drag the box to move along, drag its sides to zoom, or
@@ -1949,8 +2005,10 @@ it has.
 
 ## Getting it onto the cube
 
-Everything about the device is under the **Device** menu, in three frames.
-Like every frame - the shape editor, the sequence, the library, the
+The device's frames - Devices, Send to device, LED outputs, Audio input -
+are under the **Window** menu, and Flash firmware under **Build**; the
+**Device** menu holds the one-shot actions (send this, read that, the
+active device). Like every frame - the shape editor, the sequence, the library, the
 palettes, the LED outputs, the audio input - each opens in the **dock**:
 a tab beside the side panel's own, in the panel's column, so it never
 covers the views it changes. The tab strip over the column shows one at a
@@ -1982,13 +2040,15 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
   effect, its fps, the Script effect's frame budget), and has the sends:
   1. **Send the graph as a script** (Ctrl+Shift+D). No firmware build: the
      graph is compiled to bytecode and sent to the Studio Script effect on
-     the device, which runs it within two seconds. Playback > "Run the
-     graph as a script" previews exactly that in the sim first. Not every
+     the device, which runs it within two seconds. Build > "Run the graph
+     as a script (no build)" (Ctrl+Shift+R) previews exactly that in the
+     sim first. Not every
      node is scriptable - the studio names the one that is not (a block of
      state, per-pixel fields or a baked table: Particles, Field, Image...).
      Voronoi, Vector rotate, Adjust, Blackbody, Palette source, Previous,
-     Blur, Glow and Sparkle need the Script effect of firmware from 1.4.0:
-     sent to an older one, the studio says to flash it once first.
+     Previous at, Blur, Glow and Sparkle need the Script effect of the
+     firmware the studio has flashed since its 1.4.0: sent to an older one,
+     the studio says to flash it once first.
   2. **Send the effect's settings** makes the device show what the sim
      does: every segment - its effect, sliders, palette, colours, bounds,
      blend and options - and the device's segments past the sim's off.
@@ -2016,7 +2076,7 @@ the top right. While you type in any frame's box the hotkeys stay quiet.
   **universe** beside it - for a WLED with that receiver on in its Sync
   settings (DMX mode Multiple RGB), or a Falcon, ESPixelStick or FPP
   controller - or **DDP over WebSocket**: DDP through the device's web
-  port (its `/ws`, WLED 0.16 and later), for a network where UDP does not
+  port (its `/ws`, WLED 16 and later), for a network where UDP does not
   get through - a guest Wi-Fi, a firewall, a VPN. It is TCP, so a slow
   link drops frames rather than falling behind, and it connects again by
   itself after a drop. The line under it says how the stream is going, once a
@@ -2201,7 +2261,7 @@ on and install what it carries.
 - **File** › Open code effect › … the project's code effects
 - **File** › Save `Ctrl+S`
 - **File** › Rename... `F2`
-- **File** › Remove from the effects list `Ctrl+I`
+- **File** › Add to the effects list / Remove from the effects list `Ctrl+I`
 - **File** › History... `Ctrl+Shift+Y`
 - **File** › Open graph as code
 - **File › Project** › New project...
@@ -2547,7 +2607,7 @@ Every button, with what its tooltip says.
 
 **Devices frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Scan the network` — asks by mDNS, asks every known device for the nodes it has heard of, and sweeps the subnet; `Stop` — stop looking for devices; `Add` — add the device at this address (a name or an IP) to the list; `Refresh all` — asks every listed device again what it is and runs; `use` — make this the device the studio sends to and streams to; `remove` — take this device off the list (it is not touched)
 
-**Flash firmware frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Refresh` — WLED's releases again, from GitHub; `Choose...` — pick a firmware .bin file to flash; `set the build to the board the chosen de` — set the build to the board the chosen device reports itself to be; `Preview (no compile)` — stages the build and lists what it would carry - the manifest, resolved the way the build resolves it - without compiling; `all` — tick every effect: all of them go on the device; `none` — the project's effects and the built-in cube effects, all or none; `what the project uses` — the project's effects, and of the built-in cube effects only Studio Script (for the graphs sent as scripts); `Usermods...` — which usermods and features the firmware is built with; `Install PlatformIO` — PlatformIO's own installer, downloaded and run with this computer's Python (a few minutes; it sets PlatformIO up in its own folder, ~/.platformio); `Back up now` — the device's settings, presets, ledmap and shape table into the project now (a flash over the network keeps them first anyway); its Wi-Fi passwords are never copied; `Restore...` — a backup's files back onto the device, which reboots to read them; `Send it again` — that image to the device again - undoing a flash that turned out badly; `Start` — build the firmware and write it to the device; `Cancel` — stop the build or the flash that is running; `Open the build folder` — the folder PlatformIO builds the firmware in, in the file manager
+**Flash firmware frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Refresh` — WLED's releases again, from GitHub; `Choose...` — pick a firmware .bin file to flash; `set the build to the board the chosen device reports itself...` — set the build to the board the chosen device reports itself to be; `Preview (no compile)` — stages the build and lists what it would carry - the manifest, resolved the way the build resolves it - without compiling; `all` — tick every effect: all of them go on the device; `none` — the project's effects and the built-in cube effects, all or none; `what the project uses` — the project's effects, and of the built-in cube effects only Studio Script (for the graphs sent as scripts); `Usermods...` — which usermods and features the firmware is built with; `Install PlatformIO` — PlatformIO's own installer, downloaded and run with this computer's Python (a few minutes; it sets PlatformIO up in its own folder, ~/.platformio); `Back up now` — the device's settings, presets, ledmap and shape table into the project now (a flash over the network keeps them first anyway); its Wi-Fi passwords are never copied; `Restore...` — a backup's files back onto the device, which reboots to read them; `Send it again` — that image to the device again - undoing a flash that turned out badly; `Start` — build the firmware and write it to the device; `Cancel` — stop the build or the flash that is running; `Open the build folder` — the folder PlatformIO builds the firmware in, in the file manager
 
 **Send to device frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Find a device` — open the Devices frame: look for devices on the network, or add one by its address; `Read` — ask the device again what it is and runs; `Open in the browser` — the device's own page (WLED's interface) in the browser; `Calibrate the speed factor` — the current effect's settings sent, the device's fps read for three seconds, and the footer's device fps estimate set from the measurement (Settings > Device speed factor holds the number); `Send the graph as a script` — the graph as bytecode for the Studio Script effect - no firmware build; the device runs it at once; `Send the effect's settings` — the effect the sim shows, with its sliders, checks, palette and colours, onto the device's segment; `Send the shape` — the ledmap (the wiring) and the positions table, so Position and Direction see the real shape; `Send the ledmap only` — the wiring alone (ledmap.json): where each LED sits, without the effects or the outputs; `Play a GIF on the device...` — what the sim shows for a few seconds - or a GIF file - played by the device itself (WLED's Image effect): no stream needed; `Import the device's` — the device's ledmap becomes the geometry: a matrix with its gaps and wiring, or a strip; `Import a file...` — a ledmap.json from a file as this project's wiring; `Fill from the LED outputs` — give the ticked devices the LED outputs' ranges, in turn; `<` — the LED before, lit alone; `>` — the next LED, lit alone
 
@@ -2555,7 +2615,7 @@ Every button, with what its tooltip says.
 
 **Sequence frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `play from the top` — (an icon: this is its tooltip); `play from the selected step` — play from the selected step (Space while the frame has the keyboard); playing, it pauses and goes on; `stop` — stop: the sim goes back to running on its own; `record automation` — record automation: while the show plays, a slider moved (here or in the side panel) is written into the step playing as a curve ramp - over the stretch it was moved, the rest of the step as it was. Again: stop recording; `+ Add from the sim` — a new step after the selected one: what the sim shows now - effect, sliders, palette, colours, segments; `undo` — the steps (or the schedule) as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `-` — zoom out (Ctrl+wheel over the timeline zooms at the pointer); `+` — zoom in (Ctrl+wheel over the timeline zooms at the pointer); `All` — the whole show across the timeline (Shift+Z); `Step` — the selected step across the timeline, a little either side (Z); `Find sections` — the show's audio listened to: its intro, verses, builds, drops, breakdowns and outro, as named sections over the steps - and its tempo, when none is set; `Make a show...` — steps laid on the sections and the bars: calm effects for the quiet parts, the brightest for the drops, the intensity rising over a build - from the effects you choose, then yours to edit; `+ Audio...` — an audio file onto the show, at the playhead (or the selected step's start), on a track with room there: heard while the show plays, and by its effects; copied into the project; `+ Track` — one more track: a lane of its own under the others, for a layer of sound over another; `a copy of this step, after it` — (an icon: this is its tooltip); `this step away` — this step away (undo brings it back); `Update from the sim` — the selected step becomes what the sim shows now (its name, length, blend and ramps kept); `Load into the sim` — the sim shows the selected step (double-click it on the timeline does the same); `Duplicate` — a copy of the selected step, after it (Ctrl+D); `Delete` — the selected step away (Delete); undo brings it back; `x` — this ramp off (the others stay); `Tap` — tap tempo: tap on the beat, the bpm from the gaps; `Synth's` — the bpm of the sim's synthetic beat; `the file's` — the tempo and the beats found in the audio file playing as live audio (AUDIO > play an audio file); `Snap lengths to bars` — every step's length rounded to whole bars, so the sequence changes on the music; `Render GIF` — plays the sequence once from the top and records it as a GIF, into captures/; `Render video...` — the show made into an mp4, frame by frame at the size, rate and quality chosen, with its audio - into captures/; needs ffmpeg on the path; `Export FSEQ...` — the show frame by frame into an FSEQ file for Falcon Player, with its audio beside it - FPP plays it to the controllers, WLED among them; `Send and run it` — send the presets and the playlist to the device and start the playlist there; `Send presets + playlist` — about a second a preset: the device writes each one from its main loop, and the next is sent once it has; `Save presets.json...` — the same presets and playlist as a file, for a device that is not on the network; `+ run the playlist at` — a timer on the device that starts the playlist at a time of day; `+ off at` — a time the lights go off: an Off preset (id 250) is saved on the device and timed; `Read the device's` — the timers the device has now, into this schedule; `Send the schedule` — write these timers to the device; `Run the playlist at...` — No timers: the device runs the playlist, or goes off, at a time of day.
 
-**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails` — make every thumbnail of this bank again, each from a clean cube; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel` — stop generating the previews; `Open the folder` — the previews' folder (export/library), in the file manager; `not built yet`; `making...`
+**Library frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `Remake the thumbnails` — make every thumbnail of this bank again, each from a clean cube; `Generate previews` — a turn of the 3-D view for every effect of the bank in front, on the project's shape - a GIF and a PNG each in export/library, with an index; the tiles then show those turns; `Cancel` — stop generating the previews; `Open the folder` — the previews' folder (export/library), in the file manager
 
 **Palettes frame**: `dock` — dock: a tab beside the side panel's (or drag the grip onto the panes); `close` — close (Esc while the frame has the focus); the menu opens it again; `undo` — the palettes as they were before the last change; Ctrl+Z here does the same, Ctrl+Y redoes; `+ New` — a new gradient of the project's own; `From the sim's palette` — a new one that starts as the palette the sim shows; `Copy` — a copy of this palette, to change; `Remove` — delete this palette from the project; `Use in the sim` — the effect in the sim drawn with this palette; `spread evenly` — the colour stops at equal distances along the gradient; `Send this one` — slot n is /palette{n}.json on the device, palette id 200 - n everywhere; the device reloads its custom palettes on upload; `Send all` — every palette of the project to the device, as its custom palettes; `Remove this one there` — delete this palette's file from the device
 
@@ -2597,6 +2657,6 @@ Every button, with what its tooltip says.
 
 **Message log**: `close` — close (Esc while it has the focus); `copy all` — the log as text, to paste into an issue or a note; `clear` — empties the recent messages; the problems stay until they are fixed
 
-**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP, E1.31, Art-Net or WebSocket)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `VJ` — VJ: two decks of video and looks, crossfaded onto the shape  Ctrl+Shift+J; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP, E1.31, Art-Net or WebSocket)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all` — every match in the file replaced; `read from file` — the effect's name, labels, palette and defaults as the file has them, into these fields; `apply to file` — these fields written into the effect's metadata line in the file; `< back` — out of this sub-graph, to the graph it is in; `help_split`; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its c` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `pip_max`; `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `fold or unfold this section` — (an icon: this is its tooltip); `Lay the shape out as a grid` — the shape's LEDs projected onto a grid (the best fit), so a matrix effect draws on it - the Shape frame's Shape tab says how, and can change it; `+` — another segment, after the last; `-` — remove the segment chosen; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `Edit the shape...` — the Shape frame: the parts, their places and the wiring; `Shape settings...` — the Shape frame on the whole shape's settings: its sizes, what the effects see and how a grid is projected, power; `use live audio` — the sound the computer hears (its input, or what it plays) in place of the synth; `play an audio file...` — an audio file played as the live sound; `Choose...` — a video file: mp4, mov, mkv, webm, avi, gif - read by ffmpeg; `Find` — the webcams ffmpeg can open on this computer, into the list; `Area...` — an area of the screen: a box dragged over a picture of the desktop; `Stop` — the source closed (a webcam switched off); the Video node goes black; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or an audio file - goes to it; `VIDEO` — VIDEO: a webcam, a file, the screen, a phone or a stream, for the Video node - goes to it; `Flash - in the dock` — Flash - in the dock: opens it beside the rail; `VJ - in the dock` — VJ - in the dock: opens it beside the rail; `Panel` — Panel - brings it to the front; `Flash - brings it to the front` — (an icon: this is its tooltip); `x` — close Flash (the menus open it again); `VJ - brings it to the front` — (an icon: this is its tooltip); `Devices - brings it to the front` — (an icon: this is its tooltip); `Send - brings it to the front` — (an icon: this is its tooltip); `Shape - brings it to the front` — (an icon: this is its tooltip); `Sequence - brings it to the front` — (an icon: this is its tooltip); `Library - brings it to the front` — (an icon: this is its tooltip); `Palettes - brings it to the front` — (an icon: this is its tooltip); `LED outputs - in front` — (an icon: this is its tooltip); `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log; `vsplit_0_0`; `vsplit_1_0`; `hsplit_0_0`; `hsplit_0_1`; `hsplit_1_0`; `hsplit_1_1`; `hsplit_2_0`; `hsplit_2_1`
+**The panes and the toolbar**: `New effect` — New effect  Ctrl+N; `Open a graph or a code effect` — Open a graph or a code effect  Ctrl+O; `Save` — Save  Ctrl+S; `Compile + reload` — Compile + reload  F5; `Live` — Live: rebuild the graph as it changes  L; `Undo` — Undo  Ctrl+Z  (nothing to undo); `Redo` — Redo  Ctrl+Y  (nothing to redo); `Play` — Play  Space; `Pause` — Pause  Space; `Step one frame` — Step one frame  .; `Restart the effect` — Restart the effect  Ctrl+R; `Logical net` — Logical net  Q; `3-D view` — 3-D view  E; `Net and 3-D` — Net and 3-D  W; `Code` — Code  C; `Graph` — Graph  G; `Zoom out` — Zoom out  Ctrl+-; `100%` — Zoom 100%  Ctrl+0; `Zoom in` — Zoom in  Ctrl+=; `Frame the whole graph` — Frame the whole graph  Home; `Add a node` — Add a node (or right-click the graph)  Shift+A; `Delete the selection` — Delete the selection  Delete  (select a node first); `Arrange the graph` — Arrange the graph  Ctrl+L; `Fold the selection into a sub-graph` — Fold the selection into a sub-graph  Ctrl+G  (select two nodes or more); `Devices on the network` — Devices on the network  Ctrl+Shift+N; `Build the firmware and flash the device` — Build the firmware and flash the device  Ctrl+Shift+U; `Send to the device` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream the sim to the device` — Stream the sim to the device (DDP, E1.31, Art-Net or WebSocket)  Ctrl+Shift+T; `Shape editor` — Shape editor  Ctrl+Shift+E; `Sequence` — Sequence: presets, a playlist and the schedule  Ctrl+Shift+Q; `Library` — Library: every effect as a looping thumbnail  Ctrl+Shift+L; `Palettes` — Palettes: gradients of the project's own  Ctrl+Shift+G; `LED outputs and power` — LED outputs and power  Ctrl+Shift+O; `Audio input` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `VJ` — VJ: two decks of video and looks, crossfaded onto the shape  Ctrl+Shift+J; `Devices` — Devices on the network  Ctrl+Shift+N; `Flash` — Build the firmware and flash the device  Ctrl+Shift+U; `Send` — Send to the device: the effects, a script, the shape  Ctrl+Shift+S; `Stream` — Stream the sim to the device (DDP, E1.31, Art-Net or WebSocket)  Ctrl+Shift+T; `Shape` — Shape editor  Ctrl+Shift+E; `Outputs` — LED outputs and power  Ctrl+Shift+O; `Audio in` — Audio input: the device's microphone or line-in  Ctrl+Shift+M; `Open the code in an external editor` — Open the code in an external editor  Ctrl+E; `Screenshot of the 3-D view` — Screenshot of the 3-D view  F12; `Record 15 s as a GIF` — Record 15 s as a GIF (a video: File > Record 15 s video)  Ctrl+F12; `find` — the next match (Shift+Enter in the box, or Shift+F3: the previous); the status says which of how many; `replace` — the match the cursor is on, then the next is found; `replace all` — every match in the file replaced; `read from file` — the effect's name, labels, palette and defaults as the file has them, into these fields; `apply to file` — these fields written into the effect's metadata line in the file; `< back` — out of this sub-graph, to the graph it is in; `Move` — the handles move the selected parts: an arrow along its axis, a square in its plane, the ring in the middle in the screen's plane (G does the same from the keyboard); `Turn` — the handles turn the selected parts: a ring about its axis, 15 degrees at a time (Ctrl: free; R does the same from the keyboard); `Front` — from the front: X to the right, Z up - orthographic  (1 over the view); `Side` — from the right side: Y to the right, Z up - orthographic  (3 over the view); `Top` — from above: X to the right, Y up the screen - orthographic  (7 over the view); `Persp` — perspective - click for orthographic, sizes true across the view  (5 over the view); `tuck the 3-D view away to a tab in its corner` — tuck the 3-D view away to a tab in its corner (it is not drawn while it is away); `drag to size the 3-D view` — drag to size the 3-D view (or Ctrl+wheel over it); its ::: drags it to another corner; `close until another node is selected` — close until another node is selected (N keeps it open); `fold or unfold this section` — (an icon: this is its tooltip); `Lay the shape out as a grid` — the shape's LEDs projected onto a grid (the best fit), so a matrix effect draws on it - the Shape frame's Shape tab says how, and can change it; `+` — another segment, after the last; `-` — remove the segment chosen; `undo` — the segments as they were before the last change (add, remove, bounds, blend, options); `Edit the shape...` — the Shape frame: the parts, their places and the wiring; `Shape settings...` — the Shape frame on the whole shape's settings: its sizes, what the effects see and how a grid is projected, power; `use live audio` — the sound the computer hears (its input, or what it plays) in place of the synth; `play an audio file...` — an audio file played as the live sound; `Choose...` — a video file: mp4, mov, mkv, webm, avi, gif - read by ffmpeg; `Find` — the webcams ffmpeg can open on this computer, into the list; `Area...` — an area of the screen: a box dragged over a picture of the desktop; `Stop` — the source closed (a webcam switched off); the Video node goes black; `fold the panel away` — fold the panel away: the graph gets the room back; `EFFECT` — EFFECT: the project, the effect and its palette - goes to it; `SEGMENTS` — SEGMENTS: the strip's segments, their bounds and blends - goes to it; `GEOMETRY` — GEOMETRY: the shape the LEDs are on - goes to it; `COLOURS` — COLOURS: the segment's three colours - goes to it; `PARAMETERS` — PARAMETERS: the effect's sliders and checkboxes - goes to it; `AUDIO` — AUDIO: the synthetic audio's levels - goes to it; `LIVE` — LIVE: audio from a line in, a microphone or an audio file - goes to it; `VIDEO` — VIDEO: a webcam, a file, the screen, a phone or a stream, for the Video node - goes to it; `Panel` — Panel - brings it to the front; `x` — close Flash (the menus open it again); `LED outputs` — LED outputs - in front; `float` — float the frame in front: a window of its own over the panes (it opens so until docked again); `stats` — every figure: the picture's brightness, contrast, unlit share and saturation; the effect's, the device's and the studio's time; the current and the limiter - live while open; `N problems` — the problems that stay until they are fixed - a click opens the log at them; `log` — the last fifty messages, the problems first; each that is about a node or a line goes to it; `the latest message` — short, the whole of it on hover; a click opens the log
 
 <!-- uiref end -->

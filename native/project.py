@@ -5,9 +5,13 @@ results go.
     <dir>/
       project.json        geometry, the last-selected effect, options
       effects/*.cpp       effects authored here - compiled into the engine
-      recipes/*.json      layer recipes (phase 2) - generated to effects/
+      graphs/*.json       node graphs (compiled to effects/ as they build)
+      subgraphs/, nodes/  the graphs' sub-graphs, and user nodes
+      assets/             pictures and files the nodes read
+      history/            saved copies (File > History)
       export/             what you take to the device: ledmap.json and a
                           usermod folder with the effects in it
+      recipes/            still made, never written: layer recipes were not built
 
 An effect file here is an ordinary cube_fx-style translation unit: it includes
 wled.h and cube_fx_common.h, defines one mode_*() function, and registers it

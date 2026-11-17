@@ -1860,7 +1860,7 @@ def build(app):
                                                       "to it too: multicast as WLEDs send it, broadcast where the network "
                                                       "drops multicast, unicast to the active device only. A device "
                                                       "receives with its audio input set to network sound only "
-                                                      "(Device > Audio input), or Sync set to Receive in its own settings"):
+                                                      "(Window > Audio input), or Sync set to Receive in its own settings"):
                         from native.audio_sync import MODES as _sync_modes
                         dpg.add_combo(list(_sync_modes), tag="audio_sync_mode", width=-1, default_value="off",
                                       callback=lambda s, v: app.set_audio_sync(v))
