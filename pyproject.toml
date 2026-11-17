@@ -1,12 +1,15 @@
 [project]
 name = "wled-effects-studio"
-version = "0.9.0"
+version = "1.25.1"   # native/version.py's; tests/test_update.py keeps the two the same
 description = "Node graphs and C++ compiled into WLED effects, previewed on a simulated cube, sphere, matrix or strip"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.26", "dearpygui>=1.11", "pillow>=10"]
 
 [project.optional-dependencies]
 audio = ["sounddevice>=0.4", "pyaudiowpatch>=0.2.12; sys_platform == 'win32'"]
+midi = ["python-rtmidi>=1.5"]
+phone = ["cryptography>=41"]
+video = ["yt-dlp>=2024.1"]
 package = ["pyinstaller>=6"]
 shaders = ["moderngl>=5.8; sys_platform != 'linux' or platform_machine == 'x86_64'"]
 

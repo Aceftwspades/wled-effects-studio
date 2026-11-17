@@ -1,6 +1,6 @@
 # WLED Effects Studio
 
-Node graphs and C++ compiled into [WLED](https://github.com/Aircoookie/WLED)
+Node graphs and C++ compiled into [WLED](https://github.com/wled/WLED)
 effects, previewed on a simulated cube, sphere, matrix, strip or any shape
 you build, with synthetic or live audio - then sent to the device as a
 script, as its settings, or flashed into the firmware.
@@ -10,7 +10,8 @@ script, as its settings, or flashed into the firmware.
 - **[GUIDE.md](GUIDE.md)** - how to use it, from the first run to a show on the device
 - **[TUTORIAL.md](TUTORIAL.md)** - a first effect, node by node
 - **[NODES.md](NODES.md)** - every node
-- **[STUDIO.md](STUDIO.md)** - the design, the history and the roadmap
+- **[STUDIO.md](STUDIO.md)** - the design and the history, as a log
+- **[ROADMAP.md](ROADMAP.md)** - the latest rounds of work, and what is still open
 
 ## What it does
 
@@ -102,14 +103,20 @@ Open - or run `xattr -dr com.apple.quarantine .` in the folder once.
 Building your own effects takes Apple's compiler (`xcode-select --install`).
 An Intel Mac runs it from the source, below.
 
-**From the source**, on Windows:
+**From the source** (Python 3.10 or newer), on Windows:
 
 ```bash
 pip install -r requirements.txt
 python -m native.doctor            # what this machine has, what it lacks
-python build.py --native-only      # the engine, once (a C++ compiler: clang or gcc)
+python build.py --native-only      # the engine, once
 python -m native.app               # or run_studio.pyw (no console window) / run_studio.cmd
 ```
+
+The engine build on Windows takes clang - emsdk's (`~/emsdk`), LLVM's on
+the PATH, or one named by `SIM_CLANG` - with the MSVC Build Tools (the
+C++ workload) beside it; a g++ on the PATH is not used. Or put a
+MinGW-w64 in a `toolchain/` folder in the studio's, as the release does,
+and it needs nothing else.
 
 On Linux and macOS, in a virtual environment - current distributions refuse
 a `pip install` into the system's Python (PEP 668: "externally-managed-environment"),
@@ -141,6 +148,10 @@ sudo dnf install clang portaudio alsa-lib-devel jack-audio-connection-kit-devel
 To hear what the computer plays on Linux, choose a PipeWire / PulseAudio
 "Monitor of ..." input under the panel's LIVE, where the system lists one.
 
+Mapping lights by camera, video files, webcams and screen capture read
+through **ffmpeg**, which none of the builds include: install it and put
+it on the PATH.
+
 `python package.py` makes the release folder; `--toolchain` bundles a
 MinGW-w64 into it; `--zip` zips it (on Linux: the tarball).
 
@@ -155,15 +166,21 @@ fork **[Aceftwspades/WLED](https://github.com/Aceftwspades/WLED)** (branch
 `playground`), where the firmware side lives: the `cube_fx` usermod - the
 effect bank, the Studio Script VM, the Ace 3-D effects - and the
 PlatformIO environments the studio flashes. `WLED_SOURCE.json` names the
-commit; `WLED_ROOT=<checkout> python build.py --runtime` refreshes both
-folders from a checkout.
+commit. From a checkout, `python build.py --native-only` extracts `gen/`
+afresh and `python build.py --runtime` copies `runtime/` - with the
+checkout's path in `WLED_ROOT` (bash: `WLED_ROOT=../WLED python build.py
+--runtime`; PowerShell: `$env:WLED_ROOT="..\WLED"` first).
+
+A checkout at `../WLED` is found without `WLED_ROOT`, and then the engine
+is built from it rather than from the vendored folders - whatever commit
+it is on.
 
 Flashing firmware needs that checkout beside the studio (`../WLED`) or
 named by `WLED_ROOT`, and PlatformIO. Everything else - the simulator,
 building effects, every send to a device - needs neither.
 
 Upstream WLED is the work of Christian Schwinne and the WLED contributors:
-[github.com/Aircoookie/WLED](https://github.com/Aircoookie/WLED).
+[github.com/wled/WLED](https://github.com/wled/WLED).
 
 ## Licence
 

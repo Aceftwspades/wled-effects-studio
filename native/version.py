@@ -8,7 +8,7 @@ number with a v in front.
 __version__ = "1.25.1"
 REPO = "Aceftwspades/wled-effects-studio"            # owner/name on GitHub: the releases the update check reads
 WLED_REPO = "Aceftwspades/WLED"                       # the WLED fork the firmware side lives in (branch playground)
-WLED_UPSTREAM = "Aircoookie/WLED"                     # the WLED project itself
+WLED_UPSTREAM = "wled/WLED"                           # the WLED project itself
 GALLERY_REPO = "Aceftwspades/wled-effects-gallery"   # the shared library online: graphs to browse in the Library
 
 
