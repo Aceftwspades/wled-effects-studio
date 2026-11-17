@@ -1044,6 +1044,9 @@ static inline uint8_t get_random_wheel_index(uint8_t pos) {
 // which is the honest reading: with no gamma applied, nothing is there to
 // invert.
 static inline uint32_t gamma32inv(uint32_t c) { return c; }
+// gamma32 likewise (the firmware's colors.h macro): an effect that gamma-corrects
+// a colour compiles here and draws it as it is.
+static inline uint32_t gamma32(uint32_t c) { return c; }
 
 // Usermod base + registration, stubbed: the effect files each declare a
 // CfxBankReg, and that static registration is exactly the effect list the
