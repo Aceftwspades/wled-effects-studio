@@ -7,8 +7,8 @@
     "id": 1,
     "type": "Speed",
     "pos": [
-     9,
-     9
+     40,
+     40
     ],
     "params": {
      "label": "Speed",
@@ -20,8 +20,8 @@
     "id": 2,
     "type": "Time",
     "pos": [
-     9,
-     98
+     40,
+     140
     ],
     "params": {},
     "inputs": {}
@@ -30,8 +30,8 @@
     "id": 3,
     "type": "Multiply",
     "pos": [
-     117,
-     24
+     260,
+     90
     ],
     "params": {},
     "inputs": {}
@@ -40,8 +40,8 @@
     "id": 4,
     "type": "Coords",
     "pos": [
-     9,
-     176
+     40,
+     260
     ],
     "params": {},
     "inputs": {}
@@ -50,8 +50,8 @@
     "id": 5,
     "type": "Add",
     "pos": [
-     220,
-     24
+     460,
+     330
     ],
     "params": {},
     "inputs": {}
@@ -60,8 +60,8 @@
     "id": 6,
     "type": "Palette",
     "pos": [
-     754,
-     58
+     1260,
+     180
     ],
     "params": {},
     "inputs": {}
@@ -70,8 +70,8 @@
     "id": 7,
     "type": "Output",
     "pos": [
-     862,
-     58
+     1460,
+     180
     ],
     "params": {},
     "inputs": {}
@@ -80,8 +80,8 @@
     "id": 8,
     "type": "Wave",
     "pos": [
-     333,
-     34
+     460,
+     40
     ],
     "params": {
      "shape": "sine"
@@ -94,8 +94,8 @@
     "id": 9,
     "type": "Subtract",
     "pos": [
-     441,
-     34
+     660,
+     40
     ],
     "params": {},
     "inputs": {}
@@ -104,8 +104,8 @@
     "id": 10,
     "type": "Abs",
     "pos": [
-     543,
-     34
+     860,
+     40
     ],
     "params": {},
     "inputs": {}
@@ -114,8 +114,8 @@
     "id": 11,
     "type": "Smoothstep",
     "pos": [
-     646,
-     34
+     1060,
+     40
     ],
     "params": {
      "e0": 0.12,
@@ -162,7 +162,7 @@
     "x"
    ],
    [
-    5,
+    3,
     "result",
     8,
     "phase"

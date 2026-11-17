@@ -27,9 +27,10 @@ A few things you will do over and over:
 - **Set a value**: an input pin that has no wire shows a box - type in it.
   A node's own settings (like Wave's shape) are boxes on the node too.
 - **See it**: the bolt on the toolbar (**L**) turns on *live*: the effect
-  rebuilds itself a moment after every edit. F5 builds once. The 3-D pane
-  shows the matrix; **W** shows the flat logical view beside it.
-- Hover anything - a node, a pin - and the box above the graph explains it.
+  rebuilds itself a moment after every edit. F5 builds once. The 3-D view
+  in the corner of the graph shows the matrix.
+- Hover anything - a node, a pin - and a note beside the pointer explains
+  it.
 
 ## Step 1 - a new graph, and what comes with it
 
@@ -43,13 +44,17 @@ Read it left to right; wires go from an output to an input.
 
 - **Speed** - the Speed slider on the WLED page, as a number from 0 to 1.
   Its `value` output is the slider's position. (`label` and `default` are
-  what the slider is called on the device and where it starts.)
-- **Time** - the clock. `t` is seconds since the effect started; `dt` is
-  the length of this frame. Anything that moves reads one of these.
+  what the slider is called on the device and where it starts - `default`
+  on the device's own 0..255 scale, so 128 is half way.)
+- **Time** - the clock. `t` is in seconds; `dt` is the length of this
+  frame, in milliseconds. Anything that moves reads one of these.
 - **Multiply** - `a x b`. Here `a` is the slider and `b` is the clock, so
   `result` is *time scaled by the slider*: a phase that advances slowly
-  with the slider low and fast with it high. This pair - a slider into a
-  clock - is how nearly every moving effect takes its speed from WLED.
+  with the slider low and fast with it high. It is the shortest way to
+  give an effect a speed, with one catch: moving the slider rescales all
+  the time so far, so the picture jumps while you drag it. **Integrate**
+  (rate in, a phase out that only ever adds this frame's share) moves
+  smoothly instead - swap it in once the wave works.
 - **Coords** - where this pixel is. `u` runs 0 at the left edge to 1 at the
   right, `v` 0 at the top to 1 at the bottom. The graph runs once per
   pixel per frame, so anything wired from Coords varies across the panel.
@@ -75,12 +80,17 @@ saw, chosen by its `shape` box. Its `value` output is the wave's height,
 Wire it in:
 
 1. **Coords `u` -> Wave `x`**. The wave runs along the panel's width.
-2. **Add `result` -> Wave `phase`**. `phase` slides the wave along its x; the
-   scrolling number from Step 1 makes it travel. (You could wire Time's
-   `t` straight in, but then the slider would do nothing.)
+   (An unwired `x` reads `u` already; the wire just makes it plain.)
+2. **Multiply `result` -> Wave `phase`**. `phase` slides the wave along
+   its x; the slider-scaled clock makes it travel. (Time's `t` straight in
+   would move it too, but then the slider would do nothing. Add's result
+   would not do: it has `u` in it already, so the wave would get one cycle
+   more than `cycles` says.)
 3. Type `2` in Wave's `cycles` box: two full waves across the panel.
 4. For a first look, drag **Wave `value` -> Palette `index`**, replacing the
-   wire from Add. (Dropping a wire on a pin that has one swaps it.)
+   wire from Add. (Dropping a wire on a pin that has one swaps it.) Add
+   now feeds nothing - the studio outlines it in amber to say so; leave
+   it or delete it.
 
 ![step 2](docs/tutorial/step2_graph.png)
 
@@ -143,8 +153,9 @@ indexed by `u`; the colour goes out.
 
 ## Step 5 - see it, save it, ship it
 
-Press **W** for the logical view beside the 3-D one (the side panel is
-back with **Ctrl+Shift+H**):
+Press **W** for the flat logical view and the 3-D one side by side,
+full frame. **W** again (or Esc) brings the panels back; **H** shows the
+controls over the picture without leaving it:
 
 ![result](docs/tutorial/step5_result.png)
 
@@ -156,25 +167,31 @@ Change the palette in the EFFECT section and the line recolours.
   History keeps every save).
 - **Ctrl+I** adds it to the project's effects list, so it is built and
   exported with the project rather than only while you edit it.
-- To put it on a device: Device > *Send the graph as a script*
-  (no firmware build, it runs in the Studio Script effect within a couple
-  of seconds), or Build > *Flash firmware...* to compile it in as a real
-  effect. GUIDE.md has the details.
+- To put it on a device, pick it in **Devices** first. Then Device >
+  *Send the graph as a script* runs it within a couple of seconds, no
+  firmware build - on a device running this project's firmware, which has
+  the Studio Script effect (stock WLED does not; flash it once). Build >
+  *Flash firmware...* compiles it in as a real effect; that needs the WLED
+  checkout and PlatformIO. [GUIDE.md](GUIDE.md#getting-it-onto-the-cube)
+  has the details.
 
-The finished graph is in `docs/tutorial/sine_wave.graph.json`: File >
-Project > Import graph bundle opens it, if you would rather compare than
-build.
+The finished graph is `docs/tutorial/sine_wave.graph.json` (in a release,
+`_internal/docs/tutorial/`): File > *Import graph bundle...* opens it, if
+you would rather compare than build.
 
 ## Things to try
 
 - Wave's `shape` box: `triangle`, `square`, `saw`.
-- Wire **Coords `v`** into a second Wave and multiply the two lines - a
-  grid of moving waves.
-- Feed **Wave `value`** through **Remap** into the line's thickness: a
-  line that swells at its crests.
-- Replace Speed with the **Audio** node's `bass` output at the Multiply:
-  the wave scrolls with the music.
-- Hover any node for its description; NODES.md lists them all.
+- Wire **Coords `v`** into a second Wave, make a second line from it the
+  same way, and join the two with **Max**: a grid of moving waves.
+- Put a **Multiply** between Abs and Smoothstep, and feed its `b` from
+  **Wave `value`** through **Map range** (out 1.5 to 0.5): the distance
+  shrinks at the crests, so the line swells there.
+- Swap the Multiply for an **Integrate** and wire the **Audio** node's
+  `bass` into its `rate`: the wave scrolls faster when the bass is loud.
+  (Bass straight into the Multiply would make it lurch back and forth.)
+- Hover any node for its description; [NODES.md](NODES.md) lists them
+  all.
 
 # Tutorial 2: a Christmas tree in 3-D
 
@@ -226,8 +243,9 @@ from above, **0** from three-quarters, **F** frames the selection and
 ## Step 3 - a star on top
 
 **Add part...**, then **star** under FLAT: 5 points, 8 LEDs an edge,
-**Add**. It lands beside the tree, next after it in the wiring. Put it
-on top: in its PLACE, type the position's height - the third field - as
+**Add**. It lands beside the tree, next after it in the wiring, and is
+selected, so the Shape frame shows its settings. Put it on top: in its
+**PLACE** section, type the position's height - the third field - as
 85 cm (the tree's middle is at 0, so its tip is at 75), and press
 **upright** so it stands facing the front. (Or from the keyboard, the
 pointer on the view: G, then Z, move the pointer up until the star sits
@@ -245,22 +263,24 @@ Under the frame's tools, the checks:
 view. With an even number of strands, every other one coming down, the
 tree's wiring ends at its foot, and the star, next in the wiring, is at
 the top: a data wire that long may want a buffer. Select the tree and
-make it **9** strands. An odd number ends at the top, beside the star:
+make it **9** strands (its **strands** field, in the Shape frame). An odd number ends at the top, beside the star:
 the lead is 26 cm, and the check goes.
 
 ![nine strands](docs/tutorial/tree_nine.png)
 
 The other line is the power: 440 LEDs at full white would draw 24 A,
 and the brightness limiter keeps them to what the **Outputs** frame says
-your supply gives - **show me** opens it.
+your supply gives - **show me** opens it. Until you set your supply there
+it assumes WLED's default of 850 mA, so the tree is dim on the device;
+set the real figure before judging the brightness.
 
 ## Step 5 - light it
 
 Close the Shape frame: the effect in the side panel's EFFECT section
 runs on the tree. Effects made for any shape follow its real positions -
-the project's own (Aurora Drift here: its colours drift through the
-room, so the strands and the star share them) and WLED's 1-D effects,
-along the wiring.
+the project's graph effects that read **Position** (the picture: one
+whose colours drift through the room, so the strands and the star share
+them) and WLED's 1-D effects, along the wiring.
 
 ![aurora drift](docs/tutorial/tree_effect.png)
 
@@ -287,6 +307,9 @@ shows what the sim shows. The device's LED count has to match; the **Outputs** f
 what it carries.
 
 ## Lights in no pattern: mapped by camera
+
+This part reads films and webcams through **ffmpeg**, which the studio
+does not include: install it and put it on the PATH first.
 
 A string wound round a real tree has no pattern to type. **Map lights by
 camera...** (on the start, or the Shape frame's File...) finds each LED:
