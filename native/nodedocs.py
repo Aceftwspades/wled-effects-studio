@@ -502,9 +502,10 @@ DOCS = {
         "params": {"states": "the states, '|' between them; rows of digits, '/' between rows, '.' for none"}},
     "Levels": {
         "doc": "The last touch on a colour: brightness scales it, contrast stretches it about mid grey (above 1 "
-               "punchier, below 1 flatter), gamma bends it (below 1 brightens the darks). 1, 1, 1 changes nothing.",
-        "in": {"color": "the colour to adjust", "brightness": "0..2, 1 as is", "contrast": "0..3, 1 as is",
-               "gamma": "0.2..3, 1 as is"},
+               "punchier, below 1 flatter), gamma bends it (below 1 brightens the darks, above 1 deepens them, the "
+               "same way round as Adjust's). 1, 1, 1 changes nothing.",
+        "in": {"color": "the colour to adjust", "brightness": "0..3, 1 as is", "contrast": "0..3, 1 as is",
+               "gamma": "0.2..4, 1 as is, below 1 lighter"},
         "out": {"color": "the adjusted colour"}},
     "Flip": {
         "doc": "u and v turned round: left for right, top for bottom, or swapped so the picture lies on its "
@@ -713,7 +714,7 @@ DOCS = {
                "saturation, brighten, add contrast, apply gamma, or invert.",
         "in": {"color": "the colour to adjust", "hue": "shift round the wheel, in turns (0.5 = opposite colour)",
                "saturation": "1 leaves it, 0 makes grey, 2 doubles it", "value": "brightness multiplier",
-               "contrast": "1 leaves it, above 1 pushes toward black and white", "gamma": "1 leaves it, below 1 lifts the mids",
+               "contrast": "1 leaves it, above 1 pushes toward black and white", "gamma": "1 leaves it, below 1 lifts the mids, above 1 deepens them",
                "invert": "swap for the opposite colour"},
         "out": {"color": "the adjusted colour"}},
     "Blackbody": {

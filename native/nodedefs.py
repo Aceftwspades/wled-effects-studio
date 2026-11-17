@@ -985,7 +985,7 @@ LIBRARY = [
             "watershed: the water flowing into this pixel from the neighbours that drain to it (their last-frame water), whether it is a sink, and its height - write the height and the water back with Field write"),
          fields=["height_field", "water_field"]),
     _n("Levels", "colour", "pixel", [("color", C, 0), ("brightness", F, 1.0), ("contrast", F, 1.0), ("gamma", F, 1.0)], [("color", C)], [],
-       "{ const float ig_ = 1.0f / fmaxf(0.05f, $in.gamma); float ch_[3] = {(float)(($in.color >> 16) & 255), (float)(($in.color >> 8) & 255), (float)($in.color & 255)};\n"
+       "{ const float ig_ = fmaxf(0.05f, $in.gamma); float ch_[3] = {(float)(($in.color >> 16) & 255), (float)(($in.color >> 8) & 255), (float)($in.color & 255)};\n"
        "  for (int i_ = 0; i_ < 3; i_++) { float x_ = ((ch_[i_] * (1.0f / 255.0f) - 0.5f) * $in.contrast + 0.5f) * $in.brightness; ch_[i_] = powf(gc_sat(x_), ig_) * 255.0f; }\n"
        "  $out.color = RGBW32((uint8_t)ch_[0], (uint8_t)ch_[1], (uint8_t)ch_[2], 0); }",
        "a colour's brightness, contrast (about mid grey) and gamma, 1 each for no change - the last touch before Output"),

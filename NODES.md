@@ -4426,7 +4426,7 @@ Tweaks a colour the way a photo app does: shift the hue round the wheel, boost o
 - **saturation** *(float)*: 1 leaves it, 0 makes grey, 2 doubles it
 - **value** *(float)*: brightness multiplier
 - **contrast** *(float)*: 1 leaves it, above 1 pushes toward black and white
-- **gamma** *(float)*: 1 leaves it, below 1 lifts the mids
+- **gamma** *(float)*: 1 leaves it, below 1 lifts the mids, above 1 deepens them
 - **invert** *(bool)*: swap for the opposite colour
 
 **Outputs**
@@ -4975,13 +4975,13 @@ FX Follow Spot (sub-graph) (`subgraphs/fx_follow.json`), FX Motion Trails (sub-g
 
 ### Levels
 
-The last touch on a colour: brightness scales it, contrast stretches it about mid grey (above 1 punchier, below 1 flatter), gamma bends it (below 1 brightens the darks). 1, 1, 1 changes nothing.
+The last touch on a colour: brightness scales it, contrast stretches it about mid grey (above 1 punchier, below 1 flatter), gamma bends it (below 1 brightens the darks, above 1 deepens them, the same way round as Adjust's). 1, 1, 1 changes nothing.
 
 **Inputs**
 - **color** *(color)*: the colour to adjust
-- **brightness** *(float)*: 0..2, 1 as is
+- **brightness** *(float)*: 0..3, 1 as is
 - **contrast** *(float)*: 0..3, 1 as is
-- **gamma** *(float)*: 0.2..3, 1 as is
+- **gamma** *(float)*: 0.2..4, 1 as is, below 1 lighter
 
 **Outputs**
 - **color** *(color)*: the adjusted colour
