@@ -81,3 +81,17 @@ Reviewers:
 | 63 | min | R | Coordinates/y-down, grain axis, art vs label score, pin size, sun/frame order | **Adopted.** §5, §7.1, §7.2, §7.4 |
 | 64 | min | U | Assembly additions, licence statement, file naming, diode taper | **Adopted.** §4, §10, §12, §14 |
 | 65 | min | U | Missing risks (value prop, perf, drift, version, warp) | **Adopted.** §15 |
+
+## Round 3 — sign-off reviewer on PLAN v2
+**Verdict: READY for M0/M1**, on condition that C1 and C2 go into §6.2. Both were applied in v2.1.
+
+| # | Sev | Finding | Disposition in PLAN v2.1 |
+|---|---|---|---|
+| 66 | crit | Integer-offset perimeter slivers chain corner cusps into one component, which then gets removed; contact/length undefined; short thin nubs pass as cusps | **Adopted.** `classify()` drops slivers with open(R, δ) first; contacts = components of c ∩ dilate(O, ε); reach defined; cusp must lie in a corner wedge; validator reuses classifier at w on post-kerf geometry (§6.2) |
+| 67 | crit | Termination contradicted: later passes still remove; fill plugs can be thin; thicken undefined | **Adopted.** Only pass 1 removes; passes 2–4 add-only; thicken bounded by gap-safe Free region, else hard error; cascade property test (§6.2) |
+| 68 | maj | Hard gate would reject most purchased designs | **Adopted.** HARD vs ADVISORY tiers; imports report-only; geometric neck detection (§6.3) |
+| 69 | maj | SVG import unspecified | **Adopted.** §6.4 |
+| 70 | maj | No M2 nesting algorithm | **Adopted.** Skyline packer + offcut fill (§6.5) |
+| 71 | maj | Bridge formula unjustified, constant hard-coded | **Adopted.** Linear default, coupon-fitted k/p, uses bridgeSpanFactor, mass rule (§6.3) |
+| 72 | maj | Numbering inconsistent; M'_j symbol in spaced mode; binding front-frame width; glass spacers | **Adopted.** 1..N back→front everywhere; S_j; frame constraint (§5, §7.1) |
+| 73 | min | Cut-time needs an acceleration model; glue vs labels compete for the hidden band | **Adopted.** Trapezoidal model (§6.5); glue reserved first (§5) |

@@ -1,6 +1,6 @@
-# Layered Laser Art Generator — Plan v2
+# Layered Laser Art Generator — Plan v2.1
 
-Status: revised after two review rounds (5 independent reviewers). The
+Status: **signed off for M0/M1** after three review rounds (6 independent reviewers). The
 finding-by-finding outcomes are in `REVIEW_LOG.md`. Research basis:
 `RESEARCH.md`.
 
@@ -42,7 +42,7 @@ It also gives the generator a tested backbone.
 
 ## 4. Deliverables (per export)
 - **Sheet SVGs (primary).** One file per physical stock sheet, holding the parts of one **finish group** (one paint or stain colour), one `<g id="L03_mid">` per part.
-  - Named in cut order: `01_L05-FRONT_sheetA_walnut.svg`.
+  - Named in cut order: `01_L5of5-FRONT_sheetA_walnut.svg` (see §5 numbering).
   - Each file can be downloaded individually, or as a zip.
 - **Per-layer SVGs** (secondary).
 - **Accessory SVGs:** spacer kit, back panel, hanger plate, alignment jig. Small parts are nested into offcut space where possible.
@@ -75,6 +75,8 @@ It also gives the generator a tested backbone.
   - `frameLand_mm` (default 8): the hidden band behind the frame where spacers and glue go.
 - **Elements:** `{id (stable), kind, layer, protected: bool, source: generator|import|user, geometry, anchor}`. Geometry stays tagged with its element until export, so damage can be traced back to a motif.
 - **Size units:** shown in inches or mm (locale default), stored in µm.
+- **User-facing layer numbering:** **1..N from back to front** (layer 1 = back, layer N = front), used identically on scored labels, file names and the assembly sheet. Internally it is 0-based. Example file name: `01_L5of5-FRONT_sheetA_walnut.svg` (cut order first, then layer).
+- **Hidden-band allocation:** labels and glue zones compete for the same hidden band. Glue zones are reserved first (in the frame land and hidden pads), and labels go in what remains. If neither fits, it is an advisory warning.
 
 ## 6. Geometry engine
 ### 6.1 Principles
@@ -94,34 +96,49 @@ Plain morphological opening rounds every corner and erases the crisp,
 faceted and jagged edges the art needs. Instead:
 
 ```
-O  = open(A, w_e/2)
-R  = A \ O                              // candidate thin material
-for each component c of R:
-   touches = number of separate contacts between c and O
-   if touches == 0              → thin island: remove (if protected → error)
-   if touches >= 2              → neck: remove (if protected → thicken to w_e instead)
-   if touches == 1 and length(c) <= w_e
-                                → corner cusp: KEEP
-   if touches == 1 and length(c) >  w_e
-                                → thin protrusion: thicken to w_e if protected, else remove
-gap pass: same analysis on (Outline \ A) with g_e, resolving by ADDING material only
-          (fill neck gaps, thicken plugs to w_e)
-holes < holeMinArea filled; islands below islandMinArea / islandMinInscribed handled per mode
+classify(A, t):                          // shared by clean() and the validator
+  O  = open(A, t/2)
+  R  = open(A \ O, δ)                    // drop µm perimeter slivers FIRST (δ = 0.05 mm),
+                                         // otherwise they chain every corner into one component
+  for each component c of R:
+     contacts(c) = components of c ∩ dilate(O, ε)      (ε = 2 µm)
+     reach(c)    = max distance inside c from its contact set
+     cusp(c)     = |contacts| == 1  and reach(c) <= t
+                   and c lies inside the corner wedge of a vertex of A   // not a short thin nub
+     kind(c) ∈ { island(|contacts|=0), neck(≥2), cusp, protrusion(1, not cusp) }
+
+clean(A):
+  PASS 1 (may remove):    for c in classify(A, w_e): island/neck/protrusion → remove,
+                          unless protected → thicken; cusp → keep
+                          gap analysis on (Outline \ A) with g_e: narrow gap → fill
+  PASSES 2..4 (add-only): new width violations → thicken only; new gap violations → fill only;
+                          NOTHING is removed after pass 1
+  thicken(c) = (c ⊕ disk(w_e/2)) ∩ (A ∪ Free), where Free = region whose
+               addition keeps every neighbour gap ≥ g_e; if no such thickening
+               exists → hard error at c (no remove/fill alternation possible)
+  holes < holeMinArea filled; islands below islandMinArea / islandMinInscribed handled per mode
 ```
 
-- After the first removal pass, every step only adds material. The area only grows, so the loop converges. It is capped at 4 passes.
-- Convergence is not validity, so the validator still runs. Any residual violation is a **hard error** at a highlighted location.
+- Pass 1 is the only pass that removes material. Passes 2–4 only add, so area is monotone and the loop terminates. Hitting the cap is expected now and then, and it ends in a **hard error at a highlighted location**, never a silent result. A property test covers cascades.
+- Convergence is not validity, so the validator still runs.
+- The validator reuses `classify()` with threshold **w on post-kerf geometry** (not w_e). This makes it deliberately non-independent of `clean()` on cusp classification only. Golden tests cover that shared classifier separately.
 - **Damage report.** For each element e: `damage(e) = e ∩ (A_before \ A_after)`, and the symmetric for additions.
   - If damage exceeds δ on a protected element (focal motif, designed bridge, personalisation text, user override), the generator is asked to regenerate that element, or a hard error is shown.
   - Damage to non-protected elements is listed with a highlight.
   - User overrides go through the same pipeline. If DFM changed one, the UI shows a diff with accept/revert, and export stays blocked while violations remain.
 
-### 6.3 Validators (hard gate before export)
+### 6.3 Validators (tiered gate before export)
+**Tiers.**
+- **HARD** (export blocked): loose/unsupported parts, open cut paths, sheet/stack fit, labels outside hidden zones, duplicates.
+- **ADVISORY** (export allowed after the user acknowledges each one, and acknowledgements are stored in the project): width, gap, reveal, bridge strength, acute corners, density.
+
+Generated art must pass every check, including advisory. **Imported designs** run `clean()` in **report-only** mode by default, since typical purchased files have 1 mm details. Imports get **geometric neck detection** (`classify()` necks), because they carry no bridge provenance.
+
 | Check | Method |
 |---|---|
 | Min width | `erode_δ( P \ open(P, w/2) ) = ∅`, where P is the post-kerf polygon. Cusps are allowed per §6.2 |
 | Min gap | same on the complement within the outline |
-| Bridge strength | per bridge element (provenance gives span L): width ≥ w·max(1, L / (10 mm))^½ |
+| Bridge strength | per bridge (span L from provenance, or from neck geometry on imports): width ≥ w · max(1, k·L/L₀)^p. Defaults: **p = 1 (linear, out-of-plane handling loads dominate)**, L₀ = `bridgeSpanFactor` (10 mm), k = 1. k and p are fitted from the coupon's 5/15/30 mm bridge ladder. Islands heavier than a threshold (area × thickness) need ≥ 2 bridges |
 | Reveal (glued) | `erode_δ( M_{i+1} \ deflate(M_i, r) ) = ∅`, outer outline excluded |
 | Reveal (spaced) | visible set `V_i = M_i \ ∪_{j>i} M_j`; `erode_δ( V_i \ open(V_i, r/2) ) = ∅`, except edges tagged zero-reveal |
 | Connectivity | spaced: every component connected to the frame; glued: every island fully supported by the layer below |
@@ -136,6 +153,35 @@ holes < holeMinArea filled; islands below islandMinArea / islandMinInscribed han
 Error messages are written in plain language. Example: *"The bridge under
 the left bird is 1.4 mm wide after cutting; your material needs 2.0 mm.
 [Thicken] [Remove bird]"*
+
+### 6.4 SVG import (v0.5, the hardest M2 item)
+1. **Parse and normalise.**
+   - Resolve units: honour mm/in/pt width & height; for px or unitless, assume 96 DPI, with a 72 DPI toggle for Illustrator files.
+   - Apply all transforms, nested `<g>`/`<use>`, clipPaths (as booleans) and basic shapes (rect, circle, ellipse, polygon).
+   - Flatten curves at 0.01 mm. Ignore text (warn), images and gradients.
+2. **Regions from paths.**
+   - Filled shapes use their fill-rule.
+   - Stroke-only cut lines (the usual case for laser files) are turned into closed rings. Containment depth is computed by **even-odd contour nesting** to decide solid vs hole.
+   - Open paths are snapped closed within 0.2 mm, otherwise reported.
+   - Duplicate or overlapping contours are merged.
+3. **Layer detection.** Supported inputs:
+   - one file per layer (ordered by file name, re-orderable)
+   - one file with layers as top-level groups or Inkscape/Illustrator layers
+   - one file with layers spread out side by side: cluster by bounding box, then register by matching outer outlines
+
+   The user confirms the order in a thumbnail strip.
+4. **Existing frame.** Detect a common outer outline shared by all layers, then offer to keep it as the frame or replace it with the app's frame and spacers.
+5. Run `clean()` in report-only mode, plus the tiered validation (§6.3).
+
+### 6.5 Nesting (v0.5 algorithm)
+- **Rectangle skyline packer** on part bounding boxes (with an exact polygon spacing check):
+  - rotation limited to 0°/180° so grain stays aligned with `stock.grainAxis`
+  - part gap ≥ kerf + 2 mm; edge margin 5–10 mm
+  - one sheet set per finish group
+  - copies count supported
+- **Offcut filling:** small accessory parts (spacer-kit strips, jig) are packed into the free rectangles left by the skyline.
+- No-fit-polygon nesting stays deferred to M8.
+- **Cut-time estimate** uses a trapezoidal acceleration model (machine accel and max speed from the preset) over path segments, plus travel. A plain length ÷ speed estimate is 1.5–3× low on detailed diode work.
 
 ## 7. Construction
 ### 7.1 Shadow box (spaced) — v0.5 and v1
@@ -154,7 +200,8 @@ the left bird is 1.4 mm wide after cutting; your material needs 2.0 mm.
 
 - **Hidden region** (used for labels, glue, start points and later bridges):
 
-  `Hidden_i = ∪_{j>i} deflate(M'_j, d_ij · tan θ)`, with θ = 30°, where `d_ij` = Σ gaps between i and j + Σ thickness of the sheets in between.
+  `Hidden_i = ∪_{j>i} deflate(S_j, d_ij · tan θ)`, with θ = 30°, where `S_j` is the final (post-clean) material of spaced layer j, and `d_ij` = Σ gaps between i and j + Σ thickness of the sheets in between.
+- **Binding frame constraint:** the front aperture is the largest, so the front frame border is the narrowest. It must be ≥ `frameLand + d·tanθ`, where d is the depth of the deepest spacer it must hide. The glass-clearance spacers (`gaps[N-1]`) sit behind the **frame-front accessory**, whose border is ≥ the front art layer's border.
 
 - **Back panel**, **hanger plate** (doubled thickness; a single 3 mm keyhole tears out), and an optional standard-frame mode, where the art is sized to the inner dimensions of an 8×10, 11×14 or 12×12 in frame and its rabbet depth.
 
